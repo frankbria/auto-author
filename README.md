@@ -10,7 +10,7 @@
 * 🧠 **Interview-style questions** per chapter to gather detailed content
 * ✍️ **Chapter-by-chapter editing** in a clean, tabbed interface
 * \u🔁 Regeneration of TOC, prompts, and content at any stage
-* 🔐 Secure **user authentication** and profile management
+* 🔐 Secure **user authentication** with Clerk and profile management
 * 📚 Full **CRUD functionality** for books, chapters, and metadata
 * 🎤 Voice-to-text support across all input fields
 * 💾 **Auto-saving** and persistent storage of user data
@@ -25,11 +25,31 @@
 | Frontend       | Next.js (TypeScript), TailwindCSS |
 | Backend API    | FastAPI                           |
 | Database       | MongoDB (Atlas or self-hosted)    |
-| Auth           | JWT-based auth or Clerk/Auth0     |
+| Auth           | Clerk Authentication               |
 | AI Integration | OpenAI (or local LLM)             |
 | Voice Input    | Web Speech API / Whisper API      |
 
 ---
+
+## 🔐 Authentication with Clerk
+
+Auto Author uses Clerk for authentication, providing:
+
+- Secure user registration and login
+- Social login options (Google, GitHub, etc.)
+- Multi-factor authentication
+- Email verification
+- Session management across devices
+- Password reset functionality
+
+While Clerk manages authentication, we maintain a local user table in our MongoDB database that maps Clerk user IDs to our application's user entities. This approach allows us to:
+
+1. Associate user-generated content (books, chapters, etc.) with specific users
+2. Store application-specific user preferences and metadata
+3. Implement role-based permissions within our application
+4. Maintain data relationships without exposing authentication details
+
+The architecture separates authentication concerns (handled by Clerk) from application data management (handled by our backend), creating a more secure and maintainable system.
 
 ## 🧑‍💻 Getting Started (Development)
 
@@ -73,13 +93,16 @@ Create `.env` files for both frontend and backend:
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_*****
+CLERK_SECRET_KEY=sk_*****
 ```
 
 **`.env` (backend)**
 
 ```
 MONGODB_URI=mongodb://localhost:27017/auto_author
-JWT_SECRET=your_secret
+CLERK_SECRET_KEY=sk_*****
+CLERK_WEBHOOK_SECRET=whsec_*****
 OPENAI_API_KEY=sk-...
 ```
 

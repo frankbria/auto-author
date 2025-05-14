@@ -3,3 +3,9 @@ uvicorn
 pymongo
 python-dotenv
 openai
+motor
+pydantic
+requests
+python-jose[cryptography]
+python-multipart
+passlib[bcrypt]

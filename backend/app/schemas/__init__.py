@@ -1,1 +1,2 @@
-# This file is intentionally left blank.
+# Import schemas here for easier access
+from app.schemas.user import UserBase, UserResponse, UserCreate, UserUpdate, UserInDB

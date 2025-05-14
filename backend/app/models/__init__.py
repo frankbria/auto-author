@@ -1,1 +1,2 @@
-# This file is intentionally left blank.
+# Import models here for easier access
+from app.models.user import UserBase, UserCreate, UserDB, UserRead
