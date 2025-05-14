@@ -44,4 +44,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the Auto Author API!"}
+    return JSONResponse(
+        content={"message": "Welcome to the Auto Author API!"},
+        status_code=status.HTTP_200_OK,
+    )

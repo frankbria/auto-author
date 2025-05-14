@@ -1,4 +1,4 @@
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from typing import List
 
 
@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     CLERK_JWT_PUBLIC_KEY: str
     CLERK_FRONTEND_API: str
     CLERK_JWT_ALGORITHM: str = "RS256"
+    CLERK_SECRET_KEY: str = ""  # Secret key for Clerk
     CLERK_WEBHOOK_SECRET: str = ""  # Secret for validating webhooks
 
     # API Settings

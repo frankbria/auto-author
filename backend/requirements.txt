@@ -5,6 +5,8 @@ python-dotenv
 openai
 motor
 pydantic
+pydantic-settings
+pydantic[email]
 requests
 python-jose[cryptography]
 python-multipart

@@ -25,6 +25,7 @@ allow_users_and_admins = RoleChecker(["user", "admin"])
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: Dict = Depends(get_current_user)):
     """Get the current authenticated user's information"""
+    print(f"Current user: {current_user}")
     return current_user
 
 

@@ -8,4 +8,6 @@ def test_health_check(client: TestClient):
     """
     response = client.get("/")
     assert response.status_code == 200
-    assert "status" in response.json()  # Assuming the root returns a status field
+    assert "Auto Author" in response.json().get(
+        "message", ""
+    )  # Assuming the root returns a message field
