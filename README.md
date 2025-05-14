@@ -51,6 +51,11 @@ While Clerk manages authentication, we maintain a local user table in our MongoD
 
 The architecture separates authentication concerns (handled by Clerk) from application data management (handled by our backend), creating a more secure and maintainable system.
 
+For detailed documentation about our Clerk integration:
+- [Clerk Integration Guide](docs/clerk-integration-guide.md)
+- [Authentication User Guide](docs/user-guide-auth.md)
+- [Clerk Deployment Checklist](docs/clerk-deployment-checklist.md)
+
 ## 🧑‍💻 Getting Started (Development)
 
 ### Prerequisites

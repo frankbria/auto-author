@@ -169,15 +169,15 @@ We will eventually add pytest-cov to track test coverage and enforce thresholds 
 ### Running Tests
 Run all tests:
 ```bash
-poetry run pytest
+pytest
 ```
 With coverage:
 ```bash
-poetry run pytest --cov=app
+pytest --cov=app
 ```
 Or with file path filtering:
 ```bash
-poetry run pytest tests/test_routes/test_email.py
+pytest tests/test_routes/test_email.py
 ```
 
 ### Tone and Style
