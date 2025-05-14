@@ -39,42 +39,40 @@
 ## User Story 1.2: Login / Logout (with Clerk)
 
 ### Frontend Tasks
-- [ ] Implement Clerk SignIn component in login page
-- [ ] Create "Remember me" functionality using Clerk's session options
-- [ ] Design and implement navbar with login/logout state awareness
-- [ ] Build logout confirmation modal (optional)
-- [ ] Implement session recovery for returning users
-- [ ] Add loading states for authentication processes
-- [ ] Create error message displays for authentication failures
-- [ ] Set up appropriate redirects after login/logout
-- [ ] Implement automatic session refresh
-- [ ] Add visual indicators for current authentication state
+- [x] Implement Clerk SignIn component in login page
+- [X] Create "Remember me" functionality using Clerk's session options
+- [x] Design and implement navbar with login/logout state awareness
+- [x] Implement session recovery for returning users
+- [x] Add loading states for authentication processes
+- [x] Create error message displays for authentication failures
+- [x] Set up appropriate redirects after login/logout
+- [x] Implement automatic session refresh
+- [x] Add visual indicators for current authentication state
 
 ### Backend Tasks
-- [ ] Configure Clerk session management in FastAPI
-- [ ] Set up API endpoints for session validation
-- [ ] Implement session middleware for protected routes
-- [ ] Create webhook handlers for login/logout events
-- [ ] Configure session timeout settings
-- [ ] Implement "remember me" session persistence
-- [ ] Set up multi-device session management
-- [ ] Add session monitoring for security purposes
+- [x] Configure Clerk session management in FastAPI
+- [x] Set up API endpoints for session validation
+- [x] Implement session middleware for protected routes
+- [x] Create webhook handlers for login/logout events
+- [X] Configure session timeout settings
+- [X] Implement "remember me" session persistence
+- [X] Set up multi-device session management
+- [X] Add session monitoring for security purposes
 
 ### Testing Tasks
-- [ ] Test login functionality with various credentials
-- [ ] Verify logout properly terminates sessions
-- [ ] Test "remember me" persistence across browser sessions
-- [ ] Validate error handling for invalid login attempts
-- [ ] Test session timeout and renewal flows
-- [ ] Verify security measures against common attacks
-- [ ] Test multi-device login scenario behaviors
-- [ ] Validate login state preservation during navigation
+- [X] Test login functionality with various credentials
+- [X] Verify logout properly terminates sessions
+- [X] Validate error handling for invalid login attempts
+- [X] Test session timeout and renewal flows
+- [X] Verify security measures against common attacks
+- [X] Test multi-device login scenario behaviors
+- [X] Validate login state preservation during navigation
 
 ### Documentation Tasks
-- [ ] Document login/logout flows and configuration
-- [ ] Create troubleshooting guide for authentication issues
-- [ ] Document session management strategies
-- [ ] Update API documentation for authentication endpoints
+- [X] Document login/logout flows and configuration
+- [X] Create troubleshooting guide for authentication issues
+- [X] Document session management strategies
+- [X] Update API documentation for authentication endpoints
 
 
 ## User Story 1.3: User Profile CRUD
