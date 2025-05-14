@@ -4,6 +4,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import { Toaster } from '@/components/ui/toaster';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex flex-col min-h-screen">
             {/* Placeholder for future header/sidebar */}
             <div className="flex-1 flex flex-col">{children}</div>
+            <Toaster />
           </main>
         </body>
       </html>

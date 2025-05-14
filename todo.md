@@ -78,16 +78,15 @@
 ## User Story 1.3: User Profile CRUD
 
 ### Frontend Tasks
-- [ ] Create user profile page with editable fields
-- [ ] Implement form validation for profile information
-- [ ] Add avatar/profile picture upload functionality
-- [ ] Build UI for email change with verification flow
-- [ ] Create UI for password change with current password verification
-- [ ] Implement user preferences section (theme, notifications)
-- [ ] Add success/error notifications for profile updates
-- [ ] Create account deletion confirmation modal
-- [ ] Add form field validation with real-time feedback
-- [ ] Implement auto-save for profile changes
+- [X] Edit user profile page (`/frontend/src/app/profile/page.tsx`) with editable fields
+- [X] Implement form validation for profile information
+- [X] Add avatar/profile picture upload functionality
+- [X] Integrate into Clerk profile change (login, password, etc.)
+- [X] Implement user preferences section (theme, notifications)
+- [X] Add success/error notifications for profile updates
+- [X] Create account deletion confirmation modal
+- [X] Add form field validation with real-time feedback
+- [X] Implement auto-save for profile changes
 
 ### Backend Tasks
 - [ ] Create API endpoints for profile data retrieval

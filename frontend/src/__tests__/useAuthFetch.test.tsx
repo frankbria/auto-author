@@ -11,8 +11,7 @@ jest.mock('@clerk/nextjs', () => ({
 }));
 
 describe('useAuthFetch Hook', () => {  const mockToken = 'test_token_123';
-  const mockFetchResponse = { data: 'test data' };
-  const mockUrl = '/test'; // Remove the leading /api since the hook will add it
+  const mockFetchResponse = { data: 'test data' };  const mockUrl = '/test'; // This path will be appended to baseUrl in the hook
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -39,8 +38,7 @@ describe('useAuthFetch Hook', () => {  const mockToken = 'test_token_123';
     await act(async () => {
       responseData = await result.current.authFetch(mockUrl);
     });
-    
-    // Verify that fetch was called with the auth token and correct URL
+      // Verify that fetch was called with the auth token and correct URL
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/test', // The hook prepends '/api' to the path
       expect.objectContaining({
