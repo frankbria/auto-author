@@ -57,7 +57,7 @@ export default function DashboardLayout({
         {/* Footer */}
         <footer className="bg-zinc-900 border-t border-zinc-800 py-4 px-6">
           <div className="container mx-auto text-center text-zinc-500 text-sm">
-            <p>© 2025 Auto Author. All rights reserved.</p>
+            <p>© 2025 Noatak Enterprises, LLC, dba Auto Author. All rights reserved.</p>
           </div>
         </footer>
       </div>

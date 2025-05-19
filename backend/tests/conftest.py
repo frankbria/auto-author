@@ -1,7 +1,55 @@
+import app.api.dependencies as deps
+from fastapi import Request
+
+
+def fake_get_rate_limiter(limit: int = 10, window: int = 60):
+    """
+    Fake rate limiter that does nothing.
+    This is used to bypass rate limiting in tests.
+    """
+
+    async def _always_allow(request: Request):
+        return {"limit": float("inf"), "remaining": float("inf"), "reset": None}
+
+    return _always_allow
+
+
+deps.get_rate_limiter = fake_get_rate_limiter
 import pytest
+import mongomock
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from app.main import app
+from app.db import database
+from app.api.dependencies import verify_jwt_token
+
 import asyncio
+from unittest.mock import AsyncMock
+from datetime import datetime, timezone
+from app.core.security import get_current_user
+from app.api.endpoints import users as users_endpoint
+from bson import ObjectId
+
+
+class AsyncCollection:
+    def __init__(self, sync_coll):
+        self._coll = sync_coll
+
+    async def insert_one(self, doc):
+        return self._coll.insert_one(doc)
+
+    async def update_one(self, *args, **kwargs):
+        return self._coll.update_one(*args, **kwargs)
+
+    async def find_one(self, *args, **kwargs):
+        return self._coll.find_one(*args, **kwargs)
+
+    async def delete_one(self, *args, **kwargs):
+        return self._coll.delete_one(*args, **kwargs)
+
+    async def find_one_and_update(self, *args, **kwargs):
+        return self._coll.find_one_and_update(*args, **kwargs)
 
 
 @pytest.fixture(scope="session")
@@ -12,11 +60,272 @@ def client():
     return TestClient(app)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def event_loop():
     """
-    Create an event loop that can be used for asyncio tests.
+    Create a fresh event loop for each test function that can be used for asyncio tests.
+    Using function scope instead of session prevents 'Event loop is closed' errors
     """
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
+    # We need to close the loop properly to prevent 'Event loop is closed' errors in future tests
+    # But we need to make sure all pending tasks are finished first
+    pending = asyncio.all_tasks(loop)
+    for task in pending:
+        task.cancel()
+
+    # Run the loop until all tasks are done or cancelled
+    if pending:
+        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+
     loop.close()
+
+
+# Deprecated fixture: use `fake_mongo` instead
+@pytest.fixture(autouse=True)
+async def mock_db_connection():
+    """
+    Mock MongoDB database connection and collections
+    This fixture is applied to all tests automatically
+    """
+    # Mock the MongoDB client to prevent authentication errors
+    with patch("app.db.database.AsyncIOMotorClient") as mock_motor, patch(
+        "app.db.database.MongoClient"
+    ) as mock_mongo, patch(
+        "app.db.database.users_collection"
+    ) as mock_users_collection, patch(
+        "app.db.database.audit_logs_collection"
+    ) as mock_audit_collection:
+
+        # Configure necessary collection mocks
+        mock_motor.return_value = AsyncMock()
+        mock_mongo.return_value = AsyncMock()
+        mock_users_collection.update_one = AsyncMock()
+        mock_users_collection.delete_one = AsyncMock()
+        mock_users_collection.find_one = AsyncMock()
+        mock_users_collection.insert_one = AsyncMock()
+        mock_audit_collection.insert_one = AsyncMock()
+        # Create AsyncMock for all database functions used in the tests
+        with patch(
+            "app.db.database.get_user_by_clerk_id", new_callable=AsyncMock
+        ) as mock_get_user, patch(
+            "app.db.database.get_user_by_email", new_callable=AsyncMock
+        ) as mock_get_email, patch(
+            "app.db.database.create_user", new_callable=AsyncMock
+        ) as mock_create, patch(
+            "app.db.database.update_user", new_callable=AsyncMock
+        ) as mock_update, patch(
+            "app.db.database.delete_user", new_callable=AsyncMock
+        ) as mock_delete, patch(
+            "app.db.database.get_collection", new_callable=AsyncMock
+        ) as mock_collection, patch(
+            "app.db.database.create_audit_log", new_callable=AsyncMock
+        ) as mock_audit, patch(
+            "app.db.database.delete_user_books", new_callable=AsyncMock
+        ) as mock_delete_books:
+
+            # Configure default return values if needed
+            mock_audit.return_value = {
+                "id": "test_audit_log",
+                "created_at": "2023-01-01T00:00:00Z",
+            }
+
+            mock_delete_books.return_value = True
+
+            yield {
+                "get_user_by_clerk_id": mock_get_user,
+                "get_user_by_email": mock_get_email,
+                "create_user": mock_create,
+                "update_user": mock_update,
+                "delete_user": mock_delete,
+                "get_collection": mock_collection,
+                "create_audit_log": mock_audit,
+                "delete_user_books": mock_delete_books,
+            }
+
+
+@pytest.fixture(autouse=True)
+def fake_mongo(monkeypatch):
+    """
+    Every test will see database.users_collection and .audit_log_collection
+    backed by mongomock in-memory collections.
+    """
+    sync_client = mongomock.MongoClient()
+    sync_db = sync_client["test_db"]
+
+    # patch the two globals in your database module
+    monkeypatch.setattr(database, "users_collection", AsyncCollection(sync_db["users"]))
+    monkeypatch.setattr(
+        database, "audit_logs_collection", AsyncCollection(sync_db["audit_logs"])
+    )
+
+
+### Deprecated fixture: use `auth_client_factory` instead
+@pytest.fixture
+def authenticated_client(client: TestClient, test_user, monkeypatch):
+    """
+    Overrides get_current_user so that all protected endpoints
+    see `test_user` and never raise 401.
+    """
+    app: FastAPI = client.app
+
+    async def always_user():
+        return test_user
+
+    # 1) Override the dependency
+    app.dependency_overrides[get_current_user] = always_user
+
+    # 2) Optionally wrap your client to auto‑inject headers
+    class AuthenticatedClient:
+        def __init__(self, client, headers):
+            self.client = client
+            self.headers = headers
+
+        def get(self, url, **kwargs):
+            kwargs.setdefault("headers", self.headers)
+            return self.client.get(url, **kwargs)
+
+        def post(self, url, **kwargs):
+            kwargs.setdefault("headers", self.headers)
+            return self.client.post(url, **kwargs)
+
+        def put(self, url, **kwargs):
+            kwargs.setdefault("headers", self.headers)
+            return self.client.put(url, **kwargs)
+
+        def delete(self, url, **kwargs):
+            kwargs.setdefault("headers", self.headers)
+            return self.client.delete(url, **kwargs)
+
+        def patch(self, url, **kwargs):
+            kwargs.setdefault("headers", self.headers)
+            return self.client.patch(url, **kwargs)
+
+    # 3) Stub audit_request so it never talks to Mongo
+    async def noop_audit_request(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(users_endpoint, "audit_request", noop_audit_request)
+
+    fake_headers = {"Authorization": "Bearer does_not_matter"}
+    auth_client = AuthenticatedClient(client, fake_headers)
+
+    yield auth_client
+
+    # Finally: Clean up: remove our override so other tests aren’t “authed”
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def test_user():
+    return {
+        "_id": "507f1f77bcf86cd799439011",
+        "id": "507f1f77bcf86cd799439011",
+        "clerk_id": "test_clerk_id",
+        "email": "tester@example.com",
+        "first_name": "Test",
+        "last_name": "User",
+        "display_name": "Tester",
+        "avatar_url": None,
+        "bio": "I am a test user",
+        "role": "user",
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "books": [],
+        "preferences": {
+            "theme": "light",
+            "email_notifications": False,
+            "marketing_emails": False,
+        },
+    }
+
+
+@pytest.fixture
+def fake_user():
+    return {
+        "_id": "123456",
+        "id": "123456",
+        "clerk_id": "fake_clerk_id",
+        "email": "faker@example.com",
+        "first_name": "Fake",
+        "last_name": "User",
+        "display_name": "Fake User",
+        "avatar_url": None,
+        "bio": "I am a fake user",
+        "role": "user",
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "books": [],
+        "preferences": {
+            "theme": "light",
+            "email_notifications": False,
+            "marketing_emails": False,
+        },
+    }
+
+
+@pytest.fixture
+def auth_client_factory(monkeypatch, test_user) -> callable:
+    """
+    Returns a function `make_client(overrides: dict = None)`
+    that gives you a TestClient whose get_current_user
+    always returns `test_user` updated with your overrides.
+    """
+    client = TestClient(app)
+
+    def make_client(*, overrides: dict = None, auth: bool = True):
+
+        # 1) merge defaults and overrides
+        user = test_user.copy()
+        user["_id"] = ObjectId()  # brand new each time
+        user["id"] = str(user["_id"])
+        if overrides:
+            user.update(overrides)
+
+        # 2) Insert into our mongomock DB
+        database.users_collection._coll.insert_one(user)
+
+        # 3) Override the audit request
+        async def _noop_audit_request(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit_request)
+
+        if auth:
+            # 4) Stub out JWT verification to return that clerk_id
+            async def _fake_verify(token: str):
+                return {"sub": user["clerk_id"]}
+
+            import app.core.security as sec
+
+            monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
+
+        client = TestClient(app)
+
+        if auth:
+            client.headers.update({"Authorization": "Bearer aaa.bbb.ccc"})
+
+        return client
+
+    yield make_client
+    # Finally: Clean up: remove our override so other tests aren’t “authed”
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def mock_jwt_token():
+    """
+    Fixture to provide a mock JWT token for testing.
+    This token is not valid and should not be used in production.
+    """
+    return "mock.jwt.token"
+
+
+@pytest.fixture
+def invalid_jwt_token():
+    """
+    Fixture to provide an invalid JWT token for testing.
+    This token is intentionally malformed and should not be used in production.
+    """
+    return "invalid.jwt_token"

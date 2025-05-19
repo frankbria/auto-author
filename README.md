@@ -55,6 +55,8 @@ For detailed documentation about our Clerk integration:
 - [Clerk Integration Guide](docs/clerk-integration-guide.md)
 - [Authentication User Guide](docs/user-guide-auth.md)
 - [Clerk Deployment Checklist](docs/clerk-deployment-checklist.md)
+- [Profile Management Guide](docs/profile-management-guide.md)
+- [API Profile Endpoints](docs/api-profile-endpoints.md)
 
 ## 🧑‍💻 Getting Started (Development)
 
@@ -110,6 +112,32 @@ CLERK_SECRET_KEY=sk_*****
 CLERK_WEBHOOK_SECRET=whsec_*****
 OPENAI_API_KEY=sk-...
 ```
+
+---
+
+## 📚 Documentation
+
+Auto Author comes with comprehensive documentation to help you understand and use the system effectively:
+
+### Documentation Indexes
+- [Profile Documentation Index](docs/profile-documentation-index.md) - Complete index of profile-related docs
+
+### Authentication & Profile Management
+- [Clerk Integration Guide](docs/clerk-integration-guide.md) - How Clerk authentication is integrated
+- [Authentication User Guide](docs/user-guide-auth.md) - User-facing authentication guide
+- [Profile Management Guide](docs/profile-management-guide.md) - Features and usage of profile management
+- [Frontend Profile Components](docs/frontend-profile-components.md) - Technical docs for profile UI components
+- [Profile Testing Guide](docs/profile-testing-guide.md) - Testing and CI/CD for profile features
+- [Auth Troubleshooting](docs/auth-troubleshooting.md) - Solutions for common authentication issues
+
+### API References
+- [API Authentication Endpoints](docs/api-auth-endpoints.md) - Authentication API documentation
+- [API Profile Endpoints](docs/api-profile-endpoints.md) - Profile management API documentation
+
+### Technical Guides
+- [Clerk Deployment Checklist](docs/clerk-deployment-checklist.md) - Deployment considerations
+- [Session Management](docs/session-management.md) - How user sessions are managed
+- [Login/Logout Flows](docs/login-logout-flows.md) - Detailed authentication flows
 
 ---
 

@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import useOptimizedClerkImage from '@/hooks/useOptimizedClerkImage';
+import useProfileApi from '@/hooks/useProfileApi';
+import Image from 'next/image';
 import { 
   Form, 
   FormField, 
@@ -39,8 +41,10 @@ export default function UserProfile() {
   const router = useRouter();
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { getOptimizedImageUrl } = useOptimizedClerkImage();
+  const { updateUserProfile, deleteUserAccount } = useProfileApi();
   
   // Initialize form with default values
   const form = useForm<ProfileFormValues>({
@@ -79,6 +83,7 @@ export default function UserProfile() {
       
       try {
         const currentMetadata = (user.unsafeMetadata as Record<string, unknown>) || {};
+        
         // Update user metadata via Clerk
         await user.update({
           firstName: data.firstName,
@@ -92,6 +97,42 @@ export default function UserProfile() {
           }
         });
         
+        // Only update backend if we have enough data
+        if ((data.firstName || data.lastName || data.bio || 
+            data.theme || data.emailNotifications !== undefined || 
+            data.marketingEmails !== undefined)) {          // Convert to backend format
+          const backendData: {
+            first_name?: string;
+            last_name?: string;
+            bio?: string;
+            preferences?: {
+              theme?: "light" | "dark" | "system";
+              email_notifications?: boolean;
+              marketing_emails?: boolean;
+            };
+          } = {};
+          
+          if (data.firstName) backendData.first_name = data.firstName;
+          if (data.lastName) backendData.last_name = data.lastName;
+          if (data.bio) backendData.bio = data.bio;
+          
+          // Only add preferences if we have any preference data
+          if (data.theme || data.emailNotifications !== undefined || data.marketingEmails !== undefined) {
+            backendData.preferences = {};
+            
+            if (data.theme) backendData.preferences.theme = data.theme;
+            if (data.emailNotifications !== undefined) {
+              backendData.preferences.email_notifications = data.emailNotifications;
+            }
+            if (data.marketingEmails !== undefined) {
+              backendData.preferences.marketing_emails = data.marketingEmails;
+            }
+          }
+          
+          // Update backend
+          await updateUserProfile(backendData);
+        }
+        
         toast.success({
           description: "Profile updated successfully"
         });
@@ -102,11 +143,13 @@ export default function UserProfile() {
         });
       }
     }, 1000)
-  ).current;  // Handle form submission
+  ).current;// Handle form submission
   const onSubmit = async (data: ProfileFormValues) => {
     try {
+      setIsSubmitting(true);
+      
+      // Update in Clerk
       const currentMetadata = (user?.unsafeMetadata as Record<string, unknown>) || {};
-      // Update name and metadata in Clerk
       await user?.update({
         firstName: data.firstName,
         lastName: data.lastName,
@@ -119,6 +162,18 @@ export default function UserProfile() {
         }
       });
       
+      // Update in our backend
+      await updateUserProfile({
+        first_name: data.firstName,
+        last_name: data.lastName,
+        bio: data.bio,
+        preferences: {
+          theme: data.theme,
+          email_notifications: data.emailNotifications,
+          marketing_emails: data.marketingEmails
+        }
+      });
+      
       toast.success({
         description: "Profile updated successfully"
       });
@@ -127,6 +182,8 @@ export default function UserProfile() {
       toast.error({
         description: "Failed to update profile. Please try again."
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
     // Handle individual field changes for auto-save
@@ -165,16 +222,16 @@ export default function UserProfile() {
       setIsUploading(false);
     }
   };
-  
-  // Handle account deletion
+    // Handle account deletion
   const handleAccountDeletion = async () => {
     try {
-      // Sign out and perform additional cleanup if needed
-      await signOut();
+      setIsSubmitting(true);
       
-      // In a real implementation, you'd want to make an API call to your backend
-      // to delete user data before or after the Clerk sign out
-      // await fetch('/api/users/me', { method: 'DELETE' });
+      // Delete account in our backend
+      await deleteUserAccount();
+      
+      // Sign out from Clerk
+      await signOut();
       
       toast.success({
         description: "Account deleted successfully"
@@ -187,6 +244,7 @@ export default function UserProfile() {
       });
     } finally {
       setIsDeleteModalOpen(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -210,13 +268,17 @@ export default function UserProfile() {
                     className="relative flex w-24 h-24 shrink-0 overflow-hidden rounded-full border-2 border-indigo-500"
                     style={{ width: '96px', height: '96px' }}
                   >
-                    <img 
-                      src={getOptimizedImageUrl(user.imageUrl, 96)} 
-                      alt={user.fullName || "User"} 
+                    <Image
+                      src={getOptimizedImageUrl(user.imageUrl, 96)}
+                      alt={user.fullName || "User"}
+                      width={96}
+                      height={96}
                       className="h-full w-full object-cover"
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      priority
                     />
-                  </div>                  <button 
+                  </div>
+                  <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     className="absolute bottom-0 right-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-2 z-10"
@@ -324,9 +386,13 @@ export default function UserProfile() {
                   )}
                 />
               </div>
-              
-              <Button type="submit" className="mb-2">
-                Save Changes
+                <Button type="submit" className="mb-2" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Saving...
+                  </div>
+                ) : "Save Changes"}
               </Button>
               <p className="text-xs text-zinc-500">Changes are saved automatically as you type</p>
             </div>
@@ -446,8 +512,14 @@ export default function UserProfile() {
             </Button>            <Button
               variant="destructive"
               onClick={handleAccountDeletion}
+              disabled={isSubmitting}
             >
-              Delete Account
+              {isSubmitting ? (
+                <div className="flex items-center">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Deleting...
+                </div>
+              ) : "Delete Account"}
             </Button>
           </DialogFooter>
         </DialogContent>

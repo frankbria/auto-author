@@ -2,6 +2,12 @@
 
 This guide explains how to register, sign in, and manage your account in Auto Author.
 
+## Related Documentation
+
+- [Profile Management Guide](profile-management-guide.md) - Complete guide to managing your profile
+- [Auth Troubleshooting](auth-troubleshooting.md) - Solutions for common authentication issues
+- [Login/Logout Flows](login-logout-flows.md) - Detailed authentication flows
+
 ## Table of Contents
 
 1. [Registration](#registration)
@@ -79,6 +85,8 @@ Access profile settings through the user menu in the top-right corner:
    - Bio
    - Email address (requires verification)
    - Password
+
+For detailed information on profile management features and options, please refer to our comprehensive [Profile Management Guide](profile-management-guide.md).
 
 ### Account Security
 

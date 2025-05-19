@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import useOptimizedClerkImage from '@/hooks/useOptimizedClerkImage';
 
@@ -57,10 +58,11 @@ export function StyledAvatar({
 
   return (
     <div style={containerStyles} className={`styled-avatar ${container} rounded-full border-2 border-indigo-500`}>
-      {imageUrl ? (
-        <img 
-          src={getOptimizedImageUrl(imageUrl, pixels)} 
-          alt={fullName || "User"} 
+        <Image
+          src={getOptimizedImageUrl(imageUrl, pixels)}
+          alt={fullName || "User"}
+          width={pixels}
+          height={pixels}
           style={imageStyles}
         />
       ) : (
@@ -76,7 +78,6 @@ export function StyledAvatar({
         }}>
           {firstName?.[0]}{lastName?.[0]}
         </div>
-      )}
     </div>
   );
 }

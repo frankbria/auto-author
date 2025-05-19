@@ -3,6 +3,14 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, EmailStr
 
 
+class UserPreferences(BaseModel):
+    """User preferences schema"""
+
+    theme: str = "dark"  # light, dark, system
+    email_notifications: bool = True
+    marketing_emails: bool = False
+
+
 class UserBase(BaseModel):
     """Base Pydantic schema for user data"""
 
@@ -11,20 +19,24 @@ class UserBase(BaseModel):
     last_name: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    preferences: Optional[UserPreferences] = None
 
 
 class UserResponse(UserBase):
     """Schema for user data returned from API"""
 
-    id: str
+    id: Optional[str] = None
     clerk_id: str
-    created_at: datetime
-    updated_at: datetime
-    role: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    role: str = "user"
     books: List[str] = []
+    preferences: Optional[UserPreferences] = Field(default_factory=UserPreferences)
 
     class Config:
         orm_mode = True
+        allow_population_by_field_name = True
 
 
 class UserCreate(UserBase):
@@ -55,6 +67,8 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    preferences: Optional[UserPreferences] = None
     metadata: Optional[Dict[str, Any]] = None
     role: Optional[str] = None
 
@@ -66,6 +80,12 @@ class UserUpdate(BaseModel):
                 "last_name": "Name",
                 "display_name": "Updated Name",
                 "avatar_url": "https://example.com/new-avatar.jpg",
+                "bio": "Author and educator with 10+ years experience",
+                "preferences": {
+                    "theme": "dark",
+                    "email_notifications": True,
+                    "marketing_emails": False,
+                },
                 "metadata": {"preferences": {"theme": "dark"}},
                 "role": "admin",
             }

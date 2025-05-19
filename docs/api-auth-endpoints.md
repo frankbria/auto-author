@@ -14,6 +14,13 @@ Auto Author's API uses JWT-based authentication powered by Clerk. All protected 
 4. Backend validates token using Clerk's public key
 5. Backend permits or denies access based on token validity and permissions
 
+## Related Documentation
+
+- [API Profile Endpoints](api-profile-endpoints.md) - Profile management API documentation
+- [Authentication User Guide](user-guide-auth.md) - User-facing authentication guide
+- [Profile Management Guide](profile-management-guide.md) - Features and usage of profile management
+- [Clerk Integration Guide](clerk-integration-guide.md) - Technical details of Clerk integration
+
 ## Base URL
 
 ```

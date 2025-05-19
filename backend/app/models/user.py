@@ -18,6 +18,14 @@ class PyObjectId(str):
         return str(v)
 
 
+class UserPreferences(BaseModel):
+    """User preferences model"""
+
+    theme: str = "dark"  # light, dark, system
+    email_notifications: bool = True
+    marketing_emails: bool = False
+
+
 class UserBase(BaseModel):
     """Base user model with common fields"""
 
@@ -27,6 +35,8 @@ class UserBase(BaseModel):
     last_name: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    preferences: UserPreferences = Field(default_factory=UserPreferences)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     role: str = "user"  # Default role
 

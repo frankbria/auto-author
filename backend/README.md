@@ -48,6 +48,15 @@ uvicorn app.main:app --reload
 
 This will start the server at `http://127.0.0.1:8000`. You can access the interactive API documentation at `http://127.0.0.1:8000/docs`.
 
+## API Documentation
+
+For detailed API documentation, please refer to:
+
+- [API Authentication Endpoints](../docs/api-auth-endpoints.md) - Authentication API documentation
+- [API Profile Endpoints](../docs/api-profile-endpoints.md) - Profile management API documentation
+
+These documents provide comprehensive information about available endpoints, request/response formats, and authentication requirements.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue for any suggestions or improvements.
