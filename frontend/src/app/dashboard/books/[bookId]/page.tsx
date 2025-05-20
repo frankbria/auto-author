@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import bookClient from '@/lib/api/bookClient';
 import { BookProject } from '@/components/BookCard';
+import * as React from 'react';
 
 // Define types for book data
 type Chapter = {
@@ -59,17 +60,20 @@ const SAMPLE_CHAPTERS: Chapter[] = [
   }
 ];
 
-export default function BookPage({ params }: { params: { bookId: string } }) {
+export default function BookPage({ params }: { params: Promise<{ bookId: string }> }) {
   const router = useRouter();
   const [book, setBook] = useState<BookDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Unwrap params using React.use (Next.js 15+)
+  const { bookId } = React.use(params);
   
   useEffect(() => {
     setIsLoading(true);
     
     // Fetch book details
-    bookClient.getBook(params.bookId)
+    bookClient.getBook(bookId)
       .then((bookData: BookProject) => {
         // Enhance the book data with chapters
         // In a real app, we would fetch chapters from API
@@ -87,7 +91,7 @@ export default function BookPage({ params }: { params: { bookId: string } }) {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [params.bookId]);
+  }, [bookId]);
     const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
@@ -106,7 +110,7 @@ export default function BookPage({ params }: { params: { bookId: string } }) {
   
   const handleEditChapter = (chapterId: string) => {
     // Navigate to chapter edit page
-    router.push(`/dashboard/books/${params.bookId}/chapters/${chapterId}`);
+    router.push(`/dashboard/books/${bookId}/chapters/${chapterId}`);
   };
   
   // Show loading state

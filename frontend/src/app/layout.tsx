@@ -5,6 +5,7 @@ import { dark } from '@clerk/themes';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { SonnerProvider } from '@/components/ui/sonner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {/* Placeholder for future header/sidebar */}
             <div className="flex-1 flex flex-col">{children}</div>
             <Toaster />
+            <SonnerProvider />
           </main>
         </body>
       </html>

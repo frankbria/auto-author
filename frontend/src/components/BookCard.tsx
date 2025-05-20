@@ -11,6 +11,9 @@ export type BookProject = {
   lastEdited: string;
   progress: number;
   chapters: number;
+  subtitle?: string;  // New field
+  genre?: string;     // New field
+  targetAudience?: string; // New field
 };
 
 type BookCardProps = {
@@ -37,6 +40,9 @@ export default function BookCard({ book, onClick }: BookCardProps) {
       router.push(`/dashboard/books/${book.id}`);
     }
   };
+  
+  // Show a different badge for new books with no chapters
+  const isNewBook = book.chapters === 0;
 
   return (
     <Card 
@@ -48,8 +54,7 @@ export default function BookCard({ book, onClick }: BookCardProps) {
           {book.title}
         </CardTitle>
       </div>
-      
-      <CardContent>
+        <CardContent>
         {book.description && (
           <p className="text-zinc-400 text-sm mb-3 line-clamp-2" title={book.description}>
             {book.description}
@@ -59,21 +64,35 @@ export default function BookCard({ book, onClick }: BookCardProps) {
         <div className="flex items-center text-sm text-zinc-400 mb-4">
           <span>Last edited {formatDate(book.lastEdited)}</span>
           <span className="mx-2">•</span>
-          <span>{book.chapters} chapters</span>
+          <span>
+            {book.chapters === 0 ? (
+              <span className="text-indigo-400">New</span>
+            ) : (
+              `${book.chapters} chapters`
+            )}
+          </span>
         </div>
         
-        <div className="mb-4">
-          <div className="w-full bg-zinc-700 rounded-full h-2">
-            <div 
-              className="bg-indigo-600 h-2 rounded-full" 
-              style={{ width: `${book.progress}%` }}
-            ></div>
+        {book.chapters === 0 ? (
+          <div className="bg-indigo-900/20 border border-indigo-800/50 rounded-md p-3 mb-4">
+            <p className="text-indigo-300 text-sm font-medium">
+              Ready to start writing! Click below to begin creating your book content.
+            </p>
           </div>
-          <div className="flex justify-between mt-1 text-sm text-zinc-400">
-            <span>Progress</span>
-            <span>{book.progress}%</span>
+        ) : (
+          <div className="mb-4">
+            <div className="w-full bg-zinc-700 rounded-full h-2">
+              <div 
+                className="bg-indigo-600 h-2 rounded-full" 
+                style={{ width: `${book.progress}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between mt-1 text-sm text-zinc-400">
+              <span>Progress</span>
+              <span>{book.progress}%</span>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
       
       <CardFooter className="px-5 pt-0">

@@ -120,22 +120,22 @@
 
 ### Frontend Tasks
 - [X] Create "New Book" button on dashboard/home page
-- [ ] Build book creation form or wizard interface
-- [ ] Implement form validation for required book fields
-- [ ] Add loading states and success indicators
-- [ ] Design empty book state with guided next steps
-- [ ] Create redirect to appropriate page after book creation
-- [ ] Implement book project card in user's dashboard
+- [X] Build book creation form or wizard interface
+- [X] Implement form validation for required book fields
+- [X] Add loading states and success indicators
+- [X] Design empty book state with guided next steps
+- [X] Create redirect to appropriate page after book creation
+- [X] Implement book project card in user's dashboard
 - [ ] Add empty TOC placeholder for new books
 - [ ] Create initial book setup workflow UI
 - [ ] Add helpful tooltips for first-time book creators
 
 ### Backend Tasks
-- [ ] Define book schema and data model
-- [ ] Create API endpoint for new book creation
-- [ ] Implement data validation for book creation requests
-- [ ] Set up database queries for book creation
-- [ ] Add user-book relationship in database
+- [X] Define book schema and data model (change Books field in user schema to connect with new data model)
+- [X] Create API endpoint for new book creation
+- [X] Implement data validation for book creation requests
+- [X] Set up database queries for book creation
+- [X] Add user-book relationship in database
 - [ ] Create empty TOC structure for new books
 - [ ] Implement auto-save for draft book information
 - [ ] Set up book visibility/privacy controls

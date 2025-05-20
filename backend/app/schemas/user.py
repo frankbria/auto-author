@@ -31,7 +31,7 @@ class UserResponse(UserBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     role: str = "user"
-    books: List[str] = []
+    book_ids: List[str] = []
     preferences: Optional[UserPreferences] = Field(default_factory=UserPreferences)
 
     class Config:

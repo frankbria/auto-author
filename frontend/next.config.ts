@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Enable SWC minification and optimization
-  swcMinify: true,
+  // swcMinify: true,
   
   // Explicitly enable SWC compilation
   compiler: {

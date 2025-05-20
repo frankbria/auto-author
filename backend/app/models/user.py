@@ -53,7 +53,9 @@ class UserDB(UserBase):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    books: List[str] = Field(default_factory=list)
+    book_ids: List[str] = Field(
+        default_factory=list
+    )  # Store book IDs instead of direct references
     is_active: bool = True
 
     class Config:
@@ -69,7 +71,7 @@ class UserRead(UserBase):
     id: str
     created_at: datetime
     updated_at: datetime
-    books: List[str] = []
+    book_ids: List[str] = []
 
     class Config:
         orm_mode = True

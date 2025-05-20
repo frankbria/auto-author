@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import users, webhooks
+from app.api.endpoints import users, webhooks, books
 
 # Main router
 router = APIRouter()
@@ -7,6 +7,7 @@ router = APIRouter()
 # Include sub-routers
 router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
+router.include_router(books.router, prefix="/books", tags=["books"])
 
 
 @router.get("/")
