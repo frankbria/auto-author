@@ -43,7 +43,7 @@ async def verify_jwt_token(token: str) -> Dict[str, Any]:
         # Use the JWKS (JSON Web Key Set) to verify the signature
         payload = jwt.decode(
             token,
-            settings.CLERK_JWT_PUBLIC_KEY,
+            settings.clerk_jwt_public_key_pem,
             algorithms=[settings.CLERK_JWT_ALGORITHM],
             audience="example.com",  # Update with your domain
             options={"verify_signature": True},

@@ -7,11 +7,14 @@ import { BookProject } from '@/components/BookCard';
  * This would be expanded with more operations and proper authentication
  * as the backend is developed.
  */
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
 export class BookClient {
   private baseUrl: string;
   private authToken?: string;
   
-  constructor(baseUrl = '/api') {
+  constructor(baseUrl = API_BASE_URL) {
     this.baseUrl = baseUrl;
   }
   
@@ -41,209 +44,90 @@ export class BookClient {
    * Fetch all books for the current user
    */
   public async getUserBooks(): Promise<BookProject[]> {
-    // This is a placeholder for the real API call
-    // For now, return mock data with a delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    return [
-      { 
-        id: 'project-1', 
-        title: 'The Complete Guide to Machine Learning',
-        description: 'A comprehensive overview of ML concepts, algorithms, and practical applications.',
-        lastEdited: '2025-05-12T14:30:00Z',
-        progress: 35,
-        chapters: 12
-      },
-      { 
-        id: 'project-2', 
-        title: 'Understanding Modern Philosophy',
-        description: 'Exploring philosophical ideas from the Enlightenment to contemporary thought.',
-        lastEdited: '2025-05-10T09:15:00Z',
-        progress: 62,
-        chapters: 8
-      },
-      { 
-        id: 'project-3', 
-        title: 'History of Ancient Civilizations',
-        description: 'A journey through the great ancient civilizations and their lasting impact.',
-        lastEdited: '2025-05-08T16:45:00Z',
-        progress: 15,
-        chapters: 15
-      }
-    ];
-    
-    // Real implementation would be:
-    // const response = await fetch(`${this.baseUrl}/books`, {
-    //   headers: this.getHeaders()
-    // });
-    // 
-    // if (!response.ok) {
-    //   throw new Error(`Failed to fetch books: ${response.status}`);
-    // }
-    // 
-    // return response.json();
+    const response = await fetch(`${this.baseUrl}/books`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch books: ${response.status}`);
+    }
+    return response.json();
   }
-  
+
   /**
    * Fetch a single book by ID
    */
   public async getBook(bookId: string): Promise<BookProject> {
-    // This is a placeholder for the real API call
-    // For now, return mock data with a delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const mockBooks = [
-      { 
-        id: 'project-1', 
-        title: 'The Complete Guide to Machine Learning',
-        description: 'A comprehensive overview of ML concepts, algorithms, and practical applications.',
-        lastEdited: '2025-05-12T14:30:00Z',
-        progress: 35,
-        chapters: 12
-      },
-      { 
-        id: 'project-2', 
-        title: 'Understanding Modern Philosophy',
-        description: 'Exploring philosophical ideas from the Enlightenment to contemporary thought.',
-        lastEdited: '2025-05-10T09:15:00Z',
-        progress: 62,
-        chapters: 8
-      },
-      { 
-        id: 'project-3', 
-        title: 'History of Ancient Civilizations',
-        description: 'A journey through the great ancient civilizations and their lasting impact.',
-        lastEdited: '2025-05-08T16:45:00Z',
-        progress: 15,
-        chapters: 15
+    const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('You are not authorized to view this book. Please check your login or permissions.');
       }
-    ];
-    
-    const book = mockBooks.find(book => book.id === bookId);
-    
-    if (!book) {
-      throw new Error(`Book not found with ID: ${bookId}`);
+      throw new Error(`Failed to fetch book: ${response.status}`);
     }
-    
-    return book;
-    
-    // Real implementation would be:
-    // const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
-    //   headers: this.getHeaders()
-    // });
-    // 
-    // if (!response.ok) {
-    //   throw new Error(`Failed to fetch book: ${response.status}`);
-    // }
-    // 
-    // return response.json();
+    return response.json();
   }
-    /**
+
+  /**
    * Create a new book
    */
-  public async createBook(bookData: { 
-    title: string; 
+  public async createBook(bookData: {
+    title: string;
     subtitle?: string;
     description?: string;
     genre?: string;
-    targetAudience?: string;
+    target_audience?: string;
+    cover_image_url?: string;
   }): Promise<BookProject> {
-    try {
-      // Try to use the real API endpoint first
-      const response = await fetch(`${this.baseUrl}/v1/books`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(bookData)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        return {
-          id: data.id,
-          title: data.title,
-          description: data.description,
-          lastEdited: data.updated_at || new Date().toISOString(),
-          progress: 0,
-          chapters: data.toc_items?.length || 0
-        };
-      }
-      
-      // Fallback to mock data if API is not available
-      console.warn('Failed to create book using API, using mock data instead');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      return {
-        id: `project-${Date.now()}`,
-        title: bookData.title,
-        description: bookData.description,
-        lastEdited: new Date().toISOString(),
-        progress: 0,
-        chapters: 0
-      };
-    } catch (error) {
-      console.error('Error creating book:', error);
-      
-      // Fallback to mock data
-      return {
-        id: `project-${Date.now()}`,
-        title: bookData.title,
-        description: bookData.description,
-        lastEdited: new Date().toISOString(),
-        progress: 0,
-        chapters: 0
-      };
+    const response = await fetch(`${this.baseUrl}/books`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(bookData),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create book: ${response.status} ${error}`);
     }
+    return response.json();
   }
-  
+
   /**
    * Update an existing book
    */
   public async updateBook(
-    bookId: string, 
-    bookData: { title?: string; description?: string }
+    bookId: string,
+    bookData: { title?: string; description?: string; subtitle?: string; genre?: string; target_audience?: string; cover_image_url?: string }
   ): Promise<BookProject> {
-    // This is a placeholder for the real API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    return {
-      id: bookId,
-      title: bookData.title || 'Updated Book',
-      description: bookData.description,
-      lastEdited: new Date().toISOString(),
-      progress: 10,
-      chapters: 2
-    };
-    
-    // Real implementation would be:
-    // const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
-    //   method: 'PUT',
-    //   headers: this.getHeaders(),
-    //   body: JSON.stringify(bookData)
-    // });
-    // 
-    // if (!response.ok) {
-    //   throw new Error(`Failed to update book: ${response.status}`);
-    // }
-    // 
-    // return response.json();
+    const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(bookData),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to update book: ${response.status} ${error}`);
+    }
+    return response.json();
   }
-  
+
   /**
    * Delete a book by ID
    */
   public async deleteBook(bookId: string): Promise<void> {
-    // This is a placeholder for the real API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Real implementation would be:
-    // const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
-    //   method: 'DELETE',
-    //   headers: this.getHeaders()
-    // });
-    // 
-    // if (!response.ok) {
-    //   throw new Error(`Failed to delete book: ${response.status}`);
-    // }
+    const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to delete book: ${response.status} ${error}`);
+    }
   }
 }
 

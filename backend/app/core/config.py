@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     CLERK_API_KEY: str
     CLERK_JWT_PUBLIC_KEY: str
     CLERK_FRONTEND_API: str
+    CLERK_BACKEND_API: str
     CLERK_JWT_ALGORITHM: str = "RS256"
     CLERK_SECRET_KEY: str = ""  # Secret key for Clerk
     CLERK_WEBHOOK_SECRET: str = ""  # Secret for validating webhooks
@@ -18,6 +19,10 @@ class Settings(BaseSettings):
     # API Settings
     API_V1_PREFIX: str = "/api/v1"
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+
+    @property
+    def clerk_jwt_public_key_pem(self):
+        return self.CLERK_JWT_PUBLIC_KEY.replace("\\n", "\n")
 
     class Config:
         env_file = ".env"

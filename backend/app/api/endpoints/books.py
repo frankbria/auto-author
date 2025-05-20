@@ -36,17 +36,17 @@ async def create_new_book(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
-    
+
     # Create book data dictionary
-    book_data = book.dict()
-    
+    book_data = book.model_dump()
+
     # Create the book in the database
     try:
         new_book = await create_book(
             book_data=book_data,
             user_clerk_id=current_user.get("clerk_id")
         )
-        
+
         # Log the book creation
         await audit_request(
             request=request,
@@ -56,13 +56,13 @@ async def create_new_book(
             target_id=str(new_book.get("_id")),
             metadata={"title": book_data.get("title")}
         )
-        
+
         # Convert ObjectId to str for the response
         if "_id" in new_book:
             new_book["id"] = str(new_book["_id"])
-        
+
         return new_book
-    
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -78,6 +78,7 @@ async def get_user_books(
     current_user: Dict = Depends(get_current_user),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=20, window=60)),
 ):
+
     """Get all books for the current user"""
     try:
         books = await get_books_by_user(
@@ -85,14 +86,14 @@ async def get_user_books(
             skip=skip,
             limit=limit
         )
-        
+
         # Convert ObjectId to str for all books
         for book in books:
             if "_id" in book:
                 book["id"] = str(book["_id"])
-        
+
         return books
-    
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -179,31 +180,32 @@ async def update_book_details(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid book ID format",
             )
-        
+
         # Get only the fields that were provided
         update_data = {k: v for k, v in book_update.dict().items() if v is not None}
-        
+
         # Add updated_at timestamp
         update_data["updated_at"] = datetime.utcnow()
-        
+
         # Update the book
         updated_book = await update_book(
             book_id=book_id,
             book_data=update_data,
             user_clerk_id=current_user.get("clerk_id")
         )
-        
+
         # Check if book was found and updated
         if not updated_book:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Book not found or you don't have permission to update it",
             )
-        
+
         # Convert ObjectId to str
         if "_id" in updated_book:
             updated_book["id"] = str(updated_book["_id"])
-        
+            del updated_book["_id"]  # Remove raw ObjectId for JSON serialization
+
         # Log the book update
         await audit_request(
             request=request,
@@ -211,18 +213,127 @@ async def update_book_details(
             action="book_update",
             resource_type="book",
             target_id=book_id,
-            metadata={"updated_fields": list(update_data.keys())}
         )
-        
-        return updated_book
-    
+
+        # Fetch the full book after update to ensure all fields are present
+        full_book = await get_book_by_id(book_id)
+        if not full_book:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Book not found after update",
+            )
+        if "_id" in full_book:
+            full_book["id"] = str(full_book["_id"])
+            del full_book["_id"]
+        # Ensure required fields with defaults are present
+        if "toc_items" not in full_book:
+            full_book["toc_items"] = []
+        if "published" not in full_book:
+            full_book["published"] = False
+        if "collaborators" not in full_book:
+            full_book["collaborators"] = []
+
+        try:
+            return BookResponse.model_validate(full_book)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"BookResponse parse error: {str(e)}",
+            )
+
     except HTTPException:
         raise
-    
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update book: {str(e)}",
+        )
+
+
+@router.patch("/{book_id}", response_model=BookResponse)
+async def patch_book_details(
+    book_id: str,
+    book_update: BookUpdate,
+    request: Request,
+    current_user: Dict = Depends(get_current_user),
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=20, window=60)),
+):
+    """Partially update a book's details (PATCH)"""
+    try:
+        # Validate book_id format
+        try:
+            ObjectId(book_id)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid book ID format",
+            )
+
+        # Only include provided fields
+        update_data = {
+            k: v
+            for k, v in book_update.dict(exclude_unset=True).items()
+            if v is not None
+        }
+        update_data["updated_at"] = datetime.utcnow()
+
+        updated_book = await update_book(
+            book_id=book_id,
+            book_data=update_data,
+            user_clerk_id=current_user.get("clerk_id"),
+        )
+
+        if not updated_book:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Book not found or you don't have permission to update it",
+            )
+
+        if "_id" in updated_book:
+            updated_book["id"] = str(updated_book["_id"])
+            del updated_book["_id"]  # Remove raw ObjectId for JSON serialization
+
+        await audit_request(
+            request=request,
+            current_user=current_user,
+            action="book_patch_update",
+            resource_type="book",
+            target_id=book_id,
+        )
+
+        # Fetch the full book after update to ensure all fields are present
+        full_book = await get_book_by_id(book_id)
+        if not full_book:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Book not found after update",
+            )
+        if "_id" in full_book:
+            full_book["id"] = str(full_book["_id"])
+            del full_book["_id"]
+        # Ensure required fields with defaults are present
+        if "toc_items" not in full_book:
+            full_book["toc_items"] = []
+        if "published" not in full_book:
+            full_book["published"] = False
+        if "collaborators" not in full_book:
+            full_book["collaborators"] = []
+
+        try:
+            return BookResponse.parse_obj(full_book)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"BookResponse parse error: {str(e)}",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to patch update book: {str(e)}",
         )
 
 

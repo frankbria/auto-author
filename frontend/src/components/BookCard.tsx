@@ -8,12 +8,17 @@ export type BookProject = {
   id: string;
   title: string;
   description?: string;
-  lastEdited: string;
-  progress: number;
-  chapters: number;
-  subtitle?: string;  // New field
-  genre?: string;     // New field
-  targetAudience?: string; // New field
+  subtitle?: string;
+  genre?: string;
+  target_audience?: string;
+  cover_image_url?: string;
+  created_at?: string;
+  updated_at?: string;
+  published?: boolean;
+  collaborators?: Record<string, unknown>[];
+  owner_id?: string;
+  chapters: number; // computed from toc_items.length
+  progress: number; // computed
 };
 
 type BookCardProps = {
@@ -41,9 +46,6 @@ export default function BookCard({ book, onClick }: BookCardProps) {
     }
   };
   
-  // Show a different badge for new books with no chapters
-  const isNewBook = book.chapters === 0;
-
   return (
     <Card 
       className="w-[350px] bg-zinc-800 border border-zinc-700 hover:border-indigo-500 transition cursor-pointer"
@@ -62,7 +64,7 @@ export default function BookCard({ book, onClick }: BookCardProps) {
         )}
         
         <div className="flex items-center text-sm text-zinc-400 mb-4">
-          <span>Last edited {formatDate(book.lastEdited)}</span>
+          <span>Last edited {formatDate(book.updated_at ?? book.created_at ?? '')}</span>
           <span className="mx-2">•</span>
           <span>
             {book.chapters === 0 ? (

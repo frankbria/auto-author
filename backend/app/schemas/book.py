@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, validator
 from app.schemas.user import UserResponse
@@ -95,7 +95,7 @@ class CollaboratorSchema(BaseModel):
 
     user_id: str
     role: str = "viewer"  # Options: "viewer", "editor", "co-author"
-    added_at: datetime = Field(default_factory=datetime.utcnow)
+    added_at: datetime = Field(default_factory=datetime.now(timezone.utc))
 
 
 class BookResponse(BookBase):

@@ -69,30 +69,28 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
       subtitle: '',
       description: '',
       genre: '',
-      targetAudience: '',
+      target_audience: '',
+      cover_image_url: '',
     },
   });
 
   const onSubmit = async (data: BookFormData) => {
     try {
       setIsSubmitting(true);
-      
       const book = await bookClient.createBook({
         title: data.title,
         subtitle: data.subtitle,
         description: data.description,
         genre: data.genre,
-        targetAudience: data.targetAudience,
+        targetAudience: data.target_audience, // pass as targetAudience for API compatibility
+        cover_image_url: data.cover_image_url,
       });
-      
       toast.success('Book created successfully!');
       form.reset();
       onOpenChange(false);
-      
       if (onSuccess) {
         onSuccess(book.id);
       } else {
-        // Redirect to the book page
         router.push(`/dashboard/books/${book.id}`);
       }
     } catch (error) {
@@ -173,6 +171,28 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="cover_image_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-foreground dark:text-zinc-200">Cover Image URL</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="https://example.com/cover.jpg" 
+                      className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100" 
+                      {...field} 
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormDescription className="text-muted-foreground dark:text-zinc-500">
+                    Optional: Add a URL to your book&apos;s cover image.
+                  </FormDescription>
+                  <FormMessage className="text-destructive dark:text-red-400" />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -205,7 +225,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
 
               <FormField
                 control={form.control}
-                name="targetAudience"
+                name="target_audience"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-foreground dark:text-zinc-200">Target Audience</FormLabel>

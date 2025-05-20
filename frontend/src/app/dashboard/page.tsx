@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { PlusIcon, BookIcon } from 'lucide-react';
 import BookCard, { BookProject } from '@/components/BookCard';
@@ -14,20 +14,21 @@ import bookClient from '@/lib/api/bookClient';
 export default function Dashboard() {
   const router = useRouter();
   const { user, isLoaded: isUserLoaded } = useUser();
+  const { getToken } = useAuth();
   const [projects, setProjects] = useState<BookProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isBookDialogOpen, setIsBookDialogOpen] = useState(false);
-  
-  const fetchBooks = async () => {
+
+  const fetchBooks = useCallback(async () => {
     if (!isUserLoaded || !user) return;
-    
     setIsLoading(true);
     try {
-      // In a real app, set the auth token
-      // const token = await user.getToken();
-      // bookClient.setAuthToken(token);
-      
+      // Get Clerk session token for API authentication
+      const token = await getToken();
+      if (token) {
+        bookClient.setAuthToken(token);
+      }
       const books = await bookClient.getUserBooks();
       setProjects(books);
       setError(null);
@@ -37,11 +38,11 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
-  
+  }, [isUserLoaded, user, getToken]);
+
   useEffect(() => {
     fetchBooks();
-  }, [isUserLoaded, user]);
+  }, [fetchBooks]);
 
   const handleCreateNewBook = () => {
     setIsBookDialogOpen(true);

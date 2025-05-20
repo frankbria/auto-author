@@ -6,6 +6,23 @@ import { useRouter } from 'next/navigation';
 import bookClient from '@/lib/api/bookClient';
 import { BookProject } from '@/components/BookCard';
 import * as React from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { bookCreationSchema, BookFormData } from '@/lib/schemas/bookSchema';
+import { Button } from '@/components/ui/button';
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormDescription,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import Image from 'next/image';
 
 // Define types for book data
 type Chapter = {
@@ -19,6 +36,15 @@ type Chapter = {
 type BookDetails = Omit<BookProject, 'chapters'> & {
   description: string;
   chapters: Chapter[];
+  subtitle?: string;
+  genre?: string;
+  target_audience?: string;
+  cover_image_url?: string;
+  created_at?: string;
+  updated_at?: string;
+  published?: boolean;
+  collaborators?: Record<string, unknown>[];
+  owner_id?: string;
 };
 
 // Sample chapters data - would come from API in production
@@ -60,11 +86,34 @@ const SAMPLE_CHAPTERS: Chapter[] = [
   }
 ];
 
+const genreOptions = [
+  { label: 'Fiction', value: 'fiction' },
+  { label: 'Non-Fiction', value: 'non-fiction' },
+  { label: 'Science Fiction', value: 'sci-fi' },
+  { label: 'Fantasy', value: 'fantasy' },
+  { label: 'Mystery', value: 'mystery' },
+  { label: 'Romance', value: 'romance' },
+  { label: 'Historical', value: 'historical' },
+  { label: 'Biography', value: 'biography' },
+  { label: 'Self-Help', value: 'self-help' },
+  { label: 'Business', value: 'business' },
+  { label: 'Other', value: 'other' },
+];
+const targetAudienceOptions = [
+  { label: 'Children', value: 'children' },
+  { label: 'Young Adult', value: 'young-adult' },
+  { label: 'Adult', value: 'adult' },
+  { label: 'General', value: 'general' },
+  { label: 'Academic', value: 'academic' },
+  { label: 'Professional', value: 'professional' },
+];
+
 export default function BookPage({ params }: { params: Promise<{ bookId: string }> }) {
   const router = useRouter();
   const [book, setBook] = useState<BookDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);
@@ -75,11 +124,18 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     // Fetch book details
     bookClient.getBook(bookId)
       .then((bookData: BookProject) => {
-        // Enhance the book data with chapters
-        // In a real app, we would fetch chapters from API
         setBook({
           ...bookData,
           description: bookData.description || 'No description available',
+          subtitle: bookData.subtitle,
+          genre: bookData.genre,
+          target_audience: bookData.target_audience,
+          cover_image_url: bookData.cover_image_url,
+          created_at: bookData.created_at,
+          updated_at: bookData.updated_at,
+          published: bookData.published,
+          collaborators: bookData.collaborators,
+          owner_id: bookData.owner_id,
           chapters: SAMPLE_CHAPTERS
         });
         setError(null);
@@ -112,7 +168,82 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     // Navigate to chapter edit page
     router.push(`/dashboard/books/${bookId}/chapters/${chapterId}`);
   };
-  
+
+  const form = useForm<BookFormData>({
+    resolver: zodResolver(bookCreationSchema),
+    defaultValues: {
+      title: book?.title || '',
+      subtitle: book?.subtitle || '',
+      description: book?.description || '',
+      genre: book?.genre || '',
+      target_audience: book?.target_audience || '',
+      cover_image_url: book?.cover_image_url || '',
+    },
+    mode: 'onChange',
+  });
+
+  // Auto-save on change
+  useEffect(() => {
+    if (!book) return;
+    form.reset({
+      title: book.title,
+      subtitle: book.subtitle,
+      description: book.description,
+      genre: book.genre,
+      target_audience: book.target_audience,
+      cover_image_url: book.cover_image_url,
+    });
+  }, [book]);
+
+  const [coverPreview, setCoverPreview] = useState<string | null>(book?.cover_image_url || null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasCommitted, setHasCommitted] = useState(false);
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Invalid file type. Please upload an image.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image too large. Max size is 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCoverPreview(ev.target?.result as string);
+      // In production, upload the file and get a URL, then update the form value
+      // For now, just preview
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Auto-save on form change
+  useEffect(() => {
+    const subscription = form.watch(async (values, { name }) => {
+      if (!book) return;
+      setIsSaving(true);
+      try {
+        await bookClient.updateBook(book.id, {
+          title: values.title,
+          subtitle: values.subtitle,
+          description: values.description,
+          genre: values.genre,
+          target_audience: values.target_audience,
+          cover_image_url: values.cover_image_url,
+        });
+        toast.success('Book info saved');
+        setHasCommitted(true);
+      } catch {
+        toast.error('Failed to save book info');
+      } finally {
+        setIsSaving(false);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [book, form]);
+
   // Show loading state
   if (isLoading) {
     return (
@@ -184,13 +315,162 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-zinc-100">{book.title}</h1>
           <div className="text-zinc-400 text-sm">
-            Last edited {formatDate(book.lastEdited)}
+            Last edited {formatDate(book.updated_at ?? book.created_at ?? '')}
           </div>
         </div>
-        
-        <p className="text-zinc-400 mt-2 max-w-3xl">
-          {book.description}
-        </p>
+        {!editMode ? (
+          <>
+            {book.cover_image_url && (
+              <div className="mt-4">
+                <Image src={book.cover_image_url} alt="Book cover" width={256} height={384} className="max-w-xs rounded shadow border border-zinc-700" />
+              </div>
+            )}
+            <div className="mt-2">
+              {book.subtitle && <div className="text-zinc-300 text-lg italic mb-1">{book.subtitle}</div>}
+              <div className="text-zinc-400 max-w-3xl mb-2">{book.description}</div>
+              {book.genre && <div className="text-zinc-400 text-sm">Genre: {book.genre}</div>}
+              {book.target_audience && <div className="text-zinc-400 text-sm">Audience: {book.target_audience}</div>}
+            </div>
+            <button
+              className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+              onClick={() => setEditMode(true)}
+            >
+              Edit Book
+            </button>
+          </>
+        ) : (
+          <FormProvider {...form}>
+            <form className="space-y-6 py-2 max-w-2xl">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Book Title *</FormLabel>
+                    <FormControl>
+                      <Input {...field} maxLength={100} className="text-zinc-100 placeholder:text-zinc-300" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="subtitle"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subtitle</FormLabel>
+                    <FormControl>
+                      <Input {...field} maxLength={200} className="text-zinc-100 placeholder:text-zinc-300" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} maxLength={1000} className="text-zinc-100 placeholder:text-zinc-300" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="genre"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Genre</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="text-zinc-100 placeholder:text-zinc-300 bg-zinc-800 border-zinc-700 min-w-[12rem]">
+                            <SelectValue placeholder="Select genre" className="text-zinc-300" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {genreOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="target_audience"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Target Audience</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="text-zinc-100 placeholder:text-zinc-300 bg-zinc-800 border-zinc-700 min-w-[12rem]">
+                            <SelectValue placeholder="Select target audience" className="text-zinc-300" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {targetAudienceOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="cover_image_url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cover Image URL</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ''} placeholder="https://example.com/cover.jpg" className="text-zinc-100 placeholder:text-zinc-300" />
+                    </FormControl>
+                    <FormDescription>
+                      Optional: Add a URL to your book&apos;s cover image or upload below.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div>
+                <label className="block text-sm font-medium mb-1">Upload Cover Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverChange}
+                  className="block w-full text-sm text-zinc-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
+                {coverPreview && (
+                  <Image src={coverPreview} alt="Cover Preview" width={256} height={384} className="mt-2 max-w-xs rounded shadow border border-zinc-700" />
+                )}
+              </div>
+              {isSaving && <div className="text-indigo-400 text-sm">Saving...</div>}
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-medium rounded-md"
+                  onClick={() => setEditMode(false)}
+                >
+                  {hasCommitted ? 'Done' : 'Cancel'}
+                </button>
+              </div>
+            </form>
+          </FormProvider>
+        )}
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">

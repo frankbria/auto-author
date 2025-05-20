@@ -126,9 +126,9 @@
 - [X] Design empty book state with guided next steps
 - [X] Create redirect to appropriate page after book creation
 - [X] Implement book project card in user's dashboard
-- [ ] Add empty TOC placeholder for new books
-- [ ] Create initial book setup workflow UI
-- [ ] Add helpful tooltips for first-time book creators
+- [X] Add empty TOC placeholder for new books
+- [X] Create initial book setup workflow UI
+- [X] Add helpful tooltips for first-time book creators
 
 ### Backend Tasks
 - [X] Define book schema and data model (change Books field in user schema to connect with new data model)
@@ -136,34 +136,66 @@
 - [X] Implement data validation for book creation requests
 - [X] Set up database queries for book creation
 - [X] Add user-book relationship in database
-- [ ] Create empty TOC structure for new books
-- [ ] Implement auto-save for draft book information
-- [ ] Set up book visibility/privacy controls
-- [ ] Add rate limiting for book creation
-- [ ] Create book import functionality (optional)
+- [X] Create empty TOC structure for new books
+- [X] Implement auto-save for draft book information
+- [X] Set up book visibility/privacy controls
+- [X] Add rate limiting for book creation
+- [X] Create book import functionality (optional)
 
 ### Testing Tasks
-- [ ] Test book creation from dashboard
-- [ ] Verify form validation for required fields
-- [ ] Test API endpoint for book creation
-- [ ] Validate book appears in user's dashboard
-- [ ] Test empty TOC structure creation
-- [ ] Verify redirects after successful book creation
-- [ ] Test book creation with minimum required fields
-- [ ] Validate error handling for failed book creation
-- [ ] Test book creation limits if applicable
-- [ ] Verify book data persistence between sessions
+- [X] Test book creation from dashboard
+- [X] Verify form validation for required fields
+- [X] Test API endpoint for book creation
+- [X] Validate book appears in user's dashboard
+- [X] Test empty TOC structure creation
+- [X] Verify redirects after successful book creation
+- [X] Test book creation with minimum required fields
+- [X] Validate error handling for failed book creation
+- [X] Test book creation limits if applicable
+- [X] Verify book data persistence between sessions
 
 ### Documentation Tasks
-- [ ] Document book creation process and options
-- [ ] Create user guide for starting a new book
-- [ ] Document API endpoints for book creation
-- [ ] Update database schema documentation
-- [ ] Document book data model and relationships
-- [ ] Create troubleshooting guide for common book creation issues
+- [X] Document book creation process and options
+- [X] Create user guide for starting a new book
+- [X] Document API endpoints for book creation
+- [X] Update database schema documentation
+- [X] Document book data model and relationships
+- [X] Create troubleshooting guide for common book creation issues
 
 ## User Story 2.2: Book Info CRUD
 
+### Frontend Tasks
+- [X] Create book settings/info page with editable metadata fields (title, subtitle, synopsis, audience, genre, cover image, etc.)
+- [X] Implement form validation for all book metadata fields (length, required, allowed values)
+- [X] Add cover image upload UI with preview and format/size validation
+- [X] Implement genre and target audience selection (dropdowns, etc.)
+- [X] Add auto-save functionality for metadata changes
+- [X] Provide real-time feedback and success/error indicators for saves
+- [X] Handle edge cases (very long fields, special characters, invalid images)
+- [X] Ensure UI uses shadcn/ui form components and matches design system
+
+### Backend Tasks
+- [X] Extend book schema/model to support all metadata fields (title, subtitle, synopsis, audience, genre, cover image, etc.)
+- [X] Implement API endpoints for retrieving and updating book metadata (GET, PATCH/PUT)
+- [X] Add backend validation for all metadata fields
+- [ ] Implement file upload endpoint for cover images with validation and storage
+- [X] Add authorization checks for book metadata updates
+- [X] Implement rate limiting and error handling for metadata endpoints
+
+### Testing Tasks
+- [ ] Test retrieval and update of book metadata via API
+- [ ] Test frontend metadata editing and validation
+- [ ] Test cover image upload (valid/invalid formats, size limits)
+- [ ] Test auto-save and real-time feedback
+- [ ] Test edge cases (long fields, special characters, concurrent edits)
+- [ ] Verify metadata changes persist between sessions and reloads
+
+### Documentation Tasks
+- [ ] Document all book metadata fields and their requirements
+- [ ] Update API documentation for book metadata endpoints
+- [ ] Create user guide for editing book info and uploading cover images
+- [ ] Add troubleshooting section for common metadata issues
+- [ ] Document validation rules and error messages
 
 # Epic 3: TOC Generation & Editing
 ## User Story 3.1: Provide Summary Input

@@ -20,9 +20,14 @@ export const bookCreationSchema = z.object({
     .max(50, { message: 'Genre must be 50 characters or less' })
     .optional()
     .or(z.literal('')),
-  targetAudience: z
+  target_audience: z
     .string()
     .max(100, { message: 'Target audience must be 100 characters or less' })
+    .optional()
+    .or(z.literal('')),
+  cover_image_url: z
+    .string()
+    .url({ message: 'Cover image must be a valid URL' })
     .optional()
     .or(z.literal('')),
 });
