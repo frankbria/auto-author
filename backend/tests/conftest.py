@@ -81,70 +81,6 @@ def event_loop():
 
     loop.close()
 
-
-# Deprecated fixture: use `fake_mongo` instead
-@pytest.fixture(autouse=True)
-async def mock_db_connection():
-    """
-    Mock MongoDB database connection and collections
-    This fixture is applied to all tests automatically
-    """
-    # Mock the MongoDB client to prevent authentication errors
-    with patch("app.db.database.AsyncIOMotorClient") as mock_motor, patch(
-        "app.db.database.MongoClient"
-    ) as mock_mongo, patch(
-        "app.db.database.users_collection"
-    ) as mock_users_collection, patch(
-        "app.db.database.audit_logs_collection"
-    ) as mock_audit_collection:
-
-        # Configure necessary collection mocks
-        mock_motor.return_value = AsyncMock()
-        mock_mongo.return_value = AsyncMock()
-        mock_users_collection.update_one = AsyncMock()
-        mock_users_collection.delete_one = AsyncMock()
-        mock_users_collection.find_one = AsyncMock()
-        mock_users_collection.insert_one = AsyncMock()
-        mock_audit_collection.insert_one = AsyncMock()
-        # Create AsyncMock for all database functions used in the tests
-        with patch(
-            "app.db.database.get_user_by_clerk_id", new_callable=AsyncMock
-        ) as mock_get_user, patch(
-            "app.db.database.get_user_by_email", new_callable=AsyncMock
-        ) as mock_get_email, patch(
-            "app.db.database.create_user", new_callable=AsyncMock
-        ) as mock_create, patch(
-            "app.db.database.update_user", new_callable=AsyncMock
-        ) as mock_update, patch(
-            "app.db.database.delete_user", new_callable=AsyncMock
-        ) as mock_delete, patch(
-            "app.db.database.get_collection", new_callable=AsyncMock
-        ) as mock_collection, patch(
-            "app.db.database.create_audit_log", new_callable=AsyncMock
-        ) as mock_audit, patch(
-            "app.db.database.delete_user_books", new_callable=AsyncMock
-        ) as mock_delete_books:
-
-            # Configure default return values if needed
-            mock_audit.return_value = {
-                "id": "test_audit_log",
-                "created_at": "2023-01-01T00:00:00Z",
-            }
-
-            mock_delete_books.return_value = True
-
-            yield {
-                "get_user_by_clerk_id": mock_get_user,
-                "get_user_by_email": mock_get_email,
-                "create_user": mock_create,
-                "update_user": mock_update,
-                "delete_user": mock_delete,
-                "get_collection": mock_collection,
-                "create_audit_log": mock_audit,
-                "delete_user_books": mock_delete_books,
-            }
-
-
 @pytest.fixture(autouse=True)
 def fake_mongo(monkeypatch):
     """
@@ -329,3 +265,24 @@ def invalid_jwt_token():
     This token is intentionally malformed and should not be used in production.
     """
     return "invalid.jwt_token"
+
+@pytest.fixture
+def test_book():
+    """
+    Fixture to provide a test book object.
+    """
+    return {
+        "_id": ObjectId(),
+        "title": "Test Book",
+        "subtitle": "A book for testing",
+        "description": "This is a test book.",
+        "genre": "Fiction",
+        "target_audience": "Adults",
+        "cover_image_url": None,
+        "metadata": {},
+        "owner_id": ObjectId(),
+        "toc_items": [],
+        "published": False,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+    }

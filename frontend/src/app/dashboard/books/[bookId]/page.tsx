@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import Image from 'next/image';
+import { BookMetadataForm } from '@/components/BookMetadataForm';
 
 // Define types for book data
 type Chapter = {
@@ -339,137 +340,31 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
             </button>
           </>
         ) : (
-          <FormProvider {...form}>
-            <form className="space-y-6 py-2 max-w-2xl">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Book Title *</FormLabel>
-                    <FormControl>
-                      <Input {...field} maxLength={100} className="text-zinc-100 placeholder:text-zinc-300" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="subtitle"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subtitle</FormLabel>
-                    <FormControl>
-                      <Input {...field} maxLength={200} className="text-zinc-100 placeholder:text-zinc-300" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} maxLength={1000} className="text-zinc-100 placeholder:text-zinc-300" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="genre"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Genre</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="text-zinc-100 placeholder:text-zinc-300 bg-zinc-800 border-zinc-700 min-w-[12rem]">
-                            <SelectValue placeholder="Select genre" className="text-zinc-300" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {genreOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="target_audience"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Target Audience</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="text-zinc-100 placeholder:text-zinc-300 bg-zinc-800 border-zinc-700 min-w-[12rem]">
-                            <SelectValue placeholder="Select target audience" className="text-zinc-300" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {targetAudienceOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={form.control}
-                name="cover_image_url"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cover Image URL</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value ?? ''} placeholder="https://example.com/cover.jpg" className="text-zinc-100 placeholder:text-zinc-300" />
-                    </FormControl>
-                    <FormDescription>
-                      Optional: Add a URL to your book&apos;s cover image or upload below.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div>
-                <label className="block text-sm font-medium mb-1">Upload Cover Image</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleCoverChange}
-                  className="block w-full text-sm text-zinc-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                />
-                {coverPreview && (
-                  <Image src={coverPreview} alt="Cover Preview" width={256} height={384} className="mt-2 max-w-xs rounded shadow border border-zinc-700" />
-                )}
-              </div>
-              {isSaving && <div className="text-indigo-400 text-sm">Saving...</div>}
-              <div className="flex gap-2 mt-4">
-                <button
-                  type="button"
-                  className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-medium rounded-md"
-                  onClick={() => setEditMode(false)}
-                >
-                  {hasCommitted ? 'Done' : 'Cancel'}
-                </button>
-              </div>
-            </form>
-          </FormProvider>
+          <BookMetadataForm
+            book={{
+              title: book.title || '',
+              subtitle: book.subtitle || '',
+              description: book.description || '',
+              genre: book.genre || '',
+              target_audience: book.target_audience || '',
+              cover_image_url: book.cover_image_url || '',
+            }}
+            onUpdate={async (values) => {
+              setIsSaving(true);
+              try {
+                await bookClient.updateBook(book.id, values);
+                toast.success('Book info saved');
+                setHasCommitted(true);
+                setBook({ ...book, ...values });
+              } catch {
+                toast.error('Failed to save book info');
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            isSaving={isSaving}
+            error={error}
+          />
         )}
       </div>
       

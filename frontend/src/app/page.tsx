@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client';
 
-import { SignedIn, SignedOut, SignInButton, useUser } from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton, SignUpButton, SignOutButton, useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -56,16 +56,16 @@ export default function Home() {
             Your AI-powered assistant for creating nonfiction books—chapter by chapter, interview style.
           </p>
           <div className="space-x-4">
-            <Link href="/sign-in">
+            <SignInButton mode="modal" fallbackRedirectUrl="/dashboard">
               <button className="px-6 py-3 text-white font-semibold bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md transition">
                 Sign In
               </button>
-            </Link>
-            <Link href="/sign-up">
+            </SignInButton>
+            <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard">
               <button className="px-6 py-3 text-white font-semibold bg-zinc-700 hover:bg-zinc-600 rounded-lg shadow-md transition">
                 Sign Up
               </button>
-            </Link>
+            </SignUpButton>
           </div>
         </div>
       </SignedOut>
@@ -74,11 +74,18 @@ export default function Home() {
         <div className="space-y-6">
           <h1 className="text-4xl font-bold text-white">Welcome Back 👋</h1>
           <p className="text-zinc-400 mb-6">Continue working on your book projects.</p>
-          <Link href="/dashboard">
-            <button className="px-6 py-3 text-white font-semibold bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md transition">
-              Go to Dashboard
-            </button>
-          </Link>
+          <div className="space-x-4">
+            <Link href="/dashboard">
+              <button className="px-6 py-3 text-white font-semibold bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md transition">
+                Go to Dashboard
+              </button>
+            </Link>
+            <SignOutButton>
+              <button className="px-6 py-3 text-white font-semibold bg-zinc-700 hover:bg-zinc-600 rounded-lg shadow-md transition">
+                Sign Out
+              </button>
+            </SignOutButton>
+          </div>
         </div>
       </SignedIn>
     </div>

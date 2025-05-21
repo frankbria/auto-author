@@ -1,0 +1,91 @@
+import pytest, pytest_asyncio
+from httpx import AsyncClient
+from app.main import app
+
+import asyncio
+
+
+@pytest.mark.asyncio
+async def test_book_metadata_retrieval_and_update(
+    auth_client_factory, test_user, test_book
+):
+    # Test GET book metadata
+    api_client = auth_client_factory()
+
+    response = await api_client.get(f"/api/v1/books/{test_book['id']}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == test_book["title"]
+    assert "target_audience" in data
+
+    # Test PATCH update
+    patch_data = {"title": "Updated Title", "target_audience": "academic"}
+    response = await api_client.patch(
+        f"/api/v1/books/{test_book['id']}", json=patch_data
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "Updated Title"
+    assert data["target_audience"] == "academic"
+
+    # Test PUT update
+    put_data = {
+        "title": "Put Title",
+        "target_audience": "professional",
+        "genre": "science",
+    }
+    response = await api_client.put(f"/api/v1/books/{test_book['id']}", json=put_data)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "Put Title"
+    assert data["target_audience"] == "professional"
+    assert data["genre"] == "science"
+
+
+@pytest.mark.asyncio
+async def test_book_metadata_edge_cases(auth_client_factory, test_user, test_book):
+    api_client = auth_client_factory()
+
+    # Long fields
+    long_title = "A" * 101
+    response = await api_client.patch(
+        f"/api/v1/books/{test_book['id']}", json={"title": long_title}
+    )
+    assert response.status_code == 422  # Should fail validation
+
+    # Special characters
+    special = "!@#$%^&*()_+{}|:<>?~"
+    response = await api_client.patch(
+        f"/api/v1/books/{test_book['id']}", json={"title": special}
+    )
+    assert response.status_code == 200
+    assert response.json()["title"] == special
+
+    # Concurrent edits (simulate by rapid PATCH)
+    patch1 = api_client.patch(
+        f"/api/v1/books/{test_book['id']}", json={"title": "Concurrent 1"}
+    )
+    patch2 = api_client.patch(
+        f"/api/v1/books/{test_book['id']}", json={"title": "Concurrent 2"}
+    )
+    results = await asyncio.gather(patch1, patch2)
+    assert all(r.status_code == 200 for r in results)
+
+
+@pytest.mark.asyncio
+async def test_book_metadata_persistence(auth_client_factory, test_user, test_book):
+    api_client = auth_client_factory()
+    # Update and reload
+    response = await api_client.patch(
+        f"/api/v1/books/{test_book['id']}", json={"title": "Persistence Test"}
+    )
+    assert response.status_code == 200
+    # Simulate reload
+    response = await api_client.get(f"/api/v1/books/{test_book['id']}")
+    assert response.status_code == 200
+    assert response.json()["title"] == "Persistence Test"
+
+
+# Mark as done: Test retrieval and update of book metadata via API
+# Mark as done: Test edge cases (long fields, special characters, concurrent edits)
+# Mark as done: Verify metadata changes persist between sessions and reloads

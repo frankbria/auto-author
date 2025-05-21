@@ -82,7 +82,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
         subtitle: data.subtitle,
         description: data.description,
         genre: data.genre,
-        targetAudience: data.target_audience, // pass as targetAudience for API compatibility
+        target_audience: data.target_audience, // pass as targetAudience for API compatibility
         cover_image_url: data.cover_image_url,
       });
       toast.success('Book created successfully!');
