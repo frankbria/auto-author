@@ -2,6 +2,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from app.core.config import settings
+from app.models.book import BookDB
+from app.models.user import UserDB
 import os
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -79,7 +81,7 @@ async def delete_user(
         # Mark user as inactive instead of deleting
         result = await users_collection.update_one(
             {"clerk_id": clerk_id},
-            {"$set": {"is_active": False, "updated_at": datetime.utcnow()}},
+            {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}},
         )
     else:
         # Hard delete
@@ -165,34 +167,49 @@ async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
 # Book-related database operations
 async def create_book(book_data: Dict, user_clerk_id: str) -> Dict:
     """Create a new book in the database and associate it with a user"""
-    # Set owner ID
+    # 1) Set owner ID
     book_data["owner_id"] = user_clerk_id
 
-    # Insert the new book
-    result = await books_collection.insert_one(book_data)
-    book_id = str(result.inserted_id)
+    # 2) build the Pydantic model
+    book_obj = BookDB(**book_data)
+    # print(f"Creating book: {book_obj}")
+
+    # 3) serialize to a Mongo-ready dict, with _id alias and timestamps
+    payload = book_obj.model_dump(by_alias=True)
+
+    # 4) Insert the new book
+    result = await books_collection.insert_one(payload)
+
+    # 5) patch the real ObjectId back onto the model
+    book_obj.id = result.inserted_id
+    # print(f"Inserted book with ID: {book_obj.id}")
 
     # Associate the book with the user
     await users_collection.update_one(
-        {"clerk_id": user_clerk_id}, {"$push": {"book_ids": book_id}}
+        {"clerk_id": user_clerk_id}, {"$push": {"book_ids": str(book_obj.id)}}
     )
 
     # Create audit log entry
     await create_audit_log(
         action="book_create",
         actor_id=user_clerk_id,
-        target_id=book_id,
+        target_id=str(book_obj.id),
         resource_type="book",
         details={"title": book_data.get("title", "Untitled")},
     )
 
     # Return the created book
-    created_book = await get_book_by_id(book_id)
+    # created_book = await get_book_by_id(str(book_obj.id))
+    created_book = book_obj.model_dump()
+    # print(f"Created book: {created_book}")
+    created_book["id"] = str(book_obj.id)
+    created_book.pop("_id", None)  # Remove the MongoDB ObjectId field
     return created_book
 
 
 async def get_book_by_id(book_id: str) -> Optional[Dict]:
     """Get a book by its ID"""
+    # print(f"Getting book by ID: {book_id}")
     try:
         book = await books_collection.find_one({"_id": ObjectId(book_id)})
         return book
@@ -214,7 +231,7 @@ async def update_book(
 ) -> Optional[Dict]:
     """Update an existing book"""
     # Add updated_at timestamp
-    book_data["updated_at"] = datetime.utcnow()
+    book_data["updated_at"] = datetime.now(timezone.utc)
 
     # Update the book
     updated_book = await books_collection.find_one_and_update(

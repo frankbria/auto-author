@@ -29,6 +29,7 @@ from unittest.mock import AsyncMock
 from datetime import datetime, timezone
 from app.core.security import get_current_user
 from app.api.endpoints import users as users_endpoint
+from app.api.endpoints import books as books_endpoint
 from bson import ObjectId
 
 
@@ -227,6 +228,7 @@ def auth_client_factory(monkeypatch, test_user) -> callable:
             return None
 
         monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit_request)
+        monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit_request)
 
         if auth:
             # 4) Stub out JWT verification to return that clerk_id
@@ -266,13 +268,16 @@ def invalid_jwt_token():
     """
     return "invalid.jwt_token"
 
+
 @pytest.fixture
-def test_book():
+def test_book(test_user):
     """
     Fixture to provide a test book object.
     """
+    book_id = ObjectId()
     return {
-        "_id": ObjectId(),
+        "_id": book_id,
+        "id": str(book_id),
         "title": "Test Book",
         "subtitle": "A book for testing",
         "description": "This is a test book.",
@@ -280,7 +285,7 @@ def test_book():
         "target_audience": "Adults",
         "cover_image_url": None,
         "metadata": {},
-        "owner_id": ObjectId(),
+        "owner_id": test_user["clerk_id"],
         "toc_items": [],
         "published": False,
         "created_at": datetime.now(timezone.utc),

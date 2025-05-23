@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.security import get_current_user, RoleChecker
 from app.schemas.book import (
@@ -60,10 +60,14 @@ async def create_new_book(
         # Convert ObjectId to str for the response
         if "_id" in new_book:
             new_book["id"] = str(new_book["_id"])
+        print("->new_book", new_book)
+        # Remove the raw ObjectId for JSON serialization
+        new_book.pop("_id", None)
 
         return new_book
 
     except Exception as e:
+        print("->create_book_error", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create book: {str(e)}",
@@ -118,17 +122,18 @@ async def get_book(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid book ID format",
             )
-        
+        print("->get_book", book_id)
+
         # Get the book from the database
         book = await get_book_by_id(book_id)
-        
+
         # Check if book exists
         if not book:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Book not found",
             )
-        
+
         # Check if user has access to this book
         if book.get("owner_id") != current_user.get("clerk_id"):
             # Check for collaborator access later
@@ -136,11 +141,11 @@ async def get_book(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have access to this book",
             )
-        
+
         # Convert ObjectId to str
         if "_id" in book:
             book["id"] = str(book["_id"])
-        
+
         # Log the book view
         await audit_request(
             request=request,
@@ -149,12 +154,12 @@ async def get_book(
             resource_type="book",
             target_id=book_id,
         )
-        
+
         return book
-    
+
     except HTTPException:
         raise
-    
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -182,10 +187,12 @@ async def update_book_details(
             )
 
         # Get only the fields that were provided
-        update_data = {k: v for k, v in book_update.dict().items() if v is not None}
+        update_data = {
+            k: v for k, v in book_update.model_dump().items() if v is not None
+        }
 
         # Add updated_at timestamp
-        update_data["updated_at"] = datetime.utcnow()
+        update_data["updated_at"] = datetime.now(timezone.utc)
 
         # Update the book
         updated_book = await update_book(
@@ -273,10 +280,10 @@ async def patch_book_details(
         # Only include provided fields
         update_data = {
             k: v
-            for k, v in book_update.dict(exclude_unset=True).items()
+            for k, v in book_update.model_dump(exclude_unset=True).items()
             if v is not None
         }
-        update_data["updated_at"] = datetime.utcnow()
+        update_data["updated_at"] = datetime.now(timezone.utc)
 
         updated_book = await update_book(
             book_id=book_id,
@@ -321,7 +328,7 @@ async def patch_book_details(
             full_book["collaborators"] = []
 
         try:
-            return BookResponse.parse_obj(full_book)
+            return BookResponse.model_validate(full_book)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

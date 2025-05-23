@@ -87,7 +87,7 @@ async def clerk_webhook(
         # Check if user already exists (idempotency)
         existing_user = await get_user_by_clerk_id(user_data.clerk_id)
         if not existing_user:
-            await create_user(user_data.dict())
+            await create_user(user_data.model_dump())
 
     elif event_type == "user.updated":
         # Update an existing user in our database

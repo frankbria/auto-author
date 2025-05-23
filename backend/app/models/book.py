@@ -40,9 +40,9 @@ class BookCreate(BookBase):
 class BookDB(BookBase):
     """Book model as stored in the database"""
 
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
-    created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=datetime.now(timezone.utc))
+    id: ObjectId = Field(default_factory=ObjectId, alias="_id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     toc_items: List[TocItem] = Field(default_factory=list)
     published: bool = False
     collaborators: List[Dict[str, str]] = Field(default_factory=list)

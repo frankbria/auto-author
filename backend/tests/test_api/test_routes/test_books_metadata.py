@@ -1,18 +1,30 @@
 import pytest, pytest_asyncio
 from httpx import AsyncClient
 from app.main import app
+from fastapi.encoders import jsonable_encoder
 
 import asyncio
 
 
-@pytest.mark.asyncio
-async def test_book_metadata_retrieval_and_update(
-    auth_client_factory, test_user, test_book
-):
+def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
     # Test GET book metadata
     api_client = auth_client_factory()
+    payload = test_book.copy()
+    payload["owner_id"] = str(test_book["owner_id"])
+    del payload["_id"]
+    del payload["id"]
+    # del payload["created_at"]
+    # del payload["updated_at"]
+    del payload["toc_items"]
+    del payload["published"]
+    payload_book = jsonable_encoder(payload)
+    # print(payload_book)
 
-    response = await api_client.get(f"/api/v1/books/{test_book['id']}")
+    # Insert book into the database
+    response = api_client.post(f"/api/v1/books/", json=payload_book)
+    assert response.status_code == 201
+
+    response = api_client.get(f"/api/v1/books/{test_book['id']}")
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == test_book["title"]
@@ -20,9 +32,7 @@ async def test_book_metadata_retrieval_and_update(
 
     # Test PATCH update
     patch_data = {"title": "Updated Title", "target_audience": "academic"}
-    response = await api_client.patch(
-        f"/api/v1/books/{test_book['id']}", json=patch_data
-    )
+    response = api_client.patch(f"/api/v1/books/{test_book['id']}", json=patch_data)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Updated Title"
@@ -34,7 +44,7 @@ async def test_book_metadata_retrieval_and_update(
         "target_audience": "professional",
         "genre": "science",
     }
-    response = await api_client.put(f"/api/v1/books/{test_book['id']}", json=put_data)
+    response = api_client.put(f"/api/v1/books/{test_book['id']}", json=put_data)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Put Title"
@@ -43,7 +53,7 @@ async def test_book_metadata_retrieval_and_update(
 
 
 @pytest.mark.asyncio
-async def test_book_metadata_edge_cases(auth_client_factory, test_user, test_book):
+async def test_book_metadata_edge_cases(auth_client_factory, test_book):
     api_client = auth_client_factory()
 
     # Long fields
@@ -72,16 +82,15 @@ async def test_book_metadata_edge_cases(auth_client_factory, test_user, test_boo
     assert all(r.status_code == 200 for r in results)
 
 
-@pytest.mark.asyncio
-async def test_book_metadata_persistence(auth_client_factory, test_user, test_book):
+def test_book_metadata_persistence(auth_client_factory, test_book):
     api_client = auth_client_factory()
     # Update and reload
-    response = await api_client.patch(
+    response = api_client.patch(
         f"/api/v1/books/{test_book['id']}", json={"title": "Persistence Test"}
     )
     assert response.status_code == 200
     # Simulate reload
-    response = await api_client.get(f"/api/v1/books/{test_book['id']}")
+    response = api_client.get(f"/api/v1/books/{test_book['id']}")
     assert response.status_code == 200
     assert response.json()["title"] == "Persistence Test"
 
