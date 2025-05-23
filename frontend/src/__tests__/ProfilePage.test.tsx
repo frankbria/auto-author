@@ -104,10 +104,12 @@ jest.mock('../components/ui/dialog', () => ({
 
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ src, alt, ...props }: { src: string; alt: string; [key: string]: unknown }) => 
+  default: ({ src, alt, priority, ...props }: { src: string; alt: string; priority?: boolean; [key: string]: unknown }) => {
+    // Filter out the priority prop to avoid boolean attribute warning in tests
     // Using img for testing is fine - this is a test mock, not production code
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} {...props} data-testid="image" />,
+    return <img src={src} alt={alt} data-priority={priority} {...props} data-testid="image" />;
+  },
 }));
 
 jest.mock('../lib/toast', () => ({

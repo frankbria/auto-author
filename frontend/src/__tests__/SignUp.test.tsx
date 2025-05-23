@@ -1,28 +1,70 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
-import SignUpPage from '@/app/sign-up/[[...rest]]/page';
-import { SignUp } from '@clerk/nextjs';
-import { dark } from '@clerk/themes';
+import HomePage from '@/app/page';
+import { useUser } from '@clerk/nextjs';
 
 // Mock Next.js navigation
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 
-// Mock Clerk components and themes
-jest.mock('@clerk/themes', () => ({
-  dark: 'mock-dark-theme'
-}));
+jest.mock('next/link', () => {
+  return jest.fn(({ href, children }) => (
+    <a href={href} data-testid="next-link">
+      {children}
+    </a>
+  ));
+});
 
-jest.mock('@clerk/nextjs', () => ({
-  SignUp: jest.fn().mockImplementation(({ children, ...props }) => (
-    <div data-testid="clerk-signup" {...props}>
-      {children || 'SignUp Component'}
-    </div>
-  )),
-}));
+// Mock Clerk components
+jest.mock('@clerk/nextjs', () => {
+  // Create a mockUseUser function that can be controlled by tests
+  const mockUseUser = jest.fn().mockReturnValue({
+    isLoaded: true,
+    isSignedIn: false,
+  });
 
-describe('SignUp Component Integration', () => {
+  return {
+    SignUpButton: jest.fn().mockImplementation(({ mode, fallbackRedirectUrl, children }) => (
+      <div 
+        data-testid="clerk-signup-button" 
+        data-mode={mode} 
+        data-redirect={fallbackRedirectUrl}
+        onClick={() => {}}
+      >
+        {children}
+      </div>
+    )),
+    SignInButton: jest.fn().mockImplementation(({ mode, fallbackRedirectUrl, children }) => (
+      <div 
+        data-testid="clerk-signin-button" 
+        data-mode={mode} 
+        data-redirect={fallbackRedirectUrl}
+        onClick={() => {}}
+      >
+        {children}
+      </div>
+    )),
+    SignOutButton: jest.fn().mockImplementation(({ children }) => (
+      <div data-testid="clerk-signout-button">
+        {children}
+      </div>
+    )),
+    // Fix SignedIn to only render children when isSignedIn is true
+    SignedIn: jest.fn().mockImplementation(({ children }) => {
+      const { isSignedIn } = mockUseUser();
+      return isSignedIn ? <div data-testid="signed-in">{children}</div> : null;
+    }),
+    // Fix SignedOut to only render children when isSignedIn is false
+    SignedOut: jest.fn().mockImplementation(({ children }) => {
+      const { isSignedIn } = mockUseUser();
+      return !isSignedIn ? <div data-testid="signed-out">{children}</div> : null;
+    }),
+    useUser: mockUseUser,
+  };
+});
+
+describe('Home Page Sign Up Integration', () => {
   const mockRouter = {
     push: jest.fn(),
   };
@@ -31,41 +73,77 @@ describe('SignUp Component Integration', () => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
   });
-  test('renders Clerk SignUp component', () => {
-    render(<SignUpPage />);
+
+  test('renders SignUpButton component on the home page', () => {
+    render(<HomePage />);
     
-    // Check that the Clerk component is rendered
-    expect(screen.getByTestId('clerk-signup')).toBeInTheDocument();
+    // Check that the SignUpButton is rendered
+    const signUpButton = screen.getByTestId('clerk-signup-button');
+    expect(signUpButton).toBeInTheDocument();
+    
+    // Check that the button has the correct text
+    expect(signUpButton.textContent).toContain('Sign Up');
   });
   
-  test('passes correct routing props to Clerk component', () => {
-    render(<SignUpPage />);
+  test('configures SignUpButton with modal mode and dashboard redirect', () => {
+    render(<HomePage />);
     
-    // Check that the SignUp component was called with the correct props
-    expect(SignUp).toHaveBeenCalled();
-    const callProps = (SignUp as jest.Mock).mock.calls[0][0];
-    
-    // Verify individual props
-    expect(callProps.routing).toBe('path');
-    expect(callProps.path).toBe('/sign-up');
-    expect(callProps.signInUrl).toBe('/sign-in');
-    expect(callProps.redirectUrl).toBe('/dashboard');
-    expect(callProps.afterSignUpUrl).toBe('/dashboard');
-    expect(callProps.appearance.baseTheme).toBe('mock-dark-theme');
+    // Check the button configuration
+    const signUpButton = screen.getByTestId('clerk-signup-button');
+    expect(signUpButton).toHaveAttribute('data-mode', 'modal');
+    expect(signUpButton).toHaveAttribute('data-redirect', '/dashboard');
   });
-  test('renders with loading state hidden by default', () => {
-    render(<SignUpPage />);
+  
+  test('renders sign-up and sign-in buttons when signed out', () => {
+    render(<HomePage />);
     
-    // Initially, the loading state should not be visible
-    const loadingText = screen.queryByText('Redirecting to dashboard');
-    expect(loadingText).not.toBeInTheDocument();
+    // Check that the signed out section is visible
+    expect(screen.getByTestId('signed-out')).toBeInTheDocument();
+    
+    // Verify both buttons are available
+    expect(screen.getByTestId('clerk-signup-button')).toBeInTheDocument();
+    expect(screen.getByTestId('clerk-signin-button')).toBeInTheDocument();
   });
 
-  test('renders with error message hidden by default', () => {
-    render(<SignUpPage />);
+  test('does not show authenticated content when not logged in', () => {
+    render(<HomePage />);
     
-    // Initially, there should be no error message
-    const errorContainer = screen.queryByText(/error/i);
-    expect(errorContainer).not.toBeInTheDocument();
+    // The SignedIn content should not be visible
+    expect(screen.queryByText('Go to Dashboard')).not.toBeInTheDocument();
+  });
+  
+  test('shows loading state while authentication is being determined', () => {
+    // Mock the useUser hook to simulate loading state
+    (useUser as jest.Mock).mockReturnValueOnce({
+      isLoaded: false,
+      isSignedIn: false,
+    });
+    
+    render(<HomePage />);
+    
+    // Loading spinner should be visible
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+  });
+  test('shows authenticated content when signed in', () => {
+    // Mock the useUser hook to simulate signed in state
+    // We need to replace the existing mock implementation entirely
+    (useUser as jest.Mock).mockImplementation(() => ({
+      isLoaded: true,
+      isSignedIn: true,
+    }));
+    
+    render(<HomePage />);
+    
+    // Debug the output to see what's rendered
+    // screen.debug();
+    
+    // The signed-in section should be visible
+    expect(screen.getByTestId('signed-in')).toBeInTheDocument();
+    
+    // Dashboard button should be available
+    expect(screen.getByText('Go to Dashboard')).toBeInTheDocument();
+    
+    // Welcome back message should be visible with exact text match
+    expect(screen.getByText(/Welcome Back/)).toBeInTheDocument();
   });
 });
