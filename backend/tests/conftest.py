@@ -15,7 +15,8 @@ def fake_get_rate_limiter(limit: int = 10, window: int = 60):
 
 
 deps.get_rate_limiter = fake_get_rate_limiter
-import pytest
+import pytest, pytest_asyncio
+from httpx import AsyncClient, ASGITransport
 import mongomock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -23,9 +24,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.db import database
 from app.api.dependencies import verify_jwt_token
+import app.core.security as sec
 
 import asyncio
-from unittest.mock import AsyncMock
 from datetime import datetime, timezone
 from app.core.security import get_current_user
 from app.api.endpoints import users as users_endpoint
@@ -96,6 +97,10 @@ def fake_mongo(monkeypatch):
     monkeypatch.setattr(
         database, "audit_logs_collection", AsyncCollection(sync_db["audit_logs"])
     )
+    monkeypatch.setattr(database, "books_collection", AsyncCollection(sync_db["books"]))
+    yield
+    # Clean up: remove our override so other tests aren’t “authed”
+    sync_client.drop_database("test_db")
 
 
 ### Deprecated fixture: use `auth_client_factory` instead
@@ -209,7 +214,6 @@ def auth_client_factory(monkeypatch, test_user) -> callable:
     that gives you a TestClient whose get_current_user
     always returns `test_user` updated with your overrides.
     """
-    client = TestClient(app)
 
     def make_client(*, overrides: dict = None, auth: bool = True):
 
@@ -234,8 +238,6 @@ def auth_client_factory(monkeypatch, test_user) -> callable:
             # 4) Stub out JWT verification to return that clerk_id
             async def _fake_verify(token: str):
                 return {"sub": user["clerk_id"]}
-
-            import app.core.security as sec
 
             monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
 
@@ -291,3 +293,57 @@ def test_book(test_user):
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
     }
+
+
+@pytest_asyncio.fixture
+async def async_client_factory(monkeypatch, test_user):
+    """
+    Returns an async function make_client(overrides: dict = None, auth: bool = True)
+    that yields an AsyncClient whose get_current_user always returns test_user
+    (with optional overrides), and which writes into a mongomock test DB.
+    """
+
+    def _seed_user(overrides: dict | None):
+        # Clone the fixture user & assign a fresh ObjectId
+        user = test_user.copy()
+        user["_id"] = ObjectId()
+        user["id"] = str(user["_id"])
+        if overrides:
+            user.update(overrides)
+        # Directly insert into the underlying mongomock collection
+        database.users_collection._coll.insert_one(user)
+        return user
+
+    async def make_client(*, overrides: dict | None = None, auth: bool = True):
+        # 1) Seed a new user
+        user = _seed_user(overrides)
+
+        # 2) Stub out audit_request in both endpoints
+        async def _noop_audit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit)
+        monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit)
+
+        # 3) If you want authentication, stub verify_jwt_token to return our user's sub
+        headers = {}
+        if auth:
+
+            async def _fake_verify(token: str):
+                return {"sub": user["clerk_id"]}
+
+            monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
+            headers["Authorization"] = "Bearer dummy.token.here"
+
+        # 4) Create an AsyncClient that drives our FastAPI app
+        client = AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+            headers=headers,
+        )
+        return client
+
+    yield make_client
+
+    # teardown: clear any dependency overrides you may have set
+    app.dependency_overrides.clear()

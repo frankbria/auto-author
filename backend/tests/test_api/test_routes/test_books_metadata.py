@@ -23,8 +23,9 @@ def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
     # Insert book into the database
     response = api_client.post(f"/api/v1/books/", json=payload_book)
     assert response.status_code == 201
+    new_id = response.json()["id"]
 
-    response = api_client.get(f"/api/v1/books/{test_book['id']}")
+    response = api_client.get(f"/api/v1/books/{new_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == test_book["title"]
@@ -32,7 +33,7 @@ def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
 
     # Test PATCH update
     patch_data = {"title": "Updated Title", "target_audience": "academic"}
-    response = api_client.patch(f"/api/v1/books/{test_book['id']}", json=patch_data)
+    response = api_client.patch(f"/api/v1/books/{new_id}", json=patch_data)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Updated Title"
@@ -44,7 +45,7 @@ def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
         "target_audience": "professional",
         "genre": "science",
     }
-    response = api_client.put(f"/api/v1/books/{test_book['id']}", json=put_data)
+    response = api_client.put(f"/api/v1/books/{new_id}", json=put_data)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Put Title"
@@ -53,44 +54,71 @@ def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
 
 
 @pytest.mark.asyncio
-async def test_book_metadata_edge_cases(auth_client_factory, test_book):
-    api_client = auth_client_factory()
+async def test_book_metadata_edge_cases(async_client_factory, test_book):
+    api_client = await async_client_factory()
+
+    payload = test_book.copy()
+    payload["owner_id"] = str(test_book["owner_id"])
+    del payload["_id"]
+    del payload["id"]
+    # del payload["created_at"]
+    # del payload["updated_at"]
+    del payload["toc_items"]
+    del payload["published"]
+    payload_book = jsonable_encoder(payload)
+    # print(payload_book)
+
+    # Insert book into the database
+    response = await api_client.post(f"/api/v1/books/", json=payload_book)
+    assert response.status_code == 201
+    new_id = response.json()["id"]
 
     # Long fields
     long_title = "A" * 101
     response = await api_client.patch(
-        f"/api/v1/books/{test_book['id']}", json={"title": long_title}
+        f"/api/v1/books/{new_id}", json={"title": long_title}
     )
     assert response.status_code == 422  # Should fail validation
 
     # Special characters
     special = "!@#$%^&*()_+{}|:<>?~"
     response = await api_client.patch(
-        f"/api/v1/books/{test_book['id']}", json={"title": special}
+        f"/api/v1/books/{new_id}", json={"title": special}
     )
     assert response.status_code == 200
     assert response.json()["title"] == special
 
     # Concurrent edits (simulate by rapid PATCH)
-    patch1 = api_client.patch(
-        f"/api/v1/books/{test_book['id']}", json={"title": "Concurrent 1"}
-    )
-    patch2 = api_client.patch(
-        f"/api/v1/books/{test_book['id']}", json={"title": "Concurrent 2"}
-    )
+    patch1 = api_client.patch(f"/api/v1/books/{new_id}", json={"title": "Concurrent 1"})
+    patch2 = api_client.patch(f"/api/v1/books/{new_id}", json={"title": "Concurrent 2"})
     results = await asyncio.gather(patch1, patch2)
     assert all(r.status_code == 200 for r in results)
 
 
 def test_book_metadata_persistence(auth_client_factory, test_book):
     api_client = auth_client_factory()
+    payload = test_book.copy()
+    payload["owner_id"] = str(test_book["owner_id"])
+    del payload["_id"]
+    del payload["id"]
+    # del payload["created_at"]
+    # del payload["updated_at"]
+    del payload["toc_items"]
+    del payload["published"]
+    payload_book = jsonable_encoder(payload)
+    # print(payload_book)
+    # Insert book into the database
+    response = api_client.post(f"/api/v1/books/", json=payload_book)
+    assert response.status_code == 201
+    new_id = response.json()["id"]
+
     # Update and reload
     response = api_client.patch(
-        f"/api/v1/books/{test_book['id']}", json={"title": "Persistence Test"}
+        f"/api/v1/books/{new_id}", json={"title": "Persistence Test"}
     )
     assert response.status_code == 200
     # Simulate reload
-    response = api_client.get(f"/api/v1/books/{test_book['id']}")
+    response = api_client.get(f"/api/v1/books/{new_id}")
     assert response.status_code == 200
     assert response.json()["title"] == "Persistence Test"
 

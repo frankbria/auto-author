@@ -80,7 +80,7 @@ def test_update_partial_profile_fields(auth_client_factory, test_user):
     expected_result["preferences"]["theme"] = "system"
 
     # Mock the database update to return our expected result
-    with patch("app.db.database.update_user", return_value=expected_result):
+    with patch("app.api.endpoints.users.update_user", return_value=expected_result):
         # Make the request to update profile
         response = client.patch("/api/v1/users/me", json=partial_update)
 

@@ -53,7 +53,7 @@ async def update_user(
 ) -> Optional[Dict]:
     """Update an existing user"""
     # Add updated_at timestamp
-    user_data["updated_at"] = datetime.utcnow()
+    user_data["updated_at"] = datetime.now(timezone.utc)
 
     # Update the user
     updated_user = await users_collection.find_one_and_update(

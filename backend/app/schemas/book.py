@@ -20,12 +20,12 @@ class TocItemSchema(BaseModel):
 class BookBase(BaseModel):
     """Base schema for book data"""
 
-    title: str
-    subtitle: Optional[str] = None
-    description: Optional[str] = None
-    genre: Optional[str] = None
-    target_audience: Optional[str] = None
-    cover_image_url: Optional[str] = None
+    title: str = Field(..., min_length=1, max_length=100)
+    subtitle: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=5000)
+    genre: Optional[str] = Field(None, max_length=100)
+    target_audience: Optional[str] = Field(None, max_length=100)
+    cover_image_url: Optional[str] = Field(None, max_length=2083)
     metadata: Dict[str, Any] = {}
 
 
@@ -49,12 +49,12 @@ class BookCreate(BookBase):
 class BookUpdate(BaseModel):
     """Schema for updating an existing book"""
 
-    title: Optional[str] = None
-    subtitle: Optional[str] = None
-    description: Optional[str] = None
-    genre: Optional[str] = None
-    target_audience: Optional[str] = None
-    cover_image_url: Optional[str] = None
+    title: Optional[str] = Field(..., min_length=1, max_length=100)
+    subtitle: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=5000)
+    genre: Optional[str] = Field(None, max_length=100)
+    target_audience: Optional[str] = Field(None, max_length=100)
+    cover_image_url: Optional[str] = Field(None, max_length=2083)
     metadata: Optional[Dict[str, Any]] = None
     published: Optional[bool] = None
 

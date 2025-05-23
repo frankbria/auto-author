@@ -21,12 +21,12 @@ class TocItem(BaseModel):
 class BookBase(BaseModel):
     """Base book model with common fields"""
 
-    title: str
-    subtitle: Optional[str] = None
-    description: Optional[str] = None
-    genre: Optional[str] = None
-    target_audience: Optional[str] = None
-    cover_image_url: Optional[str] = None
+    title: str = Field(..., min_length=1, max_length=100)
+    subtitle: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=5000)
+    genre: Optional[str] = Field(None, max_length=100)
+    target_audience: Optional[str] = Field(None, max_length=100)
+    cover_image_url: Optional[str] = Field(None, max_length=2083)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     owner_id: str  # Reference to the user's clerk_id
 
