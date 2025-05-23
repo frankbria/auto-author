@@ -6,21 +6,9 @@ import { useRouter } from 'next/navigation';
 import bookClient from '@/lib/api/bookClient';
 import { BookProject } from '@/components/BookCard';
 import * as React from 'react';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { bookCreationSchema, BookFormData } from '@/lib/schemas/bookSchema';
-import { Button } from '@/components/ui/button';
-import {
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormDescription,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { BookMetadataForm } from '@/components/BookMetadataForm';
@@ -46,6 +34,7 @@ type BookDetails = Omit<BookProject, 'chapters'> & {
   published?: boolean;
   collaborators?: Record<string, unknown>[];
   owner_id?: string;
+  summary?: string; // Add summary for wizard logic
 };
 
 // Sample chapters data - would come from API in production
@@ -87,41 +76,19 @@ const SAMPLE_CHAPTERS: Chapter[] = [
   }
 ];
 
-const genreOptions = [
-  { label: 'Fiction', value: 'fiction' },
-  { label: 'Non-Fiction', value: 'non-fiction' },
-  { label: 'Science Fiction', value: 'sci-fi' },
-  { label: 'Fantasy', value: 'fantasy' },
-  { label: 'Mystery', value: 'mystery' },
-  { label: 'Romance', value: 'romance' },
-  { label: 'Historical', value: 'historical' },
-  { label: 'Biography', value: 'biography' },
-  { label: 'Self-Help', value: 'self-help' },
-  { label: 'Business', value: 'business' },
-  { label: 'Other', value: 'other' },
-];
-const targetAudienceOptions = [
-  { label: 'Children', value: 'children' },
-  { label: 'Young Adult', value: 'young-adult' },
-  { label: 'Adult', value: 'adult' },
-  { label: 'General', value: 'general' },
-  { label: 'Academic', value: 'academic' },
-  { label: 'Professional', value: 'professional' },
-];
-
 export default function BookPage({ params }: { params: Promise<{ bookId: string }> }) {
   const router = useRouter();
   const [book, setBook] = useState<BookDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [summary, setSummary] = useState<string>('');
 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);
   
   useEffect(() => {
     setIsLoading(true);
-    
     // Fetch book details
     bookClient.getBook(bookId)
       .then((bookData: BookProject) => {
@@ -137,7 +104,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           published: bookData.published,
           collaborators: bookData.collaborators,
           owner_id: bookData.owner_id,
-          chapters: SAMPLE_CHAPTERS
+          chapters: SAMPLE_CHAPTERS,
+          summary: undefined, // will be set below
         });
         setError(null);
       })
@@ -147,6 +115,16 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       })
       .finally(() => {
         setIsLoading(false);
+      });
+    // Fetch summary for wizard step logic
+    bookClient.getBookSummary(bookId)
+      .then((data) => {
+        setSummary(data.summary || '');
+        setBook((prev) => prev ? { ...prev, summary: data.summary || '' } : prev);
+      })
+      .catch(() => {
+        setSummary('');
+        setBook((prev) => prev ? { ...prev, summary: '' } : prev);
       });
   }, [bookId]);
     const formatDate = (dateString: string) => {
@@ -312,13 +290,60 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           </svg>
           Back to Dashboard
         </Link>
-        
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-zinc-100">{book.title}</h1>
           <div className="text-zinc-400 text-sm">
             Last edited {formatDate(book.updated_at ?? book.created_at ?? '')}
           </div>
         </div>
+        {/* Wizard/Stepper Actions */}
+        <div className="mt-8 mb-8">
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center">
+                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">1</div>
+                <div className="h-8 w-1 bg-indigo-300/30 md:h-1 md:w-8 md:mx-2 md:my-0 my-2"></div>
+              </div>
+              <div>
+                <div className="font-semibold text-zinc-100">Book Summary</div>
+                <div className="text-xs text-zinc-400">Describe your book&apos;s main idea and structure</div>
+                <Link href={`/dashboard/books/${bookId}/summary`}>
+                  <button className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
+                    Start with Book Summary
+                  </button>
+                </Link>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full ${book?.summary && book.summary.length >= 30 ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-400 border border-zinc-500'} flex items-center justify-center font-bold`}>2</div>
+              </div>
+              <div>
+                <div className="font-semibold text-zinc-100">Generate TOC</div>
+                <div className="text-xs text-zinc-400">AI generates a Table of Contents from your summary</div>
+                {book?.summary && book.summary.length >= 30 ? (
+                  <Link href={`./generate-toc`}>
+                    <button className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
+                      Generate TOC
+                    </button>
+                  </Link>
+                ) : (
+                  <button className="mt-2 px-4 py-2 bg-zinc-700 text-zinc-400 font-medium rounded-md cursor-not-allowed" disabled>
+                    Complete Book Summary First
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="flex-1"></div>
+            <button
+              className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-md"
+              onClick={() => setEditMode(true)}
+            >
+              Edit Book
+            </button>
+          </div>
+        </div>
+        {/* End Wizard/Stepper Actions */}
         {!editMode ? (
           <>
             {book.cover_image_url && (
@@ -367,7 +392,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           />
         )}
       </div>
-      
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-zinc-800 border border-zinc-700 p-5 rounded-lg lg:col-span-3">
           <div className="flex justify-between items-center mb-6">
@@ -382,7 +406,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
               Add Chapter
             </button>
           </div>
-          
           <div className="space-y-3">
             {book.chapters.map((chapter, index) => (
               <div 
@@ -419,7 +442,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
                 </div>
               </div>
             ))}
-            
             {book.chapters.length === 0 && (
               <div className="text-center p-8 bg-zinc-800/50 rounded-lg border border-zinc-700">
                 <p className="text-zinc-400 mb-4">No chapters yet. Create your first one to get started.</p>
@@ -433,10 +455,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
             )}
           </div>
         </div>
-        
         <div className="bg-zinc-800 border border-zinc-700 p-5 rounded-lg">
           <h2 className="text-xl font-semibold text-zinc-100 mb-4">Book Stats</h2>
-          
           <div className="space-y-3">
             <div>
               <div className="text-sm text-zinc-400 mb-1">Overall Progress</div>
@@ -450,19 +470,16 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
                 <span className="text-zinc-300">{book.progress}%</span>
               </div>
             </div>
-            
             <div className="pt-2">
               <div className="text-sm text-zinc-400 mb-1">Chapters</div>
               <div className="text-zinc-100 font-medium">{book.chapters.length}</div>
             </div>
-            
             <div className="pt-2">
               <div className="text-sm text-zinc-400 mb-1">Total Word Count</div>
               <div className="text-zinc-100 font-medium">
                 {book.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0).toLocaleString()}
               </div>
             </div>
-            
             <div className="pt-2">
               <div className="text-sm text-zinc-400 mb-1">Completed Chapters</div>
               <div className="text-zinc-100 font-medium">
@@ -470,7 +487,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
               </div>
             </div>
           </div>
-          
           <div className="mt-6 pt-4 border-t border-zinc-700">
             <button className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
               Generate PDF Preview

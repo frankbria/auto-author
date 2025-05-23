@@ -191,17 +191,41 @@
 - [X] Verify metadata changes persist between sessions and reloads
 
 ### Documentation Tasks
-- [ ] Document all book metadata fields and their requirements
-- [ ] Update API documentation for book metadata endpoints
-- [ ] Create user guide for editing book info and uploading cover images
-- [ ] Add troubleshooting section for common metadata issues
-- [ ] Document validation rules and error messages
+- [X] Document all book metadata fields and their requirements
+- [X] Update API documentation for book metadata endpoints
+- [X] Create user guide for editing book info and uploading cover images
+- [X] Add troubleshooting section for common metadata issues
+- [X] Document validation rules and error messages
 
 # Epic 3: TOC Generation & Editing
 ## User Story 3.1: Provide Summary Input
-
+### Frontend Tasks
+- [ ] Create summary input interface (text area) with clear labeling and helpful prompts/examples
+- [ ]  Implement voice-to-text functionality for spoken summary input
+- [ ]  Build real-time character/word count and display input guidelines
+- [ ]  Add auto-save for in-progress summaries (local and remote)
+- [ ]  Show summary revision history and allow reverting to previous versions
+- [ ]  Enable "Generate TOC" button only when summary meets minimum requirements
+- [ ]  Handle edge cases: very short/long summaries, failed voice transcription, multilingual input, offensive content, offline input
+### Backend Tasks
+- [ ]  Implement API endpoint for saving/retrieving summary (/api/v1/books/{id}/summary)
+- [ ]  Store summary text and revision history in database
+- [ ]  Add validation for summary length/content (min/max, offensive content filter)
+- [ ]  Support auto-save and offline sync for summary drafts
+### Testing Tasks
+- [ ]  Test summary input (typing and voice) and real-time feedback
+- [ ]  Test auto-save and revision history functionality
+- [ ]  Test API endpoints for summary saving and retrieval
+- [ ]  Test edge cases: short/long summaries, failed transcription, offline mode
+- [ ]  Verify "Generate TOC" button enables/disables correctly
+### Documentation Tasks
+- [ ]  Document summary input requirements and best practices
+- [ ]  Create user guide for summary input and voice-to-text
+- [ ]  Document API endpoints for summary saving/retrieval
+- [ ]  Add troubleshooting for common summary input issues
 
 ## User Story 3.2: Generate TOC from Summary
+- [ ]  Build a TOC generation wizard, which takes the book summary and uses AI to generate 3 - 5 clarifying questions in order to generate a draft TOC and save it in the book record. The backend should handle all AI endpoints and pass information via API endpoints.
 
 
 ## User Story 3.3: Edit and Save TOC
