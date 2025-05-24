@@ -258,7 +258,7 @@ def test_book(test_user):
     }
 
 
-@pytest.mark.asyncio
+@pytest_asyncio.fixture
 async def async_client_factory(monkeypatch, test_user):
     """
     Returns an async function make_client(overrides: dict = None, auth: bool = True)
