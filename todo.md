@@ -200,7 +200,7 @@
 # Epic 3: TOC Generation & Editing
 ## User Story 3.1: Provide Summary Input
 ### Frontend Tasks
-- [ ] Create summary input interface (text area) with clear labeling and helpful prompts/examples
+- [ ]  Create summary input interface (text area) with clear labeling and helpful prompts/examples
 - [ ]  Implement voice-to-text functionality for spoken summary input
 - [ ]  Build real-time character/word count and display input guidelines
 - [ ]  Add auto-save for in-progress summaries (local and remote)

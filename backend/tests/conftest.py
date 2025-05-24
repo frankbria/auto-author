@@ -22,7 +22,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.db import database
+from app.db import base
+import app.db.user as user_dao
+import app.db.book as book_dao
+import app.db.audit_log as audit_log_dao
 from app.api.dependencies import verify_jwt_token
 import app.core.security as sec
 
@@ -53,6 +56,9 @@ class AsyncCollection:
     async def find_one_and_update(self, *args, **kwargs):
         return self._coll.find_one_and_update(*args, **kwargs)
 
+    async def delete_many(self, *args, **kwargs):
+        return self._coll.delete_many(*args, **kwargs)
+
 
 @pytest.fixture(scope="session")
 def client():
@@ -73,90 +79,47 @@ def event_loop():
     yield loop
     # We need to close the loop properly to prevent 'Event loop is closed' errors in future tests
     # But we need to make sure all pending tasks are finished first
-    pending = asyncio.all_tasks(loop)
-    for task in pending:
-        task.cancel()
+    try:
+        # Cancel all pending tasks
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
 
-    # Run the loop until all tasks are done or cancelled
-    if pending:
-        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        # Run the loop until all tasks are done or cancelled
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    except Exception:
+        pass  # Ignore cleanup errors
+    finally:
+        loop.close()
 
-    loop.close()
 
 @pytest.fixture(autouse=True)
 def fake_mongo(monkeypatch):
     """
-    Every test will see database.users_collection and .audit_log_collection
+    Every test will see database.users_collection, database.books_collection and .audit_log_collection
     backed by mongomock in-memory collections.
     """
     sync_client = mongomock.MongoClient()
     sync_db = sync_client["test_db"]
 
-    # patch the two globals in your database module
-    monkeypatch.setattr(database, "users_collection", AsyncCollection(sync_db["users"]))
+    # Create single AsyncCollection instances that will be shared
+    users_collection_wrapper = AsyncCollection(sync_db["users"])
+    books_collection_wrapper = AsyncCollection(sync_db["books"])
+    audit_logs_collection_wrapper = AsyncCollection(sync_db["audit_logs"])
+
+    # patch the globals in your database module
+    monkeypatch.setattr(base, "users_collection", users_collection_wrapper)
+    monkeypatch.setattr(user_dao, "users_collection", users_collection_wrapper)
+    monkeypatch.setattr(base, "audit_logs_collection", audit_logs_collection_wrapper)
     monkeypatch.setattr(
-        database, "audit_logs_collection", AsyncCollection(sync_db["audit_logs"])
+        audit_log_dao, "audit_logs_collection", audit_logs_collection_wrapper
     )
-    monkeypatch.setattr(database, "books_collection", AsyncCollection(sync_db["books"]))
+    monkeypatch.setattr(base, "books_collection", books_collection_wrapper)
+    monkeypatch.setattr(book_dao, "books_collection", books_collection_wrapper)
     yield
     # Clean up: remove our override so other tests aren’t “authed”
     sync_client.drop_database("test_db")
-
-
-### Deprecated fixture: use `auth_client_factory` instead
-@pytest.fixture
-def authenticated_client(client: TestClient, test_user, monkeypatch):
-    """
-    Overrides get_current_user so that all protected endpoints
-    see `test_user` and never raise 401.
-    """
-    app: FastAPI = client.app
-
-    async def always_user():
-        return test_user
-
-    # 1) Override the dependency
-    app.dependency_overrides[get_current_user] = always_user
-
-    # 2) Optionally wrap your client to auto‑inject headers
-    class AuthenticatedClient:
-        def __init__(self, client, headers):
-            self.client = client
-            self.headers = headers
-
-        def get(self, url, **kwargs):
-            kwargs.setdefault("headers", self.headers)
-            return self.client.get(url, **kwargs)
-
-        def post(self, url, **kwargs):
-            kwargs.setdefault("headers", self.headers)
-            return self.client.post(url, **kwargs)
-
-        def put(self, url, **kwargs):
-            kwargs.setdefault("headers", self.headers)
-            return self.client.put(url, **kwargs)
-
-        def delete(self, url, **kwargs):
-            kwargs.setdefault("headers", self.headers)
-            return self.client.delete(url, **kwargs)
-
-        def patch(self, url, **kwargs):
-            kwargs.setdefault("headers", self.headers)
-            return self.client.patch(url, **kwargs)
-
-    # 3) Stub audit_request so it never talks to Mongo
-    async def noop_audit_request(*args, **kwargs):
-        return None
-
-    monkeypatch.setattr(users_endpoint, "audit_request", noop_audit_request)
-
-    fake_headers = {"Authorization": "Bearer does_not_matter"}
-    auth_client = AuthenticatedClient(client, fake_headers)
-
-    yield auth_client
-
-    # Finally: Clean up: remove our override so other tests aren’t “authed”
-    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -225,7 +188,7 @@ def auth_client_factory(monkeypatch, test_user) -> callable:
             user.update(overrides)
 
         # 2) Insert into our mongomock DB
-        database.users_collection._coll.insert_one(user)
+        base.users_collection._coll.insert_one(user)
 
         # 3) Override the audit request
         async def _noop_audit_request(*args, **kwargs):
@@ -295,13 +258,15 @@ def test_book(test_user):
     }
 
 
-@pytest_asyncio.fixture
+@pytest.mark.asyncio
 async def async_client_factory(monkeypatch, test_user):
     """
     Returns an async function make_client(overrides: dict = None, auth: bool = True)
     that yields an AsyncClient whose get_current_user always returns test_user
     (with optional overrides), and which writes into a mongomock test DB.
     """
+    # keep track of every client we hand out
+    created_clients = []
 
     def _seed_user(overrides: dict | None):
         # Clone the fixture user & assign a fresh ObjectId
@@ -311,7 +276,7 @@ async def async_client_factory(monkeypatch, test_user):
         if overrides:
             user.update(overrides)
         # Directly insert into the underlying mongomock collection
-        database.users_collection._coll.insert_one(user)
+        base.users_collection._coll.insert_one(user)
         return user
 
     async def make_client(*, overrides: dict | None = None, auth: bool = True):
@@ -341,9 +306,17 @@ async def async_client_factory(monkeypatch, test_user):
             base_url="http://testserver",
             headers=headers,
         )
+        created_clients.append(client)
         return client
 
     yield make_client
 
     # teardown: clear any dependency overrides you may have set
+    for client in created_clients:
+        try:
+            await client.aclose()
+        except Exception as e:
+            print(f"Error closing client: {e}")
+
+    # Clear any dependency overrides
     app.dependency_overrides.clear()
