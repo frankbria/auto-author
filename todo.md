@@ -229,7 +229,48 @@
 - [X]  Add troubleshooting for common summary input issues
 
 ## User Story 3.2: Generate TOC from Summary
-- [ ]  Build a TOC generation wizard, which takes the book summary and uses AI to generate 3 - 5 clarifying questions in order to generate a draft TOC and save it in the book record. The backend should handle all AI endpoints and pass information via API endpoints.
+### Frontend Tasks
+- [ ]  Create TOC generation wizard component with multi-step interface
+- [ ]  Build AI-generated clarifying questions display component
+- [ ]  Implement user responses collection form for clarifying questions
+- [ ]  Create progress indicator for TOC generation process
+- [ ]  Build hierarchical TOC preview component with chapters and subchapters
+- [ ]  Add "Generate TOC" button integration from summary page
+- [ ]  Implement loading states and generation status indicators
+- [ ]  Create TOC generation results page with accept/regenerate options
+- [ ]  Add tooltips explaining AI's TOC structure decisions
+- [ ]  Build responsive design for TOC wizard on mobile devices
+
+### Backend Tasks
+- [ ]  Implement AI service integration for summary analysis
+- [ ]  Create TOC generation algorithm based on summary content
+- [ ]  Build clarifying questions generation logic (3-5 questions)
+- [ ]  Implement API endpoint for TOC generation requests (/api/v1/books/{id}/generate-toc)
+- [ ]  Create API endpoint for clarifying questions (/api/v1/books/{id}/toc/questions)
+- [ ]  Build API endpoint for processing user responses to questions
+- [ ]  Implement TOC data model with hierarchical structure support
+- [ ]  Add validation for generated TOC structure and content
+- [ ]  Create TOC storage and retrieval in book records
+- [ ]  Implement error handling for AI service failures and timeouts
+- [ ]  Add retry mechanism for failed TOC generation attempts
+
+### Testing Tasks
+- [ ]  Write unit tests for TOC generation wizard components
+- [ ]  Test clarifying questions generation and user response handling
+- [ ]  Create integration tests for TOC generation API endpoints
+- [ ]  Test TOC preview component with various hierarchical structures
+- [ ]  Verify progress indicators and loading states work correctly
+- [ ]  Test edge cases: very brief summaries, complex summaries, ambiguous content
+- [ ]  Test AI service timeout and error recovery mechanisms
+- [ ]  Verify TOC generation works with different book genres and audiences
+- [ ]  Test mobile responsiveness of TOC generation wizard
+- [ ]  Create end-to-end tests for complete TOC generation workflow
+
+### Documentation Tasks
+- [ ]  Document TOC generation requirements and AI integration
+- [ ]  Create user guide for TOC generation wizard workflow
+- [ ]  Document API endpoints for TOC generation and clarifying questions
+- [ ]  Add troubleshooting guide for TOC generation issues and failures
 
 
 ## User Story 3.3: Edit and Save TOC
