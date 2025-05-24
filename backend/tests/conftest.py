@@ -20,9 +20,11 @@ from httpx import AsyncClient, ASGITransport
 import mongomock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from typing import Dict, Optional
 
 from app.main import app
 from app.db import base
+import app.db.database as database_module
 import app.db.user as user_dao
 import app.db.book as book_dao
 import app.db.audit_log as audit_log_dao
@@ -36,34 +38,58 @@ from app.api.endpoints import users as users_endpoint
 from app.api.endpoints import books as books_endpoint
 from bson import ObjectId
 
+pytest_plugins = ["pytest_asyncio"]
+
+
+class MockCursor:
+    def __init__(self, cursor):
+        self._data = cursor
+
+    def skip(self, count):
+        self._data = self._data[count:]
+        return self
+
+    def limit(self, count):
+        self._data = list(self._data)[:count]
+        return self
+
+    async def to_list(self, length=None):
+        return self._data[:length] if length else self._data
+
 
 class AsyncCollection:
     def __init__(self, sync_coll):
         self._coll = sync_coll
 
     async def insert_one(self, doc):
-        # return self._coll.insert_one(doc)
-        return await asyncio.to_thread(self._coll.insert_one, doc)
+        return self._coll.insert_one(doc)
 
     async def update_one(self, *args, **kwargs):
-        # return self._coll.update_one(*args, **kwargs)
-        return await asyncio.to_thread(self._coll.update_one, *args, **kwargs)
+        return self._coll.update_one(*args, **kwargs)
 
     async def find_one(self, *args, **kwargs):
-        # return self._coll.find_one(*args, **kwargs)
-        return await asyncio.to_thread(self._coll.find_one, *args, **kwargs)
+        return self._coll.find_one(*args, **kwargs)
 
     async def delete_one(self, *args, **kwargs):
-        return await asyncio.to_thread(self._coll.delete_one, *args, **kwargs)
+        return self._coll.delete_one(*args, **kwargs)
 
     async def find_one_and_update(self, *args, **kwargs):
-        return await asyncio.to_thread(self._coll.find_one_and_update, *args, **kwargs)
+        return self._coll.find_one_and_update(*args, **kwargs)
 
     async def delete_many(self, *args, **kwargs):
-        return await asyncio.to_thread(self._coll.delete_many, *args, **kwargs)
+        return self._coll.delete_many(*args, **kwargs)
+
+    def find(self, *args, **kwargs):
+        return MockCursor(self._coll.find(*args, **kwargs))
+
+    async def count_documents(self, *args, **kwargs):
+        return self._coll.count_documents(*args, **kwargs)
+
+    async def aggregate(self, *args, **kwargs):
+        return self._coll.aggregate(*args, **kwargs)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def client():
     """
     Create a TestClient instance that will be used for all tests.
@@ -71,12 +97,13 @@ def client():
     return TestClient(app)
 
 
+"""
 @pytest.fixture(scope="function")
 def event_loop():
-    """
+    ""
     Create a fresh event loop for each test function that can be used for asyncio tests.
     Using function scope instead of session prevents 'Event loop is closed' errors
-    """
+    ""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     yield loop
@@ -95,9 +122,10 @@ def event_loop():
         pass  # Ignore cleanup errors
     finally:
         loop.close()
+"""
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 def fake_mongo(monkeypatch):
     """
     Every test will see database.users_collection, database.books_collection and .audit_log_collection
@@ -106,8 +134,8 @@ def fake_mongo(monkeypatch):
     sync_client = mongomock.MongoClient()
     sync_db = sync_client["test_db"]
 
-    monkeypatch.setattr(base, "_client", sync_client)
-    monkeypatch.setattr(base, "_db", sync_db)
+    setattr(base, "_client", sync_client)
+    setattr(base, "_db", sync_db)
 
     # Create single AsyncCollection instances that will be shared
     users_collection_wrapper = AsyncCollection(sync_db["users"])
@@ -115,17 +143,23 @@ def fake_mongo(monkeypatch):
     audit_logs_collection_wrapper = AsyncCollection(sync_db["audit_logs"])
 
     # patch the globals in your database module
-    monkeypatch.setattr(base, "users_collection", users_collection_wrapper)
-    monkeypatch.setattr(user_dao, "users_collection", users_collection_wrapper)
-    monkeypatch.setattr(base, "audit_logs_collection", audit_logs_collection_wrapper)
-    monkeypatch.setattr(
-        audit_log_dao, "audit_logs_collection", audit_logs_collection_wrapper
-    )
-    monkeypatch.setattr(base, "books_collection", books_collection_wrapper)
-    monkeypatch.setattr(book_dao, "books_collection", books_collection_wrapper)
+    setattr(base, "users_collection", users_collection_wrapper)
+    setattr(user_dao, "users_collection", users_collection_wrapper)
+    setattr(base, "audit_logs_collection", audit_logs_collection_wrapper)
+    setattr(audit_log_dao, "audit_logs_collection", audit_logs_collection_wrapper)
+    setattr(base, "books_collection", books_collection_wrapper)
+    setattr(book_dao, "books_collection", books_collection_wrapper)
+
+    setattr(database_module, "users_collection", users_collection_wrapper)
+    setattr(database_module, "books_collection", books_collection_wrapper)
+    setattr(database_module, "audit_logs_collection", audit_logs_collection_wrapper)
     yield
     # Clean up: remove our override so other tests aren’t “authed”
-    sync_client.drop_database("test_db")
+    try:
+        sync_client.drop_database("test_db")
+        sync_client.close()
+    except Exception:
+        pass
 
 
 @pytest.fixture
@@ -176,7 +210,7 @@ def fake_user():
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def auth_client_factory(monkeypatch, test_user) -> callable:
     """
     Returns a function `make_client(overrides: dict = None)`
@@ -197,7 +231,14 @@ def auth_client_factory(monkeypatch, test_user) -> callable:
         base.users_collection._coll.insert_one(user)
 
         # 3) Override the audit request
-        async def _noop_audit_request(*args, **kwargs):
+        async def _noop_audit_request(
+            request: Request,
+            current_user: Dict,
+            action: str,
+            resource_type: str,
+            target_id: Optional[str] = None,
+            **kwargs,
+        ):
             return None
 
         monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit_request)
