@@ -42,22 +42,25 @@ class AsyncCollection:
         self._coll = sync_coll
 
     async def insert_one(self, doc):
-        return self._coll.insert_one(doc)
+        # return self._coll.insert_one(doc)
+        return await asyncio.to_thread(self._coll.insert_one, doc)
 
     async def update_one(self, *args, **kwargs):
-        return self._coll.update_one(*args, **kwargs)
+        # return self._coll.update_one(*args, **kwargs)
+        return await asyncio.to_thread(self._coll.update_one, *args, **kwargs)
 
     async def find_one(self, *args, **kwargs):
-        return self._coll.find_one(*args, **kwargs)
+        # return self._coll.find_one(*args, **kwargs)
+        return await asyncio.to_thread(self._coll.find_one, *args, **kwargs)
 
     async def delete_one(self, *args, **kwargs):
-        return self._coll.delete_one(*args, **kwargs)
+        return await asyncio.to_thread(self._coll.delete_one, *args, **kwargs)
 
     async def find_one_and_update(self, *args, **kwargs):
-        return self._coll.find_one_and_update(*args, **kwargs)
+        return await asyncio.to_thread(self._coll.find_one_and_update, *args, **kwargs)
 
     async def delete_many(self, *args, **kwargs):
-        return self._coll.delete_many(*args, **kwargs)
+        return await asyncio.to_thread(self._coll.delete_many, *args, **kwargs)
 
 
 @pytest.fixture(scope="session")
@@ -102,6 +105,9 @@ def fake_mongo(monkeypatch):
     """
     sync_client = mongomock.MongoClient()
     sync_db = sync_client["test_db"]
+
+    monkeypatch.setattr(base, "_client", sync_client)
+    monkeypatch.setattr(base, "_db", sync_db)
 
     # Create single AsyncCollection instances that will be shared
     users_collection_wrapper = AsyncCollection(sync_db["users"])
