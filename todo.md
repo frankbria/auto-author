@@ -5,7 +5,11 @@
 
 ### Frontend Tasks
 - [X] Install Clerk SDK and dependencies in the frontend
-- [X] Set up Clerk provider in the Next.js app
+- [X] Set up Clerk provider in### Documentation Tasks
+- [X]  Document summary input requirements and best practices
+- [X]  Create user guide for summary input and voice-to-text
+- [X]  Document API endpoints for summary saving/retrieval
+- [X]  Add troubleshooting for common summary input issuesNext.js app
 - [X] Implement Clerk SignUp component in registration page
 - [X] Customize Clerk UI to match application design
 - [X] Configure allowed authentication methods (email/password, social logins)
@@ -200,29 +204,29 @@
 # Epic 3: TOC Generation & Editing
 ## User Story 3.1: Provide Summary Input
 ### Frontend Tasks
-- [ ]  Create summary input interface (text area) with clear labeling and helpful prompts/examples
-- [ ]  Implement voice-to-text functionality for spoken summary input
-- [ ]  Build real-time character/word count and display input guidelines
-- [ ]  Add auto-save for in-progress summaries (local and remote)
-- [ ]  Show summary revision history and allow reverting to previous versions
-- [ ]  Enable "Generate TOC" button only when summary meets minimum requirements
-- [ ]  Handle edge cases: very short/long summaries, failed voice transcription, multilingual input, offensive content, offline input
+- [X]  Create summary input interface (text area) with clear labeling and helpful prompts/examples
+- [X]  Implement voice-to-text functionality for spoken summary input
+- [X]  Build real-time character/word count and display input guidelines
+- [X]  Add auto-save for in-progress summaries (local and remote)
+- [X]  Show summary revision history and allow reverting to previous versions
+- [X]  Enable "Generate TOC" button only when summary meets minimum requirements
+- [X]  Handle edge cases: very short/long summaries, failed voice transcription, multilingual input, offensive content, offline input
 ### Backend Tasks
-- [ ]  Implement API endpoint for saving/retrieving summary (/api/v1/books/{id}/summary)
-- [ ]  Store summary text and revision history in database
-- [ ]  Add validation for summary length/content (min/max, offensive content filter)
-- [ ]  Support auto-save and offline sync for summary drafts
+- [X]  Implement API endpoint for saving/retrieving summary (/api/v1/books/{id}/summary)
+- [X]  Store summary text and revision history in database
+- [X]  Add validation for summary length/content (min/max, offensive content filter)
+- [X]  Support auto-save and offline sync for summary drafts
 ### Testing Tasks
-- [ ]  Test summary input (typing and voice) and real-time feedback
-- [ ]  Test auto-save and revision history functionality
-- [ ]  Test API endpoints for summary saving and retrieval
-- [ ]  Test edge cases: short/long summaries, failed transcription, offline mode
-- [ ]  Verify "Generate TOC" button enables/disables correctly
+- [X]  Test summary input (typing and voice) and real-time feedback
+- [X]  Test auto-save and revision history functionality
+- [X]  Test API endpoints for summary saving and retrieval
+- [X]  Test edge cases: short/long summaries, failed transcription, offline mode
+- [X]  Verify "Generate TOC" button enables/disables correctly
 ### Documentation Tasks
-- [ ]  Document summary input requirements and best practices
-- [ ]  Create user guide for summary input and voice-to-text
-- [ ]  Document API endpoints for summary saving/retrieval
-- [ ]  Add troubleshooting for common summary input issues
+- [X]  Document summary input requirements and best practices
+- [X]  Create user guide for summary input and voice-to-text
+- [X]  Document API endpoints for summary saving/retrieval
+- [X]  Add troubleshooting for common summary input issues
 
 ## User Story 3.2: Generate TOC from Summary
 - [ ]  Build a TOC generation wizard, which takes the book summary and uses AI to generate 3 - 5 clarifying questions in order to generate a draft TOC and save it in the book record. The backend should handle all AI endpoints and pass information via API endpoints.
