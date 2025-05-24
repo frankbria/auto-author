@@ -443,10 +443,9 @@ export default function HelpPage() {
                 </h2>
               )}
               
-              {/* Search Results */}
-              {searchQuery && (
+              {/* Search Results */}              {searchQuery && (
                 <h2 className="text-xl font-semibold text-zinc-100 mb-4">
-                  Search results for "{searchQuery}"
+                  Search results for &ldquo;{searchQuery}&rdquo;
                 </h2>
               )}
               
@@ -456,9 +455,8 @@ export default function HelpPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-zinc-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <h3 className="text-lg font-medium text-zinc-300 mb-2">No articles found</h3>
-                  <p className="text-zinc-400">
-                    Try adjusting your search or filter to find what you're looking for
+                  <h3 className="text-lg font-medium text-zinc-300 mb-2">No articles found</h3>                  <p className="text-zinc-400">
+                    Try adjusting your search or filter to find what you&rsquo;re looking for
                   </p>
                 </div>
               )}

@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import useOptimizedClerkImage from '@/hooks/useOptimizedClerkImage';
 
 interface StyledAvatarProps {

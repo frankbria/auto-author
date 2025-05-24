@@ -242,17 +242,18 @@
 - [ ]  Build responsive design for TOC wizard on mobile devices
 
 ### Backend Tasks
-- [ ]  Implement AI service integration for summary analysis
-- [ ]  Create TOC generation algorithm based on summary content
-- [ ]  Build clarifying questions generation logic (3-5 questions)
-- [ ]  Implement API endpoint for TOC generation requests (/api/v1/books/{id}/generate-toc)
-- [ ]  Create API endpoint for clarifying questions (/api/v1/books/{id}/toc/questions)
-- [ ]  Build API endpoint for processing user responses to questions
-- [ ]  Implement TOC data model with hierarchical structure support
-- [ ]  Add validation for generated TOC structure and content
-- [ ]  Create TOC storage and retrieval in book records
-- [ ]  Implement error handling for AI service failures and timeouts
-- [ ]  Add retry mechanism for failed TOC generation attempts
+- [x]  Implement AI service integration for summary analysis
+- [x]  Create TOC generation algorithm based on summary content
+- [x]  Build clarifying questions generation logic (3-5 questions)
+- [x]  Implement API endpoint for TOC generation requests (/api/v1/books/{id}/generate-toc)
+- [x]  Create API endpoint for clarifying questions (/api/v1/books/{id}/generate-questions)
+- [x]  Build API endpoint for processing user responses to questions (/api/v1/books/{id}/question-responses)
+- [x]  Create API endpoint to check TOC generation readiness (/api/v1/books/{id}/toc-readiness)
+- [x]  Implement TOC data model with hierarchical structure support
+- [x]  Add validation for generated TOC structure and content
+- [x]  Create TOC storage and retrieval in book records
+- [x]  Implement error handling for AI service failures and timeouts
+- [x]  Add retry mechanism for failed TOC generation attempts
 
 ### Testing Tasks
 - [ ]  Write unit tests for TOC generation wizard components

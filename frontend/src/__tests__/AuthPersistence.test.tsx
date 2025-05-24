@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { useAuth } from '@clerk/nextjs';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useRouter } from 'next/navigation';

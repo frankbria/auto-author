@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 
 type AIStyle = {
   id: string;
@@ -19,7 +18,6 @@ type IntegrationStatus = {
 };
 
 export default function SettingsPage() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('general');
   const [theme, setTheme] = useState('dark');
@@ -395,9 +393,8 @@ export default function SettingsPage() {
                           <h3 className="font-medium text-zinc-200">{style.name}</h3>
                           <div className={`w-4 h-4 rounded-full ${defaultAiStyle === style.id ? 'bg-indigo-500' : 'bg-zinc-700'}`}></div>
                         </div>
-                        <p className="text-zinc-400 text-sm mb-3">{style.description}</p>
-                        <div className="bg-zinc-900 rounded p-3 text-zinc-300 text-sm italic">
-                          "{style.example}"
+                        <p className="text-zinc-400 text-sm mb-3">{style.description}</p>                        <div className="bg-zinc-900 rounded p-3 text-zinc-300 text-sm italic">
+                          &ldquo;{style.example}&rdquo;
                         </div>
                       </div>
                     ))}

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 
 // Form components that are compatible with the BookCreationWizard
-export interface FormItemProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type FormItemProps = React.HTMLAttributes<HTMLDivElement>;
 
 export const FormItem = React.forwardRef<HTMLDivElement, FormItemProps>(
   ({ className, ...props }, ref) => {
@@ -20,7 +20,7 @@ export const FormItem = React.forwardRef<HTMLDivElement, FormItemProps>(
 );
 FormItem.displayName = 'FormItem';
 
-export interface FormLabelProps extends React.ComponentProps<typeof Label> {}
+export type FormLabelProps = React.ComponentProps<typeof Label>;
 
 export const FormLabel = React.forwardRef<HTMLLabelElement, FormLabelProps>(
   ({ className, ...props }, ref) => {
@@ -35,7 +35,7 @@ export const FormLabel = React.forwardRef<HTMLLabelElement, FormLabelProps>(
 );
 FormLabel.displayName = 'FormLabel';
 
-export interface FormControlProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type FormControlProps = React.HTMLAttributes<HTMLDivElement>;
 
 export const FormControl = React.forwardRef<HTMLDivElement, FormControlProps>(
   ({ className, ...props }, ref) => {
@@ -50,7 +50,7 @@ export const FormControl = React.forwardRef<HTMLDivElement, FormControlProps>(
 );
 FormControl.displayName = 'FormControl';
 
-export interface FormDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {}
+export type FormDescriptionProps = React.HTMLAttributes<HTMLParagraphElement>;
 
 export const FormDescription = React.forwardRef<HTMLParagraphElement, FormDescriptionProps>(
   ({ className, ...props }, ref) => {

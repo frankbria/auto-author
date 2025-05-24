@@ -3,9 +3,14 @@ import SummaryInput from '../components/SummaryInput';
 import React from 'react';
 
 // Mock for Web Speech API
+interface MockSpeechRecognitionEvent {
+  resultIndex: number;
+  results: Array<Array<{ transcript: string }>>;
+}
+
 class MockSpeechRecognition {
-  public onresult: ((event: any) => void) | null = null;
-  public onerror: ((event: any) => void) | null = null;
+  public onresult: ((event: MockSpeechRecognitionEvent) => void) | null = null;
+  public onerror: ((event: Event) => void) | null = null;
   public onend: (() => void) | null = null;
   public continuous = false;
   public interimResults = false;
@@ -30,9 +35,9 @@ class MockSpeechRecognition {
 
 describe('SummaryInput', () => {
   beforeAll(() => {
-    // @ts-ignore
+    // @ts-expect-error - Mocking global speech recognition
     window.SpeechRecognition = MockSpeechRecognition;
-    // @ts-ignore
+    // @ts-expect-error - Mocking webkit speech recognition
     window.webkitSpeechRecognition = MockSpeechRecognition;
   });
 
@@ -74,11 +79,10 @@ describe('SummaryInput auto-save and revision history', () => {
     fireEvent.change(textarea, { target: { value: 'Auto-save test summary.' } });
     expect(localStorage.getItem(key)).toBe('Auto-save test summary.');
   });
-
   it('shows revision history and allows reverting', async () => {
     // Simulate a parent component managing revision history
     let value = 'First version.';
-    let history = ['First version.'];
+    const history = ['First version.'];
     const handleChange = (v: string) => {
       value = v;
       history.push(v);

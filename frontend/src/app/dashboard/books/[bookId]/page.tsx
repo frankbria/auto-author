@@ -82,7 +82,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
-  const [summary, setSummary] = useState<string>('');
+  const [summary, setSummary] = useState('');
 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);
@@ -171,36 +171,12 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       genre: book.genre,
       target_audience: book.target_audience,
       cover_image_url: book.cover_image_url,
-    });
-  }, [book]);
+    });  }, [book, form]);
 
-  const [coverPreview, setCoverPreview] = useState<string | null>(book?.cover_image_url || null);
   const [isSaving, setIsSaving] = useState(false);
-  const [hasCommitted, setHasCommitted] = useState(false);
-
-  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Invalid file type. Please upload an image.');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image too large. Max size is 2MB.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setCoverPreview(ev.target?.result as string);
-      // In production, upload the file and get a URL, then update the form value
-      // For now, just preview
-    };
-    reader.readAsDataURL(file);
-  };
-
   // Auto-save on form change
   useEffect(() => {
-    const subscription = form.watch(async (values, { name }) => {
+    const subscription = form.watch(async (values) => {
       if (!book) return;
       setIsSaving(true);
       try {
@@ -335,12 +311,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
               </div>
             </div>
             <div className="flex-1"></div>
-            <button
-              className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-md"
-              onClick={() => setEditMode(true)}
-            >
-              Edit Book
-            </button>
           </div>
         </div>
         {/* End Wizard/Stepper Actions */}
@@ -365,31 +335,38 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
             </button>
           </>
         ) : (
-          <BookMetadataForm
-            book={{
-              title: book.title || '',
-              subtitle: book.subtitle || '',
-              description: book.description || '',
-              genre: book.genre || '',
-              target_audience: book.target_audience || '',
-              cover_image_url: book.cover_image_url || '',
-            }}
-            onUpdate={async (values) => {
-              setIsSaving(true);
-              try {
-                await bookClient.updateBook(book.id, values);
-                toast.success('Book info saved');
-                setHasCommitted(true);
-                setBook({ ...book, ...values });
-              } catch {
-                toast.error('Failed to save book info');
-              } finally {
-                setIsSaving(false);
-              }
-            }}
-            isSaving={isSaving}
-            error={error}
-          />
+          <>
+            <BookMetadataForm
+              book={{
+                title: book.title || '',
+                subtitle: book.subtitle || '',
+                description: book.description || '',
+                genre: book.genre || '',
+                target_audience: book.target_audience || '',
+                cover_image_url: book.cover_image_url || '',
+              }}
+              onUpdate={async (values) => {
+                setIsSaving(true);
+                try {
+                  await bookClient.updateBook(book.id, values);
+                  toast.success('Book info saved');
+                  setBook({ ...book, ...values });
+                } catch {
+                  toast.error('Failed to save book info');
+                } finally {
+                  setIsSaving(false);
+                }
+              }}
+              isSaving={isSaving}
+              error={error}
+            />
+            <button
+              className="mt-4 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-md"
+              onClick={() => setEditMode(false)}
+            >
+              Cancel
+            </button>
+          </>
         )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">

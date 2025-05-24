@@ -129,6 +129,195 @@ export class BookClient {
       throw new Error(`Failed to delete book: ${response.status} ${error}`);
     }
   }
+
+  /**
+   * Check if a book's summary is ready for TOC generation
+   */
+  public async checkTocReadiness(bookId: string): Promise<{
+    is_ready_for_toc: boolean;
+    confidence_score: number;
+    analysis: string;
+    suggestions: string[];
+    word_count: number;
+    character_count: number;
+    meets_minimum_requirements: boolean;
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/toc-readiness`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to check TOC readiness: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Generate clarifying questions for TOC creation
+   */
+  public async generateQuestions(bookId: string): Promise<{
+    questions: string[];
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/generate-questions`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to generate questions: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Generate TOC from summary and question responses
+   */
+  public async generateToc(bookId: string, questionResponses: Array<{
+    question: string;
+    answer: string;
+  }>): Promise<{
+    toc: {
+      chapters: Array<{
+        id: string;
+        title: string;
+        description: string;
+        level: number;
+        order: number;
+        subchapters: Array<{
+          id: string;
+          title: string;
+          description: string;
+          level: number;
+          order: number;
+        }>;
+      }>;
+      total_chapters: number;
+      estimated_pages: number;
+      structure_notes: string;
+    };
+    success: boolean;
+    chapters_count: number;
+    has_subchapters: boolean;
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/generate-toc`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ question_responses: questionResponses }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to generate TOC: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get current TOC for a book
+   */
+  public async getToc(bookId: string): Promise<{
+    toc: {
+      chapters: Array<{
+        id: string;
+        title: string;
+        description: string;
+        level: number;
+        order: number;
+        subchapters: Array<{
+          id: string;
+          title: string;
+          description: string;
+          level: number;
+          order: number;
+        }>;
+      }>;
+      total_chapters: number;
+      estimated_pages: number;
+      structure_notes: string;
+    } | null;
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/toc`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get TOC: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Update TOC for a book
+   */
+  public async updateToc(bookId: string, toc: {
+    chapters: Array<{
+      id: string;
+      title: string;
+      description: string;
+      level: number;
+      order: number;
+      subchapters: Array<{
+        id: string;
+        title: string;
+        description: string;
+        level: number;
+        order: number;
+      }>;
+    }>;
+    total_chapters: number;
+    estimated_pages: number;
+    structure_notes: string;  }): Promise<{
+    toc: {
+      chapters: Array<{
+        id: string;
+        title: string;
+        description: string;
+        level: number;
+        order: number;
+        subchapters: Array<{
+          id: string;
+          title: string;
+          description: string;
+          level: number;
+          order: number;
+        }>;
+      }>;
+      total_chapters: number;
+      estimated_pages: number;
+      structure_notes: string;
+    };
+    success: boolean;
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/toc`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ toc }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to update TOC: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get the summary and revision history for a book
+   */
+  public async getBookSummary(bookId: string): Promise<{ summary: string; summary_history?: unknown[] }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/summary`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to fetch book summary: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
 }
 
 // Create a singleton instance for use throughout the app

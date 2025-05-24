@@ -6,12 +6,12 @@ import { useRouter } from 'next/navigation';
 import useOptimizedClerkImage from '@/hooks/useOptimizedClerkImage';
 import useProfileApi from '@/hooks/useProfileApi';
 import Image from 'next/image';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { 
   Form, 
-  FormField, 
-  useForm,
-  zodResolver,
-  z
+  FormField
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

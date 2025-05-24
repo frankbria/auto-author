@@ -16,9 +16,7 @@ type Chapter = {
 export default function EditTOCPage() {
   const router = useRouter();
   const [toc, setToc] = useState<Chapter[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);  const [error, setError] = useState('');
   
   // Fetch the TOC when component mounts
   useEffect(() => {
