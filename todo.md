@@ -265,19 +265,118 @@
 - [X]  Test AI service timeout and error recovery mechanisms <!-- Covered by backend tests for error handling and retry logic. -->
 - [X]  Verify TOC generation works with different book genres and audiences
 - [X]  Test mobile responsiveness of TOC generation wizard
-- [ ]  Create end-to-end tests for complete TOC generation workflow
+- [X]  Create end-to-end tests for complete TOC generation workflow
 
 ### Documentation Tasks
-- [ ]  Document TOC generation requirements and AI integration
-- [ ]  Create user guide for TOC generation wizard workflow
-- [ ]  Document API endpoints for TOC generation and clarifying questions
-- [ ]  Add troubleshooting guide for TOC generation issues and failures
+- [X]  Document TOC generation requirements and AI integration
+- [X]  Create user guide for TOC generation wizard workflow
+- [X]  Document API endpoints for TOC generation and clarifying questions
+- [X]  Add troubleshooting guide for TOC generation issues and failures
 
 
 ## User Story 3.3: Edit and Save TOC
 
+### Frontend Tasks
+- [ ] Create interactive TOC editor interface with chapter/subchapter list
+- [ ] Implement drag-and-drop functionality for reordering chapters and subchapters
+- [ ] Add inline editing for chapter titles and descriptions
+- [ ] Build chapter/subchapter addition and deletion controls
+- [ ] Implement chapter hierarchy visualization (indentation, connecting lines)
+- [ ] Create hierarchy manipulation controls (promote/demote chapters)
+- [ ] Add validation for chapter titles (required, length limits)
+- [ ] Implement confirmation dialogs for destructive actions (delete)
+- [ ] Create responsive layout for TOC editor on mobile devices
+- [ ] Add keyboard navigation and accessibility features
+- [ ] Implement undo/redo functionality for TOC edits
+- [ ] Add visual feedback for successful saves and error states
+
+### Backend Tasks
+- [ ] Create API endpoint for updating TOC structure (/api/v1/books/{id}/toc)
+- [ ] Implement validation for TOC update requests
+- [ ] Build chapter order and hierarchy maintenance logic
+- [ ] Add data integrity checks for TOC updates
+- [ ] Implement versioning for TOC changes
+- [ ] Create API endpoints for individual chapter CRUD operations
+- [ ] Add authorization checks for TOC edit operations
+- [ ] Implement rate limiting for TOC update requests
+- [ ] Create efficient batch update mechanism for multiple changes
+
+### Testing Tasks
+- [ ] Test drag-and-drop reordering functionality
+- [ ] Verify inline editing for chapter titles and descriptions
+- [ ] Test chapter/subchapter addition and deletion
+- [ ] Validate hierarchy manipulation (promoting/demoting chapters)
+- [ ] Test undo/redo functionality for multiple operations
+- [ ] Verify API endpoints for TOC updating
+- [ ] Test validation and error handling for invalid TOC structures
+- [ ] Verify mobile responsiveness of TOC editor
+- [ ] Test keyboard navigation and accessibility
+- [ ] Create integration tests for complete TOC editing workflow
+- [ ] Test performance with large TOC structures (many chapters/subchapters)
+
+### Documentation Tasks
+- [ ] Document TOC editing interface features and capabilities
+- [ ] Create user guide for TOC editing workflow
+- [ ] Document API endpoints for TOC updating
+- [ ] Add troubleshooting guide for TOC editing issues
+- [ ] Create guidance for effective TOC organization
+- [ ] Document keyboard shortcuts and accessibility features
+- [ ] Update API documentation with TOC editing endpoints
+
 
 ## User Story 3.4: TOC Persistence
+
+### Frontend Tasks
+- [ ] Implement auto-save functionality for TOC changes with appropriate timing
+- [ ] Create manual save button with loading and success/error states
+- [ ] Build version history interface to view and restore previous TOC versions
+- [ ] Implement conflict resolution UI for simultaneous edits
+- [ ] Add offline mode detection and synchronization when reconnected
+- [ ] Create local storage backup for unsaved changes
+- [ ] Implement session recovery after browser/tab crashes
+- [ ] Add visual indicators for save status (saved, saving, offline)
+- [ ] Create export functionality for TOC (PDF, DOCX formats)
+- [ ] Add progress indicators for TOC loading/saving operations
+- [ ] Implement warning system for unsaved changes on page navigation
+- [ ] Add error handling and recovery UI for failed save operations
+
+### Backend Tasks
+- [ ] Enhance TOC database schema to support version history
+- [ ] Implement API endpoint for retrieving TOC version history
+- [ ] Create API endpoint for restoring previous TOC versions
+- [ ] Build export service for generating TOC documents (PDF, DOCX)
+- [ ] Implement conflict detection and resolution for concurrent edits
+- [ ] Create efficient delta-based TOC update mechanism
+- [ ] Add data validation and sanitization for TOC persistence
+- [ ] Implement automated backups of TOC data
+- [ ] Create throttling mechanism for frequent save operations
+- [ ] Implement transaction-based TOC updates to prevent partial saves
+- [ ] Add metadata for TOC versions (timestamp, user, change description)
+- [ ] Build cross-book TOC copying functionality
+
+### Testing Tasks
+- [ ] Test auto-save functionality with different change frequencies
+- [ ] Verify manual save operation and feedback
+- [ ] Test offline mode and synchronization when connection is restored
+- [ ] Validate version history retrieval and restoration
+- [ ] Test export functionality for different formats
+- [ ] Verify session recovery after simulated crashes
+- [ ] Test conflict resolution with simultaneous edits
+- [ ] Validate data integrity after save operations
+- [ ] Test performance with large TOC structures and frequent saves
+- [ ] Verify cross-book TOC copying functionality
+- [ ] Test throttling mechanism for rapid changes
+- [ ] Validate error handling and recovery procedures
+
+### Documentation Tasks
+- [ ] Document TOC persistence mechanisms and behaviors
+- [ ] Create user guide for version history and restoration
+- [ ] Document export functionality and supported formats
+- [ ] Add troubleshooting guide for TOC persistence issues
+- [ ] Create API documentation for TOC persistence endpoints
+- [ ] Document offline capability and synchronization behavior
+- [ ] Add guidance for conflict resolution during concurrent editing
+- [ ] Document backup and recovery procedures
 
 
 # Epic 4: Chapter Content Creation

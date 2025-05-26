@@ -58,6 +58,22 @@ For detailed documentation about our Clerk integration:
 - [Profile Management Guide](docs/profile-management-guide.md)
 - [API Profile Endpoints](docs/api-profile-endpoints.md)
 
+## 📚 Table of Contents Generation
+
+Auto Author uses AI to generate structured table of contents from book summaries:
+
+- **AI-Powered Analysis**: Convert summaries into comprehensive chapter structures
+- **Interactive Wizard**: Step-by-step guidance through the TOC creation process
+- **Clarifying Questions**: Targeted questions to improve TOC quality
+- **Visual Editing**: Intuitive interface for refining the generated structure
+- **Hierarchical Organization**: Support for chapters and nested subchapters
+
+For detailed documentation about TOC generation:
+- [TOC Generation Requirements](docs/toc-generation-requirements.md)
+- [TOC Generation User Guide](docs/user-guide-toc-generation.md)
+- [API TOC Endpoints](docs/api-toc-endpoints.md)
+- [Troubleshooting TOC Generation](docs/troubleshooting-toc-generation.md)
+
 ## 🧑‍💻 Getting Started (Development)
 
 ### Prerequisites
