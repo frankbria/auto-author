@@ -1,18 +1,19 @@
-import pytest
+import pytest, pytest_asyncio
 from unittest.mock import patch, AsyncMock
 import app
 
 
-def test_account_deletion_successful(auth_client_factory):
+@pytest.mark.asyncio
+async def test_account_deletion_successful(auth_client_factory):
     """
     Test successful account deletion.
     Verifies that the account deletion process works correctly.
     """
     # Get authenticated client with default test user
-    client = auth_client_factory()
+    client = await auth_client_factory()
 
     # Make the request to delete account
-    response = client.delete("/api/v1/users/me")
+    response = await client.delete("/api/v1/users/me")
 
     # Assert successful response
     assert response.status_code == 200
@@ -32,6 +33,7 @@ def test_account_deletion_user_not_found(auth_client_factory, fake_user):
     # Get authenticated client with fake user data
     client = auth_client_factory(
         {
+            "auth": False,
             "clerk_id": fake_user["clerk_id"],
             "email": fake_user["email"],
             "first_name": fake_user["first_name"],
@@ -72,15 +74,17 @@ def test_account_deletion_with_data_cleanup(auth_client_factory):
     # Verify that the books were deleted
 
 
-def test_account_deletion_requires_authentication(client):
+@pytest.mark.asyncio
+async def test_account_deletion_requires_authentication(auth_client_factory):
     """
     Test that account deletion requires authentication.
     Verifies that unauthenticated requests are rejected.
     """
     # Use the unauthenticated client fixture directly
+    client = await auth_client_factory(auth=False)
 
     # Make the request without authentication headers
-    response = client.delete("/api/v1/users/me")
+    response = await client.delete("/api/v1/users/me")
 
     # Assert forbidden response - expect 403 Forbidden precisely
     assert response.status_code == 403
@@ -122,12 +126,13 @@ def test_admin_delete_other_account(auth_client_factory):
         delete_user_mock.assert_called_once()
 
 
-def test_regular_user_cannot_delete_other_account(auth_client_factory):
+@pytest.mark.asyncio
+async def test_regular_user_cannot_delete_other_account(auth_client_factory):
     """
     Test that regular users cannot delete another user's account.
     """
     # Create regular user with auth_client_factory
-    client = auth_client_factory(
+    client = await auth_client_factory(
         overrides={"role": "user", "clerk_id": "regular_user_clerk_id"}
     )
 
@@ -135,7 +140,7 @@ def test_regular_user_cannot_delete_other_account(auth_client_factory):
     target_user_id = "different_clerk_id"
 
     # Make the request to delete another user's account
-    response = client.delete(f"/api/v1/users/{target_user_id}")
+    response = await client.delete(f"/api/v1/users/{target_user_id}")
 
     # Assert forbidden response
     assert response.status_code == 403

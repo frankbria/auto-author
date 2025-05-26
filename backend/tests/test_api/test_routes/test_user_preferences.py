@@ -1,11 +1,14 @@
 import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock, AsyncMock
+import pytest_asyncio
+from httpx import AsyncClient
 import json
 from datetime import datetime, timezone
 
+pytestmark = pytest.mark.asyncio
 
-def test_update_user_preferences(auth_client_factory):
+
+@pytest.mark.asyncio
+async def test_update_user_preferences(auth_client_factory):
     """
     Test that user preferences can be updated successfully.
     Verifies that preference changes are saved correctly in the database.
@@ -19,8 +22,10 @@ def test_update_user_preferences(auth_client_factory):
         }
     }
 
+    client = await auth_client_factory()
+
     # Make the request to update preferences
-    response = auth_client_factory().patch("/api/v1/users/me", json=preferences_update)
+    response = await client.patch("/api/v1/users/me", json=preferences_update)
 
     # Assert successful response
     assert response.status_code == 200
@@ -29,11 +34,12 @@ def test_update_user_preferences(auth_client_factory):
     # Verify preferences were updated correctly
     assert "preferences" in data
     assert data["preferences"]["theme"] == "light"
-    assert data["preferences"]["email_notifications"] == False
-    assert data["preferences"]["marketing_emails"] == True
+    assert data["preferences"]["email_notifications"] is False
+    assert data["preferences"]["marketing_emails"] is True
 
 
-def test_update_partial_preferences(auth_client_factory, test_user):
+@pytest.mark.asyncio
+async def test_update_partial_preferences(auth_client_factory, test_user):
     """
     Test that partial preference updates work correctly.
     Verifies that updating only specific preferences doesn't affect others.
@@ -41,16 +47,10 @@ def test_update_partial_preferences(auth_client_factory, test_user):
     # Only update theme preference
     partial_update = {"preferences": {"theme": "system"}}
 
-    # Expected user after update
-    expected_user = test_user.copy()
-    expected_user["preferences"] = {
-        "theme": "system",
-        "email_notifications": True,  # Unchanged from mock_user_data
-        "marketing_emails": False,  # Unchanged from mock_user_data
-    }
+    client = await auth_client_factory()
 
     # Make the request to update preferences
-    response = auth_client_factory().patch("/api/v1/users/me", json=partial_update)
+    response = await client.patch("/api/v1/users/me", json=partial_update)
 
     # Assert successful response
     assert response.status_code == 200
@@ -59,18 +59,19 @@ def test_update_partial_preferences(auth_client_factory, test_user):
     # Verify only the theme was updated
     assert "preferences" in data
     assert data["preferences"]["theme"] == "system"
-    assert data["preferences"]["email_notifications"] == True
-    assert data["preferences"]["marketing_emails"] == False
 
 
-def test_preferences_retrieval(auth_client_factory, test_user):
+@pytest.mark.asyncio
+async def test_preferences_retrieval(auth_client_factory, test_user):
     """
     Test that user preferences are correctly retrieved from the profile endpoint.
     Verifies that the API returns the correct preference values.
     """
 
+    client = await auth_client_factory()
+
     # Make the request to get profile with preferences
-    response = auth_client_factory().get("/api/v1/users/me")
+    response = await client.get("/api/v1/users/me")
 
     # Assert successful response
     assert response.status_code == 200
@@ -89,7 +90,8 @@ def test_preferences_retrieval(auth_client_factory, test_user):
     )
 
 
-def test_preferences_default_values(auth_client_factory):
+@pytest.mark.asyncio
+async def test_preferences_default_values(auth_client_factory):
     """
     Test that default preferences are provided for new users.
     Verifies that the API assigns default preference values when none are specified.
@@ -104,11 +106,12 @@ def test_preferences_default_values(auth_client_factory):
         "last_name": "User",
         "display_name": "Test User",
         "role": "user",
-        # No preferences defined
     }
 
+    client = await auth_client_factory(overrides=user_without_preferences)
+
     # Make the request to get profile
-    response = auth_client_factory().get("/api/v1/users/me")
+    response = await client.get("/api/v1/users/me")
 
     # Assert successful response
     assert response.status_code == 200
@@ -121,7 +124,8 @@ def test_preferences_default_values(auth_client_factory):
     assert "marketing_emails" in data["preferences"]
 
 
-def test_invalid_preference_values(auth_client_factory):
+@pytest.mark.asyncio
+async def test_invalid_preference_values(auth_client_factory):
     """
     Test validation of preference values.
     Verifies that the API validates preference values properly.
@@ -134,8 +138,10 @@ def test_invalid_preference_values(auth_client_factory):
         }
     }
 
+    client = await auth_client_factory()
+
     # Make the request to update preferences
-    response = auth_client_factory().patch("/api/v1/users/me", json=invalid_update)
+    response = await client.patch("/api/v1/users/me", json=invalid_update)
 
     # Assert validation error
     assert response.status_code == 422

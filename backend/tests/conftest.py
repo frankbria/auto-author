@@ -1,6 +1,30 @@
+import sys
+import asyncio
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+import pytest
+import pymongo
+
+
 import app.api.dependencies as deps
 from fastapi import Request
+import motor.motor_asyncio
+import app.db.user as users_dao
+import app.db.book as books_dao
+import app.db.audit_log as audit_log_dao
+from app.db import base
+from app import db
 
+
+# Patch the DB connection for tests to use a real MongoDB instance
+TEST_MONGO_URI = "mongodb://localhost:27017/auto-author-test"
+_sync_client = pymongo.MongoClient(TEST_MONGO_URI)
+_sync_db = _sync_client.get_default_database()
+_sync_users = _sync_db.get_collection("users")
+_sync_books = _sync_db.get_collection("books")
+_sync_logs = _sync_db.get_collection("audit_logs")
 
 def fake_get_rate_limiter(limit: int = 10, window: int = 60):
     """
@@ -17,20 +41,11 @@ def fake_get_rate_limiter(limit: int = 10, window: int = 60):
 deps.get_rate_limiter = fake_get_rate_limiter
 import pytest, pytest_asyncio
 from httpx import AsyncClient, ASGITransport
-import mongomock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from typing import Dict, Optional
-
 from app.main import app
-from app.db import base
-import app.db.database as database_module
-import app.db.user as user_dao
-import app.db.book as book_dao
-import app.db.audit_log as audit_log_dao
-from app.api.dependencies import verify_jwt_token
 import app.core.security as sec
-
 import asyncio
 from datetime import datetime, timezone
 from app.core.security import get_current_user
@@ -40,53 +55,37 @@ from bson import ObjectId
 
 pytest_plugins = ["pytest_asyncio"]
 
-
-class MockCursor:
-    def __init__(self, cursor):
-        self._data = cursor
-
-    def skip(self, count):
-        self._data = self._data[count:]
-        return self
-
-    def limit(self, count):
-        self._data = list(self._data)[:count]
-        return self
-
-    async def to_list(self, length=None):
-        return self._data[:length] if length else self._data
+"""
+@pytest_asyncio.fixture(scope="function")
+def event_loop():
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+"""
 
 
-class AsyncCollection:
-    def __init__(self, sync_coll):
-        self._coll = sync_coll
+@pytest_asyncio.fixture(autouse=True)
+async def motor_reinit_db():
+    """
+    Every test gets its own NMotor client bound to a fresh database.
+    Drops the test DB before & after so you start with a clean slate.
+    """
+    _sync_client.drop_database(base._db.name if hasattr(base, "_db") else "auto-author")
 
-    async def insert_one(self, doc):
-        return self._coll.insert_one(doc)
+    base._client = motor.motor_asyncio.AsyncIOMotorClient(TEST_MONGO_URI)
+    base._db = base._client.get_default_database()
+    base.users_collection = base._db.get_collection("users")
+    base.books_collection = base._db.get_collection("books")
+    base.audit_logs_collection = base._db.get_collection("audit_logs")
 
-    async def update_one(self, *args, **kwargs):
-        return self._coll.update_one(*args, **kwargs)
+    books_dao.books_collection = base.books_collection
+    books_dao.users_collection = base.users_collection
+    users_dao.users_collection = base.users_collection
+    audit_log_dao.audit_logs_collection = base.audit_logs_collection
 
-    async def find_one(self, *args, **kwargs):
-        return self._coll.find_one(*args, **kwargs)
-
-    async def delete_one(self, *args, **kwargs):
-        return self._coll.delete_one(*args, **kwargs)
-
-    async def find_one_and_update(self, *args, **kwargs):
-        return self._coll.find_one_and_update(*args, **kwargs)
-
-    async def delete_many(self, *args, **kwargs):
-        return self._coll.delete_many(*args, **kwargs)
-
-    def find(self, *args, **kwargs):
-        return MockCursor(self._coll.find(*args, **kwargs))
-
-    async def count_documents(self, *args, **kwargs):
-        return self._coll.count_documents(*args, **kwargs)
-
-    async def aggregate(self, *args, **kwargs):
-        return self._coll.aggregate(*args, **kwargs)
+    yield
+    _sync_client.drop_database(base._db.name)
+    base._client.close()
 
 
 @pytest.fixture(scope="function")
@@ -95,71 +94,6 @@ def client():
     Create a TestClient instance that will be used for all tests.
     """
     return TestClient(app)
-
-
-"""
-@pytest.fixture(scope="function")
-def event_loop():
-    ""
-    Create a fresh event loop for each test function that can be used for asyncio tests.
-    Using function scope instead of session prevents 'Event loop is closed' errors
-    ""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    # We need to close the loop properly to prevent 'Event loop is closed' errors in future tests
-    # But we need to make sure all pending tasks are finished first
-    try:
-        # Cancel all pending tasks
-        pending = asyncio.all_tasks(loop)
-        for task in pending:
-            task.cancel()
-
-        # Run the loop until all tasks are done or cancelled
-        if pending:
-            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-    except Exception:
-        pass  # Ignore cleanup errors
-    finally:
-        loop.close()
-"""
-
-
-@pytest.fixture(autouse=True, scope="function")
-def fake_mongo(monkeypatch):
-    """
-    Every test will see database.users_collection, database.books_collection and .audit_log_collection
-    backed by mongomock in-memory collections.
-    """
-    sync_client = mongomock.MongoClient()
-    sync_db = sync_client["test_db"]
-
-    setattr(base, "_client", sync_client)
-    setattr(base, "_db", sync_db)
-
-    # Create single AsyncCollection instances that will be shared
-    users_collection_wrapper = AsyncCollection(sync_db["users"])
-    books_collection_wrapper = AsyncCollection(sync_db["books"])
-    audit_logs_collection_wrapper = AsyncCollection(sync_db["audit_logs"])
-
-    # patch the globals in your database module
-    setattr(base, "users_collection", users_collection_wrapper)
-    setattr(user_dao, "users_collection", users_collection_wrapper)
-    setattr(base, "audit_logs_collection", audit_logs_collection_wrapper)
-    setattr(audit_log_dao, "audit_logs_collection", audit_logs_collection_wrapper)
-    setattr(base, "books_collection", books_collection_wrapper)
-    setattr(book_dao, "books_collection", books_collection_wrapper)
-
-    setattr(database_module, "users_collection", users_collection_wrapper)
-    setattr(database_module, "books_collection", books_collection_wrapper)
-    setattr(database_module, "audit_logs_collection", audit_logs_collection_wrapper)
-    yield
-    # Clean up: remove our override so other tests aren’t “authed”
-    try:
-        sync_client.drop_database("test_db")
-        sync_client.close()
-    except Exception:
-        pass
 
 
 @pytest.fixture
@@ -210,27 +144,29 @@ def fake_user():
     }
 
 
-@pytest.fixture(scope="function")
-def auth_client_factory(monkeypatch, test_user) -> callable:
+@pytest_asyncio.fixture(scope="function")
+async def auth_client_factory(monkeypatch, test_user):
     """
-    Returns a function `make_client(overrides: dict = None)`
-    that gives you a TestClient whose get_current_user
+    Returns an async function `make_client(overrides: dict = None)`
+    that gives you an AsyncClient whose get_current_user
     always returns `test_user` updated with your overrides.
     """
+    created_clients = []
 
-    def make_client(*, overrides: dict = None, auth: bool = True):
-
-        # 1) merge defaults and overrides
+    def _seed_user(overrides: dict = None):
         user = test_user.copy()
         user["_id"] = ObjectId()  # brand new each time
         user["id"] = str(user["_id"])
         if overrides:
             user.update(overrides)
+        _sync_users.insert_one(user)
+        return user
 
-        # 2) Insert into our mongomock DB
-        base.users_collection._coll.insert_one(user)
+    async def make_client(*, overrides: dict = None, auth: bool = True):
+        user = _seed_user(overrides)
 
-        # 3) Override the audit request
+        # monkeypatch.setattr(db, "get_user_by_clerk_id", lambda: user["clerk_id"])
+
         async def _noop_audit_request(
             request: Request,
             current_user: Dict,
@@ -244,22 +180,39 @@ def auth_client_factory(monkeypatch, test_user) -> callable:
         monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit_request)
         monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit_request)
 
+        headers = {}
         if auth:
-            # 4) Stub out JWT verification to return that clerk_id
+            from app.core.security import get_current_user
+
+            app.dependency_overrides[get_current_user] = lambda: user
+            monkeypatch.setattr(
+                users_dao, "get_user_by_clerk_id", lambda: user["clerk_id"]
+            )
+
             async def _fake_verify(token: str):
                 return {"sub": user["clerk_id"]}
-
             monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
+            headers["Authorization"] = "Bearer aaa.bbb.ccc"
 
-        client = TestClient(app)
-
-        if auth:
-            client.headers.update({"Authorization": "Bearer aaa.bbb.ccc"})
-
+        client = AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+            headers=headers,
+        )
+        created_clients.append(client)
         return client
 
     yield make_client
-    # Finally: Clean up: remove our override so other tests aren’t “authed”
+
+    # await base.users_collection.delete_many({})  # Clean up test users
+    _sync_users.drop()
+    _sync_books.drop()
+    _sync_logs.drop()
+    for client in created_clients:
+        try:
+            await client.aclose()
+        except Exception as e:
+            print(f"Error closing client: {e}")
     app.dependency_overrides.clear()
 
 
@@ -305,49 +258,47 @@ def test_book(test_user):
     }
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="function")
 async def async_client_factory(monkeypatch, test_user):
     """
     Returns an async function make_client(overrides: dict = None, auth: bool = True)
     that yields an AsyncClient whose get_current_user always returns test_user
-    (with optional overrides), and which writes into a mongomock test DB.
+    (with optional overrides), and which writes into a real MongoDB test DB.
     """
-    # keep track of every client we hand out
     created_clients = []
 
     def _seed_user(overrides: dict | None):
-        # Clone the fixture user & assign a fresh ObjectId
         user = test_user.copy()
         user["_id"] = ObjectId()
         user["id"] = str(user["_id"])
         if overrides:
             user.update(overrides)
-        # Directly insert into the underlying mongomock collection
-        base.users_collection._coll.insert_one(user)
+        _sync_users.insert_one(user)
         return user
 
     async def make_client(*, overrides: dict | None = None, auth: bool = True):
-        # 1) Seed a new user
         user = _seed_user(overrides)
 
-        # 2) Stub out audit_request in both endpoints
         async def _noop_audit(*args, **kwargs):
             return None
 
         monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit)
         monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit)
 
-        # 3) If you want authentication, stub verify_jwt_token to return our user's sub
         headers = {}
         if auth:
+            from app.core.security import get_current_user
+
+            app.dependency_overrides[get_current_user] = lambda: user
+            monkeypatch.setattr(
+                users_dao, "get_user_by_clerk_id", lambda: user["clerk_id"]
+            )
 
             async def _fake_verify(token: str):
                 return {"sub": user["clerk_id"]}
-
             monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
             headers["Authorization"] = "Bearer dummy.token.here"
 
-        # 4) Create an AsyncClient that drives our FastAPI app
         client = AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
@@ -357,13 +308,27 @@ async def async_client_factory(monkeypatch, test_user):
         return client
 
     yield make_client
+    # await base.users_collection.delete_many({})  # Clean up test users
+    _sync_users.drop()
+    _sync_books.drop()
+    _sync_logs.drop()
 
-    # teardown: clear any dependency overrides you may have set
     for client in created_clients:
         try:
             await client.aclose()
         except Exception as e:
             print(f"Error closing client: {e}")
-
-    # Clear any dependency overrides
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def clean_db():
+    """
+    Provide a clean database for each test and drop it afterwards.
+    """
+    # Drop the test database before the test runs to ensure a clean state
+    sync_client = pymongo.MongoClient(TEST_MONGO_URI)
+    sync_client.drop_database(base._db.name)
+    yield base._db
+    # Drop the test database after the test completes to clean up
+    sync_client.drop_database(base._db.name)

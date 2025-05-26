@@ -1,4 +1,4 @@
-import pytest
+import pytest, pytest_asyncio
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
@@ -7,11 +7,13 @@ from app.db import database
 from app.api.endpoints import users as users_endpoint
 
 
-def test_error_handling_database_connection(auth_client_factory, monkeypatch):
+@pytest.mark.asyncio
+async def test_error_handling_database_connection(auth_client_factory, monkeypatch):
     """
     Test error handling when database connection fails.
     Verifies proper error response when the database is unavailable.
     """
+    api_client = await auth_client_factory()
 
     def explode(*args, **kwargs):
         raise Exception("Database connection error")
@@ -20,7 +22,7 @@ def test_error_handling_database_connection(auth_client_factory, monkeypatch):
     monkeypatch.setattr(security, "get_user_by_clerk_id", explode)
 
     # Make request that will trigger database error
-    response = auth_client_factory().get("/api/v1/users/me")
+    response = await api_client.get("/api/v1/users/me")
 
     # Assert server error response
     assert response.status_code == 500
@@ -29,13 +31,15 @@ def test_error_handling_database_connection(auth_client_factory, monkeypatch):
     assert "error" in data["detail"].lower()
 
 
-def test_error_handling_invalid_json(auth_client_factory):
+@pytest.mark.asyncio
+async def test_error_handling_missing_user(auth_client_factory):
     """
     Test error handling when receiving invalid JSON.
     Verifies proper error response for malformed requests.
     """
+    api_client = await auth_client_factory()
     # Send invalid JSON in request body
-    response = auth_client_factory().patch(
+    response = await api_client.patch(
         "/api/v1/users/me",
         data="this is not valid JSON",
         headers={"Content-Type": "application/json"},
@@ -49,13 +53,15 @@ def test_error_handling_invalid_json(auth_client_factory):
 
 
 @pytest.mark.skip(reason="Skipping test: race conditions aren't handled in the API")
-def test_error_handling_race_condition(auth_client_factory, test_user, monkeypatch):
+async def test_error_handling_race_condition(
+    auth_client_factory, test_user, monkeypatch
+):
     """
     Test error handling for potential race conditions.
     Verifies proper handling when data changes between operations.
     """
     # 1) get a raw client (no auto authentication)
-    client = auth_client_factory()
+    client = await auth_client_factory(auth=False)
 
     # 2) need to stub JWT -> clerk_id
     async def fake_verify(token):
@@ -94,20 +100,23 @@ def test_error_handling_race_condition(auth_client_factory, test_user, monkeypat
     assert "not found" in data["detail"].lower()
 
 
-def test_error_handling_third_party_service(auth_client_factory, monkeypatch):
+@pytest.mark.asyncio
+async def test_error_handling_third_party_service(auth_client_factory, monkeypatch):
     """
     Test error handling when a third-party service (like Clerk) fails.
     Verifies proper error response when external dependencies fail.
     """
 
+    api_client = await auth_client_factory()
+
     # Mock clerk client that throws an error
-    def api_failure(*args, **kwargs):
+    async def api_failure(*args, **kwargs):
         return None
 
     monkeypatch.setattr(security, "get_clerk_user", api_failure)
 
     # Make request that will trigger clerk error
-    response = auth_client_factory().get("/api/v1/users/me/clerk-data")
+    response = await api_client.get("/api/v1/users/me/clerk-data")
 
     # Assert server error response
     # When Clerk fails to retrieve,
@@ -152,11 +161,13 @@ def test_error_handling_concurrent_updates(auth_client_factory, test_user):
         assert "conflict" in data["detail"].lower()
 
 
-def test_error_handling_request_timeout(auth_client_factory, monkeypatch):
+@pytest.mark.asyncio
+async def test_error_handling_request_timeout(auth_client_factory, monkeypatch):
     """
     Test error handling when a request times out.
     Verifies proper error response for timeouts.
     """
+    api_client = await auth_client_factory()
     # Mock a timeout in the database
     timeout_mock = MagicMock(side_effect=Exception("Database operation timed out"))
 
@@ -167,7 +178,7 @@ def test_error_handling_request_timeout(auth_client_factory, monkeypatch):
     update_data = {"first_name": "New Name"}
 
     # Make request that will timeout
-    response = auth_client_factory().patch("/api/v1/users/me", json=update_data)
+    response = await api_client.patch("/api/v1/users/me", json=update_data)
 
     # Assert gateway timeout error
     assert response.status_code == 504  # Gateway Timeout

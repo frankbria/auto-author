@@ -230,16 +230,16 @@
 
 ## User Story 3.2: Generate TOC from Summary
 ### Frontend Tasks
-- [ ]  Create TOC generation wizard component with multi-step interface
-- [ ]  Build AI-generated clarifying questions display component
-- [ ]  Implement user responses collection form for clarifying questions
-- [ ]  Create progress indicator for TOC generation process
-- [ ]  Build hierarchical TOC preview component with chapters and subchapters
-- [ ]  Add "Generate TOC" button integration from summary page
-- [ ]  Implement loading states and generation status indicators
-- [ ]  Create TOC generation results page with accept/regenerate options
-- [ ]  Add tooltips explaining AI's TOC structure decisions
-- [ ]  Build responsive design for TOC wizard on mobile devices
+- [X]  Create TOC generation wizard component with multi-step interface
+- [X]  Build AI-generated clarifying questions display component <!-- Implemented: ClarifyingQuestions component displays questions, collects answers, and shows progress. -->
+- [X]  Implement user responses collection form for clarifying questions <!-- Implemented: ClarifyingQuestions includes a form for user answers, navigation, and validation. -->
+- [X]  Create progress indicator for TOC generation process <!-- Implemented: TocGenerationWizard and TocGenerating show step progress bars and percentage indicators. -->
+- [X]  Build hierarchical TOC preview component with chapters and subchapters <!-- Implemented: TocReview displays a hierarchical, expandable/collapsible TOC preview. -->
+- [X]  Add "Generate TOC" button integration from summary page <!-- Implemented: Summary page enables the button when requirements are met, linking to the wizard. -->
+- [X]  Implement loading states and generation status indicators <!-- Implemented: All steps/components show loading spinners, disabled buttons, and status messages. -->
+- [X]  Create TOC generation results page with accept/regenerate options <!-- Implemented: TocReview provides Accept/Regenerate buttons and displays the generated TOC. -->
+- [X]  Add tooltips explaining AI's TOC structure decisions <!-- Implemented: Tooltips and info sections (e.g., "AI Structure Notes", "Tips for better answers") are present. -->
+- [X]  Build responsive design for TOC wizard on mobile devices <!-- Implemented: All wizard components use responsive Tailwind classes for mobile compatibility. -->
 
 ### Backend Tasks
 - [x]  Implement AI service integration for summary analysis
@@ -256,15 +256,15 @@
 - [x]  Add retry mechanism for failed TOC generation attempts
 
 ### Testing Tasks
-- [ ]  Write unit tests for TOC generation wizard components
-- [ ]  Test clarifying questions generation and user response handling
-- [ ]  Create integration tests for TOC generation API endpoints
-- [ ]  Test TOC preview component with various hierarchical structures
-- [ ]  Verify progress indicators and loading states work correctly
-- [ ]  Test edge cases: very brief summaries, complex summaries, ambiguous content
-- [ ]  Test AI service timeout and error recovery mechanisms
-- [ ]  Verify TOC generation works with different book genres and audiences
-- [ ]  Test mobile responsiveness of TOC generation wizard
+- [X]  Write unit tests for TOC generation wizard components <!-- Covered by TocGenerationWizard.test.tsx: unit tests for wizard, clarifying questions, generating, and review components. -->
+- [X]  Test clarifying questions generation and user response handling <!-- Covered by TocGenerationWizard.test.tsx: 'renders ClarifyingQuestions and handles answers' test. -->
+- [X]  Create integration tests for TOC generation API endpoints <!-- Covered by backend/tests/test_api/test_routes/test_toc_generation.py: tests /api/v1/books/{book_id}/generate-toc endpoint end-to-end. -->
+- [X]  Test TOC preview component with various hierarchical structures <!-- Covered by frontend/src/__tests__/TocGenerationWizard.test.tsx: 'renders TocReview with deeply nested and empty chapters' test. -->
+- [X]  Verify progress indicators and loading states work correctly
+- [X]  Test edge cases: very brief summaries, complex summaries, ambiguous content
+- [X]  Test AI service timeout and error recovery mechanisms <!-- Covered by backend tests for error handling and retry logic. -->
+- [X]  Verify TOC generation works with different book genres and audiences
+- [X]  Test mobile responsiveness of TOC generation wizard
 - [ ]  Create end-to-end tests for complete TOC generation workflow
 
 ### Documentation Tasks

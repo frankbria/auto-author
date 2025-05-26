@@ -544,6 +544,60 @@ async def update_book_summary(
     return {"summary": summary, "summary_history": summary_history[-20:]}
 
 
+@router.patch("/{book_id}/summary", status_code=status.HTTP_200_OK)
+async def patch_book_summary(
+    book_id: str,
+    data: dict = Body(...),
+    current_user: Dict = Depends(get_current_user),
+):
+    """
+    Partially update the summary for a book. Only updates the summary field if provided.
+    Stores revision history and validates input.
+    """
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("clerk_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to update this book"
+        )
+    summary = data.get("summary")
+    if summary is not None:
+        if not isinstance(summary, str):
+            raise HTTPException(status_code=400, detail="Summary must be a string.")
+        min_len, max_len = 30, 2000
+        if len(summary) < min_len:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Summary must be at least {min_len} characters.",
+            )
+        if len(summary) > max_len:
+            raise HTTPException(
+                status_code=400, detail=f"Summary must be at most {max_len} characters."
+            )
+        # Store revision history if changed
+        summary_history = book.get("summary_history", [])
+        if book.get("summary") and book["summary"] != summary:
+            summary_history.append(
+                {
+                    "summary": book["summary"],
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+        update_data = {
+            "summary": summary,
+            "summary_history": summary_history[-20:],
+            "updated_at": datetime.now(timezone.utc),
+        }
+        await update_book(book_id, update_data, current_user.get("clerk_id"))
+        return {"summary": summary, "summary_history": summary_history[-20:]}
+    # If no summary provided, return current summary
+    return {
+        "summary": book.get("summary"),
+        "summary_history": book.get("summary_history", []),
+    }
+
+
 @router.post("/{book_id}/analyze-summary", status_code=status.HTTP_200_OK)
 async def analyze_book_summary(
     book_id: str,

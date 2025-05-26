@@ -12,46 +12,46 @@ from app.models.user import UserDB
 # Book-related database operations
 async def create_book(book_data: Dict, user_clerk_id: str) -> Dict:
     """Create a new book in the database and associate it with a user"""
-    # 1) Set owner ID
-    book_data["owner_id"] = user_clerk_id
+    try:
+        # 1) Set owner ID
+        book_data["owner_id"] = user_clerk_id
 
-    # 2) build the Pydantic model
-    book_obj = BookDB(**book_data)
-    # print(f"Creating book: {book_obj}")
+        # 2) build the Pydantic model
+        book_obj = BookDB(**book_data)
+        # print(f"Creating book: {book_obj}")
 
-    # 3) serialize to a Mongo-ready dict, with _id alias and timestamps
-    payload = book_obj.model_dump(by_alias=True)
+        # 3) serialize to a Mongo-ready dict, with _id alias and timestamps
+        payload = book_obj.model_dump(by_alias=True)
 
-    # 4) Insert the new book
-    result = await books_collection.insert_one(payload)
+        # 4) Insert the new book
+        print(f"database of the books_collection: {books_collection.database.name}")
+        result = await books_collection.insert_one(payload)
 
-    # 5) patch the real ObjectId back onto the model
-    book_obj.id = result.inserted_id
-    # print(f"Inserted book with ID: {book_obj.id}")
+        # 5) patch the real ObjectId back onto the model
+        book_obj.id = result.inserted_id
+        # print(f"Inserted book with ID: {book_obj.id}")
 
-    # Associate the book with the user
-    await users_collection.update_one(
-        {"clerk_id": user_clerk_id}, {"$push": {"book_ids": str(book_obj.id)}}
-    )
+        # Associate the book with the user
+        await users_collection.update_one(
+            {"clerk_id": user_clerk_id}, {"$push": {"book_ids": str(book_obj.id)}}
+        )
 
-    print(f"Audit log: {user_clerk_id}")
-    # Create audit log entry
-    await create_audit_log(
-        action="book_create",
-        actor_id=user_clerk_id,
-        target_id=str(book_obj.id),
-        resource_type="book",
-        details={"title": book_data.get("title", "Untitled")},
-    )
+        print(f"Audit log: {user_clerk_id}")
+        # Create audit log entry
+        await create_audit_log(
+            action="book_create",
+            actor_id=user_clerk_id,
+            target_id=str(book_obj.id),
+            resource_type="book",
+            details={"title": book_obj.title},
+        )
+        return payload
+    except Exception as e:
+        import traceback
 
-    # Return the created book
-    # created_book = await get_book_by_id(str(book_obj.id))
-
-    created_book = book_obj.model_dump()
-    # print(f"Created book: {created_book}")
-    created_book["id"] = str(book_obj.id)
-    created_book.pop("_id", None)  # Remove the MongoDB ObjectId field
-    return created_book
+        print(f"create_book_error {e}")
+        traceback.print_exc()
+        raise
 
 
 async def get_book_by_id(book_id: str) -> Optional[Dict]:

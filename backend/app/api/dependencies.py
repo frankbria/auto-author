@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 import requests
 
-from app.core.security import get_current_user, verify_jwt_token
+from app.core.security import verify_jwt_token
 from app.db.database import get_collection
 from app.db.database import create_audit_log
 from app.core.config import settings

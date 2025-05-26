@@ -1,17 +1,21 @@
 # filepath: d:\Projects\auto-author\backend\tests\test_api\test_routes\test_profile_updates.py
 import pytest
-from fastapi.testclient import TestClient
+import pytest_asyncio
+from httpx import AsyncClient
 from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime, timezone
 
+pytestmark = pytest.mark.asyncio
 
-def test_update_all_profile_fields(auth_client_factory, test_user):
+
+@pytest.mark.asyncio
+async def test_update_all_profile_fields(auth_client_factory, test_user):
     """
     Test that all profile fields can be updated successfully.
     This test verifies that each editable field is properly updated in the database.
     """
     # Create a client with test user data
-    client = auth_client_factory()
+    client = await auth_client_factory()
 
     # Update data with all editable fields
     update_data = {
@@ -35,7 +39,7 @@ def test_update_all_profile_fields(auth_client_factory, test_user):
     # Mock the database update to return our expected result
     with patch("app.db.database.update_user", return_value=updated_user):
         # Make the request to update profile
-        response = client.patch("/api/v1/users/me", json=update_data)
+        response = await client.patch("/api/v1/users/me", json=update_data)
 
         # Assert successful response
         assert response.status_code == 200
@@ -63,13 +67,14 @@ def test_update_all_profile_fields(auth_client_factory, test_user):
         assert data["role"] == test_user["role"]
 
 
-def test_update_partial_profile_fields(auth_client_factory, test_user):
+@pytest.mark.asyncio
+async def test_update_partial_profile_fields(auth_client_factory, test_user):
     """
     Test that partial profile updates work correctly.
     This test verifies that updating only specific fields doesn't affect other fields.
     """
     # Create a client with test user data
-    client = auth_client_factory()
+    client = await auth_client_factory()
 
     # Only update first_name and theme
     partial_update = {"first_name": "Partially", "preferences": {"theme": "system"}}
@@ -82,7 +87,7 @@ def test_update_partial_profile_fields(auth_client_factory, test_user):
     # Mock the database update to return our expected result
     with patch("app.api.endpoints.users.update_user", return_value=expected_result):
         # Make the request to update profile
-        response = client.patch("/api/v1/users/me", json=partial_update)
+        response = await client.patch("/api/v1/users/me", json=partial_update)
 
         # Assert successful response
         assert response.status_code == 200
@@ -107,19 +112,20 @@ def test_update_partial_profile_fields(auth_client_factory, test_user):
         )
 
 
-def test_invalid_preference_format(auth_client_factory, test_user):
+@pytest.mark.asyncio
+async def test_invalid_preference_format(auth_client_factory, test_user):
     """
     Test that invalid preference formats are caught and properly handled.
     This test verifies the validation for preference object format.
     """
     # Create a client with test user data
-    client = auth_client_factory()
+    client = await auth_client_factory()
 
     # Invalid update - preferences as an array instead of an object
     invalid_update = {"preferences": ["light", True, False]}
 
     # Make the request to update profile
-    response = client.patch("/api/v1/users/me", json=invalid_update)
+    response = await client.patch("/api/v1/users/me", json=invalid_update)
 
     # Assert validation error response
     assert response.status_code == 422

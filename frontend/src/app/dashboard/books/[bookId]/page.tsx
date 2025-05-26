@@ -83,6 +83,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [summary, setSummary] = useState('');
+  const [hasCommitted, setHasCommitted] = useState(false);
 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);

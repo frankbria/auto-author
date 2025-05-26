@@ -95,6 +95,7 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> Dict:
     """Get the current authenticated user"""
+    print("In the actual get_current_user function")
     token = credentials.credentials
     payload = await verify_jwt_token(token)
 

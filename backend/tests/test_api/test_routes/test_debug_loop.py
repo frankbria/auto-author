@@ -4,7 +4,8 @@ import threading
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from fastapi.encoders import jsonable_encoder
-
+from app.db import base
+import pymongo
 
 @pytest.mark.asyncio
 async def test_debug_event_loop_state(async_client_factory, test_book):
@@ -135,13 +136,6 @@ async def test_second_test_to_see_loop_state(async_client_factory, test_book):
         print("=== SECOND TEST END ===\n")
 
 
-import pytest
-import asyncio
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-from fastapi.encoders import jsonable_encoder
-
-
 @pytest.mark.asyncio
 async def test_debug_500_error(async_client_factory, test_book):
     """Debug what's causing the 500 error on the second request"""
@@ -209,11 +203,15 @@ async def test_debug_database_state(async_client_factory, test_book):
 
     print(f"\n--- Database state check ---")
     try:
-        # Try to query the books collection directly
-        books_in_db = list(base.books_collection._coll.find({}))
-        print(f"Books in DB before test: {len(books_in_db)}")
+        # switch to a sync PyMongo client so we hit the test DB only
+        sync_client = pymongo.MongoClient("mongodb://localhost:27017/auto-author")
+        sync_db = sync_client.get_database()
+        sync_books = sync_db.get_collection("books")
+        sync_users = sync_db.get_collection("users")
 
-        users_in_db = list(base.users_collection._coll.find({}))
+        books_in_db = list(sync_books.find({}))
+        print(f"Books in DB before test: {len(books_in_db)}")
+        users_in_db = list(sync_users.find({}))
         print(f"Users in DB before test: {len(users_in_db)}")
 
     except Exception as e:
@@ -237,12 +235,6 @@ async def test_debug_database_state(async_client_factory, test_book):
         await api_client.aclose()
 
 
-import pytest
-import asyncio
-import threading
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-from fastapi.encoders import jsonable_encoder
 from bson import ObjectId
 
 
@@ -392,14 +384,12 @@ async def test_debug_second_client(async_client_factory, test_book):
     print(f"=== Test 2 End ===\n")
 
 
-import pytest
-import asyncio
 from app.db import base
 import app.db.book as book_dao
 
 
 @pytest.mark.asyncio
-async def test_dao_method_calls(fake_mongo):
+async def test_dao_method_calls():
     """Test if DAO methods are being called correctly"""
 
     print("\n=== Testing DAO Method Calls ===")
@@ -409,7 +399,7 @@ async def test_dao_method_calls(fake_mongo):
         print("Testing book DAO create_book...")
 
         book_data = {
-            "title": "Test Book",
+            "title": "Test Book DAO Call",
             "subtitle": "Test Subtitle",
             "description": "Test Description",
             "genre": "Fiction",
@@ -459,7 +449,6 @@ async def test_dao_method_calls(fake_mongo):
     print("=== End DAO Method Test ===\n")
 
 
-import pytest
 import inspect
 
 
@@ -532,14 +521,9 @@ def test_check_imports():
     print("=== End Import Check ===\n")
 
 
-import pytest
-import asyncio
-from fastapi.encoders import jsonable_encoder
-
-
-def test_first_simple_post(auth_client_factory, test_book):
+async def test_first_simple_post(auth_client_factory, test_book):
     """Simple POST test that should work"""
-    client = auth_client_factory()
+    client = await auth_client_factory()
 
     payload = test_book.copy()
     payload["owner_id"] = str(test_book["owner_id"])
@@ -550,7 +534,7 @@ def test_first_simple_post(auth_client_factory, test_book):
     payload_book = jsonable_encoder(payload)
 
     print("\n=== FIRST TEST - POST only ===")
-    response = client.post("/api/v1/books/", json=payload_book)
+    response = await client.post("/api/v1/books/", json=payload_book)
     print(f"POST response: {response.status_code}")
 
     if response.status_code != 201:
@@ -561,9 +545,9 @@ def test_first_simple_post(auth_client_factory, test_book):
     assert response.status_code == 201
 
 
-def test_second_simple_post(auth_client_factory, test_book):
+async def test_second_simple_post(auth_client_factory, test_book):
     """Identical POST test to see if it fails"""
-    client = auth_client_factory()
+    client = await auth_client_factory()
 
     payload = test_book.copy()
     payload["owner_id"] = str(test_book["owner_id"])
@@ -574,7 +558,7 @@ def test_second_simple_post(auth_client_factory, test_book):
     payload_book = jsonable_encoder(payload)
 
     print("\n=== SECOND TEST - POST only ===")
-    response = client.post("/api/v1/books/", json=payload_book)
+    response = await client.post("/api/v1/books/", json=payload_book)
     print(f"POST response: {response.status_code}")
 
     if response.status_code != 201:
@@ -585,9 +569,9 @@ def test_second_simple_post(auth_client_factory, test_book):
     assert response.status_code == 201
 
 
-def test_third_simple_post(auth_client_factory, test_book):
+async def test_third_simple_post(auth_client_factory, test_book):
     """Third identical POST test"""
-    client = auth_client_factory()
+    client = await auth_client_factory()
 
     payload = test_book.copy()
     payload["owner_id"] = str(test_book["owner_id"])
@@ -598,7 +582,7 @@ def test_third_simple_post(auth_client_factory, test_book):
     payload_book = jsonable_encoder(payload)
 
     print("\n=== THIRD TEST - POST only ===")
-    response = client.post("/api/v1/books/", json=payload_book)
+    response = await client.post("/api/v1/books/", json=payload_book)
     print(f"POST response: {response.status_code}")
 
     if response.status_code != 201:
@@ -609,28 +593,43 @@ def test_third_simple_post(auth_client_factory, test_book):
     assert response.status_code == 201
 
 
-def test_check_auth_client_factory_state(auth_client_factory, test_book):
+async def test_check_auth_client_factory_state(auth_client_factory, test_book):
     """Check if the auth_client_factory itself is the issue"""
     print("\n=== FOURTH TEST - Check factory state ===")
 
     # Check database state before creating client
-    from app.db import base
 
     try:
         # See what's in the collections
-        books_count = len(list(base.books_collection.find({})))
-        users_count = len(list(base.users_collection.find({})))
+        books_count = len(
+            asyncio.get_event_loop().run_until_complete(
+                base.books_collection.find({}).to_list(length=100)
+            )
+        )
+        users_count = len(
+            asyncio.get_event_loop().run_until_complete(
+                base.users_collection.find({}).to_list(length=100)
+            )
+        )
         print(f"Before client creation - Books: {books_count}, Users: {users_count}")
     except Exception as e:
         print(f"Error checking DB state: {e}")
 
-    client = auth_client_factory()
+    client = await auth_client_factory()
     print("Client created successfully")
 
     # Check again after client creation
     try:
-        books_count = len(list(base.books_collection.find({})))
-        users_count = len(list(base.users_collection.find({})))
+        books_count = len(
+            asyncio.get_event_loop().run_until_complete(
+                base.books_collection.find({}).to_list(length=100)
+            )
+        )
+        users_count = len(
+            asyncio.get_event_loop().run_until_complete(
+                base.users_collection.find({}).to_list(length=100)
+            )
+        )
         print(f"After client creation - Books: {books_count}, Users: {users_count}")
     except Exception as e:
         print(f"Error checking DB state after client: {e}")
@@ -643,7 +642,7 @@ def test_check_auth_client_factory_state(auth_client_factory, test_book):
     del payload["published"]
     payload_book = jsonable_encoder(payload)
 
-    response = client.post("/api/v1/books/", json=payload_book)
+    response = await client.post("/api/v1/books/", json=payload_book)
     print(f"POST response: {response.status_code}")
 
     if response.status_code != 201:

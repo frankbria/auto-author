@@ -91,6 +91,8 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
               index={index + 1}
               isExpanded={expandedChapters.has(chapter.id)}
               onToggle={() => toggleChapter(chapter.id)}
+              expandedChapters={expandedChapters}
+              toggleChapter={toggleChapter}
             />
           ))}
         </div>
@@ -156,10 +158,14 @@ interface ChapterItemProps {
   index: number;
   isExpanded: boolean;
   onToggle: () => void;
+  expandedChapters?: Set<string>;
+  toggleChapter?: (id: string) => void;
+  parentIndex?: string;
 }
 
-function ChapterItem({ chapter, index, isExpanded, onToggle }: ChapterItemProps) {
+function ChapterItem({ chapter, index, isExpanded, onToggle, expandedChapters, toggleChapter, parentIndex }: ChapterItemProps) {
   const hasSubchapters = chapter.subchapters && chapter.subchapters.length > 0;
+  const idx = parentIndex ? `${parentIndex}.${index}` : `${index}`;
 
   return (
     <div className="border border-zinc-700 rounded-lg overflow-hidden">
@@ -169,7 +175,7 @@ function ChapterItem({ chapter, index, isExpanded, onToggle }: ChapterItemProps)
       >
         <div className="flex items-center flex-1">
           <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
-            {index}
+            {idx}
           </div>
           <div className="flex-1">
             <h4 className="text-zinc-100 font-medium">{chapter.title}</h4>
@@ -190,23 +196,25 @@ function ChapterItem({ chapter, index, isExpanded, onToggle }: ChapterItemProps)
           </svg>
         )}
       </div>
-      
       {hasSubchapters && isExpanded && (
         <div className="bg-zinc-900 p-4 border-t border-zinc-700">
           <div className="space-y-3">
-            {chapter.subchapters.map((subchapter, subIndex) => (
-              <div key={subchapter.id} className="flex items-center">
-                <div className="w-6 h-6 bg-zinc-700 rounded-full flex items-center justify-center text-zinc-300 text-xs font-medium mr-3">
-                  {index}.{subIndex + 1}
-                </div>
-                <div className="flex-1">
-                  <h5 className="text-zinc-200 font-medium">{subchapter.title}</h5>
-                  {subchapter.description && (
-                    <p className="text-zinc-500 text-sm mt-1">{subchapter.description}</p>
-                  )}
-                </div>
-              </div>
-            ))}
+            {chapter.subchapters.map((subchapter, subIndex) => {
+              const subId = subchapter.id;
+              const subExpanded = expandedChapters?.has(subId) ?? false;
+              return (
+                <ChapterItem
+                  key={subId}
+                  chapter={subchapter as TocChapter}
+                  index={subIndex + 1}
+                  isExpanded={subExpanded}
+                  onToggle={() => toggleChapter && toggleChapter(subId)}
+                  expandedChapters={expandedChapters}
+                  toggleChapter={toggleChapter}
+                  parentIndex={idx}
+                />
+              );
+            })}
           </div>
         </div>
       )}

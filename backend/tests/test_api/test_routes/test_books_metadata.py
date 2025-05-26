@@ -64,9 +64,10 @@ async def test_book_metadata_edge_cases(async_client_factory, test_book):
         # Clean up the database
 
 
-def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
+@pytest.mark.asyncio
+async def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
     # Test GET book metadata
-    api_client = auth_client_factory()
+    api_client = await auth_client_factory()
     payload = test_book.copy()
     payload["owner_id"] = str(test_book["owner_id"])
     del payload["_id"]
@@ -79,11 +80,11 @@ def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
     # print(payload_book)
 
     # Insert book into the database
-    response = api_client.post(f"/api/v1/books/", json=payload_book)
+    response = await api_client.post(f"/api/v1/books/", json=payload_book)
     assert response.status_code == 201
     new_id = response.json()["id"]
 
-    response = api_client.get(f"/api/v1/books/{new_id}")
+    response = await api_client.get(f"/api/v1/books/{new_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == test_book["title"]
@@ -91,7 +92,7 @@ def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
 
     # Test PATCH update
     patch_data = {"title": "Updated Title", "target_audience": "academic"}
-    response = api_client.patch(f"/api/v1/books/{new_id}", json=patch_data)
+    response = await api_client.patch(f"/api/v1/books/{new_id}", json=patch_data)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Updated Title"
@@ -103,7 +104,7 @@ def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
         "target_audience": "professional",
         "genre": "science",
     }
-    response = api_client.put(f"/api/v1/books/{new_id}", json=put_data)
+    response = await api_client.put(f"/api/v1/books/{new_id}", json=put_data)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Put Title"
@@ -111,8 +112,9 @@ def test_book_metadata_retrieval_and_update(auth_client_factory, test_book):
     assert data["genre"] == "science"
 
 
-def test_book_metadata_persistence(auth_client_factory, test_book):
-    api_client = auth_client_factory()
+@pytest.mark.asyncio
+async def test_book_metadata_persistence(auth_client_factory, test_book):
+    api_client = await auth_client_factory()
     payload = test_book.copy()
     payload["owner_id"] = str(test_book["owner_id"])
     del payload["_id"]
@@ -124,17 +126,17 @@ def test_book_metadata_persistence(auth_client_factory, test_book):
     payload_book = jsonable_encoder(payload)
     # print(payload_book)
     # Insert book into the database
-    response = api_client.post(f"/api/v1/books/", json=payload_book)
+    response = await api_client.post(f"/api/v1/books/", json=payload_book)
     assert response.status_code == 201
     new_id = response.json()["id"]
 
     # Update and reload
-    response = api_client.patch(
+    response = await api_client.patch(
         f"/api/v1/books/{new_id}", json={"title": "Persistence Test"}
     )
     assert response.status_code == 200
     # Simulate reload
-    response = api_client.get(f"/api/v1/books/{new_id}")
+    response = await api_client.get(f"/api/v1/books/{new_id}")
     assert response.status_code == 200
     assert response.json()["title"] == "Persistence Test"
 
