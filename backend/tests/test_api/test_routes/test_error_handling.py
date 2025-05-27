@@ -2,9 +2,11 @@ import pytest, pytest_asyncio
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
+from app.main import app
 from app.core import security
 from app.db import database
 from app.api.endpoints import users as users_endpoint
+import app.db.user as users_dao
 
 
 @pytest.mark.asyncio
@@ -13,13 +15,13 @@ async def test_error_handling_database_connection(auth_client_factory, monkeypat
     Test error handling when database connection fails.
     Verifies proper error response when the database is unavailable.
     """
-    api_client = await auth_client_factory()
-
     def explode(*args, **kwargs):
         raise Exception("Database connection error")
 
     # Mock the database connection error
-    monkeypatch.setattr(security, "get_user_by_clerk_id", explode)
+    app.dependency_overrides["get_current_user"] = explode
+
+    api_client = await auth_client_factory()
 
     # Make request that will trigger database error
     response = await api_client.get("/api/v1/users/me")
