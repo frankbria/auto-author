@@ -48,10 +48,21 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       }));
     }
   }, [bookId]);
-
   const checkTocReadiness = useCallback(async () => {
     try {
       setWizardState(prev => ({ ...prev, isLoading: true }));
+      
+      // First, analyze the summary using AI to get readiness assessment
+      try {
+        console.log('Analyzing summary with AI...');
+        await bookClient.analyzeSummary(bookId);
+        console.log('Summary analysis completed');
+      } catch (analysisError) {
+        console.warn('Summary analysis failed, proceeding with basic check:', analysisError);
+        // Continue with readiness check even if analysis fails
+      }
+      
+      // Then check readiness status (which will now include analysis results)
       const readiness = await bookClient.checkTocReadiness(bookId);
       
       if (readiness.is_ready_for_toc) {

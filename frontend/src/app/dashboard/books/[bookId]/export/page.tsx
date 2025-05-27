@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 
 type ExportFormat = {
@@ -24,7 +24,8 @@ type ChapterStatus = {
   status: 'draft' | 'edited' | 'final';
 };
 
-export default function ExportBookPage({ params }: { params: { bookId: string } }) {
+export default function ExportBookPage({ params }: { params: Promise<{ bookId: string }> }) {
+  const { bookId } = use(params);
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [bookTitle, setBookTitle] = useState('');
@@ -41,9 +42,8 @@ export default function ExportBookPage({ params }: { params: { bookId: string } 
   // Fetch book details and export options
   useEffect(() => {
     const fetchBookDetails = async () => {
-      try {
-        // In a real app, this would call your API
-        // const response = await bookClient.getBookDetails(params.bookId);
+      try {        // In a real app, this would call your API
+        // const response = await bookClient.getBookDetails(bookId);
         // const data = await response.json();
         
         // Simulate API delay
@@ -168,9 +168,8 @@ export default function ExportBookPage({ params }: { params: { bookId: string } 
         setIsLoading(false);
       }
     };
-    
-    fetchBookDetails();
-  }, [params.bookId]);
+      fetchBookDetails();
+  }, [bookId]);
   
   const toggleOption = (optionId: string) => {
     setExportOptions(prev => 
@@ -233,10 +232,9 @@ export default function ExportBookPage({ params }: { params: { bookId: string } 
       // Clear the progress interval
       clearInterval(interval);
       setExportProgress(100);
-      
-      // Set the download URL (in a real app this would come from the API)
+        // Set the download URL (in a real app this would come from the API)
       const format = formats.find(f => f.id === selectedFormat);
-      setDownloadUrl(`/api/books/${params.bookId}/exports/download-${Date.now()}${format?.fileExtension || ''}`);
+      setDownloadUrl(`/api/books/${bookId}/exports/download-${Date.now()}${format?.fileExtension || ''}`);
       
       // Mark export as complete
       setExportComplete(true);

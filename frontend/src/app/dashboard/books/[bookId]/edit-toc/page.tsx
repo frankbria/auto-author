@@ -3,6 +3,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+// import { useParams } from 'next/navigation'; // TODO: Use when implementing real API calls
+// import bookClient from '@/lib/api/bookClient';
 
 type Chapter = {
   id: string;
@@ -15,8 +17,13 @@ type Chapter = {
 
 export default function EditTOCPage() {
   const router = useRouter();
+  // const params = useParams(); // TODO: Use when implementing real API calls
+  // const bookId = params.bookId as string; // TODO: Use when implementing real API calls
   const [toc, setToc] = useState<Chapter[]>([]);
-  const [isLoading, setIsLoading] = useState(true);  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const [dragOverItem, setDragOverItem] = useState<string | null>(null);
   
   // Fetch the TOC when component mounts
   useEffect(() => {
@@ -197,21 +204,147 @@ export default function EditTOCPage() {
     findAndDeleteSubchapter(updatedToc);
     setToc(updatedToc);
   };
-  
-  const handleDragStart = (id: string) => {
+    const handleDragStart = (id: string) => {
     setDraggedItem(id);
   };
   
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
-  
+
+  const handleDragEnter = (id: string) => {
+    setDragOverItem(id);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverItem(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    
+    if (!draggedItem || draggedItem === targetId) {
+      setDraggedItem(null);
+      setDragOverItem(null);
+      return;
+    }
+
+    // Find the dragged item and target item
+    const flattenedToc = flattenTocForReordering(toc);
+    const draggedIndex = flattenedToc.findIndex(item => item.id === draggedItem);
+    const targetIndex = flattenedToc.findIndex(item => item.id === targetId);
+    
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedItem(null);
+      setDragOverItem(null);
+      return;
+    }
+
+    // Reorder the chapters
+    const reorderedToc = reorderChapters(toc, draggedItem, targetId);
+    setToc(reorderedToc);
+    
+    setDraggedItem(null);
+    setDragOverItem(null);
+  };
+
+  // Helper function to flatten TOC for easier reordering calculations
+  const flattenTocForReordering = (chapters: Chapter[]): Chapter[] => {
+    const flattened: Chapter[] = [];
+    
+    const flatten = (items: Chapter[]) => {
+      items.forEach(item => {
+        flattened.push(item);
+        if (item.children.length > 0) {
+          flatten(item.children);
+        }
+      });
+    };
+    
+    flatten(chapters);
+    return flattened;
+  };  // Helper function to reorder chapters in the TOC structure
+  const reorderChapters = (originalToc: Chapter[], draggedId: string, targetId: string): Chapter[] => {
+    // Create a deep copy
+    let newToc = JSON.parse(JSON.stringify(originalToc)) as Chapter[];
+    
+    // Find and remove the dragged item
+    let draggedChapter: Chapter | null = null;
+    
+    const removeDraggedItem = (chapters: Chapter[]): Chapter[] => {
+      return chapters.filter(chapter => {
+        if (chapter.id === draggedId) {
+          draggedChapter = { ...chapter };
+          return false;
+        }
+        chapter.children = removeDraggedItem(chapter.children);
+        return true;
+      });
+    };
+    
+    newToc = removeDraggedItem(newToc);
+    
+    if (!draggedChapter) return originalToc;
+
+    // Find target and determine insertion logic
+    const insertDraggedItem = (chapters: Chapter[], parent: Chapter | null = null): boolean => {
+      for (let i = 0; i < chapters.length; i++) {
+        if (chapters[i].id === targetId) {
+          // Determine the appropriate depth for the dragged item
+          const newDepth = parent ? parent.depth + 1 : 0;
+            // Update the dragged chapter's depth and parent relationship
+          const updatedChapter = draggedChapter as Chapter;
+          updatedChapter.depth = newDepth;
+          updatedChapter.parent = parent?.id;
+          
+          // Recursively update children depths
+          const updateChildrenDepth = (chapter: Chapter, baseDepth: number) => {
+            chapter.depth = baseDepth;
+            chapter.children.forEach(child => updateChildrenDepth(child, baseDepth + 1));
+          };
+          
+          updateChildrenDepth(updatedChapter, newDepth);
+          
+          // Insert before the target
+          chapters.splice(i, 0, updatedChapter);
+          return true;
+        }
+        
+        if (chapters[i].children.length > 0) {
+          if (insertDraggedItem(chapters[i].children, chapters[i])) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };    if (!insertDraggedItem(newToc)) {
+      // If target not found, add at the end of top level
+      if (draggedChapter) {
+        const updatedChapter = draggedChapter as Chapter;
+        updatedChapter.depth = 0;
+        delete updatedChapter.parent;
+        
+        // Update children depths
+        const updateChildrenDepth = (chapter: Chapter, baseDepth: number) => {
+          chapter.depth = baseDepth;
+          chapter.children.forEach(child => updateChildrenDepth(child, baseDepth + 1));
+        };
+        
+        updateChildrenDepth(updatedChapter, 0);
+        newToc.push(updatedChapter);
+      }
+    }
+
+    return newToc;
+  };
   const handleSaveTOC = async () => {
     setIsLoading(true);
     
     try {
-      // In a real app, save the updated TOC to your backend
-      // await bookClient.saveTOC(bookId, toc);
+      // TODO: Convert local Chapter format to API format
+      // For now, keep the existing simulation until backend API is ready
+      console.log('TOC to save:', toc);
+      // await bookClient.updateToc(bookId, formattedToc);
       
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -225,16 +358,25 @@ export default function EditTOCPage() {
       setIsLoading(false);
     }
   };
-  
-  const renderChapterItem = (chapter: Chapter) => {
+    const renderChapterItem = (chapter: Chapter) => {
+    const isDragging = draggedItem === chapter.id;
+    const isDragOver = dragOverItem === chapter.id;
+    
     return (
       <div 
         key={chapter.id}
-        className="border border-zinc-700 rounded-lg mb-3"
+        className={`border border-zinc-700 rounded-lg mb-3 transition-all duration-200 ${
+          isDragging ? 'opacity-50 transform scale-95' : ''
+        } ${
+          isDragOver ? 'border-indigo-500 bg-indigo-900/20' : ''
+        }`}
         style={{ marginLeft: `${chapter.depth * 20}px` }}
         draggable
         onDragStart={() => handleDragStart(chapter.id)}
         onDragOver={handleDragOver}
+        onDragEnter={() => handleDragEnter(chapter.id)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, chapter.id)}
       >
         <div className="bg-zinc-800 p-3 rounded-t-lg flex items-center justify-between">
           <input

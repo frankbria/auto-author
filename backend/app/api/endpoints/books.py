@@ -844,9 +844,7 @@ async def check_toc_generation_readiness(
         and has_questions
         and has_responses
         and responses_status == "completed"
-    )
-
-    # Determine next steps
+    )  # Determine next steps
     next_steps = []
     if not has_summary:
         next_steps.append("Provide a book summary (minimum 30 characters)")
@@ -864,28 +862,39 @@ async def check_toc_generation_readiness(
     if is_ready_for_toc:
         next_steps.append("Ready to generate Table of Contents")
 
-    return {
-        "book_id": book_id,
-        "is_ready_for_toc": is_ready_for_toc,
-        "summary": {
-            "exists": has_summary,
-            "analyzed": has_analysis,
-            "ready": is_summary_ready,
-            "word_count": len(summary.split()) if summary else 0,
-        },
-        "clarifying_questions": {
-            "generated": has_questions,
-            "status": questions_status,
-            "count": len(clarifying_questions.get("questions", [])),
-        },
-        "responses": {
-            "provided": has_responses,
-            "status": responses_status,
-            "count": len(question_responses.get("responses", [])),
-        },
-        "next_steps": next_steps,
-        "checked_at": datetime.now(timezone.utc).isoformat(),
-    }
+    # If we have analysis data, return it in the format expected by the frontend
+    if has_analysis:
+        # Return the analysis data from AI service in the format expected by frontend
+        return {
+            "is_ready_for_toc": summary_analysis.get("is_ready_for_toc", False),
+            "confidence_score": summary_analysis.get("confidence_score", 0.0),
+            "analysis": summary_analysis.get("analysis", "Analysis not available"),
+            "suggestions": summary_analysis.get("suggestions", []),
+            "word_count": summary_analysis.get(
+                "word_count", len(summary.split()) if summary else 0
+            ),
+            "character_count": summary_analysis.get(
+                "character_count", len(summary) if summary else 0
+            ),
+            "meets_minimum_requirements": summary_analysis.get(
+                "meets_minimum_requirements", False
+            ),
+        }
+    else:
+        # No analysis available - return basic readiness check
+        word_count = len(summary.split()) if summary else 0
+        char_count = len(summary) if summary else 0
+        meets_min_requirements = word_count >= 30 and char_count >= 150
+
+        return {
+            "is_ready_for_toc": False,
+            "confidence_score": 0.0,
+            "analysis": "Summary analysis not yet completed. Please run analysis first.",
+            "suggestions": ["Run summary analysis to get readiness assessment"],
+            "word_count": word_count,
+            "character_count": char_count,
+            "meets_minimum_requirements": meets_min_requirements,
+        }
 
 
 @router.post("/{book_id}/generate-toc", status_code=status.HTTP_200_OK)
@@ -1086,3 +1095,335 @@ async def update_book_toc(
         "chapters_count": len(chapters),
         "success": True,
     }
+
+
+# Individual Chapter CRUD Operations
+
+
+@router.post(
+    "/{book_id}/chapters", response_model=dict, status_code=status.HTTP_201_CREATED
+)
+async def create_chapter(
+    book_id: str,
+    chapter_data: TocItemCreate,
+    current_user: Dict = Depends(get_current_user),
+):
+    """
+    Create a new chapter in the book's TOC.
+    Can be used to add a new chapter at any level (chapter or subchapter).
+    """
+    # Get the book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("clerk_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to modify this book's chapters"
+        )
+
+    # Get current TOC
+    current_toc = book.get("table_of_contents", {})
+    chapters = current_toc.get("chapters", [])
+
+    # Generate unique chapter ID
+    import uuid
+
+    chapter_id = str(uuid.uuid4())
+
+    # Prepare new chapter data
+    new_chapter = {
+        "id": chapter_id,
+        "title": chapter_data.title,
+        "description": chapter_data.description or "",
+        "level": chapter_data.level,
+        "order": chapter_data.order,
+        "subchapters": [],
+    }
+
+    # If this is a subchapter (level > 1), add it to the parent
+    if chapter_data.level > 1 and chapter_data.parent_id:
+        parent_found = False
+
+        def add_to_parent(chapter_list):
+            nonlocal parent_found
+            for chapter in chapter_list:
+                if chapter.get("id") == chapter_data.parent_id:
+                    chapter.setdefault("subchapters", []).append(new_chapter)
+                    parent_found = True
+                    return True
+                # Recursively check subchapters
+                if chapter.get("subchapters"):
+                    if add_to_parent(chapter["subchapters"]):
+                        return True
+            return False
+
+        if not add_to_parent(chapters):
+            raise HTTPException(status_code=400, detail="Parent chapter not found")
+
+    else:
+        # This is a top-level chapter
+        chapters.append(new_chapter)
+
+    # Update TOC data
+    updated_toc = {
+        **current_toc,
+        "chapters": chapters,
+        "total_chapters": len([ch for ch in chapters]),  # Count top-level chapters
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "status": "edited",
+        "version": current_toc.get("version", 1) + 1,
+    }
+
+    # Save to database
+    update_data = {
+        "table_of_contents": updated_toc,
+        "updated_at": datetime.now(timezone.utc),
+    }
+    await update_book(book_id, update_data, current_user.get("clerk_id"))
+
+    return {
+        "book_id": book_id,
+        "chapter": new_chapter,
+        "chapter_id": chapter_id,
+        "success": True,
+        "message": "Chapter created successfully",
+    }
+
+
+@router.get("/{book_id}/chapters/{chapter_id}", response_model=dict)
+async def get_chapter(
+    book_id: str,
+    chapter_id: str,
+    current_user: Dict = Depends(get_current_user),
+):
+    """
+    Get a specific chapter by ID from the book's TOC.
+    """
+    # Get the book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("clerk_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to access this book's chapters"
+        )
+
+    # Get TOC and find the chapter
+    current_toc = book.get("table_of_contents", {})
+    chapters = current_toc.get("chapters", [])
+
+    def find_chapter(chapter_list):
+        for chapter in chapter_list:
+            if chapter.get("id") == chapter_id:
+                return chapter
+            # Recursively search subchapters
+            if chapter.get("subchapters"):
+                found = find_chapter(chapter["subchapters"])
+                if found:
+                    return found
+        return None
+
+    chapter = find_chapter(chapters)
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    return {"book_id": book_id, "chapter": chapter, "success": True}
+
+
+@router.put("/{book_id}/chapters/{chapter_id}", response_model=dict)
+async def update_chapter(
+    book_id: str,
+    chapter_id: str,
+    chapter_data: TocItemUpdate,
+    current_user: Dict = Depends(get_current_user),
+):
+    """
+    Update a specific chapter in the book's TOC.
+    """
+    # Get the book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("clerk_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to modify this book's chapters"
+        )
+
+    # Get current TOC
+    current_toc = book.get("table_of_contents", {})
+    chapters = current_toc.get("chapters", [])
+
+    def update_chapter_in_list(chapter_list):
+        for i, chapter in enumerate(chapter_list):
+            if chapter.get("id") == chapter_id:
+                # Update the chapter with provided data
+                if chapter_data.title is not None:
+                    chapter["title"] = chapter_data.title
+                if chapter_data.description is not None:
+                    chapter["description"] = chapter_data.description
+                if chapter_data.level is not None:
+                    chapter["level"] = chapter_data.level
+                if chapter_data.order is not None:
+                    chapter["order"] = chapter_data.order
+                if chapter_data.metadata is not None:
+                    chapter["metadata"] = chapter_data.metadata
+                return True
+            # Recursively search subchapters
+            if chapter.get("subchapters"):
+                if update_chapter_in_list(chapter["subchapters"]):
+                    return True
+        return False
+
+    if not update_chapter_in_list(chapters):
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    # Update TOC data
+    updated_toc = {
+        **current_toc,
+        "chapters": chapters,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "status": "edited",
+        "version": current_toc.get("version", 1) + 1,
+    }
+
+    # Save to database
+    update_data = {
+        "table_of_contents": updated_toc,
+        "updated_at": datetime.now(timezone.utc),
+    }
+    await update_book(book_id, update_data, current_user.get("clerk_id"))
+
+    return {
+        "book_id": book_id,
+        "chapter_id": chapter_id,
+        "success": True,
+        "message": "Chapter updated successfully",
+    }
+
+
+@router.delete("/{book_id}/chapters/{chapter_id}", response_model=dict)
+async def delete_chapter(
+    book_id: str,
+    chapter_id: str,
+    current_user: Dict = Depends(get_current_user),
+):
+    """
+    Delete a specific chapter from the book's TOC.
+    Note: Deleting a chapter will also delete all its subchapters.
+    """
+    # Get the book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("clerk_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to modify this book's chapters"
+        )
+
+    # Get current TOC
+    current_toc = book.get("table_of_contents", {})
+    chapters = current_toc.get("chapters", [])
+
+    def delete_chapter_from_list(chapter_list):
+        for i, chapter in enumerate(chapter_list):
+            if chapter.get("id") == chapter_id:
+                # Remove the chapter
+                deleted_chapter = chapter_list.pop(i)
+                return deleted_chapter
+            # Recursively search subchapters
+            if chapter.get("subchapters"):
+                deleted = delete_chapter_from_list(chapter["subchapters"])
+                if deleted:
+                    return deleted
+        return None
+
+    deleted_chapter = delete_chapter_from_list(chapters)
+    if not deleted_chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    # Update TOC data
+    updated_toc = {
+        **current_toc,
+        "chapters": chapters,
+        "total_chapters": len([ch for ch in chapters]),  # Recount top-level chapters
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "status": "edited",
+        "version": current_toc.get("version", 1) + 1,
+    }
+
+    # Save to database
+    update_data = {
+        "table_of_contents": updated_toc,
+        "updated_at": datetime.now(timezone.utc),
+    }
+    await update_book(book_id, update_data, current_user.get("clerk_id"))
+
+    return {
+        "book_id": book_id,
+        "deleted_chapter": deleted_chapter,
+        "success": True,
+        "message": "Chapter deleted successfully",
+    }
+
+
+@router.get("/{book_id}/chapters", response_model=dict)
+async def list_chapters(
+    book_id: str,
+    current_user: Dict = Depends(get_current_user),
+    flat: bool = Query(
+        False, description="Return flat list instead of hierarchical structure"
+    ),
+):
+    """
+    List all chapters in the book's TOC.
+    Can return either hierarchical structure (default) or flat list.
+    """
+    # Get the book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("clerk_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to access this book's chapters"
+        )
+
+    # Get TOC
+    current_toc = book.get("table_of_contents", {})
+    chapters = current_toc.get("chapters", [])
+
+    if flat:
+        # Return flat list of all chapters and subchapters
+        def flatten_chapters(chapter_list, result=None):
+            if result is None:
+                result = []
+            for chapter in chapter_list:
+                result.append(
+                    {
+                        "id": chapter.get("id"),
+                        "title": chapter.get("title"),
+                        "description": chapter.get("description", ""),
+                        "level": chapter.get("level", 1),
+                        "order": chapter.get("order", 0),
+                    }
+                )
+                if chapter.get("subchapters"):
+                    flatten_chapters(chapter["subchapters"], result)
+            return result
+
+        flat_chapters = flatten_chapters(chapters)
+        return {
+            "book_id": book_id,
+            "chapters": flat_chapters,
+            "total_chapters": len(flat_chapters),
+            "structure": "flat",
+            "success": True,
+        }
+    else:
+        # Return hierarchical structure
+        return {
+            "book_id": book_id,
+            "chapters": chapters,
+            "total_chapters": current_toc.get("total_chapters", len(chapters)),
+            "structure": "hierarchical",
+            "success": True,
+        }

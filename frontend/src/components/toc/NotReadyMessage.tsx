@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TocReadiness } from '@/types/toc';
+import { bookClient } from '@/lib/api/bookClient';
 
 interface NotReadyMessageProps {
   readiness: TocReadiness;
@@ -9,10 +11,29 @@ interface NotReadyMessageProps {
 
 export default function NotReadyMessage({ readiness, onRetry, bookId }: NotReadyMessageProps) {
   const router = useRouter();
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleGoToSummary = () => {
     router.push(`/dashboard/books/${bookId}/summary`);
   };
+
+  const handleAnalyzeSummary = async () => {
+    try {
+      setIsAnalyzing(true);
+      console.log('Running fresh analysis on summary...');
+      await bookClient.analyzeSummary(bookId);
+      console.log('Analysis completed, refreshing readiness check...');
+      onRetry(); // This will trigger a fresh readiness check
+    } catch (error) {
+      console.error('Error analyzing summary:', error);
+      // Still call onRetry to refresh the view
+      onRetry();
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+
 
   return (
     <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8">
@@ -40,10 +61,11 @@ export default function NotReadyMessage({ readiness, onRetry, bookId }: NotReady
             <span className="text-zinc-400">Confidence Score</span>
             <span className="text-zinc-100 font-medium">{Math.round(readiness.confidence_score * 100)}%</span>
           </div>
-          
-          <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center">
             <span className="text-zinc-400">Word Count</span>
-            <span className="text-zinc-100 font-medium">{readiness.word_count.toLocaleString()}</span>
+            <span className="text-zinc-100 font-medium">
+              {readiness.word_count ? readiness.word_count.toLocaleString() : 'N/A'}
+            </span>
           </div>
           
           <div className="flex justify-between items-center">
@@ -72,14 +94,20 @@ export default function NotReadyMessage({ readiness, onRetry, bookId }: NotReady
             </>
           )}
         </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4">
+      </div>      <div className="flex flex-col sm:flex-row gap-4">
         <button
           onClick={handleGoToSummary}
           className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-colors"
         >
           Improve Summary
+        </button>
+        
+        <button
+          onClick={handleAnalyzeSummary}
+          disabled={isAnalyzing}
+          className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:opacity-50 text-white font-medium rounded-md transition-colors"
+        >
+          {isAnalyzing ? 'Analyzing...' : 'Re-analyze Summary'}
         </button>
         
         <button

@@ -154,6 +154,34 @@ export class BookClient {
   }
 
   /**
+   * Analyze the book summary using AI to determine readiness for TOC generation
+   */
+  public async analyzeSummary(bookId: string): Promise<{
+    book_id: string;
+    analysis: {
+      is_ready_for_toc: boolean;
+      confidence_score: number;
+      analysis: string;
+      suggestions: string[];
+      word_count: number;
+      character_count: number;
+      meets_minimum_requirements: boolean;
+    };
+    analyzed_at: string;
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/analyze-summary`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to analyze summary: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
    * Generate clarifying questions for TOC creation
    */
   public async generateQuestions(bookId: string): Promise<{
@@ -315,6 +343,23 @@ export class BookClient {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to fetch book summary: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Save/update the summary for a book
+   */
+  public async saveBookSummary(bookId: string, summary: string): Promise<{ summary: string; success: boolean }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/summary`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ summary }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to save book summary: ${response.status} ${error}`);
     }
     return response.json();
   }

@@ -61,3 +61,6 @@ frontend/.vercel
 # typescript
 frontend/*.tsbuildinfo
 frontend/next-env.d.ts
+
+# old AI assets
+z-docs/
