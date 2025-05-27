@@ -1,6 +1,7 @@
 'use client';
 
 import { BookProject } from '@/components/BookCard';
+import { QuestionResponse } from '@/types/toc';
 
 /**
  * API client for book operations
@@ -346,7 +347,6 @@ export class BookClient {
     }
     return response.json();
   }
-
   /**
    * Save/update the summary for a book
    */
@@ -360,6 +360,51 @@ export class BookClient {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to save book summary: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Save question responses for TOC generation
+   */
+  public async saveQuestionResponses(bookId: string, responses: QuestionResponse[]): Promise<{
+    book_id: string;
+    responses_saved: number;
+    answered_at: string;
+    ready_for_toc_generation: boolean;
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/question-responses`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ responses }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to save question responses: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get saved question responses for a book
+   */
+  public async getQuestionResponses(bookId: string): Promise<{
+    responses: QuestionResponse[];
+    answered_at?: string;
+    status: string;
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/question-responses`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { responses: [], status: 'not_provided' };
+      }
+      const error = await response.text();
+      throw new Error(`Failed to get question responses: ${response.status} ${error}`);
     }
     return response.json();
   }

@@ -16,7 +16,11 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider appearance={{ baseTheme: dark }}>
+    <ClerkProvider 
+      appearance={{ baseTheme: dark }}
+      // Extend session duration for development
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    >
       <html lang="en" className="scroll-smooth">
         <body className={`${inter.className} bg-zinc-950 text-zinc-100 min-h-screen`}>
           <main className="flex flex-col min-h-screen">

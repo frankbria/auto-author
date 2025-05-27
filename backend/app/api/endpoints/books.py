@@ -728,6 +728,37 @@ async def generate_clarifying_questions(
         )
 
 
+@router.get("/{book_id}/question-responses", status_code=status.HTTP_200_OK)
+async def get_question_responses(
+    book_id: str,
+    current_user: Dict = Depends(get_current_user),
+):
+    """
+    Get saved question responses for a book.
+    Returns responses that were previously saved for TOC generation.
+    """
+    # Get the book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("clerk_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to access responses for this book"
+        )
+
+    # Get question responses from book record
+    question_responses = book.get("question_responses", {})
+
+    if not question_responses:
+        return {"responses": [], "status": "not_provided"}
+
+    return {
+        "responses": question_responses.get("responses", []),
+        "answered_at": question_responses.get("answered_at"),
+        "status": question_responses.get("status", "not_provided"),
+    }
+
+
 @router.put("/{book_id}/question-responses", status_code=status.HTTP_200_OK)
 async def save_question_responses(
     book_id: str,

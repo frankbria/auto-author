@@ -65,7 +65,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       // Then check readiness status (which will now include analysis results)
       const readiness = await bookClient.checkTocReadiness(bookId);
       
-      if (readiness.is_ready_for_toc) {
+      if (readiness.meets_minimum_requirements) {
         // If ready, proceed to generate questions
         await generateQuestions();
       } else {
@@ -189,13 +189,13 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
             bookId={bookId}
           />
         );
-      
-      case WizardStep.ASKING_QUESTIONS:
+        case WizardStep.ASKING_QUESTIONS:
         return (
           <ClarifyingQuestions 
             questions={wizardState.questions!}
             onSubmit={handleQuestionSubmit}
             isLoading={wizardState.isLoading}
+            bookId={bookId}
           />
         );
       

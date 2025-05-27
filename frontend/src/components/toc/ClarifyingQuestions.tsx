@@ -1,15 +1,93 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { QuestionResponse } from '@/types/toc';
+import { bookClient } from '@/lib/api/bookClient';
 
 interface ClarifyingQuestionsProps {
   questions: string[];
   onSubmit: (responses: QuestionResponse[]) => void;
   isLoading: boolean;
+  bookId: string; // Add bookId prop
 }
 
-export default function ClarifyingQuestions({ questions, onSubmit, isLoading }: ClarifyingQuestionsProps) {
+export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bookId }: ClarifyingQuestionsProps) {
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+
+  // Load existing responses when component mounts
+  useEffect(() => {
+    const loadExistingResponses = async () => {
+      try {
+        const existingResponses = await bookClient.getQuestionResponses(bookId);
+        if (existingResponses.responses && existingResponses.responses.length > 0) {
+          const responseMap: Record<string, string> = {};
+          existingResponses.responses.forEach((response, index) => {
+            // Map responses to questions by index
+            if (questions[index] === response.question) {
+              responseMap[index] = response.answer;
+            }
+          });
+          setResponses(responseMap);
+          setLastSaved(existingResponses.answered_at || null);
+        }
+      } catch (error) {
+        console.error('Failed to load existing responses:', error);
+        // Don't throw error, just continue with empty responses
+      }
+    };
+
+    if (bookId && questions.length > 0) {
+      loadExistingResponses();
+    }
+  }, [bookId, questions]);
+  // Auto-save responses with debouncing
+  useEffect(() => {
+    const saveResponsesDebounced = async () => {
+      if (Object.keys(responses).length > 0) {
+        try {
+          setIsSaving(true);
+          const questionResponses: QuestionResponse[] = questions.map((question, index) => ({
+            question,
+            answer: responses[index] || ''
+          }));
+          
+          // Only save non-empty responses
+          const nonEmptyResponses = questionResponses.filter(r => r.answer.trim().length > 0);
+          
+          if (nonEmptyResponses.length > 0) {
+            await bookClient.saveQuestionResponses(bookId, nonEmptyResponses);
+            setLastSaved(new Date().toISOString());
+          }
+        } catch (error) {
+          console.error('Failed to save responses:', error);
+          // Don't show error to user for auto-save, just log it
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    };
+
+    const timeoutId = setTimeout(saveResponsesDebounced, 2000); // Save 2 seconds after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [responses, bookId, questions]);
+
+  const handleSubmit = async () => {
+    const questionResponses: QuestionResponse[] = questions.map((question, index) => ({
+      question,
+      answer: responses[index] || ''
+    }));
+    
+    // Save final responses before submitting
+    try {
+      await bookClient.saveQuestionResponses(bookId, questionResponses);
+    } catch (error) {
+      console.error('Failed to save final responses:', error);
+    }
+    
+    onSubmit(questionResponses);
+  };
 
   const handleResponseChange = (questionIndex: number, answer: string) => {
     setResponses(prev => ({
@@ -23,20 +101,10 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading }: 
       setCurrentQuestionIndex(prev => prev + 1);
     }
   };
-
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(prev => prev - 1);
     }
-  };
-
-  const handleSubmit = () => {
-    const questionResponses: QuestionResponse[] = questions.map((question, index) => ({
-      question,
-      answer: responses[index] || ''
-    }));
-    
-    onSubmit(questionResponses);
   };
 
   const allQuestionsAnswered = questions.every((_, index) => 
@@ -47,14 +115,34 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading }: 
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 
   return (
-    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8">
-      <div className="mb-6">
+    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8">      <div className="mb-6">
         <h2 className="text-xl font-semibold text-zinc-100 mb-3">
           Clarifying Questions
         </h2>
         <p className="text-zinc-400">
           Help us create the best table of contents by answering a few questions about your book.
         </p>
+        
+        {/* Auto-save status */}
+        <div className="mt-3 flex items-center text-sm">
+          {isSaving ? (
+            <div className="flex items-center text-blue-400">
+              <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-blue-400 mr-2"></div>
+              Saving...
+            </div>
+          ) : lastSaved ? (
+            <div className="flex items-center text-green-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Auto-saved
+            </div>
+          ) : (
+            <div className="text-zinc-500">
+              Responses will be saved automatically
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Progress indicator */}

@@ -44,10 +44,9 @@ export function useAuthFetch(options: UseAuthFetchOptions = {}) {
         "Content-Type": "application/json",
         ...(restOptions.headers as Record<string, string>),
       };
-        
-      // Add auth token if authentication is not skipped
+          // Add auth token if authentication is not skipped
       if (!skipAuth) {
-        const token = await getToken();
+        const token = await getToken({ skipCache: true }); // Force fresh token
         if (token) {
           // Add authorization header
           headersObj = {
@@ -65,6 +64,34 @@ export function useAuthFetch(options: UseAuthFetchOptions = {}) {
         ...restOptions,
         headers,
       });
+      
+      // If we get a 401 and we're using auth, try once more with a fresh token
+      if (response.status === 401 && !skipAuth) {
+        console.log("Received 401, attempting to refresh token...");
+        const freshToken = await getToken({ skipCache: true });
+        if (freshToken) {
+          const retryHeaders = {
+            ...headersObj,
+            "Authorization": `Bearer ${freshToken}`
+          };
+          
+          const retryResponse = await fetch(url, {
+            ...restOptions,
+            headers: retryHeaders,
+          });
+          
+          if (retryResponse.ok) {
+            // Success with fresh token
+            const contentType = retryResponse.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+              return await retryResponse.json() as T;
+            } else {
+              return await retryResponse.text() as T;
+            }
+          }
+          // If retry also fails, fall through to normal error handling
+        }
+      }
       
       // Parse the response
       let data;

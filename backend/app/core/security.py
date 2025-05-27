@@ -41,15 +41,22 @@ async def verify_jwt_token(token: str) -> Dict[str, Any]:
     """Verify a JWT token from Clerk."""
     try:
         # Use the JWKS (JSON Web Key Set) to verify the signature
+        # Add leeway for clock skew and extend expiration tolerance
         payload = jwt.decode(
             token,
             settings.clerk_jwt_public_key_pem,
             algorithms=[settings.CLERK_JWT_ALGORITHM],
             audience="example.com",  # Update with your domain
-            options={"verify_signature": True},
+            options={
+                "verify_signature": True,
+                "verify_exp": True,  # Still verify expiration but with leeway
+                "leeway": 300,  # 5 minutes leeway for clock skew
+            },
         )
         return payload
     except JWTError as e:
+        # Log the specific error for debugging
+        print(f"JWT verification failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid authentication credentials: {str(e)}",
