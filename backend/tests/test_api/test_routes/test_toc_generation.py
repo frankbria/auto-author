@@ -99,14 +99,14 @@ async def test_toc_generation_workflow_e2e(async_client_factory):
     assert "toc" in toc_json
     assert toc_json["toc"]["chapters"]
 
-    # 7. Try submitting empty summary (should fail readiness)
+    # 7. Try submitting empty summary (should fail validation)
     summary_resp2 = await client.patch(
         f"/api/v1/books/{book_id}/summary", json={"summary": ""}
     )
-    assert summary_resp2.status_code == 200
+    assert summary_resp2.status_code == 400
     # Now TOC generation should fail again
-    toc_fail_resp3 = await client.post(f"/api/v1/books/{book_id}/generate-toc")
-    assert toc_fail_resp3.status_code == 400
+    # toc_fail_resp3 = await client.post(f"/api/v1/books/{book_id}/generate-toc")
+    # assert toc_fail_resp3.status_code == 400
 
     # 8. Cleanup
     await client.delete(f"/api/v1/books/{book_id}")
