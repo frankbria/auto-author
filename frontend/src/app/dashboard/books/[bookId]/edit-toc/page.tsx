@@ -1,105 +1,119 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-// import { useParams } from 'next/navigation'; // TODO: Use when implementing real API calls
-// import bookClient from '@/lib/api/bookClient';
+import { useAuth } from '@clerk/nextjs';
+import bookClient from '@/lib/api/bookClient';
+import { TocChapter, TocSubchapter, TocData } from '@/types/toc';
 
 type Chapter = {
   id: string;
   title: string;
   description?: string;
   parent?: string;
-  children: Chapter[];
-  depth: number;
+  children: Chapter[];  depth: number;
 };
 
-export default function EditTOCPage() {
+// Helper functions to convert between API format and local format
+const convertTocDataToChapters = (tocData: TocData): Chapter[] => {
+  const chapters: Chapter[] = [];
+  
+  tocData.chapters.forEach((apiChapter) => {
+    const chapter: Chapter = {
+      id: apiChapter.id,
+      title: apiChapter.title,
+      description: apiChapter.description,
+      depth: 0, // Top-level chapters have depth 0
+      children: []
+    };
+    
+    // Convert subchapters to children
+    apiChapter.subchapters.forEach((apiSubchapter) => {
+      const subchapter: Chapter = {
+        id: apiSubchapter.id,
+        title: apiSubchapter.title,
+        description: apiSubchapter.description,
+        parent: apiChapter.id,
+        depth: 1, // Subchapters have depth 1
+        children: []
+      };
+      chapter.children.push(subchapter);
+    });
+    
+    chapters.push(chapter);
+  });
+  
+  return chapters;
+};
+
+const convertChaptersToTocData = (chapters: Chapter[]): TocData => {
+  const apiChapters: TocChapter[] = [];
+  
+  chapters.forEach((chapter, index) => {
+    if (chapter.depth === 0) { // Only process top-level chapters
+      const apiChapter: TocChapter = {
+        id: chapter.id,
+        title: chapter.title,
+        description: chapter.description || '',
+        level: 1, // API uses level 1 for chapters
+        order: index + 1,
+        subchapters: []
+      };
+      
+      // Convert children to subchapters
+      chapter.children.forEach((child, childIndex) => {
+        const apiSubchapter: TocSubchapter = {
+          id: child.id,
+          title: child.title,
+          description: child.description || '',
+          level: 2, // API uses level 2 for subchapters
+          order: childIndex + 1
+        };
+        apiChapter.subchapters.push(apiSubchapter);
+      });
+      
+      apiChapters.push(apiChapter);
+    }
+  });
+  
+  return {
+    chapters: apiChapters,
+    total_chapters: apiChapters.length,
+    estimated_pages: apiChapters.length * 15, // Rough estimate
+    structure_notes: 'Updated via TOC editor'
+  };
+};
+
+export default function EditTOCPage({ params }: { params: Promise<{ bookId: string }> }) {
   const router = useRouter();
-  // const params = useParams(); // TODO: Use when implementing real API calls
-  // const bookId = params.bookId as string; // TODO: Use when implementing real API calls
+  const { bookId } = use(params);
+  const { getToken } = useAuth();
   const [toc, setToc] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
-  const [dragOverItem, setDragOverItem] = useState<string | null>(null);
-  
-  // Fetch the TOC when component mounts
+  const [dragOverItem, setDragOverItem] = useState<string | null>(null);    // Fetch the TOC when component mounts
   useEffect(() => {
     const fetchTOC = async () => {
       try {
-        // In a real app, this would call your API
-        // const response = await bookClient.getBookTOC(bookId);
+        // Set up auth token for the API client
+        const token = await getToken();
+        if (token) {
+          bookClient.setAuthToken(token);
+        }
         
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Fetch TOC from the backend API
+        const response = await bookClient.getToc(bookId);
         
-        // Sample TOC data
-        const tocData: Chapter[] = [
-          {
-            id: 'ch1',
-            title: 'Introduction to Machine Learning',
-            description: 'Overview of machine learning concepts and applications',
-            depth: 0,
-            children: [
-              {
-                id: 'ch1-1',
-                title: 'What is Machine Learning?',
-                description: 'Definition and basic concepts',
-                parent: 'ch1',
-                depth: 1,
-                children: []
-              },
-              {
-                id: 'ch1-2',
-                title: 'History and Evolution',
-                description: 'Historical development of ML techniques',
-                parent: 'ch1',
-                depth: 1,
-                children: []
-              }
-            ]
-          },
-          {
-            id: 'ch2',
-            title: 'Types of Learning Algorithms',
-            description: 'Exploring different ML approaches',
-            depth: 0,
-            children: [
-              {
-                id: 'ch2-1',
-                title: 'Supervised Learning',
-                parent: 'ch2',
-                depth: 1,
-                children: []
-              },
-              {
-                id: 'ch2-2',
-                title: 'Unsupervised Learning',
-                parent: 'ch2',
-                depth: 1,
-                children: []
-              },
-              {
-                id: 'ch2-3',
-                title: 'Reinforcement Learning',
-                parent: 'ch2',
-                depth: 1,
-                children: []
-              }
-            ]
-          },
-          {
-            id: 'ch3',
-            title: 'Practical Applications',
-            description: 'Real-world ML implementations',
-            depth: 0,
-            children: []
-          }
-        ];
-        
-        setToc(tocData);
+        if (response.toc) {
+          // Convert API format (TocData) to local format (Chapter[])
+          const convertedToc = convertTocDataToChapters(response.toc);
+          setToc(convertedToc);
+        } else {
+          // No TOC exists yet - start with empty state
+          setToc([]);
+        }
       } catch (err) {
         console.error('Error fetching TOC:', err);
         setError('Failed to load the table of contents. Please try again.');
@@ -109,7 +123,7 @@ export default function EditTOCPage() {
     };
     
     fetchTOC();
-  }, []);
+  }, [bookId, getToken]);
 
   const addNewChapter = () => {
     const newId = `ch${toc.length + 1}`;
@@ -336,21 +350,26 @@ export default function EditTOCPage() {
     }
 
     return newToc;
-  };
-  const handleSaveTOC = async () => {
+  };  const handleSaveTOC = async () => {
     setIsLoading(true);
+    setError('');
     
     try {
-      // TODO: Convert local Chapter format to API format
-      // For now, keep the existing simulation until backend API is ready
-      console.log('TOC to save:', toc);
-      // await bookClient.updateToc(bookId, formattedToc);
+      // Set up auth token for the API client
+      const token = await getToken();
+      if (token) {
+        bookClient.setAuthToken(token);
+      }
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Convert local Chapter format to API TocData format
+      const tocData = convertChaptersToTocData(toc);
+      console.log('TOC to save:', tocData);
+      
+      // Save TOC using the real API
+      await bookClient.updateToc(bookId, tocData);
       
       // Navigate to the next step
-      router.push('/dashboard/books/new-book-12345/chapters');
+      router.push(`/dashboard/books/${bookId}/chapters`);
     } catch (err) {
       console.error('Error saving TOC:', err);
       setError('Failed to save the table of contents. Please try again.');

@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import bookClient from '@/lib/api/bookClient';
 import { BookProject } from '@/components/BookCard';
+import { TocData } from '@/types/toc';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -37,62 +39,76 @@ type BookDetails = Omit<BookProject, 'chapters'> & {
   summary?: string; // Add summary for wizard logic
 };
 
-// Sample chapters data - would come from API in production
-const SAMPLE_CHAPTERS: Chapter[] = [
-  {
-    id: 'ch-1',
-    title: 'Introduction to Machine Learning',
-    completed: true,
-    wordCount: 2500,
-    progress: 100
-  },
-  {
-    id: 'ch-2',
-    title: 'Supervised Learning Algorithms',
-    completed: true,
-    wordCount: 3200,
-    progress: 100
-  },
-  {
-    id: 'ch-3',
-    title: 'Unsupervised Learning Techniques',
-    completed: false,
-    wordCount: 1800,
-    progress: 70
-  },
-  {
-    id: 'ch-4',
-    title: 'Neural Networks Fundamentals',
-    completed: false,
-    wordCount: 800,
-    progress: 25
-  },
-  {
-    id: 'ch-5',
-    title: 'Advanced Deep Learning',
-    completed: false,
-    wordCount: 0,
-    progress: 0
+// Helper function to convert TOC data to Chapter format for UI
+const convertTocToChapters = (tocData: TocData | null): Chapter[] => {
+  if (!tocData || !tocData.chapters) {
+    return [];
   }
-];
+
+  const chapters: Chapter[] = [];
+  
+  tocData.chapters.forEach((tocChapter) => {
+    // Add main chapter
+    const chapter: Chapter = {
+      id: tocChapter.id,
+      title: tocChapter.title,
+      completed: false, // Default to false since we don't have content yet
+      wordCount: 0, // Default to 0 since we don't have content yet
+      progress: 0, // Default to 0 since we don't have content yet
+    };
+    chapters.push(chapter);
+
+    // Add subchapters if they exist
+    if (tocChapter.subchapters && tocChapter.subchapters.length > 0) {
+      tocChapter.subchapters.forEach((subchapter) => {
+        const subChapter: Chapter = {
+          id: subchapter.id,
+          title: subchapter.title,
+          completed: false,
+          wordCount: 0,
+          progress: 0,
+        };
+        chapters.push(subChapter);
+      });
+    }
+  });
+
+  return chapters;
+};
 
 export default function BookPage({ params }: { params: Promise<{ bookId: string }> }) {
   const router = useRouter();
-  const [book, setBook] = useState<BookDetails | null>(null);
+  const { getToken } = useAuth();  const [book, setBook] = useState<BookDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
-  const [summary, setSummary] = useState('');
-  const [hasCommitted, setHasCommitted] = useState(false);
 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);
   
   useEffect(() => {
-    setIsLoading(true);
-    // Fetch book details
-    bookClient.getBook(bookId)
-      .then((bookData: BookProject) => {
+    const fetchBookData = async () => {
+      setIsLoading(true);
+      try {
+        // Set up auth token
+        const token = await getToken();
+        if (token) {
+          bookClient.setAuthToken(token);
+        }
+
+        // Fetch book details
+        const bookData: BookProject = await bookClient.getBook(bookId);
+        
+        // Fetch TOC data to populate chapters
+        let chapters: Chapter[] = [];
+        try {
+          const tocResponse = await bookClient.getToc(bookId);
+          chapters = convertTocToChapters(tocResponse.toc);
+        } catch (tocError) {
+          console.warn('No TOC found for this book yet:', tocError);
+          // Keep empty chapters array if no TOC exists
+        }
+
         setBook({
           ...bookData,
           description: bookData.description || 'No description available',
@@ -105,26 +121,26 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           published: bookData.published,
           collaborators: bookData.collaborators,
           owner_id: bookData.owner_id,
-          chapters: SAMPLE_CHAPTERS,
+          chapters: chapters,
           summary: undefined, // will be set below
-        });
-        setError(null);
-      })
-      .catch((err: Error) => {
+        });        setError(null);
+      } catch (err: unknown) {
         console.error('Error fetching book details:', err);
         setError('Failed to load book details. Please try again.');
-      })
-      .finally(() => {
+      } finally {
         setIsLoading(false);
-      });
+      }
+    };
+
+    fetchBookData();
+  }, [bookId, getToken]);
+  useEffect(() => {
     // Fetch summary for wizard step logic
     bookClient.getBookSummary(bookId)
       .then((data) => {
-        setSummary(data.summary || '');
         setBook((prev) => prev ? { ...prev, summary: data.summary || '' } : prev);
       })
       .catch(() => {
-        setSummary('');
         setBook((prev) => prev ? { ...prev, summary: '' } : prev);
       });
   }, [bookId]);
@@ -180,8 +196,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     const subscription = form.watch(async (values) => {
       if (!book) return;
       setIsSaving(true);
-      try {
-        await bookClient.updateBook(book.id, {
+      try {        await bookClient.updateBook(book.id, {
           title: values.title,
           subtitle: values.subtitle,
           description: values.description,
@@ -190,7 +205,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           cover_image_url: values.cover_image_url,
         });
         toast.success('Book info saved');
-        setHasCommitted(true);
       } catch {
         toast.error('Failed to save book info');
       } finally {
