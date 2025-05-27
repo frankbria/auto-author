@@ -1,7 +1,17 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, validator
+from enum import Enum
 from app.schemas.user import UserResponse
+
+
+class ChapterStatus(str, Enum):
+    """Valid chapter status values"""
+
+    DRAFT = "draft"
+    IN_PROGRESS = "in-progress"
+    COMPLETED = "completed"
+    PUBLISHED = "published"
 
 
 class TocItemSchema(BaseModel):
@@ -14,6 +24,14 @@ class TocItemSchema(BaseModel):
     parent_id: Optional[str] = None
     order: int
     content_id: Optional[str] = None
+
+    # NEW FIELDS FOR CHAPTER TABS
+    status: ChapterStatus = ChapterStatus.DRAFT
+    word_count: int = 0
+    last_modified: Optional[datetime] = None
+    estimated_reading_time: int = 0  # minutes
+    is_active_tab: bool = False  # For tab persistence
+
     metadata: Dict[str, Any] = {}
 
 
@@ -118,3 +136,63 @@ class BookDetailResponse(BookResponse):
     """Schema for detailed book information including owner data"""
 
     owner: Optional[Dict[str, Any]] = None
+
+
+class ChapterMetadata(BaseModel):
+    """Enhanced chapter metadata for tab functionality"""
+
+    id: str
+    title: str
+    status: ChapterStatus = ChapterStatus.DRAFT
+    word_count: int = 0
+    last_modified: Optional[datetime] = None
+    estimated_reading_time: int = 0
+    order: int
+    level: int
+    has_content: bool = False
+    description: Optional[str] = None
+    parent_id: Optional[str] = None
+
+
+class ChapterMetadataResponse(BaseModel):
+    """Response schema for chapter metadata operations"""
+
+    book_id: str
+    chapters: List[ChapterMetadata]
+    total_chapters: int
+    completion_stats: Dict[str, int]
+    last_active_chapter: Optional[str] = None
+
+
+class TabStateRequest(BaseModel):
+    """Schema for saving tab state"""
+
+    active_chapter_id: str
+    open_tab_ids: List[str] = Field(max_items=20)  # Limit open tabs
+    tab_order: List[str]
+
+    @validator("tab_order")
+    def validate_tab_order(cls, v, values):
+        open_tabs = values.get("open_tab_ids", [])
+        if set(v) != set(open_tabs):
+            raise ValueError(
+                "tab_order must contain exactly the same chapters as open_tab_ids"
+            )
+        return v
+
+
+class TabStateResponse(BaseModel):
+    """Response schema for tab state operations"""
+
+    active_chapter_id: str
+    open_tab_ids: List[str]
+    tab_order: List[str]
+    last_updated: datetime
+
+
+class BulkStatusUpdate(BaseModel):
+    """Schema for bulk chapter status updates"""
+
+    chapter_ids: List[str]
+    status: ChapterStatus
+    update_timestamp: bool = True

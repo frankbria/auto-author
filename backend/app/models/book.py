@@ -15,6 +15,14 @@ class TocItem(BaseModel):
     parent_id: Optional[str] = None
     order: int
     content_id: Optional[str] = None  # Reference to content collection if needed
+
+    # NEW FIELDS FOR CHAPTER TABS
+    status: str = "draft"  # draft, in-progress, completed, published
+    word_count: int = 0
+    last_modified: Optional[datetime] = None
+    estimated_reading_time: int = 0  # minutes
+    is_active_tab: bool = False  # For tab persistence
+
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
