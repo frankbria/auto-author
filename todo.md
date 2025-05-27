@@ -416,25 +416,94 @@
 - [X] Document TOC persistence mechanisms and behaviors <!-- Basic persistence is documented -->
 - [X] Add troubleshooting guide for TOC persistence issues <!-- Basic troubleshooting exists -->
 
-### Documentation Tasks (ADVANCED FEATURES - Future Release)
-<!-- ENTERPRISE DOCUMENTATION - Comment out for v2.0+ -->
+### Documentation Tasks (MVP and Future Features)
+<!-- MVP DOCUMENTATION TASKS -->
+- [X] Document export functionality and supported formats <!-- Created: export-functionality.md with comprehensive coverage of current implementation and future plans -->
+- [X] Add troubleshooting guide for TOC persistence issues <!-- Created: troubleshooting-toc-persistence.md with comprehensive troubleshooting guide -->
+- [X] Create API documentation for TOC persistence endpoints <!-- Already exists: api-toc-endpoints.md covers all TOC persistence APIs -->
+
+<!-- FUTURE RELEASE DOCUMENTATION (v2.0+) -->
 <!-- - [ ] Create user guide for version history and restoration - FUTURE: Version history not implemented -->
-<!-- - [ ] Document export functionality and supported formats - FUTURE: Export not implemented -->
-<!-- - [ ] Create API documentation for TOC persistence endpoints - CURRENT: Basic endpoints documented -->
 <!-- - [ ] Document offline capability and synchronization behavior - FUTURE: Offline mode not implemented -->
 <!-- - [ ] Add guidance for conflict resolution during concurrent editing - FUTURE: Multi-user editing not implemented -->
 <!-- - [ ] Document backup and recovery procedures - FUTURE: Database persistence is sufficient for MVP -->
-- [ ] Document export functionality and supported formats
-- [ ] Add troubleshooting guide for TOC persistence issues
-- [ ] Create API documentation for TOC persistence endpoints
-- [ ] Document offline capability and synchronization behavior
-- [ ] Add guidance for conflict resolution during concurrent editing
-- [ ] Document backup and recovery procedures
 
 
 # Epic 4: Chapter Content Creation
 ## User Story 4.1: View Chapters in Tabs
 
+### Frontend Tasks
+- [ ] Create tabbed interface component that renders all chapters from TOC as tabs
+- [ ] Implement tab state management (active, draft, completed, in-progress)
+- [ ] Build tab content area that dynamically loads chapter-specific components
+- [ ] Add tab navigation with keyboard shortcuts (Ctrl+1, Ctrl+2, etc.)
+- [ ] Implement tab overflow handling for many chapters (scrollable tab bar)
+- [ ] Create tab persistence to remember last active tab in localStorage
+- [ ] Add visual indicators for chapter status in tabs (icons, colors)
+- [ ] Build responsive tab layout for mobile devices (collapsible/dropdown on small screens)
+- [ ] Implement smooth transitions between tab content
+- [ ] Add tab context menu for chapter operations (duplicate, delete, reorder)
+- [ ] Create tab title truncation with tooltips for long chapter names
+- [ ] Implement tab drag-and-drop for reordering chapters within the interface
+- [ ] Add "unsaved changes" indicators on tabs when content is modified
+- [ ] Build tab loading states while fetching chapter content
+- [ ] Implement tab error states for failed chapter loads
+
+### Backend Tasks
+- [ ] Create API endpoint for retrieving all chapters with metadata (GET /api/v1/books/{book_id}/chapters)
+- [ ] Implement chapter status tracking and storage (draft, in-progress, completed)
+- [ ] Build API endpoint for bulk chapter status updates (PATCH /api/v1/books/{book_id}/chapters/status)
+- [ ] Create chapter content retrieval endpoint with caching (GET /api/v1/books/{book_id}/chapters/{chapter_id}/content)
+- [ ] Implement chapter metadata endpoint (word count, last modified, status) (GET /api/v1/books/{book_id}/chapters/{chapter_id}/metadata)
+- [ ] Add API endpoint for chapter order management to support tab reordering
+- [ ] Create efficient pagination/lazy loading for books with many chapters
+- [ ] Implement chapter access logging for analytics and tab persistence
+- [ ] Build API validation for chapter tab operations (create, reorder, delete)
+- [ ] Add authorization checks for chapter access and modification permissions
+
+### Database Tasks
+- [ ] Add chapter status field to chapters table (draft, in-progress, completed, published)
+- [ ] Create chapter_access_log table for tracking user interactions and tab persistence
+- [ ] Add indices for efficient chapter queries by book_id and status
+- [ ] Implement chapter ordering fields for tab sequence management
+- [ ] Add chapter metadata fields (word_count, last_modified, estimated_reading_time)
+- [ ] Create database constraints for chapter status transitions
+- [ ] Add cascade deletion handling for chapters when books are deleted
+- [ ] Implement soft delete for chapters to preserve content during tab removal
+
+### Integration Tasks
+- [ ] Integrate tabbed interface with existing TOC structure and hierarchy
+- [ ] Connect tab system with current chapter editing functionality (/chapters/[chapterId] pages)
+- [ ] Ensure tab state synchronizes with TOC editor changes (new chapters, reordering)
+- [ ] Update book page navigation to redirect to tabbed interface instead of individual chapter pages
+- [ ] Integrate chapter status from tabs with TOC sidebar indicators
+- [ ] Connect tab persistence with user preferences and session management
+- [ ] Ensure tab functionality works with existing book authoring workflow
+- [ ] Update breadcrumb navigation to reflect tabbed chapter context
+
+### Testing Tasks
+- [ ] Test tab rendering for books with 1, 5, 15, and 50+ chapters
+- [ ] Verify tab state management across browser refreshes and sessions
+- [ ] Test tab overflow and scrolling with many chapters
+- [ ] Validate keyboard navigation shortcuts work consistently
+- [ ] Test tab persistence across different browsers and devices
+- [ ] Verify tab status indicators update correctly when content changes
+- [ ] Test responsive tab layout on mobile, tablet, and desktop
+- [ ] Validate tab drag-and-drop reordering functions properly
+- [ ] Test tab context menu operations and permissions
+- [ ] Verify tab loading states and error handling work correctly
+- [ ] Test integration with TOC changes (new chapters, deletions, reordering)
+- [ ] Validate tab performance with large books and complex chapter structures
+
+### Documentation Tasks
+- [ ] Document tabbed interface design patterns and component architecture
+- [ ] Create user guide for tab navigation and management features
+- [ ] Document API endpoints for chapter tab operations
+- [ ] Add troubleshooting guide for common tab interface issues
+- [ ] Document keyboard shortcuts and accessibility features for tabs
+- [ ] Create developer guide for extending tab functionality
+- [ ] Document tab state persistence and session management
+- [ ] Add integration documentation for connecting tabs with existing features
 
 ## User Story 4.2: Interview-Style Prompts
 
