@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Any
 import uuid
 
-from app.db.database import get_database
+# from app.db.database import get_database
 from app.models.book import TocItem
 from app.models.chapter_access import ChapterAccessLog, ChapterAccessCreate
 from app.schemas.book import ChapterStatus, ChapterMetadata, TabStateRequest

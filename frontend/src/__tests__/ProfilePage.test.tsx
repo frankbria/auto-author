@@ -262,10 +262,9 @@ describe('UserProfile page', () => {
       mockFormValuesTemplate[name] = value;
     }),
   };
-  beforeEach(() => {
-    jest.clearAllMocks();
+  beforeEach(() => {    jest.clearAllMocks();
     // Always create a fresh form and values for each test
-    const { form, values } = createMockFormAndValues();
+    const { form } = createMockFormAndValues();
     mockForm = form;
     // Set up form module mocks using requireMock
     const formModule = jest.requireMock('../components/ui/form');

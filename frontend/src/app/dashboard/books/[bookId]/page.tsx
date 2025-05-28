@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import bookClient from '@/lib/api/bookClient';
 import { BookProject } from '@/components/BookCard';
@@ -14,6 +13,7 @@ import { bookCreationSchema, BookFormData } from '@/lib/schemas/bookSchema';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { BookMetadataForm } from '@/components/BookMetadataForm';
+import { ChapterTabs } from '@/components/chapters/ChapterTabs';
 
 // Define types for book data
 type Chapter = {
@@ -77,8 +77,7 @@ const convertTocToChapters = (tocData: TocData | null): Chapter[] => {
 };
 
 export default function BookPage({ params }: { params: Promise<{ bookId: string }> }) {
-  const router = useRouter();
-  const { getToken } = useAuth();  const [book, setBook] = useState<BookDetails | null>(null);
+  const { getToken } = useAuth();const [book, setBook] = useState<BookDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -98,12 +97,12 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
 
         // Fetch book details
         const bookData: BookProject = await bookClient.getBook(bookId);
-        
-        // Fetch TOC data to populate chapters
+          // Fetch TOC data to populate chapters
         let chapters: Chapter[] = [];
         try {
           const tocResponse = await bookClient.getToc(bookId);
-          chapters = convertTocToChapters(tocResponse.toc);
+          // Cast the response to TocData to handle missing chapter tab fields
+          chapters = convertTocToChapters(tocResponse.toc as TocData);
         } catch (tocError) {
           console.warn('No TOC found for this book yet:', tocError);
           // Keep empty chapters array if no TOC exists
@@ -143,8 +142,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       .catch(() => {
         setBook((prev) => prev ? { ...prev, summary: '' } : prev);
       });
-  }, [bookId]);
-    const formatDate = (dateString: string) => {
+  }, [bookId]);  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
@@ -153,16 +151,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
-  
-  const handleCreateChapter = () => {
-    // In production, this would open a dialog or navigate to chapter creation
-    alert('Create new chapter functionality coming soon!');
-  };
-  
-  const handleEditChapter = (chapterId: string) => {
-    // Navigate to chapter edit page
-    router.push(`/dashboard/books/${bookId}/chapters/${chapterId}`);
   };
 
   const form = useForm<BookFormData>({
@@ -383,69 +371,9 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
             </button>
           </>
         )}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-zinc-800 border border-zinc-700 p-5 rounded-lg lg:col-span-3">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-zinc-100">Chapters</h2>
-            <button 
-              onClick={handleCreateChapter}
-              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md flex items-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              Add Chapter
-            </button>
-          </div>
-          <div className="space-y-3">
-            {book.chapters.map((chapter, index) => (
-              <div 
-                key={chapter.id} 
-                className="p-4 bg-zinc-750 border border-zinc-700 rounded-md hover:border-indigo-500 transition cursor-pointer"
-                onClick={() => handleEditChapter(chapter.id)}
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="flex items-center">
-                      <span className="text-zinc-500 mr-2">#{index + 1}</span>
-                      <h3 className="font-medium text-zinc-100">
-                        {chapter.title}
-                        {chapter.completed && (
-                          <span className="ml-2 px-2 py-0.5 bg-green-900/30 text-green-400 text-xs rounded-full">
-                            Completed
-                          </span>
-                        )}
-                      </h3>
-                    </div>
-                    <div className="text-zinc-400 text-sm mt-1">
-                      {chapter.wordCount > 0 ? `${chapter.wordCount.toLocaleString()} words` : 'No content yet'}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <div className="text-sm text-zinc-400">{chapter.progress}% complete</div>
-                    <div className="w-24 bg-zinc-700 rounded-full h-1.5 mt-1">
-                      <div 
-                        className={`h-1.5 rounded-full ${chapter.completed ? 'bg-green-500' : 'bg-indigo-600'}`}
-                        style={{ width: `${chapter.progress}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {book.chapters.length === 0 && (
-              <div className="text-center p-8 bg-zinc-800/50 rounded-lg border border-zinc-700">
-                <p className="text-zinc-400 mb-4">No chapters yet. Create your first one to get started.</p>
-                <button 
-                  onClick={handleCreateChapter}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
-                >
-                  Create First Chapter
-                </button>
-              </div>
-            )}
-          </div>
+      </div>      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-zinc-800 border border-zinc-700 p-5 rounded-lg lg:col-span-3">          {/* Chapter Tabs Interface */}
+          <ChapterTabs bookId={book.id} className="h-full" />
         </div>
         <div className="bg-zinc-800 border border-zinc-700 p-5 rounded-lg">
           <h2 className="text-xl font-semibold text-zinc-100 mb-4">Book Stats</h2>

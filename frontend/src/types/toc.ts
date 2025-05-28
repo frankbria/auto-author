@@ -1,3 +1,5 @@
+import { ChapterStatus } from './chapter-tabs';
+
 // Types for TOC generation wizard and components
 
 export interface TocChapter {
@@ -7,6 +9,13 @@ export interface TocChapter {
   level: number;
   order: number;
   subchapters: TocSubchapter[];
+
+  // NEW: Tab functionality fields
+  status: ChapterStatus;
+  word_count: number;
+  last_modified?: string;
+  estimated_reading_time: number;
+  content_id?: string;
 }
 
 export interface TocSubchapter {

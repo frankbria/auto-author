@@ -103,10 +103,30 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
 
       const result = await bookClient.generateToc(bookId, responses);
       
+      // Ensure chapters have all required TocChapter fields
+      const transformedResult = {
+        ...result,
+        toc: {
+          ...result.toc,
+          chapters: result.toc.chapters.map((chapter: any) => ({
+            status: chapter.status ?? 'draft',
+            word_count: chapter.word_count ?? 0,
+            estimated_reading_time: chapter.estimated_reading_time ?? 0,
+            ...chapter,
+            subchapters: chapter.subchapters?.map((sub: any) => ({
+              status: sub.status ?? 'draft',
+              word_count: sub.word_count ?? 0,
+              estimated_reading_time: sub.estimated_reading_time ?? 0,
+              ...sub,
+            })) ?? [],
+          })),
+        },
+      };
+
       setWizardState(prev => ({
         ...prev,
         step: WizardStep.REVIEW,
-        generatedToc: result,
+        generatedToc: transformedResult,
         isLoading: false
       }));
     } catch (error) {
@@ -152,10 +172,30 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
 
       const result = await bookClient.generateToc(bookId, wizardState.questionResponses);
       
+      // Ensure chapters have all required TocChapter fields
+      const transformedResult = {
+        ...result,
+        toc: {
+          ...result.toc,
+          chapters: result.toc.chapters.map((chapter: any) => ({
+            status: chapter.status ?? 'draft',
+            word_count: chapter.word_count ?? 0,
+            estimated_reading_time: chapter.estimated_reading_time ?? 0,
+            ...chapter,
+            subchapters: chapter.subchapters?.map((sub: any) => ({
+              status: sub.status ?? 'draft',
+              word_count: sub.word_count ?? 0,
+              estimated_reading_time: sub.estimated_reading_time ?? 0,
+              ...sub,
+            })) ?? [],
+          })),
+        },
+      };
+
       setWizardState(prev => ({
         ...prev,
         step: WizardStep.REVIEW,
-        generatedToc: result,
+        generatedToc: transformedResult,
         isLoading: false
       }));
     } catch (error) {
