@@ -5,41 +5,75 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import bookClient from '@/lib/api/bookClient';
-import { TocChapter, TocSubchapter, TocData } from '@/types/toc';
+import { triggerTocUpdateEvent } from '@/hooks/useTocSync';
+import { ChapterStatusIndicator } from '@/components/ui/ChapterStatusIndicator';
+import { ChapterStatus } from '@/types/chapter-tabs';
 
 type Chapter = {
   id: string;
   title: string;
   description?: string;
   parent?: string;
-  children: Chapter[];  depth: number;
+  children: Chapter[];
+  depth: number;
+  status?: ChapterStatus;
+  word_count?: number;
+  estimated_reading_time?: number;
 };
 
 // Helper functions to convert between API format and local format
-const convertTocDataToChapters = (tocData: TocData): Chapter[] => {
+const convertTocDataToChapters = (tocData: { 
+  chapters: Array<{
+    id: string;
+    title: string;
+    description: string;
+    level: number;
+    order: number;
+    subchapters: Array<{
+      id: string;
+      title: string;
+      description: string;
+      level: number;
+      order: number;
+    }>;
+  }>;
+  total_chapters: number;
+  estimated_pages: number;
+  structure_notes: string;
+}): Chapter[] => {
   const chapters: Chapter[] = [];
   
-  tocData.chapters.forEach((apiChapter) => {
-    const chapter: Chapter = {
+  if (!tocData || !tocData.chapters) {
+    return chapters;
+  }
+  
+  tocData.chapters.forEach((apiChapter) => {    const chapter: Chapter = {
       id: apiChapter.id,
       title: apiChapter.title,
-      description: apiChapter.description,
+      description: apiChapter.description || '',
       depth: 0, // Top-level chapters have depth 0
-      children: []
+      children: [],
+      status: (apiChapter as { status?: ChapterStatus }).status || ChapterStatus.DRAFT,
+      word_count: (apiChapter as { word_count?: number }).word_count || 0,
+      estimated_reading_time: (apiChapter as { estimated_reading_time?: number }).estimated_reading_time || 0
     };
     
     // Convert subchapters to children
-    apiChapter.subchapters.forEach((apiSubchapter) => {
-      const subchapter: Chapter = {
-        id: apiSubchapter.id,
-        title: apiSubchapter.title,
-        description: apiSubchapter.description,
-        parent: apiChapter.id,
-        depth: 1, // Subchapters have depth 1
-        children: []
-      };
-      chapter.children.push(subchapter);
-    });
+    if (apiChapter.subchapters && apiChapter.subchapters.length > 0) {
+      apiChapter.subchapters.forEach((apiSubchapter) => {        const subchapter: Chapter = {
+          id: apiSubchapter.id,
+          title: apiSubchapter.title,
+          description: apiSubchapter.description || '',
+          parent: apiChapter.id,
+          depth: 1, // Subchapters have depth 1
+          children: [],
+          status: (apiSubchapter as { status?: ChapterStatus }).status || ChapterStatus.DRAFT,
+          word_count: (apiSubchapter as { word_count?: number }).word_count || 0,
+          estimated_reading_time: (apiSubchapter as { estimated_reading_time?: number }).estimated_reading_time || 0
+        };
+        chapter.children.push(subchapter);
+      });
+    }
     
     chapters.push(chapter);
   });
@@ -47,23 +81,42 @@ const convertTocDataToChapters = (tocData: TocData): Chapter[] => {
   return chapters;
 };
 
-const convertChaptersToTocData = (chapters: Chapter[]): TocData => {
-  const apiChapters: TocChapter[] = [];
+const convertChaptersToTocData = (chapters: Chapter[]) => {
+  const apiChapters: Array<{
+    id: string;
+    title: string;
+    description: string;
+    level: number;
+    order: number;
+    subchapters: Array<{
+      id: string;
+      title: string;
+      description: string;
+      level: number;
+      order: number;
+    }>;
+  }> = [];
   
   chapters.forEach((chapter, index) => {
     if (chapter.depth === 0) { // Only process top-level chapters
-      const apiChapter: TocChapter = {
+      const apiChapter = {
         id: chapter.id,
         title: chapter.title,
         description: chapter.description || '',
         level: 1, // API uses level 1 for chapters
         order: index + 1,
-        subchapters: []
+        subchapters: [] as Array<{
+          id: string;
+          title: string;
+          description: string;
+          level: number;
+          order: number;
+        }>
       };
       
       // Convert children to subchapters
       chapter.children.forEach((child, childIndex) => {
-        const apiSubchapter: TocSubchapter = {
+        const apiSubchapter = {
           id: child.id,
           title: child.title,
           description: child.description || '',
@@ -126,13 +179,15 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   }, [bookId, getToken]);
 
   const addNewChapter = () => {
-    const newId = `ch${toc.length + 1}`;
-    const newChapter: Chapter = {
+    const newId = `ch${toc.length + 1}`;    const newChapter: Chapter = {
       id: newId,
       title: 'New Chapter',
       description: 'Description of the new chapter',
       depth: 0,
-      children: []
+      children: [],
+      status: ChapterStatus.DRAFT,
+      word_count: 0,
+      estimated_reading_time: 0
     };
     
     setToc([...toc, newChapter]);
@@ -145,13 +200,15 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     const findAndAddSubchapter = (chapters: Chapter[]) => {
       for (let i = 0; i < chapters.length; i++) {
         if (chapters[i].id === parentId) {
-          const newId = `${parentId}-${chapters[i].children.length + 1}`;
-          const newSubchapter: Chapter = {
+          const newId = `${parentId}-${chapters[i].children.length + 1}`;          const newSubchapter: Chapter = {
             id: newId,
             title: 'New Subchapter',
             parent: parentId,
             depth: chapters[i].depth + 1,
-            children: []
+            children: [],
+            status: ChapterStatus.DRAFT,
+            word_count: 0,
+            estimated_reading_time: 0
           };
           
           chapters[i].children.push(newSubchapter);
@@ -368,6 +425,9 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       // Save TOC using the real API
       await bookClient.updateToc(bookId, tocData);
       
+      // Trigger TOC synchronization event for chapter tabs
+      triggerTocUpdateEvent(bookId);
+      
       // Navigate to the next step
       router.push(`/dashboard/books/${bookId}/chapters`);
     } catch (err) {
@@ -396,14 +456,22 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         onDragEnter={() => handleDragEnter(chapter.id)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, chapter.id)}
-      >
-        <div className="bg-zinc-800 p-3 rounded-t-lg flex items-center justify-between">
-          <input
-            type="text"
-            value={chapter.title}
-            onChange={(e) => updateChapter(chapter.id, 'title', e.target.value)}
-            className="bg-zinc-800 border-none focus:ring-1 focus:ring-indigo-500 outline-none text-zinc-100 font-medium w-full"
-          />
+      >        <div className="bg-zinc-800 p-3 rounded-t-lg flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-1">
+            <input
+              type="text"
+              value={chapter.title}
+              onChange={(e) => updateChapter(chapter.id, 'title', e.target.value)}
+              className="bg-zinc-800 border-none focus:ring-1 focus:ring-indigo-500 outline-none text-zinc-100 font-medium flex-1"
+            />
+            {chapter.status && (
+              <ChapterStatusIndicator 
+                status={chapter.status} 
+                size="sm" 
+                showLabel 
+              />
+            )}
+          </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={() => addSubchapter(chapter.id)}

@@ -408,6 +408,73 @@ export class BookClient {
     }
     return response.json();
   }
+
+  /**
+   * Save chapter content
+   */
+  public async saveChapterContent(
+    bookId: string, 
+    chapterId: string, 
+    content: string,
+    autoUpdateMetadata: boolean = true
+  ): Promise<{
+    book_id: string;
+    chapter_id: string;
+    success: boolean;
+    message: string;
+    metadata_updated: boolean;
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ 
+        content,
+        auto_update_metadata: autoUpdateMetadata
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to save chapter content: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get chapter content
+   */
+  public async getChapterContent(
+    bookId: string,
+    chapterId: string,
+    includeMetadata: boolean = true,
+    trackAccess: boolean = true
+  ): Promise<{
+    content: string;
+    chapter_id: string;
+    book_id: string;
+    metadata?: {
+      word_count: number;
+      last_modified: string;
+      status: string;
+      estimated_reading_time: number;
+    };
+  }> {
+    const params = new URLSearchParams({
+      include_metadata: includeMetadata.toString(),
+      track_access: trackAccess.toString()
+    });
+    
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content?${params}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get chapter content: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
 }
 
 // Create a singleton instance for use throughout the app

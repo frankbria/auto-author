@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TocGenerationResult, TocChapter } from '@/types/toc';
+import { ChapterStatusIndicator } from '@/components/ui/ChapterStatusIndicator';
 
 interface TocReviewProps {
   tocResult: TocGenerationResult;
@@ -172,15 +173,34 @@ function ChapterItem({ chapter, index, isExpanded, onToggle, expandedChapters, t
       <div
         className="flex items-center justify-between p-4 bg-zinc-800 hover:bg-zinc-750 cursor-pointer"
         onClick={onToggle}
-      >
-        <div className="flex items-center flex-1">
+      >        <div className="flex items-center flex-1">
           <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
             {idx}
           </div>
           <div className="flex-1">
-            <h4 className="text-zinc-100 font-medium">{chapter.title}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-zinc-100 font-medium">{chapter.title}</h4>
+              {chapter.status && (
+                <ChapterStatusIndicator 
+                  status={chapter.status} 
+                  size="sm" 
+                  showLabel 
+                />
+              )}
+            </div>
             {chapter.description && (
               <p className="text-zinc-400 text-sm mt-1">{chapter.description}</p>
+            )}
+            {chapter.word_count && (
+              <div className="flex items-center gap-2 text-xs text-zinc-500 mt-1">
+                <span>{chapter.word_count} words</span>
+                {chapter.estimated_reading_time && (
+                  <>
+                    <span>•</span>
+                    <span>{chapter.estimated_reading_time}min read</span>
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>

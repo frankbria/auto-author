@@ -191,10 +191,89 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
       return () => clearTimeout(timeoutId);
     }
   }, [saveTabState, state.is_loading, state.open_tab_ids, state.active_chapter_id, state.tab_order]);
-
   const openTab = useCallback((chapterId: string) => {
     setActiveChapter(chapterId);
   }, [setActiveChapter]);
+
+  const refreshChapters = useCallback(async () => {
+    try {
+      setState(prev => ({ ...prev, is_loading: true, error: null }));
+      
+      // Reload chapters from the TOC structure
+      let chapterTabsMetadata: ChapterTabMetadata[] = [];
+      
+      try {
+        const tocResponse = await bookClient.getToc(bookId);
+        if (tocResponse.toc) {
+          const processedTocData = {
+            ...tocResponse.toc,
+            chapters: tocResponse.toc.chapters.map(ch => ({
+              ...ch,
+              status: (ch as { status?: ChapterStatus }).status || ChapterStatus.DRAFT,
+              word_count: (ch as { word_count?: number }).word_count || 0,
+              estimated_reading_time: (ch as { estimated_reading_time?: number }).estimated_reading_time || 0,
+              last_modified: (ch as { last_modified?: string }).last_modified || new Date().toISOString(),
+            }))
+          };
+          
+          chapterTabsMetadata = convertTocToChapterTabs(processedTocData);
+          console.log('Successfully refreshed TOC structure and converted to chapter tabs');
+        }
+      } catch (tocError) {
+        console.warn('Failed to refresh TOC structure:', tocError);
+        // Fall back to direct chapter tabs API
+        try {
+          const metadata = await chapterTabsApi.getChaptersMetadata(bookId);
+          chapterTabsMetadata = metadata.chapters;
+          console.log('Refreshed chapter data from chapter-tabs API');
+        } catch (apiError) {
+          console.error('Failed to refresh chapter metadata:', apiError);
+          throw new Error('Unable to refresh chapter data');
+        }
+      }
+
+      // Handle removed chapters: if active chapter is deleted, switch to first available
+      const currentActiveId = state.active_chapter_id;
+      const currentOpenTabs = state.open_tab_ids;
+      const currentTabOrder = state.tab_order;
+      
+      const existingChapterIds = chapterTabsMetadata.map(ch => ch.id);
+      const validOpenTabs = currentOpenTabs.filter(id => existingChapterIds.includes(id));
+      const validTabOrder = currentTabOrder.filter(id => existingChapterIds.includes(id));
+      
+      // Add any new chapters to tab order
+      const newChapterIds = existingChapterIds.filter(id => !validTabOrder.includes(id));
+      const updatedTabOrder = [...validTabOrder, ...newChapterIds];
+      
+      let newActiveChapter = currentActiveId;
+      if (!currentActiveId || !existingChapterIds.includes(currentActiveId)) {
+        // Active chapter was deleted or doesn't exist, select first available
+        newActiveChapter = validOpenTabs.length > 0 ? validOpenTabs[0] : 
+                          (chapterTabsMetadata.length > 0 ? chapterTabsMetadata[0].id : null);
+      }
+      
+      // If no tabs are open, open the active chapter
+      const finalOpenTabs = validOpenTabs.length > 0 ? validOpenTabs : 
+                           (newActiveChapter ? [newActiveChapter] : []);
+
+      setState(prev => ({
+        ...prev,
+        chapters: chapterTabsMetadata,
+        active_chapter_id: newActiveChapter,
+        open_tab_ids: finalOpenTabs,
+        tab_order: updatedTabOrder,
+        is_loading: false,
+      }));
+      
+      console.log('Successfully refreshed chapter tabs state');
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        is_loading: false,
+        error: error instanceof Error ? error.message : 'Failed to refresh chapter tabs'
+      }));
+    }
+  }, [bookId, state.active_chapter_id, state.open_tab_ids, state.tab_order]);
 
   return {
     state,
@@ -205,6 +284,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
       closeTab,
       updateChapterStatus,
       saveTabState,
+      refreshChapters,
     },
     loading: state.is_loading,
     error: state.error,

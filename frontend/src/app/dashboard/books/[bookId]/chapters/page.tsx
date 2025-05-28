@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { use } from 'react';
 
 type Question = {
   id: string;
@@ -16,7 +17,12 @@ type ChapterPrompt = {
   questions: Question[];
 };
 
-export default function ChapterPromptsPage() {
+interface ChapterPromptsPageProps {
+  params: Promise<{ bookId: string }>;
+}
+
+export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) {
+  const { bookId } = use(params);
   const router = useRouter();
   const [activeChapter, setActiveChapter] = useState<string>('ch1');
   const [chapters, setChapters] = useState<ChapterPrompt[]>([]);
@@ -185,10 +191,10 @@ export default function ChapterPromptsPage() {
       )
     );
   };
-  
   const handleContinue = () => {
     // In a real app, you would save the question ratings
-    router.push(`/dashboard/books/new-book-12345/chapters/${activeChapter}`);
+    // Navigate to the tabbed interface instead of individual chapter pages
+    router.push(`/dashboard/books/${bookId}`);
   };
 
   if (isLoading) {

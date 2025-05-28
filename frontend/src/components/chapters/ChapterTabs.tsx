@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { useChapterTabs } from '@/hooks/useChapterTabs';
+import { useTocSync } from '@/hooks/useTocSync';
 import { TabBar } from './TabBar';
 import { TabContent } from './TabContent';
 import TabContextMenu from './TabContextMenu';
@@ -21,11 +22,19 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
       reorderTabs,
       closeTab,
       updateChapterStatus,
-      saveTabState
+      saveTabState,
+      refreshChapters
     },
     loading,
     error
   } = useChapterTabs(bookId, initialActiveChapter);
+
+  // Set up TOC synchronization
+  useTocSync({ 
+    bookId, 
+    onTocChanged: refreshChapters,
+    pollInterval: 3000 // Poll every 3 seconds as fallback
+  });
 
   const handleTabSelect = useCallback((chapterId: string) => {
     setActiveChapter(chapterId);
@@ -76,8 +85,7 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
         </button>
       </div>
     );
-  }
-  return (
+  }  return (
     <div className={orientation === 'vertical' ? `flex h-full ${className}` : className}>
       <TabBar
         chapters={state.chapters}
@@ -87,10 +95,19 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
         onTabReorder={handleTabReorder}
         onTabClose={closeTab}
         orientation={orientation}
-      />      <TabContent
+      />
+      <TabContent
         bookId={bookId}
         activeChapterId={state.active_chapter_id}
         chapters={state.chapters}
+        onContentChange={(chapterId, content) => {
+          // Handle real-time content changes for auto-save
+          console.log(`Content changed for chapter ${chapterId}: ${content.length} characters`);
+        }}        onChapterSave={(chapterId) => {
+          // Handle chapter save completion
+          console.log(`Chapter ${chapterId} saved successfully`);
+          saveTabState(); // Update tab state when content is saved
+        }}
       />
       <TabContextMenu
         onStatusUpdate={updateChapterStatus}

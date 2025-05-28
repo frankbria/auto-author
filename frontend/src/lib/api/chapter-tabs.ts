@@ -1,4 +1,3 @@
-
 import { ChapterTabMetadata, ChapterStatus } from '@/types/chapter-tabs';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -68,6 +67,21 @@ class ChapterTabsAPI {
   async getChapterContent(bookId: string, chapterId: string): Promise<string> {
     const response = await this.fetch(`/api/v1/books/${bookId}/chapters/${chapterId}/content?include_metadata=true&track_access=true`);
     return response.content || '';
+  }
+
+  async saveChapterContent(
+    bookId: string, 
+    chapterId: string, 
+    content: string,
+    autoUpdateMetadata: boolean = true
+  ): Promise<void> {
+    return this.fetch(`/api/v1/books/${bookId}/chapters/${chapterId}/content`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        content,
+        auto_update_metadata: autoUpdateMetadata
+      })
+    });
   }
 
   async saveTabState(bookId: string, tabState: Omit<TabState, 'session_id'>): Promise<void> {
