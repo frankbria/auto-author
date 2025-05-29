@@ -55,7 +55,7 @@ export default function TabContextMenu({
             className="fixed inset-0 z-10" 
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-md border bg-popover p-1 shadow-md">
+          <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-md border border-border bg-popover text-popover-foreground p-1 shadow-md">
             {onPreview && (
               <button
                 className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"

@@ -105,10 +105,10 @@ export function MobileChapterTabs({
 
 function getStatusColor(status: string): string {
   switch (status) {
-    case 'draft': return 'bg-gray-500';
+    case 'draft': return 'bg-muted';
     case 'in_progress': return 'bg-blue-500';
     case 'completed': return 'bg-green-500';
     case 'published': return 'bg-purple-500';
-    default: return 'bg-gray-500';
+    default: return 'bg-muted';
   }
 }

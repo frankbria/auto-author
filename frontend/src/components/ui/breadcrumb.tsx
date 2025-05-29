@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ChevronRight, MoreHorizontal } from "lucide-react"
+import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
 const Breadcrumb = React.forwardRef<
@@ -44,13 +45,16 @@ const BreadcrumbLink = React.forwardRef<
   React.ComponentPropsWithoutRef<"a"> & {
     asChild?: boolean
   }
->(({ className, ...props }, ref) => (
-  <a
-    ref={ref}
-    className={cn("transition-colors hover:text-foreground", className)}
-    {...props}
-  />
-))
+>(({ className, asChild = false, ...props }, ref) => {
+  const Comp = asChild ? Slot : "a"
+  return (
+    <Comp
+      ref={ref}
+      className={cn("transition-colors hover:text-foreground", className)}
+      {...props}
+    />
+  )
+})
 BreadcrumbLink.displayName = "BreadcrumbLink"
 
 const BreadcrumbPage = React.forwardRef<

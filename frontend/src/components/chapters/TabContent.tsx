@@ -17,13 +17,12 @@ export function TabContent({
   activeChapterId, 
   onContentChange,
   onChapterSave 
-}: TabContentProps) {
-  if (!activeChapterId) {
+}: TabContentProps) {  if (!activeChapterId) {
     return (
-      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+      <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <h3 className="text-lg font-medium mb-2">No Chapter Selected</h3>
-          <p>Select a chapter tab to begin editing</p>
+          <h3 className="text-lg font-medium mb-2 text-foreground">No Chapter Selected</h3>
+          <p className="text-muted-foreground">Select a chapter tab to begin editing</p>
         </div>
       </div>
     );

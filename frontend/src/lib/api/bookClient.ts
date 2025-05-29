@@ -2,6 +2,7 @@
 
 import { BookProject } from '@/components/BookCard';
 import { QuestionResponse } from '@/types/toc';
+import { ChapterStatus } from '@/types/chapter-tabs';
 
 /**
  * API client for book operations
@@ -472,6 +473,129 @@ export class BookClient {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to get chapter content: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get chapters metadata for tab management
+   */
+  public async getChaptersMetadata(bookId: string, includeContentStats = true): Promise<{
+    book_id: string;
+    chapters: Array<{
+      id: string;
+      title: string;
+      description: string;
+      level: number;
+      order: number;
+      status: string;
+      word_count: number;
+      estimated_reading_time: number;
+      last_modified: string;
+    }>;
+    total_chapters: number;
+    completion_stats: {
+      draft: number;
+      in_progress: number;
+      completed: number;
+      published: number;
+    };
+    last_active_chapter?: string;
+  }> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/metadata?include_content_stats=${includeContentStats}`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get chapters metadata: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+  /**
+   * Update chapter status
+   */
+  public async updateChapterStatus(bookId: string, chapterId: string, status: ChapterStatus): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/bulk-status`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({
+        chapter_ids: [chapterId],
+        status,
+        update_timestamp: true
+      })
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to update chapter status: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+  /**
+   * Update bulk chapter status
+   */
+  public async updateBulkChapterStatus(bookId: string, chapterIds: string[], status: ChapterStatus): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/bulk-status`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({
+        chapter_ids: chapterIds,
+        status,
+        update_timestamp: true
+      })
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to update bulk chapter status: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Save tab state for chapter navigation
+   */
+  public async saveTabState(bookId: string, tabState: {
+    active_chapter_id: string | null;
+    open_tab_ids: string[];
+    tab_order: string[];
+  }): Promise<void> {
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/tab-state`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({
+        ...tabState,
+        session_id: sessionId
+      })
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to save tab state: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get saved tab state for chapter navigation
+   */
+  public async getTabState(bookId: string, sessionId?: string): Promise<{
+    active_chapter_id: string | null;
+    open_tab_ids: string[];
+    tab_order: string[];
+    session_id?: string;
+  } | null> {
+    const params = sessionId ? `?session_id=${sessionId}` : '';
+    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/tab-state${params}`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get tab state: ${response.status} ${error}`);
     }
     return response.json();
   }

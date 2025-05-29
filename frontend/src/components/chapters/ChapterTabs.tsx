@@ -28,12 +28,11 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
     loading,
     error
   } = useChapterTabs(bookId, initialActiveChapter);
-
   // Set up TOC synchronization
   useTocSync({ 
     bookId, 
-    onTocChanged: refreshChapters,
-    pollInterval: 3000 // Poll every 3 seconds as fallback
+    onTocChanged: refreshChapters
+    // Removed pollInterval - polling disabled by default
   });
 
   const handleTabSelect = useCallback((chapterId: string) => {
@@ -60,13 +59,12 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [state.tab_order, handleTabSelect]);
-  if (loading) {
+  }, [state.tab_order, handleTabSelect]);  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mb-2"></div>
-          <p className="text-zinc-400">Loading chapters...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary mb-2"></div>
+          <p className="text-foreground">Loading chapters...</p>
         </div>
       </div>
     );

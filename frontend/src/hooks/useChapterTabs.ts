@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ChapterTabsState, ChapterStatus, ChapterTabMetadata } from '../types/chapter-tabs';
-import { chapterTabsApi } from '../lib/api/chapter-tabs';
 import bookClient from '../lib/api/bookClient';
 import { convertTocToChapterTabs } from '../lib/utils/toc-to-tabs-converter';
 
@@ -44,11 +43,14 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
             console.log('Successfully loaded TOC structure and converted to chapter tabs');
           }
         } catch (tocError) {
-          console.warn('Failed to load TOC structure:', tocError);
-          // If TOC fails, fall back to direct chapter tabs API
+          console.warn('Failed to load TOC structure:', tocError);          // If TOC fails, fall back to direct chapter tabs API
           try {
-            const metadata = await chapterTabsApi.getChaptersMetadata(bookId);
-            chapterTabsMetadata = metadata.chapters;
+            const metadata = await bookClient.getChaptersMetadata(bookId);
+            chapterTabsMetadata = metadata.chapters.map(ch => ({
+              ...ch,
+              status: ch.status as ChapterStatus,
+              has_content: false // We'll need to check this separately if needed
+            }));
             lastActiveChapter = metadata.last_active_chapter;
             
             console.log('Loaded chapter data from chapter-tabs API');
@@ -58,7 +60,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
           }
         }        // Try to load previous tab state
         let tabState = null;        try {
-          tabState = await chapterTabsApi.getTabState(bookId);
+          tabState = await bookClient.getTabState(bookId);
           console.log('Loaded tab state:', tabState);
         } catch {
           // Tab state might not exist, that's okay
@@ -146,23 +148,24 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
         chapters: prevState.chapters.map(chapter =>
           chapter.id === chapterId ? { ...chapter, status } : chapter
         ),
-      }));
-
-      // Update the status on the server
-      await chapterTabsApi.updateChapterStatus(bookId, chapterId, status);
+      }));      // Update the status on the server
+      await bookClient.updateChapterStatus(bookId, chapterId, status);
     } catch (error) {
       // Revert the optimistic update on error
       setState(prevState => ({
         ...prevState,
         error: error instanceof Error ? error.message : 'Failed to update chapter status'
       }));
-      
-      // Reload chapters to get the correct state
+        // Reload chapters to get the correct state
       try {
-        const metadata = await chapterTabsApi.getChaptersMetadata(bookId);
+        const metadata = await bookClient.getChaptersMetadata(bookId);
         setState(prevState => ({
           ...prevState,
-          chapters: metadata.chapters,
+          chapters: metadata.chapters.map(ch => ({
+            ...ch,
+            status: ch.status as ChapterStatus,
+            has_content: false // We'll need to check this separately if needed
+          })),
           error: null
         }));
       } catch (reloadError) {
@@ -170,10 +173,9 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
       }
     }
   }, [bookId]);
-
   const saveTabState = useCallback(async () => {
     try {
-      await chapterTabsApi.saveTabState(bookId, {
+      await bookClient.saveTabState(bookId, {
         active_chapter_id: state.active_chapter_id,
         open_tab_ids: state.open_tab_ids,
         tab_order: state.tab_order,
@@ -219,12 +221,15 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
           chapterTabsMetadata = convertTocToChapterTabs(processedTocData);
           console.log('Successfully refreshed TOC structure and converted to chapter tabs');
         }
-      } catch (tocError) {
-        console.warn('Failed to refresh TOC structure:', tocError);
+      } catch (tocError) {        console.warn('Failed to refresh TOC structure:', tocError);
         // Fall back to direct chapter tabs API
         try {
-          const metadata = await chapterTabsApi.getChaptersMetadata(bookId);
-          chapterTabsMetadata = metadata.chapters;
+          const metadata = await bookClient.getChaptersMetadata(bookId);
+          chapterTabsMetadata = metadata.chapters.map(ch => ({
+            ...ch,
+            status: ch.status as ChapterStatus,
+            has_content: false // We'll need to check this separately if needed
+          }));
           console.log('Refreshed chapter data from chapter-tabs API');
         } catch (apiError) {
           console.error('Failed to refresh chapter metadata:', apiError);

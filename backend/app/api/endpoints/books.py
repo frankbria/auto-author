@@ -1026,6 +1026,7 @@ async def get_book_toc(
     Get the Table of Contents for a book.
     Returns the current TOC structure or empty structure if none exists.
     """
+
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
@@ -1711,6 +1712,9 @@ async def save_tab_state(
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("clerk_id"):
+        print(
+            f"User {current_user.get('clerk_id')} is not authorized to access book {book_id}"
+        )
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book"
         )
@@ -1733,11 +1737,7 @@ async def save_tab_state(
 
 
 @router.get("/{book_id}/chapters/tab-state", response_model=dict)
-async def get_tab_state(
-    book_id: str,
-    current_user: Dict = Depends(get_current_user),
-    session_id: Optional[str] = Query(None),
-):
+async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_user)):
     """
     Retrieve saved tab state for restoration.
     """
@@ -1746,6 +1746,9 @@ async def get_tab_state(
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("clerk_id"):
+        print(
+            f"User {current_user.get('clerk_id')} is not authorized to access book {book_id}"
+        )
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book"
         )
@@ -1815,15 +1818,15 @@ async def get_chapter_content(
 
     chapter = find_chapter(chapters)
     if not chapter:
-        raise HTTPException(status_code=404, detail="Chapter not found")
-
-    # Log chapter access
+        raise HTTPException(
+            status_code=404, detail="Chapter not found"
+        )  # Log chapter access
     try:
         await chapter_access_service.log_access(
             user_id=current_user.get("clerk_id"),
             book_id=book_id,
             chapter_id=chapter_id,
-            action="read_content",
+            access_type="read_content",
             metadata={
                 "chapter_title": chapter.get("title", ""),
                 "include_metadata": include_metadata,
@@ -1831,9 +1834,7 @@ async def get_chapter_content(
             },
         )
     except Exception as e:
-        print(f"Failed to log chapter content access: {e}")
-
-    # Prepare response
+        print(f"Failed to log chapter content access: {e}")  # Prepare response
     response = {
         "book_id": book_id,
         "chapter_id": chapter_id,
@@ -1843,10 +1844,14 @@ async def get_chapter_content(
     }
 
     if include_metadata:
-        # Calculate reading time
-        reading_time = await chapter_status_service.calculate_reading_time(
-            chapter.get("content", "")
-        )
+        # Calculate reading time using word count
+        word_count = chapter.get("word_count", 0)
+        # If word_count is not available, calculate it from content
+        if word_count == 0:
+            content = chapter.get("content", "")
+            word_count = len(content.split()) if content else 0
+
+        reading_time = chapter_status_service.calculate_reading_time(word_count)
 
         response["metadata"] = {
             "status": chapter.get("status", "draft"),
@@ -1918,15 +1923,15 @@ async def update_chapter_content(
 
     updated_chapter = update_chapter_in_list(chapters)
     if not updated_chapter:
-        raise HTTPException(status_code=404, detail="Chapter not found")
-
-    # Log chapter access
+        raise HTTPException(
+            status_code=404, detail="Chapter not found"
+        )  # Log chapter access
     try:
         await chapter_access_service.log_access(
             user_id=current_user.get("clerk_id"),
             book_id=book_id,
             chapter_id=chapter_id,
-            action="update_content",
+            access_type="update_content",
             metadata={
                 "content_length": len(content) if content else 0,
                 "auto_updated_metadata": auto_update_metadata,

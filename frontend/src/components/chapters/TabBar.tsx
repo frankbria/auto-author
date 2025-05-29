@@ -35,11 +35,10 @@ export function TabBar({
 
   const orderedChapters = tabOrder
     .map(id => chapters.find(ch => ch.id === id))
-    .filter(Boolean) as ChapterTabMetadata[];
-  return (
+    .filter(Boolean) as ChapterTabMetadata[];  return (
     <div className={orientation === 'vertical' 
-      ? "flex flex-col w-64 border-r bg-background h-full" 
-      : "flex border-b bg-background"
+      ? "flex flex-col w-64 border-r border-border bg-background h-full" 
+      : "flex border-b border-border bg-background"
     }>
       <ScrollArea 
         className={orientation === 'vertical' ? "flex-1 h-full" : "flex-1"} 

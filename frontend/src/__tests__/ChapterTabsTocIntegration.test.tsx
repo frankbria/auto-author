@@ -9,20 +9,15 @@ jest.mock('@/hooks/useChapterTabs');
 const mockUseChapterTabs = useChapterTabs as jest.MockedFunction<typeof useChapterTabs>;
 
 // Mock the API clients used in the hooks
-jest.mock('@/lib/api/chapter-tabs', () => ({
-  chapterTabsApi: {
-    getChaptersMetadata: jest.fn(),
-    getTabState: jest.fn(),
-    saveTabState: jest.fn(),
-    updateChapterStatus: jest.fn(),
-  },
-}));
-
 jest.mock('@/lib/api/bookClient', () => ({
   __esModule: true,
   default: {
     getToc: jest.fn(),
     setAuthToken: jest.fn(),
+    getChaptersMetadata: jest.fn(),
+    getTabState: jest.fn(),
+    saveTabState: jest.fn(),
+    updateChapterStatus: jest.fn(),
   },
 }));
 
@@ -73,8 +68,7 @@ describe('ChapterTabs TOC Integration', () => {
         active_chapter_id: 'ch1',
         open_tab_ids: ['ch1', 'ch2'],
         tab_order: ['ch1', 'ch2'],
-        is_loading: false,
-        error: null,
+        is_loading: false,        error: null,
       },
       actions: {
         setActiveChapter: jest.fn(),
@@ -83,6 +77,7 @@ describe('ChapterTabs TOC Integration', () => {
         closeTab: jest.fn(),
         updateChapterStatus: jest.fn(),
         saveTabState: jest.fn(),
+        refreshChapters: jest.fn(),
       },
       loading: false,
       error: null,
@@ -107,14 +102,14 @@ describe('ChapterTabs TOC Integration', () => {
         tab_order: [],
         is_loading: true,
         error: null,
-      },
-      actions: {
+      },      actions: {
         setActiveChapter: jest.fn(),
         openTab: jest.fn(),
         reorderTabs: jest.fn(),
         closeTab: jest.fn(),
         updateChapterStatus: jest.fn(),
         saveTabState: jest.fn(),
+        refreshChapters: jest.fn(),
       },
       loading: true,
       error: null,
@@ -136,14 +131,14 @@ describe('ChapterTabs TOC Integration', () => {
         tab_order: [],
         is_loading: false,
         error: 'Failed to load TOC data',
-      },
-      actions: {
+      },      actions: {
         setActiveChapter: jest.fn(),
         openTab: jest.fn(),
         reorderTabs: jest.fn(),
         closeTab: jest.fn(),
         updateChapterStatus: jest.fn(),
         saveTabState: jest.fn(),
+        refreshChapters: jest.fn(),
       },
       loading: false,
       error: 'Failed to load TOC data',

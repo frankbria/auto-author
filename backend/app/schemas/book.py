@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
 from app.schemas.user import UserResponse
 
@@ -171,14 +171,33 @@ class TabStateRequest(BaseModel):
     open_tab_ids: List[str] = Field(max_items=20)  # Limit open tabs
     tab_order: List[str]
 
-    @validator("tab_order")
-    def validate_tab_order(cls, v, values):
-        open_tabs = values.get("open_tab_ids", [])
-        if set(v) != set(open_tabs):
-            raise ValueError(
-                "tab_order must contain exactly the same chapters as open_tab_ids"
-            )
+    @field_validator("tab_order")
+    @classmethod
+    def validate_tab_order(cls, v, info):
+        # In Pydantic v2, we need to use model_validator for cross-field validation
+        # For now, just validate the tab_order itself
+        if len(v) != len(set(v)):
+            raise ValueError("tab_order contains duplicate entries")
         return v
+
+    @model_validator(mode="after")
+    def validate_tab_consistency(self):
+        """Validate that open_tab_ids and tab_order are consistent"""
+        open_tabs_set = set(self.open_tab_ids)
+        tab_order_set = set(self.tab_order)
+
+        # Ensure all open tabs are present in tab_order
+        if not open_tabs_set.issubset(tab_order_set):
+            missing_tabs = open_tabs_set - tab_order_set
+            raise ValueError(
+                f"tab_order must contain all chapters from open_tab_ids. Missing: {missing_tabs}"
+            )
+
+        # Ensure no duplicates in open_tab_ids
+        if len(self.open_tab_ids) != len(open_tabs_set):
+            raise ValueError("open_tab_ids contains duplicate entries")
+
+        return self
 
 
 class TabStateResponse(BaseModel):

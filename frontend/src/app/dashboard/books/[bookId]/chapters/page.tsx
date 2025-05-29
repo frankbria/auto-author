@@ -198,21 +198,19 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
   };
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto flex-1 p-6 flex items-center justify-center">
+    return (      <div className="container mx-auto flex-1 p-6 flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-          <p className="text-zinc-400">Loading chapter information...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading chapter information...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+  return (    <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-zinc-100 mb-3">Chapter Questions</h1>
-        <p className="text-zinc-400">
+        <h1 className="text-3xl font-bold text-foreground mb-3">Chapter Questions</h1>
+        <p className="text-muted-foreground">
           Answer these interview-style questions to generate content for each chapter.
         </p>
       </div>
@@ -224,10 +222,9 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
       )}
       
       <div className="flex gap-6 flex-col md:flex-row">
-        {/* Chapter navigation sidebar */}
-        <div className="w-full md:w-64 shrink-0">
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
-            <h2 className="text-lg font-medium text-zinc-100 mb-4">Chapters</h2>
+        {/* Chapter navigation sidebar */}        <div className="w-full md:w-64 shrink-0">
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h2 className="text-lg font-medium text-foreground mb-4">Chapters</h2>
             <nav>
               <ul className="space-y-2">
                 {chapters.map(chapter => (
@@ -236,8 +233,8 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                       onClick={() => setActiveChapter(chapter.chapterId)}
                       className={`w-full text-left px-3 py-2 rounded-md ${
                         activeChapter === chapter.chapterId
-                          ? 'bg-indigo-600 text-white'
-                          : 'hover:bg-zinc-700 text-zinc-300'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'hover:bg-accent text-muted-foreground hover:text-foreground'
                       }`}
                     >
                       {chapter.chapterTitle}
@@ -249,22 +246,21 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
           </div>
         </div>
         
-        {/* Questions for active chapter */}
-        <div className="flex-1">
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6">
+        {/* Questions for active chapter */}        <div className="flex-1">
+          <div className="bg-card border border-border rounded-lg p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-zinc-100">
+              <h2 className="text-xl font-semibold text-foreground">
                 {activeChapterData?.chapterTitle || 'Chapter Questions'}
               </h2>
               
               <button
                 onClick={() => regenerateQuestions(activeChapter)}
                 disabled={isGenerating}
-                className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-md flex items-center text-sm disabled:opacity-50"
+                className="px-3 py-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md flex items-center text-sm disabled:opacity-50"
               >
                 {isGenerating ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-500 mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary mr-2"></div>
                     Generating...
                   </>
                 ) : (
@@ -277,13 +273,12 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                 )}
               </button>
             </div>
-            
-            {activeChapterData?.questions.map((question, index) => (
-              <div key={question.id} className="mb-6 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              {activeChapterData?.questions.map((question, index) => (
+              <div key={question.id} className="mb-6 bg-muted/50 border border-border rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex space-x-2 items-center">
-                    <span className="text-indigo-400 font-medium">{index + 1}.</span>
-                    <p className="text-zinc-100">{question.text}</p>
+                    <span className="text-primary font-medium">{index + 1}.</span>
+                    <p className="text-foreground">{question.text}</p>
                   </div>
                   <div className="flex space-x-1">
                     <button
@@ -291,7 +286,7 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                       className={`p-1 rounded-md ${
                         question.isRelevant === true 
                           ? 'bg-green-900/30 text-green-400' 
-                          : 'text-zinc-500 hover:text-green-400'
+                          : 'text-muted-foreground hover:text-green-400'
                       }`}
                       title="Mark as relevant"
                     >
@@ -304,7 +299,7 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                       className={`p-1 rounded-md ${
                         question.isRelevant === false 
                           ? 'bg-red-900/30 text-red-400' 
-                          : 'text-zinc-500 hover:text-red-400'
+                          : 'text-muted-foreground hover:text-red-400'
                       }`}
                       title="Mark as irrelevant"
                     >
@@ -317,29 +312,27 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                 
                 <textarea
                   placeholder="Type your answer here..."
-                  className="w-full mt-2 bg-zinc-800 border border-zinc-700 rounded-md py-2 px-3 text-zinc-100"
+                  className="w-full mt-2 bg-background border border-border rounded-md py-2 px-3 text-foreground focus:border-ring"
                   rows={3}
                 ></textarea>
               </div>
             ))}
-            
-            {activeChapterData?.questions.length === 0 && (
+              {activeChapterData?.questions.length === 0 && (
               <div className="text-center py-10">
-                <p className="text-zinc-400">No questions for this chapter yet.</p>
+                <p className="text-muted-foreground">No questions for this chapter yet.</p>
                 <button
                   onClick={() => regenerateQuestions(activeChapter)}
-                  className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+                  className="mt-4 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-md"
                 >
                   Generate Questions
                 </button>
               </div>
             )}
           </div>
-          
-          <div className="mt-6 flex justify-between">
+            <div className="mt-6 flex justify-between">
             <button
               onClick={() => router.back()}
-              className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-md"
+              className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md"
             >
               Back
             </button>
@@ -353,7 +346,7 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                   }
                 }}
                 disabled={chapters.findIndex(c => c.chapterId === activeChapter) === 0}
-                className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous Chapter
               </button>
@@ -367,7 +360,7 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                     handleContinue();
                   }
                 }}
-                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+                className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-md"
               >
                 {chapters.findIndex(c => c.chapterId === activeChapter) === chapters.length - 1
                   ? 'Generate Draft Content'
@@ -378,10 +371,9 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
           </div>
         </div>
       </div>
-      
-      <div className="mt-8 bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
-        <h3 className="text-zinc-300 font-medium mb-2">💡 Tips for answering questions:</h3>
-        <ul className="text-zinc-400 text-sm list-disc list-inside space-y-1">
+        <div className="mt-8 bg-muted/30 border border-border rounded-lg p-4">
+        <h3 className="text-foreground font-medium mb-2">💡 Tips for answering questions:</h3>
+        <ul className="text-muted-foreground text-sm list-disc list-inside space-y-1">
           <li>Provide detailed answers for better content generation</li>
           <li>Mark questions as irrelevant if they don't apply to your chapter</li>
           <li>Generate new questions if the current ones aren't helpful</li>

@@ -1,6 +1,6 @@
 import { ChapterTabMetadata, ChapterStatus } from '@/types/chapter-tabs';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 interface ChaptersMetadataResponse {
   book_id: string;
@@ -38,13 +38,11 @@ class ChapterTabsAPI {
 
     return response.json();
   }
-
   async getChaptersMetadata(bookId: string, includeContentStats = true): Promise<ChaptersMetadataResponse> {
-    return this.fetch(`/api/v1/books/${bookId}/chapters/metadata?include_content_stats=${includeContentStats}`);
+    return this.fetch(`/books/${bookId}/chapters/metadata?include_content_stats=${includeContentStats}`);
   }
-
   async updateChapterStatus(bookId: string, chapterId: string, status: ChapterStatus): Promise<void> {
-    return this.fetch(`/api/v1/books/${bookId}/chapters/bulk-status`, {
+    return this.fetch(`/books/${bookId}/chapters/bulk-status`, {
       method: 'PATCH',
       body: JSON.stringify({
         chapter_ids: [chapterId],
@@ -53,9 +51,8 @@ class ChapterTabsAPI {
       })
     });
   }
-
   async updateBulkChapterStatus(bookId: string, chapterIds: string[], status: ChapterStatus): Promise<void> {
-    return this.fetch(`/api/v1/books/${bookId}/chapters/bulk-status`, {
+    return this.fetch(`/books/${bookId}/chapters/bulk-status`, {
       method: 'PATCH',
       body: JSON.stringify({
         chapter_ids: chapterIds,
@@ -63,19 +60,17 @@ class ChapterTabsAPI {
         update_timestamp: true
       })
     });
-  }
-  async getChapterContent(bookId: string, chapterId: string): Promise<string> {
-    const response = await this.fetch(`/api/v1/books/${bookId}/chapters/${chapterId}/content?include_metadata=true&track_access=true`);
+  }  async getChapterContent(bookId: string, chapterId: string): Promise<string> {
+    const response = await this.fetch(`/books/${bookId}/chapters/${chapterId}/content?include_metadata=true&track_access=true`);
     return response.content || '';
   }
-
   async saveChapterContent(
     bookId: string, 
     chapterId: string, 
     content: string,
     autoUpdateMetadata: boolean = true
   ): Promise<void> {
-    return this.fetch(`/api/v1/books/${bookId}/chapters/${chapterId}/content`, {
+    return this.fetch(`/books/${bookId}/chapters/${chapterId}/content`, {
       method: 'PATCH',
       body: JSON.stringify({
         content,
@@ -83,11 +78,10 @@ class ChapterTabsAPI {
       })
     });
   }
-
   async saveTabState(bookId: string, tabState: Omit<TabState, 'session_id'>): Promise<void> {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    return this.fetch(`/api/v1/books/${bookId}/chapters/tab-state`, {
+
+    return this.fetch(`/books/${bookId}/chapters/tab-state`, {
       method: 'POST',
       body: JSON.stringify({
         ...tabState,
@@ -95,10 +89,9 @@ class ChapterTabsAPI {
       })
     });
   }
-
   async getTabState(bookId: string, sessionId?: string): Promise<TabState | null> {
     const params = sessionId ? `?session_id=${sessionId}` : '';
-    return this.fetch(`/api/v1/books/${bookId}/chapters/tab-state${params}`);
+    return this.fetch(`/books/${bookId}/chapters/tab-state${params}`);
   }
 }
 

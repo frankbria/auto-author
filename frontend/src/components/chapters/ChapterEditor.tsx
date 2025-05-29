@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { chapterTabsApi } from '@/lib/api/chapter-tabs';
+import bookClient from '@/lib/api/bookClient';
 
 interface ChapterEditorProps {
   bookId: string;
@@ -30,10 +30,9 @@ export function ChapterEditor({
     const loadChapterContent = async () => {
       setIsLoading(true);
       setError(null);
-      
-      try {
-        const contentData = await chapterTabsApi.getChapterContent(bookId, chapterId);
-        setContent(contentData);
+        try {
+        const contentData = await bookClient.getChapterContent(bookId, chapterId);
+        setContent(contentData.content || '');
       } catch (err) {
         console.error('Failed to load chapter content:', err);
         setError('Failed to load chapter content');
@@ -49,16 +48,14 @@ export function ChapterEditor({
 
   // Auto-save functionality
   useEffect(() => {
-    if (!content || content === initialContent) return;
-
-    const handleAutoSave = async () => {
+    if (!content || content === initialContent) return;    const handleAutoSave = async () => {
       if (isSaving) return;
       
       setIsSaving(true);
       setError(null);
       
       try {
-        await chapterTabsApi.saveChapterContent(bookId, chapterId, content);
+        await bookClient.saveChapterContent(bookId, chapterId, content);
         setLastSaved(new Date());
       } catch (err) {
         console.error('Failed to auto-save chapter:', err);
@@ -80,7 +77,6 @@ export function ChapterEditor({
       onContentChange(content);
     }
   }, [content, onContentChange]);
-
   const handleSave = async (isAutoSave: boolean = false) => {
     if (isSaving) return;
     
@@ -88,7 +84,7 @@ export function ChapterEditor({
     setError(null);
     
     try {
-      await chapterTabsApi.saveChapterContent(bookId, chapterId, content);
+      await bookClient.saveChapterContent(bookId, chapterId, content);
       setLastSaved(new Date());
       
       if (onSave) {
@@ -128,18 +124,16 @@ export function ChapterEditor({
         <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 text-sm">
           {error}
         </div>
-      )}
-      <div className="flex-1 p-4">
+      )}      <div className="flex-1 p-4">
         <Textarea
           value={content}
           onChange={(e) => handleContentChange(e.target.value)}
           placeholder="Start writing your chapter content..."
-          className="h-full min-h-[500px] resize-none"
+          className="h-full min-h-[500px] resize-none bg-background text-foreground border-border focus:border-ring"
         />
-      </div>
-      <div className="border-t p-4 flex justify-between items-center">
+      </div>      <div className="border-t border-border p-4 flex justify-between items-center bg-muted/20">
         <div className="flex items-center gap-4">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-foreground">
             {content.length} characters
           </span>
           {lastSaved && (

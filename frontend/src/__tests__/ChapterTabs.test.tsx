@@ -20,13 +20,13 @@ jest.mock('@/hooks/useChapterTabs', () => ({
       active_chapter_id: '1',
       tab_order: ['1'],
       unsaved_changes: {}
-    },
-    actions: {
+    },    actions: {
       setActiveChapter: jest.fn(),
       reorderTabs: jest.fn(),
       closeTab: jest.fn(),
       updateChapterStatus: jest.fn(),
-      saveTabState: jest.fn()
+      saveTabState: jest.fn(),
+      refreshChapters: jest.fn()
     },
     loading: false,
     error: null

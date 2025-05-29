@@ -11,7 +11,10 @@ class ChapterAccessService:
     """Service for managing chapter access logs"""
 
     def __init__(self):
-        self.collection = get_collection("chapter_access_logs")
+        pass  # No collection initialization here
+
+    async def _get_collection(self):
+        return await get_collection("chapter_access_logs")
 
     async def log_access(
         self,
@@ -35,14 +38,16 @@ class ChapterAccessService:
             metadata=metadata or {},
         )
 
-        result = await self.collection.insert_one(log_entry.dict(by_alias=True))
+        collection = await self._get_collection()
+        result = await collection.insert_one(log_entry.model_dump(by_alias=True))
         return str(result.inserted_id)
 
     async def get_user_tab_state(self, user_id: str, book_id: str) -> Optional[Dict]:
         """Retrieve latest tab state for user and book"""
 
+        collection = await self._get_collection()
         cursor = (
-            self.collection.find(
+            collection.find(
                 {"user_id": user_id, "book_id": book_id, "access_type": "tab_state"}
             )
             .sort("timestamp", -1)
@@ -56,7 +61,7 @@ class ChapterAccessService:
         """Get chapter access analytics for the past N days"""
 
         since_date = datetime.now(timezone.utc) - timedelta(days=days)
-
+        collection = await self._get_collection()
         pipeline = [
             {"$match": {"book_id": book_id, "timestamp": {"$gte": since_date}}},
             {
@@ -68,13 +73,14 @@ class ChapterAccessService:
             },
         ]
 
-        return await self.collection.aggregate(pipeline).to_list(None)
+        return await collection.aggregate(pipeline).to_list(None)
 
     async def get_user_recent_chapters(
         self, user_id: str, book_id: str, limit: int = 10
     ) -> List[Dict]:
         """Get recently accessed chapters for a user"""
 
+        collection = await self._get_collection()
         pipeline = [
             {
                 "$match": {
@@ -95,7 +101,7 @@ class ChapterAccessService:
             {"$limit": limit},
         ]
 
-        return await self.collection.aggregate(pipeline).to_list(None)
+        return await collection.aggregate(pipeline).to_list(None)
 
     async def save_tab_state(
         self,

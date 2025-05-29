@@ -18,7 +18,7 @@ interface ChapterTabProps {
 
 const statusConfig = {
   [ChapterStatus.DRAFT]: { 
-    color: 'bg-gray-500', 
+    color: 'bg-muted', 
     icon: FileText, 
     label: 'Draft' 
   },
@@ -28,7 +28,7 @@ const statusConfig = {
     label: 'In Progress' 
   },
   [ChapterStatus.COMPLETED]: { 
-    color: 'bg-green-500', 
+    color: 'bg-green-500',
     icon: Clock, 
     label: 'Completed' 
   },
@@ -55,12 +55,11 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
               "group relative flex items-center gap-2 cursor-pointer transition-colors",
               orientation === 'horizontal' 
                 ? "px-3 py-2 border-r min-w-0 max-w-[200px]"
-                : "px-3 py-3 w-full min-h-[48px]",
-              isActive 
+                : "px-3 py-3 w-full min-h-[48px]",              isActive 
                 ? orientation === 'horizontal'
-                  ? "bg-background border-b-2 border-b-primary"
-                  : "bg-background border-r-2 border-r-primary"
-                : "bg-muted hover:bg-background",
+                  ? "bg-background border-b-2 border-b-primary text-foreground"
+                  : "bg-background border-r-2 border-r-primary text-foreground"
+                : "bg-muted hover:bg-background text-muted-foreground hover:text-foreground",
               isDragging && "opacity-50",
               chapter.error && "border-red-200 bg-red-50",
               chapter.has_unsaved_changes && "border-orange-200"
@@ -68,10 +67,11 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             onClick={onSelect}
           >
             {/* Status Indicator */}
-            <div className={cn("w-2 h-2 rounded-full flex-shrink-0", config.color)} />
-
-            {/* Chapter Title */}
-            <span className="text-sm font-medium truncate flex-1">
+            <div className={cn("w-2 h-2 rounded-full flex-shrink-0", config.color)} />            {/* Chapter Title */}
+            <span className={cn(
+              "text-sm font-medium truncate flex-1",
+              isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}>
               {truncatedTitle}
             </span>
 
@@ -104,10 +104,9 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             </Button>
           </div>
         </TooltipTrigger>
-        
-        <TooltipContent side="bottom" className="max-w-xs">
+          <TooltipContent side="bottom" className="max-w-xs bg-popover text-popover-foreground border border-border">
           <div className="space-y-1">
-            <p className="font-medium">{chapter.title}</p>
+            <p className="font-medium text-foreground">{chapter.title}</p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <StatusIcon className="w-3 h-3" />
               <span>{config.label}</span>
