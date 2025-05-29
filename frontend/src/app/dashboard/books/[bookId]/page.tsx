@@ -103,15 +103,24 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
 
         // Fetch book details
         const bookData: BookProject = await bookClient.getBook(bookId);
-          // Fetch TOC data to populate chapters
+        // Fetch TOC data to populate chapters
         let chapters: Chapter[] = [];
         try {
           const tocResponse = await bookClient.getToc(bookId);
-          // Cast the response to TocData to handle missing chapter tab fields
           chapters = convertTocToChapters(tocResponse.toc as TocData);
         } catch (tocError) {
           console.warn('No TOC found for this book yet:', tocError);
-          // Keep empty chapters array if no TOC exists
+        }
+
+        // Always fetch summary from API
+        let summary = '';
+        try {
+          const summaryResponse = await bookClient.getBookSummary(bookId);
+          if (summaryResponse && summaryResponse.summary) {
+            summary = summaryResponse.summary;
+          }
+        } catch {
+          summary = '';
         }
 
         setBook({
@@ -127,8 +136,9 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           collaborators: bookData.collaborators,
           owner_id: bookData.owner_id,
           chapters: chapters,
-          summary: undefined, // will be set below
-        });        setError(null);
+          summary: summary,
+        });
+        setError(null);
       } catch (err: unknown) {
         console.error('Error fetching book details:', err);
         setError('Failed to load book details. Please try again.');
@@ -139,16 +149,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
 
     fetchBookData();
   }, [bookId, getToken]);
-  useEffect(() => {
-    // Fetch summary for wizard step logic
-    bookClient.getBookSummary(bookId)
-      .then((data) => {
-        setBook((prev) => prev ? { ...prev, summary: data.summary || '' } : prev);
-      })
-      .catch(() => {
-        setBook((prev) => prev ? { ...prev, summary: '' } : prev);
-      });
-  }, [bookId]);  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
@@ -290,6 +291,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
         </div>        {/* Wizard/Stepper Actions */}
         <div className="mt-8 mb-8">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
+            {/* Step 1: Book Summary */}
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-center">
                 <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">1</div>
@@ -300,21 +302,22 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
                 <div className="text-xs text-zinc-400">Describe your book&apos;s main idea and structure</div>
                 <Link href={`/dashboard/books/${bookId}/summary`}>
                   <button className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
-                    {book?.summary && book.summary.length >= 30 ? 'Edit Summary' : 'Start with Book Summary'}
+                    {book?.summary && book.summary.length >= 30 ? 'Edit Book Summary' : 'Start with Book Summary'}
                   </button>
                 </Link>
               </div>
             </div>
+            {/* Step 2: TOC Generation */}
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full ${book?.summary && book.summary.length >= 30 ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-400 border border-zinc-500'} flex items-center justify-center font-bold`}>2</div>
+                <div className={`w-8 h-8 rounded-full ${(book?.summary && book.summary.length >= 30) ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-400 border border-zinc-500'} flex items-center justify-center font-bold`}>2</div>
                 <div className="h-8 w-1 bg-indigo-300/30 md:h-1 md:w-8 md:mx-2 md:my-0 my-2"></div>
               </div>
               <div>
                 <div className="font-semibold text-zinc-100">Generate TOC</div>
                 <div className="text-xs text-zinc-400">AI generates a Table of Contents from your summary</div>
                 {book?.summary && book.summary.length >= 30 ? (
-                  book.chapters.length > 0 ? (
+                  book.chapters && book.chapters.length > 0 ? (
                     <Link href={`/dashboard/books/${bookId}/edit-toc`}>
                       <button className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
                         Edit TOC
@@ -334,20 +337,21 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
                 )}
               </div>
             </div>
+            {/* Step 3: Write Content */}
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full ${book.chapters.length > 0 ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-400 border border-zinc-500'} flex items-center justify-center font-bold`}>3</div>
+                <div className={`w-8 h-8 rounded-full ${(book?.summary && book.summary.length >= 30 && book.chapters && book.chapters.length > 0) ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-400 border border-zinc-500'} flex items-center justify-center font-bold`}>3</div>
               </div>
               <div>
                 <div className="font-semibold text-zinc-100">Write Content</div>
                 <div className="text-xs text-zinc-400">Write and edit your chapter content</div>
-                {book.chapters.length > 0 ? (
+                {(book?.summary && book.summary.length >= 30 && book.chapters && book.chapters.length > 0) ? (
                   <div className="mt-2 text-sm text-green-400">
                     ✓ Ready to write! Use the tabs below to start writing your chapters.
                   </div>
                 ) : (
                   <button className="mt-2 px-4 py-2 bg-zinc-700 text-zinc-400 font-medium rounded-md cursor-not-allowed" disabled>
-                    Generate TOC First
+                    {book?.summary && book.summary.length >= 30 ? 'Generate TOC First' : 'Complete Book Summary First'}
                   </button>
                 )}
               </div>
