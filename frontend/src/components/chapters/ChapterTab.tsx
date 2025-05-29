@@ -67,10 +67,11 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             onClick={onSelect}
           >
             {/* Status Indicator */}
-            <div className={cn("w-2 h-2 rounded-full flex-shrink-0", config.color)} />            {/* Chapter Title */}
+            <div className={cn("w-2 h-2 rounded-full flex-shrink-0 border border-zinc-400 bg-white", config.color)} />            
+            {/* Chapter Title */}
             <span className={cn(
-              "text-sm font-medium truncate flex-1",
-              isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              "text-sm font-semibold truncate flex-1",
+              isActive ? "text-primary" : "text-zinc-700 hover:text-primary"
             )}>
               {truncatedTitle}
             </span>
@@ -78,15 +79,15 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             {/* Indicators */}
             <div className="flex items-center gap-1">
               {chapter.has_unsaved_changes && (
-                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full border border-orange-700" />
               )}
               
               {chapter.is_loading && (
-                <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin" />
+                <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin bg-white" />
               )}
 
               {chapter.error && (
-                <AlertCircle className="w-3 h-3 text-red-500" />
+                <AlertCircle className="w-3 h-3 text-red-600" />
               )}
             </div>
 
@@ -94,7 +95,8 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             <Button
               variant="ghost"
               size="sm"
-              className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground"
+              className="h-5 w-5 p-0 border border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-destructive hover:text-destructive-foreground focus:bg-zinc-200 focus:text-zinc-900 shadow-sm"
+              style={{ opacity: 1 }}
               onClick={(e) => {
                 e.stopPropagation();
                 onClose();

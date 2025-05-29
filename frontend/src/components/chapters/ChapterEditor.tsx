@@ -46,31 +46,40 @@ export function ChapterEditor({
     }
   }, [bookId, chapterId, initialContent]);
 
-  // Auto-save functionality
+  // Auto-save functionality (unbounce: only save if user stops typing for 3s, and only one save in flight)
+  const [autoSavePending, setAutoSavePending] = useState(false);
+  const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
+
+  // Track if content changed since last save
   useEffect(() => {
-    if (!content || content === initialContent) return;    const handleAutoSave = async () => {
-      if (isSaving) return;
-      
+    if (content !== lastAutoSavedContent) {
+      setAutoSavePending(true);
+    }
+  }, [content, lastAutoSavedContent]);
+
+  // Unbounce auto-save: only save if content changed and user stopped typing for 3s
+  useEffect(() => {
+    if (!autoSavePending || !content || content === initialContent) return;
+    if (isSaving) return;
+
+    const timer = setTimeout(async () => {
       setIsSaving(true);
       setError(null);
-      
       try {
         await bookClient.saveChapterContent(bookId, chapterId, content);
         setLastSaved(new Date());
+        setLastAutoSavedContent(content);
+        setAutoSavePending(false);
       } catch (err) {
         console.error('Failed to auto-save chapter:', err);
         setError('Failed to auto-save chapter content');
       } finally {
         setIsSaving(false);
       }
-    };
+    }, 3000);
 
-    const autoSaveTimer = setTimeout(() => {
-      handleAutoSave();
-    }, 3000); // Auto-save after 3 seconds of inactivity
-
-    return () => clearTimeout(autoSaveTimer);
-  }, [content, initialContent, bookId, chapterId, isSaving]);
+    return () => clearTimeout(timer);
+  }, [autoSavePending, content, initialContent, bookId, chapterId, isSaving]);
   // Notify parent of content changes
   useEffect(() => {
     if (onContentChange) {
