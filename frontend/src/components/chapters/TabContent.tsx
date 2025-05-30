@@ -10,14 +10,17 @@ interface TabContentProps {
   chapters: ChapterTabMetadata[];
   onContentChange?: (chapterId: string, content: string) => void;
   onChapterSave?: (chapterId: string, content: string) => void;
+  'data-testid'?: string;
 }
 
 export function TabContent({ 
   bookId, 
   activeChapterId, 
   onContentChange,
-  onChapterSave 
-}: TabContentProps) {  if (!activeChapterId) {
+  onChapterSave,
+  'data-testid': testId
+}: TabContentProps) {  
+  if (!activeChapterId) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
@@ -29,7 +32,7 @@ export function TabContent({
   }
 
   return (
-    <div className="flex-1 overflow-hidden">
+    <div className="flex-1 overflow-hidden" data-testid={testId}>
       <ErrorBoundary fallback={<div>Something went wrong with this chapter</div>}>
         <ChapterEditor
           bookId={bookId}

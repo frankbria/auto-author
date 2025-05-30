@@ -77,7 +77,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             </span>
 
             {/* Indicators */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1" data-testid="indicators-container">
               {chapter.has_unsaved_changes && (
                 <div className="w-1.5 h-1.5 bg-orange-500 rounded-full border border-orange-700" />
               )}
@@ -101,6 +101,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
                 e.stopPropagation();
                 onClose();
               }}
+              aria-label="Close"
             >
               <X className="h-3 w-3" />
             </Button>

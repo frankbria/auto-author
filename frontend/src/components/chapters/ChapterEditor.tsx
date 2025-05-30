@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import bookClient from '@/lib/api/bookClient';
 
 interface ChapterEditorProps {
@@ -25,12 +24,14 @@ export function ChapterEditor({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  // Remove domReady state and setDomReady
+
   // Load chapter content if no initial content provided
   useEffect(() => {
     const loadChapterContent = async () => {
       setIsLoading(true);
       setError(null);
-        try {
+      try {
         const contentData = await bookClient.getChapterContent(bookId, chapterId);
         setContent(contentData.content || '');
       } catch (err) {
@@ -40,28 +41,32 @@ export function ChapterEditor({
         setIsLoading(false);
       }
     };
-
     if (!initialContent && bookId && chapterId) {
       loadChapterContent();
     }
   }, [bookId, chapterId, initialContent]);
 
+  // Update content state if initialContent changes
+  useEffect(() => {
+    if (content !== initialContent) {
+      setContent(initialContent);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialContent]);
+
   // Auto-save functionality (unbounce: only save if user stops typing for 3s, and only one save in flight)
   const [autoSavePending, setAutoSavePending] = useState(false);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
 
-  // Track if content changed since last save
   useEffect(() => {
     if (content !== lastAutoSavedContent) {
       setAutoSavePending(true);
     }
   }, [content, lastAutoSavedContent]);
 
-  // Unbounce auto-save: only save if content changed and user stopped typing for 3s
   useEffect(() => {
     if (!autoSavePending || !content || content === initialContent) return;
     if (isSaving) return;
-
     const timer = setTimeout(async () => {
       setIsSaving(true);
       setError(null);
@@ -77,29 +82,19 @@ export function ChapterEditor({
         setIsSaving(false);
       }
     }, 3000);
-
     return () => clearTimeout(timer);
   }, [autoSavePending, content, initialContent, bookId, chapterId, isSaving]);
-  // Notify parent of content changes
-  useEffect(() => {
-    if (onContentChange) {
-      onContentChange(content);
-    }
-  }, [content, onContentChange]);
+
   const handleSave = async (isAutoSave: boolean = false) => {
     if (isSaving) return;
-    
     setIsSaving(true);
     setError(null);
-    
     try {
       await bookClient.saveChapterContent(bookId, chapterId, content);
       setLastSaved(new Date());
-      
       if (onSave) {
         onSave(content);
       }
-      
       if (!isAutoSave) {
         console.log('Chapter content saved successfully');
       }
@@ -109,11 +104,6 @@ export function ChapterEditor({
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    if (error) setError(null); // Clear error when user types
   };
 
   if (isLoading) {
@@ -133,14 +123,22 @@ export function ChapterEditor({
         <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 text-sm">
           {error}
         </div>
-      )}      <div className="flex-1 p-4">
-        <Textarea
+      )}
+      <div className="flex-1 p-4 bg-white">
+        <textarea
           value={content}
-          onChange={(e) => handleContentChange(e.target.value)}
+          onChange={e => {
+            const newContent = e.target.value;
+            setContent(newContent);
+            if (onContentChange) {
+              onContentChange(newContent);
+            }
+          }}
+          className="w-full h-full min-h-[500px] max-h-[700px] resize-vertical p-4 border border-gray-300 rounded text-base bg-white text-black focus:outline-none focus:ring-2 focus:ring-primary"
           placeholder="Start writing your chapter content..."
-          className="h-full min-h-[500px] resize-none bg-background text-foreground border-border focus:border-ring"
         />
-      </div>      <div className="border-t border-border p-4 flex justify-between items-center bg-muted/20">
+      </div>
+      <div className="border-t border-border p-4 flex justify-between items-center bg-muted/20">
         <div className="flex items-center gap-4">
           <span className="text-sm text-foreground">
             {content.length} characters

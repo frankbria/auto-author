@@ -58,13 +58,54 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
             console.error('Failed to load chapter metadata:', apiError);
             // If both methods fail, we'll end up with an empty array
           }
-        }        // Try to load previous tab state
-        let tabState = null;        try {
-          tabState = await bookClient.getTabState(bookId);
-          console.log('Loaded tab state:', tabState);
-        } catch {
-          // Tab state might not exist, that's okay
-          console.log('No previous tab state found');
+        }
+
+        // Try to load previous tab state from localStorage first
+        let localTabState = null;
+        try {
+          const savedState = localStorage.getItem(`tabState_${bookId}`);
+          if (savedState) {
+            localTabState = JSON.parse(savedState);
+            console.log('Loaded tab state from localStorage:', localTabState);
+          }
+        } catch (e) {
+          console.warn('Failed to load tab state from localStorage:', e);
+        }
+
+        // Try to load tab state from backend
+        let backendTabState = null;
+        let tabState = null;
+        
+        try {
+          backendTabState = await bookClient.getTabState(bookId);
+          console.log('Loaded tab state from backend:', backendTabState);
+          
+          // Get the actual state object (the API might return different formats)
+          // @ts-expect-error - Handle different response formats for backwards compatibility
+          const backendStateData = backendTabState?.tab_state || backendTabState;
+          
+          // Compare timestamps if both local and backend states exist
+          if (localTabState && backendStateData) {
+            const localDate = new Date(localTabState.last_updated);
+            const backendDate = new Date(backendStateData.last_updated || new Date(0));
+            
+            // Use the newer state
+            if (backendDate > localDate) {
+              console.log('Backend state is newer, using backend state');
+              tabState = backendStateData;
+            } else {
+              console.log('Local state is newer, using local state');
+              tabState = localTabState;
+            }
+          } else {
+            // If only one exists, use that one
+            tabState = backendStateData || localTabState;
+          }
+        } catch (error) {
+          // If backend fails, fall back to local state
+          console.error('Error loading backend state:', error);
+          console.log('Failed to load backend state, falling back to local state');
+          tabState = localTabState;
         }
 
         // Handle chapter metadata and state
@@ -175,6 +216,16 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
   }, [bookId]);
   const saveTabState = useCallback(async () => {
     try {
+      // Save state to localStorage
+      const tabState = {
+        active_chapter_id: state.active_chapter_id,
+        open_tab_ids: state.open_tab_ids,
+        tab_order: state.tab_order,
+        last_updated: new Date().toISOString()
+      };
+      localStorage.setItem(`tabState_${bookId}`, JSON.stringify(tabState));
+      
+      // Also save to backend
       await bookClient.saveTabState(bookId, {
         active_chapter_id: state.active_chapter_id,
         open_tab_ids: state.open_tab_ids,
