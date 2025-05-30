@@ -1,0 +1,70 @@
+/* frontend/src/components/chapters/editor.css */
+
+.tiptap-editor {
+  @apply prose prose-sm max-w-none text-black;
+}
+
+.tiptap-editor .ProseMirror {
+  color: #000000;
+}
+
+/* Content area styling */
+.tiptap-editor p {
+  @apply my-2;
+}
+
+.tiptap-editor h1 {
+  @apply text-3xl font-bold mt-6 mb-4;
+}
+
+.tiptap-editor h2 {
+  @apply text-2xl font-bold mt-5 mb-3;
+}
+
+.tiptap-editor h3 {
+  @apply text-xl font-bold mt-4 mb-2;
+}
+
+.tiptap-editor ul {
+  @apply list-disc pl-6 my-3;
+}
+
+.tiptap-editor ol {
+  @apply list-decimal pl-6 my-3;
+}
+
+.tiptap-editor blockquote {
+  @apply border-l-4 border-gray-300 pl-4 italic my-4;
+}
+
+.tiptap-editor code {
+  @apply bg-gray-100 rounded px-1 py-0.5 font-mono text-sm;
+}
+
+.tiptap-editor pre {
+  @apply bg-gray-100 rounded p-4 overflow-auto my-4;
+}
+
+.tiptap-editor hr {
+  @apply border-t border-gray-300 my-6;
+}
+
+/* Focus styles */
+.tiptap-editor:focus {
+  @apply outline-none;
+}
+
+.tiptap-editor .ProseMirror:focus {
+  @apply outline-none;
+}
+
+/* Placeholder */
+.tiptap-editor .is-editor-empty:first-child::before {
+  @apply text-gray-400 float-left h-0 pointer-events-none;
+  content: attr(data-placeholder);
+}
+
+/* Active editor styles for toolbar buttons */
+.tiptap-toolbar-button-active {
+  @apply bg-gray-200;
+}

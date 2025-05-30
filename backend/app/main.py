@@ -79,7 +79,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "detail": f"An unexpected error occurred: {str(exc)}",
-            "type": str(type(*exc).__name__),
+            "type": str(type(exc).__name__),
         },
     )
 

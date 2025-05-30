@@ -1,8 +1,49 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import Placeholder from '@tiptap/extension-placeholder';
+import CharacterCount from '@tiptap/extension-character-count';
+import './editor.css';
+
+// Required types declaration to avoid TypeScript errors
+declare module '@tiptap/react' {
+  interface Commands<ReturnType> {
+    toggleBold: () => ReturnType;
+    toggleItalic: () => ReturnType;
+    toggleUnderline: () => ReturnType;
+    toggleStrike: () => ReturnType;
+    toggleHeading: (attributes: { level: 1 | 2 | 3 | 4 | 5 | 6 }) => ReturnType;
+    toggleBulletList: () => ReturnType;
+    toggleOrderedList: () => ReturnType;
+    toggleBlockquote: () => ReturnType;
+    toggleCodeBlock: () => ReturnType;
+    undo: () => ReturnType;
+    redo: () => ReturnType;
+    setHorizontalRule: () => ReturnType;
+  }
+}
 import { Button } from '@/components/ui/button';
 import bookClient from '@/lib/api/bookClient';
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Strikethrough,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  Quote,
+  Code,
+  Undo,
+  Redo,
+  Minus
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ChapterEditorProps {
   bookId: string;
@@ -19,12 +60,40 @@ export function ChapterEditor({
   onSave,
   onContentChange
 }: ChapterEditorProps) {
-  const [content, setContent] = useState(initialContent);
-  const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  // Remove domReady state and setDomReady
+  const [isSaving, setIsSaving] = useState(false);
+  const [autoSavePending, setAutoSavePending] = useState(false);
+  const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
+  
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      Placeholder.configure({
+        placeholder: 'Start writing your chapter content...',
+      }),
+      CharacterCount,
+    ],
+    content: initialContent,
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      if (onContentChange) {
+        onContentChange(html);
+      }
+      if (html !== lastAutoSavedContent) {
+        setAutoSavePending(true);
+      }
+    },
+    editorProps: {
+      attributes: {
+        class: 'focus:outline-none text-black',
+      },
+    },
+    // Set this to false to avoid SSR hydration issues
+    immediatelyRender: false,
+  });
 
   // Load chapter content if no initial content provided
   useEffect(() => {
@@ -33,10 +102,23 @@ export function ChapterEditor({
       setError(null);
       try {
         const contentData = await bookClient.getChapterContent(bookId, chapterId);
-        setContent(contentData.content || '');
+        if (editor) {
+          editor.commands.setContent(contentData.content || '');
+          setLastAutoSavedContent(contentData.content || '');
+        }
       } catch (err) {
-        console.error('Failed to load chapter content:', err);
-        setError('Failed to load chapter content');
+        // Ignore tab state errors as they shouldn't affect the editor functionality
+        if (err instanceof Error && !err.message.includes('Failed to get tab state')) {
+          console.error('Failed to load chapter content:', err);
+          setError('Failed to load chapter content');
+        } else {
+          console.warn('Tab state error occurred but content may still load:', err);
+          // Continue loading with empty content in case of tab state errors
+          if (editor) {
+            editor.commands.setContent('');
+            setLastAutoSavedContent('');
+          }
+        }
       } finally {
         setIsLoading(false);
       }
@@ -44,30 +126,24 @@ export function ChapterEditor({
     if (!initialContent && bookId && chapterId) {
       loadChapterContent();
     }
-  }, [bookId, chapterId, initialContent]);
+  }, [bookId, chapterId, initialContent, editor]);
 
-  // Update content state if initialContent changes
+  // Update content if initialContent changes
   useEffect(() => {
-    if (content !== initialContent) {
-      setContent(initialContent);
+    if (editor && initialContent && editor.getHTML() !== initialContent) {
+      editor.commands.setContent(initialContent);
+      setLastAutoSavedContent(initialContent);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialContent]);
+  }, [initialContent, editor]);
 
-  // Auto-save functionality (unbounce: only save if user stops typing for 3s, and only one save in flight)
-  const [autoSavePending, setAutoSavePending] = useState(false);
-  const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
-
+  // Auto-save functionality
   useEffect(() => {
-    if (content !== lastAutoSavedContent) {
-      setAutoSavePending(true);
-    }
-  }, [content, lastAutoSavedContent]);
-
-  useEffect(() => {
-    if (!autoSavePending || !content || content === initialContent) return;
-    if (isSaving) return;
+    if (!autoSavePending || !editor || isSaving) return;
+    
     const timer = setTimeout(async () => {
+      const content = editor.getHTML();
+      if (content === lastAutoSavedContent) return;
+      
       setIsSaving(true);
       setError(null);
       try {
@@ -82,16 +158,21 @@ export function ChapterEditor({
         setIsSaving(false);
       }
     }, 3000);
+    
     return () => clearTimeout(timer);
-  }, [autoSavePending, content, initialContent, bookId, chapterId, isSaving]);
+  }, [autoSavePending, bookId, chapterId, editor, isSaving, lastAutoSavedContent]);
 
   const handleSave = async (isAutoSave: boolean = false) => {
-    if (isSaving) return;
+    if (isSaving || !editor) return;
+    
+    const content = editor.getHTML();
     setIsSaving(true);
     setError(null);
+    
     try {
       await bookClient.saveChapterContent(bookId, chapterId, content);
       setLastSaved(new Date());
+      setLastAutoSavedContent(content);
       if (onSave) {
         onSave(content);
       }
@@ -124,24 +205,218 @@ export function ChapterEditor({
           {error}
         </div>
       )}
-      <div className="flex-1 p-4 bg-white">
-        <textarea
-          value={content}
-          onChange={e => {
-            const newContent = e.target.value;
-            setContent(newContent);
-            if (onContentChange) {
-              onContentChange(newContent);
-            }
-          }}
-          className="w-full h-full min-h-[500px] max-h-[700px] resize-vertical p-4 border border-gray-300 rounded text-base bg-white text-black focus:outline-none focus:ring-2 focus:ring-primary"
-          placeholder="Start writing your chapter content..."
+      
+      {/* Editor Toolbar */}
+      <div className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleBold().run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('bold') ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Bold"
+          type="button"
+        >
+          <Bold className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleItalic().run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('italic') ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Italic"
+          type="button"
+        >
+          <Italic className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleUnderline().run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('underline') ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Underline"
+          type="button"
+        >
+          <UnderlineIcon className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleStrike().run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('strike') ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Strikethrough"
+          type="button"
+        >
+          <Strikethrough className="h-4 w-4" />
+        </Button>
+        
+        <div className="w-px h-6 bg-border mx-1" />
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('heading', { level: 1 }) ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Heading 1"
+          type="button"
+        >
+          <Heading1 className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('heading', { level: 2 }) ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Heading 2"
+          type="button"
+        >
+          <Heading2 className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('heading', { level: 3 }) ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Heading 3"
+          type="button"
+        >
+          <Heading3 className="h-4 w-4" />
+        </Button>
+        
+        <div className="w-px h-6 bg-border mx-1" />
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleBulletList().run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('bulletList') ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Bullet List"
+          type="button"
+        >
+          <List className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('orderedList') ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Ordered List"
+          type="button"
+        >
+          <ListOrdered className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('blockquote') ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Blockquote"
+          type="button"
+        >
+          <Quote className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
+          className={cn(
+            'h-8 w-8 p-0',
+            editor?.isActive('codeBlock') ? 'bg-muted' : 'bg-transparent'
+          )}
+          title="Code Block"
+          type="button"
+        >
+          <Code className="h-4 w-4" />
+        </Button>
+        
+        <div className="w-px h-6 bg-border mx-1" />
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().undo().run()}
+          disabled={!editor?.can().chain().focus().undo().run()}
+          className="h-8 w-8 p-0 bg-transparent"
+          title="Undo"
+          type="button"
+        >
+          <Undo className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().redo().run()}
+          disabled={!editor?.can().chain().focus().redo().run()}
+          className="h-8 w-8 p-0 bg-transparent"
+          title="Redo"
+          type="button"
+        >
+          <Redo className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor?.chain().focus().setHorizontalRule().run()}
+          className="h-8 w-8 p-0 bg-transparent"
+          title="Horizontal Rule"
+          type="button"
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
+      </div>
+      
+      {/* Editor Content */}
+      <div className="flex-1 p-4 bg-white overflow-auto">
+        <EditorContent 
+          editor={editor} 
+          className="w-full h-full min-h-[500px] tiptap-editor text-black" 
         />
       </div>
+      
+      {/* Editor Footer */}
       <div className="border-t border-border p-4 flex justify-between items-center bg-muted/20">
         <div className="flex items-center gap-4">
           <span className="text-sm text-foreground">
-            {content.length} characters
+            {editor?.storage.characterCount.characters() ?? 0} characters
           </span>
           {lastSaved && (
             <span className="text-xs text-muted-foreground">
