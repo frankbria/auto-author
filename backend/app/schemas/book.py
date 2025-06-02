@@ -14,6 +14,31 @@ class ChapterStatus(str, Enum):
     PUBLISHED = "published"
 
 
+class QuestionType(str, Enum):
+    """Types of questions that can be generated for a chapter"""
+    
+    CHARACTER = "character"
+    PLOT = "plot"
+    SETTING = "setting"
+    THEME = "theme"
+    RESEARCH = "research"
+
+
+class QuestionDifficulty(str, Enum):
+    """Difficulty levels for questions"""
+    
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
+
+
+class ResponseStatus(str, Enum):
+    """Status values for question responses"""
+    
+    DRAFT = "draft"
+    COMPLETED = "completed"
+
+
 class TocItemSchema(BaseModel):
     """Schema for Table of Contents items"""
 
@@ -33,6 +58,81 @@ class TocItemSchema(BaseModel):
     is_active_tab: bool = False  # For tab persistence
 
     metadata: Dict[str, Any] = {}
+
+
+class QuestionMetadata(BaseModel):
+    """Metadata for questions"""
+    
+    suggested_response_length: str
+    help_text: Optional[str] = None
+    examples: Optional[List[str]] = None
+
+
+class QuestionBase(BaseModel):
+    """Base schema for chapter questions"""
+    
+    question_text: str = Field(..., min_length=10, max_length=1000)
+    question_type: QuestionType
+    difficulty: QuestionDifficulty
+    category: str
+    order: int
+    metadata: QuestionMetadata
+
+
+class QuestionCreate(QuestionBase):
+    """Schema for creating a new question"""
+    
+    chapter_id: str
+
+
+class Question(QuestionBase):
+    """Schema for a complete question"""
+    
+    id: str
+    chapter_id: str
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class QuestionResponseMetadata(BaseModel):
+    """Metadata for question responses including edit history"""
+    
+    edit_history: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class QuestionResponseBase(BaseModel):
+    """Base schema for question responses"""
+    
+    response_text: str = Field(..., min_length=1)
+    word_count: int = 0
+    status: ResponseStatus = ResponseStatus.DRAFT
+
+
+class QuestionResponseCreate(QuestionResponseBase):
+    """Schema for creating a new question response"""
+    
+    question_id: str
+
+
+class QuestionResponse(QuestionResponseBase):
+    """Schema for a complete question response"""
+    
+    id: str
+    question_id: str
+    user_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_edited_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: QuestionResponseMetadata = Field(default_factory=QuestionResponseMetadata)
+
+
+class QuestionRating(BaseModel):
+    """Schema for rating a question's relevance/quality"""
+    
+    question_id: str
+    user_id: str
+    rating: int = Field(..., ge=1, le=5)  # 1-5 star rating
+    feedback: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class BookBase(BaseModel):
@@ -215,3 +315,49 @@ class BulkStatusUpdate(BaseModel):
     chapter_ids: List[str]
     status: ChapterStatus
     update_timestamp: bool = True
+
+
+# --- Question API Request/Response Schemas ---
+
+class GenerateQuestionsRequest(BaseModel):
+    """Request schema for generating questions for a chapter"""
+    
+    count: Optional[int] = Field(10, ge=1, le=50)
+    difficulty: Optional[QuestionDifficulty] = None
+    focus: Optional[List[QuestionType]] = None
+
+
+class GenerateQuestionsResponse(BaseModel):
+    """Response schema for generated questions"""
+    
+    questions: List[Question]
+    generation_id: str
+    total: int
+
+
+class QuestionListParams(BaseModel):
+    """Query parameters for listing questions"""
+    
+    status: Optional[str] = None
+    category: Optional[str] = None
+    question_type: Optional[QuestionType] = None
+    page: int = 1
+    limit: int = 10
+
+
+class QuestionListResponse(BaseModel):
+    """Response schema for listing questions"""
+    
+    questions: List[Question]
+    total: int
+    page: int
+    pages: int
+
+
+class QuestionProgressResponse(BaseModel):
+    """Response schema for chapter question progress"""
+    
+    total: int
+    completed: int
+    progress: float  # 0.0 to 1.0
+    status: str  # "not-started", "in-progress", "completed"

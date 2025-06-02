@@ -42,6 +42,17 @@ from .book import (
 
 from .audit_log import create_audit_log
 
+from .questions import (
+    create_question,
+    get_questions_for_chapter,
+    save_question_response,
+    get_question_response,
+    save_question_rating,
+    get_chapter_question_progress,
+    delete_questions_for_chapter,
+    get_question_by_id,
+)
+
 __all__ += [
     # User DAOs
     "get_user_by_clerk_id",
@@ -59,4 +70,13 @@ __all__ += [
     "delete_book",
     # Audit log DAOs
     "create_audit_log",
+    # Question DAOs
+    "create_question",
+    "get_questions_for_chapter",
+    "save_question_response",
+    "get_question_response",
+    "save_question_rating",
+    "get_chapter_question_progress",
+    "delete_questions_for_chapter",
+    "get_question_by_id",
 ]

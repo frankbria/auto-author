@@ -3,7 +3,7 @@ import openai
 import logging
 import asyncio
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from openai import OpenAI
 from app.core.config import settings
 
@@ -566,4 +566,125 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
 
 
 # Singleton instance
+    async def generate_chapter_questions(
+        self, prompt: str, count: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate interview-style questions for a chapter using AI.
+        
+        Args:
+            prompt: The prompt containing chapter context and requirements
+            count: Number of questions to generate
+            
+        Returns:
+            List of question dictionaries
+        """
+        try:
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an expert writing coach and interviewer. Generate thoughtful, engaging questions that help authors develop compelling chapter content. Focus on questions that unlock creativity, depth, and reader engagement."
+                },
+                {"role": "user", "content": prompt}
+            ]
+            
+            response = await self._make_openai_request(
+                messages=messages, 
+                temperature=0.7,  # Higher creativity for question generation
+                max_tokens=2000
+            )
+            
+            questions_text = response.choices[0].message.content
+            questions = self._parse_chapter_questions_response(questions_text)
+            
+            logger.info(f"Generated {len(questions)} questions for chapter")
+            return questions
+            
+        except Exception as e:
+            logger.error(f"Error generating chapter questions: {str(e)}")
+            # Return empty list, fallback questions will be handled by the service
+            return []
+    
+    def _parse_chapter_questions_response(self, questions_text: str) -> List[Dict[str, Any]]:
+        """
+        Parse the AI response containing chapter questions.
+        
+        Args:
+            questions_text: Raw text response from AI
+            
+        Returns:
+            List of question dictionaries
+        """
+        import json
+        import re
+        
+        questions = []
+        
+        try:
+            # Try to parse as JSON first
+            json_match = re.search(r'\[.*\]', questions_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                parsed_questions = json.loads(json_str)
+                
+                if isinstance(parsed_questions, list):
+                    for q in parsed_questions:
+                        if isinstance(q, dict) and 'question_text' in q:
+                            questions.append(q)
+                    return questions
+        except json.JSONDecodeError:
+            pass
+        
+        # Fallback: parse structured text format
+        lines = questions_text.strip().split('\n')
+        current_question = {}
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Look for question text
+            if line.startswith('"question_text"') or 'question_text' in line:
+                match = re.search(r'"question_text"\s*:\s*"([^"]+)"', line)
+                if match:
+                    current_question['question_text'] = match.group(1)
+            elif line.startswith('"question_type"') or 'question_type' in line:
+                match = re.search(r'"question_type"\s*:\s*"([^"]+)"', line)
+                if match:
+                    current_question['question_type'] = match.group(1)
+            elif line.startswith('"difficulty"') or 'difficulty' in line:
+                match = re.search(r'"difficulty"\s*:\s*"([^"]+)"', line)
+                if match:
+                    current_question['difficulty'] = match.group(1)
+            elif line.startswith('"help_text"') or 'help_text' in line:
+                match = re.search(r'"help_text"\s*:\s*"([^"]+)"', line)
+                if match:
+                    current_question['help_text'] = match.group(1)
+            elif line.startswith('}') and current_question.get('question_text'):
+                questions.append(current_question.copy())
+                current_question = {}
+        
+        # If still no questions, try simple question extraction
+        if not questions:
+            question_lines = []
+            for line in lines:
+                if '?' in line and len(line.strip()) > 10:
+                    # Extract just the question part
+                    question_text = line.strip()
+                    # Remove numbering, bullets, etc.
+                    question_text = re.sub(r'^[\d\.\-\*\•]\s*', '', question_text)
+                    question_text = question_text.strip('"\'')
+                    
+                    if question_text:
+                        questions.append({
+                            'question_text': question_text,
+                            'question_type': 'plot',  # Default type
+                            'difficulty': 'medium',   # Default difficulty
+                            'help_text': 'Consider the key elements that would engage readers in this chapter.'
+                        })
+        
+        return questions[:20]  # Limit to reasonable number
+
+
 ai_service = AIService()

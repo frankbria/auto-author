@@ -26,6 +26,67 @@ class TocItem(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class QuestionMetadata(BaseModel):
+    """Metadata for questions"""
+    
+    suggested_response_length: str
+    help_text: Optional[str] = None
+    examples: Optional[List[str]] = None
+
+
+class Question(BaseModel):
+    """Database model for chapter questions"""
+    
+    id: str
+    chapter_id: str
+    question_text: str
+    question_type: str  # character, plot, setting, theme, research
+    difficulty: str  # easy, medium, hard
+    category: str
+    order: int
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: QuestionMetadata
+
+
+class QuestionResponseEditHistory(BaseModel):
+    """Model for tracking edits to question responses"""
+    
+    timestamp: datetime
+    word_count: int
+
+
+class QuestionResponseMetadata(BaseModel):
+    """Metadata for question responses"""
+    
+    edit_history: List[QuestionResponseEditHistory] = Field(default_factory=list)
+
+
+class QuestionResponse(BaseModel):
+    """Database model for question responses"""
+    
+    id: str
+    question_id: str
+    user_id: str
+    response_text: str
+    word_count: int = 0
+    status: str = "draft"  # draft or completed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_edited_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: QuestionResponseMetadata = Field(default_factory=QuestionResponseMetadata)
+
+
+class QuestionRating(BaseModel):
+    """Database model for question ratings"""
+    
+    id: str
+    question_id: str
+    user_id: str
+    rating: int  # 1-5 star rating
+    feedback: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class BookBase(BaseModel):
     """Base book model with common fields"""
 

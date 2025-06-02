@@ -1,0 +1,379 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: |
+          package-lock.json
+          frontend/package-lock.json
+    
+    - name: Install root dependencies
+      run: npm ci
+    
+    - name: Install frontend dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Run ESLint
+      working-directory: ./frontend
+      run: npm run lint
+    
+    - name: Run type checking
+      working-directory: ./frontend
+      run: npx tsc --noEmit
+    
+    - name: Run unit tests
+      working-directory: ./frontend
+      run: npm run test:ci
+    
+    - name: Run integration tests
+      working-directory: ./frontend
+      run: npm run test:integration
+    
+    - name: Upload frontend coverage
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: [3.9, '3.10', '3.11']
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      working-directory: ./backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov pytest-mock factory-boy
+    
+    - name: Run linting
+      working-directory: ./backend
+      run: |
+        pip install flake8 black isort mypy
+        flake8 app tests
+        black --check app tests
+        isort --check-only app tests
+        mypy app
+    
+    - name: Run unit tests
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+        OPENAI_API_KEY: test_key
+        ANTHROPIC_API_KEY: test_key
+        ENVIRONMENT: test
+      run: |
+        python -m pytest tests/unit/ -v --cov=app --cov-report=xml
+    
+    - name: Run integration tests
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+        OPENAI_API_KEY: test_key
+        ANTHROPIC_API_KEY: test_key
+        ENVIRONMENT: test
+      run: |
+        python -m pytest tests/integration/ -v --cov=app --cov-append --cov-report=xml
+    
+    - name: Run API tests
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+        OPENAI_API_KEY: test_key
+        ANTHROPIC_API_KEY: test_key
+        ENVIRONMENT: test
+      run: |
+        python -m pytest tests/test_api/ -v --cov=app --cov-append --cov-report=xml
+    
+    - name: Upload backend coverage
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./backend/coverage.xml
+        flags: backend
+        name: backend-coverage
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [frontend-tests, backend-tests]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: |
+          package-lock.json
+          frontend/package-lock.json
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd frontend && npm ci
+        cd ../backend && pip install -r requirements.txt
+    
+    - name: Start backend server
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+        OPENAI_API_KEY: test_key
+        ANTHROPIC_API_KEY: test_key
+        ENVIRONMENT: test
+      run: |
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+    
+    - name: Start frontend server
+      working-directory: ./frontend
+      env:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NODE_ENV: test
+      run: |
+        npm run build
+        npm start &
+        sleep 15
+    
+    - name: Run E2E tests
+      working-directory: ./frontend
+      run: npm run test:e2e
+    
+    - name: Upload E2E test artifacts
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: e2e-test-results
+        path: |
+          frontend/test-results/
+          frontend/screenshots/
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'performance')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        cd frontend && npm ci
+        cd ../backend && pip install -r requirements.txt
+        pip install locust
+    
+    - name: Run frontend performance tests
+      working-directory: ./frontend
+      run: npm run test:performance
+    
+    - name: Start backend for load testing
+      working-directory: ./backend
+      env:
+        DATABASE_URL: sqlite:///test.db
+        OPENAI_API_KEY: test_key
+        ANTHROPIC_API_KEY: test_key
+      run: |
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+    
+    - name: Run load tests
+      working-directory: ./backend
+      run: |
+        locust -f tests/load/locustfile.py --headless --users 10 --spawn-rate 2 --run-time 60s --host http://localhost:8000
+
+  accessibility-tests:
+    name: Accessibility Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Run accessibility tests
+      working-directory: ./frontend
+      run: npm run test:accessibility
+    
+    - name: Upload accessibility results
+      uses: actions/upload-artifact@v3
+      with:
+        name: accessibility-results
+        path: frontend/accessibility-results/
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run npm audit
+      working-directory: ./frontend
+      run: npm audit --audit-level=high
+    
+    - name: Run pip safety check
+      working-directory: ./backend
+      run: |
+        pip install safety
+        safety check -r requirements.txt
+    
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: python, javascript
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [frontend-tests, backend-tests, e2e-tests]
+    if: always()
+    
+    steps:
+    - name: Check test results
+      run: |
+        if [ "${{ needs.frontend-tests.result }}" == "failure" ] || [ "${{ needs.backend-tests.result }}" == "failure" ] || [ "${{ needs.e2e-tests.result }}" == "failure" ]; then
+          echo "Some tests failed"
+          exit 1
+        else
+          echo "All tests passed"
+        fi
+    
+    - name: Create test summary
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const results = {
+            frontend: '${{ needs.frontend-tests.result }}',
+            backend: '${{ needs.backend-tests.result }}',
+            e2e: '${{ needs.e2e-tests.result }}'
+          }
+          
+          let summary = '## Test Results\n\n'
+          for (const [test, result] of Object.entries(results)) {
+            const icon = result === 'success' ? '✅' : '❌'
+            summary += `${icon} ${test}: ${result}\n`
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          })

@@ -1,8 +1,19 @@
 'use client';
 
 import { BookProject } from '@/components/BookCard';
-import { QuestionResponse } from '@/types/toc';
+// We don't need the TOC QuestionResponse import since we're using the one from chapter-questions
 import { ChapterStatus } from '@/types/chapter-tabs';
+// Import only what we use to satisfy linting
+import {
+  QuestionResponse,
+  QuestionProgressResponse,
+  GenerateQuestionsRequest,
+  GenerateQuestionsResponse,
+  QuestionListResponse,
+  QuestionResponseRequest,
+  QuestionRatingRequest,
+  QuestionType
+} from '@/types/chapter-questions';
 
 /**
  * API client for book operations
@@ -596,6 +607,185 @@ export class BookClient {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to get tab state: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  // ============= Interview-Style Questions Methods =============
+
+  /**
+   * Generate interview-style questions for a specific chapter
+   */
+  public async generateChapterQuestions(
+    bookId: string,
+    chapterId: string,
+    options: GenerateQuestionsRequest = {}
+  ): Promise<GenerateQuestionsResponse> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/generate-questions`,
+      {
+        method: 'POST',
+        headers: this.getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(options),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to generate questions: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get questions for a chapter with optional filtering
+   */
+  public async getChapterQuestions(
+    bookId: string,
+    chapterId: string,
+    options: {
+      status?: string;
+      category?: string;
+      questionType?: QuestionType;
+      page?: number;
+      limit?: number;
+    } = {}
+  ): Promise<QuestionListResponse> {
+    const params = new URLSearchParams();
+    if (options.status) params.append('status', options.status);
+    if (options.category) params.append('category', options.category);
+    if (options.questionType) params.append('question_type', options.questionType);
+    if (options.page) params.append('page', options.page.toString());
+    if (options.limit) params.append('limit', options.limit.toString());
+
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions?${params}`,
+      {
+        headers: this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get questions: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Save or update a response to a question
+   */
+  public async saveQuestionResponse(
+    bookId: string,
+    chapterId: string,
+    questionId: string,
+    responseData: QuestionResponseRequest
+  ): Promise<{ response: QuestionResponse; success: boolean; message: string }> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/response`,
+      {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(responseData),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to save question response: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get a response to a specific question
+   */
+  public async getQuestionResponse(
+    bookId: string,
+    chapterId: string,
+    questionId: string
+  ): Promise<{ response: QuestionResponse | null; has_response: boolean; success: boolean }> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/response`,
+      {
+        headers: this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get question response: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Rate a question's relevance and quality
+   */
+  public async rateQuestion(
+    bookId: string,
+    chapterId: string,
+    questionId: string,
+    ratingData: QuestionRatingRequest
+  ): Promise<{ rating: { id: string; question_id: string; rating: number; feedback?: string; created_at: string }; success: boolean; message: string }> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/rating`,
+      {
+        method: 'POST',
+        headers: this.getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(ratingData),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to rate question: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get progress information for a chapter's questions
+   */
+  public async getChapterQuestionProgress(
+    bookId: string,
+    chapterId: string
+  ): Promise<QuestionProgressResponse> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/question-progress`,
+      {
+        headers: this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get question progress: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Regenerate questions for a chapter, optionally preserving existing responses
+   */
+  public async regenerateChapterQuestions(
+    bookId: string,
+    chapterId: string,
+    options: GenerateQuestionsRequest = {},
+    preserveResponses: boolean = true
+  ): Promise<GenerateQuestionsResponse> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/regenerate-questions?preserve_responses=${preserveResponses}`,
+      {
+        method: 'POST',
+        headers: this.getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(options),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to regenerate questions: ${response.status} ${error}`);
     }
     return response.json();
   }
