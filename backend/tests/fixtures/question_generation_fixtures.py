@@ -298,3 +298,20 @@ def generate_test_response(question_id, user_id, status="completed"):
             ]
         }
     }
+
+# Export the fixtures with the expected names
+sample_questions = SAMPLE_QUESTIONS
+sample_question_responses = SAMPLE_RESPONSES
+sample_question_ratings = SAMPLE_RATINGS
+book_with_questions = SAMPLE_BOOK
+ai_question_response = {
+    "questions": MOCK_AI_RESPONSE,
+    "generation_metadata": {
+        "ai_model": "gpt-4",
+        "parameters": {
+            "temperature": 0.7,
+            "max_tokens": 2000
+        },
+        "processing_time": 2.5
+    }
+}

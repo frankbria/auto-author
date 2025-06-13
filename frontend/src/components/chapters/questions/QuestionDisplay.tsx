@@ -1,12 +1,13 @@
 'use client';
 
 import { Question, QuestionType, QuestionDifficulty, ResponseStatus } from '@/types/chapter-questions';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, BookOpen, Map, MessageSquare, Search, Star, StarHalf, StarOff } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { bookClient } from '@/lib/api/bookClient';
+import { VoiceTextInput } from '@/components/chapters/VoiceTextInput';
 
 interface QuestionDisplayProps {
   bookId: string;
@@ -240,7 +241,7 @@ export default function QuestionDisplay({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             {getQuestionTypeIcon(question.question_type)}
-            <CardTitle className="text-xl">{question.question_type} Question</CardTitle>
+            <h2 className="text-xl" id="question-heading">{question.question_type} Question</h2>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -253,11 +254,10 @@ export default function QuestionDisplay({
         
         <CardDescription>
           {/* Question text */}
-          <p className="text-lg font-medium mt-4 mb-2">{question.question_text}</p>
-          
+          <p className="text-lg font-medium mt-4 mb-2" id="question-text">{question.question_text}</p>
           {/* Help text and examples if available */}
           {question.metadata?.help_text && (
-            <div className="mt-2 text-sm text-muted-foreground">
+            <div className="mt-2 text-sm text-muted-foreground" id="question-help-text">
               <p>{question.metadata.help_text}</p>
             </div>
           )}
@@ -279,7 +279,7 @@ export default function QuestionDisplay({
         {/* Response textarea */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <label htmlFor="response" className="text-sm font-medium">
+            <label htmlFor="response" className="text-sm font-medium" id="response-label">
               Your Response
             </label>
             
@@ -294,13 +294,13 @@ export default function QuestionDisplay({
             </div>
           </div>
           
-          <Textarea
-            id="response"
-            placeholder="Type your response here..."
-            className="min-h-[200px] resize-y"
+          <VoiceTextInput
             value={responseText}
-            onChange={(e) => setResponseText(e.target.value)}
+            onChange={setResponseText}
+            placeholder="Type your response here or use voice input..."
+            className="min-h-[200px]"
             disabled={isSaving || isCompleted}
+            onAutoSave={handleSaveDraft}
           />
           
           {/* Save status and error */}

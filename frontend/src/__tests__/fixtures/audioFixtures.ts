@@ -28,3 +28,10 @@ export const mockMediaDevices = {
     { kind: 'audioinput', deviceId: 'default', label: 'Default Microphone' }
   ]),
 };
+
+describe('audioFixtures', () => {
+  it('should create a mock audio blob', () => {
+    const blob = createMockAudioBlob();
+    expect(blob).toBeInstanceOf(Blob);
+  });
+});

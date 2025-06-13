@@ -100,9 +100,19 @@ async def test_toc_generation_workflow_e2e(async_client_factory):
     assert toc_json["toc"]["chapters"]
 
     # 7. Try submitting empty summary (should fail validation)
+    # First verify the book still exists and we can access it
+    get_book_resp = await client.get(f"/api/v1/books/{book_id}")
+    if get_book_resp.status_code != 200:
+        print(f"Book GET failed with status: {get_book_resp.status_code}")
+        print(f"Response: {get_book_resp.json()}")
+    
     summary_resp2 = await client.patch(
         f"/api/v1/books/{book_id}/summary", json={"summary": ""}
     )
+    # Debug: Print the response if it's not 400
+    if summary_resp2.status_code != 400:
+        print(f"Expected 400, got {summary_resp2.status_code}")
+        print(f"Response body: {summary_resp2.json()}")
     assert summary_resp2.status_code == 400
     # Now TOC generation should fail again
     # toc_fail_resp3 = await client.post(f"/api/v1/books/{book_id}/generate-toc")

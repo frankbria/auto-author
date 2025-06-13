@@ -1,6 +1,13 @@
 // src/jest.setup.ts
 import '@testing-library/jest-dom';
 
+// Add TextEncoder/TextDecoder polyfills for Node.js environment
+if (typeof global.TextEncoder === 'undefined') {
+  const { TextEncoder, TextDecoder } = require('util');
+  global.TextEncoder = TextEncoder;
+  global.TextDecoder = TextDecoder;
+}
+
 // Mock window.matchMedia for responsive component tests
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

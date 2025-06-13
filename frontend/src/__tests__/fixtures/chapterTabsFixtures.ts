@@ -95,3 +95,10 @@ export const setupTestEnvironment = () => {
     disconnect: jest.fn(),
   }));
 };
+
+describe('chapterTabsFixtures', () => {
+  it('should create a mock chapter', () => {
+    const chapter = createMockChapter('1', 'Test Chapter');
+    expect(chapter).toHaveProperty('id', '1');
+  });
+});

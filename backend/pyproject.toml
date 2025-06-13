@@ -1,0 +1,27 @@
+[project]
+name = "auto-author-backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.12",
+    "motor>=3.7.1",
+    "openai>=1.83.0",
+    "pydantic[email]>=2.11.5",
+    "pydantic-settings>=2.9.1",
+    "pymongo>=4.13.0",
+    "python-dotenv>=1.1.0",
+    "uvicorn>=0.34.3",
+    "requests>=2.32.3",
+    "python-jose[cryptography]>=3.5.0",
+    "python-multipart>=0.0.20",
+    "passlib[bcrypt]>=1.7.4",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.1.1",
+    "httpx>=0.28.1",
+    "pytest-mock>=3.14.1",
+    "locust>=2.37.6",
+    "faker>=37.3.0",
+]

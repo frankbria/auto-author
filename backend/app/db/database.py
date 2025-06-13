@@ -53,6 +53,14 @@ from .questions import (
     get_question_by_id,
 )
 
+from .toc_transactions import (
+    update_toc_with_transaction,
+    add_chapter_with_transaction,
+    update_chapter_with_transaction,
+    delete_chapter_with_transaction,
+    reorder_chapters_with_transaction,
+)
+
 __all__ += [
     # User DAOs
     "get_user_by_clerk_id",
@@ -79,4 +87,10 @@ __all__ += [
     "get_chapter_question_progress",
     "delete_questions_for_chapter",
     "get_question_by_id",
+    # TOC transaction DAOs
+    "update_toc_with_transaction",
+    "add_chapter_with_transaction",
+    "update_chapter_with_transaction",
+    "delete_chapter_with_transaction",
+    "reorder_chapters_with_transaction",
 ]

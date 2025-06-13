@@ -47,6 +47,13 @@ from app.db.database import (
     create_book, get_book_by_id, get_books_by_user, 
     update_book, delete_book
 )
+from app.db.toc_transactions import (
+    update_toc_with_transaction,
+    add_chapter_with_transaction,
+    update_chapter_with_transaction,
+    delete_chapter_with_transaction,
+    reorder_chapters_with_transaction,
+)
 from app.api.dependencies import (
     rate_limit, audit_request, sanitize_input, get_rate_limiter
 )
@@ -1092,17 +1099,8 @@ async def update_book_toc(
 ):
     """
     Update the Table of Contents for a book.
-    Saves user edits to the TOC structure.
+    Saves user edits to the TOC structure with transaction support.
     """
-    # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to update this book's TOC"
-        )
-
     # Validate TOC data
     toc_data = data.get("toc", {})
     if not isinstance(toc_data, dict):
@@ -1127,33 +1125,39 @@ async def update_book_toc(
                 status_code=400, detail=f"Chapter {i} must have a title"
             )
 
-    # Get current TOC to preserve metadata
-    current_toc = book.get("table_of_contents", {})
+    try:
+        # Update TOC with transaction
+        updated_toc = await update_toc_with_transaction(
+            book_id=book_id,
+            toc_data=toc_data,
+            user_clerk_id=current_user.get("clerk_id")
+        )
 
-    # Update TOC data
-    updated_toc = {
-        **toc_data,
-        "generated_at": current_toc.get("generated_at"),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "edited",
-        "version": current_toc.get("version", 1) + 1,
-    }
-
-    # Save to database
-    update_data = {
-        "table_of_contents": updated_toc,
-        "updated_at": datetime.now(timezone.utc),
-    }
-    await update_book(book_id, update_data, current_user.get("clerk_id"))
-
-    return {
-        "book_id": book_id,
-        "toc": toc_data,
-        "updated_at": updated_toc["updated_at"],
-        "version": updated_toc["version"],
-        "chapters_count": len(chapters),
-        "success": True,
-    }
+        return {
+            "book_id": book_id,
+            "toc": toc_data,
+            "updated_at": updated_toc["updated_at"],
+            "version": updated_toc["version"],
+            "chapters_count": len(chapters),
+            "success": True,
+        }
+    except ValueError as e:
+        if "Version conflict" in str(e):
+            raise HTTPException(
+                status_code=409,
+                detail="The TOC has been modified by another user. Please refresh and try again."
+            )
+        elif "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Book not found")
+        elif "not authorized" in str(e).lower():
+            raise HTTPException(
+                status_code=403, detail="Not authorized to update this book's TOC"
+            )
+        else:
+            raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error updating TOC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update TOC")
 
 
 # Individual Chapter CRUD Operations
@@ -1170,94 +1174,59 @@ async def create_chapter(
     """
     Create a new chapter in the book's TOC.
     Can be used to add a new chapter at any level (chapter or subchapter).
+    Uses transaction to ensure atomic operation.
     """
-    # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to modify this book's chapters"
+    try:
+        # Prepare chapter data
+        chapter_dict = {
+            "title": chapter_data.title,
+            "description": chapter_data.description or "",
+            "level": chapter_data.level,
+            "order": chapter_data.order,
+            "status": "draft",
+            "word_count": 0,
+            "estimated_reading_time": 0,
+            "is_active_tab": False,
+        }
+        
+        # Add chapter with transaction
+        new_chapter = await add_chapter_with_transaction(
+            book_id=book_id,
+            chapter_data=chapter_dict,
+            parent_id=chapter_data.parent_id if chapter_data.level > 1 else None,
+            user_clerk_id=current_user.get("clerk_id")
         )
-
-    # Get current TOC
-    current_toc = book.get("table_of_contents", {})
-    chapters = current_toc.get("chapters", [])
-
-    # Generate unique chapter ID
-    import uuid
-
-    chapter_id = str(uuid.uuid4())  # Prepare new chapter data
-    new_chapter = {
-        "id": chapter_id,
-        "title": chapter_data.title,
-        "description": chapter_data.description or "",
-        "level": chapter_data.level,
-        "order": chapter_data.order,
-        "subchapters": [],
-        # NEW METADATA FIELDS
-        "status": "draft",
-        "word_count": 0,
-        "last_modified": datetime.now(timezone.utc),
-        "estimated_reading_time": 0,
-        "is_active_tab": False,
-    }
-
-    # If this is a subchapter (level > 1), add it to the parent
-    if chapter_data.level > 1 and chapter_data.parent_id:
-        parent_found = False
-
-        def add_to_parent(chapter_list):
-            nonlocal parent_found
-            for chapter in chapter_list:
-                if chapter.get("id") == chapter_data.parent_id:
-                    chapter.setdefault("subchapters", []).append(new_chapter)
-                    parent_found = True
-                    return True
-                # Recursively check subchapters
-                if chapter.get("subchapters"):
-                    if add_to_parent(chapter["subchapters"]):
-                        return True
-            return False
-
-        if not add_to_parent(chapters):
+        
+        # Log chapter creation
+        await chapter_access_service.log_access(
+            user_id=current_user.get("clerk_id"),
+            book_id=book_id,
+            chapter_id=new_chapter["id"],
+            access_type="create",
+            metadata={"chapter_title": chapter_data.title, "level": chapter_data.level},
+        )
+        
+        return {
+            "book_id": book_id,
+            "chapter": new_chapter,
+            "chapter_id": new_chapter["id"],
+            "success": True,
+            "message": "Chapter created successfully",
+        }
+    except ValueError as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Book not found")
+        elif "not authorized" in str(e).lower():
+            raise HTTPException(
+                status_code=403, detail="Not authorized to modify this book's chapters"
+            )
+        elif "Parent chapter not found" in str(e):
             raise HTTPException(status_code=400, detail="Parent chapter not found")
-
-    else:
-        # This is a top-level chapter
-        chapters.append(new_chapter)
-
-    # Update TOC data
-    updated_toc = {
-        **current_toc,
-        "chapters": chapters,
-        "total_chapters": len([ch for ch in chapters]),  # Count top-level chapters
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "edited",
-        "version": current_toc.get("version", 1) + 1,
-    }  # Save to database
-    update_data = {
-        "table_of_contents": updated_toc,
-        "updated_at": datetime.now(timezone.utc),
-    }
-    await update_book(book_id, update_data, current_user.get("clerk_id"))
-
-    # Log chapter creation
-    await chapter_access_service.log_access(
-        user_id=current_user.get("clerk_id"),
-        book_id=book_id,
-        chapter_id=chapter_id,
-        access_type="create",
-        metadata={"chapter_title": chapter_data.title, "level": chapter_data.level},
-    )
-
-    return {
-        "book_id": book_id,
-        "chapter": new_chapter,
-        "chapter_id": chapter_id,
-        "success": True,
-        "message": "Chapter created successfully",
-    }
+        else:
+            raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error creating chapter: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create chapter")
 
 
 @router.get("/{book_id}/chapters/{chapter_id}", response_model=dict)
@@ -1316,81 +1285,73 @@ async def update_chapter(
 ):
     """
     Update a specific chapter in the book's TOC.
+    Uses transaction to ensure atomic operation.
     """
-    # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to modify this book's chapters"
+    try:
+        # Build updates dict
+        updates = {}
+        if chapter_data.title is not None:
+            updates["title"] = chapter_data.title
+        if chapter_data.description is not None:
+            updates["description"] = chapter_data.description
+        if chapter_data.level is not None:
+            updates["level"] = chapter_data.level
+        if chapter_data.order is not None:
+            updates["order"] = chapter_data.order
+        if chapter_data.metadata is not None:
+            updates["metadata"] = chapter_data.metadata
+            
+        # Update chapter with transaction
+        updated_chapter = await update_chapter_with_transaction(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            updates=updates,
+            user_clerk_id=current_user.get("clerk_id")
         )
-
-    # Get current TOC
-    current_toc = book.get("table_of_contents", {})
-    chapters = current_toc.get("chapters", [])
-
-    def update_chapter_in_list(chapter_list):
-        for i, chapter in enumerate(chapter_list):
-            if chapter.get("id") == chapter_id:
-                # Update the chapter with provided data
-                if chapter_data.title is not None:
-                    chapter["title"] = chapter_data.title
-                if chapter_data.description is not None:
-                    chapter["description"] = chapter_data.description
-                if chapter_data.level is not None:
-                    chapter["level"] = chapter_data.level
-                if chapter_data.order is not None:
-                    chapter["order"] = chapter_data.order
-                if chapter_data.metadata is not None:
-                    chapter["metadata"] = chapter_data.metadata
-                return True
-            # Recursively search subchapters
-            if chapter.get("subchapters"):
-                if update_chapter_in_list(chapter["subchapters"]):
-                    return True
-        return False
-
-    if not update_chapter_in_list(chapters):
-        raise HTTPException(status_code=404, detail="Chapter not found")
-
-    # Update TOC data
-    updated_toc = {
-        **current_toc,
-        "chapters": chapters,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "edited",
-        "version": current_toc.get("version", 1) + 1,
-    }  # Save to database
-    update_data = {
-        "table_of_contents": updated_toc,
-        "updated_at": datetime.now(timezone.utc),
-    }
-    await update_book(book_id, update_data, current_user.get("clerk_id"))
-
-    # Log chapter update
-    await chapter_access_service.log_access(
-        user_id=current_user.get("clerk_id"),
-        book_id=book_id,
-        chapter_id=chapter_id,
-        access_type="edit",
-        metadata={
-            "updated_fields": {
-                "title": chapter_data.title is not None,
-                "description": chapter_data.description is not None,
-                "level": chapter_data.level is not None,
-                "order": chapter_data.order is not None,
-                "metadata": chapter_data.metadata is not None,
-            }
-        },
-    )
-
-    return {
-        "book_id": book_id,
-        "chapter_id": chapter_id,
-        "success": True,
-        "message": "Chapter updated successfully",
-    }
+        
+        # Log chapter update
+        await chapter_access_service.log_access(
+            user_id=current_user.get("clerk_id"),
+            book_id=book_id,
+            chapter_id=chapter_id,
+            access_type="edit",
+            metadata={
+                "updated_fields": {
+                    "title": chapter_data.title is not None,
+                    "description": chapter_data.description is not None,
+                    "level": chapter_data.level is not None,
+                    "order": chapter_data.order is not None,
+                    "metadata": chapter_data.metadata is not None,
+                }
+            },
+        )
+        
+        return {
+            "book_id": book_id,
+            "chapter_id": chapter_id,
+            "success": True,
+            "message": "Chapter updated successfully",
+        }
+    except ValueError as e:
+        if "not found" in str(e).lower():
+            if "Chapter" in str(e):
+                raise HTTPException(status_code=404, detail="Chapter not found")
+            else:
+                raise HTTPException(status_code=404, detail="Book not found")
+        elif "not authorized" in str(e).lower():
+            raise HTTPException(
+                status_code=403, detail="Not authorized to modify this book's chapters"
+            )
+        elif "Concurrent modification" in str(e):
+            raise HTTPException(
+                status_code=409,
+                detail="The chapter has been modified by another user. Please refresh and try again."
+            )
+        else:
+            raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error updating chapter: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update chapter")
 
 
 @router.delete("/{book_id}/chapters/{chapter_id}", response_model=dict)
@@ -1401,78 +1362,46 @@ async def delete_chapter(
 ):
     """
     Delete a specific chapter from the book's TOC.
-    Note: Deleting a chapter will also delete all its subchapters.
+    Note: Deleting a chapter will also delete all its subchapters and related questions.
+    Uses transaction to ensure atomic operation.
     """
-    # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to modify this book's chapters"
-        )
-
-    # Get current TOC
-    current_toc = book.get("table_of_contents", {})
-    chapters = current_toc.get("chapters", [])
-
-    def delete_chapter_from_list(chapter_list):
-        for i, chapter in enumerate(chapter_list):
-            if chapter.get("id") == chapter_id:
-                # Remove the chapter
-                deleted_chapter = chapter_list.pop(i)
-                return deleted_chapter
-            # Recursively search subchapters
-            if chapter.get("subchapters"):
-                deleted = delete_chapter_from_list(chapter["subchapters"])
-                if deleted:
-                    return deleted
-                return None
-
-    deleted_chapter = delete_chapter_from_list(chapters)
-    if not deleted_chapter:
-        raise HTTPException(status_code=404, detail="Chapter not found")
-
-    # Log chapter access for deletion
     try:
-        await chapter_access_service.log_access(
-            user_id=current_user.get("clerk_id"),
+        # Delete chapter with transaction
+        success = await delete_chapter_with_transaction(
             book_id=book_id,
             chapter_id=chapter_id,
-            action="delete",
-            metadata={
-                "chapter_title": deleted_chapter.get("title", ""),
-                "had_subchapters": bool(deleted_chapter.get("subchapters")),
-                "deletion_timestamp": datetime.now(timezone.utc).isoformat(),
-            },
+            user_clerk_id=current_user.get("clerk_id")
         )
+        
+        # Log chapter access for deletion was moved to transaction
+        
+        return {
+            "book_id": book_id,
+            "chapter_id": chapter_id,
+            "success": True,
+            "message": "Chapter deleted successfully",
+        }
+    except ValueError as e:
+        if "not found" in str(e).lower():
+            if "Chapter" in str(e):
+                raise HTTPException(status_code=404, detail="Chapter not found")
+            else:
+                raise HTTPException(status_code=404, detail="Book not found")
+        elif "not authorized" in str(e).lower():
+            raise HTTPException(
+                status_code=403, detail="Not authorized to modify this book's chapters"
+            )
+        elif "Concurrent modification" in str(e):
+            raise HTTPException(
+                status_code=409,
+                detail="The TOC has been modified by another user. Please refresh and try again."
+            )
+        else:
+            raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # Log error but don't fail the deletion
-        print(f"Failed to log chapter deletion access: {e}")
+        print(f"Error deleting chapter: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete chapter")
 
-    # Update TOC data
-    updated_toc = {
-        **current_toc,
-        "chapters": chapters,
-        "total_chapters": len([ch for ch in chapters]),  # Recount top-level chapters
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "edited",
-        "version": current_toc.get("version", 1) + 1,
-    }
-
-    # Save to database
-    update_data = {
-        "table_of_contents": updated_toc,
-        "updated_at": datetime.now(timezone.utc),
-    }
-    await update_book(book_id, update_data, current_user.get("clerk_id"))
-
-    return {
-        "book_id": book_id,
-        "deleted_chapter": deleted_chapter,
-        "success": True,
-        "message": "Chapter deleted successfully",
-    }
 
 
 @router.get("/{book_id}/chapters", response_model=dict)

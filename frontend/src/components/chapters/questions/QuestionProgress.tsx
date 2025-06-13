@@ -60,7 +60,7 @@ export default function QuestionProgress({
   );
   
   return (
-    <div className="space-y-2">
+    <section aria-label="Question progress" className="space-y-2" role="region">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium">Progress</h4>
         
@@ -107,7 +107,17 @@ export default function QuestionProgress({
       </div>
       
       {/* Progress bar */}
-      <Progress value={progressPercentage} className="h-2" />
+      <div
+        role="progressbar"
+        aria-label="Question progress"
+        aria-valuenow={Math.round(progressPercentage)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="w-full"
+        data-testid="question-progressbar"
+      >
+        <Progress value={progressPercentage} className="h-2" />
+      </div>
       
       {/* Question position indicator */}
       <div className="flex justify-between text-xs text-muted-foreground">
@@ -155,6 +165,6 @@ export default function QuestionProgress({
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

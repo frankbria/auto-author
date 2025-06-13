@@ -70,3 +70,10 @@ export function setupSpeechRecognitionMock(config = {}) {
   window.webkitSpeechRecognition = jest.fn(() => mockInstance);
   return mockInstance;
 }
+
+describe('MockSpeechRecognition', () => {
+  it('should instantiate with default values', () => {
+    const mock = new MockSpeechRecognition();
+    expect(mock.lang).toBe('en-US');
+  });
+});

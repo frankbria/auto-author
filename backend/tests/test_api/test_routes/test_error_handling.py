@@ -6,7 +6,7 @@ from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.main import app
 from app.core import security
-from app.core.security import get_current_user, security
+from app.core.security import get_current_user
 from app.db import database
 from app.api.endpoints import users as users_endpoint
 import app.db.user as users_dao
@@ -22,7 +22,8 @@ async def test_error_handling_database_connection(auth_client_factory, monkeypat
     api_client = await auth_client_factory()
     
     # Define the function that will raise an exception with the correct signature
-    async def explode(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    from app.core.security import security as http_security
+    async def explode(credentials: HTTPAuthorizationCredentials = Depends(http_security)):
         raise Exception("Database connection error")
 
     # Override AFTER client creation to ensure it takes precedence
@@ -128,7 +129,9 @@ async def test_error_handling_third_party_service(auth_client_factory, monkeypat
     async def api_failure(*args, **kwargs):
         return None
 
-    monkeypatch.setattr(security, "get_clerk_user", api_failure)
+    # Patch the module where get_clerk_user is defined
+    import app.core.security as sec_module
+    monkeypatch.setattr(sec_module, "get_clerk_user", api_failure)
 
     # Make request that will trigger clerk error
     response = await api_client.get("/api/v1/users/me/clerk-data")

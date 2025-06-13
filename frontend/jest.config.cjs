@@ -16,6 +16,7 @@ const customJestConfig = {
     '^@/app/(.*)$': '<rootDir>/src/app/$1',
   },
   transformIgnorePatterns: ['/node_modules/'],
+  testPathIgnorePatterns: ['<rootDir>/src/e2e/'],
 }
 
 module.exports = createJestConfig(customJestConfig)

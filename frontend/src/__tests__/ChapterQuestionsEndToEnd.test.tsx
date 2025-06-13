@@ -14,16 +14,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 
 // Components under test
-import ChapterPage from '@/pages/books/[bookId]/chapters/[chapterId]';
-import QuestionContainer from '@/components/chapters/questions/QuestionContainer';
-import ChapterTabs from '@/components/chapters/ChapterTabs';
-import { QuestionType, QuestionDifficulty, ResponseStatus } from '@/types/chapter-questions';
-import { bookClient } from '@/lib/api/bookClient';
-import { draftClient } from '@/lib/api/draftClient';
+import QuestionContainer from '../components/chapters/questions/QuestionContainer';
+import ChapterTabs from '../components/chapters/ChapterTabs';
+import { QuestionType, QuestionDifficulty, ResponseStatus } from '../types/chapter-questions';
+import bookClient from '../lib/api/bookClient';
 
 // Mock all API clients
-jest.mock('@/lib/api/bookClient', () => ({
-  bookClient: {
+jest.mock('../lib/api/bookClient', () => {
+  const mockBookClient = {
     getBook: jest.fn(),
     getChapter: jest.fn(),
     getChapterQuestions: jest.fn(),
@@ -34,10 +32,20 @@ jest.mock('@/lib/api/bookClient', () => ({
     rateQuestion: jest.fn(),
     regenerateChapterQuestions: jest.fn(),
     updateChapterStatus: jest.fn(),
-  }
-}));
+    getToc: jest.fn(),
+    getChaptersMetadata: jest.fn(),
+    getTabState: jest.fn(),
+    saveTabState: jest.fn(),
+  };
+  
+  return {
+    __esModule: true,
+    default: mockBookClient,
+    bookClient: mockBookClient
+  };
+});
 
-jest.mock('@/lib/api/draftClient', () => ({
+jest.mock('../lib/api/draftClient', () => ({
   draftClient: {
     generateChapterDraft: jest.fn(),
     getDraftContent: jest.fn(),
@@ -46,10 +54,8 @@ jest.mock('@/lib/api/draftClient', () => ({
 }));
 
 // Mock notifications
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({
-    toast: jest.fn()
-  })
+jest.mock('../lib/toast', () => ({
+  toast: jest.fn()
 }));
 
 // Mock router
@@ -96,7 +102,7 @@ describe('Chapter Questions End-to-End Tests', () => {
       id: 'q1',
       chapter_id: 'test-chapter-id',
       question_text: 'What are the main learning objectives for this chapter?',
-      question_type: QuestionType.EDUCATIONAL,
+      question_type: QuestionType.RESEARCH,
       difficulty: QuestionDifficulty.MEDIUM,
       category: 'objectives',
       order: 1,
@@ -115,7 +121,7 @@ describe('Chapter Questions End-to-End Tests', () => {
       id: 'q2',
       chapter_id: 'test-chapter-id',
       question_text: 'Who is the target audience for this content?',
-      question_type: QuestionType.AUDIENCE,
+      question_type: QuestionType.CHARACTER,
       difficulty: QuestionDifficulty.EASY,
       category: 'planning',
       order: 2,
@@ -134,7 +140,7 @@ describe('Chapter Questions End-to-End Tests', () => {
       id: 'q3',
       chapter_id: 'test-chapter-id',
       question_text: 'What practical examples should be included?',
-      question_type: QuestionType.CONTENT,
+      question_type: QuestionType.PLOT,
       difficulty: QuestionDifficulty.MEDIUM,
       category: 'examples',
       order: 3,

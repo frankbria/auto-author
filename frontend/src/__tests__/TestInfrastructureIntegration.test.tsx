@@ -3,6 +3,7 @@
  * Ensures that our new test infrastructure works correctly with existing tests
  */
 
+import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
@@ -61,14 +62,17 @@ describe('Test Infrastructure Integration', () => {
       expect(typeof render).toBe('function');
       expect(typeof screen).toBe('object');
       expect(typeof fireEvent).toBe('object');
+      expect(typeof fireEvent.click).toBe('function');
       expect(typeof userEvent.setup).toBe('function');
     });
 
     it('should have jest-dom matchers available', () => {
       const div = document.createElement('div');
       div.textContent = 'Hello World';
+      document.body.appendChild(div); // Need to add to DOM first
       expect(div).toBeInTheDocument();
       expect(div).toHaveTextContent('Hello World');
+      document.body.removeChild(div); // Clean up
     });
   });
 

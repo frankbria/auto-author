@@ -13,6 +13,7 @@ import QuestionGenerator from './QuestionGenerator';
 import QuestionDisplay from './QuestionDisplay';
 import QuestionProgress from './QuestionProgress';
 import QuestionNavigation from './QuestionNavigation';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 interface QuestionContainerProps {
   bookId: string;
@@ -37,6 +38,10 @@ export default function QuestionContainer({
   const [progress, setProgress] = useState<QuestionProgressResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const isTablet = useMediaQuery('(min-width: 768px) and (max-width: 1023px)');
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  
   // Fetch questions on initial load
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -54,7 +59,6 @@ export default function QuestionContainer({
         setLoading(false);
       }
     };
-    
     fetchQuestions();
   }, [bookId, chapterId]);
   
@@ -108,10 +112,10 @@ export default function QuestionContainer({
   };
   
   // Regenerate specific question
-  const handleRegenerateQuestion = async (questionId: string) => {
-    // Implementation for regenerating a specific question
-    // Will be added in a future PR
-  };
+  // const handleRegenerateQuestion = async (questionId: string) => {
+  //   // Implementation for regenerating a specific question
+  //   // Will be added in a future PR
+  // };
   
   // Navigation handlers
   const handleNextQuestion = () => {
@@ -147,7 +151,7 @@ export default function QuestionContainer({
       <div className="space-y-4 p-4">
         <h2 className="text-2xl font-bold">Interview Questions</h2>
         <p className="text-muted-foreground">
-          Generate interview-style questions to help develop content for "{chapterTitle}".
+          Generate interview-style questions to help develop content for &quot;{chapterTitle}&quot;.
           These questions will guide you through key aspects of your chapter.
         </p>
         
@@ -176,9 +180,14 @@ export default function QuestionContainer({
   
   // Show the current question
   const currentQuestion = questions[currentQuestionIndex];
-  
+
   return (
-    <div className="space-y-6 p-4">
+    <main
+      className={`space-y-6 p-4 ${isMobile ? 'mobile-layout' : isTablet ? 'tablet-layout' : isDesktop ? 'desktop-layout' : ''}`}
+      role="main"
+      aria-label="Chapter questions interface"
+      data-testid="question-container"
+    >
       {/* Progress bar */}
       {progress && (
         <QuestionProgress 
@@ -195,7 +204,7 @@ export default function QuestionContainer({
           chapterId={chapterId}
           question={currentQuestion}
           onResponseSaved={handleResponseSaved}
-          onRegenerateQuestion={handleRegenerateQuestion}
+          onRegenerateQuestion={() => { /* TODO: implement regenerate question */ }}
         />
       )}
       
@@ -215,6 +224,6 @@ export default function QuestionContainer({
           <p>{error}</p>
         </div>
       )}
-    </div>
+    </main>
   );
 }
