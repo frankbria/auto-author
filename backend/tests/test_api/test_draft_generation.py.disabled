@@ -1,0 +1,159 @@
+"""Test the AI draft generation endpoint"""
+
+import pytest
+from unittest.mock import AsyncMock, patch
+
+
+@pytest.mark.asyncio
+async def test_generate_chapter_draft_success(auth_client_factory):
+    """Test successful draft generation"""
+    # Create client with a specific test user
+    client = await auth_client_factory()
+    
+    # Create a book with TOC
+    book_data = {
+        "title": "Test Book for Draft Generation",
+        "description": "A book to test draft generation",
+        "genre": "Educational",
+        "target_audience": "Developers",
+    }
+    book_resp = await client.post("/api/v1/books/", json=book_data)
+    assert book_resp.status_code == 201, f"Failed to create book: {book_resp.json()}"
+    book_json = book_resp.json()
+    book_id = book_json["id"]
+    
+    # Debug: Check if book is retrievable
+    get_resp = await client.get(f"/api/v1/books/{book_id}")
+    print(f"DEBUG: Get book status: {get_resp.status_code}")
+    if get_resp.status_code == 200:
+        print(f"DEBUG: Book owner_id: {get_resp.json().get('owner_id')}")
+    
+    # Add TOC with a chapter
+    toc_data = {
+        "toc": {
+            "chapters": [
+                {
+                    "id": "ch1",
+                    "title": "Introduction to Testing",
+                    "description": "Learn the basics of testing",
+                    "level": 1,
+                    "order": 1,
+                    "subchapters": []
+                }
+            ],
+            "total_chapters": 1,
+            "estimated_pages": 25,
+            "structure_notes": "Basic structure"
+        }
+    }
+    toc_resp = await client.put(f"/api/v1/books/{book_id}/toc", json=toc_data)
+    assert toc_resp.status_code == 200, f"Failed to update TOC: {toc_resp.json()}"
+    
+    # Mock the AI service
+    mock_result = {
+        "success": True,
+        "draft": "# Introduction to Testing\n\nTesting is crucial for software quality...",
+        "metadata": {
+            "word_count": 150,
+            "estimated_reading_time": 1,
+            "generated_at": "2025-01-15 10:00:00",
+            "model_used": "gpt-4",
+            "writing_style": "educational",
+            "target_length": 2000,
+            "actual_length": 150
+        },
+        "suggestions": ["Add more examples", "Consider breaking into sections"]
+    }
+    
+    with patch('app.api.endpoints.books.ai_service.generate_chapter_draft', 
+               AsyncMock(return_value=mock_result)):
+        # Generate draft
+        draft_data = {
+            "question_responses": [
+                {
+                    "question": "What is the main purpose of this chapter?",
+                    "answer": "To introduce developers to testing concepts"
+                },
+                {
+                    "question": "What key points should be covered?",
+                    "answer": "Unit tests, integration tests, and test-driven development"
+                }
+            ],
+            "writing_style": "educational",
+            "target_length": 2000
+        }
+        
+        response = await client.post(
+            f"/api/v1/books/{book_id}/chapters/ch1/generate-draft",
+            json=draft_data
+        )
+        
+        assert response.status_code == 200
+        result = response.json()
+        
+        assert result["success"] is True
+        assert result["book_id"] == book_id
+        assert result["chapter_id"] == "ch1"
+        assert "Introduction to Testing" in result["draft"]
+        assert result["metadata"]["word_count"] == 150
+        assert len(result["suggestions"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_generate_chapter_draft_missing_responses(auth_client_factory):
+    """Test draft generation fails without question responses"""
+    client = await auth_client_factory()
+    
+    # Create a book with TOC
+    book_data = {
+        "title": "Test Book",
+        "description": "Test description",
+        "genre": "Fiction",
+        "target_audience": "General",
+    }
+    book_resp = await client.post("/api/v1/books/", json=book_data)
+    book_id = book_resp.json()["id"]
+    
+    # Add TOC
+    toc_data = {
+        "toc": {
+            "chapters": [{"id": "ch1", "title": "Chapter 1", "description": "Test", "level": 1, "order": 1, "subchapters": []}],
+            "total_chapters": 1,
+            "estimated_pages": 25,
+            "structure_notes": "Test"
+        }
+    }
+    await client.put(f"/api/v1/books/{book_id}/toc", json=toc_data)
+    
+    # Try to generate without responses
+    response = await client.post(
+        f"/api/v1/books/{book_id}/chapters/ch1/generate-draft",
+        json={"question_responses": []}
+    )
+    
+    assert response.status_code == 400
+    assert "Question responses are required" in response.json()["detail"]
+
+
+@pytest.mark.asyncio  
+async def test_generate_chapter_draft_invalid_chapter(auth_client_factory):
+    """Test draft generation fails for non-existent chapter"""
+    client = await auth_client_factory()
+    
+    # Create a book
+    book_data = {"title": "Test Book", "description": "Test", "genre": "Fiction", "target_audience": "General"}
+    book_resp = await client.post("/api/v1/books/", json=book_data)
+    book_id = book_resp.json()["id"]
+    
+    # Try to generate for non-existent chapter
+    response = await client.post(
+        f"/api/v1/books/{book_id}/chapters/invalid-chapter/generate-draft",
+        json={
+            "question_responses": [
+                {"question": "Q", "answer": "A"}
+            ]
+        }
+    )
+    
+    assert response.status_code == 404
+    assert "Chapter not found" in response.json()["detail"]

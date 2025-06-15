@@ -15,7 +15,8 @@ interface TabContentProps {
 
 export function TabContent({ 
   bookId, 
-  activeChapterId, 
+  activeChapterId,
+  chapters,
   onContentChange,
   onChapterSave,
   'data-testid': testId
@@ -31,12 +32,17 @@ export function TabContent({
     );
   }
 
+  // Find the active chapter to get its title
+  const activeChapter = chapters.find(ch => ch.id === activeChapterId);
+  const chapterTitle = activeChapter?.title || 'Untitled Chapter';
+
   return (
     <div className="flex-1 overflow-hidden" data-testid={testId}>
       <ErrorBoundary fallback={<div>Something went wrong with this chapter</div>}>
         <ChapterEditor
           bookId={bookId}
           chapterId={activeChapterId}
+          chapterTitle={chapterTitle}
           onSave={(content: string) => {
             if (onChapterSave) {
               onChapterSave(activeChapterId, content);

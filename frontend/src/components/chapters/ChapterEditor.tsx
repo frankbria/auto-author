@@ -44,10 +44,12 @@ import {
   Minus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DraftGenerator } from './DraftGenerator';
 
 interface ChapterEditorProps {
   bookId: string;
   chapterId: string;
+  chapterTitle?: string;
   initialContent?: string;
   onSave?: (content: string) => void;
   onContentChange?: (content: string) => void;
@@ -55,7 +57,8 @@ interface ChapterEditorProps {
 
 export function ChapterEditor({ 
   bookId, 
-  chapterId, 
+  chapterId,
+  chapterTitle = 'Untitled Chapter',
   initialContent = '', 
   onSave,
   onContentChange
@@ -187,6 +190,15 @@ export function ChapterEditor({
     }
   };
 
+  const handleDraftGenerated = (draft: string) => {
+    if (editor) {
+      // Insert the draft at the current cursor position
+      editor.chain().focus().insertContent(draft).run();
+      // Trigger auto-save
+      setAutoSavePending(true);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -207,7 +219,8 @@ export function ChapterEditor({
       )}
       
       {/* Editor Toolbar */}
-      <div className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center">
+      <div className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center justify-between">
+        <div className="flex flex-wrap gap-1 items-center">
         <Button
           variant="ghost"
           size="sm"
@@ -402,6 +415,15 @@ export function ChapterEditor({
         >
           <Minus className="h-4 w-4" />
         </Button>
+        </div>
+        
+        {/* AI Draft Generator */}
+        <DraftGenerator
+          bookId={bookId}
+          chapterId={chapterId}
+          chapterTitle={chapterTitle}
+          onDraftGenerated={handleDraftGenerated}
+        />
       </div>
       
       {/* Editor Content */}

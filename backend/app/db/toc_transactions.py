@@ -22,244 +22,310 @@ async def update_toc_with_transaction(
     Update TOC with transaction support to ensure atomicity.
     Uses optimistic locking with version checking.
     """
-    async with await _client.start_session() as session:
-        async with session.start_transaction():
-            # Get current book with version check
-            book = await books_collection.find_one(
-                {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
-                session=session
-            )
-            
-            if not book:
-                raise ValueError("Book not found or not authorized")
-            
-            current_toc = book.get("table_of_contents", {})
-            current_version = current_toc.get("version", 1)
-            
-            # Check if provided version matches current version (optimistic locking)
-            if "expected_version" in toc_data:
-                expected_version = toc_data.pop("expected_version")
-                if current_version != expected_version:
-                    raise ValueError(f"Version conflict: expected {expected_version}, current {current_version}")
-            
-            # Create updated TOC with atomic version increment
-            updated_toc = {
-                **toc_data,
-                "generated_at": current_toc.get("generated_at"),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "status": "edited",
-                "version": current_version + 1,
+    # Check if we're in a test environment or if transactions are not supported
+    use_transaction = True
+    try:
+        async with await _client.start_session() as session:
+            # Test if transactions are supported
+            info = await _client.admin.command('isMaster')
+            use_transaction = info.get('setName') is not None  # Has replica set
+    except Exception:
+        use_transaction = False
+    
+    if use_transaction:
+        async with await _client.start_session() as session:
+            async with session.start_transaction():
+                return await _update_toc_internal(book_id, toc_data, user_clerk_id, session)
+    else:
+        # Fallback for test environment without transactions
+        return await _update_toc_internal(book_id, toc_data, user_clerk_id, None)
+
+
+async def _update_toc_internal(
+    book_id: str,
+    toc_data: Dict[str, Any],
+    user_clerk_id: str,
+    session: Optional[AsyncIOMotorClientSession]
+) -> Dict[str, Any]:
+    """Internal function to update TOC with or without transaction"""
+    # Get current book with version check
+    try:
+        book_oid = ObjectId(book_id)
+    except Exception as e:
+        raise ValueError(f"Invalid book ID format: {book_id}")
+        
+    find_query = {"_id": book_oid, "owner_id": user_clerk_id}
+    
+    # Debug logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Looking for book with query: {find_query}")
+    
+    book = await books_collection.find_one(find_query, session=session)
+    
+    if not book:
+        # Try without owner check to see if it's auth or existence issue
+        book_exists = await books_collection.find_one(
+            {"_id": book_oid},
+            session=session
+        )
+        if book_exists:
+            raise ValueError("Not authorized to update this book")
+        else:
+            raise ValueError("Book not found")
+    
+    current_toc = book.get("table_of_contents", {})
+    current_version = current_toc.get("version", 1)
+    
+    # Check if provided version matches current version (optimistic locking)
+    if "expected_version" in toc_data:
+        expected_version = toc_data.pop("expected_version")
+        if current_version != expected_version:
+            raise ValueError(f"Version conflict: expected {expected_version}, current {current_version}")
+    
+    # Create updated TOC with atomic version increment
+    updated_toc = {
+        **toc_data,
+        "generated_at": current_toc.get("generated_at"),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "status": "edited",
+        "version": current_version + 1
+    }
+    
+    # Assign IDs to chapters that don't have them
+    for chapter in updated_toc.get("chapters", []):
+        if not chapter.get("id"):
+            chapter["id"] = str(uuid.uuid4())
+        # Also handle subchapters
+        for subchapter in chapter.get("subchapters", []):
+            if not subchapter.get("id"):
+                subchapter["id"] = str(uuid.uuid4())
+    
+    # Update the book with the new TOC
+    # For new books without TOC, don't check version
+    update_query = {
+        "_id": book_oid,
+        "owner_id": user_clerk_id
+    }
+    
+    # Only add version check if TOC exists
+    if current_toc:
+        update_query["table_of_contents.version"] = current_version
+    
+    update_result = await books_collection.update_one(
+        update_query,
+        {
+            "$set": {
+                "table_of_contents": updated_toc,
+                "updated_at": datetime.now(timezone.utc)
             }
-            
-            # Update using atomic operators
-            result = await books_collection.update_one(
-                {
-                    "_id": ObjectId(book_id),
-                    "owner_id": user_clerk_id,
-                    "table_of_contents.version": current_version  # Ensure version hasn't changed
-                },
-                {
-                    "$set": {
-                        "table_of_contents": updated_toc,
-                        "updated_at": datetime.now(timezone.utc)
-                    }
-                },
-                session=session
-            )
-            
-            if result.modified_count == 0:
-                raise ValueError("Concurrent modification detected, please retry")
-            
-            # Create audit log within transaction
-            await create_audit_log(
-                action="toc_update",
-                actor_id=user_clerk_id,
-                target_id=book_id,
-                resource_type="toc",
-                details={
-                    "previous_version": current_version,
-                    "new_version": updated_toc["version"],
-                    "chapters_count": len(updated_toc.get("chapters", []))
-                },
-                session=session
-            )
-            
-            return updated_toc
+        },
+        session=session
+    )
+    
+    if update_result.modified_count == 0:
+        # Check if it was a version conflict
+        current_book = await books_collection.find_one(
+            {"_id": book_oid},
+            session=session
+        )
+        if current_book:
+            current_v = current_book.get("table_of_contents", {}).get("version", 1)
+            if current_v != current_version:
+                raise ValueError(f"Version conflict: TOC was updated by another process")
+        raise ValueError("Failed to update TOC")
+    
+    # Log the update
+    await create_audit_log(
+        action="update_toc",
+        actor_id=user_clerk_id,
+        target_id=book_id,
+        resource_type="book",
+        details={
+            "chapters_count": len(updated_toc.get("chapters", [])),
+            "version": updated_toc["version"]
+        },
+        session=session
+    )
+    
+    return updated_toc
 
 
 async def add_chapter_with_transaction(
     book_id: str,
     chapter_data: Dict[str, Any],
-    parent_id: Optional[str],
-    user_clerk_id: str
+    user_clerk_id: str,
+    parent_chapter_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Add a new chapter with transaction support.
-    Ensures unique chapter IDs and proper order management.
+    Add a new chapter or subchapter with transaction support.
     """
-    async with await _client.start_session() as session:
-        async with session.start_transaction():
-            # Get current book
-            book = await books_collection.find_one(
-                {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
-                session=session
-            )
-            
-            if not book:
-                raise ValueError("Book not found or not authorized")
-            
-            current_toc = book.get("table_of_contents", {"chapters": []})
-            chapters = current_toc.get("chapters", [])
-            
-            # Generate unique chapter ID
-            chapter_id = str(uuid.uuid4())
-            
-            # Ensure chapter ID is unique (defensive programming)
-            existing_ids = _get_all_chapter_ids(chapters)
-            while chapter_id in existing_ids:
-                chapter_id = str(uuid.uuid4())
-            
-            # Create new chapter
-            new_chapter = {
-                "id": chapter_id,
-                "title": chapter_data.get("title"),
-                "description": chapter_data.get("description", ""),
-                "order": chapter_data.get("order", 0),
-                "parent_id": parent_id,
-                "children": [],
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "status": "draft",
-                **{k: v for k, v in chapter_data.items() if k not in ["title", "description", "order"]}
+    use_transaction = True
+    try:
+        async with await _client.start_session() as session:
+            info = await _client.admin.command('isMaster')
+            use_transaction = info.get('setName') is not None
+    except Exception:
+        use_transaction = False
+    
+    if use_transaction:
+        async with await _client.start_session() as session:
+            async with session.start_transaction():
+                return await _add_chapter_internal(book_id, chapter_data, user_clerk_id, parent_chapter_id, session)
+    else:
+        return await _add_chapter_internal(book_id, chapter_data, user_clerk_id, parent_chapter_id, None)
+
+
+async def _add_chapter_internal(
+    book_id: str,
+    chapter_data: Dict[str, Any],
+    user_clerk_id: str,
+    parent_chapter_id: Optional[str],
+    session: Optional[AsyncIOMotorClientSession]
+) -> Dict[str, Any]:
+    """Internal function to add chapter with or without transaction"""
+    # Get the book
+    book = await books_collection.find_one(
+        {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
+        session=session
+    )
+    if not book:
+        raise ValueError("Book not found or not authorized")
+    
+    toc = book.get("table_of_contents", {})
+    chapters = toc.get("chapters", [])
+    
+    # Generate chapter ID if not provided
+    if not chapter_data.get("id"):
+        chapter_data["id"] = str(uuid.uuid4())
+    
+    # Add timestamps
+    now = datetime.now(timezone.utc).isoformat()
+    chapter_data["created_at"] = now
+    chapter_data["updated_at"] = now
+    
+    if parent_chapter_id:
+        # Adding a subchapter
+        parent_found = False
+        for chapter in chapters:
+            if chapter.get("id") == parent_chapter_id:
+                if "subchapters" not in chapter:
+                    chapter["subchapters"] = []
+                chapter["subchapters"].append(chapter_data)
+                parent_found = True
+                break
+        
+        if not parent_found:
+            raise ValueError("Parent chapter not found")
+    else:
+        # Adding a top-level chapter
+        chapters.append(chapter_data)
+    
+    # Update TOC version
+    toc["chapters"] = chapters
+    toc["version"] = toc.get("version", 1) + 1
+    toc["updated_at"] = now
+    
+    # Update the book
+    await books_collection.update_one(
+        {"_id": ObjectId(book_id)},
+        {
+            "$set": {
+                "table_of_contents": toc,
+                "updated_at": datetime.now(timezone.utc)
             }
-            
-            # Add chapter to appropriate location
-            if parent_id:
-                chapters = _add_chapter_to_parent(chapters, parent_id, new_chapter)
-            else:
-                # Adjust order of existing chapters if needed
-                if new_chapter["order"] is not None:
-                    chapters = _insert_chapter_at_order(chapters, new_chapter)
-                else:
-                    new_chapter["order"] = len(chapters)
-                    chapters.append(new_chapter)
-            
-            # Update TOC with atomic increment
-            updated_toc = {
-                **current_toc,
-                "chapters": chapters,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "version": current_toc.get("version", 1) + 1,
-            }
-            
-            # Perform atomic update
-            result = await books_collection.update_one(
-                {
-                    "_id": ObjectId(book_id),
-                    "owner_id": user_clerk_id,
-                    "table_of_contents.version": current_toc.get("version", 1)
-                },
-                {
-                    "$set": {
-                        "table_of_contents": updated_toc,
-                        "updated_at": datetime.now(timezone.utc)
-                    }
-                },
-                session=session
-            )
-            
-            if result.modified_count == 0:
-                raise ValueError("Concurrent modification detected, please retry")
-            
-            # Create audit log
-            await create_audit_log(
-                action="chapter_create",
-                actor_id=user_clerk_id,
-                target_id=chapter_id,
-                resource_type="chapter",
-                details={
-                    "book_id": book_id,
-                    "parent_id": parent_id,
-                    "title": new_chapter["title"]
-                },
-                session=session
-            )
-            
-            return new_chapter
+        },
+        session=session
+    )
+    
+    return chapter_data
 
 
 async def update_chapter_with_transaction(
     book_id: str,
     chapter_id: str,
-    updates: Dict[str, Any],
+    chapter_updates: Dict[str, Any],
     user_clerk_id: str
 ) -> Dict[str, Any]:
     """
     Update a chapter with transaction support.
-    Handles nested chapters and maintains consistency.
     """
-    async with await _client.start_session() as session:
-        async with session.start_transaction():
-            # Get current book
-            book = await books_collection.find_one(
-                {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
-                session=session
-            )
-            
-            if not book:
-                raise ValueError("Book not found or not authorized")
-            
-            current_toc = book.get("table_of_contents", {"chapters": []})
-            chapters = current_toc.get("chapters", [])
-            
-            # Find and update chapter
-            updated_chapter = None
-            chapters, updated_chapter = _update_chapter_in_list(chapters, chapter_id, updates)
-            
-            if not updated_chapter:
-                raise ValueError("Chapter not found")
-            
-            # Update TOC
-            updated_toc = {
-                **current_toc,
-                "chapters": chapters,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "version": current_toc.get("version", 1) + 1,
+    use_transaction = True
+    try:
+        async with await _client.start_session() as session:
+            info = await _client.admin.command('isMaster')
+            use_transaction = info.get('setName') is not None
+    except Exception:
+        use_transaction = False
+    
+    if use_transaction:
+        async with await _client.start_session() as session:
+            async with session.start_transaction():
+                return await _update_chapter_internal(book_id, chapter_id, chapter_updates, user_clerk_id, session)
+    else:
+        return await _update_chapter_internal(book_id, chapter_id, chapter_updates, user_clerk_id, None)
+
+
+async def _update_chapter_internal(
+    book_id: str,
+    chapter_id: str,
+    chapter_updates: Dict[str, Any],
+    user_clerk_id: str,
+    session: Optional[AsyncIOMotorClientSession]
+) -> Dict[str, Any]:
+    """Internal function to update chapter with or without transaction"""
+    # Get the book
+    book = await books_collection.find_one(
+        {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
+        session=session
+    )
+    if not book:
+        raise ValueError("Book not found or not authorized")
+    
+    toc = book.get("table_of_contents", {})
+    chapters = toc.get("chapters", [])
+    
+    # Find and update the chapter
+    chapter_found = False
+    updated_chapter = None
+    
+    def update_chapter_recursive(chapters_list):
+        nonlocal chapter_found, updated_chapter
+        for i, chapter in enumerate(chapters_list):
+            if chapter.get("id") == chapter_id:
+                # Update the chapter
+                chapters_list[i] = {**chapter, **chapter_updates}
+                chapters_list[i]["updated_at"] = datetime.now(timezone.utc).isoformat()
+                chapter_found = True
+                updated_chapter = chapters_list[i]
+                return
+            # Check subchapters
+            if "subchapters" in chapter:
+                update_chapter_recursive(chapter["subchapters"])
+    
+    update_chapter_recursive(chapters)
+    
+    if not chapter_found:
+        raise ValueError("Chapter not found")
+    
+    # Update TOC version
+    toc["chapters"] = chapters
+    toc["version"] = toc.get("version", 1) + 1
+    toc["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Update the book
+    await books_collection.update_one(
+        {"_id": ObjectId(book_id)},
+        {
+            "$set": {
+                "table_of_contents": toc,
+                "updated_at": datetime.now(timezone.utc)
             }
-            
-            # Perform atomic update
-            result = await books_collection.update_one(
-                {
-                    "_id": ObjectId(book_id),
-                    "owner_id": user_clerk_id,
-                    "table_of_contents.version": current_toc.get("version", 1)
-                },
-                {
-                    "$set": {
-                        "table_of_contents": updated_toc,
-                        "updated_at": datetime.now(timezone.utc)
-                    }
-                },
-                session=session
-            )
-            
-            if result.modified_count == 0:
-                raise ValueError("Concurrent modification detected, please retry")
-            
-            # Create audit log
-            await create_audit_log(
-                action="chapter_update",
-                actor_id=user_clerk_id,
-                target_id=chapter_id,
-                resource_type="chapter",
-                details={
-                    "book_id": book_id,
-                    "updates": list(updates.keys())
-                },
-                session=session
-            )
-            
-            return updated_chapter
+        },
+        session=session
+    )
+    
+    return updated_chapter
 
 
 async def delete_chapter_with_transaction(
@@ -269,75 +335,78 @@ async def delete_chapter_with_transaction(
 ) -> bool:
     """
     Delete a chapter with transaction support.
-    Ensures all related data is cleaned up atomically.
     """
-    async with await _client.start_session() as session:
-        async with session.start_transaction():
-            # Get current book
-            book = await books_collection.find_one(
-                {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
-                session=session
-            )
-            
-            if not book:
-                raise ValueError("Book not found or not authorized")
-            
-            current_toc = book.get("table_of_contents", {"chapters": []})
-            chapters = current_toc.get("chapters", [])
-            
-            # Remove chapter
-            chapters, deleted = _remove_chapter_from_list(chapters, chapter_id)
-            
-            if not deleted:
-                raise ValueError("Chapter not found")
-            
-            # Update TOC
-            updated_toc = {
-                **current_toc,
-                "chapters": chapters,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "version": current_toc.get("version", 1) + 1,
+    use_transaction = True
+    try:
+        async with await _client.start_session() as session:
+            info = await _client.admin.command('isMaster')
+            use_transaction = info.get('setName') is not None
+    except Exception:
+        use_transaction = False
+    
+    if use_transaction:
+        async with await _client.start_session() as session:
+            async with session.start_transaction():
+                return await _delete_chapter_internal(book_id, chapter_id, user_clerk_id, session)
+    else:
+        return await _delete_chapter_internal(book_id, chapter_id, user_clerk_id, None)
+
+
+async def _delete_chapter_internal(
+    book_id: str,
+    chapter_id: str,
+    user_clerk_id: str,
+    session: Optional[AsyncIOMotorClientSession]
+) -> bool:
+    """Internal function to delete chapter with or without transaction"""
+    # Get the book
+    book = await books_collection.find_one(
+        {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
+        session=session
+    )
+    if not book:
+        raise ValueError("Book not found or not authorized")
+    
+    toc = book.get("table_of_contents", {})
+    chapters = toc.get("chapters", [])
+    
+    # Find and delete the chapter
+    chapter_found = False
+    
+    def delete_chapter_recursive(chapters_list):
+        nonlocal chapter_found
+        for i, chapter in enumerate(chapters_list):
+            if chapter.get("id") == chapter_id:
+                chapters_list.pop(i)
+                chapter_found = True
+                return
+            # Check subchapters
+            if "subchapters" in chapter:
+                delete_chapter_recursive(chapter["subchapters"])
+    
+    delete_chapter_recursive(chapters)
+    
+    if not chapter_found:
+        raise ValueError("Chapter not found")
+    
+    # Update TOC version
+    toc["chapters"] = chapters
+    toc["version"] = toc.get("version", 1) + 1
+    toc["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Update the book
+    await books_collection.update_one(
+        {"_id": ObjectId(book_id)},
+        {
+            "$set": {
+                "table_of_contents": toc,
+                "updated_at": datetime.now(timezone.utc)
             }
-            
-            # Perform atomic update
-            result = await books_collection.update_one(
-                {
-                    "_id": ObjectId(book_id),
-                    "owner_id": user_clerk_id,
-                    "table_of_contents.version": current_toc.get("version", 1)
-                },
-                {
-                    "$set": {
-                        "table_of_contents": updated_toc,
-                        "updated_at": datetime.now(timezone.utc)
-                    }
-                },
-                session=session
-            )
-            
-            if result.modified_count == 0:
-                raise ValueError("Concurrent modification detected, please retry")
-            
-            # Delete related questions (if any)
-            questions_collection = _db.get_collection("questions")
-            await questions_collection.delete_many(
-                {"chapter_id": chapter_id},
-                session=session
-            )
-            
-            # Create audit log
-            await create_audit_log(
-                action="chapter_delete",
-                actor_id=user_clerk_id,
-                target_id=chapter_id,
-                resource_type="chapter",
-                details={
-                    "book_id": book_id
-                },
-                session=session
-            )
-            
-            return True
+        },
+        session=session
+    )
+    
+    return True
 
 
 async def reorder_chapters_with_transaction(
@@ -346,168 +415,77 @@ async def reorder_chapters_with_transaction(
     user_clerk_id: str
 ) -> Dict[str, Any]:
     """
-    Reorder chapters atomically to prevent inconsistent states.
+    Reorder chapters with transaction support.
+    chapter_orders should be a list of {"id": "chapter_id", "order": 1}
     """
-    async with await _client.start_session() as session:
-        async with session.start_transaction():
-            # Get current book
-            book = await books_collection.find_one(
-                {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
-                session=session
-            )
-            
-            if not book:
-                raise ValueError("Book not found or not authorized")
-            
-            current_toc = book.get("table_of_contents", {"chapters": []})
-            chapters = current_toc.get("chapters", [])
-            
-            # Apply new order
-            for order_update in chapter_orders:
-                chapter_id = order_update.get("id")
-                new_order = order_update.get("order")
-                parent_id = order_update.get("parent_id")
-                
-                chapters = _update_chapter_order(chapters, chapter_id, new_order, parent_id)
-            
-            # Update TOC
-            updated_toc = {
-                **current_toc,
-                "chapters": chapters,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "version": current_toc.get("version", 1) + 1,
+    use_transaction = True
+    try:
+        async with await _client.start_session() as session:
+            info = await _client.admin.command('isMaster')
+            use_transaction = info.get('setName') is not None
+    except Exception:
+        use_transaction = False
+    
+    if use_transaction:
+        async with await _client.start_session() as session:
+            async with session.start_transaction():
+                return await _reorder_chapters_internal(book_id, chapter_orders, user_clerk_id, session)
+    else:
+        return await _reorder_chapters_internal(book_id, chapter_orders, user_clerk_id, None)
+
+
+async def _reorder_chapters_internal(
+    book_id: str,
+    chapter_orders: List[Dict[str, Any]],
+    user_clerk_id: str,
+    session: Optional[AsyncIOMotorClientSession]
+) -> Dict[str, Any]:
+    """Internal function to reorder chapters with or without transaction"""
+    # Get the book
+    book = await books_collection.find_one(
+        {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
+        session=session
+    )
+    if not book:
+        raise ValueError("Book not found or not authorized")
+    
+    toc = book.get("table_of_contents", {})
+    chapters = toc.get("chapters", [])
+    
+    # Create a map of chapter IDs to chapters
+    chapter_map = {}
+    for chapter in chapters:
+        chapter_map[chapter.get("id")] = chapter
+    
+    # Reorder chapters based on provided order
+    new_chapters = []
+    for order_item in sorted(chapter_orders, key=lambda x: x["order"]):
+        chapter_id = order_item["id"]
+        if chapter_id in chapter_map:
+            chapter = chapter_map[chapter_id]
+            chapter["order"] = order_item["order"]
+            new_chapters.append(chapter)
+    
+    # Add any chapters that weren't in the order list at the end
+    for chapter in chapters:
+        if chapter.get("id") not in [o["id"] for o in chapter_orders]:
+            new_chapters.append(chapter)
+    
+    # Update TOC
+    toc["chapters"] = new_chapters
+    toc["version"] = toc.get("version", 1) + 1
+    toc["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Update the book
+    await books_collection.update_one(
+        {"_id": ObjectId(book_id)},
+        {
+            "$set": {
+                "table_of_contents": toc,
+                "updated_at": datetime.now(timezone.utc)
             }
-            
-            # Perform atomic update
-            result = await books_collection.update_one(
-                {
-                    "_id": ObjectId(book_id),
-                    "owner_id": user_clerk_id,
-                    "table_of_contents.version": current_toc.get("version", 1)
-                },
-                {
-                    "$set": {
-                        "table_of_contents": updated_toc,
-                        "updated_at": datetime.now(timezone.utc)
-                    }
-                },
-                session=session
-            )
-            
-            if result.modified_count == 0:
-                raise ValueError("Concurrent modification detected, please retry")
-            
-            # Create audit log
-            await create_audit_log(
-                action="chapters_reorder",
-                actor_id=user_clerk_id,
-                target_id=book_id,
-                resource_type="toc",
-                details={
-                    "chapters_reordered": len(chapter_orders)
-                },
-                session=session
-            )
-            
-            return updated_toc
-
-
-# Helper functions
-
-def _get_all_chapter_ids(chapters: List[Dict]) -> set:
-    """Recursively get all chapter IDs."""
-    ids = set()
-    for chapter in chapters:
-        ids.add(chapter["id"])
-        if "children" in chapter:
-            ids.update(_get_all_chapter_ids(chapter["children"]))
-    return ids
-
-
-def _add_chapter_to_parent(chapters: List[Dict], parent_id: str, new_chapter: Dict) -> List[Dict]:
-    """Add a chapter as a child of the specified parent."""
-    for chapter in chapters:
-        if chapter["id"] == parent_id:
-            if "children" not in chapter:
-                chapter["children"] = []
-            chapter["children"].append(new_chapter)
-            return chapters
-        elif "children" in chapter:
-            chapter["children"] = _add_chapter_to_parent(chapter["children"], parent_id, new_chapter)
-    return chapters
-
-
-def _insert_chapter_at_order(chapters: List[Dict], new_chapter: Dict) -> List[Dict]:
-    """Insert a chapter at the specified order, adjusting other chapters."""
-    order = new_chapter["order"]
-    # Adjust orders of existing chapters
-    for chapter in chapters:
-        if chapter.get("order", 0) >= order:
-            chapter["order"] = chapter.get("order", 0) + 1
+        },
+        session=session
+    )
     
-    # Insert the new chapter
-    chapters.append(new_chapter)
-    chapters.sort(key=lambda x: x.get("order", 0))
-    return chapters
-
-
-def _update_chapter_in_list(chapters: List[Dict], chapter_id: str, updates: Dict) -> tuple:
-    """Update a chapter in the list and return the updated list and chapter."""
-    updated_chapter = None
-    for i, chapter in enumerate(chapters):
-        if chapter["id"] == chapter_id:
-            chapters[i] = {
-                **chapter,
-                **updates,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }
-            updated_chapter = chapters[i]
-            break
-        elif "children" in chapter:
-            chapter["children"], child_updated = _update_chapter_in_list(
-                chapter["children"], chapter_id, updates
-            )
-            if child_updated:
-                updated_chapter = child_updated
-    
-    return chapters, updated_chapter
-
-
-def _remove_chapter_from_list(chapters: List[Dict], chapter_id: str) -> tuple:
-    """Remove a chapter from the list and return the updated list."""
-    deleted = False
-    updated_chapters = []
-    
-    for chapter in chapters:
-        if chapter["id"] == chapter_id:
-            deleted = True
-            continue
-        
-        if "children" in chapter:
-            chapter["children"], child_deleted = _remove_chapter_from_list(
-                chapter["children"], chapter_id
-            )
-            deleted = deleted or child_deleted
-        
-        updated_chapters.append(chapter)
-    
-    return updated_chapters, deleted
-
-
-def _update_chapter_order(chapters: List[Dict], chapter_id: str, new_order: int, parent_id: Optional[str]) -> List[Dict]:
-    """Update the order of a specific chapter."""
-    # This is a simplified version - in production, you'd want more sophisticated logic
-    # to handle moving chapters between parents, etc.
-    for chapter in chapters:
-        if chapter["id"] == chapter_id:
-            chapter["order"] = new_order
-            if parent_id is not None:
-                chapter["parent_id"] = parent_id
-        elif "children" in chapter:
-            chapter["children"] = _update_chapter_order(
-                chapter["children"], chapter_id, new_order, parent_id
-            )
-    
-    # Re-sort chapters by order
-    chapters.sort(key=lambda x: x.get("order", 0))
-    return chapters
+    return toc

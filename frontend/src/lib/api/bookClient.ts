@@ -614,6 +614,52 @@ export class BookClient {
   // ============= Interview-Style Questions Methods =============
 
   /**
+   * Generate AI draft for a chapter
+   */
+  public async generateChapterDraft(
+    bookId: string,
+    chapterId: string,
+    data: {
+      question_responses: Array<{ question: string; answer: string }>;
+      writing_style?: string;
+      target_length?: number;
+    }
+  ): Promise<{
+    success: boolean;
+    book_id: string;
+    chapter_id: string;
+    draft: string;
+    metadata: {
+      word_count: number;
+      estimated_reading_time: number;
+      generated_at: string;
+      model_used: string;
+      writing_style: string;
+      target_length: number;
+      actual_length: number;
+    };
+    suggestions: string[];
+    message: string;
+  }> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/generate-draft`,
+      {
+        method: 'POST',
+        headers: this.getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(data),
+      }
+    );
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to generate draft: ${response.status} ${error}`);
+    }
+    
+    return response.json();
+  }
+
+  /**
    * Generate interview-style questions for a specific chapter
    */
   public async generateChapterQuestions(
