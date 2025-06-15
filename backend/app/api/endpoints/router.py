@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import users, webhooks, books
+from app.api.endpoints import users, webhooks, books, export
 
 # Main router
 router = APIRouter()
@@ -8,6 +8,7 @@ router = APIRouter()
 router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 router.include_router(books.router, prefix="/books", tags=["books"])
+router.include_router(export.router, tags=["export"])
 
 
 @router.get("/")

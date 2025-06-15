@@ -428,8 +428,8 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       // Trigger TOC synchronization event for chapter tabs
       triggerTocUpdateEvent(bookId);
       
-      // Navigate to the next step
-      router.push(`/dashboard/books/${bookId}/chapters`);
+      // Navigate to the book page with tabs
+      router.push(`/dashboard/books/${bookId}`);
     } catch (err) {
       console.error('Error saving TOC:', err);
       setError('Failed to save the table of contents. Please try again.');

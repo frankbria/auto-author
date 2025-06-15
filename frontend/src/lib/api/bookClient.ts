@@ -835,6 +835,83 @@ export class BookClient {
     }
     return response.json();
   }
+
+  /**
+   * Get chapter content
+   */
+  public async getChapterContent(
+    bookId: string,
+    chapterId: string,
+    includeMetadata: boolean = true
+  ): Promise<{
+    book_id: string;
+    chapter_id: string;
+    title: string;
+    content: string;
+    success: boolean;
+    metadata?: {
+      status: string;
+      word_count: number;
+      estimated_reading_time: number;
+      last_modified?: string;
+      is_active_tab: boolean;
+      has_subchapters: boolean;
+      subchapter_count: number;
+    };
+  }> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content?include_metadata=${includeMetadata}`,
+      {
+        headers: this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get chapter content: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Save chapter content
+   */
+  public async saveChapterContent(
+    bookId: string,
+    chapterId: string,
+    content: string,
+    autoUpdateMetadata: boolean = true
+  ): Promise<{
+    book_id: string;
+    chapter_id: string;
+    content: string;
+    metadata: {
+      word_count: number;
+      estimated_reading_time: number;
+      last_modified: string;
+      status?: string;
+    };
+    success: boolean;
+    message: string;
+  }> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content`,
+      {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ 
+          content,
+          auto_update_metadata: autoUpdateMetadata 
+        }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to save chapter content: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
 }
 
 // Create a singleton instance for use throughout the app
