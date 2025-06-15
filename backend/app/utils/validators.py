@@ -18,7 +18,7 @@ def validate_book_create_data(book_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         validated = BookCreate(**book_data)
-        return validated.dict()
+        return validated.model_dump()
     except ValidationError as e:
         raise e
 
@@ -36,7 +36,7 @@ def validate_book_update_data(book_data: Dict[str, Any]) -> Dict[str, Any]:
     try:
         validated = BookUpdate(**book_data)
         # Only return fields that are not None
-        return {k: v for k, v in validated.dict().items() if v is not None}
+        return {k: v for k, v in validated.model_dump().items() if v is not None}
     except ValidationError as e:
         raise e
 
@@ -53,7 +53,7 @@ def validate_toc_item_data(toc_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         validated = TocItemCreate(**toc_data)
-        return validated.dict()
+        return validated.model_dump()
     except ValidationError as e:
         raise e
 

@@ -4,7 +4,8 @@ Export endpoints for generating PDF and DOCX files
 from typing import Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
-from app.api.dependencies import get_current_user, get_rate_limiter
+from app.api.dependencies import get_rate_limiter
+from app.core.security import get_current_user
 from app.db.book import get_book_by_id
 from app.services.export_service import export_service
 from app.services.chapter_access_service import chapter_access_service
@@ -28,7 +29,7 @@ async def export_book_pdf(
     page_size: str = Query(
         "letter",
         description="Page size (letter or A4)",
-        regex="^(letter|A4)$"
+        pattern="^(letter|A4)$"
     ),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 exports per hour
 ):

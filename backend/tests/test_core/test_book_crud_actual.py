@@ -1,28 +1,31 @@
 """Test actual book CRUD operations"""
 
 import pytest
-from app.db.book import (
-    create_book, get_book_by_id, get_books_by_user, 
-    update_book, delete_book
-)
-from bson import ObjectId
+from datetime import datetime, timezone
+
+
+# Since these tests require actual database access, we'll mark them as integration tests
+# and they should be run with a test database
+pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
 async def test_create_and_get_book():
     """Test creating and retrieving a book"""
+    from app.db.book import create_book, get_book_by_id
+    
     book_data = {
         "title": "Test Book",
         "description": "A test book",
         "genre": "Fiction",
         "target_audience": "General"
     }
-    user_id = "test_user_123"
+    user_clerk_id = "test_user_123"
     
     # Create book
-    new_book = await create_book(book_data, user_id)
+    new_book = await create_book(book_data, user_clerk_id)
     assert new_book["title"] == "Test Book"
-    assert new_book["owner_id"] == user_id
+    assert new_book["owner_id"] == user_clerk_id
     assert "_id" in new_book
     
     # Get book by ID
@@ -39,7 +42,9 @@ async def test_create_and_get_book():
 @pytest.mark.asyncio
 async def test_get_books_by_user():
     """Test retrieving all books for a user"""
-    user_id = "test_user_456"
+    from app.db.book import create_book, get_books_by_user
+    
+    user_clerk_id = "test_user_456"
     
     # Create multiple books
     for i in range(3):
@@ -48,25 +53,27 @@ async def test_get_books_by_user():
             "description": f"Description {i}",
             "genre": "Fiction",
             "target_audience": "General"
-        }, user_id)
+        }, user_clerk_id)
     
     # Get user's books
-    books = await get_books_by_user(user_id)
+    books = await get_books_by_user(user_clerk_id)
     assert len(books) >= 3
-    assert all(book["owner_id"] == user_id for book in books)
+    assert all(book["owner_id"] == user_clerk_id for book in books)
     
     # Test pagination
-    books_page1 = await get_books_by_user(user_id, skip=0, limit=2)
+    books_page1 = await get_books_by_user(user_clerk_id, skip=0, limit=2)
     assert len(books_page1) == 2
     
-    books_page2 = await get_books_by_user(user_id, skip=2, limit=2)
+    books_page2 = await get_books_by_user(user_clerk_id, skip=2, limit=2)
     assert len(books_page2) >= 1
 
 
 @pytest.mark.asyncio
 async def test_update_book():
     """Test updating a book"""
-    user_id = "test_user_789"
+    from app.db.book import create_book, update_book, get_book_by_id
+    
+    user_clerk_id = "test_user_789"
     
     # Create a book
     book = await create_book({
@@ -74,7 +81,7 @@ async def test_update_book():
         "description": "Original description",
         "genre": "Fiction",
         "target_audience": "General"
-    }, user_id)
+    }, user_clerk_id)
     
     book_id = str(book["_id"])
     
@@ -82,7 +89,7 @@ async def test_update_book():
     updated = await update_book(
         book_id,
         {"title": "Updated Title", "genre": "Non-Fiction"},
-        user_id
+        user_clerk_id
     )
     assert updated is not None
     assert updated["title"] == "Updated Title"
@@ -101,7 +108,10 @@ async def test_update_book():
 @pytest.mark.asyncio
 async def test_delete_book():
     """Test deleting a book"""
-    user_id = "test_user_delete"
+    from app.db.book import create_book, delete_book, get_book_by_id
+    from bson import ObjectId
+    
+    user_clerk_id = "test_user_delete"
     
     # Create a book
     book = await create_book({
@@ -109,12 +119,12 @@ async def test_delete_book():
         "description": "This will be deleted",
         "genre": "Fiction",
         "target_audience": "General"
-    }, user_id)
+    }, user_clerk_id)
     
     book_id = str(book["_id"])
     
     # Delete the book
-    deleted = await delete_book(book_id, user_id)
+    deleted = await delete_book(book_id, user_clerk_id)
     assert deleted is True
     
     # Verify deletion
@@ -122,5 +132,5 @@ async def test_delete_book():
     assert deleted_book is None
     
     # Try to delete non-existent book
-    not_deleted = await delete_book(str(ObjectId()), user_id)
+    not_deleted = await delete_book(str(ObjectId()), user_clerk_id)
     assert not_deleted is False

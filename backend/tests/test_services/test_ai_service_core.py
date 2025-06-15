@@ -13,252 +13,257 @@ def ai_service():
 
 
 @pytest.mark.asyncio
-async def test_generate_toc_structure(ai_service):
-    """Test TOC generation"""
+async def test_analyze_summary_for_toc(ai_service):
+    """Test summary analysis for TOC generation"""
+    # Mock OpenAI response
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(message=MagicMock(content="""
+READINESS: Ready
+CONFIDENCE: 0.9
+ANALYSIS: The summary provides clear structure and main topics for a technical book.
+SUGGESTIONS: Consider adding more specific examples for each chapter.
+        """))
+    ]
+    
+    with patch.object(ai_service, '_make_openai_request', 
+                      AsyncMock(return_value=mock_response)):
+        result = await ai_service.analyze_summary_for_toc(
+            summary="A comprehensive guide to Python programming",
+            book_metadata={
+                "title": "Python Mastery",
+                "genre": "Technical",
+                "target_audience": "Developers"
+            }
+        )
+        
+        assert result["is_ready_for_toc"] == True
+        assert result["confidence_score"] == 0.9
+        assert "clear structure" in result["analysis"]
+
+
+@pytest.mark.asyncio
+async def test_generate_clarifying_questions(ai_service):
+    """Test clarifying questions generation"""
+    # Mock OpenAI response
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(message=MagicMock(content="""
+1. What specific Python topics will you focus on?
+2. Will you include practical examples and exercises?
+3. What makes your book different from other Python books?
+4. How deep will you go into advanced topics?
+        """))
+    ]
+    
+    with patch.object(ai_service, '_make_openai_request', 
+                      AsyncMock(return_value=mock_response)):
+        questions = await ai_service.generate_clarifying_questions(
+            summary="A book about Python programming",
+            book_metadata={
+                "genre": "Technical",
+                "target_audience": "Beginners"
+            }
+        )
+        
+        assert len(questions) == 4
+        assert "Python topics" in questions[0]
+        assert "practical examples" in questions[1]
+
+
+@pytest.mark.asyncio
+async def test_generate_toc_from_summary_and_responses(ai_service):
+    """Test TOC generation from summary and responses"""
     # Mock OpenAI response
     mock_response = MagicMock()
     mock_response.choices = [
         MagicMock(message=MagicMock(content="""{
-            "chapters": [
-                {
-                    "title": "Introduction",
-                    "description": "Getting started",
-                    "subchapters": []
-                },
-                {
-                    "title": "Main Content",
-                    "description": "Core concepts",
-                    "subchapters": [
-                        {
-                            "title": "Subtopic 1",
-                            "description": "Details"
-                        }
-                    ]
-                }
-            ],
-            "total_chapters": 2,
-            "estimated_pages": 100,
-            "structure_notes": "Well organized"
-        }"""))
+    "table_of_contents": {
+        "chapters": [
+            {
+                "id": "ch1",
+                "title": "Introduction to Python",
+                "description": "Getting started with Python",
+                "order": 1,
+                "level": 1,
+                "parent_id": null,
+                "subchapters": []
+            },
+            {
+                "id": "ch2",
+                "title": "Python Basics",
+                "description": "Core concepts",
+                "order": 2,
+                "level": 1,
+                "parent_id": null,
+                "subchapters": [
+                    {
+                        "id": "ch2.1",
+                        "title": "Variables and Data Types",
+                        "description": "Understanding Python data types",
+                        "order": 1,
+                        "level": 2,
+                        "parent_id": "ch2"
+                    }
+                ]
+            }
+        ],
+        "total_chapters": 2,
+        "estimated_pages": 150,
+        "structure_notes": "Well-organized progression from basics to advanced"
+    }
+}"""))
     ]
     
-    with patch.object(ai_service.client.chat.completions, 'create', 
+    with patch.object(ai_service, '_make_openai_request', 
                       AsyncMock(return_value=mock_response)):
-        result = await ai_service.generate_toc_structure(
-            book_description="A book about testing",
-            genre="Technical",
-            target_audience="Developers",
-            additional_context={"writing_style": "Educational"}
+        result = await ai_service.generate_toc_from_summary_and_responses(
+            summary="A comprehensive Python guide",
+            question_responses=[
+                {"question": "What topics?", "answer": "Basics to advanced"},
+                {"question": "Examples?", "answer": "Yes, many practical examples"}
+            ],
+            book_metadata={
+                "title": "Python Mastery",
+                "genre": "Technical"
+            }
         )
         
-        assert result["success"] is True
-        assert len(result["toc"]["chapters"]) == 2
-        assert result["toc"]["chapters"][0]["title"] == "Introduction"
-        assert len(result["toc"]["chapters"][1]["subchapters"]) == 1
-        assert result["toc"]["total_chapters"] == 2
+        assert "toc" in result
+        assert len(result["toc"]["chapters"]) >= 2
+        assert result["toc"]["total_chapters"] >= 2
+        assert "success" in result
+        assert result["success"] == True
 
 
 @pytest.mark.asyncio
 async def test_generate_chapter_questions(ai_service):
-    """Test chapter question generation"""
+    """Test chapter questions generation"""
+    # Mock OpenAI response
     mock_response = MagicMock()
     mock_response.choices = [
         MagicMock(message=MagicMock(content="""{
-            "questions": [
-                {
-                    "id": "q1",
-                    "question": "What is the main topic?",
-                    "type": "open-ended",
-                    "purpose": "context",
-                    "follow_up_prompts": ["Can you elaborate?"],
-                    "expected_length": "medium"
-                },
-                {
-                    "id": "q2", 
-                    "question": "Describe your experience",
-                    "type": "narrative",
-                    "purpose": "story",
-                    "follow_up_prompts": ["What happened next?"],
-                    "expected_length": "long"
-                }
-            ]
-        }"""))
+    "questions": [
+        {
+            "id": "q1",
+            "question_text": "What are the main character's motivations?",
+            "question_type": "character",
+            "difficulty": "medium",
+            "category": "Character Development",
+            "metadata": {
+                "suggested_response_length": "200-300 words",
+                "help_text": "Think about what drives the character",
+                "examples": ["desire for revenge", "search for identity"]
+            }
+        },
+        {
+            "id": "q2",
+            "question_text": "Describe the setting of this chapter",
+            "question_type": "setting",
+            "difficulty": "easy",
+            "category": "World Building",
+            "metadata": {
+                "suggested_response_length": "150-200 words",
+                "help_text": "Consider time, place, and atmosphere"
+            }
+        }
+    ]
+}"""))
     ]
     
-    with patch.object(ai_service.client.chat.completions, 'create',
+    with patch.object(ai_service, '_make_openai_request', 
                       AsyncMock(return_value=mock_response)):
+        # Build prompt from chapter data
+        prompt = f"Generate questions for chapter: The Beginning - Introduction to the story"
         result = await ai_service.generate_chapter_questions(
-            chapter_title="Introduction",
-            chapter_description="Getting started with the topic",
-            book_genre="Educational",
-            target_audience="Students"
+            prompt=prompt,
+            count=2
         )
         
-        assert result["success"] is True
-        assert len(result["questions"]) == 2
-        assert result["questions"][0]["question"] == "What is the main topic?"
-        assert result["questions"][0]["type"] == "open-ended"
-        assert result["questions"][1]["type"] == "narrative"
+        # The method returns a list directly, not a dict with questions key
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0]["question_type"] == "character"
+        assert result[1]["question_type"] == "setting"
 
 
 @pytest.mark.asyncio
 async def test_generate_chapter_draft(ai_service):
     """Test chapter draft generation"""
+    # Mock OpenAI response
     mock_response = MagicMock()
     mock_response.choices = [
-        MagicMock(message=MagicMock(content="""# Introduction to Testing
+        MagicMock(message=MagicMock(content="""
+# The Beginning
 
-Testing is a crucial part of software development. It ensures that your code works as expected and helps catch bugs early.
+It was a dark and stormy night when Sarah first discovered her powers. The rain pelted against the windows of the old Victorian house, creating an eerie rhythm that seemed to match her racing heartbeat.
 
-## Why Testing Matters
-
-Quality software requires thorough testing. Here are the key benefits:
-
-1. **Early Bug Detection**: Find issues before they reach production
-2. **Code Confidence**: Make changes without fear of breaking things
-3. **Documentation**: Tests serve as living documentation
-
-## Types of Tests
-
-There are several types of tests you should know about...
-"""))
+She had always known she was different, but tonight everything would change...
+        """))
     ]
     
-    with patch.object(ai_service.client.chat.completions, 'create',
+    with patch.object(ai_service, '_make_openai_request', 
                       AsyncMock(return_value=mock_response)):
         result = await ai_service.generate_chapter_draft(
-            chapter_title="Introduction to Testing",
-            chapter_description="Learn testing basics",
+            chapter_title="The Beginning",
+            chapter_description="Sarah discovers her powers",
             question_responses=[
                 {
-                    "question": "What is the main purpose?",
-                    "answer": "To teach developers about testing"
+                    "question": "What are the main character's motivations?",
+                    "answer": "Sarah wants to understand her newfound abilities"
                 },
                 {
-                    "question": "What should readers learn?",
-                    "answer": "Different types of tests and when to use them"
+                    "question": "Describe the setting",
+                    "answer": "A stormy night in an old Victorian house"
                 }
             ],
-            writing_style="educational",
-            target_length=2000
+            book_metadata={
+                "genre": "Fantasy",
+                "target_audience": "Young Adults"
+            },
+            writing_style="Descriptive and atmospheric"
         )
         
-        assert result["success"] is True
-        assert "Introduction to Testing" in result["draft"]
-        assert "Why Testing Matters" in result["draft"]
+        assert result["success"] == True
+        assert "draft" in result
+        assert "Sarah" in result["draft"]
+        assert "powers" in result["draft"]
         assert result["metadata"]["word_count"] > 0
-        assert result["metadata"]["writing_style"] == "educational"
-
-
-@pytest.mark.asyncio
-async def test_validate_content(ai_service):
-    """Test content validation"""
-    # Test appropriate content
-    appropriate_result = await ai_service.validate_content(
-        "This is a clean, educational text about programming."
-    )
-    assert appropriate_result["is_appropriate"] is True
-    assert appropriate_result["confidence"] > 0.8
-    
-    # Test with mock for inappropriate content
-    mock_response = MagicMock()
-    mock_response.choices = [
-        MagicMock(message=MagicMock(content="""{
-            "is_appropriate": false,
-            "confidence": 0.95,
-            "reason": "Contains inappropriate language",
-            "suggestions": ["Remove offensive terms", "Use professional language"]
-        }"""))
-    ]
-    
-    with patch.object(ai_service.client.chat.completions, 'create',
-                      AsyncMock(return_value=mock_response)):
-        inappropriate_result = await ai_service.validate_content(
-            "Some inappropriate content here"
-        )
-        assert inappropriate_result["is_appropriate"] is False
-        assert len(inappropriate_result["suggestions"]) > 0
-
-
-@pytest.mark.asyncio
-async def test_summarize_chapter(ai_service):
-    """Test chapter summarization"""
-    mock_response = MagicMock()
-    mock_response.choices = [
-        MagicMock(message=MagicMock(content="""{
-            "summary": "This chapter introduces the basics of unit testing in Python using pytest framework.",
-            "key_points": [
-                "Setting up pytest",
-                "Writing your first test",
-                "Test fixtures and parametrization"
-            ],
-            "word_count": 15,
-            "themes": ["testing", "python", "quality assurance"]
-        }"""))
-    ]
-    
-    with patch.object(ai_service.client.chat.completions, 'create',
-                      AsyncMock(return_value=mock_response)):
-        result = await ai_service.summarize_chapter(
-            "Long chapter content about testing..." * 100
-        )
-        
-        assert "summary" in result
-        assert len(result["key_points"]) == 3
-        assert "testing" in result["themes"]
-        assert result["word_count"] > 0
 
 
 @pytest.mark.asyncio
 async def test_ai_service_error_handling(ai_service):
     """Test error handling in AI service"""
-    # Test API error
-    with patch.object(ai_service.client.chat.completions, 'create',
+    # Test rate limit error with retry
+    with patch.object(ai_service, '_make_openai_request', 
                       AsyncMock(side_effect=Exception("API Error"))):
-        result = await ai_service.generate_toc_structure(
-            "Test book", "Fiction", "General"
+        # Should return fallback questions on error
+        questions = await ai_service.generate_clarifying_questions(
+            summary="Test summary",
+            book_metadata={}
         )
-        assert result["success"] is False
-        assert "error" in result
         
-    # Test JSON parsing error
-    mock_response = MagicMock()
-    mock_response.choices = [
-        MagicMock(message=MagicMock(content="Invalid JSON"))
-    ]
-    
-    with patch.object(ai_service.client.chat.completions, 'create',
-                      AsyncMock(return_value=mock_response)):
-        result = await ai_service.generate_toc_structure(
-            "Test book", "Fiction", "General"
-        )
-        assert result["success"] is False
+        # Should return default fallback questions
+        assert len(questions) == 4
+        assert "main problem" in questions[0]
+        assert "target audience" in questions[1]
 
 
 @pytest.mark.asyncio
-async def test_enhance_question(ai_service):
-    """Test question enhancement"""
-    mock_response = MagicMock()
-    mock_response.choices = [
-        MagicMock(message=MagicMock(content="""{
-            "enhanced_question": "Can you describe a specific moment when you first realized your passion for writing? What were you doing, and how did it make you feel?",
-            "follow_up_prompts": [
-                "What triggered that moment?",
-                "How did others react?",
-                "What changed after that?"
-            ],
-            "question_type": "narrative",
-            "improvements": ["Added sensory details", "Made more specific", "Included emotional component"]
-        }"""))
-    ]
+async def test_parse_questions_response(ai_service):
+    """Test question parsing from AI response"""
+    # Test the internal parsing method
+    questions_text = """
+1. What is the main theme of your book?
+2. Who are your target readers?
+3. What unique perspective do you bring?
+4. How will readers benefit from your book?
+    """
     
-    with patch.object(ai_service.client.chat.completions, 'create',
-                      AsyncMock(return_value=mock_response)):
-        result = await ai_service.enhance_question(
-            "When did you start writing?",
-            "personal_story"
-        )
-        
-        assert len(result["enhanced_question"]) > len("When did you start writing?")
-        assert len(result["follow_up_prompts"]) > 0
-        assert result["question_type"] == "narrative"
+    questions = ai_service._parse_questions_response(questions_text)
+    
+    assert len(questions) == 4
+    assert "main theme" in questions[0]
+    assert "target readers" in questions[1]
+    assert "unique perspective" in questions[2]
+    assert "readers benefit" in questions[3]

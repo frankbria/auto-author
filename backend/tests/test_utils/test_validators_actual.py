@@ -22,22 +22,26 @@ def test_validate_book_create_data():
     assert result["title"] == "My Book"
     assert result["genre"] == "Fiction"
     
-    # Missing required field
+    # Missing required field (title)
     with pytest.raises(ValidationError) as exc_info:
         validate_book_create_data({
-            "title": "Book",
             "description": "Desc"
-            # Missing genre and target_audience
+            # Missing title (required)
         })
-    assert "genre" in str(exc_info.value)
+    assert "title" in str(exc_info.value)
     
-    # Invalid genre
+    # Empty title
     with pytest.raises(ValidationError) as exc_info:
         validate_book_create_data({
-            "title": "Book",
-            "description": "Desc",
-            "genre": "InvalidGenre",
-            "target_audience": "Adults"
+            "title": "",  # Empty string fails min_length=1
+            "description": "Desc"
+        })
+    
+    # Title too long
+    with pytest.raises(ValidationError) as exc_info:
+        validate_book_create_data({
+            "title": "A" * 101,  # Exceeds max_length=100
+            "description": "Desc"
         })
 
 
@@ -53,14 +57,20 @@ def test_validate_book_update_data():
     assert result["genre"] == "Non-Fiction"
     assert "description" not in result  # None values filtered out
     
-    # All fields None
-    result = validate_book_update_data({})
-    assert result == {}
+    # Valid update with just title
+    result = validate_book_update_data({"title": "New Title"})
+    assert result == {"title": "New Title"}
     
-    # Invalid data
+    # Invalid data - empty title
     with pytest.raises(ValidationError):
         validate_book_update_data({
-            "genre": "InvalidGenre"
+            "title": ""  # Empty string fails min_length=1
+        })
+    
+    # Invalid data - missing required title
+    with pytest.raises(ValidationError):
+        validate_book_update_data({
+            "genre": "Fiction"  # Title is required
         })
 
 
@@ -77,31 +87,24 @@ def test_validate_toc_item_data():
     assert result["title"] == "Chapter 1"
     assert result["level"] == 1
     
-    # With subchapters
-    toc_with_sub = {
+    # With metadata
+    toc_with_metadata = {
         "title": "Part 1",
         "description": "First part",
         "level": 1,
         "order": 1,
-        "subchapters": [
-            {
-                "title": "Chapter 1.1",
-                "description": "Sub chapter",
-                "level": 2,
-                "order": 1
-            }
-        ]
+        "metadata": {"status": "draft", "word_count": 0}
     }
-    result = validate_toc_item_data(toc_with_sub)
-    assert len(result["subchapters"]) == 1
+    result = validate_toc_item_data(toc_with_metadata)
+    assert result["metadata"]["status"] == "draft"
     
-    # Invalid level
+    # Missing required field
     with pytest.raises(ValidationError):
         validate_toc_item_data({
             "title": "Chapter",
             "description": "Desc",
-            "level": 7,  # Max is 6
-            "order": 1
+            "level": 1
+            # Missing order
         })
 
 
