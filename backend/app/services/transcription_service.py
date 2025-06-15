@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional, Dict, Any
 from app.schemas.transcription import TranscriptionResponse
 import re
@@ -9,6 +10,25 @@ class TranscriptionService:
     """Service for handling audio transcription using various providers."""
     
     def __init__(self):
+        # Check if AWS credentials are available
+        self.use_aws = all([
+            os.getenv('AWS_ACCESS_KEY_ID'),
+            os.getenv('AWS_SECRET_ACCESS_KEY'),
+            os.getenv('AWS_REGION')
+        ])
+        
+        if self.use_aws:
+            logger.info("Using AWS Transcribe for speech-to-text")
+            from app.services.transcription_service_aws import AWSTranscriptionService
+            self.aws_service = AWSTranscriptionService(
+                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+                aws_region=os.getenv('AWS_REGION', 'us-east-1')
+            )
+        else:
+            logger.warning("AWS credentials not found, using mock transcription service")
+            self.aws_service = None
+            
         self.punctuation_commands = {
             'comma': ',',
             'period': '.',
@@ -24,7 +44,7 @@ class TranscriptionService:
             'new paragraph': '\n\n'
         }
 
-    def transcribe_audio(
+    async def transcribe_audio(
         self, 
         audio_data: bytes, 
         language: str = 'en-US',
@@ -42,21 +62,26 @@ class TranscriptionService:
             TranscriptionResponse with transcript and metadata
         """
         try:
-            # For now, we'll use a mock implementation
-            # In production, this would integrate with Google Speech-to-Text, 
-            # Azure Speech Services, or AWS Transcribe
-            
-            mock_transcript = self._mock_transcription(audio_data)
-            
-            if enable_punctuation_commands:
-                mock_transcript = self._process_punctuation_commands(mock_transcript)
-            
-            return TranscriptionResponse(
-                transcript=mock_transcript,
-                confidence=0.95,
-                status="success",
-                duration=len(audio_data) / 44100.0  # Approximate duration
-            )
+            # Use AWS Transcribe if available, otherwise fall back to mock
+            if self.use_aws and self.aws_service:
+                return await self.aws_service.transcribe_audio(
+                    audio_data=audio_data,
+                    language=language,
+                    enable_punctuation_commands=enable_punctuation_commands
+                )
+            else:
+                # Fall back to mock implementation
+                mock_transcript = self._mock_transcription(audio_data)
+                
+                if enable_punctuation_commands:
+                    mock_transcript = self._process_punctuation_commands(mock_transcript)
+                
+                return TranscriptionResponse(
+                    transcript=mock_transcript,
+                    confidence=0.95,
+                    status="success",
+                    duration=len(audio_data) / 44100.0  # Approximate duration
+                )
             
         except Exception as e:
             logger.error(f"Transcription failed: {str(e)}")

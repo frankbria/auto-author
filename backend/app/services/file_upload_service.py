@@ -10,6 +10,11 @@ from pathlib import Path
 from typing import Optional, Tuple
 from PIL import Image
 from fastapi import UploadFile, HTTPException, status
+from io import BytesIO
+from app.services.cloud_storage_service import get_cloud_storage_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Configuration
 UPLOAD_DIR = Path("uploads")
@@ -34,7 +39,13 @@ class FileUploadService:
     
     def __init__(self):
         """Initialize the upload service and ensure directories exist."""
-        COVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        self.cloud_storage = get_cloud_storage_service()
+        if self.cloud_storage is None:
+            # Only create local directories if not using cloud storage
+            COVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+            logger.info("Using local file storage for uploads")
+        else:
+            logger.info("Using cloud storage for uploads")
     
     async def validate_image_upload(
         self, 
@@ -117,18 +128,46 @@ class FileUploadService:
             if image.width > MAX_IMAGE_WIDTH or image.height > MAX_IMAGE_HEIGHT:
                 image.thumbnail((MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT), Image.Resampling.LANCZOS)
             
-            # Save main image
-            image.save(image_path, quality=85, optimize=True)
-            
-            # Create and save thumbnail
+            # Create thumbnail
             thumbnail = image.copy()
             thumbnail.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-            thumbnail.save(thumbnail_path, quality=85, optimize=True)
             
-            # Return URLs (in production, these would be CDN URLs)
-            # For now, return relative paths that can be served by FastAPI
-            image_url = f"/uploads/cover_images/{unique_filename}"
-            thumbnail_url = f"/uploads/cover_images/{thumbnail_filename}"
+            if self.cloud_storage:
+                # Upload to cloud storage
+                # Convert images to bytes
+                main_buffer = BytesIO()
+                thumb_buffer = BytesIO()
+                
+                image_format = 'JPEG' if file_ext in ['.jpg', '.jpeg'] else 'PNG'
+                image.save(main_buffer, format=image_format, quality=85, optimize=True)
+                thumbnail.save(thumb_buffer, format=image_format, quality=85, optimize=True)
+                
+                main_buffer.seek(0)
+                thumb_buffer.seek(0)
+                
+                # Upload both images
+                content_type = f"image/{image_format.lower()}"
+                image_url = await self.cloud_storage.upload_image(
+                    file_data=main_buffer.read(),
+                    filename=unique_filename,
+                    content_type=content_type,
+                    folder=f"cover_images/{book_id}"
+                )
+                
+                thumbnail_url = await self.cloud_storage.upload_image(
+                    file_data=thumb_buffer.read(),
+                    filename=thumbnail_filename,
+                    content_type=content_type,
+                    folder=f"cover_images/{book_id}/thumbnails"
+                )
+            else:
+                # Save to local storage
+                image.save(image_path, quality=85, optimize=True)
+                thumbnail.save(thumbnail_path, quality=85, optimize=True)
+                
+                # Return local URLs
+                image_url = f"/uploads/cover_images/{unique_filename}"
+                thumbnail_url = f"/uploads/cover_images/{thumbnail_filename}"
             
             return image_url, thumbnail_url
             
@@ -147,22 +186,29 @@ class FileUploadService:
     async def delete_cover_image(self, image_url: str, thumbnail_url: Optional[str] = None):
         """Delete a cover image and its thumbnail."""
         try:
-            # Extract filename from URL
-            if image_url.startswith("/uploads/cover_images/"):
-                filename = image_url.replace("/uploads/cover_images/", "")
-                image_path = COVER_IMAGES_DIR / filename
-                if image_path.exists():
-                    image_path.unlink()
-            
-            if thumbnail_url and thumbnail_url.startswith("/uploads/cover_images/"):
-                thumb_filename = thumbnail_url.replace("/uploads/cover_images/", "")
-                thumb_path = COVER_IMAGES_DIR / thumb_filename
-                if thumb_path.exists():
-                    thumb_path.unlink()
+            if self.cloud_storage:
+                # Delete from cloud storage
+                if image_url:
+                    await self.cloud_storage.delete_image(image_url)
+                if thumbnail_url:
+                    await self.cloud_storage.delete_image(thumbnail_url)
+            else:
+                # Delete from local storage
+                if image_url and image_url.startswith("/uploads/cover_images/"):
+                    filename = image_url.replace("/uploads/cover_images/", "")
+                    image_path = COVER_IMAGES_DIR / filename
+                    if image_path.exists():
+                        image_path.unlink()
+                
+                if thumbnail_url and thumbnail_url.startswith("/uploads/cover_images/"):
+                    thumb_filename = thumbnail_url.replace("/uploads/cover_images/", "")
+                    thumb_path = COVER_IMAGES_DIR / thumb_filename
+                    if thumb_path.exists():
+                        thumb_path.unlink()
                     
         except Exception as e:
             # Log error but don't fail the operation
-            print(f"Error deleting image files: {e}")
+            logger.error(f"Error deleting image files: {e}")
     
     def get_upload_stats(self) -> dict:
         """Get statistics about uploaded files."""

@@ -471,7 +471,7 @@ async def delete_book_endpoint(
         )
 
 
-@router.post("/{book_id}/cover-image", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/{book_id}/cover-image", status_code=status.HTTP_200_OK)
 async def upload_book_cover_image(
     book_id: str,
     file: UploadFile = File(...),
@@ -479,17 +479,72 @@ async def upload_book_cover_image(
     request: Request = None,
 ):
     """
-    Upload a cover image for a book. (TODO: Connect to Cloudinary for actual upload)
-    Accepts an image file and returns a placeholder URL or error.
+    Upload a cover image for a book.
+    Accepts an image file, processes it, and stores it in cloud storage (S3/Cloudinary) or local storage.
     """
-    # TODO: Validate book ownership and permissions
-    # TODO: Validate file type and size
-    # TODO: Upload to Cloudinary and return the URL
-    # For now, just return a stub response
-    return {
-        "message": "Cover image upload endpoint is not yet implemented. TODO: Connect to Cloudinary.",
-        "cover_image_url": None,
-    }
+    try:
+        # Validate book ownership
+        book = await get_book_by_id(book_id)
+        if not book or book.get("owner_id") != current_user.get("clerk_id"):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Book not found"
+            )
+        
+        # Process and save the cover image
+        from app.services.file_upload_service import FileUploadService
+        file_upload_service = FileUploadService()
+        image_url, thumbnail_url = await file_upload_service.process_and_save_cover_image(
+            file, 
+            book_id
+        )
+        
+        # Delete old cover images if they exist
+        old_cover_url = book.get("cover_image_url")
+        old_thumbnail_url = book.get("cover_thumbnail_url")
+        if old_cover_url:
+            await file_upload_service.delete_cover_image(
+                old_cover_url, 
+                old_thumbnail_url
+            )
+        
+        # Update book with new cover image URLs
+        update_data = {
+            "cover_image_url": image_url,
+            "cover_thumbnail_url": thumbnail_url,
+            "updated_at": datetime.now(timezone.utc),
+        }
+        await update_book(book_id, update_data, current_user.get("clerk_id"))
+        
+        # Log the upload
+        if request:
+            await audit_request(
+                request=request,
+                current_user=current_user,
+                action="cover_image_upload",
+                resource_type="book",
+                target_id=book_id,
+                metadata={
+                    "filename": file.filename,
+                    "content_type": file.content_type,
+                    "image_url": image_url,
+                }
+            )
+        
+        return {
+            "message": "Cover image uploaded successfully",
+            "cover_image_url": image_url,
+            "cover_thumbnail_url": thumbnail_url,
+            "book_id": book_id,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload cover image: {str(e)}"
+        )
 
 
 @router.get("/{book_id}/summary", status_code=status.HTTP_200_OK)

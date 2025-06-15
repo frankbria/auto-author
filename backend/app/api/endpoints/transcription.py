@@ -49,7 +49,7 @@ async def transcribe_audio(
             )
         
         # Perform transcription
-        result = transcription_service.transcribe_audio(
+        result = await transcription_service.transcribe_audio(
             audio_data=audio_data,
             language=language,
             enable_punctuation_commands=enable_punctuation_commands

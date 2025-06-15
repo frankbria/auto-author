@@ -2,10 +2,13 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from app.api.endpoints.router import router as api_router
 from app.core.config import settings
 import logging
+import os
+from pathlib import Path
 
 # Set up logging
 logging.basicConfig(
@@ -37,6 +40,16 @@ app.add_middleware(RequestValidationMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+# Mount static files for local uploads (only if not using cloud storage)
+# This allows serving uploaded images when using local storage
+uploads_path = Path("uploads")
+if uploads_path.exists() and not any([
+    os.getenv('CLOUDINARY_CLOUD_NAME'),
+    os.getenv('AWS_S3_BUCKET')
+]):
+    logger.info("Mounting local uploads directory for static file serving")
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 # Validation error handler

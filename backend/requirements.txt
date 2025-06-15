@@ -12,6 +12,13 @@ python-jose[cryptography]
 python-multipart
 passlib[bcrypt]
 
+# AWS SDK for transcription and S3
+boto3>=1.26.0
+
+# Image processing and storage
+cloudinary>=1.36.0
+Pillow>=10.0.0
+
 # Testing dependencies
 pytest>=7.3.1
 pytest-asyncio>=0.21.0

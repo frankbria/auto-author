@@ -727,11 +727,11 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 {"role": "user", "content": prompt}
             ]
             
-            response = await self._retry_with_backoff(
-                self._make_api_call, messages, temperature=0.8
+            response = await self._make_openai_request(
+                messages, temperature=0.8
             )
             
-            draft_content = response["choices"][0]["message"]["content"]
+            draft_content = response.choices[0].message.content
             
             # Calculate metadata
             word_count = len(draft_content.split())
