@@ -3,18 +3,17 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DraftGenerator } from '@/components/chapters/DraftGenerator';
 import bookClient from '@/lib/api/bookClient';
-import { vi } from 'vitest';
-
 // Mock the bookClient
-vi.mock('@/lib/api/bookClient', () => ({
+jest.mock('@/lib/api/bookClient', () => ({
+  __esModule: true,
   default: {
-    generateChapterDraft: vi.fn(),
+    generateChapterDraft: jest.fn(),
   },
 }));
 
 // Mock the toast hook
-const mockToast = vi.fn();
-vi.mock('@/components/ui/use-toast', () => ({
+const mockToast = jest.fn();
+jest.mock('@/components/ui/use-toast', () => ({
   useToast: () => ({
     toast: mockToast,
   }),
@@ -25,11 +24,11 @@ describe('DraftGenerator', () => {
     bookId: 'test-book-id',
     chapterId: 'test-chapter-id',
     chapterTitle: 'Test Chapter',
-    onDraftGenerated: vi.fn(),
+    onDraftGenerated: jest.fn(),
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it('renders the generate button', () => {
@@ -195,7 +194,7 @@ describe('DraftGenerator', () => {
   it('applies generated draft to editor', async () => {
     const user = userEvent.setup();
     const mockDraft = 'This is the generated content';
-    const onDraftGenerated = vi.fn();
+    const onDraftGenerated = jest.fn();
     
     (bookClient.generateChapterDraft as any).mockResolvedValueOnce({
       success: true,

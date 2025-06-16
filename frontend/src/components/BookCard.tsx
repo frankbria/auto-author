@@ -1,8 +1,20 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { Card, CardContent, CardFooter, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export type BookProject = {
   id: string;
@@ -24,10 +36,13 @@ export type BookProject = {
 type BookCardProps = {
   book: BookProject;
   onClick?: () => void;
+  onDelete?: (bookId: string) => void;
 };
 
-export default function BookCard({ book, onClick }: BookCardProps) {
+export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
   const router = useRouter();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -46,11 +61,27 @@ export default function BookCard({ book, onClick }: BookCardProps) {
     }
   };
   
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await onDelete(book.id);
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error('Failed to delete book:', error);
+      // Error handling is done in parent component
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+  
   return (
-    <Card 
-      className="w-[350px] bg-zinc-800 border border-zinc-700 hover:border-indigo-500 transition cursor-pointer"
-      onClick={handleClick}
-    >
+    <>
+      <Card 
+        className="w-[350px] bg-zinc-800 border border-zinc-700 hover:border-indigo-500 transition cursor-pointer"
+        onClick={handleClick}
+      >
       <div className="p-5">
         <CardTitle className="text-xl font-semibold text-zinc-100 mb-2 truncate" title={book.title}>
           {book.title}
@@ -97,9 +128,9 @@ export default function BookCard({ book, onClick }: BookCardProps) {
         )}
       </CardContent>
       
-      <CardFooter className="px-5 pt-0">
+      <CardFooter className="px-5 pt-0 flex gap-2">
         <Button
-          className="w-full bg-zinc-700 hover:bg-indigo-600 text-zinc-100"
+          className="flex-1 bg-zinc-700 hover:bg-indigo-600 text-zinc-100"
           onClick={(e) => {
             e.stopPropagation();
             router.push(`/dashboard/books/${book.id}`);
@@ -107,7 +138,43 @@ export default function BookCard({ book, onClick }: BookCardProps) {
         >
           Open Project
         </Button>
+        {onDelete && (
+          <Button
+            className="bg-zinc-700 hover:bg-red-600 text-zinc-100"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDeleteDialog(true);
+            }}
+            disabled={isDeleting}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </CardFooter>
-    </Card>
+      </Card>
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Book</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete "{book.title}"? This action cannot be undone.
+            All chapters and content will be permanently deleted.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

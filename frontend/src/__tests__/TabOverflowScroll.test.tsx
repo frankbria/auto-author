@@ -19,6 +19,10 @@ describe('Tab Overflow and Scrolling', () => {
       configurable: true, 
       value: 500 
     });
+    Object.defineProperty(HTMLElement.prototype, 'scrollTop', { 
+      configurable: true, 
+      value: 100 // Has scrolled down a bit
+    });
   });
   
   test('renders scroll buttons when tabs overflow container', async () => {
@@ -46,7 +50,26 @@ describe('Tab Overflow and Scrolling', () => {
     
     // Mock scroll methods
     const scrollByMock = jest.fn();
-    Element.prototype.scrollBy = scrollByMock;
+    const addEventListenerMock = jest.fn();
+    const removeEventListenerMock = jest.fn();
+    
+    // Mock querySelector to return a mock viewport element
+    const mockViewport = {
+      scrollBy: scrollByMock,
+      scrollTop: 100,
+      scrollHeight: 1000,
+      clientHeight: 500,
+      addEventListener: addEventListenerMock,
+      removeEventListener: removeEventListenerMock
+    };
+    
+    const originalQuerySelector = HTMLElement.prototype.querySelector;
+    HTMLElement.prototype.querySelector = jest.fn((selector) => {
+      if (selector === '[data-radix-scroll-area-viewport]') {
+        return mockViewport as any;
+      }
+      return originalQuerySelector.call(this, selector);
+    });
     
     render(
       <TabBar
@@ -59,34 +82,65 @@ describe('Tab Overflow and Scrolling', () => {
       />
     );
     
+    // Wait for component to be fully rendered
+    await waitFor(() => {
+      expect(screen.getByTestId('scroll-down-button')).toBeInTheDocument();
+    });
+    
+    // The buttons should be enabled since scrollTop > 0 and scrollHeight > clientHeight
+    const scrollDownButton = screen.getByTestId('scroll-down-button');
+    const scrollUpButton = screen.getByTestId('scroll-up-button');
+    
+    // They should be enabled now since we have scroll content
+    expect(scrollDownButton).not.toBeDisabled();
+    expect(scrollUpButton).not.toBeDisabled();
+    
     // Click scroll down button
-    const scrollDownButton = await screen.findByTestId('scroll-down-button');
     fireEvent.click(scrollDownButton);
     
     expect(scrollByMock).toHaveBeenCalledWith(
       expect.objectContaining({ 
-        top: expect.any(Number),
+        top: 100,
         behavior: 'smooth'
       })
     );
     
     // Click scroll up button
-    const scrollUpButton = screen.getByTestId('scroll-up-button');
     fireEvent.click(scrollUpButton);
     
     expect(scrollByMock).toHaveBeenCalledWith(
       expect.objectContaining({ 
-        top: expect.any(Number),
+        top: -100,
         behavior: 'smooth'
       })
     );
+    
+    // Restore original querySelector
+    HTMLElement.prototype.querySelector = originalQuerySelector;
   });
   
   test('automatically scrolls to make active tab visible', async () => {
     const { chapters, tabOrder } = generateChaptersFixture(20);
     
     const scrollIntoViewMock = jest.fn();
-    Element.prototype.scrollIntoView = scrollIntoViewMock;
+    
+    // Mock querySelector to return elements with scrollIntoView
+    const originalQuerySelector = HTMLElement.prototype.querySelector;
+    HTMLElement.prototype.querySelector = jest.fn(function(this: HTMLElement, selector: string) {
+      if (selector.includes('[data-rfd-draggable-id="ch-15"]')) {
+        return {
+          scrollIntoView: scrollIntoViewMock
+        } as any;
+      }
+      if (selector === '[data-radix-scroll-area-viewport]') {
+        return {
+          scrollTop: 100,
+          scrollHeight: 1000,
+          clientHeight: 500
+        } as any;
+      }
+      return originalQuerySelector.call(this, selector);
+    });
     
     render(
       <TabBar
@@ -107,6 +161,9 @@ describe('Tab Overflow and Scrolling', () => {
         })
       );
     });
+    
+    // Restore original querySelector
+    HTMLElement.prototype.querySelector = originalQuerySelector;
   });
   
   test('has correct initial scroll button states', async () => {

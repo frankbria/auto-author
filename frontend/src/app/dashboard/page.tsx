@@ -57,6 +57,25 @@ export default function Dashboard() {
       router.push(`/dashboard/books/${bookId}`);
     }, 1500);
   };
+  
+  const handleDeleteBook = async (bookId: string) => {
+    try {
+      // Get Clerk session token for API authentication
+      const token = await getToken();
+      if (token) {
+        bookClient.setAuthToken(token);
+      }
+      
+      await bookClient.deleteBook(bookId);
+      toast.success('Book deleted successfully');
+      
+      // Update the local state to remove the deleted book
+      setProjects(prevProjects => prevProjects.filter(book => book.id !== bookId));
+    } catch (err) {
+      console.error('Error deleting book:', err);
+      toast.error('Failed to delete book. Please try again.');
+    }
+  };
 
   // Show loading state
   if (isLoading) {
@@ -109,7 +128,11 @@ export default function Dashboard() {
         {projects.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map(project => (
-              <BookCard key={project.id} book={project} />
+              <BookCard 
+                key={project.id} 
+                book={project} 
+                onDelete={handleDeleteBook}
+              />
             ))}
           </div>
         ) : (

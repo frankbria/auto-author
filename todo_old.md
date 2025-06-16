@@ -1,5 +1,8 @@
 # Auto Author - Todo List
 
+> ⚠️ **DEPRECATED**: This document has been superseded by `TODO_CONSOLIDATED.md`
+> Please refer to TODO_CONSOLIDATED.md for the current, accurate project status.
+
 ## 🚨 MVP BLOCKERS - HIGH PRIORITY
 
 These features are ESSENTIAL for a functional MVP. Without them, authors cannot create, edit, or export their books.

@@ -61,7 +61,7 @@ describe('Test Infrastructure Integration', () => {
     it('should have React Testing Library configured', () => {
       expect(typeof render).toBe('function');
       expect(typeof screen).toBe('object');
-      expect(typeof fireEvent).toBe('object');
+      expect(typeof fireEvent).toBe('function');
       expect(typeof fireEvent.click).toBe('function');
       expect(typeof userEvent.setup).toBe('function');
     });

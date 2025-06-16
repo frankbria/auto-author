@@ -80,3 +80,11 @@ Object.defineProperty(navigator, 'mediaDevices', {
     ]),
   },
 });
+
+// Ensure DOM is properly set up for React Testing Library
+if (typeof document !== 'undefined') {
+  // Ensure we have a proper DOM container
+  if (!document.body) {
+    document.body = document.createElement('body');
+  }
+}

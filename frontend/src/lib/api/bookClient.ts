@@ -912,6 +912,125 @@ export class BookClient {
     }
     return response.json();
   }
+
+  /**
+   * Export book as PDF
+   */
+  public async exportPDF(
+    bookId: string,
+    options?: {
+      includeEmptyChapters?: boolean;
+      pageSize?: 'letter' | 'A4';
+    }
+  ): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (options?.includeEmptyChapters !== undefined) {
+      params.append('include_empty_chapters', options.includeEmptyChapters.toString());
+    }
+    if (options?.pageSize) {
+      params.append('page_size', options.pageSize);
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/export/pdf?${params.toString()}`,
+      {
+        headers: this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to export PDF: ${response.status} ${error}`);
+    }
+    
+    return response.blob();
+  }
+
+  /**
+   * Export book as DOCX
+   */
+  public async exportDOCX(
+    bookId: string,
+    options?: {
+      includeEmptyChapters?: boolean;
+    }
+  ): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (options?.includeEmptyChapters !== undefined) {
+      params.append('include_empty_chapters', options.includeEmptyChapters.toString());
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/export/docx?${params.toString()}`,
+      {
+        headers: this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to export DOCX: ${response.status} ${error}`);
+    }
+    
+    return response.blob();
+  }
+
+  /**
+   * Get available export formats and book statistics
+   */
+  public async getExportFormats(bookId: string): Promise<{
+    formats: Array<{
+      format: string;
+      name: string;
+      description: string;
+      mime_type: string;
+      extension: string;
+      available: boolean;
+      options?: Record<string, any>;
+    }>;
+    book_stats: {
+      total_chapters: number;
+      chapters_with_content: number;
+      total_word_count: number;
+      estimated_pages: number;
+    };
+  }> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/export/formats`,
+      {
+        headers: this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get export formats: ${response.status} ${error}`);
+    }
+    
+    return response.json();
+  }
+
+  /**
+   * Delete a book
+   */
+  public async deleteBook(bookId: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}`,
+      {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to delete book: ${response.status} ${error}`);
+    }
+  }
 }
 
 // Create a singleton instance for use throughout the app

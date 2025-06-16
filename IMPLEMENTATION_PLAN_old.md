@@ -6,6 +6,9 @@ Auto Author is an AI-assisted book writing platform that's already substantially
 
 ## Current State Analysis
 
+> 📌 **Note**: For the most current project status, see `TODO_CONSOLIDATED.md`
+> This section reflects the state at the time of writing and may be outdated.
+
 ### ✅ What's Working Well
 - **User Authentication**: Complete Clerk integration with profile management
 - **Book Management**: Full CRUD operations with metadata and cover uploads

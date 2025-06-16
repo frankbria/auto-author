@@ -87,6 +87,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);
@@ -186,6 +187,35 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     });  }, [book, form]);
 
   const [isSaving, setIsSaving] = useState(false);
+
+  const handleExportPDF = async () => {
+    if (!book) return;
+    
+    setIsExportingPDF(true);
+    try {
+      const blob = await bookClient.exportPDF(bookId, {
+        includeEmptyChapters: false,
+        pageSize: 'letter'
+      });
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${book.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success('PDF exported successfully!');
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      toast.error('Failed to export PDF. Please try again.');
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
   // Auto-save on form change
   useEffect(() => {
     const subscription = form.watch(async (values) => {
@@ -483,8 +513,12 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
             </div>
           </div>
           <div className="mt-6 pt-4 border-t border-zinc-700">
-            <button className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
-              Generate PDF Preview
+            <button 
+              onClick={handleExportPDF}
+              disabled={isExportingPDF}
+              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {isExportingPDF ? 'Generating PDF...' : 'Generate PDF Preview'}
             </button>
           </div>
         </div>

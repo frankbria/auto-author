@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { VoiceTextInput } from '@/components/chapters/VoiceTextInput';
 import { setupSpeechRecognitionMock } from '../mocks/speechRecognition';
@@ -81,15 +81,20 @@ describe('VoiceTextInput Component', () => {
       );
       
       const recordButton = screen.getByRole('button', { name: /start voice recording/i });
-      await user.click(recordButton);
+      
+      await act(async () => {
+        await user.click(recordButton);
+      });
       
       // Should show recording state
-      expect(screen.getByText(/recording/i)).toBeInTheDocument();
+      expect(screen.getByText(/Recording started - speak now/i)).toBeInTheDocument();
       expect(mockRecognition.start).toHaveBeenCalled();
       
       // Wait for transcription
-      await waitFor(() => {
-        expect(mockOnChange).toHaveBeenCalledWith('This is a voice test. ');
+      await act(async () => {
+        await waitFor(() => {
+          expect(mockOnChange).toHaveBeenCalledWith('This is a voice test. ');
+        }, { timeout: 1000 });
       });
     });
     
@@ -109,10 +114,15 @@ describe('VoiceTextInput Component', () => {
       );
       
       const recordButton = screen.getByRole('button', { name: /start voice recording/i });
-      await user.click(recordButton);
       
-      await waitFor(() => {
-        expect(screen.getByText(/error recording audio/i)).toBeInTheDocument();
+      await act(async () => {
+        await user.click(recordButton);
+      });
+      
+      await act(async () => {
+        await waitFor(() => {
+          expect(screen.getByText(/Error recording audio: network/i)).toBeInTheDocument();
+        }, { timeout: 1000 });
       });
     });
   });
@@ -128,7 +138,7 @@ describe('VoiceTextInput Component', () => {
         delay: 100
       });
       
-      render(
+      const { rerender } = render(
         <VoiceTextInput 
           value=""
           mode="voice"
@@ -138,16 +148,35 @@ describe('VoiceTextInput Component', () => {
       );
       
       const recordButton = screen.getByRole('button', { name: /start voice recording/i });
-      await user.click(recordButton);
+      
+      await act(async () => {
+        await user.click(recordButton);
+      });
       
       // Wait for transcription
-      jest.advanceTimersByTime(200);
+      await act(async () => {
+        jest.advanceTimersByTime(200);
+      });
+      
       await waitFor(() => {
         expect(mockOnChange).toHaveBeenCalledWith('Auto-save voice content. ');
       });
       
+      // Rerender with the new value to trigger auto-save effect
+      rerender(
+        <VoiceTextInput 
+          value="Auto-save voice content. "
+          mode="voice"
+          onChange={mockOnChange}
+          onAutoSave={mockSave}
+        />
+      );
+      
       // Auto-save should trigger after delay
-      jest.advanceTimersByTime(3000);
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+      });
+      
       expect(mockSave).toHaveBeenCalledWith('Auto-save voice content. ');
       
       jest.useRealTimers();

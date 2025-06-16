@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import UserProfile from '../app/profile/page';
@@ -39,14 +40,12 @@ jest.mock('../components/ui/form', () => ({
     infer: jest.fn()
   },
   useForm: jest.fn(),
-  zodResolver: jest.fn(),  Form: ({ children, onSubmit, form }: { children: React.ReactNode; onSubmit: (...args: unknown[]) => void; form: { handleSubmit?: (callback: (...args: unknown[]) => void) => (e: React.FormEvent) => void } }) => (
+  zodResolver: jest.fn(),  Form: ({ children, onSubmit, form }: { children: React.ReactNode; onSubmit: (...args: unknown[]) => void; form: any }) => (
     <form onSubmit={(e) => { 
       e.preventDefault(); 
-      // Use the handleSubmit from the form to wrap onSubmit
-      if (form && form.handleSubmit) {
-        form.handleSubmit(onSubmit)(e);
-      } else {
-        onSubmit();
+      // Call onSubmit with form values when form is submitted
+      if (onSubmit && form?.getValues) {
+        onSubmit(form.getValues());
       }
     }} data-testid="form">{children}</form>
   ),
@@ -326,56 +325,26 @@ describe('UserProfile page', () => {
     (useProfileApi as jest.Mock).mockReturnValue({
       updateUserProfile: updateProfileSpy,
       deleteUserAccount: jest.fn(),
-    });    // Create a direct mock of form submission behavior
-    const onSubmitMock = jest.fn().mockImplementation(() => {
-      // Mock the successful submission by directly calling user.update and updateUserProfile
-      mockUser.update({
-        firstName: 'Jane',
-        lastName: 'Doe', 
-        unsafeMetadata: {
-          bio: 'Test bio',
-          theme: 'dark',
-          emailNotifications: true,
-          marketingEmails: false
-        }
-      });
-      
-      updateProfileSpy({
-        first_name: 'Jane',
-        last_name: 'Doe',
-        bio: 'Test bio',
-        preferences: {
-          theme: 'dark',
-          email_notifications: true,
-          marketing_emails: false
-        }
-      });
-      
-      return Promise.resolve({ success: true });
-    });
+    });    render(<UserProfile />);
     
-    // Redefine handleSubmit to call our mock
-    mockForm.handleSubmit = jest.fn((callback) => {
-      return (e) => {
-        if (e) e.preventDefault();
-        
-        // Call both the original callback and our mock
-        callback(mockForm.getValues());
-        onSubmitMock(mockForm.getValues());
-      };
-    });
-    
-    render(<UserProfile />);
-    // Submit the form
-    const form = screen.getByTestId('form');
+    // Wait for component to mount
     await act(async () => {
-      fireEvent.submit(form);
-      for (let i = 0; i < 40; i++) {
-        if (onSubmitMock.mock.calls.length > 0) break;
-        await new Promise(res => setTimeout(res, 100));
-      }
+      await new Promise(res => setTimeout(res, 100));
     });
-    expect(onSubmitMock).toHaveBeenCalled();
+    
+    // Submit the form by finding and clicking the submit button
+    const submitButton = screen.getByRole('button', { name: /save changes/i });
+    
+    await act(async () => {
+      fireEvent.click(submitButton);
+      // Wait for async operations
+      await new Promise(res => setTimeout(res, 500));
+    });
+    
+    // Wait for the form submission to be processed
+    await waitFor(() => {
+      expect(updateProfileSpy).toHaveBeenCalled();
+    }, { timeout: 3000 });
     
     // Check if mockUpdateFn was called (for Clerk update)
     expect(mockUpdateFn).toHaveBeenCalledWith({

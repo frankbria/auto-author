@@ -1,6 +1,6 @@
 export interface MockSpeechRecognitionEvent {
   resultIndex: number;
-  results: Array<Array<{ transcript: string; confidence: number }>>;
+  results: Array<Array<{ transcript: string; confidence: number; isFinal?: boolean }>>;
 }
 
 export class MockSpeechRecognition {
@@ -34,7 +34,9 @@ export class MockSpeechRecognition {
     setTimeout(() => {
       if (this.shouldError) {
         if (this.onerror) {
-          this.onerror(new Event('network'));
+          const errorEvent = new Event('error') as any;
+          errorEvent.error = 'network';
+          this.onerror(errorEvent);
         }
       } else {
         if (this.onresult) {
@@ -42,7 +44,8 @@ export class MockSpeechRecognition {
             resultIndex: 0,
             results: [[{ 
               transcript: this.transcript,
-              confidence: 0.95
+              confidence: 0.95,
+              isFinal: true
             }]],
           });
         }
