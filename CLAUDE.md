@@ -46,39 +46,53 @@ This is a monorepo for the auto-author project with a Next.js frontend and FastA
 - TOC generation with AI wizard
 - Chapter tabs interface (vertical layout)
 - Question-based content creation system
-- Basic test infrastructure
+- **Rich Text Editor** (TipTap with full formatting capabilities)
+- **AI Draft Generation** (Q&A to narrative with multiple writing styles)
+- **Voice Input Integration** (Browser Speech API - production ready)
+- **Export functionality** (PDF/DOCX with customizable options)
+- Auto-save functionality (3-second debounce)
+- Character count and save status indicators
+- Comprehensive test infrastructure (92.4% pass rate)
+- Production-ready file storage (local/cloud with automatic fallback)
+- AWS Transcribe integration (optional, with graceful fallback)
 
 ### 🚧 In Progress (High Priority)
-1. **Rich Text Editor** - Chapter content editing capability
-2. **AI Draft Generation** - Connect AI service for Q&A to narrative
-3. **Voice Input Integration** - Production speech-to-text service
-4. **Mock Service Replacement** - Real transcription and file storage
+1. **Test Coverage** - Fix remaining 20 tests for 100% pass rate
+2. **Production Deployment** - Infrastructure and CI/CD setup
+3. **Security Hardening** - Security audit and implementation
 
 ### 📋 Planned Features
-- Export functionality (PDF/DOCX)
 - Collaborative editing
-- Advanced AI features
+- Advanced AI features (style suggestions, grammar check)
+- EPUB export format
 - Mobile companion app
+- Performance optimizations
+- Enhanced export UI discoverability
 
 ## Implementation Priorities
 
-### Sprint 1-2: MVP Completion
-Focus on completing the core authoring workflow:
-1. Implement rich text editor (TipTap recommended)
-2. Complete AI draft generation integration
-3. Replace mock services with production implementations
+### Sprint 1-2: ✅ MVP COMPLETED
+All core authoring workflow features are implemented:
+1. ✅ Rich text editor (TipTap) - DONE
+2. ✅ AI draft generation integration - DONE
+3. ✅ Production services (no mocks in production) - DONE
 
-### Sprint 3-4: Enhanced UX
-Polish and improve reliability:
-1. Voice input integration across all text areas
-2. Basic export functionality
-3. Comprehensive error handling
+### Sprint 3-4: Production Ready (CURRENT)
+Focus on production readiness and quality:
+1. ✅ Voice input - DONE (Browser Speech API)
+2. ✅ Export functionality - DONE (PDF/DOCX)
+3. 🚧 Complete test coverage (currently at 92.4%)
+4. 🚧 Security hardening and audit
+5. 🚧 Production infrastructure setup
+6. 🚧 Performance optimization
 
-### Sprint 5: Production Ready
-Security and performance:
-1. Security hardening and audit
-2. Performance optimization
-3. Production infrastructure setup
+### Sprint 5-6: Enhanced Features
+Add collaborative and advanced features:
+1. Collaborative editing (real-time collaboration)
+2. Advanced AI features (style suggestions, grammar check, content analysis)
+3. Additional export formats (EPUB, Markdown)
+4. Enhanced analytics and progress tracking
+5. Version control for chapters
 
 ## Development Guidelines
 
