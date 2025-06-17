@@ -82,6 +82,7 @@ class QuestionBase(BaseModel):
 class QuestionCreate(QuestionBase):
     """Schema for creating a new question"""
     
+    book_id: str
     chapter_id: str
 
 
@@ -89,6 +90,7 @@ class Question(QuestionBase):
     """Schema for a complete question"""
     
     id: str
+    book_id: str
     chapter_id: str
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

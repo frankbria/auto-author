@@ -49,8 +49,8 @@ def test_imports():
 
     # Test 3: Service imports
     try:
-        from app.services.chapter_access_service import ChapterAccessService
-        from app.services.chapter_status_service import ChapterStatusService
+        from app.services.chapter_access_service import chapter_access_service
+        from app.services.chapter_status_service import chapter_status_service
         from app.services.chapter_cache_service import ChapterMetadataCache
         from app.services.chapter_error_handler import ChapterErrorHandler
 
@@ -83,15 +83,14 @@ def test_imports():
     # Test 6: Basic functionality
     try:
         from app.schemas.book import ChapterStatus
-        from app.services.chapter_status_service import ChapterStatusService
+        from app.services.chapter_status_service import chapter_status_service
 
         # Test enum values
         assert ChapterStatus.DRAFT.value == "draft"
         assert ChapterStatus.IN_PROGRESS.value == "in-progress"
 
         # Test service functionality
-        service = ChapterStatusService()
-        is_valid = service.is_valid_transition(
+        is_valid = chapter_status_service.is_valid_transition(
             ChapterStatus.DRAFT, ChapterStatus.IN_PROGRESS
         )
         assert is_valid is True

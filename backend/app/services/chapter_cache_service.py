@@ -474,4 +474,4 @@ async def cleanup_cache():
 
 
 # Export service instance
-chapter_cache_service = ChapterCacheService()
+chapter_cache_service = ChapterMetadataCache()

@@ -17,7 +17,8 @@ import json
 from functools import wraps
 
 from app.services.chapter_cache_service import chapter_cache
-from app.db.database import get_database
+from app.db.database import get_collection
+from app.db.base import _db as database
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +248,6 @@ class ChapterErrorHandler:
     ) -> Tuple[bool, Any]:
         """Attempt to recover database connection."""
         try:
-            database = await get_database()
             # Test connection
             await database.command("ping")
             return True, "Database connection recovered"
@@ -634,7 +634,6 @@ async def check_chapter_system_health() -> Dict[str, Any]:
 
     # Check database connectivity
     try:
-        database = await get_database()
         await database.command("ping")
         health_status["components"]["database"] = "operational"
     except Exception as e:

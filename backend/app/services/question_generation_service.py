@@ -5,6 +5,7 @@ import uuid
 
 from app.schemas.book import (
     QuestionCreate, 
+    Question,
     QuestionResponse, 
     QuestionResponseCreate,
     QuestionRating,
@@ -13,7 +14,8 @@ from app.schemas.book import (
     GenerateQuestionsResponse,
     QuestionType,
     QuestionDifficulty,
-    ResponseStatus
+    ResponseStatus,
+    QuestionMetadata
 )
 from app.services.ai_service import AIService
 from app.utils.validators import validate_text_safety
@@ -137,19 +139,34 @@ class QuestionGenerationService:
             # Save questions to database
             saved_questions = []
             for question in questions:
-                question.book_id = book_id  # Add book_id to question
-                saved_question = await create_question(question, user_id or current_user.get("clerk_id"))
-                saved_questions.append(saved_question)
+                saved_question_dict = await create_question(question, user_id or current_user.get("clerk_id"))
+                try:
+                    # Convert dict to Question object
+                    saved_question = Question(**saved_question_dict)
+                    saved_questions.append(saved_question)
+                except Exception as e:
+                    logger.error(f"Error converting question dict to Question object: {e}")
+                    logger.error(f"Question dict keys: {list(saved_question_dict.keys())}")
+                    logger.error(f"Question dict: {saved_question_dict}")
+                    raise
             
-            return GenerateQuestionsResponse(
-                questions=saved_questions,
-                total=len(saved_questions),
-                generated_at=datetime.now(timezone.utc).isoformat(),
-                success=True
-            )
+            logger.info(f"Saved {len(saved_questions)} questions to database")
+            
+            try:
+                response = GenerateQuestionsResponse(
+                    questions=saved_questions,
+                    generation_id=str(uuid.uuid4()),
+                    total=len(saved_questions)
+                )
+                return response
+            except Exception as e:
+                logger.error(f"Error creating GenerateQuestionsResponse: {e}")
+                raise
             
         except Exception as e:
             logger.error(f"Error generating questions: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             raise e
     
     async def get_questions_for_chapter(
@@ -279,11 +296,8 @@ class QuestionGenerationService:
             # No questions were deleted, return empty result
             return GenerateQuestionsResponse(
                 questions=[],
-                total=0,
-                generated_at=datetime.now(timezone.utc).isoformat(),
-                success=True,
-                preserved_count=count,
-                new_count=0
+                generation_id=str(uuid.uuid4()),
+                total=0
             )
     
     async def generate_chapter_questions(
@@ -531,11 +545,11 @@ class QuestionGenerationService:
                     examples = []
                 
                 # Create metadata
-                metadata = {
-                    "help_text": help_text if help_text else None,
-                    "examples": examples if examples else None,
-                    "suggested_response_length": self._get_suggested_length(difficulty)
-                }
+                metadata = QuestionMetadata(
+                    suggested_response_length=self._get_suggested_length(difficulty),
+                    help_text=help_text if help_text else None,
+                    examples=examples if examples else None
+                )
                 
                 # Create question
                 question = QuestionCreate(
@@ -546,7 +560,6 @@ class QuestionGenerationService:
                     difficulty=difficulty,
                     category="development",
                     order=i + 1,
-                    generated_at=datetime.now(timezone.utc).isoformat(),
                     metadata=metadata
                 )
                 
@@ -667,8 +680,12 @@ class QuestionGenerationService:
             question_text = templates_for_type[template_idx]
             
             # Get helper metadata
-            metadata = helper_metadata[question_type].copy()
-            metadata["suggested_response_length"] = self._get_suggested_length(difficulty)
+            helper_data = helper_metadata[question_type]
+            metadata = QuestionMetadata(
+                suggested_response_length=self._get_suggested_length(difficulty),
+                help_text=helper_data.get("help_text"),
+                examples=helper_data.get("examples")
+            )
             
             # Create question
             question = QuestionCreate(
@@ -679,7 +696,6 @@ class QuestionGenerationService:
                 difficulty=difficulty,
                 category="development",
                 order=i + 1,
-                generated_at=datetime.now(timezone.utc).isoformat(),
                 metadata=metadata
             )
             

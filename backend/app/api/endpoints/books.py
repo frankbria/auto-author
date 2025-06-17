@@ -2139,17 +2139,8 @@ async def generate_chapter_questions(
             status_code=403, detail="Not authorized to generate questions for this book"
         )
     
-    # Get the database connection from the app state
-    from fastapi import Request
-    request = Request.scope.get("root_path")
-    db = request.app.state.db if hasattr(request, "app") else None
-    
-    if db is None:
-        # Fall back to the database instance from the database module
-        from app.db.database import db
-    
     # Get question generation service
-    question_service = get_question_generation_service(db)
+    question_service = get_question_generation_service()
     
     try:
         # Generate questions
@@ -2174,7 +2165,7 @@ async def generate_chapter_questions(
                 "count": request_data.count,
                 "difficulty": request_data.difficulty.value if request_data.difficulty else None,
                 "focus": [q_type.value for q_type in request_data.focus] if request_data.focus else None,
-                "questions_generated": len(result.get("questions", [])),
+                "questions_generated": len(result.questions),
             }
         )
         
@@ -2215,17 +2206,8 @@ async def list_chapter_questions(
             status_code=403, detail="Not authorized to access this book's questions"
         )
     
-    # Get the database connection
-    from fastapi import Request
-    request = Request.scope.get("root_path")
-    db = request.app.state.db if hasattr(request, "app") else None
-    
-    if db is None:
-        # Fall back to the database instance from the database module
-        from app.db.database import db
-    
     # Get question service
-    question_service = get_question_generation_service(db)
+    question_service = get_question_generation_service()
     
     try:
         # Get questions with filters
@@ -2276,17 +2258,8 @@ async def save_question_response(
             status_code=403, detail="Not authorized to save responses for this book"
         )
     
-    # Get the database connection
-    from fastapi import Request
-    request = Request.scope.get("root_path")
-    db = request.app.state.db if hasattr(request, "app") else None
-    
-    if db is None:
-        # Fall back to the database instance from the database module
-        from app.db.database import db
-    
     # Get question service
-    question_service = get_question_generation_service(db)
+    question_service = get_question_generation_service()
     
     try:
         # Save response
@@ -2356,17 +2329,8 @@ async def get_question_response(
             status_code=403, detail="Not authorized to access responses for this book"
         )
     
-    # Get the database connection
-    from fastapi import Request
-    request = Request.scope.get("root_path")
-    db = request.app.state.db if hasattr(request, "app") else None
-    
-    if db is None:
-        # Fall back to the database instance from the database module
-        from app.db.database import db
-    
     # Get question service
-    question_service = get_question_generation_service(db)
+    question_service = get_question_generation_service()
     
     try:
         # Get response
@@ -2415,17 +2379,8 @@ async def rate_question(
             status_code=403, detail="Not authorized to rate questions for this book"
         )
     
-    # Get the database connection
-    from fastapi import Request
-    request = Request.scope.get("root_path")
-    db = request.app.state.db if hasattr(request, "app") else None
-    
-    if db is None:
-        # Fall back to the database instance from the database module
-        from app.db.database import db
-    
     # Get question service
-    question_service = get_question_generation_service(db)
+    question_service = get_question_generation_service()
     
     try:
         # Save rating
@@ -2493,17 +2448,8 @@ async def get_chapter_question_progress(
             status_code=403, detail="Not authorized to access this book's questions"
         )
     
-    # Get the database connection
-    from fastapi import Request
-    request = Request.scope.get("root_path")
-    db = request.app.state.db if hasattr(request, "app") else None
-    
-    if db is None:
-        # Fall back to the database instance from the database module
-        from app.db.database import db
-    
     # Get question service
-    question_service = get_question_generation_service(db)
+    question_service = get_question_generation_service()
     
     try:
         # Get progress
@@ -2551,17 +2497,8 @@ async def regenerate_chapter_questions(
             status_code=403, detail="Not authorized to regenerate questions for this book"
         )
     
-    # Get the database connection
-    from fastapi import Request
-    request = Request.scope.get("root_path")
-    db = request.app.state.db if hasattr(request, "app") else None
-    
-    if db is None:
-        # Fall back to the database instance from the database module
-        from app.db.database import db
-    
     # Get question service
-    question_service = get_question_generation_service(db)
+    question_service = get_question_generation_service()
     
     try:
         # Regenerate questions

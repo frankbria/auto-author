@@ -26,7 +26,8 @@ import os
 # Add the parent directory to path to import app modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.db.database import get_database
+from app.db.base import _db as database
+from app.db.database import get_collection
 from app.db.indexing_strategy import ChapterTabIndexManager
 from app.schemas.book import ChapterStatus
 
@@ -60,7 +61,7 @@ class ChapterTabsMigration:
 
     async def initialize(self):
         """Initialize database connection and index manager."""
-        self.database = await get_database()
+        self.database = database
         self.index_manager = ChapterTabIndexManager(self.database)
 
     async def migrate_chapter_metadata(self, book: Dict) -> Dict:
