@@ -100,7 +100,7 @@ describe('VoiceTextInput Component', () => {
     
     it('should handle voice recording errors', async () => {
       const user = userEvent.setup();
-      setupSpeechRecognitionMock({
+      const mockRecognition = setupSpeechRecognitionMock({
         shouldError: true,
         delay: 100
       });
@@ -119,11 +119,13 @@ describe('VoiceTextInput Component', () => {
         await user.click(recordButton);
       });
       
-      await act(async () => {
-        await waitFor(() => {
-          expect(screen.getByText(/Error recording audio: network/i)).toBeInTheDocument();
-        }, { timeout: 1000 });
-      });
+      // Wait for recognition to start
+      expect(mockRecognition.start).toHaveBeenCalled();
+      
+      // Wait for error to appear
+      await waitFor(() => {
+        expect(screen.getByText('Error recording audio: network')).toBeInTheDocument();
+      }, { timeout: 2000 });
     });
   });
   

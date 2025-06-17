@@ -24,7 +24,9 @@
       "Bash(npm install)",
       "Bash(npm install:*)",
       "Bash(nvm use:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(sed:*)",
+      "Bash(echo:*)"
     ],
     "deny": []
   }

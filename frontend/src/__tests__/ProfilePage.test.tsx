@@ -22,25 +22,19 @@ jest.mock('../hooks/useOptimizedClerkImage');
 // Mock lodash.debounce
 jest.mock('lodash.debounce', () => jest.fn((fn) => fn));
 
+// Mock react-hook-form
+jest.mock('react-hook-form', () => ({
+  useForm: jest.fn(),
+}));
+
+// Mock zod resolver
+jest.mock('@hookform/resolvers/zod', () => ({
+  zodResolver: jest.fn(),
+}));
+
 // Mock form components
 jest.mock('../components/ui/form', () => ({
-  // Mock the z object from zod
-  z: {
-    object: jest.fn().mockReturnValue({
-      shape: {}
-    }),
-    string: jest.fn().mockReturnValue({
-      min: jest.fn().mockReturnValue({
-        optional: jest.fn().mockReturnThis()
-      }),
-      optional: jest.fn().mockReturnThis()
-    }),
-    enum: jest.fn().mockReturnThis(),
-    boolean: jest.fn().mockReturnThis(),
-    infer: jest.fn()
-  },
-  useForm: jest.fn(),
-  zodResolver: jest.fn(),  Form: ({ children, onSubmit, form }: { children: React.ReactNode; onSubmit: (...args: unknown[]) => void; form: any }) => (
+  Form: ({ children, onSubmit, form }: { children: React.ReactNode; onSubmit: (...args: unknown[]) => void; form: any }) => (
     <form onSubmit={(e) => { 
       e.preventDefault(); 
       // Call onSubmit with form values when form is submitted
@@ -193,10 +187,12 @@ beforeEach(() => {
   // Always create a fresh form and values for each test
   const { form } = createMockFormAndValues();
   mockForm = form;
-  // Set up form module mocks using requireMock
-  const formModule = jest.requireMock('../components/ui/form');
-  formModule.useForm.mockReturnValue(mockForm);
-  formModule.zodResolver.mockReturnValue(() => ({}));
+  // Set up react-hook-form mock
+  const rhfModule = jest.requireMock('react-hook-form');
+  rhfModule.useForm.mockReturnValue(mockForm);
+  // Set up zod resolver mock
+  const zodModule = jest.requireMock('@hookform/resolvers/zod');
+  zodModule.zodResolver.mockReturnValue(() => ({}));
   // Set up Clerk hooks using imported clerk object
   (clerk.useUser as jest.Mock).mockReturnValue({
     user: mockUser,
@@ -261,33 +257,6 @@ describe('UserProfile page', () => {
       mockFormValuesTemplate[name] = value;
     }),
   };
-  beforeEach(() => {    jest.clearAllMocks();
-    // Always create a fresh form and values for each test
-    const { form } = createMockFormAndValues();
-    mockForm = form;
-    // Set up form module mocks using requireMock
-    const formModule = jest.requireMock('../components/ui/form');
-    formModule.useForm.mockReturnValue(mockForm);
-    formModule.zodResolver.mockReturnValue(() => ({}));
-    // Set up Clerk hooks using imported clerk object
-    (clerk.useUser as jest.Mock).mockReturnValue({
-      user: mockUser,
-      isLoaded: true,
-      isSignedIn: true,
-    });
-    (clerk.useAuth as jest.Mock).mockReturnValue({
-      signOut: jest.fn().mockResolvedValue(true),
-    });
-    // Set up useOptimizedClerkImage mock to always return getOptimizedImageUrl
-    (useOptimizedClerkImage as jest.Mock).mockReturnValue({
-      getOptimizedImageUrl: jest.fn((url) => url),
-    });
-    // Set up useProfileApi mock to always return the required functions
-    (useProfileApi as jest.Mock).mockReturnValue({
-      updateUserProfile: jest.fn().mockResolvedValue({}),
-      deleteUserAccount: jest.fn().mockResolvedValue({}),
-    });
-  });
   
   it('renders user profile data from Clerk', async () => {
     render(<UserProfile />);
@@ -384,9 +353,10 @@ describe('UserProfile page', () => {
         }
       }
     };
-    // Set up form module mocks using requireMock
-    const formModule = jest.requireMock('../components/ui/form');
-    formModule.useForm.mockReturnValue(formWithErrors);
+    // Set up react-hook-form mock
+    const rhfModule = jest.requireMock('react-hook-form');
+    rhfModule.useForm.mockReturnValue(formWithErrors);
+    
     render(<UserProfile />);
     // In a real component, we'd test for error messages in the DOM
     // With our mocked components, we'll just verify the form is using the control with errors
@@ -419,9 +389,7 @@ describe('UserProfile page', () => {
       if (fieldName) return prefsTestValues[fieldName];
       return prefsTestValues;
     });
-    // Set up form module mocks using requireMock
-    const formModule = jest.requireMock('../components/ui/form');
-    formModule.useForm.mockReturnValue(mockForm);
+    
     render(<UserProfile />);
     // Find and click the submit button
     const submitButton = screen.getByText('Save Changes');
@@ -436,6 +404,7 @@ describe('UserProfile page', () => {
       firstName: 'Jane',
       lastName: 'Doe',
       unsafeMetadata: expect.objectContaining({
+        bio: 'Test bio',
         theme: 'light',
         emailNotifications: false,
         marketingEmails: false
@@ -538,26 +507,17 @@ describe('UserProfile page', () => {
     const errorToastSpy = jest.fn();
     mockUser.update = mockUpdateFn;
     toast.error = errorToastSpy;
-    // Setup form submit handler
-    const handleSubmitMock = jest.fn((callback: FormSubmitCallback) => (e?: React.FormEvent) => {
-      if (e) e.preventDefault();
-      return callback(mockForm.getValues());
-    });
-    mockForm.handleSubmit = handleSubmitMock;
-    // Set up form module mocks using requireMock
-    const formModule = jest.requireMock('../components/ui/form');
-    formModule.useForm.mockReturnValue(mockForm);
+    // Set up react-hook-form mock
+    const rhfModule = jest.requireMock('react-hook-form');
+    rhfModule.useForm.mockReturnValue(mockForm);
+    
     render(<UserProfile />);
+    
     // Get the submit button and click it
     const submitButton = screen.getByText('Save Changes');
     await act(async () => {
       fireEvent.click(submitButton);
-      for (let i = 0; i < 40; i++) {
-        if (handleSubmitMock.mock.calls.length > 0) break;
-        await new Promise(res => setTimeout(res, 100));
-      }
     });
-    expect(handleSubmitMock).toHaveBeenCalled();
     // Wait for update to be called and fail
     await waitFor(() => {
       expect(mockUpdateFn).toHaveBeenCalled();

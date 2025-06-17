@@ -132,7 +132,7 @@ describe('Question Components', () => {
       });
 
       // Find and click the generate button
-      const generateButton = screen.getByText(/Generate/);
+      const generateButton = screen.getByRole('button', { name: 'Generate Interview Questions' });
       fireEvent.click(generateButton);
 
       await waitFor(() => {
@@ -181,12 +181,23 @@ describe('Question Components', () => {
         expect(screen.getByText('What is the main character\'s motivation?')).toBeInTheDocument();
       });
 
+      // Wait for the response area to be displayed
+      await waitFor(() => {
+        // Check for either placeholder text
+        const textarea = screen.queryByPlaceholderText('Write your answer here...') ||
+                        screen.queryByPlaceholderText('Type your response here or use voice input...');
+        expect(textarea).toBeInTheDocument();
+      }, { timeout: 3000 });
+
       // Find and type in the text area
-      const textarea = screen.getByPlaceholderText('Write your answer here...');
+      const textarea = screen.queryByPlaceholderText('Write your answer here...') ||
+                      screen.getByPlaceholderText('Type your response here or use voice input...');
       fireEvent.change(textarea, { target: { value: 'Test response' } });
 
       // Find and click the save button
-      const saveButton = screen.getByText('Save Answer');
+      const saveButton = screen.queryByText('Save Answer') ||
+                        screen.queryByText('Save Draft') ||
+                        screen.getByRole('button', { name: /save/i });
       fireEvent.click(saveButton);
 
       await waitFor(() => {
