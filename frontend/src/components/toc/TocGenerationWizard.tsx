@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { bookClient } from '@/lib/api/bookClient';
+import bookClient from '@/lib/api/bookClient';
 import { 
   WizardStep, 
   WizardState, 

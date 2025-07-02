@@ -15,7 +15,7 @@ import { BrowserRouter } from 'react-router-dom';
 
 // Components under test
 import QuestionContainer from '../components/chapters/questions/QuestionContainer';
-import ChapterTabs from '../components/chapters/ChapterTabs';
+import { ChapterTabs } from '../components/chapters/ChapterTabs';
 import { QuestionType, QuestionDifficulty, ResponseStatus } from '../types/chapter-questions';
 
 // Mock bookClient
@@ -177,7 +177,7 @@ describe('Chapter Questions End-to-End Tests', () => {
   beforeEach(() => {
     queryClient = new QueryClient({
       defaultOptions: {
-        queries: { retry: false, cacheTime: 0 },
+        queries: { retry: false, gcTime: 0 },
         mutations: { retry: false },
       },
     });
@@ -778,7 +778,7 @@ describe('Chapter Questions End-to-End Tests', () => {
           id: 'response1',
           question_id: 'q1',
           response_text: 'Previously saved response',
-          status: ResponseStatus.COMPLETE,
+          status: ResponseStatus.COMPLETED,
           created_at: '2023-01-01T10:30:00Z',
           updated_at: '2023-01-01T10:30:00Z'
         }

@@ -4,6 +4,8 @@ import { useEffect, useCallback } from 'react';
 import { useChapterTabs } from '@/hooks/useChapterTabs';
 import { useTocSync } from '@/hooks/useTocSync';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { useToast } from '@/components/ui/use-toast';
+import bookClient from '@/lib/api/bookClient';
 import { TabBar } from './TabBar';
 import { TabContent } from './TabContent';
 import TabContextMenu from './TabContextMenu';
@@ -19,6 +21,7 @@ interface ChapterTabsProps {
 export function ChapterTabs({ bookId, initialActiveChapter, className, orientation = 'vertical' }: ChapterTabsProps) {
   // Check if we're on a mobile device - must be called at the top level
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const { toast } = useToast();
   
   const {
     state,
@@ -33,6 +36,73 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
     loading,
     error
   } = useChapterTabs(bookId, initialActiveChapter);
+
+  // Delete chapter handler
+  const handleDeleteChapter = useCallback(async (chapterId: string) => {
+    try {
+      // Find the chapter to get its title
+      const chapter = state.chapters.find(ch => ch.id === chapterId);
+      const chapterTitle = chapter?.title || 'Chapter';
+      
+      // Call the API to delete the chapter
+      await bookClient.deleteChapter(bookId, chapterId);
+      
+      // Close the tab if it's open
+      closeTab(chapterId);
+      
+      // Refresh the chapters list
+      await refreshChapters();
+      
+      toast({
+        title: "Chapter deleted",
+        description: `"${chapterTitle}" has been deleted successfully.`,
+        variant: "success"
+      });
+    } catch (error) {
+      console.error('Failed to delete chapter:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete chapter. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [bookId, state.chapters, closeTab, refreshChapters, toast]);
+
+  // Create new chapter handler
+  const handleCreateChapter = useCallback(async () => {
+    try {
+      // Calculate the next chapter order
+      const nextOrder = state.chapters.length > 0 
+        ? Math.max(...state.chapters.map(ch => ch.order || 0)) + 1 
+        : 1;
+      
+      // Create the new chapter
+      const newChapter = await bookClient.createChapter(bookId, {
+        title: `Chapter ${nextOrder}`,
+        content: '',
+        order: nextOrder
+      });
+      
+      // Refresh the chapters list to include the new chapter
+      await refreshChapters();
+      
+      // Set the new chapter as active
+      setActiveChapter(newChapter.id);
+      
+      toast({
+        title: "Chapter created",
+        description: `"${newChapter.title}" has been created successfully.`,
+        variant: "success"
+      });
+    } catch (error) {
+      console.error('Failed to create chapter:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create chapter. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [bookId, state.chapters, refreshChapters, setActiveChapter, toast]);
   // Set up TOC synchronization
   useTocSync({ 
     bookId, 
@@ -105,7 +175,7 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
         </p>
         <button 
           className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-          onClick={() => console.log('Create chapter clicked')}
+          onClick={handleCreateChapter}
         >
           Create Chapter
         </button>
@@ -154,9 +224,7 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
       />
       <TabContextMenu
         onStatusUpdate={updateChapterStatus}
-        onDelete={(chapterId: string) => {
-          console.log(`Delete chapter with ID: ${chapterId}`);
-        }}
+        onDelete={handleDeleteChapter}
       />
 
       {/* For tests requiring scroll controls and overflow indicators */}

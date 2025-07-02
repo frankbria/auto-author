@@ -315,8 +315,29 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       <div className="mb-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-zinc-100">{book.title}</h1>
-          <div className="text-zinc-400 text-sm">
-            Last edited {formatDate(book.updated_at ?? book.created_at ?? '')}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleExportPDF}
+              disabled={isExportingPDF}
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 shadow-lg"
+            >
+              {isExportingPDF ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                  </svg>
+                  Export PDF
+                </>
+              )}
+            </button>
+            <div className="text-zinc-400 text-sm">
+              Last edited {formatDate(book.updated_at ?? book.created_at ?? '')}
+            </div>
           </div>
         </div>        {/* Wizard/Stepper Actions */}
         <div className="mt-8 mb-8">

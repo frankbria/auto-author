@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +10,7 @@ import { Sparkles, Loader2, AlertCircle, FileText } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import bookClient from '@/lib/api/bookClient';
 import { cn } from '@/lib/utils';
+import DOMPurify from 'dompurify';
 
 interface DraftGeneratorProps {
   bookId: string;
@@ -66,6 +67,15 @@ export function DraftGenerator({
     actual_length: number;
   } | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  // Sanitize the generated draft to prevent XSS attacks
+  const sanitizedDraft = useMemo(() => {
+    if (!generatedDraft) return null;
+    return DOMPurify.sanitize(generatedDraft, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote'],
+      ALLOWED_ATTR: ['class']
+    });
+  }, [generatedDraft]);
   const { toast } = useToast();
 
   const handleResponseChange = (index: number, value: string) => {
@@ -294,7 +304,7 @@ export function DraftGenerator({
                 <div className="border rounded-lg p-4 max-h-96 overflow-y-auto bg-muted/30">
                   <div 
                     className="text-sm leading-relaxed whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{ __html: generatedDraft }}
+                    dangerouslySetInnerHTML={{ __html: sanitizedDraft || '' }}
                   />
                 </div>
               </div>

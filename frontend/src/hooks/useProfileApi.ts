@@ -36,43 +36,24 @@ export const useProfileApi = () => {
    * Get the current user's profile data
    */
   const getUserProfile = async (): Promise<UserProfile> => {
-    const response = await authFetch('/api/users/me');
-    if (!response.ok) {
-      throw new Error(`Error fetching profile: ${response.statusText}`);
-    }
-    return await response.json();
+    // This function is deprecated - authFetch no longer works
+    throw new Error('Profile API is deprecated. Use Clerk user management instead.');
   };
   
   /**
    * Update the current user's profile data
    */
   const updateUserProfile = async (profileData: ProfileUpdateData): Promise<UserProfile> => {
-    const response = await authFetch('/api/users/me', {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(profileData),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Error updating profile: ${response.statusText}`);
-    }
-    
-    return await response.json();
+    // This function is deprecated - authFetch no longer works
+    throw new Error('Profile API is deprecated. Use Clerk user management instead.');
   };
   
   /**
    * Delete the current user's account
    */
   const deleteUserAccount = async (): Promise<void> => {
-    const response = await authFetch('/api/users/me', {
-      method: 'DELETE',
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Error deleting account: ${response.statusText}`);
-    }
+    // This function is deprecated - authFetch no longer works
+    throw new Error('Profile API is deprecated. Use Clerk user management instead.');
   };
   
   return {

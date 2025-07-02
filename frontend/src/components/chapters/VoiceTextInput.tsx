@@ -48,12 +48,6 @@ interface SpeechRecognition extends EventTarget {
   abort(): void;
 }
 
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognition;
-    webkitSpeechRecognition?: new () => SpeechRecognition;
-  }
-}
 
 export function VoiceTextInput({
   value,

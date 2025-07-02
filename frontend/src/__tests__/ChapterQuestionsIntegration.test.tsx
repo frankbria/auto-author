@@ -48,7 +48,7 @@ describe('Chapter Questions Integration Tests', () => {
       id: 'q1',
       chapter_id: mockChapterId,
       question_text: 'What are the main learning objectives for this chapter?',
-      question_type: QuestionType.EDUCATIONAL,
+      question_type: QuestionType.THEME,
       difficulty: QuestionDifficulty.MEDIUM,
       category: 'learning',
       order: 1,
@@ -59,7 +59,7 @@ describe('Chapter Questions Integration Tests', () => {
         examples: ['Understanding core concepts', 'Applying practical skills']
       },
       has_response: false,
-      response_status: ResponseStatus.NOT_STARTED
+      response_status: ResponseStatus.DRAFT
     },
     {
       id: 'q2',

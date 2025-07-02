@@ -112,10 +112,46 @@ export default function QuestionContainer({
   };
   
   // Regenerate specific question
-  // const handleRegenerateQuestion = async (questionId: string) => {
-  //   // Implementation for regenerating a specific question
-  //   // Will be added in a future PR
-  // };
+  const handleRegenerateQuestion = async (questionId: string) => {
+    try {
+      setIsGenerating(true);
+      
+      // Find the question to regenerate
+      const questionToRegenerate = questions.find(q => q.id === questionId);
+      if (!questionToRegenerate) {
+        throw new Error('Question not found');
+      }
+      
+      // Call the API to regenerate questions (this will regenerate a single question)
+      const response = await bookClient.generateQuestions(bookId);
+      
+      if (response.questions && response.questions.length > 0) {
+        // Replace the old question with a new one
+        const newQuestion = response.questions[0]; // Take the first generated question
+        
+        const updatedQuestions = questions.map(q => 
+          q.id === questionId ? { ...(newQuestion as any), id: questionId } as Question : q
+        );
+        
+        setQuestions(updatedQuestions);
+        
+        toast({
+          title: "Question regenerated",
+          description: "A new question has been generated for you.",
+          variant: "success"
+        });
+      }
+    } catch (error) {
+      console.error('Failed to regenerate question:', error);
+      toast({
+        title: "Error",
+        description: "Failed to regenerate question. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
   
   // Navigation handlers
   const handleNextQuestion = () => {
@@ -204,7 +240,7 @@ export default function QuestionContainer({
           chapterId={chapterId}
           question={currentQuestion}
           onResponseSaved={handleResponseSaved}
-          onRegenerateQuestion={() => { /* TODO: implement regenerate question */ }}
+          onRegenerateQuestion={() => handleRegenerateQuestion(currentQuestion.id)}
         />
       )}
       

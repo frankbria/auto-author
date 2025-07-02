@@ -45,7 +45,13 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   
   const formatDate = (dateString: string) => {
+    if (!dateString) {
+      return 'Never';
+    }
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Never';
+    }
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'short', 

@@ -8,24 +8,6 @@ interface SpeechRecognitionEvent extends Event {
   resultIndex: number;
 }
 
-// Use a custom interface for SpeechRecognition to avoid 'any' and TS errors
-interface CustomSpeechRecognition {
-  start: () => void;
-  stop: () => void;
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: unknown) => void) | null;
-  onerror: ((event: unknown) => void) | null;
-  onend: (() => void) | null;
-}
-
-declare global {
-  interface Window {
-    webkitSpeechRecognition?: { new (): CustomSpeechRecognition };
-    SpeechRecognition?: { new (): CustomSpeechRecognition };
-  }
-}
 
 /**
  * SummaryInput - A text area for users to enter a book summary or synopsis.
@@ -38,11 +20,11 @@ export const SummaryInput: React.FC<{
 }> = ({ value, onChange, disabled }) => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const recognitionRef = useRef<CustomSpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const handleVoiceInput = () => {
     setError(null);
-    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionClass) {
       setError('Speech recognition is not supported in your browser.');
       return;

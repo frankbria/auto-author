@@ -27,7 +27,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LoaderCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 type BookCreationWizardProps = {
   isOpen: boolean;
@@ -270,7 +270,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
               >
                 {isSubmitting ? (
                   <>
-                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...
                   </>
                 ) : (
