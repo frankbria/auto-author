@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https: blob:",
               "media-src 'self'",
-              "connect-src 'self' https://clerk.auto-author.dev https://*.clerk.accounts.dev https://api.auto-author.dev https://clerk-telemetry.com http://localhost:8000 wss:",
+              "connect-src 'self' https://clerk.auto-author.dev https://*.clerk.accounts.dev https://api.auto-author.dev https://clerk-telemetry.com http://localhost:8000 https://localhost:8000 wss:",
               "frame-src 'self' https://*.clerk.accounts.dev",
               "object-src 'none'",
               "base-uri 'self'",
