@@ -35,8 +35,8 @@ class UserResponse(UserBase):
     preferences: Optional[UserPreferences] = Field(default_factory=UserPreferences)
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        validate_by_name = True
 
 
 class UserCreate(UserBase):
@@ -46,7 +46,7 @@ class UserCreate(UserBase):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "clerk_id": "user_2NxAa1pyy8THf937QUAhKR2tXCI",
                 "email": "user@example.com",
@@ -73,7 +73,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "updated@example.com",
                 "first_name": "Updated",

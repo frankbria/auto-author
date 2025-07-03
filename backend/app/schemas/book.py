@@ -153,7 +153,7 @@ class BookCreate(BookBase):
     """Schema for creating a new book"""
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "title": "My Awesome Book",
                 "subtitle": "A Journey Through Words",
@@ -179,7 +179,7 @@ class BookUpdate(BaseModel):
     published: Optional[bool] = None
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "title": "Updated Book Title",
                 "description": "A revised description of the book",
@@ -230,8 +230,8 @@ class BookResponse(BookBase):
     collaborators: List[Dict[str, Any]] = []
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        validate_by_name = True
 
 
 class BookDetailResponse(BookResponse):

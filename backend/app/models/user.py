@@ -59,8 +59,8 @@ class UserDB(UserBase):
     is_active: bool = True
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        validate_by_name = True
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
@@ -74,4 +74,4 @@ class UserRead(UserBase):
     book_ids: List[str] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True

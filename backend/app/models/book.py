@@ -117,8 +117,8 @@ class BookDB(BookBase):
     collaborators: List[Dict[str, str]] = Field(default_factory=list)
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        validate_by_name = True
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
@@ -133,4 +133,4 @@ class BookRead(BookBase):
     published: bool = False
 
     class Config:
-        orm_mode = True
+        from_attributes = True

@@ -20,8 +20,8 @@ class ChapterAccessLog(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        validate_by_name = True
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
@@ -52,4 +52,4 @@ class ChapterAccessRead(BaseModel):
     metadata: Dict[str, Any] = {}
 
     class Config:
-        orm_mode = True
+        from_attributes = True
