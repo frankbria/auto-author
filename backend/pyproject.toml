@@ -1,22 +1,45 @@
 [project]
 name = "auto-author-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI-powered book authoring backend API with FastAPI and MongoDB"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    # Core FastAPI dependencies
     "fastapi>=0.115.12",
+    "uvicorn>=0.34.3",
+    "python-multipart>=0.0.20",
+    
+    # Database
+    "pymongo>=4.13.0",
     "motor>=3.7.1",
-    "openai>=1.83.0",
+    
+    # Configuration and environment
+    "python-dotenv>=1.1.0",
     "pydantic[email]>=2.11.5",
     "pydantic-settings>=2.9.1",
-    "pymongo>=4.13.0",
-    "python-dotenv>=1.1.0",
-    "uvicorn>=0.34.3",
+    
+    # AI and external APIs
+    "openai>=1.83.0",
     "requests>=2.32.3",
+    
+    # Authentication and security
     "python-jose[cryptography]>=3.5.0",
-    "python-multipart>=0.0.20",
     "passlib[bcrypt]>=1.7.4",
+    
+    # AWS SDK for transcription and S3
+    "boto3>=1.26.0",
+    
+    # Image processing and storage
+    "cloudinary>=1.36.0",
+    "Pillow>=10.0.0",
+    
+    # Export functionality
+    "reportlab>=4.4.2",
+    "python-docx>=0.8.11",
+    "html2text>=2020.1.16",
+    
+    # Testing dependencies
     "pytest>=8.4.0",
     "pytest-asyncio>=1.0.0",
     "pytest-cov>=6.1.1",
