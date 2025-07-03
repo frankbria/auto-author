@@ -46,10 +46,10 @@ async def verify_jwt_token(token: str) -> Dict[str, Any]:
             token,
             settings.clerk_jwt_public_key_pem,
             algorithms=[settings.CLERK_JWT_ALGORITHM],
-            audience="example.com",  # Update with your domain
             options={
                 "verify_signature": True,
                 "verify_exp": True,  # Still verify expiration but with leeway
+                "verify_aud": False,  # Disable audience verification for Clerk
                 "leeway": 300,  # 5 minutes leeway for clock skew
             },
         )
