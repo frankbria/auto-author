@@ -23,6 +23,57 @@ This is a monorepo for the auto-author project with a Next.js frontend and FastA
 - **Lint**: `cd frontend && npm run lint`
 - **Type check**: `cd frontend && npm run type-check`
 
+## Project Management with Backlog.md
+
+This project uses [Backlog.md](https://github.com/frankbria/Backlog.md) for task management and documentation. The CLI tool manages development tasks and project documentation within the Git repository.
+
+### Task Management Commands
+- **Initialize project**: `backlog init` (sets up .backlog/ directory)
+- **Create task**: `backlog task create "Task title"`
+  - Add metadata: description, assignee, status, labels, priority
+  - Create subtasks and dependencies
+- **List tasks**: `backlog task list` (filter by status, assignee, labels)
+- **View Kanban board**: `backlog browser` (interactive web interface)
+- **Export board**: `backlog board export` (markdown format)
+
+### Documentation Commands  
+- **Create document**: `backlog doc create "Document title"`
+- **List documents**: `backlog doc list`
+- **View document**: `backlog doc view <doc-id>`
+
+### AI Agent Guidelines for Backlog Management
+When working on this project, AI agents should:
+
+1. **Review Existing Tasks**: Before starting work, check current tasks with `backlog task list`
+2. **Create Tasks for New Features**: When implementing new features or fixing bugs:
+   ```bash
+   backlog task create "Feature: Add user authentication"
+   # Add description, set priority, assign labels
+   ```
+3. **Update Task Status**: Move tasks through workflow (backlog → in-progress → completed)
+4. **Document Decisions**: Create architecture decision records and technical documentation:
+   ```bash
+   backlog doc create "ADR: Database Migration Strategy"
+   backlog doc create "API Design Guidelines"
+   ```
+5. **Link Related Work**: Reference task IDs in commit messages and PRs
+6. **Export Progress**: Generate status reports for reviews: `backlog board export`
+
+### Backlog Integration Workflow
+1. Check existing tasks before starting new work
+2. Create task for significant changes (features, refactoring, bug fixes)
+3. Move task to "in-progress" when starting work
+4. Document architectural decisions and technical choices
+5. Update task status and add completion notes
+6. Export board for sprint reviews and planning
+
+### Task Categories and Labels
+Use consistent labels for better organization:
+- `frontend`, `backend`, `docs`, `tests`, `infrastructure`
+- `bug`, `feature`, `enhancement`, `refactor`
+- `high-priority`, `medium-priority`, `low-priority`
+- `sprint-current`, `sprint-next`, `backlog`
+
 ## Testing
 - Backend tests are in `backend/tests/`
 - Frontend tests are in `frontend/src/__tests__/`
