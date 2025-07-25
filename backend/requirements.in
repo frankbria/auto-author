@@ -1,0 +1,36 @@
+FastAPI
+uvicorn
+pymongo
+python-dotenv
+openai
+motor
+pydantic
+pydantic-settings
+pydantic[email]
+requests
+python-jose[cryptography]
+python-multipart
+passlib[bcrypt]
+
+# AWS SDK for transcription and S3
+boto3>=1.26.0
+
+# Image processing and storage
+cloudinary>=1.36.0
+Pillow>=10.0.1
+
+# Export functionality
+reportlab>=4.0.0
+python-docx>=0.8.11
+html2text>=2020.1.16
+
+# Testing dependencies
+pytest>=7.3.1
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+httpx>=0.24.0
+pytest-mock>=3.10.0
+locust>=2.14.0
+faker>=18.0.0
+gevent>=23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
+h11>=0.16.0 # not directly required, pinned by Snyk to avoid a vulnerability
