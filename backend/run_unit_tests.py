@@ -10,7 +10,7 @@ import os
 # Set environment variables to use test database
 os.environ['DATABASE_URI'] = 'mongodb://localhost:27017'
 os.environ['DATABASE_NAME'] = 'auto_author_test'
-os.environ['OPENAI_API_KEY'] = 'test-key'
+os.environ['OPENAI_AUTOAUTHOR_API_KEY'] = 'test-key'
 os.environ['CLERK_API_KEY'] = 'test-key'
 os.environ['CLERK_JWT_PUBLIC_KEY'] = 'test-key'
 os.environ['CLERK_FRONTEND_API'] = 'test.clerk.com'
