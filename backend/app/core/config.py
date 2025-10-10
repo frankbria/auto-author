@@ -6,7 +6,7 @@ from typing import List, Union
 class Settings(BaseSettings):
     DATABASE_URI: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "auto_author_test"
-    OPENAI_API_KEY: str
+    OPENAI_AUTOAUTHOR_API_KEY: str
 
     # Clerk Authentication Settings
     CLERK_API_KEY: str
