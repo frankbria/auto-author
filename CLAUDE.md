@@ -1,182 +1,111 @@
-# Claude Development Instructions
+# Claude Code Configuration - SPARC Development Environment
 
-This is a monorepo for the auto-author project with a Next.js frontend and FastAPI backend.
+## 🚨 CRITICAL: CONCURRENT EXECUTION & FILE MANAGEMENT
 
-## Project Structure
-- `frontend/` - Next.js application
-- `backend/` - FastAPI Python application
-- `docs/` - Project documentation
+**ABSOLUTE RULES**:
+1. ALL operations MUST be concurrent/parallel in a single message
+2. **NEVER save working files, text/mds and tests to the root folder**
+3. ALWAYS organize files in appropriate subdirectories
 
-## Development Commands
+### ⚡ GOLDEN RULE: "1 MESSAGE = ALL RELATED OPERATIONS"
 
-### Backend (FastAPI)
-- **Setup**: `cd backend && uv venv && source .venv/bin/activate && uv pip install -r requirements.txt`
-- **Start server**: `cd backend && uv run uvicorn app.main:app --reload`
-- **Run tests**: `cd backend && uv run pytest`
-- **Quick validation**: `cd backend && uv run python quick_validate.py`
-- **Lint/Format**: `cd backend && uv run ruff check . && uv run ruff format .`
+**MANDATORY PATTERNS:**
+- **TodoWrite**: ALWAYS batch ALL todos in ONE call (5-10+ todos minimum)
+- **Task tool**: ALWAYS spawn ALL agents in ONE message with full instructions
+- **File operations**: ALWAYS batch ALL reads/writes/edits in ONE message
+- **Bash commands**: ALWAYS batch ALL terminal operations in ONE message
+- **Memory operations**: ALWAYS batch ALL memory store/retrieve in ONE message
 
-### Frontend (Next.js)
-- **Start dev server**: `cd frontend && npm run dev`
-- **Run tests**: `cd frontend && npm test`
-- **Build**: `cd frontend && npm run build`
-- **Lint**: `cd frontend && npm run lint`
-- **Type check**: `cd frontend && npm run type-check`
+### 📁 File Organization Rules
 
-## Project Management with Backlog.md
+**NEVER save to root folder. Use these directories:**
+- `/src` - Source code files
+- `/tests` - Test files
+- `/docs` - Documentation and markdown files
+- `/config` - Configuration files
+- `/scripts` - Utility scripts
+- `/examples` - Example code
 
-This project uses [Backlog.md](https://github.com/frankbria/Backlog.md) for task management and documentation. The CLI tool manages development tasks and project documentation within the Git repository.
+## Project Overview
 
-### Task Management Commands
-- **Initialize project**: `backlog init` (sets up .backlog/ directory)
-- **Create task**: `backlog task create "Task title"`
-  - Add metadata: description, assignee, status, labels, priority
-  - Create subtasks and dependencies
-- **List tasks**: `backlog task list` (filter by status, assignee, labels)
-- **View Kanban board**: `backlog browser` (interactive web interface)
-- **Export board**: `backlog board export` (markdown format)
+This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Completion) methodology with Claude-Flow orchestration for systematic Test-Driven Development.
 
-### Documentation Commands  
-- **Create document**: `backlog doc create "Document title"`
-- **List documents**: `backlog doc list`
-- **View document**: `backlog doc view <doc-id>`
+## SPARC Commands
 
-### AI Agent Guidelines for Backlog Management
-When working on this project, AI agents should:
+### Core Commands
+- `npx claude-flow sparc modes` - List available modes
+- `npx claude-flow sparc run <mode> "<task>"` - Execute specific mode
+- `npx claude-flow sparc tdd "<feature>"` - Run complete TDD workflow
+- `npx claude-flow sparc info <mode>` - Get mode details
 
-1. **Review Existing Tasks**: Before starting work, check current tasks with `backlog task list`
-2. **Create Tasks for New Features**: When implementing new features or fixing bugs:
-   ```bash
-   backlog task create "Feature: Add user authentication"
-   # Add description, set priority, assign labels
-   ```
-3. **Update Task Status**: Move tasks through workflow (backlog → in-progress → completed)
-4. **Document Decisions**: Create architecture decision records and technical documentation:
-   ```bash
-   backlog doc create "ADR: Database Migration Strategy"
-   backlog doc create "API Design Guidelines"
-   ```
-5. **Link Related Work**: Reference task IDs in commit messages and PRs
-6. **Export Progress**: Generate status reports for reviews: `backlog board export`
+### Batchtools Commands
+- `npx claude-flow sparc batch <modes> "<task>"` - Parallel execution
+- `npx claude-flow sparc pipeline "<task>"` - Full pipeline processing
+- `npx claude-flow sparc concurrent <mode> "<tasks-file>"` - Multi-task processing
 
-### Backlog Integration Workflow
-1. Check existing tasks before starting new work
-2. Create task for significant changes (features, refactoring, bug fixes)
-3. Move task to "in-progress" when starting work
-4. Document architectural decisions and technical choices
-5. Update task status and add completion notes
-6. Export board for sprint reviews and planning
+### Build Commands
+- `npm run build` - Build project
+- `npm run test` - Run tests
+- `npm run lint` - Linting
+- `npm run typecheck` - Type checking
 
-### Task Categories and Labels
-Use consistent labels for better organization:
-- `frontend`, `backend`, `docs`, `tests`, `infrastructure`
-- `bug`, `feature`, `enhancement`, `refactor`
-- `high-priority`, `medium-priority`, `low-priority`
-- `sprint-current`, `sprint-next`, `backlog`
+## SPARC Workflow Phases
 
-## Testing
-- Backend tests are in `backend/tests/`
-- Frontend tests are in `frontend/src/__tests__/`
-- Use pytest for backend, Jest for frontend
-- Always run tests after making changes
-- Maintain 80%+ test coverage for new features
+1. **Specification** - Requirements analysis (`sparc run spec-pseudocode`)
+2. **Pseudocode** - Algorithm design (`sparc run spec-pseudocode`)
+3. **Architecture** - System design (`sparc run architect`)
+4. **Refinement** - TDD implementation (`sparc tdd`)
+5. **Completion** - Integration (`sparc run integration`)
 
-## Key Features
-- Book creation and metadata management
-- Chapter editing with rich text editor
-- Table of contents generation
-- Question generation system
-- User authentication with Clerk
-- File upload for book covers
+## Code Style & Best Practices
 
-## Current Implementation Status
+- **Modular Design**: Files under 500 lines
+- **Environment Safety**: Never hardcode secrets
+- **Test-First**: Write tests before implementation
+- **Clean Architecture**: Separate concerns
+- **Documentation**: Keep updated
 
-### ✅ Completed Features
-- User authentication (Clerk integration)
-- Book CRUD operations with metadata
-- TOC generation with AI wizard
-- Chapter tabs interface (vertical layout)
-- Question-based content creation system
-- **Rich Text Editor** (TipTap with full formatting capabilities)
-- **AI Draft Generation** (Q&A to narrative with multiple writing styles)
-- **Voice Input Integration** (Browser Speech API - production ready)
-- **Export functionality** (PDF/DOCX with customizable options)
-- Auto-save functionality (3-second debounce)
-- Character count and save status indicators
-- **Comprehensive test infrastructure** (100% backend tests passing, 11 skipped)
-- **E2E Test Suite** (Complete workflow validation from book creation to draft generation)
-- Production-ready file storage (local/cloud with automatic fallback)
-- AWS Transcribe integration (optional, with graceful fallback)
-- Chapter access logging and analytics
-- Chapter status workflow (draft → in-progress → completed → published)
+## 🚀 Available Agents (54 Total)
 
-### 🚧 In Progress (High Priority)
-1. **Export UI Enhancement** - Add prominent Export button to book detail page
-2. **Production Deployment** - Infrastructure and CI/CD setup
-3. **Security Hardening** - Security audit and implementation
+### Core Development
+`coder`, `reviewer`, `tester`, `planner`, `researcher`
 
-### 📋 Planned Features
-- Collaborative editing
-- Advanced AI features (style suggestions, grammar check)
-- EPUB export format
-- Mobile companion app
-- Performance optimizations
-- Enhanced export UI discoverability
+### Swarm Coordination
+`hierarchical-coordinator`, `mesh-coordinator`, `adaptive-coordinator`, `collective-intelligence-coordinator`, `swarm-memory-manager`
 
-## Implementation Priorities
+### Consensus & Distributed
+`byzantine-coordinator`, `raft-manager`, `gossip-coordinator`, `consensus-builder`, `crdt-synchronizer`, `quorum-manager`, `security-manager`
 
-### Sprint 1-2: ✅ MVP COMPLETED
-All core authoring workflow features are implemented:
-1. ✅ Rich text editor (TipTap) - DONE
-2. ✅ AI draft generation integration - DONE
-3. ✅ Production services (no mocks in production) - DONE
+### Performance & Optimization
+`perf-analyzer`, `performance-benchmarker`, `task-orchestrator`, `memory-coordinator`, `smart-agent`
 
-### Sprint 3-4: Production Ready (CURRENT)
-Focus on production readiness and quality:
-1. ✅ Voice input - DONE (Browser Speech API)
-2. ✅ Export functionality - DONE (PDF/DOCX)
-3. ✅ Complete test coverage - DONE (100% backend tests passing)
-4. 🚧 Security hardening and audit
-5. 🚧 Production infrastructure setup
-6. 🚧 Performance optimization
+### GitHub & Repository
+`github-modes`, `pr-manager`, `code-review-swarm`, `issue-tracker`, `release-manager`, `workflow-automation`, `project-board-sync`, `repo-architect`, `multi-repo-swarm`
 
-### Sprint 5-6: Enhanced Features
-Add collaborative and advanced features:
-1. Collaborative editing (real-time collaboration)
-2. Advanced AI features (style suggestions, grammar check, content analysis)
-3. Additional export formats (EPUB, Markdown)
-4. Enhanced analytics and progress tracking
-5. Version control for chapters
+### SPARC Methodology
+`sparc-coord`, `sparc-coder`, `specification`, `pseudocode`, `architecture`, `refinement`
 
-## Development Guidelines
+### Specialized Development
+`backend-dev`, `mobile-dev`, `ml-developer`, `cicd-engineer`, `api-docs`, `system-architect`, `code-analyzer`, `base-template-generator`
 
-### Code Quality Standards
-- Write clean, self-documenting code
-- Follow existing patterns and conventions
-- Implement proper error handling
-- Add comprehensive logging
-- Maintain backward compatibility
+### Testing & Validation
+`tdd-london-swarm`, `production-validator`
 
-### Testing Requirements
-- Unit tests: 80% minimum coverage
-- Integration tests for critical flows
-- E2E tests for happy paths
-- Performance benchmarks for new features
-- Security testing for sensitive operations
+### Migration & Planning
+`migration-planner`, `swarm-init`
 
-### Security Considerations
-- Always validate and sanitize user input
-- Use proper authentication checks
-- Implement rate limiting for expensive operations
-- Encrypt sensitive data
-- Follow OWASP guidelines
+## 🎯 Claude Code vs MCP Tools
 
-### Performance Guidelines
-- Optimize database queries
-- Implement proper caching strategies
-- Use lazy loading where appropriate
-- Monitor bundle sizes
-- Profile and optimize bottlenecks
+### Claude Code Handles ALL:
+- File operations (Read, Write, Edit, MultiEdit, Glob, Grep)
+- Code generation and programming
+- Bash commands and system operations
+- Implementation work
+- Project navigation and analysis
+- TodoWrite and task management
+- Git operations
+- Package management
+- Testing and debugging
 
 ## Important Notes
 - Always run linting and type checking before committing

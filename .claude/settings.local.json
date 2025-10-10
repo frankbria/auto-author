@@ -1,35 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find:*)",
-      "Bash(grep:*)",
-      "Bash(uv run:*)",
-      "Bash(ls:*)",
-      "Bash(rg:*)",
-      "Bash(source:*)",
-      "Bash(python -m pytest tests/test_services/test_ai_service_draft_generation.py -v)",
-      "Bash(python3 -m pytest tests/test_services/test_ai_service_draft_generation.py -v --no-header)",
-      "Bash(pip3 list:*)",
-      "Bash(python3:*)",
-      "Bash(rm:*)",
-      "Bash(uv pip install:*)",
-      "Bash(touch:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(npm run type-check:*)",
-      "Bash(git reset:*)",
-      "Bash(npm test:*)",
-      "Bash(npm run typecheck:*)",
-      "Bash(npm install)",
-      "Bash(npm install:*)",
-      "Bash(nvm use:*)",
-      "Bash(node:*)",
-      "Bash(sed:*)",
-      "Bash(echo:*)",
-      "mcp__context7__resolve-library-id",
-      "mcp__context7__get-library-docs",
-      "WebFetch(domain:github.com)"
+      "mcp__ruv-swarm",
+      "mcp__claude-flow"
     ],
     "deny": []
   }
