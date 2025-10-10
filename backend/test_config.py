@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-os.environ['OPENAI_API_KEY'] = 'test-key'
+os.environ['OPENAI_AUTOAUTHOR_API_KEY'] = 'test-key'
 os.environ['CLERK_API_KEY'] = 'test-key'
 os.environ['CLERK_JWT_PUBLIC_KEY'] = 'test-key'
 os.environ['CLERK_FRONTEND_API'] = 'test.clerk.com'

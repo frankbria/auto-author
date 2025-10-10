@@ -3,30 +3,15 @@
 Run service tests in isolation without database dependencies
 """
 
-import os
-import sys
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
 import pytest
-
-# Set test environment
-os.environ['DATABASE_URI'] = 'mongodb://localhost:27017'
-os.environ['DATABASE_NAME'] = 'auto_author_test'
-os.environ['OPENAI_API_KEY'] = 'test-key'
-os.environ['CLERK_API_KEY'] = 'test-key'
-os.environ['CLERK_JWT_PUBLIC_KEY'] = 'test-key'
-os.environ['CLERK_FRONTEND_API'] = 'test.clerk.com'
-os.environ['CLERK_BACKEND_API'] = 'api.clerk.com'
-
-# Mock the database module before importing app
-sys.modules['motor'] = MagicMock()
-sys.modules['motor.motor_asyncio'] = MagicMock()
-sys.modules['pymongo'] = MagicMock()
-
-# Now we can import our modules
+import os
+from unittest.mock import patch, MagicMock
 from app.services.ai_service import AIService
-from app.services.transcription_service import TranscriptionService
 from app.core.config import settings
+
+# Set environment variables for testing
+os.environ['OPENAI_AUTOAUTHOR_API_KEY'] = 'test-key'
+os.environ['CLERK_API_KEY'] = 'test-clerk-key'
 
 async def test_ai_service():
     """Test AI service draft generation"""

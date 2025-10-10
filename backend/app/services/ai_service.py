@@ -18,7 +18,7 @@ class AIService:
 
     def __init__(self):
         """Initialize the AI service with OpenAI client."""
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = OpenAI(api_key=settings.OPENAI_AUTOAUTHOR_API_KEY)
         self.model = "gpt-4"  # Using GPT-4 for better analysis capabilities
         self.max_retries = 3
         self.base_delay = 1.0  # Base delay for exponential backoff
