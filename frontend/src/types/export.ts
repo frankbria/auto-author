@@ -11,7 +11,7 @@ export type ExportFormat = 'pdf' | 'docx';
 /**
  * Page size options for PDF export
  */
-export type PageSize = 'letter' | 'a4';
+export type PageSize = 'letter' | 'A4';
 
 /**
  * Export options provided by user

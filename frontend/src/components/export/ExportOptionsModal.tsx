@@ -203,7 +203,7 @@ export function ExportOptionsModal({
                   </Label>
                 </div>
                 <div className="flex items-center space-x-3 space-y-0">
-                  <RadioGroupItem value="a4" id="size-a4" />
+                  <RadioGroupItem value="A4" id="size-a4" />
                   <Label htmlFor="size-a4" className="font-normal cursor-pointer">
                     A4 (210mm × 297mm) - International Standard
                   </Label>
