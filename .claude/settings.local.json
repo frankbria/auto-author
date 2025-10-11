@@ -29,7 +29,11 @@
       "Bash(echo:*)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "mcp__serena__list_dir",
+      "mcp__serena__find_file",
+      "mcp__serena__activate_project",
+      "mcp__sequential-thinking__sequentialthinking"
     ],
     "deny": []
   }
