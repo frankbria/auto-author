@@ -5,16 +5,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardFooter, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteBookModal } from '@/components/books';
 
 export type BookProject = {
   id: string;
@@ -160,27 +151,17 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
       </CardFooter>
       </Card>
       
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete Book</AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to delete "{book.title}"? This action cannot be undone.
-            All chapters and content will be permanently deleted.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="bg-red-600 hover:bg-red-700"
-          >
-            {isDeleting ? 'Deleting...' : 'Delete'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      <DeleteBookModal
+        isOpen={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        bookTitle={book.title}
+        bookStats={{
+          chapterCount: book.chapters,
+          wordCount: 0, // TODO: Add word count to BookProject type
+        }}
+        onConfirm={handleDelete}
+        isDeleting={isDeleting}
+      />
     </>
   );
 }

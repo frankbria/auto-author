@@ -30,7 +30,7 @@ export function classifyError(
   // Handle API errors with status codes
   if (isApiError(error)) {
     const statusCode = error.statusCode || error.status;
-    const errorType = HTTP_STATUS_TO_ERROR_TYPE[statusCode] || ErrorType.SYSTEM;
+    const errorType = statusCode ? (HTTP_STATUS_TO_ERROR_TYPE[statusCode] || ErrorType.SYSTEM) : ErrorType.SYSTEM;
     const severity = ERROR_TYPE_TO_SEVERITY[errorType];
     const retryable = errorType === ErrorType.TRANSIENT;
 

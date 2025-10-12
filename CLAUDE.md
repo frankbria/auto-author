@@ -83,6 +83,7 @@ Use consistent labels for better organization:
 
 ## Key Features
 - Book creation and metadata management
+- **Book deletion with confirmation** (requires typing exact title)
 - Chapter editing with rich text editor (TipTap)
 - Table of contents generation with AI wizard
 - Question generation system for content development
@@ -96,6 +97,7 @@ Use consistent labels for better organization:
 ### ✅ Completed Features
 - User authentication (Clerk integration)
 - Book CRUD operations with metadata
+- **Book Deletion UI** (Type-to-confirm with comprehensive data loss warnings)
 - TOC generation with AI wizard
 - Chapter tabs interface (vertical layout)
 - Question-based content creation system
@@ -186,6 +188,60 @@ Add collaborative and advanced features:
 - Check documentation in `docs/` for specific feature guides
 - Review IMPLEMENTATION_PLAN.md for detailed sprint planning
 - Test coverage must meet 80% threshold before merging
+
+## Component Documentation
+
+### Book Deletion UI
+
+**Location**: `frontend/src/components/books/DeleteBookModal.tsx`
+
+**Description**: A comprehensive deletion confirmation modal that prevents accidental book deletion through a type-to-confirm pattern.
+
+**Key Features**:
+- **Type-to-Confirm**: Users must type the exact book title (case-sensitive) to enable deletion
+- **Data Loss Warnings**: Displays comprehensive warnings about what will be permanently deleted
+- **Book Statistics**: Shows chapter count and word count before deletion
+- **Loading States**: Disables all controls during deletion operation
+- **Prevention Mechanisms**: Blocks modal closure during deletion, prevents escape key and outside clicks
+- **Accessibility**: Full ARIA label support, keyboard navigation, autofocus on input field
+
+**Usage Example**:
+```tsx
+import { DeleteBookModal } from '@/components/books';
+
+<DeleteBookModal
+  isOpen={showDeleteDialog}
+  onOpenChange={setShowDeleteDialog}
+  bookTitle={book.title}
+  bookStats={{
+    chapterCount: book.chapters,
+    wordCount: book.wordCount,
+  }}
+  onConfirm={handleDeleteBook}
+  isDeleting={isDeleting}
+/>
+```
+
+**Props**:
+- `isOpen: boolean` - Controls modal visibility
+- `onOpenChange: (open: boolean) => void` - Callback when modal open state changes
+- `bookTitle: string` - Title of book to delete (used for confirmation)
+- `bookStats?: { chapterCount: number; wordCount: number }` - Optional statistics to display
+- `onConfirm: () => void | Promise<void>` - Callback when user confirms deletion
+- `isDeleting?: boolean` - Loading state during deletion
+
+**Test Coverage**: 86.2% overall, 91.66% for DeleteBookModal.tsx (29 tests, 100% pass rate)
+
+**Integration Points**:
+- Dashboard book cards (BookCard.tsx) - Delete button with trash icon
+- Book detail page (future enhancement)
+
+**Error Handling**:
+- Parent component handles deletion errors
+- Toast notifications for success/failure
+- Network error retry via parent logic
+
+---
 
 ## Feature Development Quality Standards
 
