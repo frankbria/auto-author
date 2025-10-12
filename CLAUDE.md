@@ -83,11 +83,13 @@ Use consistent labels for better organization:
 
 ## Key Features
 - Book creation and metadata management
-- Chapter editing with rich text editor
-- Table of contents generation
-- Question generation system
+- Chapter editing with rich text editor (TipTap)
+- Table of contents generation with AI wizard
+- Question generation system for content development
 - User authentication with Clerk
 - File upload for book covers
+- **Export functionality** (PDF/DOCX with customizable options)
+- **Unified error handling** with automatic retry logic
 
 ## Current Implementation Status
 
