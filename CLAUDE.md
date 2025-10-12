@@ -215,7 +215,7 @@ import { DeleteBookModal } from '@/components/books';
   bookTitle={book.title}
   bookStats={{
     chapterCount: book.chapters,
-    wordCount: book.wordCount,
+    wordCount: book.word_count ?? 0,  // Optional field with null coalescing
   }}
   onConfirm={handleDeleteBook}
   isDeleting={isDeleting}
@@ -227,6 +227,7 @@ import { DeleteBookModal } from '@/components/books';
 - `onOpenChange: (open: boolean) => void` - Callback when modal open state changes
 - `bookTitle: string` - Title of book to delete (used for confirmation)
 - `bookStats?: { chapterCount: number; wordCount: number }` - Optional statistics to display
+  - Note: `word_count` field may be null/undefined on Book objects; use null coalescing (`?? 0`)
 - `onConfirm: () => void | Promise<void>` - Callback when user confirms deletion
 - `isDeleting?: boolean` - Loading state during deletion
 
