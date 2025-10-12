@@ -20,6 +20,8 @@ import { ExportOptionsModal } from '@/components/export/ExportOptionsModal';
 import { ExportProgressModal } from '@/components/export/ExportProgressModal';
 import { downloadBlob, generateFilename, formatFileSize } from '@/components/export/exportHelpers';
 import { ExportOptions, ExportStatus } from '@/types/export';
+import { handleApiCall } from '@/lib/errors';
+import { showErrorNotification, showRecoveryNotification } from '@/components/errors';
 
 // Define types for book data
 type Chapter = {
@@ -213,49 +215,68 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     setExportProgress(0);
     setExportError(undefined);
 
-    try {
-      // Update status to processing
-      setExportStatus('processing');
+    // Update status to processing
+    setExportStatus('processing');
 
-      // Simulate progress (in real implementation, this would come from backend)
-      const progressInterval = setInterval(() => {
-        setExportProgress((prev) => {
-          if (prev >= 90) return prev;
-          return prev + 10;
-        });
-      }, 500);
+    // Simulate progress (in real implementation, this would come from backend)
+    const progressInterval = setInterval(() => {
+      setExportProgress((prev) => {
+        if (prev >= 90) return prev;
+        return prev + 10;
+      });
+    }, 500);
 
-      // Call appropriate export method
-      let blob: Blob;
-      if (options.format === 'pdf') {
-        blob = await bookClient.exportPDF(bookId, {
-          includeEmptyChapters: options.includeEmptyChapters,
-          pageSize: options.pageSize,
-        });
-      } else {
-        blob = await bookClient.exportDOCX(bookId, {
-          includeEmptyChapters: options.includeEmptyChapters,
-        });
+    // Call appropriate export method with error handling
+    const result = await handleApiCall(
+      async () => {
+        if (options.format === 'pdf') {
+          return await bookClient.exportPDF(bookId, {
+            includeEmptyChapters: options.includeEmptyChapters,
+            pageSize: options.pageSize,
+          });
+        } else {
+          return await bookClient.exportDOCX(bookId, {
+            includeEmptyChapters: options.includeEmptyChapters,
+          });
+        }
+      },
+      {
+        context: `Export ${options.format.toUpperCase()}`,
+        onRetry: (attempt, error) => {
+          setExportProgress(0);
+          toast.info(`Retrying export (attempt ${attempt})...`);
+        },
+        onSuccess: (attempts) => {
+          if (attempts > 1) {
+            showRecoveryNotification('Export completed', attempts);
+          }
+        },
       }
+    );
 
-      clearInterval(progressInterval);
+    clearInterval(progressInterval);
+
+    if (result.success && result.data) {
+      // Success!
       setExportProgress(100);
 
       // Generate filename and download
       const filename = generateFilename(book.title, options.format);
       setExportFilename(filename);
-      downloadBlob(blob, filename);
+      downloadBlob(result.data, filename);
 
       // Update status to completed
       setExportStatus('completed');
       toast.success(`${options.format.toUpperCase()} exported successfully!`);
-    } catch (err) {
-      console.error('Failed to export:', err);
+    } else if (result.error) {
+      // Error occurred
       setExportStatus('failed');
-      setExportError(
-        err instanceof Error ? err.message : 'Failed to export. Please try again.'
-      );
-      toast.error('Export failed. Please try again.');
+      setExportError(result.error.message);
+
+      // Show error notification with retry capability
+      showErrorNotification(result.error, {
+        onRetry: handleRetryExport,
+      });
     }
   };
 

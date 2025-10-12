@@ -33,7 +33,8 @@
       "mcp__serena__list_dir",
       "mcp__serena__find_file",
       "mcp__serena__activate_project",
-      "mcp__sequential-thinking__sequentialthinking"
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(npm run build)"
     ],
     "deny": []
   }
