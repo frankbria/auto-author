@@ -85,12 +85,15 @@ Use consistent labels for better organization:
 - Book creation and metadata management
 - **Book deletion with confirmation** (requires typing exact title)
 - Chapter editing with rich text editor (TipTap)
+- **Auto-save with localStorage backup** (saves every 3 seconds, backs up on network failure)
+- **Enhanced save status indicators** (visual feedback for saving/saved/error states)
 - Table of contents generation with AI wizard
 - Question generation system for content development
 - User authentication with Clerk
 - File upload for book covers
 - **Export functionality** (PDF/DOCX with customizable options)
 - **Unified error handling** with automatic retry logic
+- **WCAG 2.1 compliant keyboard navigation** (all interactive elements accessible via keyboard)
 
 ## Current Implementation Status
 
@@ -99,10 +102,13 @@ Use consistent labels for better organization:
 - Book CRUD operations with metadata
 - **Book Deletion UI** (Type-to-confirm with comprehensive data loss warnings)
 - TOC generation with AI wizard
-- Chapter tabs interface (vertical layout)
+- Chapter tabs interface (vertical layout with keyboard shortcuts Ctrl+1-9)
 - Question-based content creation system
 - **Rich Text Editor** (TipTap with full formatting capabilities)
 - **AI Draft Generation** (Q&A to narrative with multiple writing styles)
+- **Enhanced Auto-save System** (3-second debounce with localStorage backup on network failure)
+- **Save Status Indicators** (Visual feedback: "Not saved yet" → "Saving..." → "Saved ✓ [timestamp]")
+- **Keyboard Accessibility** (WCAG 2.1 compliant - all tabs and interactive elements accessible via Enter/Space)
 - **Voice Input Integration** (Browser Speech API - production ready)
 - **Export functionality** (PDF/DOCX with customizable options)
 - Auto-save functionality (3-second debounce)
