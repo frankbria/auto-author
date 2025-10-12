@@ -51,11 +51,17 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
         <TooltipTrigger asChild>
           <div
             ref={ref}
-            {...props}            className={cn(
-              "group relative flex items-center gap-2 cursor-pointer transition-colors",
-              orientation === 'horizontal' 
+            {...props}
+            role="button"
+            tabIndex={0}
+            aria-label={`Open chapter ${chapter.title}`}
+            aria-selected={isActive}
+            className={cn(
+              "group relative flex items-center gap-2 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+              orientation === 'horizontal'
                 ? "px-3 py-2 border-r min-w-0 max-w-[200px]"
-                : "px-3 py-3 w-full min-h-[48px]",              isActive 
+                : "px-3 py-3 w-full min-h-[48px]",
+              isActive
                 ? orientation === 'horizontal'
                   ? "bg-background border-b-2 border-b-primary text-foreground"
                   : "bg-background border-r-2 border-r-primary text-foreground"
@@ -65,6 +71,12 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
               chapter.has_unsaved_changes && "border-orange-200"
             )}
             onClick={onSelect}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect();
+              }
+            }}
           >
             {/* Status Indicator */}
             <div className={cn("w-2 h-2 rounded-full flex-shrink-0 border border-zinc-400 bg-white", config.color)} />            
