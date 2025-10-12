@@ -41,7 +41,9 @@ import {
   Code,
   Undo,
   Redo,
-  Minus
+  Minus,
+  Check,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DraftGenerator } from './DraftGenerator';
@@ -55,11 +57,11 @@ interface ChapterEditorProps {
   onContentChange?: (content: string) => void;
 }
 
-export function ChapterEditor({ 
-  bookId, 
+export function ChapterEditor({
+  bookId,
   chapterId,
   chapterTitle = 'Untitled Chapter',
-  initialContent = '', 
+  initialContent = '',
   onSave,
   onContentChange
 }: ChapterEditorProps) {
@@ -69,6 +71,7 @@ export function ChapterEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [autoSavePending, setAutoSavePending] = useState(false);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
+  const [hasBackup, setHasBackup] = useState(false);
   
   const editor = useEditor({
     extensions: [
@@ -97,6 +100,15 @@ export function ChapterEditor({
     // Set this to false to avoid SSR hydration issues
     immediatelyRender: false,
   });
+
+  // Check for localStorage backup on mount
+  useEffect(() => {
+    const backupKey = `chapter-backup-${bookId}-${chapterId}`;
+    const backupData = localStorage.getItem(backupKey);
+    if (backupData) {
+      setHasBackup(true);
+    }
+  }, [bookId, chapterId]);
 
   // Load chapter content if no initial content provided
   useEffect(() => {
@@ -139,14 +151,14 @@ export function ChapterEditor({
     }
   }, [initialContent, editor]);
 
-  // Auto-save functionality
+  // Auto-save functionality with localStorage backup
   useEffect(() => {
     if (!autoSavePending || !editor || isSaving) return;
-    
+
     const timer = setTimeout(async () => {
       const content = editor.getHTML();
       if (content === lastAutoSavedContent) return;
-      
+
       setIsSaving(true);
       setError(null);
       try {
@@ -154,28 +166,54 @@ export function ChapterEditor({
         setLastSaved(new Date());
         setLastAutoSavedContent(content);
         setAutoSavePending(false);
+
+        // Clear backup after successful save
+        const backupKey = `chapter-backup-${bookId}-${chapterId}`;
+        localStorage.removeItem(backupKey);
+        setHasBackup(false);
       } catch (err) {
         console.error('Failed to auto-save chapter:', err);
-        setError('Failed to auto-save chapter content');
+
+        // Backup to localStorage on failure
+        try {
+          const backupKey = `chapter-backup-${bookId}-${chapterId}`;
+          const backup = {
+            content,
+            timestamp: Date.now(),
+            error: err instanceof Error ? err.message : 'Unknown error'
+          };
+          localStorage.setItem(backupKey, JSON.stringify(backup));
+          setHasBackup(true);
+          setError('Failed to auto-save. Content backed up locally.');
+        } catch (storageErr) {
+          console.error('Failed to backup to localStorage:', storageErr);
+          setError('Failed to auto-save chapter content');
+        }
       } finally {
         setIsSaving(false);
       }
     }, 3000);
-    
+
     return () => clearTimeout(timer);
   }, [autoSavePending, bookId, chapterId, editor, isSaving, lastAutoSavedContent]);
 
   const handleSave = async (isAutoSave: boolean = false) => {
     if (isSaving || !editor) return;
-    
+
     const content = editor.getHTML();
     setIsSaving(true);
     setError(null);
-    
+
     try {
       await bookClient.saveChapterContent(bookId, chapterId, content);
       setLastSaved(new Date());
       setLastAutoSavedContent(content);
+
+      // Clear backup after successful save
+      const backupKey = `chapter-backup-${bookId}-${chapterId}`;
+      localStorage.removeItem(backupKey);
+      setHasBackup(false);
+
       if (onSave) {
         onSave(content);
       }
@@ -199,6 +237,29 @@ export function ChapterEditor({
     }
   };
 
+  const handleRecoverBackup = () => {
+    const backupKey = `chapter-backup-${bookId}-${chapterId}`;
+    const backupData = localStorage.getItem(backupKey);
+    if (backupData && editor) {
+      try {
+        const backup = JSON.parse(backupData);
+        editor.commands.setContent(backup.content);
+        setAutoSavePending(true); // Trigger auto-save of recovered content
+        setHasBackup(false);
+        localStorage.removeItem(backupKey);
+      } catch (err) {
+        console.error('Failed to recover backup:', err);
+        setError('Failed to recover backed up content');
+      }
+    }
+  };
+
+  const handleDismissBackup = () => {
+    const backupKey = `chapter-backup-${bookId}-${chapterId}`;
+    localStorage.removeItem(backupKey);
+    setHasBackup(false);
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -212,6 +273,29 @@ export function ChapterEditor({
 
   return (
     <div className="h-full flex flex-col">
+      {hasBackup && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-700 dark:text-yellow-400 px-4 py-2 text-sm flex items-center justify-between">
+          <span>A local backup of your content is available. Would you like to restore it?</span>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRecoverBackup}
+              className="text-xs"
+            >
+              Restore Backup
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleDismissBackup}
+              className="text-xs"
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 text-sm">
           {error}
@@ -440,11 +524,25 @@ export function ChapterEditor({
           <span className="text-sm text-foreground">
             {editor?.storage.characterCount.characters() ?? 0} characters
           </span>
-          {lastSaved && (
-            <span className="text-xs text-muted-foreground">
-              Last saved: {lastSaved.toLocaleTimeString()}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {isSaving && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Saving...
+              </span>
+            )}
+            {!isSaving && lastSaved && (
+              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <Check className="h-3 w-3" />
+                Saved {lastSaved.toLocaleTimeString()}
+              </span>
+            )}
+            {!isSaving && !lastSaved && (
+              <span className="text-xs text-muted-foreground">
+                Not saved yet
+              </span>
+            )}
+          </div>
         </div>
         <Button
           onClick={() => handleSave(false)}

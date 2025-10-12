@@ -16,6 +16,12 @@ import Image from 'next/image';
 import { BookMetadataForm } from '@/components/BookMetadataForm';
 import { ChapterTabs } from '@/components/chapters/ChapterTabs';
 import { ChapterBreadcrumb } from '@/components/navigation/ChapterBreadcrumb';
+import { ExportOptionsModal } from '@/components/export/ExportOptionsModal';
+import { ExportProgressModal } from '@/components/export/ExportProgressModal';
+import { downloadBlob, generateFilename, formatFileSize } from '@/components/export/exportHelpers';
+import { ExportOptions, ExportStatus } from '@/types/export';
+import { handleApiCall } from '@/lib/errors';
+import { showErrorNotification, showRecoveryNotification } from '@/components/errors';
 
 // Define types for book data
 type Chapter = {
@@ -87,7 +93,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
-  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);
@@ -188,33 +193,104 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
 
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleExportPDF = async () => {
+  // Export modal states
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [showExportProgress, setShowExportProgress] = useState(false);
+  const [exportStatus, setExportStatus] = useState<ExportStatus>('pending');
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportError, setExportError] = useState<string | undefined>();
+  const [exportFilename, setExportFilename] = useState<string | undefined>();
+
+  const handleExportClick = () => {
+    setShowExportOptions(true);
+  };
+
+  const handleExport = async (options: ExportOptions) => {
     if (!book) return;
-    
-    setIsExportingPDF(true);
-    try {
-      const blob = await bookClient.exportPDF(bookId, {
-        includeEmptyChapters: false,
-        pageSize: 'letter'
+
+    // Close options modal and open progress modal
+    setShowExportOptions(false);
+    setShowExportProgress(true);
+    setExportStatus('pending');
+    setExportProgress(0);
+    setExportError(undefined);
+
+    // Update status to processing
+    setExportStatus('processing');
+
+    // Simulate progress (in real implementation, this would come from backend)
+    const progressInterval = setInterval(() => {
+      setExportProgress((prev) => {
+        if (prev >= 90) return prev;
+        return prev + 10;
       });
-      
-      // Create a download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${book.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast.success('PDF exported successfully!');
-    } catch (err) {
-      console.error('Failed to export PDF:', err);
-      toast.error('Failed to export PDF. Please try again.');
-    } finally {
-      setIsExportingPDF(false);
+    }, 500);
+
+    // Call appropriate export method with error handling
+    const result = await handleApiCall(
+      async () => {
+        if (options.format === 'pdf') {
+          return await bookClient.exportPDF(bookId, {
+            includeEmptyChapters: options.includeEmptyChapters,
+            pageSize: options.pageSize,
+          });
+        } else {
+          return await bookClient.exportDOCX(bookId, {
+            includeEmptyChapters: options.includeEmptyChapters,
+          });
+        }
+      },
+      {
+        context: `Export ${options.format.toUpperCase()}`,
+        onRetry: (attempt, error) => {
+          setExportProgress(0);
+          toast.info(`Retrying export (attempt ${attempt})...`);
+        },
+        onSuccess: (attempts) => {
+          if (attempts > 1) {
+            showRecoveryNotification('Export completed', attempts);
+          }
+        },
+      }
+    );
+
+    clearInterval(progressInterval);
+
+    if (result.success && result.data) {
+      // Success!
+      setExportProgress(100);
+
+      // Generate filename and download
+      const filename = generateFilename(book.title, options.format);
+      setExportFilename(filename);
+      downloadBlob(result.data, filename);
+
+      // Update status to completed
+      setExportStatus('completed');
+      toast.success(`${options.format.toUpperCase()} exported successfully!`);
+    } else if (result.error) {
+      // Error occurred
+      setExportStatus('failed');
+      setExportError(result.error.message);
+
+      // Show error notification with retry capability
+      showErrorNotification(result.error, {
+        onRetry: handleRetryExport,
+      });
     }
+  };
+
+  const handleCloseExportProgress = () => {
+    setShowExportProgress(false);
+    setExportProgress(0);
+    setExportStatus('pending');
+    setExportError(undefined);
+    setExportFilename(undefined);
+  };
+
+  const handleRetryExport = () => {
+    setShowExportProgress(false);
+    setShowExportOptions(true);
   };
   // Auto-save on form change
   useEffect(() => {
@@ -317,23 +393,13 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           <h1 className="text-3xl font-bold text-zinc-100">{book.title}</h1>
           <div className="flex items-center gap-4">
             <button
-              onClick={handleExportPDF}
-              disabled={isExportingPDF}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 shadow-lg"
+              onClick={handleExportClick}
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 shadow-lg"
             >
-              {isExportingPDF ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                  </svg>
-                  Export PDF
-                </>
-              )}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+              </svg>
+              Export Book
             </button>
             <div className="text-zinc-400 text-sm">
               Last edited {formatDate(book.updated_at ?? book.created_at ?? '')}
@@ -534,16 +600,34 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
             </div>
           </div>
           <div className="mt-6 pt-4 border-t border-zinc-700">
-            <button 
-              onClick={handleExportPDF}
-              disabled={isExportingPDF}
-              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            <button
+              onClick={handleExportClick}
+              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-all"
             >
-              {isExportingPDF ? 'Generating PDF...' : 'Generate PDF Preview'}
+              Export Book
             </button>
           </div>
         </div>
       </div>
+
+      {/* Export Modals */}
+      <ExportOptionsModal
+        bookId={bookId}
+        isOpen={showExportOptions}
+        onOpenChange={setShowExportOptions}
+        onExport={handleExport}
+        bookTitle={book.title}
+      />
+
+      <ExportProgressModal
+        isOpen={showExportProgress}
+        status={exportStatus}
+        progress={exportProgress}
+        error={exportError}
+        filename={exportFilename}
+        onCancel={handleRetryExport}
+        onClose={handleCloseExportProgress}
+      />
     </div>
   );
 }
