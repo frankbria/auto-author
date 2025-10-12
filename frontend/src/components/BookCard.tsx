@@ -22,6 +22,7 @@ export type BookProject = {
   owner_id?: string;
   chapters: number; // computed from toc_items.length
   progress: number; // computed
+  word_count?: number; // total word count across all chapters
 };
 
 type BookCardProps = {
@@ -157,7 +158,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
         bookTitle={book.title}
         bookStats={{
           chapterCount: book.chapters,
-          wordCount: 0, // TODO: Add word count to BookProject type
+          wordCount: book.word_count ?? 0,
         }}
         onConfirm={handleDelete}
         isDeleting={isDeleting}
