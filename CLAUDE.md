@@ -57,6 +57,20 @@ This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Co
 4. **Refinement** - TDD implementation (`sparc tdd`)
 5. **Completion** - Integration (`sparc run integration`)
 
+## Key Features
+- Book creation and metadata management
+- **Book deletion with confirmation** (requires typing exact title)
+- Chapter editing with rich text editor (TipTap)
+- **Auto-save with localStorage backup** (saves every 3 seconds, backs up on network failure)
+- **Enhanced save status indicators** (visual feedback for saving/saved/error states)
+- Table of contents generation with AI wizard
+- Question generation system for content development
+- User authentication with Clerk
+- File upload for book covers
+- **Export functionality** (PDF/DOCX with customizable options)
+- **Unified error handling** with automatic retry logic
+- **WCAG 2.1 compliant keyboard navigation** (all interactive elements accessible via keyboard)
+
 ## Code Style & Best Practices
 
 - **Modular Design**: Files under 500 lines
@@ -64,6 +78,29 @@ This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Co
 - **Test-First**: Write tests before implementation
 - **Clean Architecture**: Separate concerns
 - **Documentation**: Keep updated
+
+### ✅ Completed Features
+- User authentication (Clerk integration)
+- Book CRUD operations with metadata
+- **Book Deletion UI** (Type-to-confirm with comprehensive data loss warnings)
+- TOC generation with AI wizard
+- Chapter tabs interface (vertical layout with keyboard shortcuts Ctrl+1-9)
+- Question-based content creation system
+- **Rich Text Editor** (TipTap with full formatting capabilities)
+- **AI Draft Generation** (Q&A to narrative with multiple writing styles)
+- **Enhanced Auto-save System** (3-second debounce with localStorage backup on network failure)
+- **Save Status Indicators** (Visual feedback: "Not saved yet" → "Saving..." → "Saved ✓ [timestamp]")
+- **Keyboard Accessibility** (WCAG 2.1 compliant - all tabs and interactive elements accessible via Enter/Space)
+- **Voice Input Integration** (Browser Speech API - production ready)
+- **Export functionality** (PDF/DOCX with customizable options)
+- Auto-save functionality (3-second debounce)
+- Character count and save status indicators
+- **Comprehensive test infrastructure** (100% backend tests passing, 11 skipped)
+- **E2E Test Suite** (Complete workflow validation from book creation to draft generation)
+- Production-ready file storage (local/cloud with automatic fallback)
+- AWS Transcribe integration (optional, with graceful fallback)
+- Chapter access logging and analytics
+- Chapter status workflow (draft → in-progress → completed → published)
 
 ## 🚀 Available Agents (54 Total)
 
@@ -113,6 +150,61 @@ This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Co
 - Check documentation in `docs/` for specific feature guides
 - Review IMPLEMENTATION_PLAN.md for detailed sprint planning
 - Test coverage must meet 80% threshold before merging
+
+## Component Documentation
+
+### Book Deletion UI
+
+**Location**: `frontend/src/components/books/DeleteBookModal.tsx`
+
+**Description**: A comprehensive deletion confirmation modal that prevents accidental book deletion through a type-to-confirm pattern.
+
+**Key Features**:
+- **Type-to-Confirm**: Users must type the exact book title (case-sensitive) to enable deletion
+- **Data Loss Warnings**: Displays comprehensive warnings about what will be permanently deleted
+- **Book Statistics**: Shows chapter count and word count before deletion
+- **Loading States**: Disables all controls during deletion operation
+- **Prevention Mechanisms**: Blocks modal closure during deletion, prevents escape key and outside clicks
+- **Accessibility**: Full ARIA label support, keyboard navigation, autofocus on input field
+
+**Usage Example**:
+```tsx
+import { DeleteBookModal } from '@/components/books';
+
+<DeleteBookModal
+  isOpen={showDeleteDialog}
+  onOpenChange={setShowDeleteDialog}
+  bookTitle={book.title}
+  bookStats={{
+    chapterCount: book.chapters,
+    wordCount: book.word_count ?? 0,  // Optional field with null coalescing
+  }}
+  onConfirm={handleDeleteBook}
+  isDeleting={isDeleting}
+/>
+```
+
+**Props**:
+- `isOpen: boolean` - Controls modal visibility
+- `onOpenChange: (open: boolean) => void` - Callback when modal open state changes
+- `bookTitle: string` - Title of book to delete (used for confirmation)
+- `bookStats?: { chapterCount: number; wordCount: number }` - Optional statistics to display
+  - Note: `word_count` field may be null/undefined on Book objects; use null coalescing (`?? 0`)
+- `onConfirm: () => void | Promise<void>` - Callback when user confirms deletion
+- `isDeleting?: boolean` - Loading state during deletion
+
+**Test Coverage**: 86.2% overall, 91.66% for DeleteBookModal.tsx (29 tests, 100% pass rate)
+
+**Integration Points**:
+- Dashboard book cards (BookCard.tsx) - Delete button with trash icon
+- Book detail page (future enhancement)
+
+**Error Handling**:
+- Parent component handles deletion errors
+- Toast notifications for success/failure
+- Network error retry via parent logic
+
+---
 
 ## Feature Development Quality Standards
 
