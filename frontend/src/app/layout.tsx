@@ -7,6 +7,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SonnerProvider } from '@/components/ui/sonner';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { WebVitalsInit } from '@/components/performance/WebVitalsInit';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             }
           >
+            <WebVitalsInit />
             <main className="flex flex-col min-h-screen">
               {/* Placeholder for future header/sidebar */}
               <div className="flex-1 flex flex-col">{children}</div>

@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { ExportOptions, ExportFormat, PageSize, BookExportStats } from '@/types/export';
+import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import bookClient from '@/lib/api/bookClient';
 
 interface ExportOptionsModalProps {
@@ -58,6 +59,8 @@ export function ExportOptionsModal({
   onExport,
   bookTitle,
 }: ExportOptionsModalProps) {
+  const { trackOperation } = usePerformanceTracking();
+
   // Export options state
   const [format, setFormat] = useState<ExportFormat>('pdf');
   const [pageSize, setPageSize] = useState<PageSize>('letter');
@@ -77,7 +80,9 @@ export function ExportOptionsModal({
   const loadBookStats = async () => {
     try {
       setLoadingStats(true);
-      const response = await bookClient.getExportFormats(bookId);
+      const { data: response } = await trackOperation('export-stats', async () => {
+        return await bookClient.getExportFormats(bookId);
+      }, { bookId });
       setStats(response.book_stats);
     } catch (error) {
       console.error('Failed to load book statistics:', error);

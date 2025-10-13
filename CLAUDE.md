@@ -385,6 +385,101 @@ See `CURRENT_SPRINT.md` for active tasks. Current focus:
 
 ## Component Documentation
 
+### Loading State Components
+
+**Location**: `frontend/src/components/loading/`
+
+**Description**: Comprehensive loading indicators with progress feedback for async operations.
+
+**Components**:
+1. **LoadingStateManager** - Full-featured loading indicator with progress, time estimates, and cancellation
+2. **ProgressIndicator** - Visual progress display with percentage and count tracking
+
+**Key Features**:
+- Progress bars with smooth transitions
+- Time estimates with countdown (uses time budgets from `lib/loading/timeEstimator.ts`)
+- Cancellable operations (optional)
+- Accessible ARIA labels (WCAG 2.1 compliant)
+- Graceful transitions (200ms delay to avoid flicker)
+- Inline and full-screen variants
+- Compact variant for space-constrained UI
+
+**Usage Example - LoadingStateManager**:
+```tsx
+import { LoadingStateManager } from '@/components/loading';
+import { createProgressTracker } from '@/lib/loading';
+
+// Create progress tracker for time estimates
+const getProgress = useMemo(() =>
+  createProgressTracker('toc.generation'),
+  []
+);
+const { progress, estimatedTimeRemaining } = getProgress();
+
+<LoadingStateManager
+  isLoading={isGenerating}
+  operation="Generating Table of Contents"
+  progress={progress}
+  estimatedTime={estimatedTimeRemaining}
+  message="Analyzing your summary and generating chapter structure..."
+  onCancel={() => setIsGenerating(false)}
+  inline={false}
+/>
+```
+
+**Usage Example - ProgressIndicator**:
+```tsx
+import { ProgressIndicator } from '@/components/loading';
+
+<ProgressIndicator
+  current={5}
+  total={10}
+  unit="chapters"
+  showPercentage={true}
+  message="Processing chapters..."
+  size="default"
+/>
+
+// Compact variant for space-constrained UI
+<ProgressIndicator.Compact
+  current={3}
+  total={10}
+  unit="items"
+/>
+```
+
+**Time Estimation**:
+The `timeEstimator` utility provides intelligent time estimates based on:
+- Operation type (TOC generation, export, draft generation, etc.)
+- Data size (word count, chapter count)
+- Historical performance data
+
+```tsx
+import { estimateOperationTime, formatTime } from '@/lib/loading';
+
+// Get time estimate
+const estimate = estimateOperationTime('export.pdf', {
+  wordCount: 50000,
+  chapterCount: 15
+});
+// Returns: { min: 5000, max: 60000, average: 35000 }
+
+// Format for display
+const timeString = formatTime(estimate.average);
+// Returns: "35s" or "1m 15s"
+```
+
+**Integrated Operations**:
+- **TOC Generation**: `components/toc/TocGenerating.tsx` - 10-30 seconds
+- **Export Operations**: `app/dashboard/books/[bookId]/export/page.tsx` - 5-20 seconds
+- **Draft Generation**: `components/chapters/DraftGenerator.tsx` - 10-30 seconds
+
+**Test Coverage**: 100% (53 tests, 100% pass rate)
+
+**Accessibility**: All components include proper ARIA labels, roles, and live regions for screen reader support
+
+---
+
 ### Book Deletion UI
 
 **Location**: `frontend/src/components/books/DeleteBookModal.tsx`

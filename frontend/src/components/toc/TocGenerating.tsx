@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { LoadingStateManager } from '@/components/loading';
+import { createProgressTracker } from '@/lib/loading';
 
 export default function TocGenerating() {
-  const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState(0);
-
   const steps = useMemo(() => [
     "Analyzing your responses...",
     "Identifying key themes and topics...",
@@ -13,54 +12,25 @@ export default function TocGenerating() {
     "Finalizing table of contents..."
   ], []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        const newProgress = Math.min(prev + 2, 95);
-        const stepIndex = Math.floor((newProgress / 100) * steps.length);
-        setCurrentStep(stepIndex);
-        return newProgress;
-      });
-    }, 200);
+  // Use the progress tracker for realistic time estimates
+  const getProgress = useMemo(() => createProgressTracker('toc.generation'), []);
+  const { progress, estimatedTimeRemaining } = getProgress();
 
-    return () => clearInterval(interval);
-  }, [steps]);
+  // Calculate current step based on progress
+  const currentStep = Math.floor((progress / 100) * steps.length);
 
   return (
     <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8">
-      <div className="flex flex-col items-center">
-        <div className="relative mb-8">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-          </div>
-        </div>
+      {/* New LoadingStateManager with progress and time estimate */}
+      <LoadingStateManager
+        isLoading={true}
+        operation="Generating Your Table of Contents"
+        progress={progress}
+        estimatedTime={estimatedTimeRemaining}
+        message="Our AI is analyzing your responses and creating a comprehensive table of contents tailored to your book's content and structure."
+      />
 
-        <h2 className="text-xl font-semibold text-zinc-100 mb-3">
-          Generating Your Table of Contents
-        </h2>
-          <p className="text-zinc-400 text-center mb-8 max-w-md">
-          Our AI is analyzing your responses and creating a comprehensive table of contents tailored to your book&apos;s content and structure.
-        </p>
-
-        {/* Progress bar */}
-        <div className="w-full max-w-md mb-6">
-          <div className="flex justify-between text-sm text-zinc-400 mb-2">
-            <span>Progress</span>
-            <span>{progress}%</span>
-          </div>
-          <div className="w-full bg-zinc-700 rounded-full h-3">
-            <div 
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 h-3 rounded-full transition-all duration-300" 
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-        </div>
-
+      <div className="flex flex-col items-center mt-8">
         {/* Current step */}
         <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 w-full max-w-md mb-6">
           <p className="text-zinc-300 text-center font-medium">

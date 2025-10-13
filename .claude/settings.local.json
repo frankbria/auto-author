@@ -49,7 +49,11 @@
       "Bash(git restore:*)",
       "mcp__serena__think_about_whether_you_are_done",
       "Bash(npm run lint:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(cat:*)",
+      "Read(//tmp/**)",
+      "Bash(npm run test:coverage:*)",
+      "Bash(npm run test:*)"
     ],
     "deny": []
   }

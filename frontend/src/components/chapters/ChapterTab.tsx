@@ -103,19 +103,19 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
               )}
             </div>
 
-            {/* Close Button */}
+            {/* Close Button - WCAG 2.1 compliant 44x44px touch target */}
             <Button
               variant="ghost"
               size="sm"
-              className="h-5 w-5 p-0 border border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-destructive hover:text-destructive-foreground focus:bg-zinc-200 focus:text-zinc-900 shadow-sm"
+              className="h-11 w-11 p-0 border border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-destructive hover:text-destructive-foreground focus:bg-zinc-200 focus:text-zinc-900 shadow-sm"
               style={{ opacity: 1 }}
               onClick={(e) => {
                 e.stopPropagation();
                 onClose();
               }}
-              aria-label="Close"
+              aria-label="Close chapter"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </TooltipTrigger>

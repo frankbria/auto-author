@@ -8,9 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sparkles, Loader2, AlertCircle, FileText } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import bookClient from '@/lib/api/bookClient';
 import { cn } from '@/lib/utils';
 import DOMPurify from 'dompurify';
+import { LoadingStateManager } from '@/components/loading';
+import { createProgressTracker } from '@/lib/loading';
 
 interface DraftGeneratorProps {
   bookId: string;
@@ -42,13 +45,14 @@ const SAMPLE_QUESTIONS = [
   "What challenges might readers face, and how can they overcome them?",
 ];
 
-export function DraftGenerator({ 
-  bookId, 
-  chapterId, 
+export function DraftGenerator({
+  bookId,
+  chapterId,
   chapterTitle,
   onDraftGenerated,
-  className 
+  className
 }: DraftGeneratorProps) {
+  const { trackOperation } = usePerformanceTracking();
   const [isOpen, setIsOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [questionResponses, setQuestionResponses] = useState<QuestionResponse[]>(
@@ -67,6 +71,18 @@ export function DraftGenerator({
     actual_length: number;
   } | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  // Progress tracking for draft generation
+  const getProgress = useMemo(() => {
+    if (!isGenerating) return null;
+    const validResponseCount = questionResponses.filter(qr => qr.question.trim() && qr.answer.trim()).length;
+    return createProgressTracker('chapter.draft', {
+      questionCount: validResponseCount,
+      wordCount: targetLength,
+    });
+  }, [isGenerating, questionResponses, targetLength]);
+
+  const draftProgress = getProgress ? getProgress() : { progress: 0, estimatedTimeRemaining: 0 };
 
   // Sanitize the generated draft to prevent XSS attacks
   const sanitizedDraft = useMemo(() => {
@@ -117,11 +133,13 @@ export function DraftGenerator({
         qr => qr.question.trim() && qr.answer.trim()
       );
 
-      const result = await bookClient.generateChapterDraft(bookId, chapterId, {
-        question_responses: validResponses,
-        writing_style: writingStyle,
-        target_length: targetLength,
-      });
+      const { data: result } = await trackOperation('generate-draft', async () => {
+        return await bookClient.generateChapterDraft(bookId, chapterId, {
+          question_responses: validResponses,
+          writing_style: writingStyle,
+          target_length: targetLength,
+        });
+      }, { bookId, chapterId, writingStyle, targetLength, responseCount: validResponses.length });
 
       setGeneratedDraft(result.draft);
       setDraftMetadata(result.metadata);
@@ -289,6 +307,17 @@ export function DraftGenerator({
                   )}
                 </Button>
               </div>
+            </div>
+          ) : isGenerating ? (
+            <div className="py-8">
+              <LoadingStateManager
+                isLoading={true}
+                operation="Generating Chapter Draft"
+                progress={draftProgress.progress}
+                estimatedTime={draftProgress.estimatedTimeRemaining}
+                message="Analyzing your responses and creating narrative content..."
+                inline
+              />
             </div>
           ) : (
             <div className="space-y-6">
