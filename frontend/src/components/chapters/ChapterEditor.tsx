@@ -46,7 +46,15 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { DraftGenerator } from './DraftGenerator';
+import { useRouter } from 'next/navigation';
+import {
+  validateChapterBackup,
+  getValidatedItem,
+  setValidatedItem,
+  ChapterBackup,
+} from '@/lib/storage/dataValidator';
 
 interface ChapterEditorProps {
   bookId: string;
@@ -65,6 +73,7 @@ export function ChapterEditor({
   onSave,
   onContentChange
 }: ChapterEditorProps) {
+  const { trackOperation } = usePerformanceTracking();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -72,7 +81,10 @@ export function ChapterEditor({
   const [autoSavePending, setAutoSavePending] = useState(false);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
   const [hasBackup, setHasBackup] = useState(false);
-  
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const router = useRouter();
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -90,6 +102,7 @@ export function ChapterEditor({
       }
       if (html !== lastAutoSavedContent) {
         setAutoSavePending(true);
+        setHasUnsavedChanges(true);
       }
     },
     editorProps: {
@@ -101,14 +114,28 @@ export function ChapterEditor({
     immediatelyRender: false,
   });
 
-  // Check for localStorage backup on mount
+  // Check for localStorage backup on mount (with validation)
   useEffect(() => {
     const backupKey = `chapter-backup-${bookId}-${chapterId}`;
-    const backupData = localStorage.getItem(backupKey);
-    if (backupData) {
+    const backup = getValidatedItem<ChapterBackup>(backupKey, validateChapterBackup);
+    if (backup) {
       setHasBackup(true);
     }
   }, [bookId, chapterId]);
+
+  // Warn user before leaving page with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && autoSavePending) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, autoSavePending]);
 
   // Load chapter content if no initial content provided
   useEffect(() => {
@@ -162,10 +189,13 @@ export function ChapterEditor({
       setIsSaving(true);
       setError(null);
       try {
-        await bookClient.saveChapterContent(bookId, chapterId, content);
+        await trackOperation('auto-save', async () => {
+          return await bookClient.saveChapterContent(bookId, chapterId, content);
+        }, { bookId, chapterId, contentLength: content.length });
         setLastSaved(new Date());
         setLastAutoSavedContent(content);
         setAutoSavePending(false);
+        setHasUnsavedChanges(false);
 
         // Clear backup after successful save
         const backupKey = `chapter-backup-${bookId}-${chapterId}`;
@@ -174,17 +204,21 @@ export function ChapterEditor({
       } catch (err) {
         console.error('Failed to auto-save chapter:', err);
 
-        // Backup to localStorage on failure
+        // Backup to localStorage on failure (with validation)
         try {
           const backupKey = `chapter-backup-${bookId}-${chapterId}`;
-          const backup = {
+          const backup: ChapterBackup = {
             content,
             timestamp: Date.now(),
             error: err instanceof Error ? err.message : 'Unknown error'
           };
-          localStorage.setItem(backupKey, JSON.stringify(backup));
-          setHasBackup(true);
-          setError('Failed to auto-save. Content backed up locally.');
+          const saved = setValidatedItem(backupKey, backup, validateChapterBackup);
+          if (saved) {
+            setHasBackup(true);
+            setError('Failed to auto-save. Content backed up locally.');
+          } else {
+            setError('Failed to auto-save and backup chapter content');
+          }
         } catch (storageErr) {
           console.error('Failed to backup to localStorage:', storageErr);
           setError('Failed to auto-save chapter content');
@@ -205,9 +239,12 @@ export function ChapterEditor({
     setError(null);
 
     try {
-      await bookClient.saveChapterContent(bookId, chapterId, content);
+      await trackOperation('manual-save', async () => {
+        return await bookClient.saveChapterContent(bookId, chapterId, content);
+      }, { bookId, chapterId, contentLength: content.length });
       setLastSaved(new Date());
       setLastAutoSavedContent(content);
+      setHasUnsavedChanges(false);
 
       // Clear backup after successful save
       const backupKey = `chapter-backup-${bookId}-${chapterId}`;
@@ -223,6 +260,20 @@ export function ChapterEditor({
     } catch (err) {
       console.error('Failed to save chapter:', err);
       setError('Failed to save chapter content');
+
+      // Backup to localStorage on manual save failure too
+      try {
+        const backupKey = `chapter-backup-${bookId}-${chapterId}`;
+        const backup: ChapterBackup = {
+          content,
+          timestamp: Date.now(),
+          error: err instanceof Error ? err.message : 'Unknown error'
+        };
+        setValidatedItem(backupKey, backup, validateChapterBackup);
+        setHasBackup(true);
+      } catch (storageErr) {
+        console.error('Failed to backup after manual save failure:', storageErr);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -239,12 +290,12 @@ export function ChapterEditor({
 
   const handleRecoverBackup = () => {
     const backupKey = `chapter-backup-${bookId}-${chapterId}`;
-    const backupData = localStorage.getItem(backupKey);
-    if (backupData && editor) {
+    const backup = getValidatedItem<ChapterBackup>(backupKey, validateChapterBackup);
+    if (backup && editor) {
       try {
-        const backup = JSON.parse(backupData);
         editor.commands.setContent(backup.content);
         setAutoSavePending(true); // Trigger auto-save of recovered content
+        setHasUnsavedChanges(true);
         setHasBackup(false);
         localStorage.removeItem(backupKey);
       } catch (err) {

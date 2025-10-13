@@ -54,7 +54,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleBold().run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('bold') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Bold"
@@ -68,7 +68,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleItalic().run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('italic') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Italic"
@@ -82,7 +82,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleUnderline().run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('underline') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Underline"
@@ -96,7 +96,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleStrike().run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('strike') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Strikethrough"
@@ -112,7 +112,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('heading', { level: 1 }) ? 'bg-muted' : 'bg-transparent'
         )}
         title="Heading 1"
@@ -126,7 +126,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('heading', { level: 2 }) ? 'bg-muted' : 'bg-transparent'
         )}
         title="Heading 2"
@@ -140,7 +140,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('heading', { level: 3 }) ? 'bg-muted' : 'bg-transparent'
         )}
         title="Heading 3"
@@ -156,7 +156,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('bulletList') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Bullet List"
@@ -170,7 +170,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('orderedList') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Ordered List"
@@ -184,7 +184,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('blockquote') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Blockquote"
@@ -198,7 +198,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().toggleCodeBlock().run()}
         className={cn(
-          'h-8 w-8 p-0',
+          'h-11 w-11 p-0',
           editor.isActive('codeBlock') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Code Block"
@@ -214,7 +214,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().chain().focus().undo().run()}
-        className="h-8 w-8 p-0 bg-transparent"
+        className="h-11 w-11 p-0 bg-transparent"
         title="Undo"
         type="button"
       >
@@ -226,7 +226,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().chain().focus().redo().run()}
-        className="h-8 w-8 p-0 bg-transparent"
+        className="h-11 w-11 p-0 bg-transparent"
         title="Redo"
         type="button"
       >
@@ -237,7 +237,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         variant="ghost"
         size="sm"
         onClick={() => editor.chain().focus().setHorizontalRule().run()}
-        className="h-8 w-8 p-0 bg-transparent"
+        className="h-11 w-11 p-0 bg-transparent"
         title="Horizontal Rule"
         type="button"
       >

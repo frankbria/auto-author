@@ -76,8 +76,8 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
   
   return (
     <>
-      <Card 
-        className="w-[350px] bg-zinc-800 border border-zinc-700 hover:border-indigo-500 transition cursor-pointer"
+      <Card
+        className="w-full max-w-[350px] bg-zinc-800 border border-zinc-700 hover:border-indigo-500 transition cursor-pointer"
         onClick={handleClick}
       >
       <div className="p-5">
@@ -128,7 +128,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
       
       <CardFooter className="px-5 pt-0 flex gap-2">
         <Button
-          className="flex-1 bg-zinc-700 hover:bg-indigo-600 text-zinc-100"
+          className="flex-1 bg-zinc-700 hover:bg-indigo-600 text-zinc-100 h-11"
           onClick={(e) => {
             e.stopPropagation();
             router.push(`/dashboard/books/${book.id}`);
@@ -138,13 +138,13 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
         </Button>
         {onDelete && (
           <Button
-            className="bg-zinc-700 hover:bg-red-600 text-zinc-100"
-            size="icon"
+            className="bg-zinc-700 hover:bg-red-600 text-zinc-100 h-11 w-11"
             onClick={(e) => {
               e.stopPropagation();
               setShowDeleteDialog(true);
             }}
             disabled={isDeleting}
+            aria-label="Delete book"
           >
             <Trash2 className="h-4 w-4" />
           </Button>

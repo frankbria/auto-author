@@ -51,6 +51,7 @@
     "@tiptap/starter-kit": "^2.1.13",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "date-fns": "^4.1.0",
     "dompurify": "^3.2.6",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.544.0",
@@ -61,6 +62,7 @@
     "sonner": "^1.2.4",
     "tailwind-merge": "^2.1.0",
     "tailwindcss-animate": "^1.0.7",
+    "web-vitals": "^5.1.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

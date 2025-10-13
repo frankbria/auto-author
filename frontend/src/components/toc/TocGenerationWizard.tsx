@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import bookClient from '@/lib/api/bookClient';
-import { 
-  WizardStep, 
-  WizardState, 
+import {
+  WizardStep,
+  WizardState,
   QuestionResponse
 } from '@/types/toc';
+import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import ReadinessChecker from './ReadinessChecker';
 import NotReadyMessage from './NotReadyMessage';
 import ClarifyingQuestions from './ClarifyingQuestions';
@@ -21,6 +22,7 @@ interface TocGenerationWizardProps {
 
 export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps) {
   const router = useRouter();
+  const { trackOperation } = usePerformanceTracking();
   const [wizardState, setWizardState] = useState<WizardState>({
     step: WizardStep.CHECKING_READINESS,
     questionResponses: [],
@@ -30,7 +32,9 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
   const generateQuestions = useCallback(async () => {
     try {
       setWizardState(prev => ({ ...prev, isLoading: true }));
-      const response = await bookClient.generateQuestions(bookId);
+      const { data: response } = await trackOperation('toc-questions', async () => {
+        return await bookClient.generateQuestions(bookId);
+      }, { bookId });
       
       setWizardState(prev => ({
         ...prev,
@@ -55,15 +59,19 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       // First, analyze the summary using AI to get readiness assessment
       try {
         console.log('Analyzing summary with AI...');
-        await bookClient.analyzeSummary(bookId);
+        await trackOperation('analyze-summary', async () => {
+          return await bookClient.analyzeSummary(bookId);
+        }, { bookId });
         console.log('Summary analysis completed');
       } catch (analysisError) {
         console.warn('Summary analysis failed, proceeding with basic check:', analysisError);
         // Continue with readiness check even if analysis fails
       }
-      
+
       // Then check readiness status (which will now include analysis results)
-      const readiness = await bookClient.checkTocReadiness(bookId);
+      const { data: readiness } = await trackOperation('toc-readiness', async () => {
+        return await bookClient.checkTocReadiness(bookId);
+      }, { bookId });
       
       if (readiness.meets_minimum_requirements) {
         // If ready, proceed to generate questions
@@ -90,7 +98,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
   // Check if the book summary is ready for TOC generation
   useEffect(() => {
     checkTocReadiness();
-  }, [checkTocReadiness]);
+  }, [checkTocReadiness, trackOperation]);
 
   const handleQuestionSubmit = async (responses: QuestionResponse[]) => {
     try {
@@ -101,7 +109,9 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         isLoading: true
       }));
 
-      const result = await bookClient.generateToc(bookId, responses);
+      const { data: result } = await trackOperation('toc-generation', async () => {
+        return await bookClient.generateToc(bookId, responses);
+      }, { bookId, responseCount: responses.length });
       
       // Ensure chapters have all required TocChapter fields
       const transformedResult = {
@@ -170,7 +180,9 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         error: undefined
       }));
 
-      const result = await bookClient.generateToc(bookId, wizardState.questionResponses);
+      const { data: result } = await trackOperation('toc-generation', async () => {
+        return await bookClient.generateToc(bookId, wizardState.questionResponses);
+      }, { bookId, responseCount: wizardState.questionResponses.length });
       
       // Ensure chapters have all required TocChapter fields
       const transformedResult = {

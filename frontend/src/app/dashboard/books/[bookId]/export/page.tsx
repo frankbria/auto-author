@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import bookClient from '@/lib/api/bookClient';
 import { toast } from 'sonner';
 import { BookProject } from '@/components/BookCard';
+import { LoadingStateManager } from '@/components/loading';
+import { createProgressTracker } from '@/lib/loading';
 
 type ExportFormat = {
   format: string;
@@ -39,6 +41,19 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
   const [isExporting, setIsExporting] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
   const [downloadBlob, setDownloadBlob] = useState<Blob | null>(null);
+
+  // Progress tracking for export operations
+  const getProgress = useMemo(() => {
+    if (!isExporting) return null;
+    const wordCount = chapters.reduce((sum, ch) => sum + ch.word_count, 0);
+    const chapterCount = includeEmptyChapters ? chapters.length : chapters.filter(ch => ch.word_count > 0).length;
+    return createProgressTracker(
+      selectedFormat === 'pdf' ? 'export.pdf' : 'export.docx',
+      { wordCount, chapterCount }
+    );
+  }, [isExporting, selectedFormat, chapters, includeEmptyChapters]);
+
+  const exportProgress = getProgress ? getProgress() : { progress: 0, estimatedTimeRemaining: 0 };
   
   // Fetch book details and export options
   useEffect(() => {
@@ -431,10 +446,14 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
               
               {isExporting ? (
                 <div className="mt-6">
-                  <div className="flex justify-center mb-2">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-                  </div>
-                  <p className="text-center text-zinc-400 text-sm">Generating export...</p>
+                  <LoadingStateManager
+                    isLoading={true}
+                    operation={`Generating ${selectedFormat.toUpperCase()}`}
+                    progress={exportProgress.progress}
+                    estimatedTime={exportProgress.estimatedTimeRemaining}
+                    message={`Processing ${includeEmptyChapters ? chapters.length : chapters.filter(ch => ch.word_count > 0).length} chapters...`}
+                    inline
+                  />
                 </div>
               ) : (
                 <div className="mt-6">
