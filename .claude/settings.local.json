@@ -37,23 +37,9 @@
       "mcp__serena__activate_project",
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(npm run build)",
-      "mcp__serena__think_about_collected_information",
-      "Bash(npx tsc:*)",
-      "mcp__serena__list_memories",
-      "mcp__serena__get_current_config",
-      "mcp__serena__write_memory",
-      "Bash(mkdir:*)",
-      "Bash(git pull:*)",
-      "Bash(git rebase:*)",
-      "mcp__serena__search_for_pattern",
-      "Bash(git restore:*)",
-      "mcp__serena__think_about_whether_you_are_done",
-      "Bash(npm run lint:*)",
-      "Bash(npx eslint:*)",
-      "Bash(cat:*)",
-      "Read(//tmp/**)",
-      "Bash(npm run test:coverage:*)",
-      "Bash(npm run test:*)"
+      "Read(//home/frankbria/.config/superpowers/skills/skills/collaboration/brainstorming/**)",
+      "Read(//home/frankbria/.config/superpowers/skills/skills/collaboration/writing-plans/**)",
+      "Read(//home/frankbria/.config/superpowers/skills/skills/collaboration/executing-plans/**)"
     ],
     "deny": []
   }
