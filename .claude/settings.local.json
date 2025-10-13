@@ -43,6 +43,7 @@
       "mcp__serena__get_current_config",
       "mcp__serena__write_memory",
       "Bash(mkdir:*)",
+      "Bash(git pull:*)",
       "Bash(git rebase:*)"
     ],
     "deny": []
