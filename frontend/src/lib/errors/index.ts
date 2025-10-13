@@ -40,3 +40,13 @@ export {
   formatErrorMessage,
   getErrorMessage,
 } from './utils';
+
+// TDD Error Handler (Task 4 implementation)
+export {
+  ErrorHandler,
+  classifyError as classifyErrorTDD,
+  shouldRetry,
+  calculateBackoff,
+  extractErrorMessage,
+  handleApiError,
+} from './errorHandler';
