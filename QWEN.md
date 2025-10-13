@@ -87,5 +87,6 @@ Auto Author is an AI-powered application designed to help users write long-form 
 - [README.md](README.md) - Project overview and setup instructions
 - [user-stories.md](user-stories.md) - Complete list of user stories and acceptance criteria
 - [application-summary.md](application-summary.md) - High-level application architecture
-- [TODO.md](TODO.md) - Current development status and priorities
+- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) - Master implementation roadmap
+- [CURRENT_SPRINT.md](CURRENT_SPRINT.md) - Current sprint tasks and priorities
 - [docs/](docs/) - Comprehensive API documentation and user guides

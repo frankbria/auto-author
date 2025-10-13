@@ -7,6 +7,37 @@
 2. **NEVER save working files, text/mds and tests to the root folder**
 3. ALWAYS organize files in appropriate subdirectories
 
+## Project Structure
+- `frontend/` - Next.js application
+- `backend/` - FastAPI Python application
+- `docs/` - Project documentation
+- `claudedocs/` - Claude-specific analysis reports and detailed plans
+- `archive/` - Historical planning documents (read-only)
+
+## Planning Documentation
+
+**Active Documents** (always current):
+- **IMPLEMENTATION_PLAN.md** - Master implementation roadmap (single source of truth)
+- **CURRENT_SPRINT.md** - Current sprint tasks and daily progress
+- **CLAUDE.md** - This file - development guidelines and standards
+
+**Detailed Plans** (reference as needed):
+- `claudedocs/QUALITY_MONITORING_IMPLEMENTATION_PLAN.md` - Quality monitoring implementation
+- `claudedocs/loading_states_audit_report.md` - Loading state gap analysis
+
+**Historical Reference** (archived):
+- `archive/TODO.md` - Legacy task tracking
+- `archive/PHASE1_IMPLEMENTATION_PLAN.md` - Phase 1 detailed notes
+- `archive/UI_IMPROVEMENTS_TODO.md` - Expert panel requirements
+- `archive/KEYBOARD_NAVIGATION_ACTION_PLAN.md` - Accessibility action plan
+
+**Documentation Policy**:
+- All active implementation details go in `IMPLEMENTATION_PLAN.md`
+- Current sprint work tracked in `CURRENT_SPRINT.md` (updated daily)
+- Detailed technical plans stay in `claudedocs/` directory
+- Completed/obsolete plans move to `archive/` directory
+- This file (CLAUDE.md) contains development standards and guidelines
+
 ### ⚡ GOLDEN RULE: "1 MESSAGE = ALL RELATED OPERATIONS"
 
 **MANDATORY PATTERNS:**
@@ -101,6 +132,12 @@ This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Co
 - AWS Transcribe integration (optional, with graceful fallback)
 - Chapter access logging and analytics
 - Chapter status workflow (draft → in-progress → completed → published)
+
+### 🚧 In Progress (High Priority)
+See `CURRENT_SPRINT.md` for active tasks. Current focus:
+1. **API Contract Formalization** - TypeScript interfaces and JSDoc documentation
+2. **Performance Monitoring** - Core Web Vitals tracking and operation budgets
+3. **Quality Enhancement** - Loading states, data preservation, responsive validation
 
 ## 🚀 Available Agents (54 Total)
 

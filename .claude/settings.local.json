@@ -36,7 +36,14 @@
       "mcp__serena__find_file",
       "mcp__serena__activate_project",
       "mcp__sequential-thinking__sequentialthinking",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "mcp__serena__think_about_collected_information",
+      "Bash(npx tsc:*)",
+      "mcp__serena__list_memories",
+      "mcp__serena__get_current_config",
+      "mcp__serena__write_memory",
+      "Bash(mkdir:*)",
+      "Bash(git rebase:*)"
     ],
     "deny": []
   }
