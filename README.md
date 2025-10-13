@@ -277,6 +277,6 @@ We're in the early MVP phase. Contributions, suggestions, and PRs are welcome! P
 
 ## 📄 License
 
-MIT License © 2025 Auto Author Team
+MIT License © 2025 Noatak Enterprises, LLC, dba Bria Strategy Group
 
 ---
