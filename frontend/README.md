@@ -384,4 +384,4 @@ npm test -- --clearCache
 
 ## 📄 License
 
-MIT License © 2025 Auto-Author Team
+MIT License © 2025 Noatak Enterprises, LLC, dba Bria Strategy Group
