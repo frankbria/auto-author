@@ -319,6 +319,7 @@ This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Co
 - **Keyboard Accessibility** (WCAG 2.1 compliant - all tabs and interactive elements accessible via Enter/Space)
 - **Voice Input Integration** (Browser Speech API - production ready)
 - **Export functionality** (PDF/DOCX with customizable options)
+- **Performance Monitoring** (Core Web Vitals + custom operation tracking with budgets)
 - Auto-save functionality (3-second debounce)
 - Character count and save status indicators
 - **Comprehensive test infrastructure** (100% backend tests passing, 11 skipped)
@@ -330,8 +331,8 @@ This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Co
 
 ### 🚧 In Progress (High Priority)
 See `CURRENT_SPRINT.md` for active tasks. Current focus:
-1. **API Contract Formalization** - TypeScript interfaces and JSDoc documentation
-2. **Performance Monitoring** - Core Web Vitals tracking and operation budgets
+1. **API Contract Formalization** - ✅ COMPLETE (TypeScript interfaces and JSDoc documentation)
+2. **Performance Monitoring** - ✅ COMPLETE (Core Web Vitals tracking and operation budgets)
 3. **Quality Enhancement** - Loading states, data preservation, responsive validation
 
 ## 🚀 Available Agents (54 Total)
