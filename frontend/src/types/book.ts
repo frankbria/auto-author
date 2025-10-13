@@ -592,7 +592,8 @@ export function isTocItem(obj: unknown): obj is TocItem {
     typeof item.word_count === 'number' &&
     typeof item.estimated_reading_time === 'number' &&
     typeof item.is_active_tab === 'boolean' &&
-    typeof item.metadata === 'object'
+    typeof item.metadata === 'object' &&
+    item.metadata !== null
   );
 }
 
@@ -624,7 +625,8 @@ export function isBookResponse(obj: unknown): obj is BookResponse {
     typeof book.owner_id === 'string' &&
     Array.isArray(book.toc_items) &&
     typeof book.published === 'boolean' &&
-    typeof book.metadata === 'object'
+    typeof book.metadata === 'object' &&
+    book.metadata !== null
   );
 }
 
