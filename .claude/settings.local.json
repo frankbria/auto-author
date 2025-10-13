@@ -44,7 +44,12 @@
       "mcp__serena__write_memory",
       "Bash(mkdir:*)",
       "Bash(git pull:*)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "mcp__serena__search_for_pattern",
+      "Bash(git restore:*)",
+      "mcp__serena__think_about_whether_you_are_done",
+      "Bash(npm run lint:*)",
+      "Bash(npx eslint:*)"
     ],
     "deny": []
   }
