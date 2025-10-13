@@ -66,6 +66,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@axe-core/react": "^4.10.2",
     "@playwright/test": "^1.53.2",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
