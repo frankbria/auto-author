@@ -158,7 +158,7 @@ def fake_user():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def auth_client_factory(monkeypatch, test_user):
+async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
     """
     Returns an async function `make_client(overrides: dict = None)`
     that gives you an AsyncClient whose get_current_user
@@ -272,7 +272,7 @@ def test_book(test_user):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def async_client_factory(monkeypatch, test_user):
+async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
     """
     Returns an async function make_client(overrides: dict = None, auth: bool = True)
     that yields an AsyncClient whose get_current_user always returns test_user
