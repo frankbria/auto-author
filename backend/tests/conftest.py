@@ -55,25 +55,36 @@ from bson import ObjectId
 
 pytest_plugins = ["pytest_asyncio"]
 
-"""
 @pytest_asyncio.fixture(scope="function")
 def event_loop():
+    """
+    Create a new event loop for each test function.
+    This ensures Motor async clients have a proper event loop context.
+    """
     loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
     loop.close()
-"""
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def motor_reinit_db():
+@pytest.fixture(autouse=False)  # Not autouse - tests must explicitly request this fixture
+def motor_reinit_db():
     """
-    Every test gets its own NMotor client bound to a fresh database.
+    Every test gets its own Motor client bound to a fresh database.
     Drops the test DB before & after so you start with a clean slate.
-    """
-    _sync_client.drop_database(base._db.name if hasattr(base, "_db") else "auto-author")
 
+    Note: This is a SYNC fixture (not async) because autouse=True fixtures
+    need to work with both sync and async tests. Using async autouse fixtures
+    with sync tests causes pytest-asyncio to hang.
+    """
+    # Drop database before test using sync client
+    _sync_client.drop_database("auto-author-test")
+
+    # Create async Motor client for test use
     base._client = motor.motor_asyncio.AsyncIOMotorClient(TEST_MONGO_URI)
     base._db = base._client.get_default_database()
+
+    # Set up collections
     base.users_collection = base._db.get_collection("users")
     base.books_collection = base._db.get_collection("books")
     base.audit_logs_collection = base._db.get_collection("audit_logs")
@@ -84,7 +95,9 @@ async def motor_reinit_db():
     audit_log_dao.audit_logs_collection = base.audit_logs_collection
 
     yield
-    _sync_client.drop_database(base._db.name)
+
+    # Drop database after test using sync client
+    _sync_client.drop_database("auto-author-test")
     base._client.close()
 
 
@@ -321,14 +334,6 @@ async def async_client_factory(monkeypatch, test_user):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture(autouse=True)
-def clean_db():
-    """
-    Provide a clean database for each test and drop it afterwards.
-    """
-    # Drop the test database before the test runs to ensure a clean state
-    sync_client = pymongo.MongoClient(TEST_MONGO_URI)
-    sync_client.drop_database(base._db.name)
-    yield base._db
-    # Drop the test database after the test completes to clean up
-    sync_client.drop_database(base._db.name)
+# REMOVED: clean_db fixture was redundant and conflicting with motor_reinit_db
+# The motor_reinit_db fixture (line 67) already handles database cleanup before/after each test
+# Having both autouse fixtures caused race conditions and test hangs
