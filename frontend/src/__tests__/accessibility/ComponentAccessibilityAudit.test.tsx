@@ -52,31 +52,83 @@ describe('Component Accessibility Audit - Phase 1', () => {
   });
 
   describe('4.2 Book Management Components', () => {
-    it.skip('should pass accessibility scan for BookCard', async () => {
-      // TODO: Import BookCard component
-      // const { container } = render(<BookCard book={mockBook} />);
-      // const results = await axe(container);
-      // expect(results).toHaveNoViolations();
+    it('should pass accessibility scan for BookCard', async () => {
+      const BookCard = (await import('@/components/BookCard')).default;
+
+      const mockBook = {
+        id: '1',
+        title: 'Test Book',
+        genre: 'Non-Fiction',
+        target_audience: 'General',
+        chapters: 5,
+        word_count: 10000,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { container } = render(
+        <BookCard book={mockBook} onDelete={jest.fn()} />
+      );
+
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
     });
 
-    it.skip('should pass accessibility scan for DeleteBookModal', async () => {
-      // TODO: Import DeleteBookModal component
+    it('should pass accessibility scan for DeleteBookModal', async () => {
+      const { DeleteBookModal } = await import('@/components/books/DeleteBookModal');
+
+      const { container } = render(
+        <DeleteBookModal
+          isOpen={true}
+          onOpenChange={jest.fn()}
+          bookTitle="Test Book"
+          bookStats={{ chapterCount: 5, wordCount: 10000 }}
+          onConfirm={jest.fn()}
+          isDeleting={false}
+        />
+      );
+
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
     });
   });
 
   describe('4.3 Chapter Editing Components', () => {
-    it.skip('should pass accessibility scan for Chapter Tabs', async () => {
-      // TODO: Import chapter tabs component
+    it('should pass accessibility scan for Chapter Tabs', async () => {
+      const { ChapterTabs } = await import('@/components/chapters/ChapterTabs');
+
+      const { container } = render(
+        <ChapterTabs
+          bookId="test-book"
+          initialActiveChapter="1"
+          orientation="vertical"
+        />
+      );
+
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
     });
 
     it.skip('should pass accessibility scan for TipTap Editor', async () => {
-      // TODO: Import editor component
+      // TODO: Import editor component - requires complex TipTap setup
+      // Skipping for now as TipTap editor has extensive dependencies
     });
   });
 
   describe('4.4 Form Components', () => {
-    it.skip('should pass accessibility scan for BookCreationWizard', async () => {
-      // TODO: Import wizard component
+    it('should pass accessibility scan for BookCreationWizard', async () => {
+      const { BookCreationWizard } = await import('@/components/BookCreationWizard');
+
+      const { container } = render(
+        <BookCreationWizard
+          isOpen={true}
+          onOpenChange={jest.fn()}
+          onSuccess={jest.fn()}
+        />
+      );
+
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
     });
   });
 
