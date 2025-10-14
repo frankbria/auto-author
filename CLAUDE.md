@@ -1036,3 +1036,4 @@ Per the agile testing strategy plan (see `docs/plans/2025-10-13-agile-testing-st
 
 **Projected Final Coverage**: 77-83% frontend (exceeds 80% target)
 
+We track work in Beads instead of Markdown for AI Agents. Run `bd quickstart` to see how.

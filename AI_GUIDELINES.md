@@ -2,8 +2,12 @@
 
 This project is a monorepo called `auto-author`. It contains:
 
+## Project Structure
 - `frontend/`: A Next.js (TypeScript) app used for the UI
 - `backend/`: A FastAPI (Python) app used for API and AI logic
+- `docs/`: Project documentation and guides
+- `claudedocs/`: Claude-specific analysis reports and detailed plans
+- `archive/`: Historical planning documents (read-only)
 - MongoDB is the primary database used in the backend
 - No shared libraries exist between frontend and backend
 - The root of the backend application is `backend`, so no need to append `backend` to imports
@@ -74,6 +78,23 @@ const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/api/v1/email`,
 - Apply Tailwind CSS for custom styling
 - Aim for consistency between UI components
 
+### Key UI Components (Production Ready)
+
+**Loading States** (`frontend/src/components/loading/`):
+- `LoadingStateManager` - Full-featured loading with progress, time estimates, and cancellation
+- `ProgressIndicator` - Visual progress with percentage and count tracking
+- Features: WCAG 2.1 compliant, time budgets, graceful transitions, inline/full-screen variants
+
+**Book Management** (`frontend/src/components/books/`):
+- `DeleteBookModal` - Type-to-confirm deletion with comprehensive data loss warnings
+- Features: Prevention mechanisms, accessibility, loading states, statistics display
+
+**Performance Monitoring** (`frontend/src/lib/performance/`):
+- Comprehensive Core Web Vitals tracking with custom operation budgets
+- 25+ operation budgets defined (TOC: 3000ms, Export: 5000ms, Auto-save: 1000ms)
+- React hook: `usePerformanceTracking` for async operation monitoring
+- Automatic budget validation with warnings
+
 
 ## Test-Driven Development (TDD) Notes
 
@@ -93,12 +114,16 @@ const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/api/v1/email`,
 
 - Use `Vitest` for unit and integration tests
 - Use `@testing-library/react` for UI and interaction
+- **Coverage Requirement**: Minimum 85% code coverage for all new code (target: 80% overall project coverage)
 - Each new component should be accompanied by at least one test
 - Use test-first development when feasible: start with a minimal failing test, then create the component
 - As with all testing, solve the problem, not just pass the test. Do not hardcode responses.
 - E2E tests (Playwright) are used for multi-page or form validation flows
+- **Test Helper Libraries**: Use condition-based waiting helpers from `__tests__/helpers/conditionWaiting.ts` instead of arbitrary timeouts
+- **Test Data Setup**: Use API-based test data factories from `__tests__/helpers/testDataSetup.ts` for faster, more reliable E2E tests
 - Prefer `screen.findByText()` with flexible matchers over `getbyTestId()` unless strictly necessary. think like a user would - what are they trying to see?
 - Use `userEvent` to simulate real clicks, typing and navigation - don't just `render()` and call it done.
+- **Comprehensive E2E Coverage**: Complete authoring journey, editing/auto-save flow, and error recovery flow tests implemented
 
 ### Testing conventions:
 - `.test.tsx` files go in `__tests__/` folders alongside components
@@ -108,8 +133,11 @@ const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/api/v1/email`,
 ## Backend Testing Strategy (Python)
 
 - We use `pytest` as the main test framework for the FastAPI backend. All tests should be **simple, focused**, and follow a **test-guided development** approach where possible.
+- **Coverage Requirement**: Minimum 85% code coverage for all new code
 - Just like in the frontend testing strategy, solve the problem, not just pass the test. Do not hardcode responses.
 - Mock database tests by creating a *-test database and seeding it with test data
+- **Test Quality Standards**: All tests must have 100% pass rate - no failing tests allowed
+- Use condition-based waiting instead of arbitrary timeouts for reliable async testing
 
 
 ### General Guidelines
