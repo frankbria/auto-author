@@ -1,6 +1,17 @@
 # Auto-Author Implementation Plan
 
-**Last Updated**: 2025-10-12
+> ℹ️ **NOTE**: This file is transitioning to auto-generated status.
+>
+> **New Workflow (Effective 2025-10-14)**:
+> - **Source of Truth**: bd (Beads issue tracker) - `.beads/*.db`
+> - **Task Status**: Query with `bd list`, `bd ready`, `bd show <task-id>`
+> - **Task Updates**: Use `bd create`, `bd update`, `bd close` commands
+> - **Regenerate This File**: Run `./scripts/export-implementation-plan.sh`
+>
+> This file will maintain high-level narrative context while referencing bd for task details.
+> See CLAUDE.md "Task Management with bd" section for complete workflow.
+
+**Last Updated**: 2025-10-12 (Manual) - Transitioning to bd
 **Status**: Active Development
 **Current Phase**: Sprint 3-4 - Production Ready
 

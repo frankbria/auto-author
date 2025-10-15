@@ -10,6 +10,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
+  globalSetup: require.resolve('./playwright.global-setup.ts'),
   reporter: [
     ['html'],
     ['json', { outputFile: 'test-results/results.json' }],
@@ -21,6 +22,11 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure'
+  },
+
+  // Set environment variables for all tests
+  env: {
+    BYPASS_AUTH: 'true'
   },
 
   projects: [
@@ -75,10 +81,15 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev',
+    command: 'BYPASS_AUTH=true NEXT_PUBLIC_BYPASS_AUTH=true npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
+    env: {
+      BYPASS_AUTH: 'true',
+      NEXT_PUBLIC_BYPASS_AUTH: 'true'
+      // Keep NODE_ENV as development to load .env.local with Clerk keys
+    }
   },
 
   expect: {

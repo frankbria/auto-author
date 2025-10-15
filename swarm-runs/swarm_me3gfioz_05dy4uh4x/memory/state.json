@@ -1,0 +1,51 @@
+{
+  "namespace": "swarm",
+  "timestamp": "2025-08-08T23:33:59.779Z",
+  "entries": [],
+  "partitions": [
+    {
+      "id": "partition_me3gfiro_zp9t0b97i",
+      "name": "default",
+      "type": "knowledge",
+      "entries": [],
+      "maxSize": 104857600,
+      "readOnly": false,
+      "shared": true,
+      "indexed": true,
+      "compressed": false
+    },
+    {
+      "id": "partition_me3gfirp_t8vuyxyqj",
+      "name": "system",
+      "type": "configuration",
+      "entries": [],
+      "maxSize": 104857600,
+      "readOnly": false,
+      "shared": true,
+      "indexed": true,
+      "compressed": false
+    },
+    {
+      "id": "partition_me3gfirp_xpeo8u88t",
+      "name": "cache",
+      "type": "cache",
+      "entries": [],
+      "maxSize": 104857600,
+      "readOnly": false,
+      "shared": true,
+      "indexed": true,
+      "compressed": false
+    },
+    {
+      "id": "partition_me3gfirp_pp3ukmk0y",
+      "name": "logs",
+      "type": "logs",
+      "entries": [],
+      "maxSize": 104857600,
+      "readOnly": false,
+      "shared": true,
+      "indexed": true,
+      "compressed": false
+    }
+  ]
+}

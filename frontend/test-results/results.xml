@@ -1,0 +1,978 @@
+<testsuites id="" name="" tests="224" failures="0" skipped="224" errors="0" time="0.14823299999999995">
+<testsuite name="complete-authoring-journey.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="chromium" tests="3" failures="0" skipped="3" time="0" errors="0">
+<testcase name="Complete Authoring Journey E2E › user can create book, generate TOC, add chapters, answer questions, and generate draft" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › handles errors gracefully during AI operations" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › preserves progress across browser refresh" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="editing-autosave-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="chromium" tests="7" failures="0" skipped="7" time="0" errors="0">
+<testcase name="Editing &amp; Auto-save Flow › auto-saves content after 3-second debounce" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › backs up content to localStorage when network fails" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › recovers content from localStorage backup" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › dismisses localStorage backup without restoring" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › shows correct save status indicators during lifecycle" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › respects 3-second debounce for auto-save" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › saves successfully after network recovers from failure" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="error-recovery-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="chromium" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › automatically retries transient 503 error and succeeds on second attempt" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects exponential backoff timing across multiple retries" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry validation errors (400 Bad Request)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects maximum retry limit of 3 attempts and shows final error" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries network errors and eventually succeeds" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries rate limit errors (429) with exponential backoff" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry authentication errors (401 Unauthorized)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › shows appropriate loading states during retry attempts" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="interview-prompts.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="chromium" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question generation works across all browsers" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question response interface is accessible" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Mobile question interface works correctly" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question progress tracking persists across browser sessions" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question interface handles network errors gracefully" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › High-contrast mode compatibility" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Reduced motion preferences respected" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Right-to-left (RTL) language support" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="smoke-test.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="chromium" tests="2" failures="0" skipped="2" time="0" errors="0">
+<testcase name="Smoke Test › can load homepage and navigate to dashboard" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Smoke Test › can make API call to backend" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="complete-authoring-journey.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="firefox" tests="3" failures="0" skipped="3" time="0" errors="0">
+<testcase name="Complete Authoring Journey E2E › user can create book, generate TOC, add chapters, answer questions, and generate draft" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › handles errors gracefully during AI operations" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › preserves progress across browser refresh" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="editing-autosave-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="firefox" tests="7" failures="0" skipped="7" time="0" errors="0">
+<testcase name="Editing &amp; Auto-save Flow › auto-saves content after 3-second debounce" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › backs up content to localStorage when network fails" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › recovers content from localStorage backup" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › dismisses localStorage backup without restoring" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › shows correct save status indicators during lifecycle" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › respects 3-second debounce for auto-save" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › saves successfully after network recovers from failure" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="error-recovery-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="firefox" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › automatically retries transient 503 error and succeeds on second attempt" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects exponential backoff timing across multiple retries" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry validation errors (400 Bad Request)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects maximum retry limit of 3 attempts and shows final error" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries network errors and eventually succeeds" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries rate limit errors (429) with exponential backoff" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry authentication errors (401 Unauthorized)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › shows appropriate loading states during retry attempts" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="interview-prompts.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="firefox" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question generation works across all browsers" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question response interface is accessible" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Mobile question interface works correctly" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question progress tracking persists across browser sessions" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question interface handles network errors gracefully" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › High-contrast mode compatibility" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Reduced motion preferences respected" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Right-to-left (RTL) language support" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="smoke-test.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="firefox" tests="2" failures="0" skipped="2" time="0" errors="0">
+<testcase name="Smoke Test › can load homepage and navigate to dashboard" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Smoke Test › can make API call to backend" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="complete-authoring-journey.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="webkit" tests="3" failures="0" skipped="3" time="0" errors="0">
+<testcase name="Complete Authoring Journey E2E › user can create book, generate TOC, add chapters, answer questions, and generate draft" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › handles errors gracefully during AI operations" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › preserves progress across browser refresh" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="editing-autosave-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="webkit" tests="7" failures="0" skipped="7" time="0" errors="0">
+<testcase name="Editing &amp; Auto-save Flow › auto-saves content after 3-second debounce" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › backs up content to localStorage when network fails" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › recovers content from localStorage backup" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › dismisses localStorage backup without restoring" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › shows correct save status indicators during lifecycle" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › respects 3-second debounce for auto-save" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › saves successfully after network recovers from failure" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="error-recovery-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="webkit" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › automatically retries transient 503 error and succeeds on second attempt" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects exponential backoff timing across multiple retries" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry validation errors (400 Bad Request)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects maximum retry limit of 3 attempts and shows final error" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries network errors and eventually succeeds" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries rate limit errors (429) with exponential backoff" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry authentication errors (401 Unauthorized)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › shows appropriate loading states during retry attempts" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="interview-prompts.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="webkit" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question generation works across all browsers" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question response interface is accessible" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Mobile question interface works correctly" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question progress tracking persists across browser sessions" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question interface handles network errors gracefully" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › High-contrast mode compatibility" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Reduced motion preferences respected" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Right-to-left (RTL) language support" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="smoke-test.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="webkit" tests="2" failures="0" skipped="2" time="0" errors="0">
+<testcase name="Smoke Test › can load homepage and navigate to dashboard" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Smoke Test › can make API call to backend" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="complete-authoring-journey.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Chrome" tests="3" failures="0" skipped="3" time="0" errors="0">
+<testcase name="Complete Authoring Journey E2E › user can create book, generate TOC, add chapters, answer questions, and generate draft" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › handles errors gracefully during AI operations" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › preserves progress across browser refresh" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="editing-autosave-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Chrome" tests="7" failures="0" skipped="7" time="0" errors="0">
+<testcase name="Editing &amp; Auto-save Flow › auto-saves content after 3-second debounce" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › backs up content to localStorage when network fails" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › recovers content from localStorage backup" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › dismisses localStorage backup without restoring" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › shows correct save status indicators during lifecycle" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › respects 3-second debounce for auto-save" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › saves successfully after network recovers from failure" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="error-recovery-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Chrome" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › automatically retries transient 503 error and succeeds on second attempt" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects exponential backoff timing across multiple retries" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry validation errors (400 Bad Request)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects maximum retry limit of 3 attempts and shows final error" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries network errors and eventually succeeds" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries rate limit errors (429) with exponential backoff" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry authentication errors (401 Unauthorized)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › shows appropriate loading states during retry attempts" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="interview-prompts.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Chrome" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question generation works across all browsers" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question response interface is accessible" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Mobile question interface works correctly" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question progress tracking persists across browser sessions" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question interface handles network errors gracefully" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › High-contrast mode compatibility" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Reduced motion preferences respected" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Right-to-left (RTL) language support" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="smoke-test.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Chrome" tests="2" failures="0" skipped="2" time="0" errors="0">
+<testcase name="Smoke Test › can load homepage and navigate to dashboard" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Smoke Test › can make API call to backend" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="complete-authoring-journey.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari" tests="3" failures="0" skipped="3" time="0" errors="0">
+<testcase name="Complete Authoring Journey E2E › user can create book, generate TOC, add chapters, answer questions, and generate draft" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › handles errors gracefully during AI operations" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › preserves progress across browser refresh" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="editing-autosave-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari" tests="7" failures="0" skipped="7" time="0" errors="0">
+<testcase name="Editing &amp; Auto-save Flow › auto-saves content after 3-second debounce" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › backs up content to localStorage when network fails" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › recovers content from localStorage backup" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › dismisses localStorage backup without restoring" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › shows correct save status indicators during lifecycle" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › respects 3-second debounce for auto-save" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › saves successfully after network recovers from failure" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="error-recovery-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › automatically retries transient 503 error and succeeds on second attempt" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects exponential backoff timing across multiple retries" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry validation errors (400 Bad Request)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects maximum retry limit of 3 attempts and shows final error" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries network errors and eventually succeeds" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries rate limit errors (429) with exponential backoff" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry authentication errors (401 Unauthorized)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › shows appropriate loading states during retry attempts" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="interview-prompts.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question generation works across all browsers" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question response interface is accessible" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Mobile question interface works correctly" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question progress tracking persists across browser sessions" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question interface handles network errors gracefully" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › High-contrast mode compatibility" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Reduced motion preferences respected" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Right-to-left (RTL) language support" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="smoke-test.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari" tests="2" failures="0" skipped="2" time="0" errors="0">
+<testcase name="Smoke Test › can load homepage and navigate to dashboard" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Smoke Test › can make API call to backend" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="complete-authoring-journey.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari iPad" tests="3" failures="0" skipped="3" time="0" errors="0">
+<testcase name="Complete Authoring Journey E2E › user can create book, generate TOC, add chapters, answer questions, and generate draft" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › handles errors gracefully during AI operations" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › preserves progress across browser refresh" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="editing-autosave-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari iPad" tests="7" failures="0" skipped="7" time="0" errors="0">
+<testcase name="Editing &amp; Auto-save Flow › auto-saves content after 3-second debounce" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › backs up content to localStorage when network fails" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › recovers content from localStorage backup" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › dismisses localStorage backup without restoring" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › shows correct save status indicators during lifecycle" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › respects 3-second debounce for auto-save" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › saves successfully after network recovers from failure" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="error-recovery-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari iPad" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › automatically retries transient 503 error and succeeds on second attempt" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects exponential backoff timing across multiple retries" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry validation errors (400 Bad Request)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects maximum retry limit of 3 attempts and shows final error" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries network errors and eventually succeeds" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries rate limit errors (429) with exponential backoff" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry authentication errors (401 Unauthorized)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › shows appropriate loading states during retry attempts" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="interview-prompts.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari iPad" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question generation works across all browsers" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question response interface is accessible" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Mobile question interface works correctly" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question progress tracking persists across browser sessions" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question interface handles network errors gracefully" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › High-contrast mode compatibility" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Reduced motion preferences respected" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Right-to-left (RTL) language support" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="smoke-test.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Mobile Safari iPad" tests="2" failures="0" skipped="2" time="0" errors="0">
+<testcase name="Smoke Test › can load homepage and navigate to dashboard" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Smoke Test › can make API call to backend" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="complete-authoring-journey.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="High DPI Chrome" tests="3" failures="0" skipped="3" time="0" errors="0">
+<testcase name="Complete Authoring Journey E2E › user can create book, generate TOC, add chapters, answer questions, and generate draft" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › handles errors gracefully during AI operations" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › preserves progress across browser refresh" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="editing-autosave-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="High DPI Chrome" tests="7" failures="0" skipped="7" time="0" errors="0">
+<testcase name="Editing &amp; Auto-save Flow › auto-saves content after 3-second debounce" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › backs up content to localStorage when network fails" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › recovers content from localStorage backup" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › dismisses localStorage backup without restoring" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › shows correct save status indicators during lifecycle" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › respects 3-second debounce for auto-save" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › saves successfully after network recovers from failure" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="error-recovery-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="High DPI Chrome" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › automatically retries transient 503 error and succeeds on second attempt" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects exponential backoff timing across multiple retries" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry validation errors (400 Bad Request)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects maximum retry limit of 3 attempts and shows final error" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries network errors and eventually succeeds" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries rate limit errors (429) with exponential backoff" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry authentication errors (401 Unauthorized)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › shows appropriate loading states during retry attempts" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="interview-prompts.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="High DPI Chrome" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question generation works across all browsers" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question response interface is accessible" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Mobile question interface works correctly" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question progress tracking persists across browser sessions" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question interface handles network errors gracefully" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › High-contrast mode compatibility" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Reduced motion preferences respected" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Right-to-left (RTL) language support" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="smoke-test.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="High DPI Chrome" tests="2" failures="0" skipped="2" time="0" errors="0">
+<testcase name="Smoke Test › can load homepage and navigate to dashboard" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Smoke Test › can make API call to backend" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="complete-authoring-journey.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Chrome with reduced motion" tests="3" failures="0" skipped="3" time="0" errors="0">
+<testcase name="Complete Authoring Journey E2E › user can create book, generate TOC, add chapters, answer questions, and generate draft" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › handles errors gracefully during AI operations" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Complete Authoring Journey E2E › preserves progress across browser refresh" classname="complete-authoring-journey.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="editing-autosave-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Chrome with reduced motion" tests="7" failures="0" skipped="7" time="0" errors="0">
+<testcase name="Editing &amp; Auto-save Flow › auto-saves content after 3-second debounce" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › backs up content to localStorage when network fails" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › recovers content from localStorage backup" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › dismisses localStorage backup without restoring" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › shows correct save status indicators during lifecycle" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › respects 3-second debounce for auto-save" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Editing &amp; Auto-save Flow › saves successfully after network recovers from failure" classname="editing-autosave-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="error-recovery-flow.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Chrome with reduced motion" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › automatically retries transient 503 error and succeeds on second attempt" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects exponential backoff timing across multiple retries" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry validation errors (400 Bad Request)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › respects maximum retry limit of 3 attempts and shows final error" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries network errors and eventually succeeds" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › retries rate limit errors (429) with exponential backoff" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › does not retry authentication errors (401 Unauthorized)" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Recovery Flow - Automatic Retry with Exponential Backoff › shows appropriate loading states during retry attempts" classname="error-recovery-flow.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="interview-prompts.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Chrome with reduced motion" tests="8" failures="0" skipped="8" time="0" errors="0">
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question generation works across all browsers" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question response interface is accessible" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Mobile question interface works correctly" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question progress tracking persists across browser sessions" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Question interface handles network errors gracefully" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › High-contrast mode compatibility" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Reduced motion preferences respected" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Interview-Style Prompts Cross-Browser Tests › Right-to-left (RTL) language support" classname="interview-prompts.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="smoke-test.spec.ts" timestamp="2025-10-14T19:15:10.940Z" hostname="Chrome with reduced motion" tests="2" failures="0" skipped="2" time="0" errors="0">
+<testcase name="Smoke Test › can load homepage and navigate to dashboard" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Smoke Test › can make API call to backend" classname="smoke-test.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>
