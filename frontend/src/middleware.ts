@@ -1,13 +1,23 @@
 // frontend/src/middleware.ts
 
 import { clerkMiddleware } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
 
 // Export the Clerk middleware for route protection
 // This will:
 // 1. Verify authentication for protected routes
 // 2. Redirect unauthenticated users to sign-in page
 // 3. Provide auth context to your application
-export default clerkMiddleware();
+//
+// For E2E testing: Set BYPASS_AUTH=true to skip authentication
+export default function middleware(req: any) {
+  // Allow bypassing auth for E2E tests
+  if (process.env.BYPASS_AUTH === 'true' || process.env.NODE_ENV === 'test') {
+    return NextResponse.next();
+  }
+
+  return clerkMiddleware()(req);
+}
 
 export const config = {
   matcher: [

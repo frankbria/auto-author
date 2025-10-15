@@ -39,7 +39,8 @@
       "Bash(npm run build)",
       "Read(//home/frankbria/.config/superpowers/skills/skills/collaboration/brainstorming/**)",
       "Read(//home/frankbria/.config/superpowers/skills/skills/collaboration/writing-plans/**)",
-      "Read(//home/frankbria/.config/superpowers/skills/skills/collaboration/executing-plans/**)"
+      "Read(//home/frankbria/.config/superpowers/skills/skills/collaboration/executing-plans/**)",
+      "Read(//home/frankbria/.config/superpowers/skills/skills/debugging/systematic-debugging/**)"
     ],
     "deny": []
   }

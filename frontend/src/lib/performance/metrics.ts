@@ -6,8 +6,7 @@
  *
  * Core Web Vitals tracked:
  * - LCP (Largest Contentful Paint): Loading performance
- * - FID (First Input Delay): Interactivity (deprecated, use INP)
- * - INP (Interaction to Next Paint): Interactivity (new standard)
+ * - INP (Interaction to Next Paint): Interactivity
  * - CLS (Cumulative Layout Shift): Visual stability
  * - TTFB (Time to First Byte): Server response time
  * - FCP (First Contentful Paint): Initial render
@@ -15,7 +14,7 @@
  * @module performance/metrics
  */
 
-import { onCLS, onFID, onLCP, onTTFB, onINP, onFCP, type Metric } from 'web-vitals';
+import { onCLS, onLCP, onTTFB, onINP, onFCP, type Metric } from 'web-vitals';
 
 /**
  * Performance metric rating categories based on Google's Web Vitals thresholds
@@ -25,7 +24,7 @@ export type MetricRating = 'good' | 'needs-improvement' | 'poor';
 /**
  * Core Web Vitals metric names
  */
-export type WebVitalName = 'CLS' | 'FID' | 'INP' | 'LCP' | 'TTFB' | 'FCP';
+export type WebVitalName = 'CLS' | 'INP' | 'LCP' | 'TTFB' | 'FCP';
 
 /**
  * Custom operation metric data
@@ -65,7 +64,6 @@ interface AnalyticsEvent {
  *
  * Thresholds:
  * - LCP: good < 2500ms, poor > 4000ms
- * - FID: good < 100ms, poor > 300ms
  * - INP: good < 200ms, poor > 500ms
  * - CLS: good < 0.1, poor > 0.25
  * - TTFB: good < 800ms, poor > 1800ms
@@ -74,7 +72,6 @@ interface AnalyticsEvent {
 function rateWebVital(metric: Metric): MetricRating {
   const thresholds: Record<WebVitalName, { good: number; poor: number }> = {
     LCP: { good: 2500, poor: 4000 },
-    FID: { good: 100, poor: 300 },
     INP: { good: 200, poor: 500 },
     CLS: { good: 0.1, poor: 0.25 },
     TTFB: { good: 800, poor: 1800 },
@@ -243,18 +240,7 @@ export function initializeWebVitals(): void {
     });
   });
 
-  // FID - First Input Delay (interactivity - deprecated)
-  onFID((metric) => {
-    const rating = rateWebVital(metric);
-    sendToAnalytics({
-      event_name: 'web_vital',
-      metric_name: 'FID',
-      value: metric.value,
-      rating,
-    });
-  });
-
-  // INP - Interaction to Next Paint (interactivity - new standard)
+  // INP - Interaction to Next Paint (interactivity - replaces deprecated FID)
   onINP((metric) => {
     const rating = rateWebVital(metric);
     sendToAnalytics({
