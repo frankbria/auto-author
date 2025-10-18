@@ -1,7 +1,37 @@
 # Deployment and Development Setup
 
-**Last Updated**: 2025-10-12
-**Environment**: Development & Production
+**Last Updated**: 2025-10-18
+**Environment**: 3-Stage Deployment Process
+
+---
+
+## 🎯 3-Stage Deployment Process
+
+This project follows a 3-stage deployment process to ensure code quality and stability:
+
+### Stage 1: Local Development
+- **Environment**: Local development machine
+- **Purpose**: Development and initial testing
+- **Location**: `/home/frankbria/projects/auto-author`
+- **Usage**: Primary development environment where features are built and initially tested
+
+### Stage 2: Staging Server ⚠️ **HIGH PRIORITY SETUP**
+- **Environment**: frankbria-inspiron-7586 staging server
+- **Purpose**: Stable "sprint demo" environment
+- **Usage**: 
+  - Integration testing
+  - Sprint demonstrations
+  - QA testing
+  - Pre-production validation
+- **Status**: 🚧 **NEEDS SETUP** - This should be one of the first tasks when beginning development work
+
+### Stage 3: Production Deployment
+- **Environment**: Live VPS with production configurations
+- **Purpose**: End-user production environment
+- **Features**:
+  - Full production configurations
+  - Live user access
+  - Production monitoring and logging
 
 ---
 
