@@ -119,7 +119,7 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
   test('triggers auto-save when typing', async () => {
     const user = userEvent.setup();
     const mockOnResponseSaved = jest.fn();
-    
+
     render(
       <QuestionDisplay
         bookId="book1"
@@ -139,7 +139,7 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
     const input = screen.getByPlaceholderText('Type your response here or use voice input...');
     await user.type(input, 'This is my response text');
 
-    // Wait for auto-save (3 seconds delay)
+    // Wait for auto-save (3 seconds delay) with extended timeout
     await waitFor(() => {
       expect(bookClient.saveQuestionResponse).toHaveBeenCalledWith(
         'book1',

@@ -8,6 +8,12 @@ if (typeof global.TextEncoder === 'undefined') {
   global.TextDecoder = TextDecoder;
 }
 
+// Clear localStorage before each test to prevent JSON parse errors
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+});
+
 // Mock window.matchMedia for responsive component tests
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
@@ -148,6 +154,18 @@ jest.mock('next/navigation', () => ({
   redirect: jest.fn(),
   notFound: jest.fn(),
 }));
+
+// Mock Radix UI Dialog Portal to work in jsdom (portals don't work properly)
+jest.mock('@radix-ui/react-dialog', () => {
+  const React = require('react');
+  const actual = jest.requireActual('@radix-ui/react-dialog');
+
+  return {
+    ...actual,
+    // Replace Portal with direct rendering (no createPortal)
+    Portal: ({ children }: any) => children,
+  };
+});
 
 // Mock Radix UI Select with simple HTML <select> for testing
 // Radix UI Select uses portals which don't work properly in jsdom
