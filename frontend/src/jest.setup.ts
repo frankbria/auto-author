@@ -122,6 +122,13 @@ if (typeof Element.prototype.scrollIntoView === 'undefined') {
   Element.prototype.scrollIntoView = jest.fn();
 }
 
+// Mock ResizeObserver for Radix UI components
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+
 // Mock Radix UI Select with simple HTML <select> for testing
 // Radix UI Select uses portals which don't work properly in jsdom
 jest.mock('@/components/ui/select', () => {
