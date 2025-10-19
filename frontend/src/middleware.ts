@@ -10,14 +10,15 @@ import { NextResponse } from 'next/server';
 // 3. Provide auth context to your application
 //
 // For E2E testing: Set BYPASS_AUTH=true to skip authentication
-export default function middleware(req: any) {
+export default clerkMiddleware((auth, req) => {
   // Allow bypassing auth for E2E tests
   if (process.env.BYPASS_AUTH === 'true' || process.env.NODE_ENV === 'test') {
     return NextResponse.next();
   }
 
-  return clerkMiddleware()(req);
-}
+  // Let Clerk handle authentication
+  return NextResponse.next();
+});
 
 export const config = {
   matcher: [

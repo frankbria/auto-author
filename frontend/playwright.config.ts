@@ -24,11 +24,6 @@ export default defineConfig({
     video: 'retain-on-failure'
   },
 
-  // Set environment variables for all tests
-  env: {
-    BYPASS_AUTH: 'true'
-  },
-
   projects: [
     // Desktop browsers
     {
