@@ -29,7 +29,7 @@ export default function QuestionProgress({
   totalQuestions
 }: QuestionProgressProps) {
   // Calculate progress percentage for the progress bar
-  const progressPercentage = progress.progress * 100;
+  const progressPercentage = progress.completion_percentage || 0;
   
   // Calculate current position
   const currentPosition = currentIndex + 1;
@@ -72,7 +72,7 @@ export default function QuestionProgress({
           {progress.status === 'completed' ? (
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger>
+                <TooltipTrigger aria-label="All questions completed">
                   <CheckCircle className="h-4 w-4 text-green-600" />
                 </TooltipTrigger>
                 <TooltipContent>
@@ -83,7 +83,7 @@ export default function QuestionProgress({
           ) : progress.status === 'in-progress' ? (
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger>
+                <TooltipTrigger aria-label="Some questions still need answers">
                   <Clock className="h-4 w-4 text-amber-600" />
                 </TooltipTrigger>
                 <TooltipContent>
@@ -94,7 +94,7 @@ export default function QuestionProgress({
           ) : (
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger>
+                <TooltipTrigger aria-label="No questions answered yet">
                   <Circle className="h-4 w-4 text-gray-400" />
                 </TooltipTrigger>
                 <TooltipContent>
@@ -110,7 +110,7 @@ export default function QuestionProgress({
       <div
         role="progressbar"
         aria-label="Question progress"
-        aria-valuenow={Math.round(progressPercentage)}
+        aria-valuenow={isNaN(progressPercentage) ? 0 : Math.round(progressPercentage)}
         aria-valuemin={0}
         aria-valuemax={100}
         className="w-full"
@@ -122,7 +122,7 @@ export default function QuestionProgress({
       {/* Question position indicator */}
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>Question {currentPosition} of {totalQuestions}</span>
-        <span>{Math.round(progressPercentage)}% complete</span>
+        <span>{isNaN(progressPercentage) ? 0 : Math.round(progressPercentage)}% complete</span>
       </div>
       
       {/* Question dots - visual representation of each question's status */}

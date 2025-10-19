@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 import QuestionDisplay from '../components/chapters/questions/QuestionDisplay';
@@ -117,7 +117,8 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
   });
 
   test('triggers auto-save when typing', async () => {
-    const user = userEvent.setup();
+    jest.useFakeTimers();
+    const user = userEvent.setup({ delay: null });
     const mockOnResponseSaved = jest.fn();
 
     render(
@@ -139,7 +140,14 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
     const input = screen.getByPlaceholderText('Type your response here or use voice input...');
     await user.type(input, 'This is my response text');
 
-    // Wait for auto-save (3 seconds delay) with extended timeout
+    // Fast-forward through 3-second debounce wrapped in act
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+      // Allow promises to resolve
+      await Promise.resolve();
+    });
+
+    // Wait for auto-save to complete
     await waitFor(() => {
       expect(bookClient.saveQuestionResponse).toHaveBeenCalledWith(
         'book1',
@@ -150,8 +158,10 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
           status: ResponseStatus.DRAFT
         })
       );
-    }, { timeout: 6000 });
-  });
+    });
+
+    jest.useRealTimers();
+  }, 10000);
 
   test('can toggle between text and voice modes', async () => {
     render(

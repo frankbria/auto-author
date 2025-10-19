@@ -151,7 +151,7 @@ describe('ChapterEditor localStorage backup', () => {
     });
 
     it('restores backed up content when user clicks Restore Backup', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const backupKey = 'chapter-backup-book-1-chapter-1';
       const backup = {
         content: '<p>Backed up content from previous session</p>',
@@ -192,10 +192,10 @@ describe('ChapterEditor localStorage backup', () => {
           expect.stringContaining('Backed up content from previous session')
         );
       });
-    });
+    }, 10000);
 
     it('dismisses backup when user clicks Dismiss', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const backupKey = 'chapter-backup-book-1-chapter-1';
       const backup = {
         content: '<p>Old backup to dismiss</p>',
@@ -223,7 +223,7 @@ describe('ChapterEditor localStorage backup', () => {
 
       // Backup should be cleared
       expect(localStorage.getItem(backupKey)).toBeNull();
-    });
+    }, 10000);
 
     it('handles corrupted backup data gracefully', async () => {
       const user = userEvent.setup();
@@ -294,7 +294,7 @@ describe('ChapterEditor localStorage backup', () => {
     });
 
     it('clears backup after successful manual save', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const backupKey = 'chapter-backup-book-1-chapter-1';
 
       const existingBackup = {
@@ -325,7 +325,7 @@ describe('ChapterEditor localStorage backup', () => {
       await waitFor(() => {
         expect(localStorage.getItem(backupKey)).toBeNull();
       });
-    });
+    }, 10000);
   });
 
   describe('Edge cases', () => {

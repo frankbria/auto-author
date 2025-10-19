@@ -236,7 +236,7 @@ export default function QuestionDisplay({
   const difficultyInfo = getDifficultyInfo(question.difficulty);
   
   return (
-    <Card className="w-full">
+    <Card className="w-full" data-testid="question-scroll-container" style={{ overflowY: 'auto', scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -254,7 +254,7 @@ export default function QuestionDisplay({
         
         <CardDescription>
           {/* Question text */}
-          <p className="text-lg font-medium mt-4 mb-2" id="question-text">{question.question_text}</p>
+          <p className="text-lg font-medium mt-4 mb-2 break-words" id="question-text" style={{ wordWrap: 'break-word' }}>{question.question_text}</p>
           {/* Help text and examples if available */}
           {question.metadata?.help_text && (
             <div className="mt-2 text-sm text-muted-foreground" id="question-help-text">
@@ -298,9 +298,10 @@ export default function QuestionDisplay({
             value={responseText}
             onChange={setResponseText}
             placeholder="Type your response here or use voice input..."
-            className="min-h-[200px]"
+            className="min-h-[200px] min-w-[44px]"
             disabled={isSaving || isCompleted}
             onAutoSave={handleSaveDraft}
+            aria-label="Your response to the question"
           />
           
           {/* Save status and error */}
@@ -325,15 +326,17 @@ export default function QuestionDisplay({
                   size="sm"
                   onClick={handleSaveDraft}
                   disabled={isSaving || !responseText.trim()}
+                  className="min-h-[44px] min-w-[44px]"
                 >
                   Save Draft
                 </Button>
-                
+
                 <Button
                   variant="default"
                   size="sm"
                   onClick={handleMarkCompleted}
                   disabled={isSaving || !responseText.trim()}
+                  className="min-h-[44px] min-w-[44px]"
                 >
                   Complete Response
                 </Button>
@@ -345,6 +348,7 @@ export default function QuestionDisplay({
                 onClick={() => {
                   setIsCompleted(false);
                 }}
+                className="min-h-[44px] min-w-[44px]"
               >
                 Edit Response
               </Button>
@@ -356,25 +360,29 @@ export default function QuestionDisplay({
               variant="ghost"
               size="sm"
               onClick={() => handleRateQuestion(1)}
-              className={rating === 1 ? 'bg-red-100 dark:bg-red-900/20' : ''}
+              className={`min-h-[44px] min-w-[44px] ${rating === 1 ? 'bg-red-100 dark:bg-red-900/20' : ''}`}
+              aria-label="Rate question as poor"
             >
               <ThumbsDown className="h-4 w-4 text-red-500" />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
               onClick={() => handleRateQuestion(5)}
-              className={rating === 5 ? 'bg-green-100 dark:bg-green-900/20' : ''}
+              className={`min-h-[44px] min-w-[44px] ${rating === 5 ? 'bg-green-100 dark:bg-green-900/20' : ''}`}
+              aria-label="Rate question as good"
             >
               <ThumbsUp className="h-4 w-4 text-green-500" />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
               onClick={handleRegenerateQuestion}
               title="Generate a new question"
+              className="min-h-[44px] min-w-[44px]"
+              aria-label="Generate a new question"
             >
               <RefreshCw className="h-4 w-4" />
             </Button>

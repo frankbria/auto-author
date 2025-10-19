@@ -113,6 +113,13 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
                 e.stopPropagation();
                 onClose();
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onClose();
+                }
+              }}
               aria-label="Close chapter"
             >
               <X className="h-4 w-4" />

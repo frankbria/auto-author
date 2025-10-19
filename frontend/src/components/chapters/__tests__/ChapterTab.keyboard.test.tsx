@@ -3,13 +3,20 @@
  * Ensures tabs are fully keyboard accessible with Enter and Space key support
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChapterTab } from '../ChapterTab';
 import { ChapterTabMetadata, ChapterStatus } from '@/types/chapter-tabs';
 
 // Wrap ChapterTab with TooltipProvider for tests
 import { TooltipProvider } from '@/components/ui/tooltip';
+
+// Helper to wrap focus() calls in act() to avoid Tooltip state update warnings
+const focusElement = async (element: HTMLElement) => {
+  await act(async () => {
+    element.focus();
+  });
+};
 
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   <TooltipProvider>{children}</TooltipProvider>
@@ -132,7 +139,7 @@ describe('ChapterTab keyboard accessibility', () => {
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
 
       // Focus the tab
-      tabElement.focus();
+      await focusElement(tabElement);
       expect(tabElement).toHaveFocus();
 
       // Press Enter
@@ -157,7 +164,7 @@ describe('ChapterTab keyboard accessibility', () => {
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
 
       // Focus the tab
-      tabElement.focus();
+      await focusElement(tabElement);
 
       // Press Space
       await user.keyboard(' ');
@@ -179,7 +186,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       // Press various non-activation keys
       await user.keyboard('{Escape}');
@@ -206,7 +213,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       // Add event listener to verify preventDefault was called
       tabElement.addEventListener('keydown', (e) => {
@@ -236,7 +243,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       await user.keyboard(' ');
 
@@ -264,7 +271,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const prevButton = screen.getByText('Previous focusable');
-      prevButton.focus();
+      await focusElement(prevButton);
 
       // Tab to chapter tab
       await user.tab();
@@ -307,7 +314,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       await user.keyboard('{Enter}');
 
@@ -329,7 +336,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       await user.keyboard(' ');
 
@@ -353,7 +360,7 @@ describe('ChapterTab keyboard accessibility', () => {
 
       // Tab to chapter tab
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       // Tab again to reach close button
       await user.tab();
@@ -376,7 +383,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const closeButton = screen.getByRole('button', { name: /close/i });
-      closeButton.focus();
+      await focusElement(closeButton);
 
       await user.keyboard('{Enter}');
 
@@ -420,7 +427,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       // Test with Enter key
-      tabElement.focus();
+      await focusElement(tabElement);
       await user.keyboard('{Enter}');
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
     });
@@ -459,7 +466,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       // Test with Space key
-      tabElement.focus();
+      await focusElement(tabElement);
       await user.keyboard(' ');
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
     });
@@ -480,7 +487,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       // Rapid Enter presses
       await user.keyboard('{Enter}');
@@ -509,7 +516,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       await user.keyboard('{Enter}');
 
@@ -535,7 +542,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       await user.keyboard('{Enter}');
 
@@ -557,7 +564,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       await user.keyboard('{Enter}');
 
@@ -581,7 +588,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       await user.keyboard('{Enter}');
 
@@ -603,7 +610,7 @@ describe('ChapterTab keyboard accessibility', () => {
       );
 
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
-      tabElement.focus();
+      await focusElement(tabElement);
 
       await user.keyboard('{Enter}');
 

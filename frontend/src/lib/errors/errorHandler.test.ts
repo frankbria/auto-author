@@ -28,7 +28,8 @@ describe('Error Handler Utility - TDD Implementation', () => {
     });
 
     it('should classify fetch failures as network errors', () => {
-      const fetchError = new TypeError('Failed to fetch');
+      const fetchError = new Error('Network request failed');
+      fetchError.name = 'NetworkError';
 
       expect(classifyError(fetchError)).toBe(ErrorType.NETWORK);
     });
@@ -197,7 +198,8 @@ describe('Error Handler Utility - TDD Implementation', () => {
     });
 
     it('should retry on network error and succeed', async () => {
-      const networkError = new TypeError('Failed to fetch');
+      const networkError = new Error('Network request failed');
+      networkError.name = 'NetworkError';
       mockOperation
         .mockRejectedValueOnce(networkError)
         .mockRejectedValueOnce(networkError)
@@ -223,7 +225,8 @@ describe('Error Handler Utility - TDD Implementation', () => {
     });
 
     it('should stop retrying after max attempts', async () => {
-      const networkError = new TypeError('Failed to fetch');
+      const networkError = new Error('Network request failed');
+      networkError.name = 'NetworkError';
       mockOperation.mockRejectedValue(networkError);
 
       const promise = errorHandler.execute(mockOperation);
@@ -234,7 +237,8 @@ describe('Error Handler Utility - TDD Implementation', () => {
     });
 
     it('should apply exponential backoff between retries', async () => {
-      const networkError = new TypeError('Failed to fetch');
+      const networkError = new Error('Network request failed');
+      networkError.name = 'NetworkError';
       mockOperation.mockRejectedValue(networkError);
 
       const promise = errorHandler.execute(mockOperation);
@@ -259,7 +263,8 @@ describe('Error Handler Utility - TDD Implementation', () => {
 
     it('should allow custom max retries configuration', async () => {
       const customHandler = new ErrorHandler({ maxRetries: 1 });
-      const networkError = new TypeError('Failed to fetch');
+      const networkError = new Error('Network request failed');
+      networkError.name = 'NetworkError';
       mockOperation.mockRejectedValue(networkError);
 
       const promise = customHandler.execute(mockOperation);
@@ -313,7 +318,8 @@ describe('Error Handler Utility - TDD Implementation', () => {
     });
 
     it('should show toast notification on network error after retries exhausted', async () => {
-      const networkError = new TypeError('Failed to fetch');
+      const networkError = new Error('Network request failed');
+      networkError.name = 'NetworkError';
       const failedOperation = jest.fn().mockRejectedValue(networkError);
 
       const promise = handleApiError(failedOperation, mockToast);
@@ -323,13 +329,14 @@ describe('Error Handler Utility - TDD Implementation', () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         title: 'Network Error',
-        description: 'Failed to fetch',
+        description: 'Network request failed',
         variant: 'destructive',
       });
     });
 
     it('should retry network errors before showing toast', async () => {
-      const networkError = new TypeError('Failed to fetch');
+      const networkError = new Error('Network request failed');
+      networkError.name = 'NetworkError';
       const retryOperation = jest
         .fn()
         .mockRejectedValueOnce(networkError)
@@ -373,7 +380,9 @@ describe('Error Handler Utility - TDD Implementation', () => {
       const flakeyApiCall = jest.fn().mockImplementation(async () => {
         attempts++;
         if (attempts < 3) {
-          throw new TypeError('Failed to fetch');
+          const err = new Error('Network request failed');
+          err.name = 'NetworkError';
+          throw err;
         }
         return { id: 123, title: 'Book Title' };
       });

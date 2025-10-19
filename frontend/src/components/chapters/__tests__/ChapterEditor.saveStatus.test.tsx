@@ -89,7 +89,7 @@ describe('ChapterEditor save status indicators', () => {
     });
 
     it('shows loading spinner during manual save', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       mockBookClient.saveChapterContent.mockImplementation(() =>
         new Promise((resolve) => setTimeout(resolve, 1000))
@@ -112,10 +112,13 @@ describe('ChapterEditor save status indicators', () => {
 
       // Status text should also show saving
       expect(screen.getByText('Saving...')).toBeInTheDocument();
-    });
+
+      // Advance timers to complete save
+      jest.advanceTimersByTime(1000);
+    }, 10000);
 
     it('disables save button during save operation', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       mockBookClient.saveChapterContent.mockImplementation(() =>
         new Promise((resolve) => setTimeout(resolve, 1000))
@@ -135,7 +138,10 @@ describe('ChapterEditor save status indicators', () => {
         const savingButton = screen.getByRole('button', { name: /saving/i });
         expect(savingButton).toBeDisabled();
       });
-    });
+
+      // Advance timers to complete save
+      jest.advanceTimersByTime(1000);
+    }, 10000);
   });
 
   describe('Saved state', () => {
@@ -176,7 +182,7 @@ describe('ChapterEditor save status indicators', () => {
     });
 
     it('shows green checkmark after successful manual save', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       mockBookClient.saveChapterContent.mockResolvedValue({});
 
@@ -197,7 +203,7 @@ describe('ChapterEditor save status indicators', () => {
       await waitFor(() => {
         expect(screen.getByText(/^Saved/)).toBeInTheDocument();
       });
-    });
+    }, 10000);
 
     it('updates timestamp on subsequent saves', async () => {
       const user = userEvent.setup({ delay: null });

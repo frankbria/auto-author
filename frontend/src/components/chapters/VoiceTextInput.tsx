@@ -232,7 +232,7 @@ export function VoiceTextInput({
             size="sm"
             onClick={toggleMode}
             disabled={disabled}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 min-h-[44px] min-w-[44px]"
           >
             {currentMode === 'text' ? (
               <>
@@ -319,7 +319,7 @@ export function VoiceTextInput({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className="min-h-[200px] resize-none"
+          className={cn("min-h-[200px] resize-none min-w-[44px]", className)}
           aria-label="Chapter content text input"
         />
       ) : (

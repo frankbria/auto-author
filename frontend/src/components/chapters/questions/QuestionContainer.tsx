@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { bookClient } from '@/lib/api/bookClient';
-import { 
-  Question, 
-  QuestionProgressResponse, 
+import {
+  Question,
+  QuestionProgressResponse,
   QuestionType,
   QuestionDifficulty,
 } from '@/types/chapter-questions';
@@ -41,24 +41,31 @@ export default function QuestionContainer({
   const isMobile = useMediaQuery('(max-width: 767px)');
   const isTablet = useMediaQuery('(min-width: 768px) and (max-width: 1023px)');
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const prefersHighContrast = useMediaQuery('(prefers-contrast: high)');
+  const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+
+  // Ref for screen reader announcements
+  const announcementRef = useRef<HTMLDivElement>(null);
   
   // Fetch questions on initial load
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      try {
-        setLoading(true);
-        const response = await bookClient.getChapterQuestions(bookId, chapterId);
-        if (response.questions.length > 0) {
-          setQuestions(response.questions);
-          await fetchProgress();
-        }
-      } catch (err) {
-        console.error('Error fetching questions:', err);
-        setError('Failed to load questions. Please try again.');
-      } finally {
-        setLoading(false);
+  const fetchQuestions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await bookClient.getChapterQuestions(bookId, chapterId);
+      if (response.questions.length > 0) {
+        setQuestions(response.questions);
+        await fetchProgress();
       }
-    };
+    } catch (err) {
+      console.error('Error fetching questions:', err);
+      setError('Failed to load questions. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchQuestions();
   }, [bookId, chapterId]);
   
@@ -153,16 +160,27 @@ export default function QuestionContainer({
     }
   };
   
+  // Screen reader announcement helper
+  const announceToScreenReader = (message: string) => {
+    if (announcementRef.current) {
+      announcementRef.current.textContent = message;
+    }
+  };
+
   // Navigation handlers
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
+      const newIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(newIndex);
+      announceToScreenReader(`Question ${newIndex + 1} of ${questions.length}`);
     }
   };
-  
+
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+      const newIndex = currentQuestionIndex - 1;
+      setCurrentQuestionIndex(newIndex);
+      announceToScreenReader(`Question ${newIndex + 1} of ${questions.length}`);
     }
   };
   
@@ -183,6 +201,21 @@ export default function QuestionContainer({
   
   // If there are no questions, show the generator
   if (questions.length === 0 && !loading) {
+    // If there's an error from loading, we should retry loading instead of generating
+    const handleRetryOrGenerate = async (
+      count?: number,
+      difficulty?: QuestionDifficulty,
+      focus?: QuestionType[]
+    ) => {
+      if (error) {
+        // If there's a load error, retry fetching existing questions
+        await fetchQuestions();
+      } else {
+        // Otherwise, generate new questions
+        await handleGenerateQuestions(count, difficulty, focus);
+      }
+    };
+
     return (
       <div className="space-y-4 p-4">
         <h2 className="text-2xl font-bold">Interview Questions</h2>
@@ -190,12 +223,12 @@ export default function QuestionContainer({
           Generate interview-style questions to help develop content for &quot;{chapterTitle}&quot;.
           These questions will guide you through key aspects of your chapter.
         </p>
-        
-        <QuestionGenerator 
+
+        <QuestionGenerator
           bookId={bookId}
           chapterId={chapterId}
-          onGenerate={handleGenerateQuestions}
-          isGenerating={isGenerating}
+          onGenerate={handleRetryOrGenerate}
+          isGenerating={isGenerating || loading}
           error={error}
         />
       </div>
@@ -217,13 +250,39 @@ export default function QuestionContainer({
   // Show the current question
   const currentQuestion = questions[currentQuestionIndex];
 
+  // Build container classes
+  const containerClasses = [
+    'space-y-6 p-4',
+    isMobile && 'mobile-layout',
+    isTablet && 'tablet-layout',
+    isDesktop && 'desktop-layout',
+    prefersHighContrast && 'high-contrast',
+    prefersReducedMotion && 'reduce-motion'
+  ].filter(Boolean).join(' ');
+
   return (
-    <main
-      className={`space-y-6 p-4 ${isMobile ? 'mobile-layout' : isTablet ? 'tablet-layout' : isDesktop ? 'desktop-layout' : ''}`}
-      role="main"
-      aria-label="Chapter questions interface"
-      data-testid="question-container"
-    >
+    <>
+      {/* Screen reader live region for announcements */}
+      <div
+        ref={announcementRef}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      />
+
+      <main
+        className={containerClasses}
+        role="main"
+        aria-label="Chapter questions interface"
+        data-testid="question-container"
+        style={{
+          ...(prefersReducedMotion && {
+            animationDuration: '0s',
+            transitionDuration: '0s'
+          })
+        }}
+      >
       {/* Progress bar */}
       {progress && (
         <QuestionProgress 
@@ -261,5 +320,6 @@ export default function QuestionContainer({
         </div>
       )}
     </main>
+    </>
   );
 }
