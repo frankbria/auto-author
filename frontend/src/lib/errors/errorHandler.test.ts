@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// Jest globals are automatically available (describe, it, expect)
 import {
   ErrorType,
   ErrorHandler,
@@ -11,12 +11,12 @@ import {
 
 describe('Error Handler Utility - TDD Implementation', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
-    vi.useRealTimers();
+    jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   describe('Error Classification', () => {
@@ -180,11 +180,11 @@ describe('Error Handler Utility - TDD Implementation', () => {
 
   describe('ErrorHandler Class', () => {
     let errorHandler: ErrorHandler;
-    let mockOperation: ReturnType<typeof vi.fn>;
+    let mockOperation: ReturnType<typeof jest.fn>;
 
     beforeEach(() => {
       errorHandler = new ErrorHandler({ maxRetries: 3 });
-      mockOperation = vi.fn();
+      mockOperation = jest.fn();
     });
 
     it('should execute operation successfully on first try', async () => {
@@ -206,7 +206,7 @@ describe('Error Handler Utility - TDD Implementation', () => {
       const promise = errorHandler.execute(mockOperation);
 
       // Fast-forward through backoff delays
-      await vi.runAllTimersAsync();
+      await jest.runAllTimersAsync();
 
       const result = await promise;
 
@@ -227,7 +227,7 @@ describe('Error Handler Utility - TDD Implementation', () => {
       mockOperation.mockRejectedValue(networkError);
 
       const promise = errorHandler.execute(mockOperation);
-      await vi.runAllTimersAsync();
+      await jest.runAllTimersAsync();
 
       await expect(promise).rejects.toEqual(networkError);
       expect(mockOperation).toHaveBeenCalledTimes(3); // Initial + 2 retries
@@ -240,20 +240,20 @@ describe('Error Handler Utility - TDD Implementation', () => {
       const promise = errorHandler.execute(mockOperation);
 
       // First retry after 1000ms
-      await vi.advanceTimersByTimeAsync(999);
+      await jest.advanceTimersByTimeAsync(999);
       expect(mockOperation).toHaveBeenCalledTimes(1);
 
-      await vi.advanceTimersByTimeAsync(1);
+      await jest.advanceTimersByTimeAsync(1);
       expect(mockOperation).toHaveBeenCalledTimes(2);
 
       // Second retry after 2000ms
-      await vi.advanceTimersByTimeAsync(1999);
+      await jest.advanceTimersByTimeAsync(1999);
       expect(mockOperation).toHaveBeenCalledTimes(2);
 
-      await vi.advanceTimersByTimeAsync(1);
+      await jest.advanceTimersByTimeAsync(1);
       expect(mockOperation).toHaveBeenCalledTimes(3);
 
-      await vi.runAllTimersAsync();
+      await jest.runAllTimersAsync();
       await expect(promise).rejects.toEqual(networkError);
     });
 
@@ -263,7 +263,7 @@ describe('Error Handler Utility - TDD Implementation', () => {
       mockOperation.mockRejectedValue(networkError);
 
       const promise = customHandler.execute(mockOperation);
-      await vi.runAllTimersAsync();
+      await jest.runAllTimersAsync();
 
       await expect(promise).rejects.toEqual(networkError);
       expect(mockOperation).toHaveBeenCalledTimes(1); // Initial only, no retries
@@ -271,14 +271,14 @@ describe('Error Handler Utility - TDD Implementation', () => {
   });
 
   describe('handleApiError - High-Level API', () => {
-    let mockToast: ReturnType<typeof vi.fn>;
+    let mockToast: ReturnType<typeof jest.fn>;
 
     beforeEach(() => {
-      mockToast = vi.fn();
+      mockToast = jest.fn();
     });
 
     it('should handle successful API calls without toast', async () => {
-      const successOperation = vi.fn().mockResolvedValue({ data: 'success' });
+      const successOperation = jest.fn().mockResolvedValue({ data: 'success' });
 
       const result = await handleApiError(successOperation, mockToast);
 
@@ -288,7 +288,7 @@ describe('Error Handler Utility - TDD Implementation', () => {
 
     it('should show toast notification on validation error', async () => {
       const validationError = { status: 400, message: 'Invalid input' };
-      const failedOperation = vi.fn().mockRejectedValue(validationError);
+      const failedOperation = jest.fn().mockRejectedValue(validationError);
 
       await expect(handleApiError(failedOperation, mockToast)).rejects.toEqual(validationError);
 
@@ -301,7 +301,7 @@ describe('Error Handler Utility - TDD Implementation', () => {
 
     it('should show toast notification on auth error', async () => {
       const authError = { status: 401, message: 'Unauthorized' };
-      const failedOperation = vi.fn().mockRejectedValue(authError);
+      const failedOperation = jest.fn().mockRejectedValue(authError);
 
       await expect(handleApiError(failedOperation, mockToast)).rejects.toEqual(authError);
 
@@ -314,10 +314,10 @@ describe('Error Handler Utility - TDD Implementation', () => {
 
     it('should show toast notification on network error after retries exhausted', async () => {
       const networkError = new TypeError('Failed to fetch');
-      const failedOperation = vi.fn().mockRejectedValue(networkError);
+      const failedOperation = jest.fn().mockRejectedValue(networkError);
 
       const promise = handleApiError(failedOperation, mockToast);
-      await vi.runAllTimersAsync();
+      await jest.runAllTimersAsync();
 
       await expect(promise).rejects.toEqual(networkError);
 
@@ -330,13 +330,13 @@ describe('Error Handler Utility - TDD Implementation', () => {
 
     it('should retry network errors before showing toast', async () => {
       const networkError = new TypeError('Failed to fetch');
-      const retryOperation = vi
+      const retryOperation = jest
         .fn()
         .mockRejectedValueOnce(networkError)
         .mockResolvedValueOnce({ data: 'success' });
 
       const promise = handleApiError(retryOperation, mockToast);
-      await vi.runAllTimersAsync();
+      await jest.runAllTimersAsync();
 
       const result = await promise;
 
@@ -347,13 +347,13 @@ describe('Error Handler Utility - TDD Implementation', () => {
 
     it('should support custom error messages in toast', async () => {
       const error = { status: 500, message: 'Server crashed' };
-      const failedOperation = vi.fn().mockRejectedValue(error);
+      const failedOperation = jest.fn().mockRejectedValue(error);
 
       const promise = handleApiError(failedOperation, mockToast, {
         customMessage: 'Custom error occurred',
       });
 
-      await vi.runAllTimersAsync();
+      await jest.runAllTimersAsync();
 
       await expect(promise).rejects.toEqual(error);
 
@@ -367,10 +367,10 @@ describe('Error Handler Utility - TDD Implementation', () => {
 
   describe('Integration Tests', () => {
     it('should handle real-world API error scenario', async () => {
-      const mockToast = vi.fn();
+      const mockToast = jest.fn();
       let attempts = 0;
 
-      const flakeyApiCall = vi.fn().mockImplementation(async () => {
+      const flakeyApiCall = jest.fn().mockImplementation(async () => {
         attempts++;
         if (attempts < 3) {
           throw new TypeError('Failed to fetch');
@@ -379,7 +379,7 @@ describe('Error Handler Utility - TDD Implementation', () => {
       });
 
       const promise = handleApiError(flakeyApiCall, mockToast);
-      await vi.runAllTimersAsync();
+      await jest.runAllTimersAsync();
 
       const result = await promise;
 
@@ -389,8 +389,8 @@ describe('Error Handler Utility - TDD Implementation', () => {
     });
 
     it('should handle permanent failure with toast notification', async () => {
-      const mockToast = vi.fn();
-      const permanentFailure = vi.fn().mockRejectedValue({
+      const mockToast = jest.fn();
+      const permanentFailure = jest.fn().mockRejectedValue({
         status: 404,
         message: 'Resource not found',
       });
