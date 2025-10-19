@@ -16,7 +16,6 @@ interface VoiceTextInputProps {
   value: string;
   onChange: (value: string) => void;
   onModeChange?: (mode: InputMode) => void;
-  onAutoSave?: (content: string) => void;
   mode?: InputMode;
   placeholder?: string;
   className?: string;
@@ -53,7 +52,6 @@ export function VoiceTextInput({
   value,
   onChange,
   onModeChange,
-  onAutoSave,
   mode = 'text',
   placeholder = 'Start writing...',
   className,
@@ -64,35 +62,15 @@ export function VoiceTextInput({
   const [error, setError] = useState<string | null>(null);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isSupported, setIsSupported] = useState(false);
-  
+
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check for speech recognition support
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     setIsSupported(!!SpeechRecognition);
   }, []);
-
-  // Auto-save functionality
-  useEffect(() => {
-    if (!onAutoSave || !value) return;
-
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
-
-    autoSaveTimeoutRef.current = setTimeout(() => {
-      onAutoSave(value);
-    }, 3000);
-
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-    };
-  }, [value, onAutoSave]);
 
   // Update mode when prop changes
   useEffect(() => {

@@ -23,21 +23,21 @@ interface QuestionProgressProps {
 /**
  * Component to display question completion progress with visual indicators
  */
-export default function QuestionProgress({ 
+export default function QuestionProgress({
   progress,
   currentIndex,
   totalQuestions
 }: QuestionProgressProps) {
-  // Calculate progress percentage for the progress bar
-  const progressPercentage = progress.completion_percentage || 0;
-  
+  // Calculate progress percentage for the progress bar (progress is 0.0-1.0, convert to 0-100)
+  const progressPercentage = (progress.progress || 0) * 100;
+
   // Calculate current position
   const currentPosition = currentIndex + 1;
-  
+
   // Determine status label
   let statusLabel = '';
   let statusColor = '';
-  
+
   if (progress.status === 'completed') {
     statusLabel = 'All questions completed';
     statusColor = 'text-green-600';

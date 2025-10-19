@@ -1,4 +1,5 @@
 // Jest globals are automatically available (describe, it, expect)
+import { act } from '@testing-library/react';
 import {
   ErrorType,
   ErrorHandler,
@@ -230,6 +231,11 @@ describe('Error Handler Utility - TDD Implementation', () => {
       mockOperation.mockRejectedValue(networkError);
 
       const promise = errorHandler.execute(mockOperation);
+
+      // Suppress unhandled rejection warning
+      promise.catch(() => {});
+
+      // Advance through all retry delays
       await jest.runAllTimersAsync();
 
       await expect(promise).rejects.toEqual(networkError);
@@ -242,6 +248,9 @@ describe('Error Handler Utility - TDD Implementation', () => {
       mockOperation.mockRejectedValue(networkError);
 
       const promise = errorHandler.execute(mockOperation);
+
+      // Suppress unhandled rejection warning
+      promise.catch(() => {});
 
       // First retry after 1000ms
       await jest.advanceTimersByTimeAsync(999);
@@ -268,6 +277,10 @@ describe('Error Handler Utility - TDD Implementation', () => {
       mockOperation.mockRejectedValue(networkError);
 
       const promise = customHandler.execute(mockOperation);
+
+      // Suppress unhandled rejection warning
+      promise.catch(() => {});
+
       await jest.runAllTimersAsync();
 
       await expect(promise).rejects.toEqual(networkError);
@@ -323,6 +336,10 @@ describe('Error Handler Utility - TDD Implementation', () => {
       const failedOperation = jest.fn().mockRejectedValue(networkError);
 
       const promise = handleApiError(failedOperation, mockToast);
+
+      // Suppress unhandled rejection warning
+      promise.catch(() => {});
+
       await jest.runAllTimersAsync();
 
       await expect(promise).rejects.toEqual(networkError);
@@ -359,6 +376,9 @@ describe('Error Handler Utility - TDD Implementation', () => {
       const promise = handleApiError(failedOperation, mockToast, {
         customMessage: 'Custom error occurred',
       });
+
+      // Suppress unhandled rejection warning
+      promise.catch(() => {});
 
       await jest.runAllTimersAsync();
 

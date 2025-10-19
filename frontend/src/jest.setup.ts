@@ -262,7 +262,7 @@ jest.mock('@tiptap/react', () => {
   // Create mock editor instance with all required methods
   const createMockEditor = (config: any) => {
     let content = config?.content || '';
-    let updateHandler = config?.onUpdate;
+    const updateHandler = config?.onUpdate;
 
     const mockEditor = {
       // Core properties
@@ -274,11 +274,18 @@ jest.mock('@tiptap/react', () => {
       view: {},
       schema: {},
 
-      // Storage for extensions
+      // Storage for extensions - DYNAMIC character count
       storage: {
         characterCount: {
-          characters: jest.fn(() => content.length),
-          words: jest.fn(() => content.split(/\s+/).filter(Boolean).length),
+          characters: jest.fn(() => {
+            // Strip HTML tags and return character count
+            const textContent = content.replace(/<[^>]*>/g, '');
+            return textContent.length;
+          }),
+          words: jest.fn(() => {
+            const textContent = content.replace(/<[^>]*>/g, '');
+            return textContent.split(/\s+/).filter(Boolean).length;
+          }),
         },
       },
 
@@ -395,6 +402,23 @@ jest.mock('@tiptap/react', () => {
   // Mock useEditor hook
   const useEditor = jest.fn((config?: any) => {
     const [editor] = React.useState(() => createMockEditor(config));
+    // Force re-render when editor content changes by tracking update count
+    const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+
+    // Wrap the original onUpdate handler to force component re-render
+    React.useEffect(() => {
+      const originalOnUpdate = config?.onUpdate;
+      if (originalOnUpdate && editor) {
+        // Override the setContent command to also force re-render
+        const originalSetContent = editor.commands.setContent;
+        editor.commands.setContent = jest.fn((newContent: string) => {
+          const result = originalSetContent(newContent);
+          // Force parent component to re-render after content change
+          forceUpdate();
+          return result;
+        });
+      }
+    }, [editor, config?.onUpdate, forceUpdate]);
 
     // Update content when initialContent changes
     React.useEffect(() => {
@@ -407,6 +431,7 @@ jest.mock('@tiptap/react', () => {
   });
 
   // Mock EditorContent component - render a simple textarea with role="textbox"
+  // CRITICAL: This component must trigger onUpdate when user types
   const EditorContent = React.forwardRef(({ editor, className, ...props }: any, ref: any) => {
     const [value, setValue] = React.useState(editor?.getHTML() || '');
 
@@ -420,6 +445,7 @@ jest.mock('@tiptap/react', () => {
       const newValue = e.target.value;
       setValue(newValue);
 
+      // CRITICAL FIX: Call setContent which triggers onUpdate callback
       if (editor?.commands?.setContent) {
         editor.commands.setContent(newValue);
       }

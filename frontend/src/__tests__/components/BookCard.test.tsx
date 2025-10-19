@@ -62,6 +62,23 @@ jest.mock('lucide-react', () => ({
   Trash2: ({ className }: any) => <span className={className} data-testid="trash-icon">Trash</span>,
 }));
 
+// Mock DeleteBookModal
+jest.mock('@/components/books', () => ({
+  DeleteBookModal: ({ isOpen, bookTitle, onConfirm, isDeleting, onOpenChange }: any) => (
+    isOpen ? (
+      <div data-testid="delete-book-modal" role="dialog">
+        <h2>Delete Book</h2>
+        <p>Are you sure you want to delete &quot;{bookTitle}&quot;?</p>
+        <p>All chapters and content will be permanently deleted</p>
+        <button onClick={() => onOpenChange(false)} data-testid="modal-cancel">Cancel</button>
+        <button onClick={onConfirm} disabled={isDeleting} data-testid="modal-confirm">
+          {isDeleting ? 'Deleting...' : 'Delete'}
+        </button>
+      </div>
+    ) : null
+  ),
+}));
+
 describe('BookCard', () => {
   const mockPush = jest.fn();
   
@@ -170,35 +187,35 @@ describe('BookCard', () => {
       expect(screen.getByText(/All chapters and content will be permanently deleted/)).toBeInTheDocument();
     });
 
-    it('should close dialog when cancel is clicked', () => {
+    it('should close dialog when cancel is clicked', async () => {
       render(<BookCard book={mockBook} onDelete={mockOnDelete} />);
-      
+
       const deleteButton = screen.getByTestId('trash-icon').closest('button')!;
       fireEvent.click(deleteButton);
-      
-      expect(screen.getByTestId('alert-dialog')).toBeInTheDocument();
-      
-      const cancelButton = screen.getByTestId('alert-cancel');
+
+      expect(screen.getByTestId('delete-book-modal')).toBeInTheDocument();
+
+      const cancelButton = screen.getByTestId('modal-cancel');
       fireEvent.click(cancelButton);
-      
+
       // Dialog should be closed
-      waitFor(() => {
-        expect(screen.queryByTestId('alert-dialog')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByTestId('delete-book-modal')).not.toBeInTheDocument();
       });
-      
+
       expect(mockOnDelete).not.toHaveBeenCalled();
     });
 
     it('should call onDelete when delete is confirmed', async () => {
       mockOnDelete.mockResolvedValue(undefined);
       render(<BookCard book={mockBook} onDelete={mockOnDelete} />);
-      
+
       const deleteButton = screen.getByTestId('trash-icon').closest('button')!;
       fireEvent.click(deleteButton);
-      
-      const confirmButton = screen.getByTestId('alert-action');
+
+      const confirmButton = screen.getByTestId('modal-confirm');
       fireEvent.click(confirmButton);
-      
+
       await waitFor(() => {
         expect(mockOnDelete).toHaveBeenCalledWith('book-123');
       });
@@ -207,15 +224,15 @@ describe('BookCard', () => {
     it('should show loading state during deletion', async () => {
       mockOnDelete.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
       render(<BookCard book={mockBook} onDelete={mockOnDelete} />);
-      
+
       const deleteButton = screen.getByTestId('trash-icon').closest('button')!;
       fireEvent.click(deleteButton);
-      
-      const confirmButton = screen.getByTestId('alert-action');
+
+      const confirmButton = screen.getByTestId('modal-confirm');
       fireEvent.click(confirmButton);
-      
+
       expect(screen.getByText('Deleting...')).toBeInTheDocument();
-      
+
       await waitFor(() => {
         expect(screen.queryByText('Deleting...')).not.toBeInTheDocument();
       });
@@ -224,19 +241,19 @@ describe('BookCard', () => {
     it('should handle deletion errors gracefully', async () => {
       const consoleError = jest.spyOn(console, 'error').mockImplementation();
       mockOnDelete.mockRejectedValue(new Error('Delete failed'));
-      
+
       render(<BookCard book={mockBook} onDelete={mockOnDelete} />);
-      
+
       const deleteButton = screen.getByTestId('trash-icon').closest('button')!;
       fireEvent.click(deleteButton);
-      
-      const confirmButton = screen.getByTestId('alert-action');
+
+      const confirmButton = screen.getByTestId('modal-confirm');
       fireEvent.click(confirmButton);
-      
+
       await waitFor(() => {
         expect(consoleError).toHaveBeenCalledWith('Failed to delete book:', expect.any(Error));
       });
-      
+
       consoleError.mockRestore();
     });
 

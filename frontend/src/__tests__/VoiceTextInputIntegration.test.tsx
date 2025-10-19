@@ -7,19 +7,19 @@ import { Question, QuestionType, QuestionDifficulty, ResponseStatus } from '../t
 import bookClient from '../lib/api/bookClient';
 
 // Mock the bookClient
-jest.mock('../lib/api/bookClient', () => ({
-  __esModule: true,
-  default: {
+jest.mock('../lib/api/bookClient', () => {
+  const mockFns = {
     getQuestionResponse: jest.fn(),
     saveQuestionResponse: jest.fn(),
     rateQuestion: jest.fn(),
-  },
-  bookClient: {
-    getQuestionResponse: jest.fn(),
-    saveQuestionResponse: jest.fn(),
-    rateQuestion: jest.fn(),
-  }
-}));
+  };
+
+  return {
+    __esModule: true,
+    default: mockFns,
+    bookClient: mockFns,
+  };
+});
 
 describe('VoiceTextInput Integration in QuestionDisplay', () => {
   const mockQuestion: Question = {
@@ -117,8 +117,7 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
   });
 
   test('triggers auto-save when typing', async () => {
-    jest.useFakeTimers();
-    const user = userEvent.setup({ delay: null });
+    const user = userEvent.setup();
     const mockOnResponseSaved = jest.fn();
 
     render(
@@ -140,14 +139,7 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
     const input = screen.getByPlaceholderText('Type your response here or use voice input...');
     await user.type(input, 'This is my response text');
 
-    // Fast-forward through 3-second debounce wrapped in act
-    await act(async () => {
-      jest.advanceTimersByTime(3000);
-      // Allow promises to resolve
-      await Promise.resolve();
-    });
-
-    // Wait for auto-save to complete
+    // Wait for auto-save to complete (3-second debounce)
     await waitFor(() => {
       expect(bookClient.saveQuestionResponse).toHaveBeenCalledWith(
         'book1',
@@ -158,9 +150,7 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
           status: ResponseStatus.DRAFT
         })
       );
-    });
-
-    jest.useRealTimers();
+    }, { timeout: 5000 }); // Allow 5 seconds for debounce + API call
   }, 10000);
 
   test('can toggle between text and voice modes', async () => {

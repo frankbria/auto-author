@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/co
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, BookOpen, Map, MessageSquare, Search, Star, StarHalf, StarOff } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { bookClient } from '@/lib/api/bookClient';
 import { VoiceTextInput } from '@/components/chapters/VoiceTextInput';
 
@@ -75,24 +75,7 @@ export default function QuestionDisplay({
   useEffect(() => {
     setWordCount(responseText.split(/\s+/).filter(Boolean).length);
   }, [responseText]);
-  
-  // Auto-save functionality
-  useEffect(() => {
-    let autoSaveTimer: NodeJS.Timeout;
-    
-    if (responseText.trim() && !isSaving) {
-      autoSaveTimer = setTimeout(() => {
-        handleSaveDraft();
-      }, 3000); // Auto-save after 3 seconds of inactivity
-    }
-    
-    return () => {
-      if (autoSaveTimer) {
-        clearTimeout(autoSaveTimer);
-      }
-    };
-  }, [responseText, isSaving]);
-  
+
   // Get question type icon
   const getQuestionTypeIcon = (type: QuestionType) => {
     switch (type) {
@@ -143,13 +126,13 @@ export default function QuestionDisplay({
   };
   
   // Handle save as draft
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = useCallback(async () => {
     if (!responseText.trim()) return;
-    
+
     setIsSaving(true);
     setSaveStatus('Saving...');
     setSaveError('');
-    
+
     try {
       await bookClient.saveQuestionResponse(
         bookId,
@@ -160,7 +143,7 @@ export default function QuestionDisplay({
           status: ResponseStatus.DRAFT
         }
       );
-      
+
       setSaveStatus('Draft saved');
       // Notify parent component that response was saved
       onResponseSaved();
@@ -171,8 +154,25 @@ export default function QuestionDisplay({
     } finally {
       setIsSaving(false);
     }
-  };
-  
+  }, [responseText, bookId, chapterId, question.id, onResponseSaved]);
+
+  // Auto-save functionality
+  useEffect(() => {
+    let autoSaveTimer: NodeJS.Timeout;
+
+    if (responseText.trim() && !isSaving) {
+      autoSaveTimer = setTimeout(() => {
+        handleSaveDraft();
+      }, 3000); // Auto-save after 3 seconds of inactivity
+    }
+
+    return () => {
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+      }
+    };
+  }, [responseText, isSaving, handleSaveDraft]);
+
   // Handle mark as completed
   const handleMarkCompleted = async () => {
     if (!responseText.trim()) {
@@ -300,7 +300,6 @@ export default function QuestionDisplay({
             placeholder="Type your response here or use voice input..."
             className="min-h-[200px] min-w-[44px]"
             disabled={isSaving || isCompleted}
-            onAutoSave={handleSaveDraft}
             aria-label="Your response to the question"
           />
           

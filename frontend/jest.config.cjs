@@ -25,7 +25,8 @@ const customJestConfig = {
   testMatch: [
     '**/__tests__/**/*.(test|spec).[jt]s?(x)',
     '**/*.(test|spec).[jt]s?(x)',
-    '!**/__tests__/helpers/**',          // Exclude helper files
+    '!**/__tests__/helpers/**',          // Exclude ALL files in helpers
+    '!**/helpers/**/*.ts',                // Exclude helper .ts files
     '!**/*.spec.ts',                     // Exclude Playwright spec files
     '!**/e2e/**',                        // Exclude all E2E directories
   ],

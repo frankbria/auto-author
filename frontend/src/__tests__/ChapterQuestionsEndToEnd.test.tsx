@@ -196,9 +196,11 @@ describe('Chapter Questions End-to-End Tests', () => {
     mockBookClient.getChapter.mockResolvedValue(mockChapter);
     mockBookClient.getChapterQuestions.mockResolvedValue({ questions: [] });
     mockBookClient.getChapterQuestionProgress.mockResolvedValue({
-      total_questions: 0,
-      answered_questions: 0,
-      completion_percentage: 0
+      total: 0,
+      completed: 0,
+      in_progress: 0,
+      progress: 0.0,
+      status: 'not-started'
     });
   });
 
@@ -351,9 +353,11 @@ describe('Chapter Questions End-to-End Tests', () => {
         questions: mockGeneratedQuestions
       });
       (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
-        total_questions: 3,
-        answered_questions: 0,
-        completion_percentage: 0
+        total: 3,
+        completed: 0,
+        in_progress: 0,
+        progress: 0.0,
+        status: 'not-started'
       });
       (mockBookClient.getQuestionResponse as jest.Mock).mockResolvedValue({
         has_response: false,
@@ -461,7 +465,17 @@ describe('Chapter Questions End-to-End Tests', () => {
       const response3 = 'Practical examples should include step-by-step code walkthroughs, real-world project scenarios, common troubleshooting cases, and hands-on exercises.';
       await testUser.type(responseTextarea3, response3);
 
-      // Wait for auto-save
+      // Update progress mock to show completion BEFORE the last save completes
+      // This simulates the backend returning completed status
+      (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
+        total: 3,
+        completed: 3,
+        in_progress: 0,
+        progress: 1.0,
+        status: 'completed'
+      });
+
+      // Wait for auto-save of the last question
       await waitFor(() => {
         expect(mockBookClient.saveQuestionResponse).toHaveBeenCalledWith(
           'test-book-id',
@@ -474,14 +488,13 @@ describe('Chapter Questions End-to-End Tests', () => {
         );
       }, { timeout: 10000 });
 
-      // Mark as complete
-      const completeButton = screen.queryByText('Complete Response') ||
-                           screen.queryByRole('button', { name: /complete/i });
-      if (completeButton) {
-        await testUser.click(completeButton);
-      }
+      // After save, the component should call fetchProgress() via handleResponseSaved
+      // Wait for progress to be fetched and UI to update
+      await waitFor(() => {
+        expect(mockBookClient.getChapterQuestionProgress).toHaveBeenCalled();
+      }, { timeout: 5000 });
 
-      // Should show completion message
+      // Should show completion message after progress updates
       await waitFor(() => {
         expect(screen.getByText(/All questions completed/i)).toBeInTheDocument();
       }, { timeout: 10000 });
@@ -577,9 +590,11 @@ describe('Chapter Questions End-to-End Tests', () => {
         questions: mockGeneratedQuestions
       });
       (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
-        total_questions: 3,
-        answered_questions: 3,
-        completion_percentage: 100
+        total: 3,
+        completed: 3,
+        in_progress: 0,
+        progress: 1.0,
+        status: 'completed'
       });
 
       render(
@@ -609,9 +624,11 @@ describe('Chapter Questions End-to-End Tests', () => {
         questions: mockGeneratedQuestions
       });
       (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
-        total_questions: 3,
-        answered_questions: 3,
-        completion_percentage: 100
+        total: 3,
+        completed: 3,
+        in_progress: 0,
+        progress: 1.0,
+        status: 'completed'
       });
       (mockDraftClient.generateChapterDraft as jest.Mock).mockResolvedValue({
         draft_content: 'Generated draft content based on question responses...',
@@ -689,9 +706,11 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       // Complete all questions (simulated)
       (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
-        total_questions: 3,
-        answered_questions: 3,
-        completion_percentage: 100
+        total: 3,
+        completed: 3,
+        in_progress: 0,
+        progress: 1.0,
+        status: 'completed'
       });
 
       // Trigger status update - button might have different text
