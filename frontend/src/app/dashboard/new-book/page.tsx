@@ -45,8 +45,8 @@ export default function NewBook() {
     <div className="container mx-auto p-6">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold text-zinc-100 mb-6">Create New Book</h1>
-        
-        <div className="bg-zinc-800 rounded-lg p-6">
+
+        <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 shadow-xl">
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label htmlFor="title" className="block text-sm font-medium text-zinc-300 mb-1">
