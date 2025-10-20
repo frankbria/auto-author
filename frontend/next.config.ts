@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
               "font-src 'self' https://fonts.gstatic.com https://r2cdn.perplexity.ai data:",
               "img-src 'self' data: https: blob:",
               "media-src 'self'",
-              "connect-src 'self' https://clerk.auto-author.dev https://*.clerk.accounts.dev https://api.auto-author.dev https://clerk-telemetry.com https://dev.autoauthor.app http://localhost:8000 https://localhost:8000 wss:",
+              "connect-src 'self' https://clerk.auto-author.dev https://*.clerk.accounts.dev https://api.auto-author.dev https://api.dev.autoauthor.app https://clerk-telemetry.com https://dev.autoauthor.app http://localhost:8000 https://localhost:8000 wss:",
               "frame-src 'self' https://*.clerk.accounts.dev",
               "worker-src 'self' blob:",
               "object-src 'none'",
