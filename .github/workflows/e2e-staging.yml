@@ -1,0 +1,152 @@
+name: E2E Tests on Staging
+
+on:
+  workflow_run:
+    workflows: ["Deploy to Staging"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: 'Staging URL to test'
+        required: false
+        default: 'https://dev.autoauthor.app'
+
+env:
+  STAGING_URL: https://dev.autoauthor.app
+  STAGING_API_URL: https://api.dev.autoauthor.app
+
+jobs:
+  e2e-tests:
+    name: Run E2E Tests Against Staging
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for staging to be ready
+        run: |
+          echo "Waiting for staging server to be ready..."
+          max_attempts=30
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f -s ${{ env.STAGING_API_URL }}/api/v1/health > /dev/null; then
+              echo "✅ Staging server is ready!"
+              break
+            fi
+
+            echo "⏳ Attempt $((attempt + 1))/$max_attempts - waiting for staging..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+
+          if [ $attempt -eq $max_attempts ]; then
+            echo "❌ Staging server did not become ready in time"
+            exit 1
+          fi
+
+      - name: Run Playwright E2E tests
+        working-directory: ./frontend
+        run: npx playwright test
+        env:
+          BASE_URL: ${{ env.STAGING_URL }}
+          NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}/api/v1
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv venv
+          source .venv/bin/activate
+          uv pip install -r requirements.txt
+          uv pip install pytest pytest-asyncio
+
+      - name: Run backend E2E tests with real APIs
+        working-directory: ./backend
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_e2e_no_mocks.py \
+            tests/test_debug_chapter_questions.py \
+            tests/test_debug_questions.py \
+            tests/test_api/test_routes/test_toc_generation.py::test_generate_toc_endpoint \
+            tests/test_api/test_routes/test_toc_generation.py::test_toc_generation_workflow_e2e \
+            -v --tb=short
+        env:
+          # Use staging environment
+          DATABASE_URI: mongodb://localhost:27017
+          DATABASE_NAME: autoauthor_e2e_test
+
+          # Real API keys from secrets
+          OPENAI_AUTOAUTHOR_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CLERK_API_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_JWT_PUBLIC_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_FRONTEND_API: https://delicate-ladybird-47.clerk.accounts.dev
+          CLERK_BACKEND_API: https://api.clerk.dev
+
+          # Test against staging server
+          BASE_URL: ${{ env.STAGING_API_URL }}
+          ENVIRONMENT: staging
+
+      - name: Upload Playwright test results
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-e2e-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Upload backend test logs
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-e2e-logs
+          path: backend/test-logs/
+          retention-days: 7
+
+  notify-results:
+    name: Notify E2E Test Results
+    runs-on: ubuntu-latest
+    needs: [e2e-tests]
+    if: always()
+
+    steps:
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ needs.e2e-tests.result }}
+          text: |
+            🧪 Staging E2E Tests ${{ needs.e2e-tests.result }}
+
+            Environment: https://dev.autoauthor.app
+            API: https://api.dev.autoauthor.app
+
+            Tests included:
+            - Playwright E2E suite (full user journeys)
+            - Backend E2E tests with OpenAI integration
+            - TOC generation workflow
+            - Chapter question generation
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
