@@ -10,6 +10,8 @@
 
 This guide provides step-by-step instructions for configuring GitHub secrets required for automated CI/CD deployments.
 
+**Key Concept**: Secrets use **generic names** (e.g., `SSH_KEY`, `API_URL`) that are scoped to **environments** (e.g., `staging`, `production`). This allows the same workflow code to work across all environments.
+
 ---
 
 ## Step 1: Navigate to GitHub Secrets
@@ -35,11 +37,11 @@ This guide provides step-by-step instructions for configuring GitHub secrets req
 
 Navigate to: Environments → staging → Environment secrets
 
-Click **Add environment secret** for each of the following:
+Click **Add environment secret** for each of the following 7 secrets:
 
-### Secret 1: STAGING_SSH_KEY
+### Secret 1: SSH_KEY
 
-**Name**: `STAGING_SSH_KEY`
+**Name**: `SSH_KEY`
 
 **Value**: Copy the entire output of this command (including BEGIN/END lines):
 
@@ -59,9 +61,9 @@ b3BlbnNzaC1rZXktdjEAAAAA...
 
 ---
 
-### Secret 2: STAGING_HOST
+### Secret 2: HOST
 
-**Name**: `STAGING_HOST`
+**Name**: `HOST`
 
 **Value**:
 ```
@@ -70,9 +72,9 @@ b3BlbnNzaC1rZXktdjEAAAAA...
 
 ---
 
-### Secret 3: STAGING_USER
+### Secret 3: USER
 
-**Name**: `STAGING_USER`
+**Name**: `USER`
 
 **Value**:
 ```
@@ -81,9 +83,9 @@ root
 
 ---
 
-### Secret 4: STAGING_API_URL
+### Secret 4: API_URL
 
-**Name**: `STAGING_API_URL`
+**Name**: `API_URL`
 
 **Value**:
 ```
@@ -92,9 +94,9 @@ https://api.dev.autoauthor.app/api/v1
 
 ---
 
-### Secret 5: STAGING_FRONTEND_URL
+### Secret 5: FRONTEND_URL
 
-**Name**: `STAGING_FRONTEND_URL`
+**Name**: `FRONTEND_URL`
 
 **Value**:
 ```
@@ -103,9 +105,9 @@ https://dev.autoauthor.app
 
 ---
 
-### Secret 6: STAGING_CLERK_PUBLISHABLE_KEY
+### Secret 6: CLERK_PUBLISHABLE_KEY
 
-**Name**: `STAGING_CLERK_PUBLISHABLE_KEY`
+**Name**: `CLERK_PUBLISHABLE_KEY`
 
 **Value**: Get from server (run this command):
 
@@ -117,9 +119,9 @@ ssh root@47.88.89.175 "grep NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY /opt/auto-author/c
 
 ---
 
-### Secret 7: STAGING_CLERK_SECRET_KEY
+### Secret 7: CLERK_SECRET_KEY
 
-**Name**: `STAGING_CLERK_SECRET_KEY`
+**Name**: `CLERK_SECRET_KEY`
 
 **Value**: Get from server (run this command):
 
@@ -161,13 +163,13 @@ After adding all secrets, verify the configuration:
 
 1. **Navigate to**: Settings → Environments → staging
 2. **Verify you see 7 environment secrets**:
-   - STAGING_SSH_KEY
-   - STAGING_HOST
-   - STAGING_USER
-   - STAGING_API_URL
-   - STAGING_FRONTEND_URL
-   - STAGING_CLERK_PUBLISHABLE_KEY
-   - STAGING_CLERK_SECRET_KEY
+   - SSH_KEY
+   - HOST
+   - USER
+   - API_URL
+   - FRONTEND_URL
+   - CLERK_PUBLISHABLE_KEY
+   - CLERK_SECRET_KEY
 
 3. **Optional**: If configured, verify repository secret:
    - SLACK_WEBHOOK_URL (in Secrets and variables → Actions)
@@ -212,6 +214,40 @@ After configuring secrets, test the deployment:
 
 ---
 
+## Understanding Secret Naming
+
+### Why Generic Names?
+
+Secrets use **generic names** without environment prefixes:
+- ✅ `SSH_KEY` (not `STAGING_SSH_KEY`)
+- ✅ `HOST` (not `STAGING_HOST`)
+- ✅ `API_URL` (not `STAGING_API_URL`)
+
+**Benefit**: The same workflow file works for both staging and production. The environment determines which secret values are used.
+
+### How It Works
+
+```yaml
+# Same workflow code for all environments
+environment:
+  name: staging  # or production
+
+# Uses SSH_KEY from the "staging" environment
+${{ secrets.SSH_KEY }}
+```
+
+**Staging Environment** (`staging`):
+- `SSH_KEY` → Staging server SSH key
+- `HOST` → `47.88.89.175`
+- `API_URL` → `https://api.dev.autoauthor.app/api/v1`
+
+**Production Environment** (`production`):
+- `SSH_KEY` → Production server SSH key
+- `HOST` → Production server IP (TBD)
+- `API_URL` → `https://api.autoauthor.app/api/v1`
+
+---
+
 ## Troubleshooting
 
 ### Error: "Permission denied (publickey)"
@@ -225,7 +261,7 @@ After configuring secrets, test the deployment:
    # Should show: -----BEGIN OPENSSH PRIVATE KEY-----
    ```
 
-2. Re-copy the **entire** key including BEGIN/END lines to STAGING_SSH_KEY secret
+2. Re-copy the **entire** key including BEGIN/END lines to SSH_KEY secret
 
 3. Test SSH connection locally:
    ```bash
@@ -237,8 +273,8 @@ After configuring secrets, test the deployment:
 **Cause**: Environment variables not set correctly
 
 **Solution**:
-1. Verify STAGING_API_URL is set correctly
-2. Verify STAGING_CLERK_PUBLISHABLE_KEY is set correctly
+1. Verify API_URL is set correctly in staging environment
+2. Verify CLERK_PUBLISHABLE_KEY is set correctly
 3. Check secrets are in **staging environment**, not repository secrets
 
 ### Error: "curl: (7) Failed to connect"
@@ -246,7 +282,7 @@ After configuring secrets, test the deployment:
 **Cause**: Server not reachable or services not running
 
 **Solution**:
-1. Verify STAGING_HOST is correct: `47.88.89.175`
+1. Verify HOST is correct: `47.88.89.175`
 2. Check server is online:
    ```bash
    ping 47.88.89.175
@@ -266,8 +302,8 @@ After configuring secrets, test the deployment:
 
 2. **Rotate SSH keys periodically**
    - Generate new key every 6-12 months
-   - Update STAGING_SSH_KEY secret
-   - Remove old key from server
+   - Update SSH_KEY secret in all environments
+   - Remove old key from servers
 
 3. **Use environment-specific keys**
    - Staging uses `github_actions_staging` key
@@ -285,52 +321,65 @@ After configuring secrets, test the deployment:
 
 When ready for production deployment:
 
-1. **Create production environment**:
-   - Settings → Environments → New environment → `production`
-   - **Enable**: Required reviewers (add yourself)
-   - This requires manual approval before production deployments
+### 1. Generate Production SSH Key
 
-2. **Generate production SSH key**:
-   ```bash
-   ssh-keygen -t ed25519 -C "github-actions-production" -f ~/.ssh/github_actions_production -N ""
-   ```
+```bash
+ssh-keygen -t ed25519 -C "github-actions-production" -f ~/.ssh/github_actions_production -N ""
 
-3. **Add production secrets** (similar to staging):
-   - PRODUCTION_SSH_KEY
-   - PRODUCTION_HOST (TBD - production server IP)
-   - PRODUCTION_USER (TBD - production SSH user)
-   - PRODUCTION_API_URL: `https://api.autoauthor.app/api/v1`
-   - PRODUCTION_FRONTEND_URL: `https://autoauthor.app`
-   - PRODUCTION_CLERK_PUBLISHABLE_KEY: `pk_live_...`
-   - PRODUCTION_CLERK_SECRET_KEY: `sk_live_...`
+# Copy to production server (when available):
+ssh-copy-id -i ~/.ssh/github_actions_production.pub user@production-server
+```
+
+### 2. Create Production Environment
+
+1. **Navigate to**: Settings → Environments → New environment
+2. **Name**: `production`
+3. **Enable protection**:
+   - ✅ Required reviewers (add yourself)
+   - ✅ Wait timer: 5 minutes (optional)
+4. **Click**: Add environment
+
+### 3. Add Production Secrets
+
+Same 7 secret names, different values:
+
+| Secret Name | Production Value |
+|-------------|------------------|
+| SSH_KEY | Contents of `~/.ssh/github_actions_production` |
+| HOST | Production server IP (TBD) |
+| USER | Production SSH username (e.g., `deploy`) |
+| API_URL | `https://api.autoauthor.app/api/v1` |
+| FRONTEND_URL | `https://autoauthor.app` |
+| CLERK_PUBLISHABLE_KEY | `pk_live_...` (Clerk production key) |
+| CLERK_SECRET_KEY | `sk_live_...` (Clerk production secret) |
 
 ---
 
 ## Quick Reference
 
-### Where to Find Secret Values
+### Staging Secret Values
 
 | Secret | Command to Get Value |
 |--------|---------------------|
-| STAGING_SSH_KEY | `cat ~/.ssh/github_actions_staging` |
-| STAGING_HOST | `47.88.89.175` (hardcoded) |
-| STAGING_USER | `root` (hardcoded) |
-| STAGING_API_URL | `https://api.dev.autoauthor.app/api/v1` (hardcoded) |
-| STAGING_FRONTEND_URL | `https://dev.autoauthor.app` (hardcoded) |
-| STAGING_CLERK_PUBLISHABLE_KEY | `ssh root@47.88.89.175 "grep NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY /opt/auto-author/current/frontend/.env.production \| cut -d= -f2"` |
-| STAGING_CLERK_SECRET_KEY | `ssh root@47.88.89.175 "grep CLERK_SECRET_KEY /opt/auto-author/current/frontend/.env.production \| cut -d= -f2"` |
+| SSH_KEY | `cat ~/.ssh/github_actions_staging` |
+| HOST | `47.88.89.175` |
+| USER | `root` |
+| API_URL | `https://api.dev.autoauthor.app/api/v1` |
+| FRONTEND_URL | `https://dev.autoauthor.app` |
+| CLERK_PUBLISHABLE_KEY | `ssh root@47.88.89.175 "grep NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY /opt/auto-author/current/frontend/.env.production \| cut -d= -f2"` |
+| CLERK_SECRET_KEY | `ssh root@47.88.89.175 "grep CLERK_SECRET_KEY /opt/auto-author/current/frontend/.env.production \| cut -d= -f2"` |
 
 ### Expected Formats
 
 | Secret | Format |
 |--------|--------|
-| STAGING_SSH_KEY | Multi-line, starts with `-----BEGIN OPENSSH PRIVATE KEY-----` |
-| STAGING_HOST | IP address: `47.88.89.175` |
-| STAGING_USER | Username: `root` |
-| STAGING_API_URL | Full URL with /api/v1: `https://api.dev.autoauthor.app/api/v1` |
-| STAGING_FRONTEND_URL | Full URL: `https://dev.autoauthor.app` |
-| STAGING_CLERK_PUBLISHABLE_KEY | Starts with `pk_test_` |
-| STAGING_CLERK_SECRET_KEY | Starts with `sk_test_` |
+| SSH_KEY | Multi-line, starts with `-----BEGIN OPENSSH PRIVATE KEY-----` |
+| HOST | IP address: `47.88.89.175` |
+| USER | Username: `root` |
+| API_URL | Full URL with /api/v1: `https://api.dev.autoauthor.app/api/v1` |
+| FRONTEND_URL | Full URL: `https://dev.autoauthor.app` |
+| CLERK_PUBLISHABLE_KEY | Starts with `pk_test_` (staging) or `pk_live_` (production) |
+| CLERK_SECRET_KEY | Starts with `sk_test_` (staging) or `sk_live_` (production) |
 
 ---
 
@@ -339,13 +388,13 @@ When ready for production deployment:
 Use this checklist to verify all secrets are configured:
 
 - [ ] Created `staging` environment in GitHub
-- [ ] Added STAGING_SSH_KEY (includes BEGIN/END lines)
-- [ ] Added STAGING_HOST (47.88.89.175)
-- [ ] Added STAGING_USER (root)
-- [ ] Added STAGING_API_URL (https://api.dev.autoauthor.app/api/v1)
-- [ ] Added STAGING_FRONTEND_URL (https://dev.autoauthor.app)
-- [ ] Added STAGING_CLERK_PUBLISHABLE_KEY (pk_test_...)
-- [ ] Added STAGING_CLERK_SECRET_KEY (sk_test_...)
+- [ ] Added SSH_KEY to staging environment (includes BEGIN/END lines)
+- [ ] Added HOST to staging environment (47.88.89.175)
+- [ ] Added USER to staging environment (root)
+- [ ] Added API_URL to staging environment
+- [ ] Added FRONTEND_URL to staging environment
+- [ ] Added CLERK_PUBLISHABLE_KEY to staging environment (pk_test_...)
+- [ ] Added CLERK_SECRET_KEY to staging environment (sk_test_...)
 - [ ] (Optional) Added SLACK_WEBHOOK_URL repository secret
 - [ ] Verified all 7 staging secrets appear in environment
 - [ ] Tested SSH key locally: `ssh -i ~/.ssh/github_actions_staging root@47.88.89.175`

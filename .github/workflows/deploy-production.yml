@@ -77,8 +77,8 @@ jobs:
       - name: Build frontend
         working-directory: ./frontend
         env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.PRODUCTION_API_URL }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.PRODUCTION_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_ENVIRONMENT: production
         run: |
           npm ci --production
@@ -111,28 +111,28 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/production_key
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/production_key
           chmod 600 ~/.ssh/production_key
-          ssh-keyscan -H ${{ secrets.PRODUCTION_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
       - name: Upload package
         run: |
           scp -i ~/.ssh/production_key /tmp/deploy-package.tar.gz \
-            ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:/tmp/
+            ${{ secrets.USER }}@${{ secrets.HOST }}:/tmp/
 
       - name: Deploy to production
         run: |
           ssh -i ~/.ssh/production_key \
-            ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} \
+            ${{ secrets.USER }}@${{ secrets.HOST }} \
             'bash -s' << 'ENDSSH'
           set -euo pipefail
 
           ENVIRONMENT="production"
           RELEASE_ID="${{ github.ref_name }}"
-          API_URL="${{ secrets.PRODUCTION_API_URL }}"
-          FRONTEND_URL="${{ secrets.PRODUCTION_FRONTEND_URL }}"
-          CLERK_PUBLISHABLE_KEY="${{ secrets.PRODUCTION_CLERK_PUBLISHABLE_KEY }}"
-          CLERK_SECRET_KEY="${{ secrets.PRODUCTION_CLERK_SECRET_KEY }}"
+          API_URL="${{ secrets.API_URL }}"
+          FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
+          CLERK_PUBLISHABLE_KEY="${{ secrets.CLERK_PUBLISHABLE_KEY }}"
+          CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
 
           DEPLOY_BASE="/opt/auto-author"
           RELEASE_DIR="$DEPLOY_BASE/releases/$RELEASE_ID"

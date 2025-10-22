@@ -46,7 +46,7 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_API_URL: https://api.dev.autoauthor.app/api/v1
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.STAGING_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
   backend-tests:
     name: Backend Tests
@@ -135,7 +135,7 @@ jobs:
         run: npx playwright test
         env:
           NEXT_PUBLIC_API_URL: https://api.dev.autoauthor.app/api/v1
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.STAGING_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
       - name: Upload test results
         if: failure()

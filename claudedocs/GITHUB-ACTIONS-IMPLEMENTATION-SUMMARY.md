@@ -123,7 +123,7 @@ All core infrastructure for automated CI/CD has been implemented and is ready fo
 - ✅ SSH connection verified: `ssh -i ~/.ssh/github_actions_staging root@47.88.89.175`
 
 ### Security Notes
-- Private key must be added to GitHub Secrets as `STAGING_SSH_KEY`
+- Private key must be added to GitHub Secrets as `SSH_KEY`
 - Key is passwordless for automated deployments
 - Restricted to deployment user on server
 - Consider IP-based restrictions in `~/.ssh/authorized_keys` for additional security
@@ -185,13 +185,13 @@ Create environment: Settings → Environments → New environment → "staging"
 
 | Secret Name | Value | Notes |
 |-------------|-------|-------|
-| `STAGING_SSH_KEY` | Contents of `~/.ssh/github_actions_staging` | Private key (see below) |
-| `STAGING_HOST` | `47.88.89.175` | Server IP |
-| `STAGING_USER` | `root` | SSH username |
-| `STAGING_API_URL` | `https://api.dev.autoauthor.app/api/v1` | Backend API URL |
-| `STAGING_FRONTEND_URL` | `https://dev.autoauthor.app` | Frontend URL |
-| `STAGING_CLERK_PUBLISHABLE_KEY` | `pk_test_...` | From current .env |
-| `STAGING_CLERK_SECRET_KEY` | `sk_test_...` | From current .env |
+| `SSH_KEY` | Contents of `~/.ssh/github_actions_staging` | Private key (see below) |
+| `HOST` | `47.88.89.175` | Server IP |
+| `USER` | `root` | SSH username |
+| `API_URL` | `https://api.dev.autoauthor.app/api/v1` | Backend API URL |
+| `FRONTEND_URL` | `https://dev.autoauthor.app` | Frontend URL |
+| `CLERK_PUBLISHABLE_KEY` | `pk_test_...` | From current .env |
+| `CLERK_SECRET_KEY` | `sk_test_...` | From current .env |
 
 #### Environment: `production` (Future)
 
@@ -201,13 +201,13 @@ Create environment: Settings → Environments → New environment → "productio
 
 | Secret Name | Value | Notes |
 |-------------|-------|-------|
-| `PRODUCTION_SSH_KEY` | TBD | Production server SSH key |
-| `PRODUCTION_HOST` | TBD | Production server IP |
-| `PRODUCTION_USER` | TBD | SSH username |
-| `PRODUCTION_API_URL` | `https://api.autoauthor.app/api/v1` | TBD |
-| `PRODUCTION_FRONTEND_URL` | `https://autoauthor.app` | TBD |
-| `PRODUCTION_CLERK_PUBLISHABLE_KEY` | `pk_live_...` | TBD |
-| `PRODUCTION_CLERK_SECRET_KEY` | `sk_live_...` | TBD |
+| `SSH_KEY` | TBD | Production server SSH key |
+| `HOST` | TBD | Production server IP |
+| `USER` | TBD | SSH username |
+| `API_URL` | `https://api.autoauthor.app/api/v1` | TBD |
+| `FRONTEND_URL` | `https://autoauthor.app` | TBD |
+| `CLERK_PUBLISHABLE_KEY` | `pk_live_...` | TBD |
+| `CLERK_SECRET_KEY` | `sk_live_...` | TBD |
 
 ### How to Get SSH Private Key
 
@@ -237,7 +237,7 @@ Copy the entire output including `-----BEGIN OPENSSH PRIVATE KEY-----` and `----
 3. **Add Staging Secrets** (8 secrets total):
    - Click "Add environment secret" for each secret
    - Copy values from table above
-   - For `STAGING_SSH_KEY`: `cat ~/.ssh/github_actions_staging` and copy entire output
+   - For `SSH_KEY`: `cat ~/.ssh/github_actions_staging` and copy entire output
 
 4. **Optional: Add Slack Webhook** (for notifications):
    - Settings → Secrets and variables → Actions
@@ -361,7 +361,7 @@ curl -I -X OPTIONS https://api.dev.autoauthor.app/api/v1/books \
 ssh -i ~/.ssh/github_actions_staging root@47.88.89.175 "echo OK"
 
 # Check key in GitHub Secrets:
-# Settings → Environments → staging → STAGING_SSH_KEY
+# Settings → Environments → staging → SSH_KEY
 # Should contain full private key including BEGIN/END lines
 ```
 
@@ -371,8 +371,8 @@ ssh -i ~/.ssh/github_actions_staging root@47.88.89.175 "echo OK"
 
 ```bash
 # Check GitHub Secrets are configured:
-# - STAGING_API_URL
-# - STAGING_CLERK_PUBLISHABLE_KEY
+# - API_URL
+# - CLERK_PUBLISHABLE_KEY
 
 # Test build locally:
 cd frontend
