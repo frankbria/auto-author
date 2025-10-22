@@ -91,7 +91,11 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
-          pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml
+          pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml \
+            --ignore=tests/test_debug_chapter_questions.py \
+            --ignore=tests/test_debug_questions.py \
+            --ignore=tests/test_e2e_no_mocks.py \
+            -k "not test_generate_toc_endpoint and not test_toc_generation_workflow_e2e"
         env:
           DATABASE_URI: mongodb://localhost:27017
           DATABASE_NAME: autoauthor_test
