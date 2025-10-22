@@ -27,8 +27,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -95,8 +93,13 @@ jobs:
           source .venv/bin/activate
           pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml
         env:
-          MONGODB_URI: mongodb://localhost:27017/autoauthor_test
-          CLERK_JWT_PUBLIC_KEY: ${{ secrets.STAGING_CLERK_PUBLISHABLE_KEY }}
+          DATABASE_URI: mongodb://localhost:27017
+          DATABASE_NAME: autoauthor_test
+          OPENAI_AUTOAUTHOR_API_KEY: test-key-for-ci
+          CLERK_API_KEY: test-key-for-ci
+          CLERK_JWT_PUBLIC_KEY: test-jwt-public-key-for-ci
+          CLERK_FRONTEND_API: https://delicate-ladybird-47.clerk.accounts.dev
+          CLERK_BACKEND_API: https://api.clerk.dev
           ENVIRONMENT: test
 
       - name: Upload coverage
@@ -122,8 +125,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
