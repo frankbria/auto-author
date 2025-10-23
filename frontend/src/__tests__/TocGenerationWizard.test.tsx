@@ -5,6 +5,24 @@ import TocGenerating from '../components/toc/TocGenerating';
 import TocReview from '../components/toc/TocReview';
 import React from 'react';
 
+// Mock LoadingStateManager
+jest.mock('@/components/loading', () => ({
+  LoadingStateManager: ({ operation, message }: any) => (
+    <div>
+      <h2>{operation}</h2>
+      <p>{message}</p>
+    </div>
+  ),
+}));
+
+// Mock createProgressTracker
+jest.mock('@/lib/loading', () => ({
+  createProgressTracker: () => () => ({
+    progress: 50,
+    estimatedTimeRemaining: 30000,
+  }),
+}));
+
 describe('TOC Generation Wizard Components', () => {
   it('renders TocGenerationWizard and shows steps', () => {
     // Skipping this test because TocGenerationWizard uses useRouter from next/navigation, which requires a Next.js app router context.

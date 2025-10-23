@@ -1,0 +1,267 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  pre-flight:
+    name: Production Readiness Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          cd frontend && npm ci
+          cd ../backend && pip install -r requirements.txt
+
+      - name: Run full test suite
+        run: |
+          cd frontend && npm test -- --ci --coverage
+          cd ../backend && pytest --cov=app tests/
+
+      - name: Security audit
+        run: |
+          cd frontend && npm audit --audit-level=moderate
+          cd ../backend && pip install safety && safety check -r requirements.txt
+
+      - name: Check for TODOs/FIXMEs
+        run: |
+          if grep -r "TODO\|FIXME" frontend/src backend/app --exclude-dir=node_modules --exclude-dir=.venv; then
+            echo "⚠️  Found TODO/FIXME comments - review before production"
+            exit 1
+          fi
+
+  build-and-deploy:
+    name: Build and Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [pre-flight]
+
+    environment:
+      name: production
+      url: https://autoauthor.app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: ./frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_ENVIRONMENT: production
+        run: |
+          npm ci --production
+          npm run build
+
+      - name: Create deployment package
+        run: |
+          mkdir -p /tmp/deploy
+
+          rsync -av --progress \
+            --exclude='node_modules' \
+            --exclude='.venv' \
+            --exclude='.next' \
+            --exclude='coverage' \
+            --exclude='*.log' \
+            --exclude='.env*' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='.pytest_cache' \
+            --exclude='test-results' \
+            --exclude='playwright-report' \
+            --exclude='.git' \
+            --exclude='tests' \
+            --exclude='e2e' \
+            . /tmp/deploy/
+
+          cd /tmp/deploy
+          tar -czf /tmp/deploy-package.tar.gz .
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/production_key
+          chmod 600 ~/.ssh/production_key
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+      - name: Upload package
+        run: |
+          scp -i ~/.ssh/production_key /tmp/deploy-package.tar.gz \
+            ${{ secrets.USER }}@${{ secrets.HOST }}:/tmp/
+
+      - name: Deploy to production
+        run: |
+          ssh -i ~/.ssh/production_key \
+            ${{ secrets.USER }}@${{ secrets.HOST }} \
+            'bash -s' << 'ENDSSH'
+          set -euo pipefail
+
+          ENVIRONMENT="production"
+          RELEASE_ID="${{ github.ref_name }}"
+          API_URL="${{ secrets.API_URL }}"
+          FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
+          CLERK_PUBLISHABLE_KEY="${{ secrets.CLERK_PUBLISHABLE_KEY }}"
+          CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
+
+          DEPLOY_BASE="/opt/auto-author"
+          RELEASE_DIR="$DEPLOY_BASE/releases/$RELEASE_ID"
+          CURRENT_DIR="$DEPLOY_BASE/current"
+
+          echo "==> Deploying $ENVIRONMENT environment (Release: $RELEASE_ID)"
+
+          # Create release directory
+          mkdir -p "$RELEASE_DIR"
+
+          # Extract uploaded package
+          echo "==> Extracting deployment package..."
+          tar -xzf /tmp/deploy-package.tar.gz -C "$RELEASE_DIR"
+
+          # Setup backend environment
+          echo "==> Setting up backend..."
+          cd "$RELEASE_DIR/backend"
+
+          # Install Python dependencies
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv venv
+          source .venv/bin/activate
+          uv pip install -r requirements.txt
+
+          # Update .env file (merge with existing)
+          if [ -f "$CURRENT_DIR/backend/.env" ]; then
+            cp "$CURRENT_DIR/backend/.env" .env
+          fi
+
+          # Setup frontend environment
+          echo "==> Setting up frontend..."
+          cd "$RELEASE_DIR/frontend"
+
+          # Install Node dependencies (production only)
+          npm ci --production
+
+          # Create/update .env.production
+          cat > .env.production <<EOF
+          NEXT_PUBLIC_API_URL=$API_URL
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
+          CLERK_SECRET_KEY=$CLERK_SECRET_KEY
+          NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT
+          PORT=3002
+          EOF
+
+          # Build frontend
+          echo "==> Building frontend..."
+          npm run build
+
+          # Update symlink atomically
+          echo "==> Switching to new release..."
+          ln -snf "$RELEASE_DIR" "$CURRENT_DIR.tmp"
+          mv -Tf "$CURRENT_DIR.tmp" "$CURRENT_DIR"
+
+          # Restart services
+          echo "==> Restarting services..."
+          pm2 restart auto-author-backend
+          pm2 restart auto-author-frontend
+
+          # Wait for services to start
+          sleep 5
+
+          # Health checks
+          echo "==> Running health checks..."
+          curl -f http://localhost:8000/api/v1/health || {
+            echo "ERROR: Backend health check failed"
+            exit 1
+          }
+
+          curl -f http://localhost:3002 || {
+            echo "ERROR: Frontend health check failed"
+            exit 1
+          }
+
+          echo "==> Deployment successful!"
+          echo "    Release: $RELEASE_ID"
+          echo "    Backend: http://localhost:8000"
+          echo "    Frontend: http://localhost:3002"
+
+          # Cleanup old releases (keep last 5)
+          cd "$DEPLOY_BASE/releases"
+          ls -t | tail -n +6 | xargs -r rm -rf
+
+          echo "==> Cleanup complete"
+          ENDSSH
+
+      - name: Production verification
+        run: |
+          sleep 15
+
+          # Backend health
+          curl -f https://api.autoauthor.app/api/v1/health || exit 1
+
+          # Frontend health
+          curl -f https://autoauthor.app || exit 1
+
+          # SSL certificate check
+          echo | openssl s_client -connect autoauthor.app:443 2>/dev/null | \
+            openssl x509 -noout -dates
+
+          # Security headers
+          curl -I https://autoauthor.app | grep -i "strict-transport-security" || exit 1
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/production_key
+          rm -f /tmp/deploy-package.tar.gz
+
+  notify:
+    name: Notify Production Deployment
+    runs-on: ubuntu-latest
+    needs: [build-and-deploy]
+    if: always()
+
+    steps:
+      - name: Notify team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ needs.build-and-deploy.result }}
+          text: |
+            🚀 Production Deployment ${{ needs.build-and-deploy.result }}
+
+            Version: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Deployed by: ${{ github.actor }}
+
+            🌐 https://autoauthor.app
+            📡 https://api.autoauthor.app
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

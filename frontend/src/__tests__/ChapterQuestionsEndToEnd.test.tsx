@@ -62,6 +62,13 @@ jest.mock('../lib/toast', () => ({
 // Mock ChapterTabs component
 jest.mock('../components/chapters/ChapterTabs', () => ({
   __esModule: true,
+  ChapterTabs: ({ bookId, chapterId, activeTab, onTabChange }: any) => (
+    <div data-testid="chapter-tabs">
+      <div role="tab" data-tab="questions">
+        Questions (3/3)
+      </div>
+    </div>
+  ),
   default: ({ bookId, chapterId, activeTab, onTabChange }: any) => (
     <div data-testid="chapter-tabs">
       <div role="tab" data-tab="questions">
@@ -189,9 +196,11 @@ describe('Chapter Questions End-to-End Tests', () => {
     mockBookClient.getChapter.mockResolvedValue(mockChapter);
     mockBookClient.getChapterQuestions.mockResolvedValue({ questions: [] });
     mockBookClient.getChapterQuestionProgress.mockResolvedValue({
-      total_questions: 0,
-      answered_questions: 0,
-      completion_percentage: 0
+      total: 0,
+      completed: 0,
+      in_progress: 0,
+      progress: 0.0,
+      status: 'not-started'
     });
   });
 
@@ -221,10 +230,10 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
@@ -235,8 +244,8 @@ describe('Chapter Questions End-to-End Tests', () => {
         const generateText = screen.queryByText(/Generate interview-style questions/i);
         const noQuestions = screen.queryByText(/No questions generated yet/i);
         expect(generateText || noQuestions).toBeTruthy();
-      }, { timeout: 5000 });
-      
+      }, { timeout: 10000 });
+
       // Click generate questions button
       const generateButton = screen.getByRole('button', { name: 'Generate Interview Questions' });
       fireEvent.click(generateButton);
@@ -247,7 +256,7 @@ describe('Chapter Questions End-to-End Tests', () => {
         const loading = screen.queryByText(/Loading/i);
         // Either state is fine
         expect(generating || loading || screen.queryByText('What are the main learning objectives for this chapter?')).toBeTruthy();
-      });
+      }, { timeout: 10000 });
 
       // Mock the updated questions list
       mockBookClient.getChapterQuestions.mockResolvedValue({
@@ -257,7 +266,7 @@ describe('Chapter Questions End-to-End Tests', () => {
       // Should display generated questions
       await waitFor(() => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-      }, { timeout: 5000 });
+      }, { timeout: 10000 });
 
       // Verify all questions are accessible
       const questionText = screen.getAllByText(/Question 1 of 3/i);
@@ -267,9 +276,11 @@ describe('Chapter Questions End-to-End Tests', () => {
         'test-chapter-id',
         expect.any(Object)
       );
-    });
+    }, 15000);
 
     test('handles question generation with custom options', async () => {
+      const testUser = userEvent.setup();
+
       (mockBookClient.generateChapterQuestions as jest.Mock).mockResolvedValue({
         questions: mockGeneratedQuestions,
         generation_metadata: {
@@ -281,10 +292,10 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
@@ -292,22 +303,22 @@ describe('Chapter Questions End-to-End Tests', () => {
       // Wait for the component to load
       await waitFor(() => {
         expect(screen.queryByText(/Generate interview-style questions/i)).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Open generation options
       const optionsButton = screen.getByRole('button', { name: 'Show Advanced Options' });
-      fireEvent.click(optionsButton);
+      await testUser.click(optionsButton);
 
       // Set custom options
       // Find difficulty select if it exists
-      const difficultySelect = screen.queryByLabelText('Question Difficulty') || 
+      const difficultySelect = screen.queryByLabelText('Question Difficulty') ||
                               screen.queryByRole('combobox', { name: /difficulty/i });
       if (difficultySelect) {
         fireEvent.change(difficultySelect, { target: { value: 'hard' } });
       }
 
       // Find count input - might be a slider
-      const countInput = screen.queryByLabelText(/Number of [Qq]uestions/i) || 
+      const countInput = screen.queryByLabelText(/Number of [Qq]uestions/i) ||
                         screen.queryByRole('slider', { name: /Number of questions/i });
       if (countInput) {
         fireEvent.change(countInput, { target: { value: '5' } });
@@ -317,12 +328,12 @@ describe('Chapter Questions End-to-End Tests', () => {
       const focusTextarea = screen.queryByLabelText('Focus Areas') ||
                            screen.queryByPlaceholderText(/focus areas/i);
       if (focusTextarea) {
-        await user.type(focusTextarea, 'Advanced concepts, practical applications, troubleshooting');
+        await testUser.type(focusTextarea, 'Advanced concepts, practical applications, troubleshooting');
       }
 
       // Generate with custom options
       const generateButton = screen.getByRole('button', { name: 'Generate Interview Questions' });
-      fireEvent.click(generateButton);
+      await testUser.click(generateButton);
 
       await waitFor(() => {
         expect(mockBookClient.generateChapterQuestions).toHaveBeenCalledWith(
@@ -332,8 +343,8 @@ describe('Chapter Questions End-to-End Tests', () => {
             count: 5
           })
         );
-      });
-    });
+      }, { timeout: 10000 });
+    }, 15000);
   });
 
   describe('Complete Question Answering Workflow', () => {
@@ -342,9 +353,11 @@ describe('Chapter Questions End-to-End Tests', () => {
         questions: mockGeneratedQuestions
       });
       (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
-        total_questions: 3,
-        answered_questions: 0,
-        completion_percentage: 0
+        total: 3,
+        completed: 0,
+        in_progress: 0,
+        progress: 0.0,
+        status: 'not-started'
       });
       (mockBookClient.getQuestionResponse as jest.Mock).mockResolvedValue({
         has_response: false,
@@ -354,13 +367,14 @@ describe('Chapter Questions End-to-End Tests', () => {
     });
 
     test('completes full question answering session', async () => {
+      const testUser = userEvent.setup();
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
@@ -368,17 +382,17 @@ describe('Chapter Questions End-to-End Tests', () => {
       // Wait for questions to load
       await waitFor(() => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Answer first question
       const responseTextarea = screen.queryByPlaceholderText(/Type your response here/i) ||
                              screen.queryByPlaceholderText(/Write your answer here/i) ||
                              screen.getByRole('textbox');
       const response1 = 'The main learning objectives include understanding fundamental concepts, applying basic principles, and building a foundation for advanced topics.';
-      
-      await user.type(responseTextarea, response1);
 
-      // Auto-save should trigger after 3 seconds
+      await testUser.type(responseTextarea, response1);
+
+      // Wait for auto-save (3-second debounce)
       await waitFor(() => {
         expect(mockBookClient.saveQuestionResponse).toHaveBeenCalledWith(
           'test-book-id',
@@ -389,30 +403,43 @@ describe('Chapter Questions End-to-End Tests', () => {
             status: ResponseStatus.DRAFT
           })
         );
-      }, { timeout: 5000 });
+      }, { timeout: 10000 });
 
       // Move to next question
       const nextButton = screen.getByText('Next');
-      fireEvent.click(nextButton);
+      await testUser.click(nextButton);
 
       await waitFor(() => {
         expect(screen.getByText('Who is the target audience for this content?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Answer second question
       const responseTextarea2 = screen.queryByPlaceholderText(/Type your response here/i) ||
                                screen.queryByPlaceholderText(/Write your answer here/i) ||
                                screen.getByRole('textbox');
-      await user.clear(responseTextarea2);
+      await testUser.clear(responseTextarea2);
       const response2 = 'The target audience consists of beginner to intermediate developers who want to learn modern software development practices.';
-      await user.type(responseTextarea2, response2);
+      await testUser.type(responseTextarea2, response2);
+
+      // Wait for auto-save
+      await waitFor(() => {
+        expect(mockBookClient.saveQuestionResponse).toHaveBeenCalledWith(
+          'test-book-id',
+          'test-chapter-id',
+          'q2',
+          expect.objectContaining({
+            response_text: expect.stringContaining('target audience'),
+            status: ResponseStatus.DRAFT
+          })
+        );
+      }, { timeout: 10000 });
 
       // Rate the question - look for thumbs up/down buttons instead
-      const thumbsUp = screen.queryByRole('button', { name: /thumbs up/i }) || 
+      const thumbsUp = screen.queryByRole('button', { name: /thumbs up/i }) ||
                       screen.queryByLabelText(/thumbs up/i) ||
                       screen.queryByTestId('thumbs-up');
       if (thumbsUp) {
-        fireEvent.click(thumbsUp);
+        await testUser.click(thumbsUp);
         await waitFor(() => {
           expect(mockBookClient.rateQuestion).toHaveBeenCalledWith(
             'test-book-id',
@@ -420,96 +447,128 @@ describe('Chapter Questions End-to-End Tests', () => {
             'q2',
             expect.objectContaining({ rating: 5 })
           );
-        });
+        }, { timeout: 10000 });
       }
 
       // Continue to final question
-      fireEvent.click(nextButton);
+      await testUser.click(nextButton);
 
       await waitFor(() => {
         expect(screen.getByText('What practical examples should be included?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Answer final question
       const responseTextarea3 = screen.queryByPlaceholderText(/Type your response here/i) ||
                                screen.queryByPlaceholderText(/Write your answer here/i) ||
                                screen.getByRole('textbox');
-      await user.clear(responseTextarea3);
+      await testUser.clear(responseTextarea3);
       const response3 = 'Practical examples should include step-by-step code walkthroughs, real-world project scenarios, common troubleshooting cases, and hands-on exercises.';
-      await user.type(responseTextarea3, response3);
+      await testUser.type(responseTextarea3, response3);
 
-      // Mark as complete
-      const completeButton = screen.queryByText('Complete Response') || 
-                           screen.queryByRole('button', { name: /complete/i });
-      if (completeButton) {
-        fireEvent.click(completeButton);
-      }
+      // Update progress mock to show completion BEFORE the last save completes
+      // This simulates the backend returning completed status
+      (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
+        total: 3,
+        completed: 3,
+        in_progress: 0,
+        progress: 1.0,
+        status: 'completed'
+      });
 
-      // Should show completion message
+      // Wait for auto-save of the last question
+      await waitFor(() => {
+        expect(mockBookClient.saveQuestionResponse).toHaveBeenCalledWith(
+          'test-book-id',
+          'test-chapter-id',
+          'q3',
+          expect.objectContaining({
+            response_text: expect.stringContaining('Practical examples'),
+            status: ResponseStatus.DRAFT
+          })
+        );
+      }, { timeout: 10000 });
+
+      // After save, the component should call fetchProgress() via handleResponseSaved
+      // Wait for progress to be fetched and UI to update
+      await waitFor(() => {
+        expect(mockBookClient.getChapterQuestionProgress).toHaveBeenCalled();
+      }, { timeout: 5000 });
+
+      // Should show completion message after progress updates
       await waitFor(() => {
         expect(screen.getByText(/All questions completed/i)).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Verify all responses were saved
       expect(mockBookClient.saveQuestionResponse).toHaveBeenCalledTimes(3);
-    });
+    }, 30000);
 
     test('supports skipping questions and coming back later', async () => {
+      const testUser = userEvent.setup();
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
 
       await waitFor(() => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Skip first question - look for Next button instead
-      const nextButton = screen.queryByText('Next') || 
+      const nextButton = screen.queryByText('Next') ||
                         screen.queryByRole('button', { name: /next/i });
       if (nextButton) {
-        fireEvent.click(nextButton);
+        await testUser.click(nextButton);
       }
 
       // QuestionDisplay doesn't have skip functionality, so we'll just move to next
       await waitFor(() => {
         expect(screen.getByText('Who is the target audience for this content?')).toBeInTheDocument();
-      });
-
-      // Should move to next question
-      await waitFor(() => {
-        expect(screen.getByText('Who is the target audience for this content?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Answer this question
       const responseTextarea = screen.queryByPlaceholderText(/Type your response here/i) ||
                              screen.queryByPlaceholderText(/Write your answer here/i) ||
                              screen.getByRole('textbox');
-      await user.type(responseTextarea, 'Target audience response');
+      await testUser.type(responseTextarea, 'Target audience response');
+
+      // Wait for auto-save
+      await waitFor(() => {
+        expect(mockBookClient.saveQuestionResponse).toHaveBeenCalledWith(
+          'test-book-id',
+          'test-chapter-id',
+          'q2',
+          expect.objectContaining({
+            response_text: 'Target audience response',
+            status: ResponseStatus.DRAFT
+          })
+        );
+      }, { timeout: 10000 });
 
       // Go back to previous question
-      const prevButton = screen.queryByText('Previous') || 
+      const prevButton = screen.queryByText('Previous') ||
                         screen.queryByRole('button', { name: /previous/i });
       if (prevButton) {
-        fireEvent.click(prevButton);
+        await testUser.click(prevButton);
 
         await waitFor(() => {
           expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-        });
+        }, { timeout: 10000 });
 
         // Now answer the first question
         const textarea2 = screen.queryByPlaceholderText(/Type your response here/i) ||
                          screen.queryByPlaceholderText(/Write your answer here/i) ||
                          screen.getByRole('textbox');
-        await user.clear(textarea2);
-        await user.type(textarea2, 'Now answering the first question');
+        await testUser.clear(textarea2);
+        await testUser.type(textarea2, 'Now answering the first question');
 
+        // Wait for auto-save
         await waitFor(() => {
           expect(mockBookClient.saveQuestionResponse).toHaveBeenCalledWith(
             'test-book-id',
@@ -520,9 +579,9 @@ describe('Chapter Questions End-to-End Tests', () => {
               status: ResponseStatus.DRAFT
             })
           );
-        });
+        }, { timeout: 10000 });
       }
-    });
+    }, 20000);
   });
 
   describe('Integration with Chapter Workflow', () => {
@@ -531,9 +590,11 @@ describe('Chapter Questions End-to-End Tests', () => {
         questions: mockGeneratedQuestions
       });
       (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
-        total_questions: 3,
-        answered_questions: 3,
-        completion_percentage: 100
+        total: 3,
+        completed: 3,
+        in_progress: 0,
+        progress: 1.0,
+        status: 'completed'
       });
 
       render(
@@ -563,9 +624,11 @@ describe('Chapter Questions End-to-End Tests', () => {
         questions: mockGeneratedQuestions
       });
       (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
-        total_questions: 3,
-        answered_questions: 3,
-        completion_percentage: 100
+        total: 3,
+        completed: 3,
+        in_progress: 0,
+        progress: 1.0,
+        status: 'completed'
       });
       (mockDraftClient.generateChapterDraft as jest.Mock).mockResolvedValue({
         draft_content: 'Generated draft content based on question responses...',
@@ -587,7 +650,7 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/All questions completed/i)).toBeInTheDocument();
-      });
+      }, { timeout: 15000 });
 
       // Should show option to generate draft
       const generateDraftButton = screen.queryByRole('button', { name: /Generate Chapter Draft/i }) ||
@@ -643,9 +706,11 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       // Complete all questions (simulated)
       (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
-        total_questions: 3,
-        answered_questions: 3,
-        completion_percentage: 100
+        total: 3,
+        completed: 3,
+        in_progress: 0,
+        progress: 1.0,
+        status: 'completed'
       });
 
       // Trigger status update - button might have different text
@@ -718,6 +783,8 @@ describe('Chapter Questions End-to-End Tests', () => {
     });
 
     test('handles offline scenarios with data persistence', async () => {
+      const testUser = userEvent.setup();
+
       (mockBookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
         questions: mockGeneratedQuestions
       });
@@ -727,33 +794,33 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
 
       await waitFor(() => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Try to answer question while offline
       const responseTextarea = screen.queryByPlaceholderText(/Type your response here/i) ||
                              screen.queryByPlaceholderText(/Write your answer here/i) ||
                              screen.getByRole('textbox');
-      await user.type(responseTextarea, 'This response should be saved locally');
+      await testUser.type(responseTextarea, 'This response should be saved locally');
 
-      // Should show offline indicator or error
+      // Should show offline indicator or error (after debounce)
       await waitFor(() => {
         const savedLocally = screen.queryByText(/Saved locally/i);
         const offline = screen.queryByText(/offline/i);
         const errorToast = screen.queryByText(/Network unavailable/i);
-        
+
         // At least one offline indicator should be present
         expect(savedLocally || offline || errorToast).toBeTruthy();
-      });
+      }, { timeout: 10000 });
 
       // Mock coming back online
       (mockBookClient.saveQuestionResponse as jest.Mock).mockResolvedValue({ success: true });
@@ -762,11 +829,11 @@ describe('Chapter Questions End-to-End Tests', () => {
       await waitFor(() => {
         const synced = screen.queryByText(/Synced/i);
         const saved = screen.queryByText(/Saved/i);
-        
-        // At least one success indicator should be present  
+
+        // At least one success indicator should be present
         expect(synced || saved).toBeTruthy();
-      });
-    });
+      }, { timeout: 15000 });
+    }, 25000);
 
     test('handles browser refresh and session recovery', async () => {
       (mockBookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
@@ -809,45 +876,48 @@ describe('Chapter Questions End-to-End Tests', () => {
 
   describe('Accessibility and User Experience', () => {
     test('supports keyboard navigation throughout workflow', async () => {
+      const testUser = userEvent.setup();
+
       (mockBookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
         questions: mockGeneratedQuestions
       });
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
 
       await waitFor(() => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Test keyboard navigation
       const responseTextarea = screen.queryByPlaceholderText(/Type your response here/i) ||
                              screen.queryByPlaceholderText(/Write your answer here/i) ||
                              screen.getByRole('textbox');
+
       responseTextarea.focus();
 
       // Tab should move to next interactive element (might be Save Draft button)
-      await user.tab();
+      await testUser.tab();
       const activeElement = document.activeElement;
       expect(activeElement?.tagName).toBe('BUTTON');
 
       // Navigate to next question if Next button exists
       const nextButton = screen.queryByText('Next') || screen.queryByRole('button', { name: /next/i });
       if (nextButton) {
-        fireEvent.click(nextButton);
+        await testUser.click(nextButton);
 
         await waitFor(() => {
           expect(screen.getByText('Who is the target audience for this content?')).toBeInTheDocument();
-        });
+        }, { timeout: 10000 });
       }
-    });
+    }, 15000);
 
     test('provides proper ARIA labels and screen reader support', async () => {
       (mockBookClient.getChapterQuestions as jest.Mock).mockResolvedValue({

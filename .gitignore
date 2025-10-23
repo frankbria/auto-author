@@ -14,6 +14,8 @@ backend/.venv/
 backend/__pycache__/
 backend/*.pyc
 backend/.env
+backend/.env.*
+!backend/.env.example
 
 # Frontend (Next.js)
 frontend/node_modules/
@@ -88,3 +90,4 @@ claude-flow
 claude-flow.bat
 claude-flow.ps1
 hive-mind-prompt-*.txt
+auto-author-clawcloud.tar.gz

@@ -247,7 +247,7 @@ export default function QuestionGenerator({
       </CardContent>
       
       <CardFooter>
-        <Button 
+        <Button
           onClick={handleGenerate}
           disabled={isGenerating}
           className="w-full"
@@ -257,6 +257,8 @@ export default function QuestionGenerator({
               <span className="animate-spin mr-2">◌</span>
               Generating Questions...
             </>
+          ) : error ? (
+            <>Retry</>
           ) : (
             <>Generate Interview Questions</>
           )}

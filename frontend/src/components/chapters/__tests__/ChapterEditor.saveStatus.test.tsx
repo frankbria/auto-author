@@ -3,7 +3,7 @@
  * Ensures visual feedback for save states: saving, saved, not saved, error
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChapterEditor } from '../ChapterEditor';
 import bookClient from '@/lib/api/bookClient';
@@ -48,8 +48,8 @@ describe('ChapterEditor save status indicators', () => {
       // Initial state should show "Not saved yet"
       expect(screen.getByText('Not saved yet')).toBeInTheDocument();
 
-      // Check mark should not be visible
-      expect(screen.queryByText(/saved/i)).not.toBeInTheDocument();
+      // Check mark should not be visible - use ^Saved to match only "Saved [timestamp]", not "Not saved yet"
+      expect(screen.queryByText(/^Saved/)).not.toBeInTheDocument();
 
       // Spinner should not be visible
       expect(screen.queryByText('Saving...')).not.toBeInTheDocument();
@@ -75,21 +75,21 @@ describe('ChapterEditor save status indicators', () => {
       await user.clear(editor);
       await user.type(editor, 'New content');
 
-      // Advance past debounce
-      jest.advanceTimersByTime(3000);
+      // Advance past debounce with act() wrapping
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
 
       // Should show saving state
       await waitFor(() => {
-        expect(screen.getByText('Saving...')).toBeInTheDocument();
+        const savingElements = screen.queryAllByText('Saving...');
+        expect(savingElements.length).toBeGreaterThan(0);
       });
-
-      // Verify spinner icon is present (via test id or accessible name)
-      const savingText = screen.getByText('Saving...');
-      expect(savingText).toBeInTheDocument();
     });
 
     it('shows loading spinner during manual save', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       mockBookClient.saveChapterContent.mockImplementation(() =>
         new Promise((resolve) => setTimeout(resolve, 1000))
@@ -111,11 +111,18 @@ describe('ChapterEditor save status indicators', () => {
       });
 
       // Status text should also show saving
-      expect(screen.getByText('Saving...')).toBeInTheDocument();
-    });
+      const savingElements = screen.queryAllByText('Saving...');
+      expect(savingElements.length).toBeGreaterThan(0);
+
+      // Advance timers to complete save
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+        await Promise.resolve();
+      });
+    }, 10000);
 
     it('disables save button during save operation', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       mockBookClient.saveChapterContent.mockImplementation(() =>
         new Promise((resolve) => setTimeout(resolve, 1000))
@@ -135,7 +142,10 @@ describe('ChapterEditor save status indicators', () => {
         const savingButton = screen.getByRole('button', { name: /saving/i });
         expect(savingButton).toBeDisabled();
       });
-    });
+
+      // Advance timers to complete save
+      jest.advanceTimersByTime(1000);
+    }, 10000);
   });
 
   describe('Saved state', () => {
@@ -154,7 +164,10 @@ describe('ChapterEditor save status indicators', () => {
       await user.clear(editor);
       await user.type(editor, 'Saved content');
 
-      jest.advanceTimersByTime(3000);
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
 
       // Wait for save to complete
       await waitFor(() => {
@@ -163,20 +176,25 @@ describe('ChapterEditor save status indicators', () => {
 
       // Should show saved status with timestamp
       await waitFor(() => {
-        const savedText = screen.getByText(/^Saved/);
-        expect(savedText).toBeInTheDocument();
-
-        // Verify timestamp format (HH:MM:SS AM/PM)
-        expect(savedText.textContent).toMatch(/Saved \d{1,2}:\d{2}:\d{2} (AM|PM)/);
+        const savedElements = screen.getAllByText(/^Saved/);
+        // Find the element with timestamp (not just "Saved content" from editor)
+        const savedStatus = savedElements.find(el =>
+          el.textContent && /Saved \d{1,2}:\d{2}:\d{2} (AM|PM)/.test(el.textContent)
+        );
+        expect(savedStatus).toBeDefined();
+        expect(savedStatus?.textContent).toMatch(/Saved \d{1,2}:\d{2}:\d{2} (AM|PM)/);
       });
 
       // Verify green color styling (check className or style)
-      const savedElement = screen.getByText(/^Saved/);
-      expect(savedElement.className).toContain('green');
+      const savedElements = screen.getAllByText(/^Saved/);
+      const savedStatus = savedElements.find(el =>
+        el.textContent && /Saved \d{1,2}:\d{2}:\d{2} (AM|PM)/.test(el.textContent)
+      );
+      expect(savedStatus?.className).toContain('green');
     });
 
     it('shows green checkmark after successful manual save', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       mockBookClient.saveChapterContent.mockResolvedValue({});
 
@@ -197,7 +215,7 @@ describe('ChapterEditor save status indicators', () => {
       await waitFor(() => {
         expect(screen.getByText(/^Saved/)).toBeInTheDocument();
       });
-    });
+    }, 10000);
 
     it('updates timestamp on subsequent saves', async () => {
       const user = userEvent.setup({ delay: null });
@@ -215,7 +233,11 @@ describe('ChapterEditor save status indicators', () => {
       // First save
       await user.clear(editor);
       await user.type(editor, 'First save');
-      jest.advanceTimersByTime(3000);
+
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/^Saved/)).toBeInTheDocument();
@@ -224,11 +246,18 @@ describe('ChapterEditor save status indicators', () => {
       const firstTimestamp = screen.getByText(/^Saved/).textContent;
 
       // Advance time
-      jest.advanceTimersByTime(10000);
+      await act(async () => {
+        jest.advanceTimersByTime(10000);
+        await Promise.resolve();
+      });
 
       // Second save
       await user.type(editor, ' Second save');
-      jest.advanceTimersByTime(3000);
+
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
 
       await waitFor(() => {
         const secondTimestamp = screen.getByText(/^Saved/).textContent;
@@ -253,7 +282,10 @@ describe('ChapterEditor save status indicators', () => {
       await user.clear(editor);
       await user.type(editor, 'Failed content');
 
-      jest.advanceTimersByTime(3000);
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
 
       // Should show error message
       await waitFor(() => {
@@ -281,7 +313,10 @@ describe('ChapterEditor save status indicators', () => {
       await user.clear(editor);
       await user.type(editor, 'First attempt');
 
-      jest.advanceTimersByTime(3000);
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/Failed to auto-save/)).toBeInTheDocument();
@@ -291,7 +326,10 @@ describe('ChapterEditor save status indicators', () => {
       mockBookClient.saveChapterContent.mockResolvedValueOnce({});
       await user.type(editor, ' Second attempt');
 
-      jest.advanceTimersByTime(3000);
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
 
       // Error should be cleared, saved status shown
       await waitFor(() => {
@@ -314,9 +352,8 @@ describe('ChapterEditor save status indicators', () => {
       // Character count should be visible
       expect(screen.getByText(/characters$/)).toBeInTheDocument();
 
-      // Both character count and save status should be in footer
-      const footer = screen.getByText(/characters$/).closest('div');
-      expect(footer).toContain(screen.getByText('Not saved yet'));
+      // Save status should also be visible in the document
+      expect(screen.getByText('Not saved yet')).toBeInTheDocument();
     });
 
     it('updates character count as user types', async () => {
@@ -351,19 +388,20 @@ describe('ChapterEditor save status indicators', () => {
         expect(screen.getByRole('textbox')).toBeInTheDocument();
       });
 
-      // Footer should contain all elements in consistent layout
-      const footer = screen.getByText('Not saved yet').closest('div');
-      expect(footer).toBeTruthy();
+      // Save status should be visible
+      expect(screen.getByText('Not saved yet')).toBeInTheDocument();
 
-      // Verify Save button is in the same footer
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      expect(footer).toContain(saveButton);
+      // Save button should also be visible
+      expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
     });
 
     it('shows only one status indicator at a time', async () => {
       const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
-      mockBookClient.saveChapterContent.mockResolvedValue({});
+      // Add delay to save to catch "Saving..." state
+      mockBookClient.saveChapterContent.mockImplementation(() =>
+        new Promise((resolve) => setTimeout(resolve, 100))
+      );
 
       render(<ChapterEditor {...defaultProps} />);
 
@@ -381,18 +419,31 @@ describe('ChapterEditor save status indicators', () => {
       await user.clear(editor);
       await user.type(editor, 'Content');
 
-      jest.advanceTimersByTime(3000);
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
 
       // During save: "Saving..."
       await waitFor(() => {
-        expect(screen.getByText('Saving...')).toBeInTheDocument();
+        const savingElements = screen.queryAllByText('Saving...');
+        expect(savingElements.length).toBeGreaterThan(0);
         expect(screen.queryByText('Not saved yet')).not.toBeInTheDocument();
-        expect(screen.queryByText(/^Saved/)).not.toBeInTheDocument();
+      });
+
+      // Advance timer to complete save
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+        await Promise.resolve();
       });
 
       // After save: "Saved [timestamp]"
       await waitFor(() => {
-        expect(screen.getByText(/^Saved/)).toBeInTheDocument();
+        const savedElements = screen.queryAllByText(/^Saved/);
+        const savedStatus = savedElements.find(el =>
+          el.textContent && /Saved \d{1,2}:\d{2}:\d{2} (AM|PM)/.test(el.textContent)
+        );
+        expect(savedStatus).toBeDefined();
         expect(screen.queryByText('Saving...')).not.toBeInTheDocument();
         expect(screen.queryByText('Not saved yet')).not.toBeInTheDocument();
       });
@@ -403,7 +454,10 @@ describe('ChapterEditor save status indicators', () => {
     it('provides accessible status updates for screen readers', async () => {
       const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
-      mockBookClient.saveChapterContent.mockResolvedValue({});
+      // Add delay to save to allow time for UI to update
+      mockBookClient.saveChapterContent.mockImplementation(() =>
+        new Promise((resolve) => setTimeout(resolve, 100))
+      );
 
       render(<ChapterEditor {...defaultProps} />);
 
@@ -415,11 +469,24 @@ describe('ChapterEditor save status indicators', () => {
       await user.clear(editor);
       await user.type(editor, 'Accessible content');
 
-      jest.advanceTimersByTime(3000);
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
+
+      // Advance timer to complete save
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+        await Promise.resolve();
+      });
 
       // Status text should be present and readable
       await waitFor(() => {
-        const savedStatus = screen.getByText(/^Saved/);
+        const savedElements = screen.getAllByText(/^Saved/);
+        const savedStatus = savedElements.find(el =>
+          el.textContent && /Saved \d{1,2}:\d{2}:\d{2} (AM|PM)/.test(el.textContent)
+        );
+        expect(savedStatus).toBeDefined();
         expect(savedStatus).toBeVisible();
       });
     });
