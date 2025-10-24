@@ -56,7 +56,7 @@ jobs:
         env:
           # Dummy/public-safe values; your build should not need server secrets
           NEXT_PUBLIC_API_URL: http://localhost:9999
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: dummy
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_CI_TEST }} 
           CLERK_SECRET_KEY: dummy
         run: npm run build
 
