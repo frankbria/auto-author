@@ -6,238 +6,58 @@ on:
     types: [completed]
     branches: [develop]
 
-env:
-  NODE_VERSION: '18'
-  PYTHON_VERSION: '3.9'
-
 jobs:
-  build-and-deploy:
-    name: Build and Deploy to Staging
+  deploy:
+    name: Deploy to Staging
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
-    environment:
-      name: staging
-      url: https://dev.autoauthor.app
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
+    env:
+      HOST: ${{ secrets.HOST }}
+      USER: ${{ secrets.USER }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Build frontend
-        working-directory: ./frontend
-        env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_ENVIRONMENT: staging
-        run: |
-          npm ci
-          npm run build
-
-      - name: Create deployment package
-        run: |
-          # Create temporary directory
-          mkdir -p /tmp/deploy
-
-          # Copy necessary files (exclude development artifacts)
-          rsync -av --progress \
-            --exclude='node_modules' \
-            --exclude='.venv' \
-            --exclude='.next' \
-            --exclude='coverage' \
-            --exclude='*.log' \
-            --exclude='.env.local' \
-            --exclude='.env' \
-            --exclude='__pycache__' \
-            --exclude='*.pyc' \
-            --exclude='.pytest_cache' \
-            --exclude='test-results' \
-            --exclude='playwright-report' \
-            --exclude='.git' \
-            . /tmp/deploy/
-
-          # Create tar archive
-          cd /tmp/deploy
-          tar -czf /tmp/deploy-package.tar.gz .
 
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
           chmod 600 ~/.ssh/staging_key
-          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
 
-      - name: Upload package to server
+      - name: Create Remote Release Directory
         run: |
-          scp -i ~/.ssh/staging_key /tmp/deploy-package.tar.gz \
-            ${{ secrets.USER }}@${{ secrets.HOST }}:/tmp/
+          RELEASE_ID=$(date +%Y%m%d-%H%M%S)
+          echo "RELEASE_ID=$RELEASE_ID" >> $GITHUB_ENV
+          ssh -i ~/.ssh/staging_key $USER@$HOST "mkdir -p /opt/auto-author/releases/$RELEASE_ID"
 
-      - name: Deploy to staging
+      - name: Rsync source (no dev artifacts)
         run: |
-          ssh -i ~/.ssh/staging_key \
-            ${{ secrets.USER }}@${{ secrets.HOST }} \
-            'bash -s' << 'ENDSSH'
-          set -euo pipefail
-
-          ENVIRONMENT="staging"
-          RELEASE_ID="$(date +%Y%m%d-%H%M%S)"
-          API_URL="${{ secrets.API_URL }}"
-          FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
-          CLERK_PUBLISHABLE_KEY="${{ secrets.CLERK_PUBLISHABLE_KEY }}"
-          CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
-
-          DEPLOY_BASE="/opt/auto-author"
-          RELEASE_DIR="$DEPLOY_BASE/releases/$RELEASE_ID"
-          CURRENT_DIR="$DEPLOY_BASE/current"
-
-          echo "==> Deploying $ENVIRONMENT environment (Release: $RELEASE_ID)"
-
-          # Create release directory
-          mkdir -p "$RELEASE_DIR"
-
-          # Extract uploaded package
-          echo "==> Extracting deployment package..."
-          tar -xzf /tmp/deploy-package.tar.gz -C "$RELEASE_DIR"
-
-          # Setup backend environment
-          echo "==> Setting up backend..."
-          cd "$RELEASE_DIR/backend"
-
-          # Install Python dependencies
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          export PATH="$HOME/.local/bin:$PATH"
-          uv venv
-          source .venv/bin/activate
-          uv pip install -r requirements.txt
-
-          # Create backend .env file with all required variables
-          {
-            echo "ENVIRONMENT=staging"
-            echo "DATABASE_URI=${{ secrets.DATABASE_URI }}"
-            echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}"
-            echo "OPENAI_AUTOAUTHOR_API_KEY=${{ secrets.OPENAI_API_KEY }}"
-            echo "CLERK_API_KEY=$CLERK_SECRET_KEY"
-            echo "CLERK_JWT_PUBLIC_KEY=$CLERK_PUBLISHABLE_KEY"
-            echo "CLERK_FRONTEND_API=https://delicate-ladybird-47.clerk.accounts.dev"
-            echo "CLERK_BACKEND_API=https://api.clerk.dev"
-            echo 'BACKEND_CORS_ORIGINS=["'"$FRONTEND_URL"'"]'
-          } > .env
-
-          # Setup frontend environment
-          echo "==> Setting up frontend..."
-          cd "$RELEASE_DIR/frontend"
-
-          # Install Node dependencies (production only)
-          npm ci --production
-
-          # Create/update .env.production with all required variables
-          {
-            echo "NEXT_PUBLIC_API_URL=$API_URL"
-            echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY"
-            echo "CLERK_SECRET_KEY=$CLERK_SECRET_KEY"
-            echo "NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT"
-            echo "PORT=3002"
-          } > .env.production
-
-          # Export environment variables for build process
-          export NEXT_PUBLIC_API_URL=$API_URL
-          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
-          export CLERK_SECRET_KEY=$CLERK_SECRET_KEY
-          export NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT
-
-          # Build frontend with environment variables
-          echo "==> Building frontend..."
-          npm run build
-
-          # Update symlink atomically
-          echo "==> Switching to new release..."
-          ln -snf "$RELEASE_DIR" "$CURRENT_DIR.tmp"
-          mv -Tf "$CURRENT_DIR.tmp" "$CURRENT_DIR"
-
-          # Restart services
-          echo "==> Restarting services..."
-          pm2 restart auto-author-backend || pm2 start "$CURRENT_DIR/backend/.venv/bin/uvicorn" --name auto-author-backend -- app.main:app --host 0.0.0.0 --port 8000
-
-          # Start frontend with environment variables loaded
-          cd "$CURRENT_DIR/frontend"
-          # Load environment variables from .env.production
-          set -a
-          source .env.production
-          set +a
-          pm2 restart auto-author-frontend || pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start
-
-          # Wait for services to start
-          sleep 5
-
-          # Health checks
-          echo "==> Running health checks..."
-          curl -f http://localhost:8000/api/v1/health || {
-            echo "ERROR: Backend health check failed"
-            exit 1
-          }
-
-          curl -f http://localhost:3002 || {
-            echo "ERROR: Frontend health check failed"
-            exit 1
-          }
-
-          echo "==> Deployment successful!"
-          echo "    Release: $RELEASE_ID"
-          echo "    Backend: http://localhost:8000"
-          echo "    Frontend: http://localhost:3002"
-
-          # Cleanup old releases (keep last 5)
-          cd "$DEPLOY_BASE/releases"
-          ls -t | tail -n +6 | xargs -r rm -rf
-
-          echo "==> Cleanup complete"
-          ENDSSH
-
-      - name: Health checks
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            --exclude '*.log' \
+            --exclude '.next' \
+            ./ $USER@$HOST:/opt/auto-author/releases/${{ env.RELEASE_ID }}/
+            
+      - name: Run server-side deploy
         run: |
-          # Wait for services to stabilize
-          sleep 10
+          ssh -i ~/.ssh/staging_key $USER@$HOST \
+            "bash /opt/auto-author/releases/${{ env.RELEASE_ID }}/scripts/deploy.sh /opt/auto-author/releases/${{ env.RELEASE_ID }}"
 
-          # Backend health check
-          echo "Checking backend health..."
-          curl -f https://api.dev.autoauthor.app/api/v1/health || exit 1
 
-          # Frontend health check
-          echo "Checking frontend health..."
-          curl -f https://dev.autoauthor.app || exit 1
-
-          # CORS verification
-          echo "Checking CORS headers..."
-          curl -I -X OPTIONS https://api.dev.autoauthor.app/api/v1/books \
-            -H "Origin: https://dev.autoauthor.app" \
-            -H "Access-Control-Request-Method: GET" | grep -i "access-control-allow-origin" || exit 1
-
-      - name: Smoke tests
+      - name: External Health Checks (with backoff)
         run: |
-          # Test API docs endpoint
-          curl -f https://api.dev.autoauthor.app/docs || exit 1
-
-          echo "✅ All smoke tests passed"
-
-      - name: Cleanup
+          for i in {1..10}; do
+            curl -f https://api.dev.autoauthor.app/api/v1/health && break || sleep 5
+          done
+          for i in {1..10}; do
+            curl -f https://dev.autoauthor.app && break || sleep 5
+          done
+          
+      - name: Cleanup Local Keys
         if: always()
-        run: |
-          rm -f ~/.ssh/staging_key
-          rm -f /tmp/deploy-package.tar.gz
+        run: rm -f ~/.ssh/staging_keyts
