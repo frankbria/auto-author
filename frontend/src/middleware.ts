@@ -9,10 +9,11 @@ import { NextResponse } from 'next/server';
 // 2. Redirect unauthenticated users to sign-in page
 // 3. Provide auth context to your application
 //
-// For E2E testing: Set BYPASS_AUTH=true to skip authentication
+// For E2E testing: Set NEXT_PUBLIC_BYPASS_AUTH=true to skip authentication
 export default clerkMiddleware((auth, req) => {
   // Allow bypassing auth for E2E tests
-  if (process.env.BYPASS_AUTH === 'true' || process.env.NODE_ENV === 'test') {
+  // NOTE: Must use NEXT_PUBLIC_ prefix to be available in middleware
+  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true' || process.env.NEXT_PUBLIC_ENVIRONMENT === 'test') {
     return NextResponse.next();
   }
 
