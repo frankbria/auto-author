@@ -111,7 +111,7 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          printf "%s" "${{ secrets.SSH_KEY }}" > ~/.ssh/production_key
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/production_key
           chmod 600 ~/.ssh/production_key
           ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
@@ -247,7 +247,8 @@ jobs:
     name: Notify Production Deployment
     runs-on: ubuntu-latest
     needs: [build-and-deploy]
-    if: always()
+    # Only run if Slack webhook is configured
+    if: always() && secrets.SLACK_WEBHOOK_URL != ''
 
     steps:
       - name: Notify team

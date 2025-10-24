@@ -82,7 +82,7 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          printf "%s" "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
           chmod 600 ~/.ssh/staging_key
           ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
@@ -240,7 +240,8 @@ jobs:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
     needs: [build-and-deploy]
-    if: always()
+    # Only run if Slack webhook is configured
+    if: always() && secrets.SLACK_WEBHOOK_URL != ''
 
     steps:
       - name: Notify Slack
