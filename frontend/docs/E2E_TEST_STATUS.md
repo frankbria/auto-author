@@ -6,14 +6,20 @@
 
 ## Current Status
 
-### ✅ Working Tests (2/25)
+### ✅ Working (Infrastructure Complete)
 
-1. **Smoke Test: API Connectivity** - Backend health check
-2. **Smoke Test: Homepage & Dashboard** - Basic navigation with auth bypass
+1. **Frontend Auth Bypass** - Middleware correctly bypasses Clerk authentication
+2. **Backend Auth Bypass** - API accepts requests without JWT tokens
+3. **Test Data Helpers** - Functions to create/delete books and chapters
+4. **Smoke Tests** (2/2) - API connectivity and dashboard navigation
+5. **API Book Creation** - Verified via curl without authentication
 
 ### ❌ Failing Tests (23/25)
 
-All integration tests are failing due to missing test data and setup issues.
+Integration tests timeout waiting for UI elements. The test data is being created successfully via API, but tests are blocked by:
+- Missing UI elements (buttons, modals, etc.)
+- Tests expecting features that may not be fully implemented
+- Need to review test expectations vs actual UI state
 
 ## Configuration Complete
 
@@ -35,6 +41,18 @@ All integration tests are failing due to missing test data and setup issues.
    - Fixed to check `NEXT_PUBLIC_BYPASS_AUTH` instead of `BYPASS_AUTH`
    - Fixed to check `NEXT_PUBLIC_ENVIRONMENT` instead of `NODE_ENV`
    - Auth bypass now works correctly in E2E tests
+
+4. **Backend Changes** (in `../backend/`)
+   - `app/core/config.py` - Added `BYPASS_AUTH` setting
+   - `app/core/security.py` - Added `optional_security()` and updated `get_current_user()`
+   - `app/api/dependencies.py` - Updated `audit_request()` to bypass token verification
+   - Backend `.env` - Added `BYPASS_AUTH=true` for local E2E testing
+
+5. **`src/e2e/helpers/testData.ts`** (Created)
+   - Comprehensive helper functions for creating/deleting test data
+   - Functions: `createTestBook()`, `createTestBookWithTOC()`, `deleteTestBook()`
+   - Navigation helpers: `waitForBookInDashboard()`, `navigateToBookEditor()`
+   - All functions work via Playwright's `page.request` API
 
 ## Issues to Fix
 
