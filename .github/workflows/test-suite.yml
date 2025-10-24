@@ -50,6 +50,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://api.dev.autoauthor.app/api/v1
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
 
   backend-tests:
     name: Backend Tests
@@ -151,6 +152,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://api.dev.autoauthor.app/api/v1
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
 
       - name: Upload test results
         if: failure()

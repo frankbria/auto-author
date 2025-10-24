@@ -242,27 +242,3 @@ jobs:
         run: |
           rm -f ~/.ssh/production_key
           rm -f /tmp/deploy-package.tar.gz
-
-  notify:
-    name: Notify Production Deployment
-    runs-on: ubuntu-latest
-    needs: [build-and-deploy]
-    # Only run if Slack webhook is configured
-    if: always() && secrets.SLACK_WEBHOOK_URL != ''
-
-    steps:
-      - name: Notify team
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ needs.build-and-deploy.result }}
-          text: |
-            🚀 Production Deployment ${{ needs.build-and-deploy.result }}
-
-            Version: ${{ github.ref_name }}
-            Commit: ${{ github.sha }}
-            Deployed by: ${{ github.actor }}
-
-            🌐 https://autoauthor.app
-            📡 https://api.autoauthor.app
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

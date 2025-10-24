@@ -133,29 +133,3 @@ jobs:
           name: backend-e2e-logs
           path: backend/test-logs/
           retention-days: 7
-
-  notify-results:
-    name: Notify E2E Test Results
-    runs-on: ubuntu-latest
-    needs: [e2e-tests]
-    # Only run if Slack webhook is configured
-    if: always() && secrets.SLACK_WEBHOOK_URL != ''
-
-    steps:
-      - name: Notify Slack
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ needs.e2e-tests.result }}
-          text: |
-            🧪 Staging E2E Tests ${{ needs.e2e-tests.result }}
-
-            Environment: https://dev.autoauthor.app
-            API: https://api.dev.autoauthor.app
-
-            Tests included:
-            - Playwright E2E suite (full user journeys)
-            - Backend E2E tests with OpenAI integration
-            - TOC generation workflow
-            - Chapter question generation
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
