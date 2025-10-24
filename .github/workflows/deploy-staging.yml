@@ -1,8 +1,6 @@
 name: Deploy to Staging
 
 on:
-  push:
-    branches: [develop]
   workflow_run:
     workflows: ["Test Suite"]
     types: [completed]
@@ -16,7 +14,7 @@ jobs:
   build-and-deploy:
     name: Build and Deploy to Staging
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     environment:
       name: staging

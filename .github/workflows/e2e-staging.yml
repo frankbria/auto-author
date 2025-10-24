@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["Deploy to Staging"]
     types: [completed]
-    branches: [main]
+    branches: [develop]
   workflow_dispatch:
     inputs:
       staging_url:
