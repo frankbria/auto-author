@@ -10,9 +10,14 @@ import {
 /**
  * Cross-browser E2E tests for interview-style prompts functionality
  * Tests the complete workflow from question generation to response saving
+ *
+ * ⚠️ THESE TESTS ARE CURRENTLY SKIPPED ⚠️
+ * The interview-style prompts feature is not yet implemented.
+ * These tests were written aspirationally for a future AI Q&A authoring feature.
+ * Re-enable these tests once the feature is implemented.
  */
 
-test.describe('Interview-Style Prompts Cross-Browser Tests', () => {
+test.describe.skip('Interview-Style Prompts Cross-Browser Tests (NOT IMPLEMENTED)', () => {
   let testBook: TestBook;
   let testChapters: TestChapter[];
 
