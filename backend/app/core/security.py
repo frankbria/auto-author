@@ -4,7 +4,7 @@ import json
 from jose import jwt, jwk
 from jose.exceptions import JWTError
 from typing import Optional, Dict, Any, List, Union
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import settings
 from app.db.database import get_user_by_clerk_id
@@ -132,10 +132,46 @@ class RoleChecker:
         return user
 
 
+async def optional_security(request: Request) -> Union[HTTPAuthorizationCredentials, None]:
+    """Optional security dependency that doesn't auto-error"""
+    from app.core.config import settings
+
+    if settings.BYPASS_AUTH:
+        return None
+
+    bearer = HTTPBearer(auto_error=False)
+    return await bearer(request)
+
+
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Union[HTTPAuthorizationCredentials, None] = Depends(optional_security),
 ) -> Dict:
-    """Get the current authenticated user"""
+    """Get the current authenticated user
+
+    For E2E testing, set BYPASS_AUTH=true to bypass authentication and return a test user.
+    """
+    from app.core.config import settings
+
+    # E2E Test Mode: Bypass authentication
+    if settings.BYPASS_AUTH:
+        # Return a test user for E2E tests
+        return {
+            "id": "test-user-id",
+            "clerk_id": "test-clerk-id",
+            "email": "test@example.com",
+            "first_name": "Test",
+            "last_name": "User",
+            "role": "user",
+            "metadata": {}
+        }
+
+    # Normal authentication flow - require credentials
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication credentials"
+        )
+
     token = credentials.credentials
     payload = await verify_jwt_token(token)
 

@@ -24,6 +24,9 @@ class Settings(BaseSettings):
         default=["http://localhost:3000", "http://localhost:8000"],
         json_schema_extra={"env_parse_none_str": "null"}
     )
+
+    # E2E Testing Settings
+    BYPASS_AUTH: bool = False  # Set to True for E2E tests to bypass authentication
     
     # AWS Settings (Optional - for transcription and storage)
     AWS_ACCESS_KEY_ID: str = ""
