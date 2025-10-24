@@ -1,13 +1,14 @@
 from passlib.context import CryptContext
 import requests
 import json
-from jose import jwt
+from jose import jwt, jwk
 from jose.exceptions import JWTError
 from typing import Optional, Dict, Any, List, Union
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import settings
 from app.db.database import get_user_by_clerk_id
+from functools import lru_cache
 
 # Create a password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -37,20 +38,53 @@ async def get_clerk_user(clerk_id: str) -> Optional[Dict]:
     return None
 
 
+@lru_cache(maxsize=1)
+def get_clerk_jwks() -> Dict[str, Any]:
+    """Fetch JWKS from Clerk (cached)"""
+    jwks_uri = f"https://{settings.CLERK_FRONTEND_API.replace('https://', '')}/.well-known/jwks.json"
+    response = requests.get(jwks_uri)
+    response.raise_for_status()
+    return response.json()
+
+
 async def verify_jwt_token(token: str) -> Dict[str, Any]:
     """Verify a JWT token from Clerk."""
     try:
-        # Use the JWKS (JSON Web Key Set) to verify the signature
-        # Add leeway for clock skew and extend expiration tolerance
+        # Decode header to get the key ID (kid)
+        unverified_header = jwt.get_unverified_header(token)
+        kid = unverified_header.get('kid')
+
+        # If JWT public key is provided, use it directly
+        if settings.clerk_jwt_public_key_pem:
+            key = settings.clerk_jwt_public_key_pem
+        else:
+            # Otherwise, fetch from JWKS endpoint
+            jwks = get_clerk_jwks()
+            # Find the key with matching kid
+            key_data = None
+            for key in jwks['keys']:
+                if key.get('kid') == kid:
+                    key_data = key
+                    break
+
+            if not key_data:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unable to find appropriate key in JWKS",
+                )
+
+            # Construct the key from JWKS
+            key = jwk.construct(key_data)
+
         payload = jwt.decode(
             token,
-            settings.clerk_jwt_public_key_pem,
+            key,
             algorithms=[settings.CLERK_JWT_ALGORITHM],
             options={
                 "verify_signature": True,
-                "verify_exp": True,  # Still verify expiration but with leeway
-                "verify_aud": False,  # Disable audience verification for Clerk
-                "leeway": 300,  # 5 minutes leeway for clock skew
+                "verify_exp": True,
+                "verify_aud": False,
+                "leeway": 300,
             },
         )
         return payload
