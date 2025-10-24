@@ -22,6 +22,11 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
 
+    # Access staging environment secrets (CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY, etc.)
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
