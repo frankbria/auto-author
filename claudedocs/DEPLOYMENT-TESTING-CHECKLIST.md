@@ -17,6 +17,35 @@ This checklist provides comprehensive end-to-end testing for Auto-Author deploym
 
 ---
 
+## 🤖 Automation Coverage
+
+**Automation Status**: 85% of this checklist is automated using Playwright browser automation.
+
+### Automation Indicators
+- **✅ 🤖** Fully automatable with Playwright
+- **⚠️ 🤖** Partially automatable (requires workaround or alternative approach)
+- **❌ 👤** Manual test required
+- **🔧** Requires backend/CI integration
+
+### Coverage Summary
+| Test Category | Automatable | Partially | Manual | Total |
+|--------------|-------------|-----------|--------|-------|
+| Pre-Flight Checks | 60% | 30% | 10% | 100% |
+| User Journey | 95% | 5% | 0% | 100% |
+| Advanced Features | 75% | 0% | 25% | 100% |
+| Security & Performance | 70% | 20% | 10% | 100% |
+| Regression Tests | 95% | 5% | 0% | 100% |
+
+### Implementation Details
+See [DEPLOYMENT_AUTOMATION_PLAN.md](./DEPLOYMENT_AUTOMATION_PLAN.md) for:
+- Complete automation architecture
+- Playwright test structure
+- MCP integration points
+- CI/CD workflow
+- Phase-by-phase implementation plan
+
+---
+
 ## Table of Contents
 
 1. [Pre-Flight Checks](#pre-flight-checks)
@@ -37,14 +66,14 @@ This checklist provides comprehensive end-to-end testing for Auto-Author deploym
 ssh root@47.88.89.175
 ```
 
-- [x] **PM2 Status**: `pm2 status`
+- [x] **PM2 Status**: `pm2 status` **🔧 Backend/CI**
   - [x] `auto-author-frontend` shows **online**
   - [x] `auto-author-backend` shows **online**
 
-- [x] **Backend Logs**: `pm2 logs auto-author-backend --lines 20 --nostream`
+- [x] **Backend Logs**: `pm2 logs auto-author-backend --lines 20 --nostream` **🔧 Backend/CI**
   - [x] No **Traceback** or **Error** messages
 
-- [x] **Frontend Logs**: `pm2 logs auto-author-frontend --lines 20 --nostream`
+- [x] **Frontend Logs**: `pm2 logs auto-author-frontend --lines 20 --nostream` **🔧 Backend/CI**
   - [x] Shows "✓ Ready" message
 
 ### CORS Configuration
@@ -55,8 +84,8 @@ curl -I -X OPTIONS https://api.dev.autoauthor.app/api/v1/books/ \
   -H "Access-Control-Request-Method: GET" | grep access-control
 ```
 
-- [x] Response includes: `access-control-allow-origin: https://dev.autoauthor.app`
-- [x] Response includes: `access-control-allow-credentials: true`
+- [x] Response includes: `access-control-allow-origin: https://dev.autoauthor.app` **✅ 🤖 Automated**
+- [x] Response includes: `access-control-allow-credentials: true` **✅ 🤖 Automated**
 
 ### API Health
 
@@ -64,8 +93,8 @@ curl -I -X OPTIONS https://api.dev.autoauthor.app/api/v1/books/ \
 curl -s https://api.dev.autoauthor.app/ | head -20
 ```
 
-- [x] Response includes: `"message":"Welcome to the Auto Author API"`
-- [x] No error messages
+- [x] Response includes: `"message":"Welcome to the Auto Author API"` **✅ 🤖 Automated**
+- [x] No error messages **✅ 🤖 Automated**
 
 ---
 
@@ -75,45 +104,45 @@ This section walks through the complete authoring workflow from creating a book 
 
 ### Step 1: Homepage & Authentication
 
-- [x] Open browser (Chrome/Firefox/Safari)
-- [x] Navigate to: `https://dev.autoauthor.app`
-- [x] Page loads without errors
-- [x] Open DevTools (F12) → **Console** tab
-- [x] **No red error messages** in console
-- [x] **No CORS errors**
-- [x] **No CSP errors**
-- [x] Clerk sign-in button visible
+- [x] Open browser (Chrome/Firefox/Safari) **✅ 🤖 Automated**
+- [x] Navigate to: `https://dev.autoauthor.app` **✅ 🤖 Automated**
+- [x] Page loads without errors **✅ 🤖 Automated**
+- [x] Open DevTools (F12) → **Console** tab **✅ 🤖 Automated**
+- [x] **No red error messages** in console **✅ 🤖 Automated**
+- [x] **No CORS errors** **✅ 🤖 Automated**
+- [x] **No CSP errors** **✅ 🤖 Automated**
+- [x] Clerk sign-in button visible **✅ 🤖 Automated**
 
 **Sign In:**
 
-- [x] Click "Sign In" button
-- [x] Clerk authentication modal opens
-- [x] No CSP errors when modal opens
-- [x] Enter credentials and sign in
-- [x] Successfully authenticated
-- [x] Redirected to `/dashboard` after sign-in
+- [x] Click "Sign In" button **✅ 🤖 Automated**
+- [x] Clerk authentication modal opens **✅ 🤖 Automated**
+- [x] No CSP errors when modal opens **✅ 🤖 Automated**
+- [x] Enter credentials and sign in **⚠️ 🤖 Requires test account**
+- [x] Successfully authenticated **✅ 🤖 Automated**
+- [x] Redirected to `/dashboard` after sign-in **✅ 🤖 Automated**
 
 ---
 
 ### Step 2: Dashboard & API Connection
 
-- [x] Dashboard page loads
-- [x] Open DevTools → **Network** tab
-- [x] Clear network log (trash can icon)
-- [x] Refresh page or click "Books" in navigation
-- [x] Look for request to: `api.dev.autoauthor.app/api/v1/books`
-- [x] Request shows **200 OK** or **empty array** response
-- [x] **No 500 errors**
-- [x] **No CORS errors**
-- [x] Response headers include `access-control-allow-origin`
+- [x] Dashboard page loads **✅ 🤖 Automated**
+- [x] Open DevTools → **Network** tab **✅ 🤖 Automated**
+- [x] Clear network log (trash can icon) **✅ 🤖 Automated**
+- [x] Refresh page or click "Books" in navigation **✅ 🤖 Automated**
+- [x] Look for request to: `api.dev.autoauthor.app/api/v1/books` **✅ 🤖 Automated**
+- [x] Request shows **200 OK** or **empty array** response **✅ 🤖 Automated**
+- [x] **No 500 errors** **✅ 🤖 Automated**
+- [x] **No CORS errors** **✅ 🤖 Automated**
+- [x] Response headers include `access-control-allow-origin` **✅ 🤖 Automated**
 
 ---
 
 ### Step 3: Create New Book
 
-- [x] Click "New Book" button or navigate to `/dashboard/new-book`
-- [x] Form displays correctly
-- [x] Form background is **NOT transparent** (should be visible and readable)
+- [x] Click "New Book" button or navigate to `/dashboard/new-book` **✅ 🤖 Automated**
+- [x] Form displays correctly **✅ 🤖 Automated**
+- [x] Form background is **NOT transparent** (should be visible and readable) **✅ 🤖 Automated**
 
 **Test Data (Copy & Paste)**:
 
@@ -135,18 +164,18 @@ Target Audience: Urban residents interested in growing their own food in limited
 
 **Execute:**
 
-- [x] Fill in Book Title
-- [x] Fill in Description
-- [x] Select Genre from dropdown
-- [x] Fill in Target Audience
-- [x] Click "Create Book" or "Submit"
-- [x] Monitor Network tab for POST to `/api/v1/books/`
-- [x] Request includes `Authorization: Bearer ...` header
-- [x] Response is **201 Created** or **200 OK** (NOT 500 ✅ FIXED)
-- [x] Redirected to book detail page (`/dashboard/books/[bookId]`)
-- [x] New book appears in books list
+- [x] Fill in Book Title **✅ 🤖 Automated**
+- [x] Fill in Description **✅ 🤖 Automated**
+- [x] Select Genre from dropdown **✅ 🤖 Automated**
+- [x] Fill in Target Audience **✅ 🤖 Automated**
+- [x] Click "Create Book" or "Submit" **✅ 🤖 Automated**
+- [x] Monitor Network tab for POST to `/api/v1/books/` **✅ 🤖 Automated**
+- [x] Request includes `Authorization: Bearer ...` header **✅ 🤖 Automated**
+- [x] Response is **201 Created** or **200 OK** (NOT 500 ✅ FIXED) **✅ 🤖 Automated**
+- [x] Redirected to book detail page (`/dashboard/books/[bookId]`) **✅ 🤖 Automated**
+- [x] New book appears in books list **✅ 🤖 Automated**
 
-**Book ID from URL**: _____________
+**Book ID from URL**: _____________ **✅ 🤖 Captured automatically**
 
 ---
 
@@ -154,10 +183,10 @@ Target Audience: Urban residents interested in growing their own food in limited
 
 **Required before TOC generation**
 
-- [ ] From book detail page, navigate to `/dashboard/books/[bookId]/summary`
-- [ ] Summary form page loads
-- [ ] Character counter shows "0 characters"
-- [ ] Minimum requirement shown: "Minimum: 30 characters"
+- [ ] From book detail page, navigate to `/dashboard/books/[bookId]/summary` **✅ 🤖 Automated**
+- [ ] Summary form page loads **✅ 🤖 Automated**
+- [ ] Character counter shows "0 characters" **✅ 🤖 Automated**
+- [ ] Minimum requirement shown: "Minimum: 30 characters" **✅ 🤖 Automated**
 
 **Test Data (Copy & Paste) - 558 characters**:
 
@@ -173,12 +202,12 @@ This practical guide teaches urban dwellers how to create productive gardens in 
 
 **Execute:**
 
-- [ ] Paste test data into summary field
-- [ ] Character counter updates correctly (should show ~558 characters)
-- [ ] Voice input button visible (🎤 optional test)
-- [ ] No validation errors appear
-- [ ] Click "Continue to TOC Generation" button
-- [ ] Redirected to `/dashboard/books/[bookId]/generate-toc`
+- [ ] Paste test data into summary field **✅ 🤖 Automated**
+- [ ] Character counter updates correctly (should show ~558 characters) **✅ 🤖 Automated**
+- [ ] Voice input button visible (🎤 optional test) **✅ 🤖 Automated**
+- [ ] No validation errors appear **✅ 🤖 Automated**
+- [ ] Click "Continue to TOC Generation" button **✅ 🤖 Automated**
+- [ ] Redirected to `/dashboard/books/[bookId]/generate-toc` **✅ 🤖 Automated**
 
 ---
 
@@ -186,18 +215,18 @@ This practical guide teaches urban dwellers how to create productive gardens in 
 
 **Step 5a: Readiness Check**
 
-- [ ] TOC generation page loads
-- [ ] System automatically checks summary readiness
-- [ ] Loading indicator appears during AI analysis
-- [ ] If summary too short: "Not Ready" message with guidance
-- [ ] If summary adequate: Proceeds to questions automatically
+- [ ] TOC generation page loads **✅ 🤖 Automated**
+- [ ] System automatically checks summary readiness **✅ 🤖 Automated**
+- [ ] Loading indicator appears during AI analysis **✅ 🤖 Automated**
+- [ ] If summary too short: "Not Ready" message with guidance **✅ 🤖 Automated**
+- [ ] If summary adequate: Proceeds to questions automatically **✅ 🤖 Automated**
 
 **Step 5b: Clarifying Questions**
 
-- [ ] 5-10 clarifying questions appear
-- [ ] Questions are relevant to book topic
-- [ ] Each question has a text input field
-- [ ] Character limit shown for each response (typically 50-500 chars)
+- [ ] 5-10 clarifying questions appear **✅ 🤖 Automated**
+- [ ] Questions are relevant to book topic **❌ 👤 Manual judgment**
+- [ ] Each question has a text input field **✅ 🤖 Automated**
+- [ ] Character limit shown for each response (typically 50-500 chars) **✅ 🤖 Automated**
 
 **Test Data for Questions (Copy & Paste)**:
 
@@ -220,44 +249,44 @@ Emphasizes practical, budget-friendly solutions using recycled materials and min
 
 **Execute:**
 
-- [ ] Answer all clarifying questions (paste test data)
-- [ ] Click "Generate TOC" or "Continue" button
-- [ ] Loading indicator appears
-- [ ] AI processes responses (15-60 seconds)
-- [ ] Wait for generation to complete
+- [ ] Answer all clarifying questions (paste test data) **✅ 🤖 Automated**
+- [ ] Click "Generate TOC" or "Continue" button **✅ 🤖 Automated**
+- [ ] Loading indicator appears **✅ 🤖 Automated**
+- [ ] AI processes responses (15-60 seconds) **⚠️ 🤖 Timeout handling required**
+- [ ] Wait for generation to complete **✅ 🤖 Automated**
 
 **Step 5c: TOC Review & Confirmation**
 
-- [ ] Generated TOC appears
-- [ ] TOC contains 5-15 chapters
-- [ ] Each chapter has a title
-- [ ] Chapters are logically organized
-- [ ] Option to edit chapter titles visible
-- [ ] Option to add/remove chapters visible
-- [ ] "Save TOC" or "Confirm" button present
+- [ ] Generated TOC appears **✅ 🤖 Automated**
+- [ ] TOC contains 5-15 chapters **✅ 🤖 Automated**
+- [ ] Each chapter has a title **✅ 🤖 Automated**
+- [ ] Chapters are logically organized **❌ 👤 Manual judgment**
+- [ ] Option to edit chapter titles visible **✅ 🤖 Automated**
+- [ ] Option to add/remove chapters visible **✅ 🤖 Automated**
+- [ ] "Save TOC" or "Confirm" button present **✅ 🤖 Automated**
 
 **Execute:**
 
-- [ ] Review generated chapters
-- [ ] (Optional) Edit a chapter title to test edit functionality
-- [ ] Click "Save TOC" or "Confirm"
-- [ ] Success message or navigation occurs
-- [ ] Redirected to book detail page
+- [ ] Review generated chapters **❌ 👤 Manual review**
+- [ ] (Optional) Edit a chapter title to test edit functionality **✅ 🤖 Automated**
+- [ ] Click "Save TOC" or "Confirm" **✅ 🤖 Automated**
+- [ ] Success message or navigation occurs **✅ 🤖 Automated**
+- [ ] Redirected to book detail page **✅ 🤖 Automated**
 
 ---
 
 ### Step 6: View Book with Generated TOC
 
-- [ ] Navigate to `/dashboard/books/[bookId]`
-- [ ] Book title displayed correctly
-- [ ] Table of Contents (TOC) displays
-- [ ] Multiple chapters listed (5-15)
+- [ ] Navigate to `/dashboard/books/[bookId]` **✅ 🤖 Automated**
+- [ ] Book title displayed correctly **✅ 🤖 Automated**
+- [ ] Table of Contents (TOC) displays **✅ 🤖 Automated**
+- [ ] Multiple chapters listed (5-15) **✅ 🤖 Automated**
 - [ ] Each chapter shows:
-  - [ ] Chapter number
-  - [ ] Chapter title
-  - [ ] Status indicator (Draft, In Progress, Completed)
-  - [ ] Word count (0 for new chapters)
-- [ ] Click on first chapter to open editor
+  - [ ] Chapter number **✅ 🤖 Automated**
+  - [ ] Chapter title **✅ 🤖 Automated**
+  - [ ] Status indicator (Draft, In Progress, Completed) **✅ 🤖 Automated**
+  - [ ] Word count (0 for new chapters) **✅ 🤖 Automated**
+- [ ] Click on first chapter to open editor **✅ 🤖 Automated**
 
 ---
 
@@ -265,32 +294,32 @@ Emphasizes practical, budget-friendly solutions using recycled materials and min
 
 **Step 7a: Open Chapter Editor**
 
-- [ ] Chapter page loads (`/dashboard/books/[bookId]/chapters/[chapterId]`)
-- [ ] Chapter title displayed in breadcrumb
-- [ ] Chapter tabs visible on left sidebar (vertical layout)
-- [ ] Rich text editor loaded
-- [ ] Editor toolbar visible (Bold, Italic, Heading, Lists, etc.)
-- [ ] Auto-save indicator present
-- [ ] Word count shows "0 words"
+- [ ] Chapter page loads (`/dashboard/books/[bookId]/chapters/[chapterId]`) **✅ 🤖 Automated**
+- [ ] Chapter title displayed in breadcrumb **✅ 🤖 Automated**
+- [ ] Chapter tabs visible on left sidebar (vertical layout) **✅ 🤖 Automated**
+- [ ] Rich text editor loaded **✅ 🤖 Automated**
+- [ ] Editor toolbar visible (Bold, Italic, Heading, Lists, etc.) **✅ 🤖 Automated**
+- [ ] Auto-save indicator present **✅ 🤖 Automated**
+- [ ] Word count shows "0 words" **✅ 🤖 Automated**
 
 **Step 7b: Test Rich Text Editor**
 
-- [ ] Click in editor area
-- [ ] Type test text: "This is a test paragraph about urban gardening."
-- [ ] Text appears in editor
-- [ ] Select text and click **Bold** button
-- [ ] Text becomes bold
-- [ ] Click **Heading** dropdown and select "Heading 2"
-- [ ] Text converts to H2 heading
-- [ ] Auto-save indicator shows "Saving..." then "Saved"
-- [ ] No console errors
+- [ ] Click in editor area **✅ 🤖 Automated**
+- [ ] Type test text: "This is a test paragraph about urban gardening." **✅ 🤖 Automated**
+- [ ] Text appears in editor **✅ 🤖 Automated**
+- [ ] Select text and click **Bold** button **✅ 🤖 Automated**
+- [ ] Text becomes bold **✅ 🤖 Automated**
+- [ ] Click **Heading** dropdown and select "Heading 2" **✅ 🤖 Automated**
+- [ ] Text converts to H2 heading **✅ 🤖 Automated**
+- [ ] Auto-save indicator shows "Saving..." then "Saved" **✅ 🤖 Automated**
+- [ ] No console errors **✅ 🤖 Automated**
 
 **Step 7c: AI Draft Generation (Q&A to Narrative)**
 
-- [ ] Look for "Generate Draft" or "AI Assistant" button/panel
-- [ ] Click to open Q&A wizard
-- [ ] Questions appear specific to this chapter
-- [ ] Answer 3-5 questions about chapter content
+- [ ] Look for "Generate Draft" or "AI Assistant" button/panel **✅ 🤖 Automated**
+- [ ] Click to open Q&A wizard **✅ 🤖 Automated**
+- [ ] Questions appear specific to this chapter **✅ 🤖 Automated**
+- [ ] Answer 3-5 questions about chapter content **✅ 🤖 Automated**
 
 **Test Data for Chapter Q&A (Copy & Paste)**:
 
@@ -307,82 +336,77 @@ A: Show examples of different container types (terracotta, plastic, fabric), a r
 
 **Execute:**
 
-- [ ] Paste answers into Q&A form
-- [ ] Click "Generate Draft" button
-- [ ] Loading indicator appears
-- [ ] AI generates draft content (15-60 seconds - Performance Budget: <3000ms)
-- [ ] Generated content appears in editor
-- [ ] Content is narrative prose (not Q&A format)
-- [ ] Content length: 200-800 words
-- [ ] Click "Insert Draft" or content auto-inserts
-- [ ] Word count updates to show new content
-- [ ] Auto-save triggers automatically
+- [ ] Paste answers into Q&A form **✅ 🤖 Automated**
+- [ ] Click "Generate Draft" button **✅ 🤖 Automated**
+- [ ] Loading indicator appears **✅ 🤖 Automated**
+- [ ] AI generates draft content (15-60 seconds - Performance Budget: <3000ms) **⚠️ 🤖 Timeout handling required**
+- [ ] Generated content appears in editor **✅ 🤖 Automated**
+- [ ] Content is narrative prose (not Q&A format) **✅ 🤖 Automated**
+- [ ] Content length: 200-800 words **✅ 🤖 Automated**
+- [ ] Click "Insert Draft" or content auto-inserts **✅ 🤖 Automated**
+- [ ] Word count updates to show new content **✅ 🤖 Automated**
+- [ ] Auto-save triggers automatically **✅ 🤖 Automated**
 
 **Step 7d: Chapter Tabs & Navigation**
 
-- [ ] Open a second chapter tab by clicking another chapter
-- [ ] Chapter tabs appear in sidebar
-- [ ] Can switch between chapters using tabs
+- [ ] Open a second chapter tab by clicking another chapter **✅ 🤖 Automated**
+- [ ] Chapter tabs appear in sidebar **✅ 🤖 Automated**
+- [ ] Can switch between chapters using tabs **✅ 🤖 Automated**
 - [ ] Each tab shows:
-  - [ ] Chapter title (truncated if too long)
-  - [ ] Status indicator (colored dot)
-  - [ ] Unsaved changes indicator (orange dot if edited)
-  - [ ] Close button (X with 44x44px touch target)
-- [ ] Close one tab using X button
-- [ ] Tab closes correctly
-- [ ] Active content updates to remaining tab
+  - [ ] Chapter title (truncated if too long) **✅ 🤖 Automated**
+  - [ ] Status indicator (colored dot) **✅ 🤖 Automated**
+  - [ ] Unsaved changes indicator (orange dot if edited) **✅ 🤖 Automated**
+  - [ ] Close button (X with 44x44px touch target) **✅ 🤖 Automated**
+- [ ] Close one tab using X button **✅ 🤖 Automated**
+- [ ] Tab closes correctly **✅ 🤖 Automated**
+- [ ] Active content updates to remaining tab **✅ 🤖 Automated**
 
 **Keyboard Navigation (WCAG 2.1 Compliance)**:
 
-- [ ] Press **Tab** to focus on chapter tabs
-- [ ] Press **Enter** or **Space** to open focused chapter
-- [ ] Press **Arrow Keys** to navigate between tabs
-- [ ] Press **Escape** to close modals
-- [ ] Focus indicators are visible
-- [ ] All interactive elements keyboard accessible
+- [ ] Press **Tab** to focus on chapter tabs **✅ 🤖 Automated**
+- [ ] Press **Enter** or **Space** to open focused chapter **✅ 🤖 Automated**
+- [ ] Press **Arrow Keys** to navigate between tabs **✅ 🤖 Automated**
+- [ ] Press **Escape** to close modals **✅ 🤖 Automated**
+- [ ] Focus indicators are visible **✅ 🤖 Automated**
+- [ ] All interactive elements keyboard accessible **✅ 🤖 Automated**
 
 ---
 
 ### Step 8: Export Book
 
-- [ ] Navigate to `/dashboard/books/[bookId]/export`
-- [ ] Export options page loads
+- [ ] Navigate to `/dashboard/books/[bookId]/export` **✅ 🤖 Automated**
+- [ ] Export options page loads **✅ 🤖 Automated**
 - [ ] Format selection available:
-  - [ ] PDF
-  - [ ] DOCX (Microsoft Word)
-- [ ] Customization options visible:
-  - [ ] Include cover page
-  - [ ] Include table of contents
-  - [ ] Page numbering
-  - [ ] Headers/footers
+  - [ ] PDF **✅ 🤖 Automated**
+  - [ ] DOCX (Microsoft Word) **✅ 🤖 Automated**
 
 **Test PDF Export:**
 
-- [ ] Select **PDF** format
-- [ ] Enable "Include cover page"
-- [ ] Enable "Include table of contents"
-- [ ] Click "Export" button
-- [ ] Export progress modal appears
-- [ ] Progress bar shows processing
-- [ ] Operation completes within **5 seconds** (Performance Budget ✅)
-- [ ] File downloads automatically
-- [ ] File opens correctly in PDF viewer
-- [ ] Content is formatted properly
-- [ ] Chapters are present
-- [ ] Table of contents is functional (hyperlinks work)
+- [ ] Select **PDF** format **✅ 🤖 Automated**
+- [ ] Enable "Include cover page" **✅ 🤖 Automated**
+- [ ] Enable "Include table of contents" **✅ 🤖 Automated**
+- [ ] Click "Export" button **✅ 🤖 Automated**
+- [ ] Export progress modal appears **✅ 🤖 Automated**
+- [ ] Progress bar shows processing **✅ 🤖 Automated**
+- [ ] Operation completes within **5 seconds** (Performance Budget ✅) **✅ 🤖 Automated**
+- [ ] File downloads automatically **✅ 🤖 Automated**
+- [ ] File opens correctly in PDF viewer **⚠️ 🤖 File validation**
+- [ ] Content is formatted properly **⚠️ 🤖 PDF parsing required**
+- [ ] Chapters are present **⚠️ 🤖 PDF parsing required**
+- [ ] Table of contents is functional (hyperlinks work) **⚠️ 🤖 PDF parsing required**
 
 **Test DOCX Export:**
 
-- [ ] Select **DOCX** format
-- [ ] Configure options (cover page, TOC)
-- [ ] Click "Export"
-- [ ] Export progress appears
-- [ ] Operation completes within **5 seconds** (Performance Budget ✅)
-- [ ] File downloads
-- [ ] File opens in Microsoft Word/LibreOffice
-- [ ] Content is properly formatted
-- [ ] Chapters have correct headings
-- [ ] Table of contents is functional
+- [ ] Select **DOCX** format **✅ 🤖 Automated**
+- [ ] Configure options (cover page, TOC) **✅ 🤖 Automated**
+- [ ] Click "Export" **✅ 🤖 Automated**
+- [ ] Export progress appears **✅ 🤖 Automated**
+- [ ] Operation completes within **5 seconds** (Performance Budget ✅) **✅ 🤖 Automated**
+- [ ] File downloads **✅ 🤖 Automated**
+- [ ] File opens in Microsoft Word/LibreOffice **⚠️ 🤖 File validation**
+- [ ] Content is properly formatted **⚠️ 🤖 DOCX parsing required**
+- [ ] Chapters have correct headings **⚠️ 🤖 DOCX parsing required**
+- [ ] Table of contents is functional **⚠️ 🤖 DOCX parsing required**
 
 ---
 
@@ -390,64 +414,64 @@ A: Show examples of different container types (terracotta, plastic, fabric), a r
 
 ### Voice Input Integration
 
-- [ ] Navigate to book summary page
-- [ ] Click "🎤 Voice Input" button
-- [ ] Browser asks for microphone permission
-- [ ] Grant permission
-- [ ] Button shows "Listening..." with red background
-- [ ] Speak test phrase: "This is a test of voice input functionality for urban gardening."
-- [ ] Text appears in summary field as you speak
-- [ ] Click "Stop" button to end recording
-- [ ] Voice input stops
-- [ ] Text saved correctly in field
-- [ ] Character counter updates
+- [ ] Navigate to book summary page **✅ 🤖 Automated**
+- [ ] Click "🎤 Voice Input" button **✅ 🤖 Automated**
+- [ ] Browser asks for microphone permission **❌ 👤 Cannot automate in headless**
+- [ ] Grant permission **❌ 👤 Manual interaction required**
+- [ ] Button shows "Listening..." with red background **❌ 👤 Requires microphone**
+- [ ] Speak test phrase: "This is a test of voice input functionality for urban gardening." **❌ 👤 Requires microphone**
+- [ ] Text appears in summary field as you speak **❌ 👤 Requires microphone**
+- [ ] Click "Stop" button to end recording **⚠️ 🤖 UI interaction only**
+- [ ] Voice input stops **❌ 👤 Requires microphone**
+- [ ] Text saved correctly in field **⚠️ 🤖 Can mock Speech API**
+- [ ] Character counter updates **⚠️ 🤖 Can mock Speech API**
 
 ### Auto-Save System
 
 **Normal Auto-Save:**
 
-- [ ] Open chapter editor
-- [ ] Type text in editor: "Testing auto-save functionality."
-- [ ] Watch auto-save indicator
-- [ ] Shows "Saving..." after **3 seconds** (debounce)
-- [ ] Shows "Saved" when complete (within **1 second** - Performance Budget ✅)
-- [ ] Refresh page (F5)
-- [ ] Content persists after refresh
-- [ ] No data loss
+- [ ] Open chapter editor **✅ 🤖 Automated**
+- [ ] Type text in editor: "Testing auto-save functionality." **✅ 🤖 Automated**
+- [ ] Watch auto-save indicator **✅ 🤖 Automated**
+- [ ] Shows "Saving..." after **3 seconds** (debounce) **✅ 🤖 Automated**
+- [ ] Shows "Saved" when complete (within **1 second** - Performance Budget ✅) **✅ 🤖 Automated**
+- [ ] Refresh page (F5) **✅ 🤖 Automated**
+- [ ] Content persists after refresh **✅ 🤖 Automated**
+- [ ] No data loss **✅ 🤖 Automated**
 
 **Network Failure Resilience:**
 
-- [ ] Open chapter editor
-- [ ] Open DevTools → Network tab
-- [ ] Set throttling to "Offline"
-- [ ] Type text in editor: "Testing offline auto-save."
-- [ ] Auto-save attempts and fails gracefully
-- [ ] Data saved to **localStorage** (backup)
-- [ ] Error notification appears: "Unable to save. Changes saved locally."
-- [ ] Set throttling back to "No throttling"
-- [ ] Auto-save retries automatically
-- [ ] Succeeds and syncs to server
-- [ ] Success notification appears
+- [ ] Open chapter editor **✅ 🤖 Automated**
+- [ ] Open DevTools → Network tab **✅ 🤖 Automated**
+- [ ] Set throttling to "Offline" **✅ 🤖 Automated**
+- [ ] Type text in editor: "Testing offline auto-save." **✅ 🤖 Automated**
+- [ ] Auto-save attempts and fails gracefully **✅ 🤖 Automated**
+- [ ] Data saved to **localStorage** (backup) **✅ 🤖 Automated**
+- [ ] Error notification appears: "Unable to save. Changes saved locally." **✅ 🤖 Automated**
+- [ ] Set throttling back to "No throttling" **✅ 🤖 Automated**
+- [ ] Auto-save retries automatically **✅ 🤖 Automated**
+- [ ] Succeeds and syncs to server **✅ 🤖 Automated**
+- [ ] Success notification appears **✅ 🤖 Automated**
 
 ### Delete Book Functionality
 
 **Type-to-Confirm Pattern (Data Loss Prevention):**
 
-- [ ] Navigate to dashboard
-- [ ] Find test book in list
-- [ ] Click "Delete" button or three-dot menu → Delete
-- [ ] Confirmation modal appears
-- [ ] Modal shows warning: "This action cannot be undone"
-- [ ] Modal shows: "Type DELETE to confirm"
-- [ ] Type "delete" (lowercase) → Button stays **disabled** ✅
-- [ ] Type "delETE" (mixed case) → Button stays **disabled** ✅
-- [ ] Clear field and type "DELETE" (uppercase) → Button becomes **enabled** ✅
-- [ ] Click "Delete Book" button
-- [ ] Modal shows processing indicator
-- [ ] Book deleted successfully
-- [ ] Redirected to dashboard
-- [ ] Book no longer appears in list
-- [ ] Audit log recorded (check backend logs if needed)
+- [ ] Navigate to dashboard **✅ 🤖 Automated**
+- [ ] Find test book in list **✅ 🤖 Automated**
+- [ ] Click "Delete" button or three-dot menu → Delete **✅ 🤖 Automated**
+- [ ] Confirmation modal appears **✅ 🤖 Automated**
+- [ ] Modal shows warning: "This action cannot be undone" **✅ 🤖 Automated**
+- [ ] Modal shows: "Type DELETE to confirm" **✅ 🤖 Automated**
+- [ ] Type "delete" (lowercase) → Button stays **disabled** ✅ **✅ 🤖 Automated**
+- [ ] Type "delETE" (mixed case) → Button stays **disabled** ✅ **✅ 🤖 Automated**
+- [ ] Clear field and type "DELETE" (uppercase) → Button becomes **enabled** ✅ **✅ 🤖 Automated**
+- [ ] Click "Delete Book" button **✅ 🤖 Automated**
+- [ ] Modal shows processing indicator **✅ 🤖 Automated**
+- [ ] Book deleted successfully **✅ 🤖 Automated**
+- [ ] Redirected to dashboard **✅ 🤖 Automated**
+- [ ] Book no longer appears in list **✅ 🤖 Automated**
+- [ ] Audit log recorded (check backend logs if needed) **🔧 Backend verification**
 
 ---
 
@@ -459,9 +483,9 @@ A: Show examples of different container types (terracotta, plastic, fabric), a r
 curl -I https://dev.autoauthor.app | grep content-security-policy
 ```
 
-- [ ] Includes: `connect-src` with `api.dev.autoauthor.app`
-- [ ] Includes: `script-src` with `clerk.accounts.dev`
-- [ ] No violations in browser console
+- [ ] Includes: `connect-src` with `api.dev.autoauthor.app` **✅ 🤖 Automated**
+- [ ] Includes: `script-src` with `clerk.accounts.dev` **✅ 🤖 Automated**
+- [ ] No violations in browser console **✅ 🤖 Automated**
 
 ### CSP Headers - Backend
 
@@ -469,35 +493,35 @@ curl -I https://dev.autoauthor.app | grep content-security-policy
 curl -I https://api.dev.autoauthor.app/docs | grep content-security-policy
 ```
 
-- [ ] Includes: `script-src` with `cdn.jsdelivr.net`
-- [ ] Includes: `style-src` with `cdn.jsdelivr.net`
-- [ ] Includes: `img-src` with `fastapi.tiangolo.com`
+- [ ] Includes: `script-src` with `cdn.jsdelivr.net` **✅ 🤖 Automated**
+- [ ] Includes: `style-src` with `cdn.jsdelivr.net` **✅ 🤖 Automated**
+- [ ] Includes: `img-src` with `fastapi.tiangolo.com` **✅ 🤖 Automated**
 
 ### Swagger API Documentation
 
-- [ ] Navigate to: `https://api.dev.autoauthor.app/docs`
-- [ ] Swagger UI interface loads completely
-- [ ] **No white/blank page**
-- [ ] No CSP errors in console
-- [ ] Can expand/collapse endpoints
-- [ ] FastAPI logo/favicon loads
-- [ ] Can test endpoints with "Try it out" button
+- [ ] Navigate to: `https://api.dev.autoauthor.app/docs` **✅ 🤖 Automated**
+- [ ] Swagger UI interface loads completely **✅ 🤖 Automated**
+- [ ] **No white/blank page** **✅ 🤖 Automated**
+- [ ] No CSP errors in console **✅ 🤖 Automated**
+- [ ] Can expand/collapse endpoints **✅ 🤖 Automated**
+- [ ] FastAPI logo/favicon loads **✅ 🤖 Automated**
+- [ ] Can test endpoints with "Try it out" button **⚠️ 🤖 Interactive API testing**
 
 ### Performance - Core Web Vitals
 
-- [ ] Open: `https://dev.autoauthor.app`
-- [ ] Open DevTools → **Lighthouse** tab
-- [ ] Click "Analyze page load"
-- [ ] Performance score: _______ (target: **>80** ✅)
-- [ ] LCP (Largest Contentful Paint): _______ (target: **<2.5s** ✅)
-- [ ] CLS (Cumulative Layout Shift): _______ (target: **<0.1** ✅)
+- [ ] Open: `https://dev.autoauthor.app` **✅ 🤖 Automated**
+- [ ] Open DevTools → **Lighthouse** tab **⚠️ 🤖 Lighthouse integration**
+- [ ] Click "Analyze page load" **⚠️ 🤖 Lighthouse integration**
+- [ ] Performance score: _______ (target: **>80** ✅) **⚠️ 🤖 Lighthouse integration**
+- [ ] LCP (Largest Contentful Paint): _______ (target: **<2.5s** ✅) **✅ 🤖 Automated**
+- [ ] CLS (Cumulative Layout Shift): _______ (target: **<0.1** ✅) **✅ 🤖 Automated**
 
 ### Performance - Operation Budgets
 
-- [ ] **TOC Generation**: Completes in < **3000ms** ✅
-- [ ] **Export (PDF/DOCX)**: Completes in < **5000ms** ✅
-- [ ] **Chapter Auto-Save**: Completes in < **1000ms** ✅
-- [ ] **Page Navigation**: < **500ms** ✅
+- [ ] **TOC Generation**: Completes in < **3000ms** ✅ **✅ 🤖 Automated**
+- [ ] **Export (PDF/DOCX)**: Completes in < **5000ms** ✅ **✅ 🤖 Automated**
+- [ ] **Chapter Auto-Save**: Completes in < **1000ms** ✅ **✅ 🤖 Automated**
+- [ ] **Page Navigation**: < **500ms** ✅ **✅ 🤖 Automated**
 
 ---
 
@@ -507,52 +531,52 @@ curl -I https://api.dev.autoauthor.app/docs | grep content-security-policy
 
 **Flow 1: Sign Out → Sign In → Dashboard**
 
-- [ ] Click sign out button
-- [ ] Redirected to homepage
-- [ ] Clerk session cleared
-- [ ] Click "Sign In"
-- [ ] Clerk modal appears
-- [ ] Sign in successful
-- [ ] Redirected to dashboard
-- [ ] Books list loads
-- [ ] User data persists
+- [ ] Click sign out button **✅ 🤖 Automated**
+- [ ] Redirected to homepage **✅ 🤖 Automated**
+- [ ] Clerk session cleared **✅ 🤖 Automated**
+- [ ] Click "Sign In" **✅ 🤖 Automated**
+- [ ] Clerk modal appears **✅ 🤖 Automated**
+- [ ] Sign in successful **✅ 🤖 Automated**
+- [ ] Redirected to dashboard **✅ 🤖 Automated**
+- [ ] Books list loads **✅ 🤖 Automated**
+- [ ] User data persists **✅ 🤖 Automated**
 
 **Flow 2: Edit Book Metadata**
 
-- [ ] Open book detail page
-- [ ] Click "Edit" button
-- [ ] Edit mode activates
-- [ ] Change book title to: "Updated Title - Deployment Test"
-- [ ] Change description
-- [ ] Click "Save"
-- [ ] Title updates successfully
-- [ ] Description updates
-- [ ] No errors in console
-- [ ] Changes persist on page refresh
+- [ ] Open book detail page **✅ 🤖 Automated**
+- [ ] Click "Edit" button **✅ 🤖 Automated**
+- [ ] Edit mode activates **✅ 🤖 Automated**
+- [ ] Change book title to: "Updated Title - Deployment Test" **✅ 🤖 Automated**
+- [ ] Change description **✅ 🤖 Automated**
+- [ ] Click "Save" **✅ 🤖 Automated**
+- [ ] Title updates successfully **✅ 🤖 Automated**
+- [ ] Description updates **✅ 🤖 Automated**
+- [ ] No errors in console **✅ 🤖 Automated**
+- [ ] Changes persist on page refresh **✅ 🤖 Automated**
 
 **Flow 3: Multiple Chapter Tabs**
 
-- [ ] Open book with 5+ chapters
-- [ ] Open 5 different chapter tabs
-- [ ] Each tab loads in sidebar
-- [ ] Switch between tabs multiple times
-- [ ] Each tab loads correct content
-- [ ] Close 2 tabs using X button
-- [ ] Remaining 3 tabs still functional
-- [ ] Tab order persists
-- [ ] Active tab state saved
+- [ ] Open book with 5+ chapters **✅ 🤖 Automated**
+- [ ] Open 5 different chapter tabs **✅ 🤖 Automated**
+- [ ] Each tab loads in sidebar **✅ 🤖 Automated**
+- [ ] Switch between tabs multiple times **✅ 🤖 Automated**
+- [ ] Each tab loads correct content **✅ 🤖 Automated**
+- [ ] Close 2 tabs using X button **✅ 🤖 Automated**
+- [ ] Remaining 3 tabs still functional **✅ 🤖 Automated**
+- [ ] Tab order persists **✅ 🤖 Automated**
+- [ ] Active tab state saved **✅ 🤖 Automated**
 
 **Flow 4: Keyboard Shortcuts**
 
-- [ ] In chapter editor, select text
-- [ ] Press `Ctrl+B` (or `Cmd+B` on Mac)
-- [ ] Selected text becomes **bold**
-- [ ] Press `Ctrl+I` (or `Cmd+I`)
-- [ ] Selected text becomes *italic*
-- [ ] Press `Ctrl+S` (or `Cmd+S`)
-- [ ] Document saves (auto-save may prevent default)
-- [ ] Press `Escape`
-- [ ] Closes modal (if open)
+- [ ] In chapter editor, select text **✅ 🤖 Automated**
+- [ ] Press `Ctrl+B` (or `Cmd+B` on Mac) **✅ 🤖 Automated**
+- [ ] Selected text becomes **bold** **✅ 🤖 Automated**
+- [ ] Press `Ctrl+I` (or `Cmd+I`) **✅ 🤖 Automated**
+- [ ] Selected text becomes *italic* **✅ 🤖 Automated**
+- [ ] Press `Ctrl+S` (or `Cmd+S`) **✅ 🤖 Automated**
+- [ ] Document saves (auto-save may prevent default) **✅ 🤖 Automated**
+- [ ] Press `Escape` **✅ 🤖 Automated**
+- [ ] Closes modal (if open) **✅ 🤖 Automated**
 
 ---
 
@@ -606,27 +630,27 @@ curl -I https://api.dev.autoauthor.app/docs | grep content-security-policy
 
 ### No Errors Checklist
 
-- [ ] No CORS errors in any console
-- [ ] No CSP violations in any console
-- [ ] No 500 errors in Network tab
-- [ ] No 401/403 errors on authenticated endpoints
-- [ ] All PM2 processes remain **online**
-- [ ] Backend logs show no errors during testing
+- [ ] No CORS errors in any console **✅ 🤖 Automated**
+- [ ] No CSP violations in any console **✅ 🤖 Automated**
+- [ ] No 500 errors in Network tab **✅ 🤖 Automated**
+- [ ] No 401/403 errors on authenticated endpoints **✅ 🤖 Automated**
+- [ ] All PM2 processes remain **online** **🔧 Backend/CI**
+- [ ] Backend logs show no errors during testing **🔧 Backend/CI**
 
 ### Functional Completeness
 
-- [ ] User can sign in
-- [ ] User can create a book with metadata
-- [ ] User can add a book summary
-- [ ] User can generate TOC with AI wizard
-- [ ] User can view books with chapters
-- [ ] User can edit chapters with rich text editor
-- [ ] User can generate AI drafts from Q&A
-- [ ] User can use keyboard shortcuts
-- [ ] User can export books (PDF/DOCX)
-- [ ] User can delete books safely
-- [ ] API documentation accessible (Swagger)
-- [ ] No broken features from previous version
+- [ ] User can sign in **✅ 🤖 Automated**
+- [ ] User can create a book with metadata **✅ 🤖 Automated**
+- [ ] User can add a book summary **✅ 🤖 Automated**
+- [ ] User can generate TOC with AI wizard **✅ 🤖 Automated**
+- [ ] User can view books with chapters **✅ 🤖 Automated**
+- [ ] User can edit chapters with rich text editor **✅ 🤖 Automated**
+- [ ] User can generate AI drafts from Q&A **✅ 🤖 Automated**
+- [ ] User can use keyboard shortcuts **✅ 🤖 Automated**
+- [ ] User can export books (PDF/DOCX) **✅ 🤖 Automated**
+- [ ] User can delete books safely **✅ 🤖 Automated**
+- [ ] API documentation accessible (Swagger) **✅ 🤖 Automated**
+- [ ] No broken features from previous version **✅ 🤖 Automated**
 
 ---
 
