@@ -15,6 +15,11 @@ jobs:
     name: Frontend Tests
     runs-on: ubuntu-latest
 
+    # Access staging environment secrets for build validation
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
+
     defaults:
       run:
         working-directory: ./frontend
@@ -116,6 +121,11 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+
+    # Access staging environment secrets for E2E tests
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
 
     defaults:
       run:
