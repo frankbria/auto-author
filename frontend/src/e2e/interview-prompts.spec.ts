@@ -1,4 +1,11 @@
 import { test, expect } from '@playwright/test';
+import {
+  createTestBookWithTOC,
+  deleteTestBook,
+  waitForBookInDashboard,
+  type TestBook,
+  type TestChapter
+} from './helpers/testData';
 
 /**
  * Cross-browser E2E tests for interview-style prompts functionality
@@ -6,12 +13,32 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('Interview-Style Prompts Cross-Browser Tests', () => {
+  let testBook: TestBook;
+  let testChapters: TestChapter[];
+
   test.beforeEach(async ({ page }) => {
-    // Mock authentication for testing
+    // Navigate to dashboard
     await page.goto('/dashboard');
-    
-    // Wait for auth state to stabilize
     await page.waitForLoadState('networkidle');
+
+    // Create test book with TOC and chapters
+    const result = await createTestBookWithTOC(page, {
+      title: `Interview Test Book ${Date.now()}`,
+      description: 'Test book for interview prompts E2E tests'
+    });
+
+    testBook = result.book;
+    testChapters = result.chapters;
+
+    // Wait for book to appear in dashboard
+    await waitForBookInDashboard(page, testBook.title);
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Cleanup: Delete test book
+    if (testBook?.id) {
+      await deleteTestBook(page, testBook.id);
+    }
   });
 
   test('Question generation works across all browsers', async ({ page, browserName }) => {
