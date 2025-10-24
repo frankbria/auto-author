@@ -46,7 +46,15 @@ jobs:
       - name: Run server-side deploy
         run: |
           ssh -i ~/.ssh/staging_key $USER@$HOST \
-            "bash /opt/auto-author/releases/${{ env.RELEASE_ID }}/scripts/deploy.sh /opt/auto-author/releases/${{ env.RELEASE_ID }}"
+            "export API_URL='${{ secrets.API_URL }}' && \
+             export FRONTEND_URL='${{ secrets.FRONTEND_URL }}' && \
+             export CLERK_PUBLISHABLE_KEY='${{ secrets.CLERK_PUBLISHABLE_KEY }}' && \
+             export CLERK_SECRET_KEY='${{ secrets.CLERK_SECRET_KEY }}' && \
+             export DATABASE_URI='${{ secrets.DATABASE_URI }}' && \
+             export DATABASE_NAME='${{ secrets.DATABASE_NAME }}' && \
+             export OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}' && \
+             export CLERK_WEBHOOK_SECRET='${{ secrets.CLERK_WEBHOOK_SECRET }}' && \
+             bash /opt/auto-author/releases/${{ env.RELEASE_ID }}/scripts/deploy.sh /opt/auto-author/releases/${{ env.RELEASE_ID }}"
 
 
       - name: External Health Checks (with backoff)
@@ -60,4 +68,4 @@ jobs:
           
       - name: Cleanup Local Keys
         if: always()
-        run: rm -f ~/.ssh/staging_keyts
+        run: rm -f ~/.ssh/staging_key
