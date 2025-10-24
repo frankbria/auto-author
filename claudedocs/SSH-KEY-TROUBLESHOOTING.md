@@ -79,7 +79,7 @@ cat ~/.ssh/github_deploy_key.pub
 
 1. **Add public key to staging server:**
    ```bash
-   ssh frank@47.88.89.175
+   ssh root@47.88.89.175
    echo "ssh-ed25519 AAAA... github-actions-deploy" >> ~/.ssh/authorized_keys
    ```
 
@@ -102,7 +102,7 @@ EOF
 chmod 600 /tmp/test_key
 
 # Test SSH connection
-ssh -i /tmp/test_key frank@47.88.89.175 "echo 'SSH works!'"
+ssh -i /tmp/test_key root@47.88.89.175 "echo 'SSH works!'"
 
 # Clean up
 rm /tmp/test_key
