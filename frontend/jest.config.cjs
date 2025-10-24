@@ -11,7 +11,10 @@ const customJestConfig = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-  transformIgnorePatterns: ['/node_modules/'],
+  transformIgnorePatterns: [
+    // Transform @clerk packages (they use ES modules in v6+)
+    'node_modules/(?!(@clerk/.*)/)',
+  ],
   testPathIgnorePatterns: [
     '<rootDir>/src/e2e/',
     '<rootDir>/e2e/',                    // Exclude Playwright E2E tests

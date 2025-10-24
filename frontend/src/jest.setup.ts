@@ -30,7 +30,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Add a fetch polyfill for tests
-global.fetch = jest.fn().mockImplementation(() => 
+global.fetch = jest.fn().mockImplementation(() =>
   Promise.resolve({
     ok: true,
     json: () => Promise.resolve({}),
@@ -52,7 +52,7 @@ class MockSpeechRecognition {
   public continuous = false;
   public interimResults = false;
   public lang = 'en-US';
-  
+
   start = jest.fn();
   stop = jest.fn();
   abort = jest.fn();
@@ -492,4 +492,48 @@ jest.mock('@tiptap/extension-placeholder', () => {
 
 jest.mock('@tiptap/extension-character-count', () => {
   return jest.fn(() => ({ name: 'characterCount' }));
+});
+
+// Mock Clerk for Next.js v6+ (uses ES modules)
+jest.mock('@clerk/nextjs', () => {
+  const React = require('react');
+
+  return {
+    ClerkProvider: ({ children }: any) => React.createElement('div', null, children),
+    UserButton: () => React.createElement('div', { 'data-testid': 'clerk-user-button' }, 'UserButton'),
+    SignInButton: ({ children }: any) => React.createElement('div', { 'data-testid': 'clerk-sign-in-button' }, children || 'Sign In'),
+    SignUpButton: ({ children }: any) => React.createElement('div', { 'data-testid': 'clerk-sign-up-button' }, children || 'Sign Up'),
+    SignOutButton: ({ children }: any) => React.createElement('div', { 'data-testid': 'clerk-sign-out-button' }, children || 'Sign Out'),
+    useUser: jest.fn(() => ({
+      isSignedIn: true,
+      user: {
+        id: 'test-user-id',
+        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        firstName: 'Test',
+        lastName: 'User',
+      },
+      isLoaded: true,
+    })),
+    useAuth: jest.fn(() => ({
+      isSignedIn: true,
+      userId: 'test-user-id',
+      sessionId: 'test-session-id',
+      getToken: jest.fn(() => Promise.resolve('test-token')),
+      isLoaded: true,
+    })),
+    useClerk: jest.fn(() => ({
+      signOut: jest.fn(),
+      openSignIn: jest.fn(),
+      openSignUp: jest.fn(),
+    })),
+    auth: jest.fn(() => Promise.resolve({
+      userId: 'test-user-id',
+      sessionId: 'test-session-id',
+      getToken: jest.fn(() => Promise.resolve('test-token')),
+    })),
+    currentUser: jest.fn(() => Promise.resolve({
+      id: 'test-user-id',
+      emailAddresses: [{ emailAddress: 'test@example.com' }],
+    })),
+  };
 });
