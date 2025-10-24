@@ -16,7 +16,7 @@ export default defineConfig({
     ['json', { outputFile: 'test-results/results.json' }],
     ['junit', { outputFile: 'test-results/results.xml' }]
   ],
-  
+
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
@@ -82,8 +82,10 @@ export default defineConfig({
     timeout: 120 * 1000,
     env: {
       BYPASS_AUTH: 'true',
-      NEXT_PUBLIC_BYPASS_AUTH: 'true'
-      // Keep NODE_ENV as development to load .env.local with Clerk keys
+      NEXT_PUBLIC_BYPASS_AUTH: 'true',
+      // Pass through Clerk keys from GitHub Actions environment
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '',
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
     }
   },
 

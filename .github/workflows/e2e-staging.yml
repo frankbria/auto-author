@@ -68,9 +68,12 @@ jobs:
 
       - name: Run Playwright E2E tests
         working-directory: ./frontend
-        run: npx playwright test
+        run: npx playwright test tests/e2e/deployment --config=tests/e2e/deployment/playwright.config.ts
         env:
+          DEPLOYMENT_URL: ${{ env.STAGING_URL }}
           BASE_URL: ${{ env.STAGING_URL }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
           NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}/api/v1
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
