@@ -71,7 +71,7 @@ npm ci --omit=dev
 # Create/update .env.production with all required variables
 echo "==> Creating frontend .env.production file..."
 {
-    echo "NEXT_PUBLIC_API_URL=$API_URL"
+    echo "NEXT_PUBLIC_API_URL=$API_URL/api/v1"
     echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY"
     echo "CLERK_SECRET_KEY=$CLERK_SECRET_KEY"
     echo "NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT"
@@ -79,7 +79,7 @@ echo "==> Creating frontend .env.production file..."
 } > .env.production
 
 # Export environment variables for build process
-export NEXT_PUBLIC_API_URL=$API_URL
+export NEXT_PUBLIC_API_URL=$API_URL/api/v1
 export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
 export CLERK_SECRET_KEY=$CLERK_SECRET_KEY
 export NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT
