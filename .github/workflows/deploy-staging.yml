@@ -124,7 +124,7 @@ jobs:
 
           # Install Python dependencies
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          export PATH="$HOME/.cargo/bin:$PATH"
+          export PATH="$HOME/.local/bin:$PATH"
           uv venv
           source .venv/bin/activate
           uv pip install -r requirements.txt
