@@ -82,7 +82,7 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
           chmod 600 ~/.ssh/staging_key
           ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 

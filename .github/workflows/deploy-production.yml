@@ -111,7 +111,7 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/production_key
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/production_key
           chmod 600 ~/.ssh/production_key
           ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
