@@ -16,10 +16,10 @@ Fully automated deployment pipeline from code commit to production, with compreh
 
 ### ✅ What We Have
 
-1. **Automated Staging Deployment Script**
-   - Location: `scripts/deploy-staging.sh`
-   - Features: Tests, builds, transfers, health checks
-   - Execution: Manual trigger from local machine
+1. **GitHub Actions CI/CD Pipelines**
+   - Workflows: `.github/workflows/deploy-staging.yml`, `.github/workflows/deploy-production.yml`
+   - Features: Automated tests, builds, transfers, health checks, notifications
+   - Execution: Automatic on push to `develop` branch (staging) or tag creation (production)
 
 2. **Test Infrastructure**
    - Frontend: Jest + React Testing Library (721/724 tests, 99.59%)

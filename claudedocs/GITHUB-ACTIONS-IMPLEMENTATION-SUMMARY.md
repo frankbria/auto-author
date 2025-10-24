@@ -18,9 +18,12 @@ All core infrastructure for automated CI/CD has been implemented and is ready fo
 - ✅ `.github/workflows/deploy-staging.yml` - Staging deployment automation
 - ✅ `.github/workflows/deploy-production.yml` - Production deployment automation
 
-#### 2. **Deployment Scripts** (2 files)
-- ✅ `scripts/deploy-remote.sh` - Server-side deployment with blue-green strategy
-- ✅ `scripts/rollback.sh` - Emergency rollback capability
+#### 2. **Legacy Deployment Scripts** (Removed)
+
+> **Note**: Legacy shell-based deployment scripts (`deploy-staging.sh`, `deploy-remote.sh`, `rollback.sh`, `setup-clawcloud-ssh.sh`, `harden-ssh.sh`) have been removed. All deployment logic is now embedded in GitHub Actions workflows.
+
+- Deployment logic is handled directly by `.github/workflows/deploy-staging.yml` and `.github/workflows/deploy-production.yml`
+- Rollback capability available via GitHub Actions re-run of previous successful workflow
 
 #### 3. **Server Infrastructure**
 - ✅ SSH key generated: `~/.ssh/github_actions_staging`
@@ -116,7 +119,6 @@ All core infrastructure for automated CI/CD has been implemented and is ready fo
 - **Location**: `~/.ssh/github_actions_staging`
 - **Public Key**: `~/.ssh/github_actions_staging.pub`
 - **Comment**: `github-actions-staging`
-- **Fingerprint**: `SHA256:6ga8FljHbVxn3sVIucwl+DKPcb8TvLR2YLKWGT4HUOA`
 
 ### Installation Status
 - ✅ Installed on staging server: `root@47.88.89.175`
@@ -212,11 +214,11 @@ Create environment: Settings → Environments → New environment → "productio
 ### How to Get SSH Private Key
 
 ```bash
-# Display private key (copy entire output including BEGIN/END lines):
+# Display private key (copy entire output):
 cat ~/.ssh/github_actions_staging
 ```
 
-Copy the entire output including `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----` lines.
+Copy the entire output including header and footer lines.
 
 ---
 

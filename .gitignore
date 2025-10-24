@@ -90,4 +90,7 @@ claude-flow
 claude-flow.bat
 claude-flow.ps1
 hive-mind-prompt-*.txt
-auto-author-clawcloud.tar.gz
+
+# Deployment archives and documentation exports
+*.tar.gz
+repomix-output.xml

@@ -171,49 +171,64 @@ NEXT_PUBLIC_ENVIRONMENT=staging
 
 ## Automated Deployment
 
-### Quick Deployment
+> **Note**: Deployment is now fully automated via GitHub Actions. Legacy shell scripts have been removed.
 
+### Deployment via GitHub Actions
+
+Deployments to staging are handled automatically by the **Deploy to Staging** workflow (`.github/workflows/deploy-staging.yml`).
+
+**Automatic Triggers:**
+- Push to `develop` branch
+- After successful test suite completion on `develop`
+
+**Manual Trigger:**
 ```bash
-# From project root on local machine
-./scripts/deploy-staging.sh
+# Via GitHub CLI
+gh workflow run deploy-staging.yml
+
+# Or use GitHub UI:
+# Actions tab → Deploy to Staging → Run workflow
 ```
 
-This will:
-1. ✅ Run pre-flight checks
-2. ✅ Execute test suites (frontend + backend)
-3. ✅ Build production frontend
-4. ✅ Create deployment package
-5. ✅ Transfer to staging server
-6. ✅ Extract and setup environment
-7. ✅ Install dependencies
-8. ✅ Start services
-9. ✅ Run health checks
-10. ✅ Execute smoke tests
+**The workflow automatically:**
+1. ✅ Runs pre-flight checks
+2. ✅ Executes test suites (frontend + backend)
+3. ✅ Builds production frontend
+4. ✅ Creates deployment package
+5. ✅ Transfers to staging server via SSH
+6. ✅ Extracts and sets up environment
+7. ✅ Installs dependencies
+8. ✅ Restarts services with PM2
+9. ✅ Runs health checks
+10. ✅ Executes smoke tests
+11. ✅ Sends Slack notification (if configured)
 
-### Deployment Options
+### Required GitHub Secrets
 
-```bash
-# Skip tests (faster deployment)
-./scripts/deploy-staging.sh --skip-tests
+Ensure the following secrets are configured in repository settings:
 
-# Skip build (use existing build)
-./scripts/deploy-staging.sh --skip-build
-
-# Skip both
-./scripts/deploy-staging.sh --skip-tests --skip-build
+```
+SSH_KEY              # Private SSH key for staging server
+HOST                 # Staging server hostname
+USER                 # SSH user
+API_URL              # Backend API URL
+FRONTEND_URL         # Frontend URL
+CLERK_PUBLISHABLE_KEY
+CLERK_SECRET_KEY
+SLACK_WEBHOOK_URL    # (Optional) for notifications
 ```
 
-### Environment Variables
+### Monitoring Deployments
 
 ```bash
-# Custom staging host
-STAGING_HOST=staging.example.com ./scripts/deploy-staging.sh
+# View deployment status
+gh run list --workflow=deploy-staging.yml
 
-# Custom user
-STAGING_USER=deployuser ./scripts/deploy-staging.sh
+# View logs for latest deployment
+gh run view --log
 
-# Custom directory
-STAGING_DIR=/opt/auto-author ./scripts/deploy-staging.sh
+# Watch deployment in real-time
+gh run watch
 ```
 
 ---
