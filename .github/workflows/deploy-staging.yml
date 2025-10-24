@@ -142,13 +142,13 @@ jobs:
           npm ci --production
 
           # Create/update .env.production with all required variables
-          cat > .env.production <<EOF
-NEXT_PUBLIC_API_URL=$API_URL
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
-CLERK_SECRET_KEY=$CLERK_SECRET_KEY
-NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT
-PORT=3002
-EOF
+          {
+            echo "NEXT_PUBLIC_API_URL=$API_URL"
+            echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY"
+            echo "CLERK_SECRET_KEY=$CLERK_SECRET_KEY"
+            echo "NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT"
+            echo "PORT=3002"
+          } > .env.production
 
           # Export environment variables for build process
           export NEXT_PUBLIC_API_URL=$API_URL
