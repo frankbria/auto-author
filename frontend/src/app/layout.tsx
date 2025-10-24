@@ -8,6 +8,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { SonnerProvider } from '@/components/ui/sonner';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { WebVitalsInit } from '@/components/performance/WebVitalsInit';
+import { RefreshButton } from '@/components/ui/refresh-button';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -18,7 +19,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider 
+    <ClerkProvider
       appearance={{ baseTheme: dark }}
       // Extend session duration for development
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
@@ -31,12 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="text-center">
                   <h1 className="text-2xl font-bold text-red-400 mb-4">Something went wrong</h1>
                   <p className="text-zinc-400 mb-4">An unexpected error occurred. Please refresh the page.</p>
-                  <button 
-                    onClick={() => window.location.reload()} 
-                    className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded"
-                  >
-                    Refresh Page
-                  </button>
+                  <RefreshButton />
                 </div>
               </div>
             }
