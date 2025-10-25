@@ -1,5 +1,16 @@
 name: E2E Tests on Staging
 
+# IMPORTANT: This workflow runs POST-DEPLOYMENT and is INFORMATIONAL ONLY
+# E2E test failures DO NOT block staging deployment or rollback the release
+# The 3-tier CI/CD strategy:
+#   Tier 1 (BLOCKS): Fast tests (lint, typecheck, unit, build) - 3-5 min
+#   Tier 2 (AUTO): Deploy to staging - 1-2 min
+#   Tier 3 (INFORMATIONAL): E2E tests - 10-15 min
+#
+# This workflow is Tier 3 - it validates the deployed environment but does not
+# prevent the deployment from completing. If E2E tests fail, the team is notified
+# and can decide whether to fix forward or rollback using scripts/rollback.sh
+
 on:
   workflow_run:
     workflows: ["Deploy to Staging"]
@@ -20,6 +31,8 @@ jobs:
   e2e-tests:
     name: Run E2E Tests Against Staging
     runs-on: ubuntu-latest
+    # Run if deployment succeeded OR if manually triggered
+    # NOTE: This job runs AFTER deployment is complete and does NOT block staging
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
 
     # Access staging environment secrets (CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY, etc.)
@@ -133,3 +146,42 @@ jobs:
           name: backend-e2e-logs
           path: backend/test-logs/
           retention-days: 7
+
+      # Notify on E2E test failures (informational - does NOT block deployment)
+      - name: Notify E2E Failure
+        if: failure()
+        run: |
+          echo "## 🚨 E2E Test Failure (Non-Blocking)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "E2E tests failed but **staging deployment is already live**." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Staging URL**: https://dev.autoauthor.app" >> $GITHUB_STEP_SUMMARY
+          echo "- **Playwright Report**: Check artifacts for detailed test results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review test failure artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify staging environment manually" >> $GITHUB_STEP_SUMMARY
+          echo "3. Decide: Fix forward or rollback?" >> $GITHUB_STEP_SUMMARY
+          echo "4. To rollback: \`ssh user@dev.autoauthor.app 'bash /opt/auto-author/current/scripts/rollback.sh'\`" >> $GITHUB_STEP_SUMMARY
+
+      # TODO: Add Slack/Discord webhook notification
+      # - name: Send Slack Notification
+      #   if: failure()
+      #   run: |
+      #     curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+      #       -H 'Content-Type: application/json' \
+      #       -d '{
+      #         "channel": "#dev-alerts",
+      #         "text": "🚨 E2E tests failed on staging (non-blocking)",
+      #         "attachments": [{
+      #           "color": "warning",
+      #           "fields": [
+      #             {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+      #             {"title": "Commit", "value": "${{ github.sha }}", "short": true},
+      #             {"title": "Run", "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "short": false}
+      #           ]
+      #         }]
+      #       }'

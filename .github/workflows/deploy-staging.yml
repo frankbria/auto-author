@@ -10,7 +10,8 @@ jobs:
   deploy:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
+    # Only deploy if the Test Suite workflow passed
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     env:
       HOST: ${{ secrets.HOST }}
       USER: ${{ secrets.USER }}
@@ -69,3 +70,64 @@ jobs:
       - name: Cleanup Local Keys
         if: always()
         run: rm -f ~/.ssh/staging_key
+
+      # Notify deployment success
+      - name: Deployment Success Notification
+        if: success()
+        run: |
+          echo "## ✅ Staging Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Staging environment has been updated successfully." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release ID**: ${{ env.RELEASE_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend URL**: https://dev.autoauthor.app" >> $GITHUB_STEP_SUMMARY
+          echo "- **API URL**: https://api.dev.autoauthor.app" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- E2E tests will run automatically post-deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor E2E test results for any issues" >> $GITHUB_STEP_SUMMARY
+          echo "- Rollback available: \`bash /opt/auto-author/current/scripts/rollback.sh\`" >> $GITHUB_STEP_SUMMARY
+
+      # Notify deployment failure
+      - name: Deployment Failure Notification
+        if: failure()
+        run: |
+          echo "## 🚨 Staging Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Deployment to staging environment failed. Previous version remains active." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release ID**: ${{ env.RELEASE_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review workflow logs for error details" >> $GITHUB_STEP_SUMMARY
+          echo "2. Fix the issue in your branch" >> $GITHUB_STEP_SUMMARY
+          echo "3. Push again to trigger a new deployment" >> $GITHUB_STEP_SUMMARY
+          echo "4. If staging is broken, verify previous version is still serving" >> $GITHUB_STEP_SUMMARY
+
+      # TODO: Add Slack/Discord webhook notifications
+      # - name: Send Deployment Notification
+      #   if: always()
+      #   run: |
+      #     STATUS="${{ job.status }}"
+      #     COLOR=$([[ "$STATUS" == "success" ]] && echo "good" || echo "danger")
+      #     curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+      #       -H 'Content-Type: application/json' \
+      #       -d '{
+      #         "channel": "#deployments",
+      #         "text": "Staging deployment '$STATUS'",
+      #         "attachments": [{
+      #           "color": "'$COLOR'",
+      #           "fields": [
+      #             {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+      #             {"title": "Release", "value": "${{ env.RELEASE_ID }}", "short": true},
+      #             {"title": "Frontend", "value": "https://dev.autoauthor.app", "short": true},
+      #             {"title": "API", "value": "https://api.dev.autoauthor.app", "short": true}
+      #           ]
+      #         }]
+      #       }'
