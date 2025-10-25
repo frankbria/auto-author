@@ -240,6 +240,13 @@ async def audit_request(
         details=details,
     )
 
+    # E2E Test Mode: Skip token verification
+    if settings.BYPASS_AUTH:
+        return {
+            "sub": current_user["clerk_id"],
+            "email": current_user.get("email", "test@example.com")
+        }
+
     # Extract token from Authorization header
     auth_header = request.headers.get("authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
