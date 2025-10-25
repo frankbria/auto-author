@@ -17,8 +17,9 @@ export default clerkMiddleware((auth, req) => {
     return NextResponse.next();
   }
 
-  // Let Clerk handle authentication
-  return NextResponse.next();
+  // Enforce authentication for protected routes
+  // This will redirect unauthenticated users to the sign-in page
+  auth().protect();
 });
 
 export const config = {
