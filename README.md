@@ -67,12 +67,26 @@ While Clerk manages authentication, we maintain a local user table in our MongoD
 
 The architecture separates authentication concerns (handled by Clerk) from application data management (handled by our backend), creating a more secure and maintainable system.
 
+### Authentication Implementation Details
+
+**Production Environment:**
+- JWT verification using Clerk's JWKS endpoint (`https://clerk.{domain}/.well-known/jwks.json`)
+- Secure token validation with automatic key rotation support
+- Session management with configurable timeout policies
+
+**Development & Testing:**
+- Auth bypass mode available via `BYPASS_AUTH=true` environment variable
+- Enables E2E testing without real authentication credentials
+- **Security Note:** Auth bypass must NEVER be enabled in production
+
 For detailed documentation about our Clerk integration:
 - [Clerk Integration Guide](docs/clerk-integration-guide.md)
 - [Authentication User Guide](docs/user-guide-auth.md)
 - [Clerk Deployment Checklist](docs/clerk-deployment-checklist.md)
 - [Profile Management Guide](docs/profile-management-guide.md)
 - [API Profile Endpoints](docs/api-profile-endpoints.md)
+
+---
 
 ## 📚 Table of Contents Generation
 
@@ -89,6 +103,8 @@ For detailed documentation about TOC generation:
 - [TOC Generation User Guide](docs/user-guide-toc-generation.md)
 - [API TOC Endpoints](docs/api-toc-endpoints.md)
 - [Troubleshooting TOC Generation](docs/troubleshooting-toc-generation.md)
+
+---
 
 ## 🧑‍💻 Getting Started (Development)
 
@@ -120,7 +136,7 @@ npm run dev
 
 ```bash
 cd backend
-pip install 
+pip install
 uvicorn app.main:app --reload
 ```
 
@@ -134,6 +150,8 @@ Create `.env` files for both frontend and backend:
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_*****
 CLERK_SECRET_KEY=sk_*****
+# Development only - NEVER use in production
+# BYPASS_AUTH=true
 ```
 
 **`.env` (backend)**
@@ -143,7 +161,64 @@ MONGODB_URI=mongodb://localhost:27017/auto_author
 CLERK_SECRET_KEY=sk_*****
 CLERK_WEBHOOK_SECRET=whsec_*****
 OPENAI_API_KEY=sk-...
+# Development only - NEVER use in production
+# BYPASS_AUTH=true
 ```
+
+---
+
+## 🧪 Running Tests
+
+### Frontend Tests
+
+```bash
+cd frontend
+npm run test              # Run all tests
+npm run test:coverage     # Run with coverage report
+npm run test:watch        # Run in watch mode
+```
+
+**Current Status:**
+- **Pass Rate:** 88.7% (613/691 tests passing)
+- **Known Issues:** 75 failures are environmental (missing mocks, not code bugs)
+- **Fix Timeline:** 3.5-5.5 hours across 4 phases
+- See [Frontend Test Failure Analysis](frontend/docs/TEST_FAILURE_ANALYSIS.md) for details
+
+### Backend Tests
+
+```bash
+cd backend
+uv run pytest                                           # Run all tests
+uv run pytest --cov=app tests/ --cov-report=term-missing  # With coverage
+```
+
+**Current Status:**
+- **Pass Rate:** 98.9% (187/189 tests passing)
+- **Coverage:** 41% (target: 85%)
+- **Improvement Plan:** 4-5 weeks, 207-252 new tests needed
+- See [Backend Test Coverage Report](backend/TEST_COVERAGE_REPORT.md) for details
+
+### E2E Tests (Playwright)
+
+```bash
+cd frontend
+npx playwright test --ui    # Run with UI mode (recommended)
+npx playwright test         # Run headless
+
+# With auth bypass (for testing without real authentication)
+BYPASS_AUTH=true npx playwright test
+```
+
+**Current Status:**
+- Complete Playwright test suite with auth bypass support
+- Test helpers for condition-based waiting (no arbitrary timeouts)
+- Comprehensive page objects for all major workflows
+- See [E2E Test Status](frontend/docs/E2E_TEST_STATUS.md) for details
+
+### Comprehensive Test Analysis
+
+For a complete overview of test infrastructure status:
+- [Post-Deployment Test Report](docs/POST_DEPLOYMENT_TEST_REPORT.md) - Overall test status and analysis
 
 ---
 
@@ -171,21 +246,11 @@ Auto Author comes with comprehensive documentation to help you understand and us
 - [Session Management](docs/session-management.md) - How user sessions are managed
 - [Login/Logout Flows](docs/login-logout-flows.md) - Detailed authentication flows
 
----
-
-## 🤪 Running Tests
-
-### Frontend
-
-```bash
-npm run test
-```
-
-### Backend
-
-```bash
-pytest
-```
+### Testing Documentation
+- [Post-Deployment Test Report](docs/POST_DEPLOYMENT_TEST_REPORT.md) - Comprehensive test analysis
+- [Backend Test Coverage Report](backend/TEST_COVERAGE_REPORT.md) - Module-by-module coverage analysis
+- [Frontend Test Failure Analysis](frontend/docs/TEST_FAILURE_ANALYSIS.md) - Categorized test failures with priorities
+- [E2E Test Status](frontend/docs/E2E_TEST_STATUS.md) - Playwright test suite documentation
 
 ---
 
@@ -197,13 +262,19 @@ auto-author/
 ├── frontend/                # Next.js UI
 │   ├── components/
 │   ├── pages/
-│   └── styles/
+│   ├── styles/
+│   └── docs/
+│       ├── TEST_FAILURE_ANALYSIS.md
+│       └── E2E_TEST_STATUS.md
 |
 ├── backend/                 # FastAPI backend
 │   ├── app/
-│   └── tests/
+│   ├── tests/
+│   └── TEST_COVERAGE_REPORT.md
 |
 ├── docs/                    # Project documentation
+│   ├── POST_DEPLOYMENT_TEST_REPORT.md
+│   └── [other documentation]
 └── README.md
 ```
 
@@ -269,6 +340,42 @@ auto-author/
 
 ---
 
+## 🔧 What's New (Updated: 2025-10-29)
+
+### Security & Authentication
+- **JWT Verification Enhancement**: Migrated from hardcoded public key to Clerk's JWKS endpoint for improved security and automatic key rotation
+- **E2E Testing Support**: Added `BYPASS_AUTH=true` environment variable for authentication bypass during testing (development only)
+- **Security Audit**: Completed comprehensive authentication middleware review
+
+### Testing Infrastructure
+- **E2E Test Suite**: Complete Playwright test coverage with auth bypass support
+- **Test Helpers**: Comprehensive fixtures for books, chapters, and TOC data
+- **Condition-based Waiting**: Replaced arbitrary timeouts with state polling for more reliable tests
+- **Page Objects**: Full coverage for all major user workflows
+
+### Test Analysis & Documentation
+- **Post-Deployment Analysis**: Added comprehensive test status report
+  - Frontend: 88.7% pass rate (75 failures are environmental, not code bugs)
+  - Backend: 98.9% pass rate, 41% coverage vs 85% target
+- **Coverage Improvement Plan**: Detailed 4-week plan to reach 85% backend coverage
+- **Test Categorization**: Frontend failures analyzed and prioritized by fix complexity
+
+### Known Issues
+- **Frontend Tests**: 75 environmental failures (missing mocks for Next.js router, ResizeObserver, module imports)
+  - Estimated fix time: 3.5-5.5 hours
+  - All failures are test setup issues, not application bugs
+- **Backend Coverage Gap**: 41% vs 85% target
+  - Critical modules need coverage: `security.py` (18%), `book_cover_upload.py` (0%), `transcription.py` (0%)
+  - Path to 85%: 207-252 new tests over 4-5 weeks
+- **Backend Asyncio**: 2 test failures related to event loop lifecycle
+
+### Package Updates
+- Upgraded `lucide-react` to 0.468.0
+- Resolved 5 npm audit vulnerabilities
+- Updated `.gitignore` to exclude test artifacts
+
+---
+
 ## 🧑‍🤝🧑 Contributing
 
 We're in the early MVP phase. Contributions, suggestions, and PRs are welcome! Please check the [CONTRIBUTING.md](CONTRIBUTING.md) guidelines before submitting.
@@ -279,4 +386,4 @@ We're in the early MVP phase. Contributions, suggestions, and PRs are welcome! P
 
 MIT License © 2025 Noatak Enterprises, LLC, dba Bria Strategy Group
 
----# Testing CI/CD
+---
