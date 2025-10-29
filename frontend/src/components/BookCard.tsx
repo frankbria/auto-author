@@ -77,6 +77,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
   return (
     <>
       <Card
+        data-testid="book-card"
         className="w-full max-w-[350px] bg-zinc-800 border border-zinc-700 hover:border-indigo-500 transition cursor-pointer"
         onClick={handleClick}
       >

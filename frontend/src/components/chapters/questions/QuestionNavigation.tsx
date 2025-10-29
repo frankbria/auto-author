@@ -63,18 +63,18 @@ export default function QuestionNavigation({
           size="sm"
           onClick={onPrevious}
           disabled={isFirstQuestion}
-          className="flex items-center space-x-1"
+          className="flex items-center space-x-1 min-h-[44px] min-w-[44px]"
         >
           <ChevronLeft className="h-4 w-4" />
           <span>Previous</span>
         </Button>
-        
+
         <div className="relative">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowQuestionList(!showQuestionList)}
-            className="flex items-center space-x-1"
+            className="flex items-center space-x-1 min-h-[44px] min-w-[44px]"
           >
             <Menu className="h-4 w-4" />
             <span>Question {currentIndex + 1} of {totalQuestions}</span>
@@ -108,7 +108,7 @@ export default function QuestionNavigation({
           size="sm"
           onClick={onNext}
           disabled={isLastQuestion}
-          className="flex items-center space-x-1"
+          className="flex items-center space-x-1 min-h-[44px] min-w-[44px]"
         >
           <span>Next</span>
           <ChevronRight className="h-4 w-4" />
@@ -117,10 +117,10 @@ export default function QuestionNavigation({
       
       {/* Secondary actions */}
       <div className="flex justify-center space-x-2">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           size="sm"
-          className="text-xs"
+          className="text-xs min-h-[44px] min-w-[44px]"
           onClick={() => {
             // If we're at the last question, go back to the first one
             // Otherwise, go to the next question

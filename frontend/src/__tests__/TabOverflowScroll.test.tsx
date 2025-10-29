@@ -6,6 +6,10 @@ describe('Tab Overflow and Scrolling', () => {
   beforeEach(() => {
     setupTestEnvironment();
     
+    // Clear any previous mocks
+    jest.clearAllMocks();
+    localStorage.clear();
+    
     // Mock element dimensions for testing overflow
     Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { 
       configurable: true, 
@@ -23,6 +27,10 @@ describe('Tab Overflow and Scrolling', () => {
       configurable: true, 
       value: 100 // Has scrolled down a bit
     });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
   
   test('renders scroll buttons when tabs overflow container', async () => {
@@ -79,6 +87,7 @@ describe('Tab Overflow and Scrolling', () => {
         onTabSelect={jest.fn()}
         onTabReorder={jest.fn()}
         onTabClose={jest.fn()}
+        data-testid="tab-bar"
       />
     );
     
@@ -186,6 +195,7 @@ describe('Tab Overflow and Scrolling', () => {
         onTabSelect={jest.fn()}
         onTabReorder={jest.fn()}
         onTabClose={jest.fn()}
+        data-testid="tab-bar"
       />
     );
     

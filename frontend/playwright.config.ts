@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load .env.test file for E2E test environment
+dotenv.config({ path: path.resolve(__dirname, '.env.test') });
 
 /**
  * Cross-browser E2E testing configuration for Auto-Author
@@ -16,17 +21,12 @@ export default defineConfig({
     ['json', { outputFile: 'test-results/results.json' }],
     ['junit', { outputFile: 'test-results/results.xml' }]
   ],
-  
+
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure'
-  },
-
-  // Set environment variables for all tests
-  env: {
-    BYPASS_AUTH: 'true'
   },
 
   projects: [
@@ -81,14 +81,22 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'BYPASS_AUTH=true NEXT_PUBLIC_BYPASS_AUTH=true npm run dev',
+    command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
     env: {
-      BYPASS_AUTH: 'true',
-      NEXT_PUBLIC_BYPASS_AUTH: 'true'
-      // Keep NODE_ENV as development to load .env.local with Clerk keys
+      // E2E test environment variables (loaded from .env.test)
+      BYPASS_AUTH: process.env.BYPASS_AUTH || 'true',
+      NEXT_PUBLIC_BYPASS_AUTH: process.env.NEXT_PUBLIC_BYPASS_AUTH || 'true',
+      // Clerk configuration (with fallback defaults for E2E tests)
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_ZGVsaWNhdGUtbGFkeWJpcmQtNDcuY2xlcmsuYWNjb3VudHMuZGV2JA',
+      CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY || 'sk_test_yxycVoEwI4EzhsYAJ8g0Re8VBKClBrfoQC5OTnS6zE',
+      // API configuration
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
+      // Environment
+      NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT || 'test',
+      NODE_ENV: process.env.NODE_ENV || 'test'
     }
   },
 

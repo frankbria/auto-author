@@ -48,15 +48,15 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             response.headers["X-Request-ID"] = request_id
 
             # Set Content Security Policy
-            # This is a basic policy - customize as needed
+            # Includes Swagger UI and Clerk authentication resources
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' https://clerk.your-domain.com; "
-                "style-src 'self' 'unsafe-inline'; "
-                "img-src 'self' data: https://img.clerk.com; "
+                "script-src 'self' 'unsafe-inline' https://clerk.your-domain.com https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' data: https://img.clerk.com https://fastapi.tiangolo.com; "
                 "connect-src 'self' https://clerk.your-domain.com; "
                 "frame-src 'self' https://clerk.your-domain.com; "
-                "font-src 'self';"
+                "font-src 'self' data: https://r2cdn.perplexity.ai;"
             )
 
             # Calculate and log request duration

@@ -39,8 +39,17 @@ export default function Dashboard() {
       setError(null);
     } catch (err) {
       console.error('Error fetching books:', err);
+
+      // Check if this is a 404 error (user has no books yet or doesn't exist in DB)
+      const is404 = err instanceof Error && (
+        err.message.includes('404') ||
+        err.message.includes('Not Found') ||
+        err.message.includes('not found')
+      );
+
       // In E2E mode, treat empty list as success (no auth token = no books)
-      if (isE2EMode) {
+      // For 404 errors, treat as empty state (user has no books yet)
+      if (isE2EMode || is404) {
         setProjects([]);
         setError(null);
       } else {

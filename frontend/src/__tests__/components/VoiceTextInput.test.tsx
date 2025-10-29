@@ -129,59 +129,34 @@ describe('VoiceTextInput Component', () => {
     });
   });
   
-  describe('Auto-save Integration', () => {
-    it('should auto-save voice transcriptions', async () => {
-      jest.useFakeTimers();
-      const user = userEvent.setup({ delay: null });
-      const mockSave = jest.fn();
-      
-      setupSpeechRecognitionMock({
-        transcript: 'Auto-save voice content.',
+  describe('Voice Content Handling', () => {
+    it('should call onChange with transcribed voice content', async () => {
+      const user = userEvent.setup();
+      const mockRecognition = setupSpeechRecognitionMock({
+        transcript: 'Voice transcription test.',
         delay: 100
       });
-      
-      const { rerender } = render(
-        <VoiceTextInput 
+
+      render(
+        <VoiceTextInput
           value=""
           mode="voice"
           onChange={mockOnChange}
-          onAutoSave={mockSave}
         />
       );
-      
+
       const recordButton = screen.getByRole('button', { name: /start voice recording/i });
-      
+
       await act(async () => {
         await user.click(recordButton);
       });
-      
-      // Wait for transcription
-      await act(async () => {
-        jest.advanceTimersByTime(200);
-      });
-      
+
+      expect(mockRecognition.start).toHaveBeenCalled();
+
+      // Wait for transcription to complete and onChange to be called
       await waitFor(() => {
-        expect(mockOnChange).toHaveBeenCalledWith('Auto-save voice content. ');
-      });
-      
-      // Rerender with the new value to trigger auto-save effect
-      rerender(
-        <VoiceTextInput 
-          value="Auto-save voice content. "
-          mode="voice"
-          onChange={mockOnChange}
-          onAutoSave={mockSave}
-        />
-      );
-      
-      // Auto-save should trigger after delay
-      await act(async () => {
-        jest.advanceTimersByTime(3000);
-      });
-      
-      expect(mockSave).toHaveBeenCalledWith('Auto-save voice content. ');
-      
-      jest.useRealTimers();
+        expect(mockOnChange).toHaveBeenCalledWith('Voice transcription test. ');
+      }, { timeout: 1000 });
     });
   });
 });

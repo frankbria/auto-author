@@ -195,6 +195,7 @@ async def audit_request(
     action: str,
     resource_type: str,
     target_id: Optional[str] = None,
+    metadata: Optional[Dict] = None,
 ):
     """
     Log an audit entry for the current request
@@ -205,6 +206,7 @@ async def audit_request(
         action: The action being performed (e.g., "create", "update", "delete")
         resource_type: The type of resource being accessed (e.g., "user", "book")
         target_id: The ID of the resource being accessed (if applicable)
+        metadata: Optional dictionary of additional metadata to include in the audit log
     """
     # Extract request details
     method = request.method
@@ -212,24 +214,38 @@ async def audit_request(
     ip_address = request.client.host
     user_agent = request.headers.get("user-agent", "")
 
+    # Build details dictionary with request info
+    details = {
+        "method": method,
+        "path": path,
+        "ip_address": ip_address,
+        "user_agent": user_agent,
+        "request_id": (
+            str(request.state.request_id)
+            if hasattr(request.state, "request_id")
+            else None
+        ),
+    }
+
+    # Merge in any additional metadata
+    if metadata:
+        details.update(metadata)
+
     # Create audit log
     await create_audit_log(
         action=action,
         actor_id=current_user["clerk_id"],
         target_id=target_id or "unknown",
         resource_type=resource_type,
-        details={
-            "method": method,
-            "path": path,
-            "ip_address": ip_address,
-            "user_agent": user_agent,
-            "request_id": (
-                str(request.state.request_id)
-                if hasattr(request.state, "request_id")
-                else None
-            ),
-        },
+        details=details,
     )
+
+    # E2E Test Mode: Skip token verification
+    if settings.BYPASS_AUTH:
+        return {
+            "sub": current_user["clerk_id"],
+            "email": current_user.get("email", "test@example.com")
+        }
 
     # Extract token from Authorization header
     auth_header = request.headers.get("authorization")

@@ -10,7 +10,8 @@ class Settings(BaseSettings):
 
     # Clerk Authentication Settings
     CLERK_API_KEY: str
-    CLERK_JWT_PUBLIC_KEY: str
+    CLERK_PUBLISHABLE_KEY: str
+    CLERK_JWT_PUBLIC_KEY: str | None = None  # Optional: Will fetch from JWKS if not provided
     CLERK_FRONTEND_API: str
     CLERK_BACKEND_API: str
     CLERK_JWT_ALGORITHM: str = "RS256"
@@ -23,6 +24,9 @@ class Settings(BaseSettings):
         default=["http://localhost:3000", "http://localhost:8000"],
         json_schema_extra={"env_parse_none_str": "null"}
     )
+
+    # E2E Testing Settings
+    BYPASS_AUTH: bool = False  # Set to True for E2E tests to bypass authentication
     
     # AWS Settings (Optional - for transcription and storage)
     AWS_ACCESS_KEY_ID: str = ""
@@ -37,7 +41,9 @@ class Settings(BaseSettings):
 
     @property
     def clerk_jwt_public_key_pem(self):
-        return self.CLERK_JWT_PUBLIC_KEY.replace("\\n", "\n")
+        if self.CLERK_JWT_PUBLIC_KEY:
+            return self.CLERK_JWT_PUBLIC_KEY.replace("\\n", "\n")
+        return None
     
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod

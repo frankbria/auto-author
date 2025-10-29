@@ -89,6 +89,14 @@ describe('Chapter Questions Integration Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    // Clear any DOM elements that might persist
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('QuestionGenerator Component', () => {
@@ -471,15 +479,12 @@ describe('Chapter Questions Integration Tests', () => {
       );
 
       await waitFor(() => {
-        // Component might show empty state or error message
-        const errorMessage = screen.queryByText(/error loading questions/i);
-        const emptyState = screen.queryByText(/generate interview-style questions/i);
-        expect(errorMessage || emptyState).toBeInTheDocument();
+        // Component shows generator with error message
+        expect(screen.getByText(/generate interview-style questions/i)).toBeInTheDocument();
       });
 
-      // Test retry functionality - might be a generate button or retry button
-      const retryButton = screen.queryByRole('button', { name: /try again/i }) || 
-                         screen.queryByRole('button', { name: /generate.*questions/i });
+      // Test retry functionality - button text is "Retry" when there's an error
+      const retryButton = screen.getByRole('button', { name: /retry/i });
       expect(retryButton).toBeInTheDocument();
 
       // Mock successful retry
@@ -548,10 +553,20 @@ describe('Chapter Questions Integration Tests', () => {
     });
 
     test('provides proper ARIA labels and roles', () => {
+      // Fix progress data to include completion_percentage
+      const testProgress = {
+        total: 10,
+        completed: 3,
+        in_progress: 0,
+        progress: 0.3,
+        completion_percentage: 30,  // Component uses this field
+        status: 'in-progress'
+      };
+
       render(
         <QuestionProgress
-          progress={mockProgress}
-          currentQuestionIndex={2}
+          progress={testProgress}
+          currentIndex={2}
           totalQuestions={10}
         />
       );
