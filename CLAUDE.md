@@ -28,13 +28,52 @@
 
 ---
 
+## Recent Changes (2025-10-29)
+
+### Security & Authentication
+- **JWT Verification Fix**: Switched from hardcoded public key to Clerk JWKS endpoint (`https://clerk.{domain}/.well-known/jwks.json`)
+- **Auth Bypass Mode**: Added `BYPASS_AUTH=true` environment variable for E2E testing
+- **Security Audit**: Comprehensive authentication middleware review completed
+
+### Testing Infrastructure
+- **E2E Test Suite**: Complete Playwright tests with auth bypass support
+- **Test Data Helpers**: Comprehensive fixtures for books, chapters, and TOC data
+- **Condition-based Waiting**: Replaced arbitrary timeouts with state polling
+- **Page Objects**: Full coverage (auth, dashboard, books, summary, TOC wizard, chapter editor, export)
+
+### Test Analysis Reports
+- `docs/POST_DEPLOYMENT_TEST_REPORT.md`: Comprehensive test status after staging deployment
+  - Frontend: 88.7% pass rate (75 failures are environmental, not code bugs)
+  - Backend: 98.9% pass rate (2 asyncio failures), 41% coverage vs 85% target
+- `backend/TEST_COVERAGE_REPORT.md`: Module-by-module coverage analysis with 4-week improvement plan
+- `frontend/docs/TEST_FAILURE_ANALYSIS.md`: Categorized frontend failures with fix priorities
+
+### Known Issues
+- **Frontend Tests**: 75 failures due to missing mocks (Next.js router, ResizeObserver, module imports)
+  - Fix time: 3.5-5.5 hours across 4 phases
+  - All failures are environmental setup issues, not code bugs
+- **Backend Coverage**: 41% vs 85% target
+  - Critical gaps: `security.py` (18%), `book_cover_upload.py` (0%), `transcription.py` (0%)
+  - Path to 85%: 4-5 weeks, 207-252 new tests
+- **Backend Asyncio**: 2 test failures related to event loop lifecycle
+
+### Package Updates
+- Upgraded `lucide-react` to 0.468.0
+- Resolved 5 npm audit vulnerabilities
+- Updated `.gitignore` to exclude test artifacts
+
+---
+
 ## Project Structure
 - `frontend/` - Next.js application
 - `backend/` - FastAPI Python application
 - `docs/` - Project documentation
+  - `POST_DEPLOYMENT_TEST_REPORT.md` - Comprehensive test analysis
+  - `references/` - On-demand reference documentation (read when needed)
+- `backend/TEST_COVERAGE_REPORT.md` - Backend coverage details
+- `frontend/docs/TEST_FAILURE_ANALYSIS.md` - Frontend test categorization
 - `claudedocs/` - Claude-specific analysis reports and detailed plans
 - `archive/` - Historical planning documents (read-only)
-- `docs/references/` - On-demand reference documentation (read when needed)
 
 ---
 
@@ -108,6 +147,9 @@ uv run pytest --cov=app tests/ --cov-report=term-missing
 ```bash
 cd frontend
 npx playwright test --ui    # Run with UI mode (recommended)
+
+# With auth bypass (for testing without real auth)
+BYPASS_AUTH=true npx playwright test
 ```
 
 ---
@@ -115,7 +157,7 @@ npx playwright test --ui    # Run with UI mode (recommended)
 ## Key Features
 
 ### ✅ Production Ready
-- User authentication (Clerk integration)
+- User authentication (Clerk integration with JWKS endpoint verification)
 - Book CRUD operations with metadata
 - **Book Deletion UI** (Type-to-confirm with data loss warnings)
 - TOC generation with AI wizard
@@ -131,6 +173,15 @@ npx playwright test --ui    # Run with UI mode (recommended)
 
 ### 🚧 In Progress
 See `CURRENT_SPRINT.md` for active tasks or run `bd ready` for unblocked work.
+
+### 🔧 Test Infrastructure Status
+- **Frontend**: 88.7% pass rate (613/691 tests passing)
+  - 75 failures are environmental (missing mocks, not code bugs)
+  - Fix plan: 3.5-5.5 hours across 4 phases
+- **Backend**: 98.9% pass rate (187/189 tests passing)
+  - 41% coverage vs 85% target
+  - Improvement plan: 4-5 weeks, 207-252 new tests
+- **E2E**: Comprehensive Playwright suite with auth bypass support
 
 ---
 
@@ -224,6 +275,9 @@ See `CURRENT_SPRINT.md` for active tasks or run `bd ready` for unblocked work.
 | Completing features | `docs/references/quality-standards.md` |
 | Performance optimization | `docs/references/performance-monitoring.md` |
 | Writing/fixing tests | `docs/references/testing-infrastructure.md` |
+| Understanding test status | `docs/POST_DEPLOYMENT_TEST_REPORT.md` |
+| Backend coverage details | `backend/TEST_COVERAGE_REPORT.md` |
+| Frontend test failures | `frontend/docs/TEST_FAILURE_ANALYSIS.md` |
 
 ---
 
@@ -243,3 +297,24 @@ See `CURRENT_SPRINT.md` for active tasks or run `bd ready` for unblocked work.
 - `docs/references/*.md` - Detailed reference documentation (read on-demand)
 - `claudedocs/*.md` - Technical analysis and detailed plans
 - `archive/*.md` - Historical planning documents (read-only)
+
+**Environment Variables**:
+- `BYPASS_AUTH=true` - Disable authentication for E2E testing (development only)
+- Standard Next.js and FastAPI environment variables (see `.env.example`)
+
+---
+
+## API Overview
+
+### Authentication
+- **Production**: Clerk JWT verification using JWKS endpoint
+- **Testing**: `BYPASS_AUTH=true` creates mock authenticated context
+- **Security**: Never use auth bypass in production environments
+
+### Core Endpoints
+- `/api/v1/books` - Book CRUD operations
+- `/api/v1/chapters` - Chapter management
+- `/api/v1/toc` - Table of Contents generation
+- `/api/v1/export` - PDF/DOCX export
+
+See backend API documentation for full endpoint reference.
