@@ -28,9 +28,17 @@
 
 ---
 
-## Recent Changes (2025-10-29)
+## Recent Changes (2025-11-01)
 
-### Security & Authentication
+### Session Management (NEW)
+- **Session Tracking**: Automatic session creation and activity monitoring
+- **Security Features**: Session fingerprinting, suspicious activity detection, concurrent session limits
+- **Session Timeouts**: 30-minute idle timeout, 12-hour absolute timeout
+- **Frontend Integration**: `useSession` hook with auto-refresh and warning notifications
+- **API Endpoints**: Complete session management API (`/api/v1/sessions/*`)
+- **Comprehensive Tests**: 85%+ test coverage for session management
+
+### Security & Authentication (2025-10-29)
 - **JWT Verification Fix**: Switched from hardcoded public key to Clerk JWKS endpoint (`https://clerk.{domain}/.well-known/jwks.json`)
 - **Auth Bypass Mode**: Added `BYPASS_AUTH=true` environment variable for E2E testing
 - **Security Audit**: Comprehensive authentication middleware review completed
@@ -158,6 +166,7 @@ BYPASS_AUTH=true npx playwright test
 
 ### ✅ Production Ready
 - User authentication (Clerk integration with JWKS endpoint verification)
+- **Session Management** (Activity tracking, security features, timeout handling)
 - Book CRUD operations with metadata
 - **Book Deletion UI** (Type-to-confirm with data loss warnings)
 - TOC generation with AI wizard

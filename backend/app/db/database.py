@@ -61,6 +61,20 @@ from .toc_transactions import (
     reorder_chapters_with_transaction,
 )
 
+from .session import (
+    create_session,
+    get_session_by_id,
+    get_active_session_by_user,
+    get_user_sessions,
+    update_session,
+    update_session_activity,
+    deactivate_session,
+    deactivate_user_sessions,
+    cleanup_expired_sessions,
+    get_concurrent_sessions_count,
+    flag_suspicious_session,
+)
+
 __all__ += [
     # User DAOs
     "get_user_by_clerk_id",
@@ -93,4 +107,16 @@ __all__ += [
     "update_chapter_with_transaction",
     "delete_chapter_with_transaction",
     "reorder_chapters_with_transaction",
+    # Session DAOs
+    "create_session",
+    "get_session_by_id",
+    "get_active_session_by_user",
+    "get_user_sessions",
+    "update_session",
+    "update_session_activity",
+    "deactivate_session",
+    "deactivate_user_sessions",
+    "cleanup_expired_sessions",
+    "get_concurrent_sessions_count",
+    "flag_suspicious_session",
 ]

@@ -35,8 +35,12 @@ app.add_middleware(
 
 # Add custom request validation middleware
 from app.api.middleware import RequestValidationMiddleware
+from app.api.middleware.session_middleware import add_session_middleware
 
 app.add_middleware(RequestValidationMiddleware)
+
+# Add session tracking middleware
+add_session_middleware(app)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
