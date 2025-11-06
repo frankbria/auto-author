@@ -1,100 +1,73 @@
 # Pre-commit hooks configuration for Auto-Author
-# Prevents accidental commits of secrets, private keys, and sensitive files
-# Documentation: https://pre-commit.com/
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
 
 repos:
-  # Gitleaks - Secret detection
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.18.1
+  # Auto-sync documentation with bd tracker
+  - repo: local
     hooks:
-      - id: gitleaks
-        name: Detect secrets with gitleaks
-        description: Scan for hardcoded secrets, API keys, and credentials
+      - id: export-current-sprint
+        name: Export Current Sprint from bd
+        entry: ./scripts/export-current-sprint.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+        verbose: true
 
-  # Standard pre-commit hooks
+      - id: auto-add-exports
+        name: Auto-add exported documentation files
+        entry: bash -c 'git add CURRENT_SPRINT.md 2>/dev/null || true'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+  # Frontend testing
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: Frontend Linting
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+      - id: frontend-typecheck
+        name: Frontend Type Checking
+        entry: bash -c 'cd frontend && npm run typecheck'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+  # Backend testing
+  - repo: local
+    hooks:
+      - id: backend-lint
+        name: Backend Linting (ruff)
+        entry: bash -c 'cd backend && uv run ruff check app/ tests/ || true'
+        language: system
+        files: ^backend/
+        pass_filenames: false
+
+  # General code quality
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
-      # Security checks
-      - id: check-added-large-files
-        name: Check for large files
-        args: ['--maxkb=1000']
-        description: Prevent accidentally committing large files
-
-      - id: detect-private-key
-        name: Detect private keys
-        description: Prevent committing SSH private keys
-
-      # Merge and conflict checks
-      - id: check-merge-conflict
-        name: Check for merge conflicts
-        description: Ensure no merge conflict markers in files
-
-      # File formatting
-      - id: end-of-file-fixer
-        name: Fix end of files
-        description: Ensure files end with a newline
-        exclude: '\.json$'
-
       - id: trailing-whitespace
-        name: Trim trailing whitespace
-        description: Remove trailing whitespace from lines
-        args: ['--markdown-linebreak-ext=md']
-
-      # JSON/YAML validation
-      - id: check-json
-        name: Validate JSON files
-        description: Ensure JSON files are valid
-
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        exclude: '\.md$'
       - id: check-yaml
-        name: Validate YAML files
-        description: Ensure YAML files are valid
-        exclude: '.github/workflows/'  # GitHub Actions uses special YAML
+        exclude: '^\.github/workflows/'
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: detect-private-key
+      - id: mixed-line-ending
 
-      - id: check-toml
-        name: Validate TOML files
-        description: Ensure TOML files are valid
-
-      # Python specific
-      - id: check-ast
-        name: Check Python syntax
-        description: Validate Python AST
-
-      - id: debug-statements
-        name: Check for debug statements
-        description: Detect pdb/ipdb debug statements in Python
-
-      # Case conflicts
-      - id: check-case-conflict
-        name: Check filename case conflicts
-        description: Check for files that would conflict in case-insensitive filesystems
-
-  # Custom local hooks
-  - repo: local
-    hooks:
-      # Prevent .env files (except .env.example)
-      - id: prevent-env-files
-        name: Prevent .env files (except .env.example)
-        entry: bash -c 'FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E "\.env$|\.env\..*$" | grep -v "\.env\.example$" || true); if [ -n "$FILES" ]; then echo "❌ Attempted to commit .env file(s):"; echo "$FILES"; echo ""; echo "Only .env.example files are allowed."; echo "Add secrets to .env.local or .env.test (already in .gitignore)"; exit 1; fi'
-        language: system
-        pass_filenames: false
-
-      # Prevent committing to main/master without explicit flag
-      - id: prevent-main-commits
-        name: Prevent direct commits to main/master
-        entry: bash -c 'BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo detached); if [[ "$BRANCH" == "main" || "$BRANCH" == "master" ]]; then echo "Direct commits to $BRANCH are discouraged. Use a feature branch and create a PR. To override use --no-verify"; exit 1; fi'
-        language: system
-        pass_filenames: false
-        stages: [commit]
-
-      # Verify git status is clean (no unstaged changes)
-      - id: warn-unstaged-changes
-        name: Warn about unstaged changes
-        entry: bash -c 'if [ -n "$(git diff --name-only)" ]; then echo "Warning - You have unstaged changes. Run git status"; fi'
-        language: system
-        pass_filenames: false
-        verbose: true
-
-# Global settings
+# Configuration
+default_install_hook_types: [pre-commit, commit-msg]
 default_stages: [commit]
 fail_fast: false

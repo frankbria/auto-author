@@ -2,8 +2,8 @@
 
 **Sprint Duration**: Weeks 1-6 of Sprint 3-4
 **Current Week**: Week 6
-**Sprint Goal**: MVP production readiness - Core functionality, monitoring, and basic usability
-**Last Updated**: 2025-10-14
+**Sprint Goal**: Production readiness - Quality, contracts, accessibility
+**Last Updated**: 2025-11-06
 **Source**: Auto-generated from bd - DO NOT EDIT MANUALLY
 
 > ⚠️ **WARNING**: This file is auto-generated from bd (Beads issue tracker).
@@ -16,74 +16,85 @@
 
 ### 🚧 Active Tasks (In Progress)
 
-- **[auto-author-47]** Fix frontend tests: Add scrollIntoView mock to jest.setup.ts
-  - Status: in_progress
-  - Priority: 0
-  - Assignee: unassigned
-  - Created: 2025-10-14T12:17:55.430734454-07:00
+No tasks currently in progress.
 
 
 ### ✅ Ready to Start
 
-- **[auto-author-50]** Measure test coverage after fixes
+- **[auto-author-58]** Implement TDD and E2E test enforcement with pre-commit hooks
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-57]** Close completed tasks and sync documentation with bd tracker
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-56]** Create Playwright E2E test suite for TOC generation workflow
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-55]** Verify TOC bug fix and deploy to production
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-53]** Execute deployment testing checklist on staging
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-62]** Create .pre-commit-config.yaml with test enforcement hooks
   - Priority: 1
   - No blocking dependencies
 
-- **[auto-author-49]** Verify E2E test execution and coverage
+- **[auto-author-61]** Backend coverage sprint - Security & Auth (41% → 55%)
   - Priority: 1
   - No blocking dependencies
 
-- **[auto-author-17]** Settings & Help Pages - Help documentation
+- **[auto-author-60]** Fix 75 frontend test environmental failures
   - Priority: 1
   - No blocking dependencies
 
-- **[auto-author-13]** Mobile Experience - Touch target sizing
+- **[auto-author-59]** Create comprehensive E2E test suite for all critical user journeys
   - Priority: 1
   - No blocking dependencies
 
-- **[auto-author-19]** Settings & Help Pages - Onboarding flow
-  - Priority: 2
-  - No blocking dependencies
-
-- **[auto-author-18]** Settings & Help Pages - Keyboard shortcuts page
-  - Priority: 2
-  - No blocking dependencies
-
-- **[auto-author-15]** Mobile Experience - Mobile performance optimization
-  - Priority: 2
-  - No blocking dependencies
-
-- **[auto-author-14]** Mobile Experience - Mobile-specific features
-  - Priority: 2
-  - No blocking dependencies
-
-- **[auto-author-11]** Mobile Experience - Responsive breakpoints documentation
-  - Priority: 2
-  - No blocking dependencies
-
-- **[auto-author-1]** Accessibility Audit - Phase 1: Automated scanning
-  - Priority: 2
+- **[auto-author-52]** Fix remaining 2 test failures in TabStatePersistence
+  - Priority: 1
   - No blocking dependencies
 
 
 ### 📋 Planned (Open)
 
-- **[auto-author-8]** Operational Requirements - Session management
+- **[auto-author-58]** Implement TDD and E2E test enforcement with pre-commit hooks
   - Priority: 0
 
-- **[auto-author-7]** Operational Requirements - Error logging and monitoring
+- **[auto-author-57]** Close completed tasks and sync documentation with bd tracker
   - Priority: 0
 
-- **[auto-author-50]** Measure test coverage after fixes
+- **[auto-author-56]** Create Playwright E2E test suite for TOC generation workflow
+  - Priority: 0
+
+- **[auto-author-55]** Verify TOC bug fix and deploy to production
+  - Priority: 0
+
+- **[auto-author-53]** Execute deployment testing checklist on staging
+  - Priority: 0
+
+- **[auto-author-62]** Create .pre-commit-config.yaml with test enforcement hooks
   - Priority: 1
 
-- **[auto-author-49]** Verify E2E test execution and coverage
+- **[auto-author-61]** Backend coverage sprint - Security & Auth (41% → 55%)
+  - Priority: 1
+
+- **[auto-author-60]** Fix 75 frontend test environmental failures
+  - Priority: 1
+
+- **[auto-author-59]** Create comprehensive E2E test suite for all critical user journeys
+  - Priority: 1
+
+- **[auto-author-52]** Fix remaining 2 test failures in TabStatePersistence
   - Priority: 1
 
 - **[auto-author-17]** Settings & Help Pages - Help documentation
-  - Priority: 1
-
-- **[auto-author-13]** Mobile Experience - Touch target sizing
   - Priority: 1
 
 - **[auto-author-10]** Operational Requirements - SLA monitoring setup
@@ -94,6 +105,9 @@
 
 - **[auto-author-6]** Operational Requirements - User action tracking
   - Priority: 1
+
+- **[auto-author-63]** Review and cleanup obsolete documentation (34 files in claudedocs/)
+  - Priority: 2
 
 - **[auto-author-19]** Settings & Help Pages - Onboarding flow
   - Priority: 2
@@ -114,21 +128,6 @@
   - Priority: 2
 
 - **[auto-author-11]** Mobile Experience - Responsive breakpoints documentation
-  - Priority: 2
-
-- **[auto-author-5]** Accessibility Audit - Phase 5: Documentation & reporting
-  - Priority: 2
-
-- **[auto-author-4]** Accessibility Audit - Phase 4: Visual testing
-  - Priority: 2
-
-- **[auto-author-3]** Accessibility Audit - Phase 3: Screen reader testing
-  - Priority: 2
-
-- **[auto-author-2]** Accessibility Audit - Phase 2: Manual keyboard testing
-  - Priority: 2
-
-- **[auto-author-1]** Accessibility Audit - Phase 1: Automated scanning
   - Priority: 2
 
 - **[auto-author-46]** Push Notifications System
@@ -182,55 +181,26 @@
 - **[auto-author-30]** Real-time Collaborative Editing
   - Priority: 3
 
+- **[auto-author-5]** Accessibility Audit - Phase 5: Documentation & reporting
+  - Priority: 3
+
+- **[auto-author-4]** Accessibility Audit - Phase 4: Visual testing
+  - Priority: 3
+
+- **[auto-author-3]** Accessibility Audit - Phase 3: Screen reader testing
+  - Priority: 3
+
+- **[auto-author-2]** Accessibility Audit - Phase 2: Manual keyboard testing
+  - Priority: 3
+
+- **[auto-author-1]** Accessibility Audit - Phase 1: Automated scanning
+  - Priority: 3
+
 
 ### ✅ Completed This Week
 
-- **[auto-author-48]** Start MongoDB for backend tests
-  - Closed: 2025-10-14T16:28:18.701843573-07:00
-  - Reason: none
-
-- **[auto-author-28]** Keyboard Navigation Implementation
-  - Closed: 2025-10-14T09:12:36.635079925-07:00
-  - Reason: none
-
-- **[auto-author-26]** Accessibility Audit Preparation
-  - Closed: 2025-10-14T09:12:36.548177864-07:00
-  - Reason: none
-
-- **[auto-author-24]** Performance Monitoring Setup
-  - Closed: 2025-10-14T09:12:36.462191926-07:00
-  - Reason: none
-
-- **[auto-author-22]** API Contract Formalization
-  - Closed: 2025-10-14T09:12:36.375482558-07:00
-  - Reason: none
-
-- **[auto-author-21]** Unified Error Handling Framework
-  - Closed: 2025-10-14T09:12:36.334750366-07:00
-  - Reason: none
-
-- **[auto-author-20]** Export Feature - PDF/DOCX
-  - Closed: 2025-10-14T09:12:36.295630717-07:00
-  - Reason: none
-
-- **[auto-author-51]** Auto-start MongoDB on WSL shell initialization (non-blocking)
-  - Closed: 2025-10-14T16:28:19.966236807-07:00
-  - Reason: none
-
-- **[auto-author-29]** Auto-save with localStorage Backup
-  - Closed: 2025-10-14T09:12:36.676200922-07:00
-  - Reason: none
-
-- **[auto-author-27]** Responsive Design Validation
-  - Closed: 2025-10-14T09:12:36.593047358-07:00
-  - Reason: none
-
-- **[auto-author-25]** Loading State Implementation
-  - Closed: 2025-10-14T09:12:36.505146465-07:00
-  - Reason: none
-
-- **[auto-author-23]** Book Deletion UI
-  - Closed: 2025-10-14T09:12:36.419825418-07:00
+- **[auto-author-8]** Operational Requirements - Session management
+  - Closed: 2025-11-01T14:21:04.48529933-07:00
   - Reason: none
 
 
@@ -238,10 +208,10 @@
 
 ## 📊 Sprint Metrics
 
-- **Total Issues**: 51
-- **Open**: 38
-- **In Progress**: 1
-- **Closed**: 12
+- **Total Issues**: 63
+- **Open**: 44
+- **In Progress**: 0
+- **Closed**: 19
 - **Ready to Start**: 10
 
 ---
@@ -270,6 +240,6 @@ bd dep add <task-1> <task-2>
 
 ---
 
-**Generated**: 2025-10-14
+**Generated**: 2025-11-06
 **Command**: `./scripts/export-current-sprint.sh`
 **Source of Truth**: bd database (`.beads/*.db`)
