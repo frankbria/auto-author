@@ -19,7 +19,7 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Enforce authentication for protected routes
   // This will redirect unauthenticated users to the sign-in page
-  await auth().protect();
+  await auth.protect();
 
   return NextResponse.next();
 });
