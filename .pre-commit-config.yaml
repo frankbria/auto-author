@@ -49,6 +49,27 @@ repos:
         files: ^frontend/
         pass_filenames: false
 
+      - id: frontend-unit-tests
+        name: Frontend Unit Tests
+        entry: bash -c 'cd frontend && npm test -- --passWithNoTests --watchAll=false'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+      - id: frontend-coverage
+        name: Frontend Coverage Check (≥85%)
+        entry: bash -c 'cd frontend && npm test -- --coverage --coverageThreshold="{\"global\":{\"lines\":85,\"statements\":85,\"branches\":75,\"functions\":85}}" --watchAll=false'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+      - id: frontend-e2e-tests
+        name: Frontend E2E Tests (Playwright)
+        entry: bash -c 'cd frontend && BYPASS_AUTH=true npx playwright test'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
   # Backend testing
   - repo: local
     hooks:
@@ -58,6 +79,22 @@ repos:
         language: system
         files: ^backend/
         pass_filenames: false
+
+      - id: backend-unit-tests
+        name: Backend Unit Tests
+        entry: bash -c 'cd backend && uv run pytest tests/'
+        language: system
+        files: ^backend/
+        pass_filenames: false
+        require_serial: true
+
+      - id: backend-coverage
+        name: Backend Coverage Check (≥85%)
+        entry: bash -c 'cd backend && uv run pytest tests/ --cov=app --cov-fail-under=85'
+        language: system
+        files: ^backend/
+        pass_filenames: false
+        require_serial: true
 
   # General code quality
   - repo: https://github.com/pre-commit/pre-commit-hooks

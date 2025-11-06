@@ -307,67 +307,58 @@ test('user can generate TOC from book summary', async ({ page }) => {
 
 ### Pre-Commit Hook Setup
 
-**Install pre-commit hooks for this project:**
+**✅ PRE-COMMIT HOOKS ARE CONFIGURED AND ENFORCED**
+
+This project uses automated pre-commit hooks that run before every commit. These hooks enforce TDD and quality standards.
+
+**Install pre-commit hooks (one-time setup):**
 
 ```bash
 # Install pre-commit (if not already installed)
 pip install pre-commit
 
 # Install the git hook scripts
+cd /home/frankbria/projects/auto-author
 pre-commit install
 
 # Test the hooks
 pre-commit run --all-files
 ```
 
-**Hook configuration** (`.pre-commit-config.yaml` in project root):
-```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: frontend-tests
-        name: Frontend Unit Tests
-        entry: bash -c 'cd frontend && npm test'
-        language: system
-        pass_filenames: false
+**What runs on every commit:**
 
-      - id: backend-tests
-        name: Backend Unit Tests
-        entry: bash -c 'cd backend && uv run pytest tests/'
-        language: system
-        pass_filenames: false
+1. **Documentation Auto-Sync** (always runs)
+   - Exports current sprint from bd tracker
+   - Exports implementation plan from bd tracker
+   - Auto-adds updated docs to commit
 
-      - id: e2e-tests
-        name: E2E Tests
-        entry: bash -c 'cd frontend && npx playwright test'
-        language: system
-        pass_filenames: false
+2. **Frontend Quality Gates** (runs when frontend/ files change)
+   - Linting (`npm run lint`)
+   - Type checking (`npm run typecheck`)
+   - Unit tests (`npm test`)
+   - Coverage check (≥85% required)
+   - E2E tests (Playwright)
 
-      - id: frontend-coverage
-        name: Frontend Coverage Check
-        entry: bash -c 'cd frontend && npm test -- --coverage --coverageThreshold='\''{"global":{"lines":85}}'\'''
-        language: system
-        pass_filenames: false
+3. **Backend Quality Gates** (runs when backend/ files change)
+   - Linting (`ruff check`)
+   - Unit tests (`pytest tests/`)
+   - Coverage check (≥85% required)
 
-      - id: frontend-lint
-        name: Frontend Linting
-        entry: bash -c 'cd frontend && npm run lint'
-        language: system
-        pass_filenames: false
-```
+4. **General Code Quality** (always runs)
+   - Trailing whitespace removal
+   - End-of-file fixing
+   - YAML/JSON validation
+   - Merge conflict detection
+   - Large file detection (>1MB blocked)
+   - Private key detection
 
-### Bypassing Hooks (EMERGENCY ONLY)
+**Configuration:** See `.pre-commit-config.yaml` in project root for full details.
 
-**Only use `--no-verify` in TRUE emergencies:**
-
+**Bypassing hooks (emergency only):**
 ```bash
-# Emergency hotfix ONLY - will require post-fix validation
-git commit --no-verify -m "hotfix: critical production bug"
-
-# Then immediately:
-# 1. Create follow-up task to add missing tests
-# 2. Create PR to add proper test coverage
-# 3. Document why emergency bypass was needed
+git commit --no-verify -m "hotfix: emergency fix"
+# Then immediately create follow-up task:
+bd create "Add tests for emergency hotfix" -p 0 -t bug
 ```
 
 ### Test Quality Standards
