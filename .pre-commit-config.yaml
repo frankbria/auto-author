@@ -12,7 +12,7 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [commit]
+        stages: [pre-commit]
         verbose: true
 
       - id: export-implementation-plan
@@ -21,7 +21,7 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [commit]
+        stages: [pre-commit]
         verbose: true
 
       - id: auto-add-exports
@@ -30,7 +30,19 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [commit]
+        stages: [pre-commit]
+
+  # Security - Check for secrets and credentials
+  - repo: local
+    hooks:
+      - id: check-secrets
+        name: Check for secrets and credentials
+        entry: ./scripts/check-secrets.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+        verbose: true
 
   # Frontend testing
   - repo: local
@@ -115,5 +127,5 @@ repos:
 
 # Configuration
 default_install_hook_types: [pre-commit, commit-msg]
-default_stages: [commit]
+default_stages: [pre-commit]
 fail_fast: false
