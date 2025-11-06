@@ -57,6 +57,10 @@
 - `frontend/docs/TEST_FAILURE_ANALYSIS.md`: Categorized frontend failures with fix priorities
 
 ### Known Issues
+- **E2E Tests SKIPPED**: Critical E2E tests exist but are disabled
+  - `frontend/src/e2e/complete-authoring-journey.spec.ts` - SKIPPED (line 47: "PARTIALLY IMPLEMENTED")
+  - `frontend/tests/e2e/deployment/02-user-journey.spec.ts` - TOC workflow tests exist but need to be enabled
+  - **ACTION REQUIRED**: Enable E2E tests and fix any failures before deployment (bd task auto-author-56)
 - **Frontend Tests**: 75 failures due to missing mocks (Next.js router, ResizeObserver, module imports)
   - Fix time: 3.5-5.5 hours across 4 phases
   - All failures are environmental setup issues, not code bugs
@@ -64,6 +68,7 @@
   - Critical gaps: `security.py` (18%), `book_cover_upload.py` (0%), `transcription.py` (0%)
   - Path to 85%: 4-5 weeks, 207-252 new tests
 - **Backend Asyncio**: 2 test failures related to event loop lifecycle
+- **Manual TOC Bug**: Manual tester found bug in TOC workflow - needs investigation (bd task auto-author-55)
 
 ### Package Updates
 - Upgraded `lucide-react` to 0.468.0
@@ -201,6 +206,184 @@ See `CURRENT_SPRINT.md` for active tasks or run `bd ready` for unblocked work.
 - **Test-First**: Write tests before implementation (TDD)
 - **Clean Architecture**: Separate concerns
 - **Documentation**: Keep synchronized with code
+
+---
+
+## 🔒 MANDATORY: TDD & E2E Test Enforcement
+
+**CRITICAL**: This project REQUIRES Test-Driven Development and E2E test coverage for ALL features. No feature is complete without proper test coverage.
+
+### Pre-Commit Hook Requirements
+
+**ALL commits MUST pass these gates:**
+
+1. **Unit Tests**: All unit tests must pass
+   ```bash
+   # Frontend
+   cd frontend && npm test
+
+   # Backend
+   cd backend && uv run pytest tests/
+   ```
+
+2. **E2E Tests**: All E2E tests must pass
+   ```bash
+   cd frontend && npx playwright test
+   ```
+
+3. **Test Coverage**: Minimum 85% coverage required
+   ```bash
+   # Frontend
+   cd frontend && npm test -- --coverage --coverageThreshold='{"global":{"lines":85}}'
+
+   # Backend
+   cd backend && uv run pytest --cov=app tests/ --cov-fail-under=85
+   ```
+
+4. **Linting & Type Checking**: No errors allowed
+   ```bash
+   cd frontend && npm run lint && npm run typecheck
+   cd backend && uv run mypy app/
+   ```
+
+### Feature Branch Workflow (MANDATORY)
+
+**NEVER commit directly to `main` or `develop`. Always use feature branches:**
+
+```bash
+# Create feature branch
+git checkout -b feature/your-feature-name
+
+# Make changes and commit (pre-commit hooks will run automatically)
+git add .
+git commit -m "feat: implement your feature"
+
+# Push to remote
+git push -u origin feature/your-feature-name
+
+# Create Pull Request for review
+# PR must have:
+# - All tests passing
+# - ≥85% test coverage
+# - E2E test for user-facing features
+# - Updated documentation
+```
+
+### Feature Completion Checklist (ENFORCED)
+
+**A feature is NOT complete until ALL of these are done:**
+
+- [ ] **Unit tests written** (≥85% coverage for new code)
+- [ ] **E2E test created** (for user-facing features)
+- [ ] **All tests passing** (unit + E2E)
+- [ ] **Documentation updated** (CLAUDE.md, API docs, user guides)
+- [ ] **Performance validated** (meets operation budgets)
+- [ ] **Accessibility verified** (WCAG 2.1 Level AA minimum)
+- [ ] **Code reviewed** (PR approved by team)
+- [ ] **bd task closed** (`bd close <task-id> --reason "Completed in PR #123"`)
+
+### E2E Test Coverage Requirements
+
+**EVERY user-facing feature MUST have an E2E test that validates:**
+
+1. **Happy Path**: Complete user journey from start to finish
+2. **Error Handling**: How the system handles failures
+3. **Performance**: Operation completes within budget
+4. **Accessibility**: Keyboard navigation works
+5. **Data Integrity**: Data persists correctly
+
+**Example - TOC Generation Feature:**
+```typescript
+// frontend/tests/e2e/toc-generation.spec.ts
+test('user can generate TOC from book summary', async ({ page }) => {
+  // 1. Create book with summary
+  // 2. Navigate to TOC wizard
+  // 3. Answer clarifying questions
+  // 4. Verify TOC generates within 3000ms budget
+  // 5. Verify TOC data saves to database
+  // 6. Verify TOC appears in book view
+});
+```
+
+### Pre-Commit Hook Setup
+
+**Install pre-commit hooks for this project:**
+
+```bash
+# Install pre-commit (if not already installed)
+pip install pre-commit
+
+# Install the git hook scripts
+pre-commit install
+
+# Test the hooks
+pre-commit run --all-files
+```
+
+**Hook configuration** (`.pre-commit-config.yaml` in project root):
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: frontend-tests
+        name: Frontend Unit Tests
+        entry: bash -c 'cd frontend && npm test'
+        language: system
+        pass_filenames: false
+
+      - id: backend-tests
+        name: Backend Unit Tests
+        entry: bash -c 'cd backend && uv run pytest tests/'
+        language: system
+        pass_filenames: false
+
+      - id: e2e-tests
+        name: E2E Tests
+        entry: bash -c 'cd frontend && npx playwright test'
+        language: system
+        pass_filenames: false
+
+      - id: frontend-coverage
+        name: Frontend Coverage Check
+        entry: bash -c 'cd frontend && npm test -- --coverage --coverageThreshold='\''{"global":{"lines":85}}'\'''
+        language: system
+        pass_filenames: false
+
+      - id: frontend-lint
+        name: Frontend Linting
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        pass_filenames: false
+```
+
+### Bypassing Hooks (EMERGENCY ONLY)
+
+**Only use `--no-verify` in TRUE emergencies:**
+
+```bash
+# Emergency hotfix ONLY - will require post-fix validation
+git commit --no-verify -m "hotfix: critical production bug"
+
+# Then immediately:
+# 1. Create follow-up task to add missing tests
+# 2. Create PR to add proper test coverage
+# 3. Document why emergency bypass was needed
+```
+
+### Test Quality Standards
+
+**Tests MUST be:**
+- **Isolated**: No dependencies on external services (use mocks)
+- **Repeatable**: Same result every time
+- **Fast**: Unit tests <1s each, E2E tests <30s each
+- **Meaningful**: Test behavior, not implementation
+- **Maintainable**: Clear, well-documented test code
+
+**Tests MUST NOT:**
+- Use arbitrary timeouts (`await page.waitForTimeout(5000)` ❌)
+- Depend on test execution order
+- Leave side effects (data, files, processes)
+- Test internal implementation details
 
 ---
 
