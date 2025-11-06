@@ -14,17 +14,37 @@
 
 ### 🚧 Active Tasks (In Progress)
 
-- **[auto-author-57]** Close completed tasks and sync documentation with bd tracker
-  - Status: in_progress
-  - Priority: 0
-  - Assignee: unassigned
-  - Created: 2025-11-06T14:12:03.727982369-07:00
+No tasks currently in progress.
 
 
 ### ✅ Ready to Start
 
+- **[auto-author-71]** SECURITY: Fix auth middleware - invalid tokens being accepted
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-70]** Fix MongoDB Atlas SSL connection failures in backend tests
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-69]** Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-67]** Fix bookClient.test.tsx: 'should set auth token' test failure
+  - Priority: 0
+  - No blocking dependencies
+
 - **[auto-author-53]** Execute deployment testing checklist on staging
   - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-72]** Fix auth middleware status code precedence (5 tests)
+  - Priority: 1
+  - No blocking dependencies
+
+- **[auto-author-68]** Fix BookCard.test.tsx: Date formatting timezone issue
+  - Priority: 1
   - No blocking dependencies
 
 - **[auto-author-61]** Backend coverage sprint - Security & Auth (41% → 55%)
@@ -37,37 +57,31 @@
 
 - **[auto-author-59]** Create comprehensive E2E test suite for all critical user journeys
   - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-52]** Fix remaining 2 test failures in TabStatePersistence
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-17]** Settings & Help Pages - Help documentation
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-10]** Operational Requirements - SLA monitoring setup
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-9]** Operational Requirements - Data backup verification
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-6]** Operational Requirements - User action tracking
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-63]** Review and cleanup obsolete documentation (34 files in claudedocs/)
-  - Priority: 2
   - No blocking dependencies
 
 
 ### 📋 Planned (Open)
 
+- **[auto-author-71]** SECURITY: Fix auth middleware - invalid tokens being accepted
+  - Priority: 0
+
+- **[auto-author-70]** Fix MongoDB Atlas SSL connection failures in backend tests
+  - Priority: 0
+
+- **[auto-author-69]** Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
+  - Priority: 0
+
+- **[auto-author-67]** Fix bookClient.test.tsx: 'should set auth token' test failure
+  - Priority: 0
+
 - **[auto-author-53]** Execute deployment testing checklist on staging
   - Priority: 0
+
+- **[auto-author-72]** Fix auth middleware status code precedence (5 tests)
+  - Priority: 1
+
+- **[auto-author-68]** Fix BookCard.test.tsx: Date formatting timezone issue
+  - Priority: 1
 
 - **[auto-author-61]** Backend coverage sprint - Security & Auth (41% → 55%)
   - Priority: 1
@@ -92,6 +106,9 @@
 
 - **[auto-author-6]** Operational Requirements - User action tracking
   - Priority: 1
+
+- **[auto-author-73]** Fix user agent parsing for iOS/mobile device detection
+  - Priority: 2
 
 - **[auto-author-63]** Review and cleanup obsolete documentation (34 files in claudedocs/)
   - Priority: 2
@@ -202,6 +219,10 @@
   - Closed: 2025-11-06T15:01:28.976290408-07:00
   - Reason: none
 
+- **[auto-author-57]** Close completed tasks and sync documentation with bd tracker
+  - Closed: 2025-11-06T16:27:39.525218427-07:00
+  - Reason: none
+
 - **[auto-author-56]** Create Playwright E2E test suite for TOC generation workflow
   - Closed: 2025-11-06T15:12:37.630865263-07:00
   - Reason: none
@@ -223,10 +244,10 @@
 
 ## 📊 Sprint Metrics
 
-- **Total Issues**: 66
-- **Open**: 39
-- **In Progress**: 1
-- **Closed**: 26
+- **Total Issues**: 73
+- **Open**: 46
+- **In Progress**: 0
+- **Closed**: 27
 - **Ready to Start**: 10
 
 ---

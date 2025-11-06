@@ -2,7 +2,7 @@
 
 **Last Updated**: 2025-11-06
 **Status**: Active Development
-**Current Phase**: Feature Development (39% complete)
+**Current Phase**: Feature Development (36% complete)
 
 > ℹ️ **NOTE**: This is a high-level implementation roadmap organized by priority and status.
 > For current task status and details, run: `bd list` or `bd ready`
@@ -22,23 +22,23 @@ This document serves as the single source of truth for the Auto-Author implement
 
 ### Project Overview
 
-**Progress**: 26 of 66 tasks complete (39%)
+**Progress**: 27 of 73 tasks complete (36%)
 
 **Status Breakdown**:
-- ✅ Completed: 26 tasks
-- 🚧 In Progress: 1 tasks
+- ✅ Completed: 27 tasks
+- 🚧 In Progress: 0 tasks
 - 📋 Ready to Start: 10 tasks (no blockers)
 - 🔒 Blocked: 8 tasks
-- 📝 Planned: 39 tasks
+- 📝 Planned: 46 tasks
 
 **Priority Distribution**:
-- P0 (Critical): 19 tasks
-- P1 (High): 17 tasks
-- P2 (Medium): 8 tasks
+- P0 (Critical): 23 tasks
+- P1 (High): 19 tasks
+- P2 (Medium): 9 tasks
 - P3 (Low): 22 tasks
 
 **Type Breakdown**:
-- 🐛 Bugs: 6
+- 🐛 Bugs: 13
 - ✨ Features: 41
 - 📋 Tasks: 19
 
@@ -48,17 +48,42 @@ This document serves as the single source of truth for the Auto-Author implement
 
 ### In Progress
 
-#### auto-author-57: Close completed tasks and sync documentation with bd tracker
-**Priority**: P0 | **Type**: task
-
-Close auto-author-7 (error logging), auto-author-13 (touch targets). Verify export scripts are needed or remove them. Regenerate/update all planning docs or archive if obsolete.
-
-**Dependencies**: None
+No tasks currently in progress.
 
 
 ### Ready to Start (No Blockers)
 
-**P0 Critical Path** (19 total):
+**P0 Critical Path** (23 total):
+
+#### auto-author-71: SECURITY: Fix auth middleware - invalid tokens being accepted
+**Type**: bug
+
+CRITICAL SECURITY VULNERABILITY: test_invalid_token shows invalid JWT tokens return 200 OK instead of 401 Unauthorized. Auth middleware is not validating tokens properly. This allows unauthorized access with any token string. Must fix immediately. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.4.
+
+#### auto-author-70: Fix MongoDB Atlas SSL connection failures in backend tests
+**Type**: bug
+
+13 tests failing with SSL handshake errors connecting to MongoDB Atlas (Connection reset by peer). Affects session service tests (12) and question generation tests (2). Investigate: network whitelist, SSL/TLS config, WSL2 networking, connection string parameters. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 1.
+
+#### auto-author-69: Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
+**Type**: bug
+
+Test: Dashboard - Book Deletion › should maintain correct auth token for deletion
+File: src/__tests__/pages/DashboardBookDelete.test.tsx (lines 349-369)
+Issue: Test verifies auth token is retrieved and set before book deletion API call, but one or more of these conditions fails: mockGetToken not called, bookClient.setAuthToken not called with token, or incorrect timing/order.
+Root Cause: Dashboard deletion flow not properly managing authentication token lifecycle.
+Impact: Critical - book deletion may fail or be insecure without proper token management.
+Category: Dashboard / Authentication
+
+#### auto-author-67: Fix bookClient.test.tsx: 'should set auth token' test failure
+**Type**: bug
+
+Test: BookClient › Authentication and Headers › should set auth token
+File: src/__tests__/bookClient.test.tsx (lines 737-757)
+Issue: Test creates new client, sets auth token via setAuthToken('new-token'), calls getUserBooks(), but fetch mock shows 0 calls instead of expected 1.
+Root Cause: BookClient constructor or setAuthToken method likely not initializing properly, or method call may be async without proper await.
+Impact: Core authentication functionality not working as expected.
+Category: API Client / Authentication
 
 #### auto-author-53: Execute deployment testing checklist on staging
 **Type**: task
@@ -66,7 +91,24 @@ Close auto-author-7 (error logging), auto-author-13 (touch targets). Verify expo
 Use claudedocs/DEPLOYMENT-TESTING-CHECKLIST.md to validate staging deployment at dev.autoauthor.app. Test pre-flight checks, user journey, advanced features, security & performance
 
 
-**P1 High Priority** (17 total):
+**P1 High Priority** (19 total):
+
+#### auto-author-72: Fix auth middleware status code precedence (5 tests)
+**Type**: bug
+
+Auth middleware must run before route resolution. 5 tests expect 403/401 but getting 404/500: test_upload_book_cover_unauthorized (403→404), test_export_unauthorized (403→404), test_missing_token (403→500), test_account_deletion_requires_authentication (exception). Route guards should check auth BEFORE returning 404. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.
+
+#### auto-author-68: Fix BookCard.test.tsx: Date formatting timezone issue
+**Type**: bug
+
+Test: BookCard › should format date correctly
+File: src/__tests__/bookClient.test.tsx (lines 119-125)
+Issue: Test expects 'Jan 15, 2024' but component renders 'Jan 14, 2024'
+Root Cause: Timezone conversion. updated_at is '2024-01-15T00:00:00Z' (UTC) but formatting converts to local time, showing previous day depending on timezone.
+Expected: Jan 15, 2024
+Actual: Jan 14, 2024
+Impact: Visual bug - users see incorrect last-edited dates.
+Category: UI / Date Formatting
 
 #### auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
 **Type**: task
@@ -82,31 +124,6 @@ All failures are mock/config issues, not code bugs. Phase 1: Next.js router mock
 **Type**: task
 
 Playwright tests for: book creation → summary → TOC generation → chapter editing → AI drafts → export. Target: 85% automation coverage per DEPLOYMENT-TESTING-CHECKLIST.md. Must run in CI/CD before deployment.
-
-#### auto-author-52: Fix remaining 2 test failures in TabStatePersistence
-**Type**: bug
-
-2 tests failing in TabStatePersistence.test.tsx related to localStorage.setItem mocking. Currently at 99.7% pass rate (719/724)
-
-#### auto-author-17: Settings & Help Pages - Help documentation
-**Type**: task
-
-Create comprehensive help documentation. Estimated: 8 hours
-
-#### auto-author-10: Operational Requirements - SLA monitoring setup
-**Type**: feature
-
-Set up SLA monitoring and alerting. Estimated: 2 hours
-
-#### auto-author-9: Operational Requirements - Data backup verification
-**Type**: feature
-
-Verify data backup processes and recovery. Estimated: 2 hours
-
-#### auto-author-6: Operational Requirements - User action tracking
-**Type**: feature
-
-Implement user action tracking system. Estimated: 6 hours
 
 
 ### Blocked Tasks
@@ -174,6 +191,44 @@ Accessibility statement, issue remediation plan, testing checklist updates. Esti
 
 ### P0 Critical Path
 
+#### auto-author-71: SECURITY: Fix auth middleware - invalid tokens being accepted
+**Type**: bug
+
+CRITICAL SECURITY VULNERABILITY: test_invalid_token shows invalid JWT tokens return 200 OK instead of 401 Unauthorized. Auth middleware is not validating tokens properly. This allows unauthorized access with any token string. Must fix immediately. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.4.
+
+**Dependencies**: None
+
+#### auto-author-70: Fix MongoDB Atlas SSL connection failures in backend tests
+**Type**: bug
+
+13 tests failing with SSL handshake errors connecting to MongoDB Atlas (Connection reset by peer). Affects session service tests (12) and question generation tests (2). Investigate: network whitelist, SSL/TLS config, WSL2 networking, connection string parameters. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 1.
+
+**Dependencies**: None
+
+#### auto-author-69: Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
+**Type**: bug
+
+Test: Dashboard - Book Deletion › should maintain correct auth token for deletion
+File: src/__tests__/pages/DashboardBookDelete.test.tsx (lines 349-369)
+Issue: Test verifies auth token is retrieved and set before book deletion API call, but one or more of these conditions fails: mockGetToken not called, bookClient.setAuthToken not called with token, or incorrect timing/order.
+Root Cause: Dashboard deletion flow not properly managing authentication token lifecycle.
+Impact: Critical - book deletion may fail or be insecure without proper token management.
+Category: Dashboard / Authentication
+
+**Dependencies**: None
+
+#### auto-author-67: Fix bookClient.test.tsx: 'should set auth token' test failure
+**Type**: bug
+
+Test: BookClient › Authentication and Headers › should set auth token
+File: src/__tests__/bookClient.test.tsx (lines 737-757)
+Issue: Test creates new client, sets auth token via setAuthToken('new-token'), calls getUserBooks(), but fetch mock shows 0 calls instead of expected 1.
+Root Cause: BookClient constructor or setAuthToken method likely not initializing properly, or method call may be async without proper await.
+Impact: Core authentication functionality not working as expected.
+Category: API Client / Authentication
+
+**Dependencies**: None
+
 #### auto-author-53: Execute deployment testing checklist on staging
 **Type**: task
 
@@ -183,6 +238,27 @@ Use claudedocs/DEPLOYMENT-TESTING-CHECKLIST.md to validate staging deployment at
 
 
 ### P1 High Priority
+
+#### auto-author-72: Fix auth middleware status code precedence (5 tests)
+**Type**: bug
+
+Auth middleware must run before route resolution. 5 tests expect 403/401 but getting 404/500: test_upload_book_cover_unauthorized (403→404), test_export_unauthorized (403→404), test_missing_token (403→500), test_account_deletion_requires_authentication (exception). Route guards should check auth BEFORE returning 404. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.
+
+**Dependencies**: None
+
+#### auto-author-68: Fix BookCard.test.tsx: Date formatting timezone issue
+**Type**: bug
+
+Test: BookCard › should format date correctly
+File: src/__tests__/bookClient.test.tsx (lines 119-125)
+Issue: Test expects 'Jan 15, 2024' but component renders 'Jan 14, 2024'
+Root Cause: Timezone conversion. updated_at is '2024-01-15T00:00:00Z' (UTC) but formatting converts to local time, showing previous day depending on timezone.
+Expected: Jan 15, 2024
+Actual: Jan 14, 2024
+Impact: Visual bug - users see incorrect last-edited dates.
+Category: UI / Date Formatting
+
+**Dependencies**: None
 
 #### auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
 **Type**: task
@@ -242,6 +318,13 @@ Implement user action tracking system. Estimated: 6 hours
 
 
 ### P2 Medium Priority
+
+#### auto-author-73: Fix user agent parsing for iOS/mobile device detection
+**Type**: bug
+
+Session service user agent parser incorrectly identifies iPhone Safari as MacOS/desktop instead of iOS/mobile. Affects 2 tests: test_extract_session_metadata_mobile, test_metadata_for_mobile_safari. Impacts session security (suspicious activity detection based on device changes). Consider switching to 'user-agents' library or fix current parser. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 4.
+
+**Dependencies**: None
 
 #### auto-author-63: Review and cleanup obsolete documentation (34 files in claudedocs/)
 **Type**: task
@@ -461,7 +544,7 @@ Run axe-core and Lighthouse audits on all components. Component-by-component val
 
 ## Completed Work
 
-**Total Completed**: 26 tasks (39%)
+**Total Completed**: 27 tasks (36%)
 
 #### ✅ auto-author-66: Add dotenv to frontend dependencies for E2E tests
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T15:25:14.855239534-07:00
@@ -480,6 +563,11 @@ No reason provided
 
 #### ✅ auto-author-58: Implement TDD and E2E test enforcement with pre-commit hooks
 **Priority**: P0 | **Type**: task | **Closed**: 2025-11-06T15:01:28.976290408-07:00
+
+No reason provided
+
+#### ✅ auto-author-57: Close completed tasks and sync documentation with bd tracker
+**Priority**: P0 | **Type**: task | **Closed**: 2025-11-06T16:27:39.525218427-07:00
 
 No reason provided
 
@@ -609,11 +697,15 @@ No tasks with dependencies.
 
 The following critical and high-priority tasks must be completed for production deployment:
 
+- [ ] SECURITY: Fix auth middleware - invalid tokens being accepted (auto-author-71) - P0
+- [ ] Fix MongoDB Atlas SSL connection failures in backend tests (auto-author-70) - P0
+- [ ] Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion (auto-author-69) - P0
+- [ ] Fix bookClient.test.tsx: 'should set auth token' test failure (auto-author-67) - P0
 - [x] Add dotenv to frontend dependencies for E2E tests (auto-author-66) - P0
 - [x] Fix backend session_middleware import error (auto-author-65) - P0
 - [x] Fix TypeScript errors blocking frontend tests (auto-author-64) - P0
 - [x] Implement TDD and E2E test enforcement with pre-commit hooks (auto-author-58) - P0
-- [ ] Close completed tasks and sync documentation with bd tracker (auto-author-57) - P0
+- [x] Close completed tasks and sync documentation with bd tracker (auto-author-57) - P0
 - [x] Create Playwright E2E test suite for TOC generation workflow (auto-author-56) - P0
 - [x] Verify TOC bug fix and deploy to production (auto-author-55) - P0
 - [x] Complete staging deployment to dev.autoauthor.app (auto-author-54) - P0
@@ -628,6 +720,8 @@ The following critical and high-priority tasks must be completed for production 
 - [x] Export Feature - PDF/DOCX (auto-author-20) - P0
 - [x] Operational Requirements - Session management (auto-author-8) - P0
 - [x] Operational Requirements - Error logging and monitoring (auto-author-7) - P0
+- [ ] Fix auth middleware status code precedence (5 tests) (auto-author-72) - P1
+- [ ] Fix BookCard.test.tsx: Date formatting timezone issue (auto-author-68) - P1
 - [x] Create .pre-commit-config.yaml with test enforcement hooks (auto-author-62) - P1
 - [ ] Backend coverage sprint - Security & Auth (41% → 55%) (auto-author-61) - P1
 - [ ] Fix 75 frontend test environmental failures (auto-author-60) - P1
