@@ -28,9 +28,17 @@
 
 ---
 
-## Recent Changes (2025-11-01)
+## Recent Changes
 
-### Session Management (NEW)
+### 2025-11-06
+- **TOC JWT Bug Fix**: Fixed JWT token expiration during long TOC workflows (11+ seconds) by implementing token provider pattern in BookClient
+- **E2E Tests Enabled**: Complete authoring journey E2E test now active in `frontend/src/e2e/complete-authoring-journey.spec.ts`
+- **TDD Enforcement**: Pre-commit hooks now enforce unit tests, E2E tests, and ≥85% coverage for all commits
+- **GitHub Actions**: Implemented automated documentation sync and test workflows
+- **Documentation Automation**: Pre-commit hooks auto-sync CURRENT_SPRINT.md and IMPLEMENTATION_PLAN.md from bd tracker
+
+### 2025-11-01
+- **Session Management (NEW)**
 - **Session Tracking**: Automatic session creation and activity monitoring
 - **Security Features**: Session fingerprinting, suspicious activity detection, concurrent session limits
 - **Session Timeouts**: 30-minute idle timeout, 12-hour absolute timeout
@@ -57,10 +65,6 @@
 - `frontend/docs/TEST_FAILURE_ANALYSIS.md`: Categorized frontend failures with fix priorities
 
 ### Known Issues
-- **E2E Tests SKIPPED**: Critical E2E tests exist but are disabled
-  - `frontend/src/e2e/complete-authoring-journey.spec.ts` - SKIPPED (line 47: "PARTIALLY IMPLEMENTED")
-  - `frontend/tests/e2e/deployment/02-user-journey.spec.ts` - TOC workflow tests exist but need to be enabled
-  - **ACTION REQUIRED**: Enable E2E tests and fix any failures before deployment (bd task auto-author-56)
 - **Frontend Tests**: 75 failures due to missing mocks (Next.js router, ResizeObserver, module imports)
   - Fix time: 3.5-5.5 hours across 4 phases
   - All failures are environmental setup issues, not code bugs
@@ -68,7 +72,7 @@
   - Critical gaps: `security.py` (18%), `book_cover_upload.py` (0%), `transcription.py` (0%)
   - Path to 85%: 4-5 weeks, 207-252 new tests
 - **Backend Asyncio**: 2 test failures related to event loop lifecycle
-- **Manual TOC Bug**: Manual tester found bug in TOC workflow - needs investigation (bd task auto-author-55)
+- **Backend Module Structure**: Missing `__init__.py` in `app/api/middleware/` causing import errors
 
 ### Package Updates
 - Upgraded `lucide-react` to 0.468.0

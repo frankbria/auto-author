@@ -96,7 +96,7 @@ echo "" >> "$OUTPUT_FILE"
 echo "### Planned Tasks (Open)" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 
-bd list --status open --json | jq -r '.[] | "#### \(.id): \(.title)\n**Priority**: P\(.priority)\n\n\(.description // "No description")\n\n**Blocked by**: " + (if (.dependencies | length) > 0 then ([.dependencies[]] | join(", ")) else "None" end) + "\n"' >> "$OUTPUT_FILE"
+bd list --status open --json | jq -r '.[] | "#### \(.id): \(.title)\n**Priority**: P\(.priority)\n\n\(.description // "No description")\n\n**Blocked by**: " + (if (.dependencies | length) > 0 then (.dependencies | join(", ")) else "None" end) + "\n"' >> "$OUTPUT_FILE"
 
 # Export completed tasks
 echo "" >> "$OUTPUT_FILE"

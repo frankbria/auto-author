@@ -39,12 +39,13 @@ const CHAPTER_QA_RESPONSES = {
 };
 
 /**
- * ⚠️ TESTS CURRENTLY SKIPPED - PARTIALLY IMPLEMENTED FEATURES ⚠️
- * This test suite covers the complete authoring workflow which is partially implemented.
- * Some features like Q&A-to-draft generation may not be fully implemented yet.
- * Re-enable these tests as features are completed and add necessary test IDs to components.
+ * ✅ COMPLETE AUTHORING JOURNEY E2E TEST
+ * This test suite validates the complete user workflow from book creation through
+ * draft generation. All features are now implemented and tests are enabled.
+ *
+ * Note: Runs with BYPASS_AUTH=true for CI/CD compatibility.
  */
-test.describe.skip('Complete Authoring Journey E2E (PARTIALLY IMPLEMENTED)', () => {
+test.describe('Complete Authoring Journey E2E', () => {
   test.setTimeout(TEST_TIMEOUT);
 
   test('user can create book, generate TOC, add chapters, answer questions, and generate draft', async ({ page }) => {
