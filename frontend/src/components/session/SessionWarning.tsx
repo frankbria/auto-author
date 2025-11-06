@@ -98,7 +98,7 @@ export function SessionWarning({
               <p className="text-sm text-amber-700 mb-3">
                 Your session will expire in{" "}
                 <strong>
-                  {formatTimeRemaining(sessionStatus.time_until_expiry_seconds)}
+                  {formatTimeRemaining(sessionStatus!.time_until_expiry_seconds)}
                 </strong>
                 . Click "Stay Signed In" to continue your session.
               </p>

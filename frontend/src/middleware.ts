@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
 // 3. Provide auth context to your application
 //
 // For E2E testing: Set NEXT_PUBLIC_BYPASS_AUTH=true to skip authentication
-export default clerkMiddleware((auth, req) => {
+export default clerkMiddleware(async (auth, req) => {
   // Allow bypassing auth for E2E tests
   // NOTE: Must use NEXT_PUBLIC_ prefix to be available in middleware
   if (process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true' || process.env.NEXT_PUBLIC_ENVIRONMENT === 'test') {
@@ -19,7 +19,9 @@ export default clerkMiddleware((auth, req) => {
 
   // Enforce authentication for protected routes
   // This will redirect unauthenticated users to the sign-in page
-  auth().protect();
+  await auth().protect();
+
+  return NextResponse.next();
 });
 
 export const config = {

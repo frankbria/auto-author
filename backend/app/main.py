@@ -34,7 +34,7 @@ app.add_middleware(
 )
 
 # Add custom request validation middleware
-from app.api.middleware import RequestValidationMiddleware
+from app.api.request_validation import RequestValidationMiddleware
 from app.api.middleware.session_middleware import add_session_middleware
 
 app.add_middleware(RequestValidationMiddleware)
