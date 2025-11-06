@@ -59,12 +59,9 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
   useEffect(() => {
     const fetchBookDetails = async () => {
       try {
-        // Get auth token
-        const token = await getToken();
-        if (token) {
-          bookClient.setAuthToken(token);
-        }
-        
+        // Set up token provider for automatic token refresh
+        bookClient.setTokenProvider(getToken);
+
         // Fetch book details
         const bookData = await bookClient.getBook(bookId);
         setBook(bookData);

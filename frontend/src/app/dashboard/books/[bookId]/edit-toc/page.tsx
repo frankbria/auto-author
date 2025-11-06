@@ -150,12 +150,9 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   useEffect(() => {
     const fetchTOC = async () => {
       try {
-        // Set up auth token for the API client
-        const token = await getToken();
-        if (token) {
-          bookClient.setAuthToken(token);
-        }
-        
+        // Set up token provider for automatic token refresh
+        bookClient.setTokenProvider(getToken);
+
         // Fetch TOC from the backend API
         const response = await bookClient.getToc(bookId);
         
@@ -410,14 +407,11 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   };  const handleSaveTOC = async () => {
     setIsLoading(true);
     setError('');
-    
+
     try {
-      // Set up auth token for the API client
-      const token = await getToken();
-      if (token) {
-        bookClient.setAuthToken(token);
-      }
-      
+      // Set up token provider for automatic token refresh
+      bookClient.setTokenProvider(getToken);
+
       // Convert local Chapter format to API TocData format
       const tocData = convertChaptersToTocData(toc);
       console.log('TOC to save:', tocData);

@@ -101,11 +101,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     const fetchBookData = async () => {
       setIsLoading(true);
       try {
-        // Set up auth token
-        const token = await getToken();
-        if (token) {
-          bookClient.setAuthToken(token);
-        }
+        // Set up token provider for automatic token refresh
+        bookClient.setTokenProvider(getToken);
 
         // Fetch book details
         const bookData: BookProject = await bookClient.getBook(bookId);
