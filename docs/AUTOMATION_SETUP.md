@@ -67,7 +67,10 @@ git add .
 # Commit (pre-commit hooks run automatically)
 git commit -m "feat: your feature"
 
-# Result: CURRENT_SPRINT.md is auto-updated and included in commit
+# Result:
+# - CURRENT_SPRINT.md and IMPLEMENTATION_PLAN.md are auto-updated
+# - Secret detection scans staged files
+# - All hooks run automatically
 ```
 
 ---
@@ -79,13 +82,45 @@ git commit -m "feat: your feature"
 **Hooks that run on every commit:**
 
 1. **export-current-sprint** - Regenerates CURRENT_SPRINT.md from bd
-2. **auto-add-exports** - Adds updated docs to commit
-3. **frontend-lint** - Lints frontend code (if frontend/ files changed)
-4. **frontend-typecheck** - Type checks (if frontend/ files changed)
-5. **backend-lint** - Lints backend code (if backend/ files changed)
-6. **General quality** - Trailing whitespace, merge conflicts, large files, etc.
+2. **export-implementation-plan** - Regenerates IMPLEMENTATION_PLAN.md from bd
+3. **auto-add-exports** - Adds updated docs to commit
+4. **check-secrets** - Scans for leaked credentials (AWS keys, API tokens, private keys, etc.)
+5. **frontend-lint** - Lints frontend code (if frontend/ files changed)
+6. **frontend-typecheck** - Type checks (if frontend/ files changed)
+7. **backend-lint** - Lints backend code (if backend/ files changed)
+8. **General quality** - Trailing whitespace, merge conflicts, large files, etc.
 
 **Performance**: Fast! Only linting/type-checking run conditionally.
+
+---
+
+## Secret Detection
+
+**Script**: `scripts/check-secrets.sh`
+
+The pre-commit hook scans staged files for accidentally committed credentials and secrets.
+
+**What gets detected:**
+- **AWS Keys**: `AKIA[0-9A-Z]{16}`
+- **API Keys/Secrets**: Generic patterns for API keys, secrets, tokens
+- **OAuth Tokens**: GitHub tokens (ghp_, gho_, github_pat_), Slack tokens (xox-)
+- **Passwords**: Password strings in configuration files
+- **Private Keys**: .pem files
+- **Base64 Auth**: Base64-encoded authentication strings
+- **JWT Tokens**: Real JWT tokens (not example tokens)
+
+**On detection:**
+- Commit is blocked
+- File and pattern details are displayed
+- Suggests using environment variables instead
+
+**False positives:**
+```bash
+# If you get a false positive, you can:
+1. Remove the actual secret and use environment variables
+2. Add the pattern to .gitignore
+3. Use 'git commit --no-verify' (NOT recommended)
+```
 
 ---
 
@@ -156,13 +191,13 @@ git commit -m "docs: manual sync from bd tracker"
 
 ### Created
 - `.pre-commit-config.yaml` - Pre-commit hook configuration
-- `.github/workflows/sync-docs.yml` - Auto-sync GitHub Action
 - `.github/workflows/tests.yml` - Test automation GitHub Action
+- `scripts/check-secrets.sh` - Secret detection script for pre-commit hooks
 - `docs/AUTOMATION_SETUP.md` - This file
 
 ### Auto-Generated (Don't Edit Manually)
-- `CURRENT_SPRINT.md` - Regenerated on every commit
-- ~~`IMPLEMENTATION_PLAN.md`~~ - Deprecated due to script issues
+- `CURRENT_SPRINT.md` - Regenerated on every commit from bd tracker
+- `IMPLEMENTATION_PLAN.md` - Regenerated on every commit from bd tracker
 
 ### Source of Truth
 - **bd database** (`.beads/*.db`) - ALL task data lives here
@@ -192,6 +227,7 @@ git commit -m "docs: manual sync from bd tracker"
 ✅ **No manual work** - Automation handles everything
 ✅ **Single source of truth** - bd database drives all documentation
 ✅ **Quality gates** - Linting and type-checking run automatically
+✅ **Secret detection** - Prevents accidental credential leaks
 ✅ **Visible in commits** - Doc changes show in git history
 ✅ **CI/CD ready** - GitHub Actions enforce standards on PR
 
@@ -202,8 +238,9 @@ git commit -m "docs: manual sync from bd tracker"
 1. ✅ Pre-commit hooks installed
 2. ✅ GitHub Actions configured
 3. ✅ Documentation automation active
-4. 📋 **TODO**: Enable E2E tests in pre-commit (once tests are fixed)
-5. 📋 **TODO**: Add coverage enforcement to pre-commit (once ≥85% reached)
+4. ✅ Secret detection integrated
+5. 📋 **TODO**: Enable E2E tests in pre-commit (once tests are fixed)
+6. 📋 **TODO**: Add coverage enforcement to pre-commit (once ≥85% reached)
 
 ---
 
