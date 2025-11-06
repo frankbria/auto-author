@@ -15,9 +15,18 @@ repos:
         stages: [commit]
         verbose: true
 
+      - id: export-implementation-plan
+        name: Export Implementation Plan from bd
+        entry: ./scripts/export-implementation-plan.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+        verbose: true
+
       - id: auto-add-exports
         name: Auto-add exported documentation files
-        entry: bash -c 'git add CURRENT_SPRINT.md 2>/dev/null || true'
+        entry: bash -c 'git add CURRENT_SPRINT.md IMPLEMENTATION_PLAN.md 2>/dev/null || true'
         language: system
         pass_filenames: false
         always_run: true
