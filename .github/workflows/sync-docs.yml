@@ -17,6 +17,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Full history for accurate git operations
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
 
       - name: Set up bd (Beads)
         run: |

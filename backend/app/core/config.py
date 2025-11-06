@@ -6,14 +6,14 @@ from typing import List, Union
 class Settings(BaseSettings):
     DATABASE_URI: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "auto_author_test"
-    OPENAI_AUTOAUTHOR_API_KEY: str
+    OPENAI_AUTOAUTHOR_API_KEY: str = "test-key"  # Default for testing
 
     # Clerk Authentication Settings
-    CLERK_API_KEY: str
-    CLERK_PUBLISHABLE_KEY: str
+    CLERK_API_KEY: str = "test-clerk-api-key"
+    CLERK_PUBLISHABLE_KEY: str = "pk_test_test"
     CLERK_JWT_PUBLIC_KEY: str | None = None  # Optional: Will fetch from JWKS if not provided
-    CLERK_FRONTEND_API: str
-    CLERK_BACKEND_API: str
+    CLERK_FRONTEND_API: str = "clerk.test.api"
+    CLERK_BACKEND_API: str = "clerk.test.backend"
     CLERK_JWT_ALGORITHM: str = "RS256"
     CLERK_SECRET_KEY: str = ""  # Secret key for Clerk
     CLERK_WEBHOOK_SECRET: str = ""  # Secret for validating webhooks
