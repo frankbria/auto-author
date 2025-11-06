@@ -29,11 +29,8 @@ export default function Dashboard() {
 
     setIsLoading(true);
     try {
-      // Get Clerk session token for API authentication
-      const token = await getToken();
-      if (token) {
-        bookClient.setAuthToken(token);
-      }
+      // Set up token provider for automatic token refresh
+      bookClient.setTokenProvider(getToken);
       const books = await bookClient.getUserBooks();
       setProjects(books);
       setError(null);
@@ -80,12 +77,9 @@ export default function Dashboard() {
   
   const handleDeleteBook = async (bookId: string) => {
     try {
-      // Get Clerk session token for API authentication
-      const token = await getToken();
-      if (token) {
-        bookClient.setAuthToken(token);
-      }
-      
+      // Set up token provider for automatic token refresh
+      bookClient.setTokenProvider(getToken);
+
       await bookClient.deleteBook(bookId);
       toast.success('Book deleted successfully');
       

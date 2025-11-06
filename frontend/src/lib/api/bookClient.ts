@@ -44,6 +44,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/a
 export class BookClient {
   private baseUrl: string;
   private authToken?: string;
+  private tokenProvider?: () => Promise<string | null>;
 
   /**
    * Creates a new BookClient instance
@@ -87,21 +88,58 @@ export class BookClient {
   }
 
   /**
+   * Set a token provider function for automatic token refresh
+   *
+   * This allows the client to fetch fresh tokens before each API call,
+   * preventing token expiration issues during long-running operations.
+   *
+   * @param provider - Function that returns a promise resolving to a token or null
+   *
+   * @example
+   * ```typescript
+   * // With Clerk
+   * const { getToken } = useAuth();
+   * bookClient.setTokenProvider(getToken);
+   * ```
+   */
+  public setTokenProvider(provider: () => Promise<string | null>) {
+    this.tokenProvider = provider;
+  }
+
+  /**
+   * Get authentication token
+   *
+   * Internal method that returns either the cached token or fetches a fresh one
+   * from the token provider if available.
+   *
+   * @private
+   * @returns Promise resolving to token string or undefined
+   */
+  private async getAuthToken(): Promise<string | undefined> {
+    if (this.tokenProvider) {
+      const token = await this.tokenProvider();
+      return token || undefined;
+    }
+    return this.authToken;
+  }
+
+  /**
    * Get default headers for API requests
    *
    * Internal method that constructs headers for all API calls.
    * Includes Content-Type and Authorization headers.
    *
    * @private
-   * @returns Headers object with Content-Type and optional Authorization
+   * @returns Promise resolving to headers object with Content-Type and optional Authorization
    */
-  private getHeaders() {
+  private async getHeaders(): Promise<HeadersInit> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
 
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
+    const token = await this.getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     return headers;
@@ -141,7 +179,7 @@ export class BookClient {
    */
   public async getUserBooks(): Promise<BookProject[]> {
     const response = await fetch(`${this.baseUrl}/books`, {
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -186,7 +224,7 @@ export class BookClient {
    */
   public async getBook(bookId: string): Promise<BookProject> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -258,7 +296,7 @@ export class BookClient {
   }): Promise<BookProject> {
     const response = await fetch(`${this.baseUrl}/books`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify(bookData),
     });
@@ -327,7 +365,7 @@ export class BookClient {
   ): Promise<BookProject> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
       method: 'PATCH',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify(bookData),
     });
@@ -389,7 +427,7 @@ export class BookClient {
   public async deleteBook(bookId: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
       method: 'DELETE',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -442,7 +480,7 @@ export class BookClient {
     meets_minimum_requirements: boolean;
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/toc-readiness`, {
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -520,7 +558,7 @@ export class BookClient {
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/analyze-summary`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -559,7 +597,7 @@ export class BookClient {
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/generate-questions`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -630,7 +668,7 @@ export class BookClient {
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/generate-toc`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify({ question_responses: questionResponses }),
     });
@@ -688,7 +726,7 @@ export class BookClient {
     } | null;
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/toc`, {
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -764,7 +802,7 @@ export class BookClient {
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/toc`, {
       method: 'PUT',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify({ toc }),
     });
@@ -801,7 +839,7 @@ export class BookClient {
    */
   public async getBookSummary(bookId: string): Promise<{ summary: string; summary_history?: unknown[] }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/summary`, {
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -838,7 +876,7 @@ export class BookClient {
   public async saveBookSummary(bookId: string, summary: string): Promise<{ summary: string; success: boolean }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/summary`, {
       method: 'PUT',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify({ summary }),
     });
@@ -860,7 +898,7 @@ export class BookClient {
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/question-responses`, {
       method: 'PUT',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify({ responses }),
     });
@@ -881,7 +919,7 @@ export class BookClient {
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/question-responses`, {
       method: 'GET',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -911,7 +949,7 @@ export class BookClient {
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content`, {
       method: 'PATCH',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify({ 
         content,
@@ -951,7 +989,7 @@ export class BookClient {
     
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content?${params}`, {
       method: 'GET',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -987,7 +1025,7 @@ export class BookClient {
     last_active_chapter?: string;
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/metadata?include_content_stats=${includeContentStats}`, {
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -1002,7 +1040,7 @@ export class BookClient {
   public async updateChapterStatus(bookId: string, chapterId: string, status: ChapterStatus): Promise<void> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/bulk-status`, {
       method: 'PATCH',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify({
         chapter_ids: [chapterId],
@@ -1022,7 +1060,7 @@ export class BookClient {
   public async updateBulkChapterStatus(bookId: string, chapterIds: string[], status: ChapterStatus): Promise<void> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/bulk-status`, {
       method: 'PATCH',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify({
         chapter_ids: chapterIds,
@@ -1049,7 +1087,7 @@ export class BookClient {
 
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/tab-state`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
       body: JSON.stringify({
         ...tabState,
@@ -1074,7 +1112,7 @@ export class BookClient {
   } | null> {
     const params = sessionId ? `?session_id=${sessionId}` : '';
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/tab-state${params}`, {
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include',
     });
     if (!response.ok) {
@@ -1118,7 +1156,7 @@ export class BookClient {
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/generate-draft`,
       {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify(data),
       }
@@ -1144,7 +1182,7 @@ export class BookClient {
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/generate-questions`,
       {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify(options),
       }
@@ -1180,7 +1218,7 @@ export class BookClient {
     const response = await fetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions?${params}`,
       {
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
       }
     );
@@ -1204,7 +1242,7 @@ export class BookClient {
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/response`,
       {
         method: 'PUT',
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify(responseData),
       }
@@ -1227,7 +1265,7 @@ export class BookClient {
     const response = await fetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/response`,
       {
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
       }
     );
@@ -1251,7 +1289,7 @@ export class BookClient {
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/rating`,
       {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify(ratingData),
       }
@@ -1273,7 +1311,7 @@ export class BookClient {
     const response = await fetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/question-progress`,
       {
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
       }
     );
@@ -1297,7 +1335,7 @@ export class BookClient {
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/regenerate-questions?preserve_responses=${preserveResponses}`,
       {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify(options),
       }
@@ -1332,7 +1370,7 @@ export class BookClient {
     const response = await fetch(
       `${this.baseUrl}/books/${bookId}/export/pdf?${params.toString()}`,
       {
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
       }
     );
@@ -1362,7 +1400,7 @@ export class BookClient {
     const response = await fetch(
       `${this.baseUrl}/books/${bookId}/export/docx?${params.toString()}`,
       {
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
       }
     );
@@ -1398,7 +1436,7 @@ export class BookClient {
     const response = await fetch(
       `${this.baseUrl}/books/${bookId}/export/formats`,
       {
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
       }
     );
@@ -1432,7 +1470,7 @@ export class BookClient {
       `${this.baseUrl}/books/${bookId}/chapters`,
       {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify(chapterData),
       }
@@ -1454,7 +1492,7 @@ export class BookClient {
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}`,
       {
         method: 'DELETE',
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
         credentials: 'include',
       }
     );
