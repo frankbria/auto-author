@@ -17,17 +17,17 @@ This project uses **Option A: Automated Export Scripts** to keep planning docume
 
 ### How It Works
 
-**Two mechanisms ensure docs stay in sync:**
+**Documentation sync happens via pre-commit hooks:**
 
-1. **Pre-commit Hooks** (Local Development)
+1. **Pre-commit Hooks** (Local Development Only)
    - Runs on every `git commit`
    - Exports latest bd data to markdown
    - Auto-adds updated files to commit
 
-2. **GitHub Actions** (CI/CD)
-   - Runs on push to `main` or `develop`
-   - Syncs docs if they're out of date
-   - Auto-commits and pushes changes
+**Why not GitHub Actions?**
+- The `.beads/` database is gitignored (contains local development data)
+- GitHub Actions runners don't have access to the database
+- Documentation sync must happen locally where the database exists
 
 ---
 
@@ -47,15 +47,16 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-### 2. Verify GitHub Actions
+### 2. GitHub Actions
 
-**Files Created:**
-- `.github/workflows/sync-docs.yml` - Auto-sync documentation
-- `.github/workflows/tests.yml` - Run tests on PR
+**File:**
+- `.github/workflows/tests.yml` - Run tests on PR/push
 
 **What Happens:**
-- On push to `main`/`develop`: Docs auto-sync if out of date
-- On PR: All tests run (frontend, backend, E2E)
+- On push to `main`/`develop` or PR: All tests run (frontend, backend, E2E)
+- Frontend: lint, typecheck, unit tests, coverage check
+- Backend: pytest with coverage
+- E2E: Playwright tests with auth bypass
 
 ### 3. Normal Development Workflow
 
