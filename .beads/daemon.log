@@ -2252,3 +2252,18 @@ fatal: Need to specify how to reconcile divergent branches.
 [2025-11-07 12:43:43] Pulled from remote
 [2025-11-07 12:43:43] Imported from JSONL
 [2025-11-07 12:43:43] Auto-import complete
+[2025-11-07 12:46:46] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 12:46:47] Import triggered by file change
+[2025-11-07 12:46:47] Starting auto-import...
+[2025-11-07 12:46:47] Skipping import: JSONL not newer than database
+[2025-11-07 12:56:01] Mutation detected: update auto-author-59
+[2025-11-07 12:56:02] Export triggered by mutation events
+[2025-11-07 12:56:02] Starting export...
+[2025-11-07 12:56:02] Exported to JSONL
+[2025-11-07 12:56:02] Export complete
+[2025-11-07 12:56:02] JSONL file created: /home/frankbria/projects/auto-author/.beads/issues.jsonl
+[2025-11-07 12:56:03] Import triggered by file change
+[2025-11-07 12:56:03] Starting auto-import...
+[2025-11-07 12:56:03] Pulled from remote
+[2025-11-07 12:56:03] Imported from JSONL
+[2025-11-07 12:56:03] Auto-import complete
