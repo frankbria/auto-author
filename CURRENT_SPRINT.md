@@ -1,6 +1,6 @@
 # Current Sprint - 
 
-**Last Updated**: 2025-11-06
+**Last Updated**: 2025-11-07
 
 **Source**: Auto-generated from bd - DO NOT EDIT MANUALLY
 
@@ -277,6 +277,6 @@ bd dep add <task-1> <task-2>
 
 ---
 
-**Generated**: 2025-11-06
+**Generated**: 2025-11-07
 **Command**: `./scripts/export-current-sprint.sh`
 **Source of Truth**: bd database (`.beads/*.db`)

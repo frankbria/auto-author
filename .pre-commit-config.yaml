@@ -4,6 +4,9 @@
 
 repos:
   # Auto-sync documentation with bd tracker
+  # NOTE: These hooks are disabled by default to avoid conflicts during commits.
+  # Run manually when needed: pre-commit run export-current-sprint --all-files
+  # Or run the scripts directly: ./scripts/export-current-sprint.sh
   - repo: local
     hooks:
       - id: export-current-sprint
@@ -11,8 +14,8 @@ repos:
         entry: ./scripts/export-current-sprint.sh
         language: system
         pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
+        always_run: false
+        stages: [manual]
         verbose: true
 
       - id: export-implementation-plan
@@ -20,17 +23,9 @@ repos:
         entry: ./scripts/export-implementation-plan.sh
         language: system
         pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
+        always_run: false
+        stages: [manual]
         verbose: true
-
-      - id: auto-add-exports
-        name: Auto-add exported documentation files
-        entry: bash -c 'git add CURRENT_SPRINT.md IMPLEMENTATION_PLAN.md 2>/dev/null || true'
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
 
   # Security - Check for secrets and credentials
   - repo: local
