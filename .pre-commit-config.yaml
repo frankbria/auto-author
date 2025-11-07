@@ -122,7 +122,10 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ['--maxkb=1000']
-      - id: detect-private-key
+      # detect-private-key removed - replaced by custom check-secrets.sh
+      # The built-in hook has grep syntax errors and triggers false positives
+      # on documentation files. Our custom script at ./scripts/check-secrets.sh
+      # provides more accurate secret detection.
       - id: mixed-line-ending
 
 # Configuration
