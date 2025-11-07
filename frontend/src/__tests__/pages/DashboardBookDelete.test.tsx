@@ -173,8 +173,9 @@ describe('Dashboard - Book Deletion', () => {
     mockGetToken.mockResolvedValue('test-token');
     (bookClient.getUserBooks as jest.Mock).mockResolvedValue(mockBooks);
     (bookClient.setAuthToken as jest.Mock).mockImplementation(() => {});
+    (bookClient.setTokenProvider as jest.Mock).mockImplementation(() => {});
     (bookClient.deleteBook as jest.Mock).mockResolvedValue({ success: true });
-    
+
     // Mock toast
     (toast.success as jest.Mock) = jest.fn();
     (toast.error as jest.Mock) = jest.fn();
@@ -348,22 +349,21 @@ describe('Dashboard - Book Deletion', () => {
 
   it('should maintain correct auth token for deletion', async () => {
     (bookClient.deleteBook as jest.Mock).mockResolvedValue(undefined);
-    
+
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     const deleteButtons = screen.getAllByTestId('trash-icon');
     fireEvent.click(deleteButtons[0].closest('button')!);
-    
+
     const confirmButton = screen.getByTestId('confirm-delete');
     fireEvent.click(confirmButton);
-    
+
     await waitFor(() => {
-      expect(mockGetToken).toHaveBeenCalled();
-      expect(bookClient.setAuthToken).toHaveBeenCalledWith('test-token');
+      expect(bookClient.setTokenProvider).toHaveBeenCalledWith(mockGetToken);
       expect(bookClient.deleteBook).toHaveBeenCalledWith('book-1');
     });
   });

@@ -734,17 +734,17 @@ describe('BookClient', () => {
   });
 
   describe('Authentication and Headers', () => {
-    it('should set auth token', () => {
+    it('should set auth token', async () => {
       const newClient = new (bookClient.constructor as any)();
       newClient.setAuthToken('new-token');
-      
+
       // Test that the token is used in requests
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => [],
       });
 
-      newClient.getUserBooks();
+      await newClient.getUserBooks();
 
       expect(global.fetch).toHaveBeenCalledWith(
         expect.any(String),
