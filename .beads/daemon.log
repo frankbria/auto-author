@@ -1,0 +1,2254 @@
+[2025-11-06 16:59:02] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 16:59:02] Error: Non-canonical database name: auto-author.db
+[2025-11-06 16:59:02] Expected: beads.db
+[2025-11-06 16:59:02] 
+[2025-11-06 16:59:02] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:01:50] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:01:50] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:01:50] Expected: beads.db
+[2025-11-06 17:01:50] 
+[2025-11-06 17:01:50] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:07:38] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:07:38] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:07:38] Expected: beads.db
+[2025-11-06 17:07:38] 
+[2025-11-06 17:07:38] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:09:35] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:09:35] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:09:35] Expected: beads.db
+[2025-11-06 17:09:35] 
+[2025-11-06 17:09:35] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:09:43] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:09:43] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:09:43] Expected: beads.db
+[2025-11-06 17:09:43] 
+[2025-11-06 17:09:43] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:09:49] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:09:49] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:09:49] Expected: beads.db
+[2025-11-06 17:09:49] 
+[2025-11-06 17:09:49] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:09:55] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:09:55] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:09:55] Expected: beads.db
+[2025-11-06 17:09:55] 
+[2025-11-06 17:09:55] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:00] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:00] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:00] Expected: beads.db
+[2025-11-06 17:10:00] 
+[2025-11-06 17:10:00] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:06] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:06] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:06] Expected: beads.db
+[2025-11-06 17:10:06] 
+[2025-11-06 17:10:06] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:12] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:12] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:12] Expected: beads.db
+[2025-11-06 17:10:12] 
+[2025-11-06 17:10:12] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:19] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:19] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:19] Expected: beads.db
+[2025-11-06 17:10:19] 
+[2025-11-06 17:10:19] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:25] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:25] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:25] Expected: beads.db
+[2025-11-06 17:10:25] 
+[2025-11-06 17:10:25] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:31] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:31] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:31] Expected: beads.db
+[2025-11-06 17:10:31] 
+[2025-11-06 17:10:31] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:36] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:36] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:36] Expected: beads.db
+[2025-11-06 17:10:36] 
+[2025-11-06 17:10:36] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:42] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:42] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:42] Expected: beads.db
+[2025-11-06 17:10:42] 
+[2025-11-06 17:10:42] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:50] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:50] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:50] Expected: beads.db
+[2025-11-06 17:10:50] 
+[2025-11-06 17:10:50] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:10:55] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:10:55] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:10:55] Expected: beads.db
+[2025-11-06 17:10:55] 
+[2025-11-06 17:10:55] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:11:01] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:11:01] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:11:01] Expected: beads.db
+[2025-11-06 17:11:01] 
+[2025-11-06 17:11:01] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:11:07] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:11:07] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:11:07] Expected: beads.db
+[2025-11-06 17:11:07] 
+[2025-11-06 17:11:07] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:11:30] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:11:30] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:11:30] Expected: beads.db
+[2025-11-06 17:11:30] 
+[2025-11-06 17:11:30] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:11:59] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:11:59] Error: Non-canonical database name: auto-author.db
+[2025-11-06 17:11:59] Expected: beads.db
+[2025-11-06 17:11:59] 
+[2025-11-06 17:11:59] Run 'bd init' to migrate to canonical name
+[2025-11-06 17:20:51] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:20:51] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:20:51] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:20:51] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:23:01] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:23:01] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:23:02] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:23:02] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:26:57] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:26:57] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:26:57] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:26:57] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:27:35] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:27:35] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:27:36] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:27:36] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:27:41] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:27:41] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:27:42] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:27:42] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:27:47] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:27:47] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:27:48] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:27:48] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:27:53] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:27:53] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:27:53] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:27:53] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:00] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:00] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:01] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:01] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:06] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:06] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:06] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:06] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:12] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:12] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:12] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:12] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:17] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:17] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:18] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:18] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:23] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:23] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:24] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:24] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:31] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:31] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:31] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:31] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:36] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:36] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:37] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:37] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:42] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:42] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:43] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:43] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:48] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:48] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:48] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:48] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:53] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:53] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:54] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:28:54] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:28:59] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:28:59] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:00] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:00] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:29:07] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:29:07] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:08] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:08] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:29:13] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:29:13] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:13] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:13] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:29:18] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:29:18] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:19] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:19] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:29:24] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:29:24] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:25] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:25] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:29:30] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:29:30] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:31] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:31] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:29:36] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:29:36] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:36] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:36] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:29:43] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:29:43] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:44] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:44] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:29:49] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:29:49] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:50] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:50] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:29:55] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:29:55] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:56] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:29:56] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:01] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:01] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:01] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:01] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:06] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:06] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:07] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:07] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:14] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:14] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:15] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:15] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:20] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:20] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:21] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:21] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:26] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:26] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:26] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:26] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:31] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:31] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:32] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:32] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:37] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:37] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:38] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:38] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:43] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:43] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:43] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:43] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:51] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:51] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:52] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:52] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:30:57] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:30:57] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:58] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:30:58] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:03] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:03] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:03] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:03] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:08] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:08] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:09] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:09] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:14] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:14] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:15] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:15] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:22] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:22] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:22] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:22] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:27] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:27] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:28] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:28] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:33] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:33] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:34] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:34] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:39] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:39] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:40] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:40] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:45] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:45] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:45] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:45] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:50] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:50] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:51] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:51] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:31:58] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:31:58] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:59] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:31:59] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:04] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:04] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:05] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:05] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:10] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:10] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:10] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:10] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:15] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:15] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:16] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:16] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:21] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:21] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:22] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:22] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:27] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:27] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:27] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:27] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:34] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:34] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:35] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:35] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:40] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:40] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:41] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:41] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:46] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:46] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:46] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:46] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:51] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:51] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:52] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:52] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:32:57] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:32:57] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:58] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:32:58] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:33:05] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:33:05] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:06] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:06] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:33:11] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:33:11] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:11] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:11] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:33:16] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:33:16] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:17] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:17] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:33:22] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:33:22] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:23] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:23] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:33:28] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:33:28] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:28] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:28] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:33:33] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:33:33] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:34] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:34] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:33:41] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:33:41] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:42] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:42] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:33:47] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:33:47] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:47] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:47] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:33:52] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:33:52] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:53] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:33:53] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-06 17:34:06] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-06 17:34:06] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:34:06] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-06 17:34:06] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:23:27] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:23:27] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:27] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:27] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:23:32] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:23:32] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:33] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:33] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:23:38] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:23:38] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:39] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:39] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:23:44] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:23:44] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:44] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:44] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:23:50] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:23:50] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:50] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:50] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:23:55] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:23:55] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:56] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:23:56] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:01] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:01] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:02] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:02] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:07] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:07] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:07] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:07] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:12] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:12] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:13] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:13] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:18] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:18] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:19] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:19] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:24] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:24] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:25] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:25] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:30] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:30] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:30] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:30] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:35] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:35] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:36] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:36] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:41] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:41] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:42] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:42] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:47] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:47] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:47] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:47] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:52] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:52] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:53] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:53] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:24:58] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:24:58] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:59] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:24:59] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:04] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:04] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:05] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:05] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:10] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:10] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:10] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:10] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:15] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:15] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:16] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:16] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:21] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:21] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:22] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:22] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:27] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:27] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:28] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:28] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:33] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:33] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:33] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:33] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:38] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:38] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:39] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:39] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:44] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:44] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:45] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:45] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:50] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:50] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:50] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:50] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:25:55] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:25:55] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:56] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:25:56] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:26:01] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:26:01] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:02] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:02] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:26:07] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:26:07] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:08] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:08] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:26:13] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:26:13] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:13] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:13] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:26:18] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:26:18] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:19] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:19] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:26:24] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:26:24] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:25] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:26:25] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:30:52] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:30:52] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:30:53] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:30:53] Error: 
+LEGACY DATABASE DETECTED!
+
+This database was created before version 0.17.5 and lacks a repository fingerprint.
+To continue using this database, you must explicitly set its repository ID:
+
+  bd migrate --update-repo-id
+
+This ensures the database is bound to this repository and prevents accidental
+database sharing between different repositories.
+
+If this is a fresh clone, run:
+  rm -rf .beads && bd init
+
+Note: Auto-claiming legacy databases is intentionally disabled to prevent
+silent corruption when databases are copied between repositories.
+
+[2025-11-07 09:31:06] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-07 09:31:06] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:31:07] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-07 09:31:07] Repository fingerprint validated: b73d87bf
+[2025-11-07 09:31:07] Starting RPC server: /home/frankbria/projects/auto-author/.beads/bd.sock
+[2025-11-07 09:31:07] RPC server ready (socket listening)
+[2025-11-07 09:31:07] Registered in global registry
+[2025-11-07 09:31:07] Starting sync cycle...
+[2025-11-07 09:31:07] Exported to JSONL
+[2025-11-07 09:31:08] Pulled from remote
+[2025-11-07 09:31:08] Imported from JSONL
+[2025-11-07 09:31:08] Sync cycle complete
+[2025-11-07 09:31:08] Using event-driven mode
+[2025-11-07 09:32:30] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 09:32:31] Import triggered by file change
+[2025-11-07 09:32:31] Starting auto-import...
+[2025-11-07 09:32:31] Pull failed: git pull failed: exit status 1
+From https://github.com/frankbria/auto-author
+ * branch            main       -> FETCH_HEAD
+error: Your local changes to the following files would be overwritten by merge:
+	.pre-commit-config.yaml
+Please commit your changes or stash them before you merge.
+Aborting
+Updating 6fad8d9..81253ab
+
+[2025-11-07 09:32:53] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 09:32:54] Import triggered by file change
+[2025-11-07 09:32:54] Starting auto-import...
+[2025-11-07 09:32:55] Pull failed: git pull failed: exit status 128
+From https://github.com/frankbria/auto-author
+ * branch            main       -> FETCH_HEAD
+hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint: 
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default
+hint: preference for all repositories. You can also pass --rebase, --no-rebase,
+hint: or --ff-only on the command line to override the configured default per
+hint: invocation.
+fatal: Need to specify how to reconcile divergent branches.
+
+[2025-11-07 09:33:12] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 09:33:13] Import triggered by file change
+[2025-11-07 09:33:13] Starting auto-import...
+[2025-11-07 09:33:13] Pulled from remote
+[2025-11-07 09:33:13] Imported from JSONL
+[2025-11-07 09:33:13] Auto-import complete
+[2025-11-07 09:41:17] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 09:41:18] Import triggered by file change
+[2025-11-07 09:41:18] Starting auto-import...
+[2025-11-07 09:41:19] Pulled from remote
+[2025-11-07 09:41:19] Imported from JSONL
+[2025-11-07 09:41:19] Auto-import complete
+[2025-11-07 09:46:00] Mutation detected: update auto-author-67
+[2025-11-07 09:46:00] Export triggered by mutation events
+[2025-11-07 09:46:00] Starting export...
+[2025-11-07 09:46:00] Pre-export validation failed: refusing to export: JSONL is newer than database (import first to avoid data loss)
+[2025-11-07 09:46:01] Mutation detected: update auto-author-69
+[2025-11-07 09:46:02] Export triggered by mutation events
+[2025-11-07 09:46:02] Starting export...
+[2025-11-07 09:46:02] Pre-export validation failed: refusing to export: JSONL is newer than database (import first to avoid data loss)
+[2025-11-07 09:49:05] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 09:49:06] Import triggered by file change
+[2025-11-07 09:49:06] Starting auto-import...
+[2025-11-07 09:49:06] Pulled from remote
+[2025-11-07 09:49:06] Imported from JSONL
+[2025-11-07 09:49:06] Auto-import complete
+[2025-11-07 09:50:43] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 09:50:44] Import triggered by file change
+[2025-11-07 09:50:44] Starting auto-import...
+[2025-11-07 09:50:44] Skipping import: JSONL not newer than database
+[2025-11-07 10:18:28] Mutation detected: update auto-author-68
+[2025-11-07 10:18:28] Export triggered by mutation events
+[2025-11-07 10:18:28] Starting export...
+[2025-11-07 10:18:28] JSONL file created: /home/frankbria/projects/auto-author/.beads/issues.jsonl
+[2025-11-07 10:18:28] Exported to JSONL
+[2025-11-07 10:18:28] Export complete
+[2025-11-07 10:18:29] Import triggered by file change
+[2025-11-07 10:18:29] Starting auto-import...
+[2025-11-07 10:18:30] Pulled from remote
+[2025-11-07 10:18:30] Imported from JSONL
+[2025-11-07 10:18:30] Auto-import complete
+[2025-11-07 10:18:44] File change detected: /home/frankbria/projects/auto-author/.beads/issues.jsonl (op: CHMOD)
+[2025-11-07 10:18:44] JSONL removed/renamed, re-establishing watch
+[2025-11-07 10:18:44] Successfully re-established JSONL watch after 50ms
+[2025-11-07 10:18:44] JSONL file created: /home/frankbria/projects/auto-author/.beads/issues.jsonl
+[2025-11-07 10:18:44] File change detected: /home/frankbria/projects/auto-author/.beads/issues.jsonl (op: WRITE)
+[2025-11-07 10:18:45] Import triggered by file change
+[2025-11-07 10:18:45] Starting auto-import...
+[2025-11-07 10:18:45] Pulled from remote
+[2025-11-07 10:18:45] Imported from JSONL
+[2025-11-07 10:18:46] Auto-import complete
+[2025-11-07 10:21:15] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 10:21:16] Import triggered by file change
+[2025-11-07 10:21:16] Starting auto-import...
+[2025-11-07 10:21:16] Pulled from remote
+[2025-11-07 10:21:16] Imported from JSONL
+[2025-11-07 10:21:16] Auto-import complete
+[2025-11-07 10:41:47] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 10:41:48] Import triggered by file change
+[2025-11-07 10:41:48] Starting auto-import...
+[2025-11-07 10:41:48] Pulled from remote
+[2025-11-07 10:41:48] Imported from JSONL
+[2025-11-07 10:41:48] Auto-import complete
+[2025-11-07 10:50:37] Mutation detected: update auto-author-60
+[2025-11-07 10:50:37] Export triggered by mutation events
+[2025-11-07 10:50:37] Starting export...
+[2025-11-07 10:50:37] Pre-export validation failed: refusing to export: JSONL is newer than database (import first to avoid data loss)
+[2025-11-07 10:54:09] Mutation detected: update auto-author-60
+[2025-11-07 10:54:10] Export triggered by mutation events
+[2025-11-07 10:54:10] Starting export...
+[2025-11-07 10:54:10] Pre-export validation failed: refusing to export: JSONL is newer than database (import first to avoid data loss)
+[2025-11-07 10:54:33] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 10:54:34] Import triggered by file change
+[2025-11-07 10:54:34] Starting auto-import...
+[2025-11-07 10:54:34] Pulled from remote
+[2025-11-07 10:54:34] Imported from JSONL
+[2025-11-07 10:54:34] Auto-import complete
+[2025-11-07 10:59:07] Git ref change detected: /home/frankbria/projects/auto-author/.git/refs/heads/main.lock
+[2025-11-07 10:59:08] Import triggered by file change
+[2025-11-07 10:59:08] Starting auto-import...
+[2025-11-07 10:59:08] Skipping import: JSONL not newer than database
+[2025-11-07 12:33:30] Mutation detected: update auto-author-70
+[2025-11-07 12:33:30] Export triggered by mutation events
+[2025-11-07 12:33:30] Starting export...
+[2025-11-07 12:33:30] JSONL file created: /home/frankbria/projects/auto-author/.beads/issues.jsonl
+[2025-11-07 12:33:30] Exported to JSONL
+[2025-11-07 12:33:30] Export complete
+[2025-11-07 12:33:31] Import triggered by file change
+[2025-11-07 12:33:31] Starting auto-import...
+[2025-11-07 12:33:32] Pulled from remote
+[2025-11-07 12:33:32] Imported from JSONL
+[2025-11-07 12:33:32] Auto-import complete
+[2025-11-07 12:43:41] Mutation detected: update auto-author-70
+[2025-11-07 12:43:42] Export triggered by mutation events
+[2025-11-07 12:43:42] Starting export...
+[2025-11-07 12:43:42] JSONL file created: /home/frankbria/projects/auto-author/.beads/issues.jsonl
+[2025-11-07 12:43:42] Exported to JSONL
+[2025-11-07 12:43:42] Export complete
+[2025-11-07 12:43:42] File change detected: /home/frankbria/projects/auto-author/.beads/issues.jsonl (op: CHMOD)
+[2025-11-07 12:43:43] Import triggered by file change
+[2025-11-07 12:43:43] Starting auto-import...
+[2025-11-07 12:43:43] Pulled from remote
+[2025-11-07 12:43:43] Imported from JSONL
+[2025-11-07 12:43:43] Auto-import complete

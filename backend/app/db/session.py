@@ -6,13 +6,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 from bson import ObjectId
 
-from app.db.base import get_collection
+from app.db import base
 from app.models.session import SessionModel, SessionCreate, SessionUpdate, SessionMetadata
-
-
-async def get_sessions_collection():
-    """Get the sessions collection"""
-    return await get_collection("sessions")
 
 
 async def create_session(session_data: SessionCreate) -> SessionModel:
@@ -24,7 +19,7 @@ async def create_session(session_data: SessionCreate) -> SessionModel:
     Returns:
         Created session model
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     # Generate session ID
     import secrets
@@ -68,7 +63,7 @@ async def get_session_by_id(session_id: str) -> Optional[SessionModel]:
     Returns:
         Session model if found, None otherwise
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
     session_doc = await collection.find_one({"session_id": session_id})
 
     if session_doc:
@@ -85,7 +80,7 @@ async def get_active_session_by_user(user_id: str) -> Optional[SessionModel]:
     Returns:
         Most recent active session if found, None otherwise
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     session_doc = await collection.find_one(
         {
@@ -116,7 +111,7 @@ async def get_user_sessions(
     Returns:
         List of session models
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     query = {"user_id": user_id}
     if active_only:
@@ -139,7 +134,7 @@ async def update_session(session_id: str, update_data: SessionUpdate) -> Optiona
     Returns:
         Updated session model if found, None otherwise
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     # Build update document (only include fields that are set)
     update_doc = {}
@@ -184,7 +179,7 @@ async def update_session_activity(session_id: str, endpoint: Optional[str] = Non
     Returns:
         Updated session model if found, None otherwise
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     update_doc = {
         "last_activity": datetime.now(timezone.utc),
@@ -214,7 +209,7 @@ async def deactivate_session(session_id: str) -> bool:
     Returns:
         True if session was deactivated, False otherwise
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     result = await collection.update_one(
         {"session_id": session_id},
@@ -234,7 +229,7 @@ async def deactivate_user_sessions(user_id: str, except_session_id: Optional[str
     Returns:
         Number of sessions deactivated
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     query = {"user_id": user_id}
     if except_session_id:
@@ -254,7 +249,7 @@ async def cleanup_expired_sessions() -> int:
     Returns:
         Number of sessions deleted
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     result = await collection.delete_many({
         "expires_at": {"$lt": datetime.now(timezone.utc)}
@@ -272,7 +267,7 @@ async def get_concurrent_sessions_count(user_id: str) -> int:
     Returns:
         Number of active sessions
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     count = await collection.count_documents({
         "user_id": user_id,
@@ -293,7 +288,7 @@ async def flag_suspicious_session(session_id: str, reason: Optional[str] = None)
     Returns:
         True if session was flagged, False otherwise
     """
-    collection = await get_sessions_collection()
+    collection = base.sessions_collection
 
     update_doc = {"is_suspicious": True}
     if reason:

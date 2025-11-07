@@ -42,7 +42,7 @@ def mock_request():
 class TestSessionService:
     """Test session service functions"""
 
-    async def test_create_user_session(self, mock_request):
+    async def test_create_user_session(self, motor_reinit_db, mock_request):
         """Test creating a new session for a user"""
         user_id = "test_user_123"
 
@@ -58,7 +58,7 @@ class TestSessionService:
         assert session.metadata.browser == "Chrome"
         assert session.metadata.os == "Windows"
 
-    async def test_create_session_with_max_concurrent_limit(self, mock_request):
+    async def test_create_session_with_max_concurrent_limit(self, motor_reinit_db, mock_request):
         """Test that old sessions are deactivated when limit is reached"""
         user_id = "test_user_max_sessions"
 
@@ -73,7 +73,7 @@ class TestSessionService:
         active_count = await get_concurrent_sessions_count(user_id)
         assert active_count <= MAX_CONCURRENT_SESSIONS
 
-    async def test_validate_session(self, mock_request):
+    async def test_validate_session(self, motor_reinit_db, mock_request):
         """Test validating an active session"""
         user_id = "test_user_validate"
         session = await create_user_session(user_id, mock_request)
@@ -86,7 +86,7 @@ class TestSessionService:
         assert validated.is_active is True
         assert validated.request_count > 0  # Should increment
 
-    async def test_validate_expired_session(self, mock_request):
+    async def test_validate_expired_session(self, motor_reinit_db, mock_request):
         """Test validating an expired session"""
         user_id = "test_user_expired"
 
@@ -106,7 +106,7 @@ class TestSessionService:
         validated = await validate_session(session.session_id, mock_request)
         assert validated is None
 
-    async def test_validate_session_fingerprint_mismatch(self, mock_request):
+    async def test_validate_session_fingerprint_mismatch(self, motor_reinit_db, mock_request):
         """Test session validation flags fingerprint mismatch as suspicious"""
         user_id = "test_user_fingerprint"
         session = await create_user_session(user_id, mock_request)
@@ -120,7 +120,7 @@ class TestSessionService:
         assert validated is not None
         assert validated.is_suspicious is True
 
-    async def test_refresh_session(self, mock_request):
+    async def test_refresh_session(self, motor_reinit_db, mock_request):
         """Test refreshing a session's expiry time"""
         user_id = "test_user_refresh"
         session = await create_user_session(user_id, mock_request)
@@ -137,7 +137,7 @@ class TestSessionService:
         assert refreshed is not None
         assert refreshed.expires_at > original_expiry
 
-    async def test_end_session(self, mock_request):
+    async def test_end_session(self, motor_reinit_db, mock_request):
         """Test ending a session"""
         user_id = "test_user_end"
         session = await create_user_session(user_id, mock_request)
@@ -151,7 +151,7 @@ class TestSessionService:
         ended_session = await get_session_by_id(session.session_id)
         assert ended_session.is_active is False
 
-    async def test_end_all_user_sessions(self, mock_request):
+    async def test_end_all_user_sessions(self, motor_reinit_db, mock_request):
         """Test ending all sessions for a user"""
         user_id = "test_user_end_all"
 
@@ -170,7 +170,7 @@ class TestSessionService:
         active_session = await get_session_by_id(session3.session_id)
         assert active_session.is_active is True
 
-    async def test_get_session_status(self, mock_request):
+    async def test_get_session_status(self, motor_reinit_db, mock_request):
         """Test getting session status information"""
         user_id = "test_user_status"
         session = await create_user_session(user_id, mock_request)
@@ -200,7 +200,7 @@ class TestSessionService:
         assert metadata.os == "iOS"
         assert metadata.browser == "Safari"
 
-    async def test_generate_fingerprint(self, mock_request):
+    async def test_generate_fingerprint(self, motor_reinit_db, mock_request):
         """Test generating browser fingerprint"""
         fingerprint1 = generate_fingerprint(mock_request)
 
@@ -213,7 +213,7 @@ class TestSessionService:
         fingerprint3 = generate_fingerprint(mock_request)
         assert fingerprint1 != fingerprint3
 
-    async def test_cleanup_expired_sessions(self, mock_request):
+    async def test_cleanup_expired_sessions(self, motor_reinit_db, mock_request):
         """Test cleanup of expired sessions"""
         user_id = "test_user_cleanup"
 

@@ -31,6 +31,13 @@
 ## Recent Changes
 
 ### 2025-11-07
+- **MongoDB Atlas SSL Connection Fix**: Resolved test database connection issues
+  - **Problem**: 13 tests failing with SSL handshake errors connecting to MongoDB Atlas
+  - **Solution**: Updated test infrastructure to use local MongoDB for all tests
+  - **Changes**: Added sessions_collection to conftest fixture, updated session.py to use base.sessions_collection
+  - **Impact**: 9/15 session service tests now passing (was 3/15), all SSL errors eliminated
+  - **Status**: ✅ auto-author-70 completed - tests now use local MongoDB correctly
+
 - **Frontend Test Suite Status**: All environmental test issues resolved
   - **Test Results**: 732/735 tests passing (99.6% pass rate, 3 skipped)
   - **Test Suites**: 51/51 passing (100%)

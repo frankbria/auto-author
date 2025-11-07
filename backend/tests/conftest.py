@@ -25,6 +25,7 @@ _sync_db = _sync_client.get_default_database()
 _sync_users = _sync_db.get_collection("users")
 _sync_books = _sync_db.get_collection("books")
 _sync_logs = _sync_db.get_collection("audit_logs")
+_sync_sessions = _sync_db.get_collection("sessions")
 
 def fake_get_rate_limiter(limit: int = 10, window: int = 60):
     """
@@ -88,6 +89,7 @@ def motor_reinit_db():
     base.users_collection = base._db.get_collection("users")
     base.books_collection = base._db.get_collection("books")
     base.audit_logs_collection = base._db.get_collection("audit_logs")
+    base.sessions_collection = base._db.get_collection("sessions")
 
     books_dao.books_collection = base.books_collection
     books_dao.users_collection = base.users_collection
