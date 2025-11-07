@@ -94,7 +94,3 @@ hive-mind-prompt-*.txt
 # Deployment archives and documentation exports
 *.tar.gz
 repomix-output.xml
-
-# bd (Beads) issue tracker - local task tracking data
-.beads/
-!.beads/.gitkeep
