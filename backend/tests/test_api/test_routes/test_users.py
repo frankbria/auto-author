@@ -24,15 +24,20 @@ async def test_read_users_me(auth_client_factory, test_user):
     assert data["clerk_id"] == test_user["clerk_id"]
 
 
-def test_missing_token(client):
+def test_missing_token(client, monkeypatch):
     """
-    Test that the /users/me endpoint returns a 403 error when no token is provided
+    Test that the /users/me endpoint returns a 401 error when no token is provided
     """
+    # CRITICAL: Disable BYPASS_AUTH to test actual token verification
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "BYPASS_AUTH", False)
+
     response = client.get("/api/v1/users/me")
 
-    # FastAPI's HTTPBearer returns 403 Forbidden when no token is provided
-    assert response.status_code == 403
+    # Should return 401 Unauthorized when no authentication is provided
+    assert response.status_code == 401
     assert "detail" in response.json()
+    assert "missing authentication credentials" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -40,6 +45,9 @@ async def test_invalid_token(auth_client_factory, invalid_jwt_token, monkeypatch
     """
     Test that the /users/me endpoint returns a 401 error when an invalid token is provided
     """
+    # CRITICAL: Disable BYPASS_AUTH to test actual token verification
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "BYPASS_AUTH", False)
 
     # 1) Force verify_jwt_token to blow up with an HTTPException(401)
     def fail_verify(token: str):

@@ -19,11 +19,7 @@ No tasks currently in progress.
 
 ### ✅ Ready to Start
 
-- **[auto-author-71]** SECURITY: Fix auth middleware - invalid tokens being accepted
-  - Priority: 0
-  - No blocking dependencies
-
-- **[auto-author-70]** Fix MongoDB Atlas SSL connection failures in backend tests
+- **[auto-author-67]** Fix bookClient.test.tsx: 'should set auth token' test failure
   - Priority: 0
   - No blocking dependencies
 
@@ -31,23 +27,11 @@ No tasks currently in progress.
   - Priority: 0
   - No blocking dependencies
 
-- **[auto-author-67]** Fix bookClient.test.tsx: 'should set auth token' test failure
+- **[auto-author-70]** Fix MongoDB Atlas SSL connection failures in backend tests
   - Priority: 0
   - No blocking dependencies
 
-- **[auto-author-53]** Execute deployment testing checklist on staging
-  - Priority: 0
-  - No blocking dependencies
-
-- **[auto-author-72]** Fix auth middleware status code precedence (5 tests)
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-68]** Fix BookCard.test.tsx: Date formatting timezone issue
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-61]** Backend coverage sprint - Security & Auth (41% → 55%)
+- **[auto-author-59]** Create comprehensive E2E test suite for all critical user journeys
   - Priority: 1
   - No blocking dependencies
 
@@ -55,15 +39,28 @@ No tasks currently in progress.
   - Priority: 1
   - No blocking dependencies
 
-- **[auto-author-59]** Create comprehensive E2E test suite for all critical user journeys
+- **[auto-author-61]** Backend coverage sprint - Security & Auth (41% → 55%)
   - Priority: 1
+  - No blocking dependencies
+
+- **[auto-author-68]** Fix BookCard.test.tsx: Date formatting timezone issue
+  - Priority: 1
+  - No blocking dependencies
+
+- **[auto-author-72]** Fix auth middleware status code precedence (5 tests)
+  - Priority: 1
+  - No blocking dependencies
+
+- **[auto-author-63]** Review and cleanup obsolete documentation (34 files in claudedocs/)
+  - Priority: 2
+  - No blocking dependencies
+
+- **[auto-author-73]** Fix user agent parsing for iOS/mobile device detection
+  - Priority: 2
   - No blocking dependencies
 
 
 ### 📋 Planned (Open)
-
-- **[auto-author-71]** SECURITY: Fix auth middleware - invalid tokens being accepted
-  - Priority: 0
 
 - **[auto-author-70]** Fix MongoDB Atlas SSL connection failures in backend tests
   - Priority: 0
@@ -203,6 +200,10 @@ No tasks currently in progress.
 
 ### ✅ Completed This Week
 
+- **[auto-author-71]** SECURITY: Fix auth middleware - invalid tokens being accepted
+  - Closed: 2025-11-06T17:27:02.775927832-07:00
+  - Reason: none
+
 - **[auto-author-66]** Add dotenv to frontend dependencies for E2E tests
   - Closed: 2025-11-06T15:25:14.855239534-07:00
   - Reason: none
@@ -245,9 +246,9 @@ No tasks currently in progress.
 ## 📊 Sprint Metrics
 
 - **Total Issues**: 73
-- **Open**: 46
+- **Open**: 45
 - **In Progress**: 0
-- **Closed**: 27
+- **Closed**: 28
 - **Ready to Start**: 10
 
 ---

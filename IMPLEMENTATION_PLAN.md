@@ -2,7 +2,7 @@
 
 **Last Updated**: 2025-11-06
 **Status**: Active Development
-**Current Phase**: Feature Development (36% complete)
+**Current Phase**: Feature Development (38% complete)
 
 > ℹ️ **NOTE**: This is a high-level implementation roadmap organized by priority and status.
 > For current task status and details, run: `bd list` or `bd ready`
@@ -22,14 +22,14 @@ This document serves as the single source of truth for the Auto-Author implement
 
 ### Project Overview
 
-**Progress**: 27 of 73 tasks complete (36%)
+**Progress**: 28 of 73 tasks complete (38%)
 
 **Status Breakdown**:
-- ✅ Completed: 27 tasks
+- ✅ Completed: 28 tasks
 - 🚧 In Progress: 0 tasks
 - 📋 Ready to Start: 10 tasks (no blockers)
 - 🔒 Blocked: 8 tasks
-- 📝 Planned: 46 tasks
+- 📝 Planned: 45 tasks
 
 **Priority Distribution**:
 - P0 (Critical): 23 tasks
@@ -55,15 +55,15 @@ No tasks currently in progress.
 
 **P0 Critical Path** (23 total):
 
-#### auto-author-71: SECURITY: Fix auth middleware - invalid tokens being accepted
+#### auto-author-67: Fix bookClient.test.tsx: 'should set auth token' test failure
 **Type**: bug
 
-CRITICAL SECURITY VULNERABILITY: test_invalid_token shows invalid JWT tokens return 200 OK instead of 401 Unauthorized. Auth middleware is not validating tokens properly. This allows unauthorized access with any token string. Must fix immediately. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.4.
-
-#### auto-author-70: Fix MongoDB Atlas SSL connection failures in backend tests
-**Type**: bug
-
-13 tests failing with SSL handshake errors connecting to MongoDB Atlas (Connection reset by peer). Affects session service tests (12) and question generation tests (2). Investigate: network whitelist, SSL/TLS config, WSL2 networking, connection string parameters. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 1.
+Test: BookClient › Authentication and Headers › should set auth token
+File: src/__tests__/bookClient.test.tsx (lines 737-757)
+Issue: Test creates new client, sets auth token via setAuthToken('new-token'), calls getUserBooks(), but fetch mock shows 0 calls instead of expected 1.
+Root Cause: BookClient constructor or setAuthToken method likely not initializing properly, or method call may be async without proper await.
+Impact: Core authentication functionality not working as expected.
+Category: API Client / Authentication
 
 #### auto-author-69: Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
 **Type**: bug
@@ -75,28 +75,28 @@ Root Cause: Dashboard deletion flow not properly managing authentication token l
 Impact: Critical - book deletion may fail or be insecure without proper token management.
 Category: Dashboard / Authentication
 
-#### auto-author-67: Fix bookClient.test.tsx: 'should set auth token' test failure
+#### auto-author-70: Fix MongoDB Atlas SSL connection failures in backend tests
 **Type**: bug
 
-Test: BookClient › Authentication and Headers › should set auth token
-File: src/__tests__/bookClient.test.tsx (lines 737-757)
-Issue: Test creates new client, sets auth token via setAuthToken('new-token'), calls getUserBooks(), but fetch mock shows 0 calls instead of expected 1.
-Root Cause: BookClient constructor or setAuthToken method likely not initializing properly, or method call may be async without proper await.
-Impact: Core authentication functionality not working as expected.
-Category: API Client / Authentication
-
-#### auto-author-53: Execute deployment testing checklist on staging
-**Type**: task
-
-Use claudedocs/DEPLOYMENT-TESTING-CHECKLIST.md to validate staging deployment at dev.autoauthor.app. Test pre-flight checks, user journey, advanced features, security & performance
+13 tests failing with SSL handshake errors connecting to MongoDB Atlas (Connection reset by peer). Affects session service tests (12) and question generation tests (2). Investigate: network whitelist, SSL/TLS config, WSL2 networking, connection string parameters. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 1.
 
 
 **P1 High Priority** (19 total):
 
-#### auto-author-72: Fix auth middleware status code precedence (5 tests)
-**Type**: bug
+#### auto-author-59: Create comprehensive E2E test suite for all critical user journeys
+**Type**: task
 
-Auth middleware must run before route resolution. 5 tests expect 403/401 but getting 404/500: test_upload_book_cover_unauthorized (403→404), test_export_unauthorized (403→404), test_missing_token (403→500), test_account_deletion_requires_authentication (exception). Route guards should check auth BEFORE returning 404. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.
+Playwright tests for: book creation → summary → TOC generation → chapter editing → AI drafts → export. Target: 85% automation coverage per DEPLOYMENT-TESTING-CHECKLIST.md. Must run in CI/CD before deployment.
+
+#### auto-author-60: Fix 75 frontend test environmental failures
+**Type**: task
+
+All failures are mock/config issues, not code bugs. Phase 1: Next.js router mock (42 tests, 90min). Phase 2: Module imports (3 suites, 60min). Phase 3: ResizeObserver mock (3 tests, 30min). Phase 4: Test infrastructure (12 tests, 2hr). Total: 3.5-5.5 hours.
+
+#### auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
+**Type**: task
+
+CRITICAL: security.py from 18% → 100% (JWT verification). dependencies.py from 25% → 100%. Add 45-55 new tests. Estimated: 1 week. This is a SECURITY RISK - prioritize before other features.
 
 #### auto-author-68: Fix BookCard.test.tsx: Date formatting timezone issue
 **Type**: bug
@@ -110,20 +110,10 @@ Actual: Jan 14, 2024
 Impact: Visual bug - users see incorrect last-edited dates.
 Category: UI / Date Formatting
 
-#### auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
-**Type**: task
+#### auto-author-72: Fix auth middleware status code precedence (5 tests)
+**Type**: bug
 
-CRITICAL: security.py from 18% → 100% (JWT verification). dependencies.py from 25% → 100%. Add 45-55 new tests. Estimated: 1 week. This is a SECURITY RISK - prioritize before other features.
-
-#### auto-author-60: Fix 75 frontend test environmental failures
-**Type**: task
-
-All failures are mock/config issues, not code bugs. Phase 1: Next.js router mock (42 tests, 90min). Phase 2: Module imports (3 suites, 60min). Phase 3: ResizeObserver mock (3 tests, 30min). Phase 4: Test infrastructure (12 tests, 2hr). Total: 3.5-5.5 hours.
-
-#### auto-author-59: Create comprehensive E2E test suite for all critical user journeys
-**Type**: task
-
-Playwright tests for: book creation → summary → TOC generation → chapter editing → AI drafts → export. Target: 85% automation coverage per DEPLOYMENT-TESTING-CHECKLIST.md. Must run in CI/CD before deployment.
+Auth middleware must run before route resolution. 5 tests expect 403/401 but getting 404/500: test_upload_book_cover_unauthorized (403→404), test_export_unauthorized (403→404), test_missing_token (403→500), test_account_deletion_requires_authentication (exception). Route guards should check auth BEFORE returning 404. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.
 
 
 ### Blocked Tasks
@@ -190,13 +180,6 @@ Accessibility statement, issue remediation plan, testing checklist updates. Esti
 ## Planned Work
 
 ### P0 Critical Path
-
-#### auto-author-71: SECURITY: Fix auth middleware - invalid tokens being accepted
-**Type**: bug
-
-CRITICAL SECURITY VULNERABILITY: test_invalid_token shows invalid JWT tokens return 200 OK instead of 401 Unauthorized. Auth middleware is not validating tokens properly. This allows unauthorized access with any token string. Must fix immediately. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.4.
-
-**Dependencies**: None
 
 #### auto-author-70: Fix MongoDB Atlas SSL connection failures in backend tests
 **Type**: bug
@@ -544,7 +527,12 @@ Run axe-core and Lighthouse audits on all components. Component-by-component val
 
 ## Completed Work
 
-**Total Completed**: 27 tasks (36%)
+**Total Completed**: 28 tasks (38%)
+
+#### ✅ auto-author-71: SECURITY: Fix auth middleware - invalid tokens being accepted
+**Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T17:27:02.775927832-07:00
+
+No reason provided
 
 #### ✅ auto-author-66: Add dotenv to frontend dependencies for E2E tests
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T15:25:14.855239534-07:00
@@ -697,7 +685,7 @@ No tasks with dependencies.
 
 The following critical and high-priority tasks must be completed for production deployment:
 
-- [ ] SECURITY: Fix auth middleware - invalid tokens being accepted (auto-author-71) - P0
+- [x] SECURITY: Fix auth middleware - invalid tokens being accepted (auto-author-71) - P0
 - [ ] Fix MongoDB Atlas SSL connection failures in backend tests (auto-author-70) - P0
 - [ ] Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion (auto-author-69) - P0
 - [ ] Fix bookClient.test.tsx: 'should set auth token' test failure (auto-author-67) - P0
