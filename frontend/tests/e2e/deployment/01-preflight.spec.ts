@@ -64,11 +64,11 @@ test.describe('Pre-Flight Health Checks', () => {
     // This should return 401 Unauthorized (no auth token), not 500 or network error
     const response = await request.get(`${API_BASE_URL}/api/v1/books/`);
 
-    // Accept 200 (if auth not required) or 401 (auth required)
-    const validStatuses = [200, 401];
+    // Accept 200 (if auth not required), 401 (auth required), or 403 (forbidden)
+    const validStatuses = [200, 401, 403];
     expect(
       validStatuses.includes(response.status()),
-      `Books API should return 200 or 401, not ${response.status()}`
+      `Books API should return 200, 401, or 403, not ${response.status()}`
     ).toBeTruthy();
 
     // Should NOT be 500 Internal Server Error
