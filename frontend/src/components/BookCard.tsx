@@ -44,10 +44,13 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
     if (isNaN(date.getTime())) {
       return 'Never';
     }
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    // Use UTC date to avoid timezone conversion issues
+    // This ensures the displayed date matches the stored UTC date
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC'
     });
   };
   
