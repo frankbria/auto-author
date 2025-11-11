@@ -90,7 +90,7 @@ class TestSessionService:
         """Test validating an expired session"""
         user_id = "test_user_expired"
 
-        # Create session with immediate expiry
+        # Create session that expired 1 hour ago (use large window to avoid timing flakiness)
         from app.db.session import create_session
         from app.models.session import SessionCreate
 
@@ -98,7 +98,7 @@ class TestSessionService:
         session_data = SessionCreate(
             user_id=user_id,
             metadata=metadata,
-            expires_at=datetime.now(timezone.utc) - timedelta(seconds=1)  # Already expired
+            expires_at=datetime.now(timezone.utc) - timedelta(hours=1)  # Expired 1 hour ago
         )
         session = await create_session(session_data)
 

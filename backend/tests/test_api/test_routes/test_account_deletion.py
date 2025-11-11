@@ -86,8 +86,8 @@ async def test_account_deletion_requires_authentication(auth_client_factory):
     # Make the request without authentication headers
     response = await client.delete("/api/v1/users/me")
 
-    # Assert forbidden response - expect 403 Forbidden precisely
-    assert response.status_code == 403
+    # Assert unauthorized response - expect 401 Unauthorized for missing auth
+    assert response.status_code == 401
     data = response.json()
 
     # Verify response indicates authentication issue

@@ -197,8 +197,8 @@ class TestExportEndpoints:
     async def test_export_unauthorized(self, client):
         """Test export without authentication."""
         response = client.get("/api/v1/books/some_id/export/pdf")
-        
-        assert response.status_code == 403  # FastAPI returns 403 for missing auth
+
+        assert response.status_code == 401  # 401 Unauthorized for missing auth
     
     @pytest.mark.asyncio
     async def test_export_not_owner(self, auth_client_factory):

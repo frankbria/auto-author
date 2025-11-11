@@ -2267,3 +2267,17 @@ fatal: Need to specify how to reconcile divergent branches.
 [2025-11-07 12:56:03] Pulled from remote
 [2025-11-07 12:56:03] Imported from JSONL
 [2025-11-07 12:56:03] Auto-import complete
+[2025-11-10 20:47:49] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-11-10 20:47:49] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-10 20:47:50] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-11-10 20:47:50] Repository fingerprint validated: b73d87bf
+[2025-11-10 20:47:50] Starting RPC server: /home/frankbria/projects/auto-author/.beads/bd.sock
+[2025-11-10 20:47:50] RPC server ready (socket listening)
+[2025-11-10 20:47:50] Registered in global registry
+[2025-11-10 20:47:50] Starting sync cycle...
+[2025-11-10 20:47:50] Exported to JSONL
+[2025-11-10 20:47:50] Pull failed: git pull failed: exit status 128
+error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+
+[2025-11-10 20:47:50] Using event-driven mode

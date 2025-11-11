@@ -44,9 +44,10 @@ def extract_session_metadata(request: Request) -> SessionMetadata:
 
     # Parse device type from user agent
     device_type = "desktop"
-    if "mobile" in user_agent.lower():
+    user_agent_lower = user_agent.lower()
+    if "mobile" in user_agent_lower or "iphone" in user_agent_lower:
         device_type = "mobile"
-    elif "tablet" in user_agent.lower():
+    elif "tablet" in user_agent_lower or "ipad" in user_agent_lower:
         device_type = "tablet"
 
     # Parse browser (simple heuristic)
@@ -60,18 +61,18 @@ def extract_session_metadata(request: Request) -> SessionMetadata:
     elif "Edge" in user_agent:
         browser = "Edge"
 
-    # Parse OS
+    # Parse OS - check iOS/iPhone BEFORE Mac (iOS user agents contain "Mac OS X")
     os = "unknown"
     if "Windows" in user_agent:
         os = "Windows"
+    elif "Android" in user_agent:
+        os = "Android"
+    elif "iOS" in user_agent or "iPhone" in user_agent or "iPad" in user_agent:
+        os = "iOS"
     elif "Mac" in user_agent:
         os = "MacOS"
     elif "Linux" in user_agent:
         os = "Linux"
-    elif "Android" in user_agent:
-        os = "Android"
-    elif "iOS" in user_agent or "iPhone" in user_agent:
-        os = "iOS"
 
     return SessionMetadata(
         ip_address=request.client.host if request.client else None,
@@ -200,8 +201,15 @@ async def validate_session(session_id: str, request: Request) -> Optional[Sessio
                 )
                 session.is_suspicious = True
 
-    # Update activity
-    await update_session_activity(session_id, request.url.path)
+    # Update activity and get updated session
+    updated_session = await update_session_activity(session_id, request.url.path)
+
+    # Return the updated session if available, otherwise return the original with suspicious flag
+    if updated_session:
+        # Transfer suspicious flag to updated session if it was set
+        if session.is_suspicious:
+            updated_session.is_suspicious = True
+        return updated_session
 
     return session
 

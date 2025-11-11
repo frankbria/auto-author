@@ -147,8 +147,8 @@ class TestBookCoverUpload:
             "/api/v1/books/some_book_id/cover-image",
             files=files
         )
-        
-        assert response.status_code == 403  # FastAPI returns 403 for missing auth
+
+        assert response.status_code == 401  # 401 Unauthorized for missing auth
     
     @pytest.mark.asyncio
     async def test_upload_book_cover_invalid_file_type(self, test_book_with_auth):

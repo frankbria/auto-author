@@ -1,8 +1,8 @@
 # Auto-Author Implementation Plan
 
-**Last Updated**: 2025-11-07
+**Last Updated**: 2025-11-10
 **Status**: Active Development
-**Current Phase**: Feature Development (38% complete)
+**Current Phase**: Feature Development (44% complete)
 
 > ℹ️ **NOTE**: This is a high-level implementation roadmap organized by priority and status.
 > For current task status and details, run: `bd list` or `bd ready`
@@ -22,23 +22,23 @@ This document serves as the single source of truth for the Auto-Author implement
 
 ### Project Overview
 
-**Progress**: 28 of 73 tasks complete (38%)
+**Progress**: 33 of 74 tasks complete (44%)
 
 **Status Breakdown**:
-- ✅ Completed: 28 tasks
+- ✅ Completed: 33 tasks
 - 🚧 In Progress: 0 tasks
 - 📋 Ready to Start: 10 tasks (no blockers)
 - 🔒 Blocked: 8 tasks
-- 📝 Planned: 45 tasks
+- 📝 Planned: 41 tasks
 
 **Priority Distribution**:
 - P0 (Critical): 23 tasks
-- P1 (High): 19 tasks
+- P1 (High): 20 tasks
 - P2 (Medium): 9 tasks
 - P3 (Low): 22 tasks
 
 **Type Breakdown**:
-- 🐛 Bugs: 13
+- 🐛 Bugs: 14
 - ✨ Features: 41
 - 📋 Tasks: 19
 
@@ -55,65 +55,30 @@ No tasks currently in progress.
 
 **P0 Critical Path** (23 total):
 
-#### auto-author-67: Fix bookClient.test.tsx: 'should set auth token' test failure
-**Type**: bug
-
-Test: BookClient › Authentication and Headers › should set auth token
-File: src/__tests__/bookClient.test.tsx (lines 737-757)
-Issue: Test creates new client, sets auth token via setAuthToken('new-token'), calls getUserBooks(), but fetch mock shows 0 calls instead of expected 1.
-Root Cause: BookClient constructor or setAuthToken method likely not initializing properly, or method call may be async without proper await.
-Impact: Core authentication functionality not working as expected.
-Category: API Client / Authentication
-
-#### auto-author-69: Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
-**Type**: bug
-
-Test: Dashboard - Book Deletion › should maintain correct auth token for deletion
-File: src/__tests__/pages/DashboardBookDelete.test.tsx (lines 349-369)
-Issue: Test verifies auth token is retrieved and set before book deletion API call, but one or more of these conditions fails: mockGetToken not called, bookClient.setAuthToken not called with token, or incorrect timing/order.
-Root Cause: Dashboard deletion flow not properly managing authentication token lifecycle.
-Impact: Critical - book deletion may fail or be insecure without proper token management.
-Category: Dashboard / Authentication
-
-#### auto-author-70: Fix MongoDB Atlas SSL connection failures in backend tests
-**Type**: bug
-
-13 tests failing with SSL handshake errors connecting to MongoDB Atlas (Connection reset by peer). Affects session service tests (12) and question generation tests (2). Investigate: network whitelist, SSL/TLS config, WSL2 networking, connection string parameters. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 1.
+No P0 tasks ready to start.
 
 
-**P1 High Priority** (19 total):
+**P1 High Priority** (20 total):
 
-#### auto-author-59: Create comprehensive E2E test suite for all critical user journeys
+#### auto-author-6: Operational Requirements - User action tracking
+**Type**: feature
+
+Implement user action tracking system. Estimated: 6 hours
+
+#### auto-author-9: Operational Requirements - Data backup verification
+**Type**: feature
+
+Verify data backup processes and recovery. Estimated: 2 hours
+
+#### auto-author-10: Operational Requirements - SLA monitoring setup
+**Type**: feature
+
+Set up SLA monitoring and alerting. Estimated: 2 hours
+
+#### auto-author-17: Settings & Help Pages - Help documentation
 **Type**: task
 
-Playwright tests for: book creation → summary → TOC generation → chapter editing → AI drafts → export. Target: 85% automation coverage per DEPLOYMENT-TESTING-CHECKLIST.md. Must run in CI/CD before deployment.
-
-#### auto-author-60: Fix 75 frontend test environmental failures
-**Type**: task
-
-All failures are mock/config issues, not code bugs. Phase 1: Next.js router mock (42 tests, 90min). Phase 2: Module imports (3 suites, 60min). Phase 3: ResizeObserver mock (3 tests, 30min). Phase 4: Test infrastructure (12 tests, 2hr). Total: 3.5-5.5 hours.
-
-#### auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
-**Type**: task
-
-CRITICAL: security.py from 18% → 100% (JWT verification). dependencies.py from 25% → 100%. Add 45-55 new tests. Estimated: 1 week. This is a SECURITY RISK - prioritize before other features.
-
-#### auto-author-68: Fix BookCard.test.tsx: Date formatting timezone issue
-**Type**: bug
-
-Test: BookCard › should format date correctly
-File: src/__tests__/bookClient.test.tsx (lines 119-125)
-Issue: Test expects 'Jan 15, 2024' but component renders 'Jan 14, 2024'
-Root Cause: Timezone conversion. updated_at is '2024-01-15T00:00:00Z' (UTC) but formatting converts to local time, showing previous day depending on timezone.
-Expected: Jan 15, 2024
-Actual: Jan 14, 2024
-Impact: Visual bug - users see incorrect last-edited dates.
-Category: UI / Date Formatting
-
-#### auto-author-72: Fix auth middleware status code precedence (5 tests)
-**Type**: bug
-
-Auth middleware must run before route resolution. 5 tests expect 403/401 but getting 404/500: test_upload_book_cover_unauthorized (403→404), test_export_unauthorized (403→404), test_missing_token (403→500), test_account_deletion_requires_authentication (exception). Route guards should check auth BEFORE returning 404. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.
+Create comprehensive help documentation. Estimated: 8 hours
 
 
 ### Blocked Tasks
@@ -181,37 +146,6 @@ Accessibility statement, issue remediation plan, testing checklist updates. Esti
 
 ### P0 Critical Path
 
-#### auto-author-70: Fix MongoDB Atlas SSL connection failures in backend tests
-**Type**: bug
-
-13 tests failing with SSL handshake errors connecting to MongoDB Atlas (Connection reset by peer). Affects session service tests (12) and question generation tests (2). Investigate: network whitelist, SSL/TLS config, WSL2 networking, connection string parameters. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 1.
-
-**Dependencies**: None
-
-#### auto-author-69: Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
-**Type**: bug
-
-Test: Dashboard - Book Deletion › should maintain correct auth token for deletion
-File: src/__tests__/pages/DashboardBookDelete.test.tsx (lines 349-369)
-Issue: Test verifies auth token is retrieved and set before book deletion API call, but one or more of these conditions fails: mockGetToken not called, bookClient.setAuthToken not called with token, or incorrect timing/order.
-Root Cause: Dashboard deletion flow not properly managing authentication token lifecycle.
-Impact: Critical - book deletion may fail or be insecure without proper token management.
-Category: Dashboard / Authentication
-
-**Dependencies**: None
-
-#### auto-author-67: Fix bookClient.test.tsx: 'should set auth token' test failure
-**Type**: bug
-
-Test: BookClient › Authentication and Headers › should set auth token
-File: src/__tests__/bookClient.test.tsx (lines 737-757)
-Issue: Test creates new client, sets auth token via setAuthToken('new-token'), calls getUserBooks(), but fetch mock shows 0 calls instead of expected 1.
-Root Cause: BookClient constructor or setAuthToken method likely not initializing properly, or method call may be async without proper await.
-Impact: Core authentication functionality not working as expected.
-Category: API Client / Authentication
-
-**Dependencies**: None
-
 #### auto-author-53: Execute deployment testing checklist on staging
 **Type**: task
 
@@ -222,6 +156,13 @@ Use claudedocs/DEPLOYMENT-TESTING-CHECKLIST.md to validate staging deployment at
 
 ### P1 High Priority
 
+#### auto-author-03x: Debug and fix deployment E2E test hangs/timeouts
+**Type**: bug
+
+Deployment E2E tests hang indefinitely after 10+ minutes. Tests fail to complete even with servers running and BYPASS_AUTH enabled. Need to: 1) Identify why tests hang (likely missing data-testid attributes or incorrect selectors), 2) Fix page object selectors to match actual component structure, 3) Add missing data-testid attributes to components, 4) Verify tests complete in reasonable time (<2min each), 5) Get at least basic user journey test passing as proof-of-concept.
+
+**Dependencies**: None
+
 #### auto-author-72: Fix auth middleware status code precedence (5 tests)
 **Type**: bug
 
@@ -229,31 +170,10 @@ Auth middleware must run before route resolution. 5 tests expect 403/401 but get
 
 **Dependencies**: None
 
-#### auto-author-68: Fix BookCard.test.tsx: Date formatting timezone issue
-**Type**: bug
-
-Test: BookCard › should format date correctly
-File: src/__tests__/bookClient.test.tsx (lines 119-125)
-Issue: Test expects 'Jan 15, 2024' but component renders 'Jan 14, 2024'
-Root Cause: Timezone conversion. updated_at is '2024-01-15T00:00:00Z' (UTC) but formatting converts to local time, showing previous day depending on timezone.
-Expected: Jan 15, 2024
-Actual: Jan 14, 2024
-Impact: Visual bug - users see incorrect last-edited dates.
-Category: UI / Date Formatting
-
-**Dependencies**: None
-
 #### auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
 **Type**: task
 
 CRITICAL: security.py from 18% → 100% (JWT verification). dependencies.py from 25% → 100%. Add 45-55 new tests. Estimated: 1 week. This is a SECURITY RISK - prioritize before other features.
-
-**Dependencies**: None
-
-#### auto-author-60: Fix 75 frontend test environmental failures
-**Type**: task
-
-All failures are mock/config issues, not code bugs. Phase 1: Next.js router mock (42 tests, 90min). Phase 2: Module imports (3 suites, 60min). Phase 3: ResizeObserver mock (3 tests, 30min). Phase 4: Test infrastructure (12 tests, 2hr). Total: 3.5-5.5 hours.
 
 **Dependencies**: None
 
@@ -527,10 +447,25 @@ Run axe-core and Lighthouse audits on all components. Component-by-component val
 
 ## Completed Work
 
-**Total Completed**: 28 tasks (38%)
+**Total Completed**: 33 tasks (44%)
 
 #### ✅ auto-author-71: SECURITY: Fix auth middleware - invalid tokens being accepted
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T17:27:02.775927832-07:00
+
+No reason provided
+
+#### ✅ auto-author-70: Fix MongoDB Atlas SSL connection failures in backend tests
+**Priority**: P0 | **Type**: bug | **Closed**: 2025-11-07T12:43:41.557318205-07:00
+
+No reason provided
+
+#### ✅ auto-author-69: Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
+**Priority**: P0 | **Type**: bug | **Closed**: 2025-11-07T09:46:01.552817744-07:00
+
+No reason provided
+
+#### ✅ auto-author-67: Fix bookClient.test.tsx: 'should set auth token' test failure
+**Priority**: P0 | **Type**: bug | **Closed**: 2025-11-07T09:46:00.316849477-07:00
 
 No reason provided
 
@@ -624,8 +559,18 @@ No reason provided
 
 No reason provided
 
+#### ✅ auto-author-68: Fix BookCard.test.tsx: Date formatting timezone issue
+**Priority**: P1 | **Type**: bug | **Closed**: 2025-11-07T10:18:28.403055141-07:00
+
+No reason provided
+
 #### ✅ auto-author-62: Create .pre-commit-config.yaml with test enforcement hooks
 **Priority**: P1 | **Type**: task | **Closed**: 2025-11-06T14:22:04.295594198-07:00
+
+No reason provided
+
+#### ✅ auto-author-60: Fix 75 frontend test environmental failures
+**Priority**: P1 | **Type**: task | **Closed**: 2025-11-07T10:54:09.807537853-07:00
 
 No reason provided
 
@@ -686,9 +631,9 @@ No tasks with dependencies.
 The following critical and high-priority tasks must be completed for production deployment:
 
 - [x] SECURITY: Fix auth middleware - invalid tokens being accepted (auto-author-71) - P0
-- [ ] Fix MongoDB Atlas SSL connection failures in backend tests (auto-author-70) - P0
-- [ ] Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion (auto-author-69) - P0
-- [ ] Fix bookClient.test.tsx: 'should set auth token' test failure (auto-author-67) - P0
+- [x] Fix MongoDB Atlas SSL connection failures in backend tests (auto-author-70) - P0
+- [x] Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion (auto-author-69) - P0
+- [x] Fix bookClient.test.tsx: 'should set auth token' test failure (auto-author-67) - P0
 - [x] Add dotenv to frontend dependencies for E2E tests (auto-author-66) - P0
 - [x] Fix backend session_middleware import error (auto-author-65) - P0
 - [x] Fix TypeScript errors blocking frontend tests (auto-author-64) - P0
@@ -708,11 +653,12 @@ The following critical and high-priority tasks must be completed for production 
 - [x] Export Feature - PDF/DOCX (auto-author-20) - P0
 - [x] Operational Requirements - Session management (auto-author-8) - P0
 - [x] Operational Requirements - Error logging and monitoring (auto-author-7) - P0
+- [ ] Debug and fix deployment E2E test hangs/timeouts (auto-author-03x) - P1
 - [ ] Fix auth middleware status code precedence (5 tests) (auto-author-72) - P1
-- [ ] Fix BookCard.test.tsx: Date formatting timezone issue (auto-author-68) - P1
+- [x] Fix BookCard.test.tsx: Date formatting timezone issue (auto-author-68) - P1
 - [x] Create .pre-commit-config.yaml with test enforcement hooks (auto-author-62) - P1
 - [ ] Backend coverage sprint - Security & Auth (41% → 55%) (auto-author-61) - P1
-- [ ] Fix 75 frontend test environmental failures (auto-author-60) - P1
+- [x] Fix 75 frontend test environmental failures (auto-author-60) - P1
 - [ ] Create comprehensive E2E test suite for all critical user journeys (auto-author-59) - P1
 - [ ] Fix remaining 2 test failures in TabStatePersistence (auto-author-52) - P1
 - [x] Auto-start MongoDB on WSL shell initialization (non-blocking) (auto-author-51) - P1
@@ -791,6 +737,6 @@ bd close <task-id> --reason "Completed in PR #123"
 
 ---
 
-**Generated**: 2025-11-07
+**Generated**: 2025-11-10
 **Command**: `./scripts/export-implementation-plan.sh`
 **Source of Truth**: bd database (priority and status-driven)
