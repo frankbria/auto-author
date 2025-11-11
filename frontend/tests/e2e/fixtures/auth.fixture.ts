@@ -38,6 +38,23 @@ export async function authenticateUser(
   page: Page,
   credentials?: AuthCredentials
 ): Promise<void> {
+  // Check if BYPASS_AUTH is enabled (for testing without Clerk)
+  const bypassAuth = process.env.BYPASS_AUTH === 'true';
+
+  if (bypassAuth) {
+    console.log('⚠️ BYPASS_AUTH enabled - skipping Clerk authentication');
+
+    // Navigate directly to dashboard
+    await page.goto('/dashboard');
+
+    // Wait for dashboard to load
+    await page.waitForLoadState('networkidle');
+
+    console.log('✅ User authenticated successfully (BYPASS_AUTH mode)');
+    return;
+  }
+
+  // Normal Clerk authentication flow
   const { email, password } = credentials || getTestCredentials();
 
   // Navigate to homepage
