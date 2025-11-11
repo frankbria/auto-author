@@ -38,11 +38,11 @@ export async function authenticateUser(
   page: Page,
   credentials?: AuthCredentials
 ): Promise<void> {
-  // Check if BYPASS_AUTH is enabled (for testing without Clerk)
-  const bypassAuth = process.env.BYPASS_AUTH === 'true';
+  // Check if NEXT_PUBLIC_BYPASS_AUTH is enabled (for testing without Clerk)
+  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   if (bypassAuth) {
-    console.log('⚠️ BYPASS_AUTH enabled - skipping Clerk authentication');
+    console.log('⚠️ NEXT_PUBLIC_BYPASS_AUTH enabled - skipping Clerk authentication');
 
     // Navigate directly to dashboard
     await page.goto('/dashboard');
@@ -50,7 +50,7 @@ export async function authenticateUser(
     // Wait for dashboard to load
     await page.waitForLoadState('networkidle');
 
-    console.log('✅ User authenticated successfully (BYPASS_AUTH mode)');
+    console.log('✅ User authenticated successfully (NEXT_PUBLIC_BYPASS_AUTH mode)');
     return;
   }
 

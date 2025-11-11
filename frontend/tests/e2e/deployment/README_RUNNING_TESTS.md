@@ -25,7 +25,7 @@ These tests require a **fully running environment** with real API access:
 
 5. **✅ Clerk Authentication**: Configured for development
    - Test user created
-   - Or use `BYPASS_AUTH=true` for testing
+   - Or use `NEXT_PUBLIC_BYPASS_AUTH=true` for testing
 
 ## Running Tests
 
@@ -63,7 +63,7 @@ npx playwright test --config=tests/e2e/deployment/playwright.config.ts 06-draft-
 
 ```bash
 # For testing without real Clerk authentication
-BYPASS_AUTH=true npx playwright test --config=tests/e2e/deployment/playwright.config.ts
+NEXT_PUBLIC_BYPASS_AUTH=true npx playwright test --config=tests/e2e/deployment/playwright.config.ts
 ```
 
 ## Test Suites
@@ -155,8 +155,8 @@ npx playwright test --config=tests/e2e/deployment/playwright.config.ts --timeout
 - **Fix**: Update test selectors to match current UI
 
 **3. Authentication Failures**
-- **Cause**: Clerk not configured or BYPASS_AUTH not set
-- **Fix**: Set `BYPASS_AUTH=true` or configure Clerk test user
+- **Cause**: Clerk not configured or NEXT_PUBLIC_BYPASS_AUTH not set
+- **Fix**: Set `NEXT_PUBLIC_BYPASS_AUTH=true` or configure Clerk test user
 
 **4. Database Connection Errors**
 - **Cause**: MongoDB not running
@@ -178,7 +178,7 @@ These tests should run:
     npx playwright install --with-deps chromium
     npm run test:e2e:deployment
   env:
-    BYPASS_AUTH: true
+    NEXT_PUBLIC_BYPASS_AUTH: true
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
