@@ -174,37 +174,38 @@ mv -Tf "$CURRENT_DIR.tmp" "$CURRENT_DIR"
 echo "==> Restarting services..."
 
 # ============================================
-# FIX 4: Correct PM2 Backend Path
+# FIX 4: Correct PM2 Backend Path and Interpreter
 # ============================================
+cd "$CURRENT_DIR/backend"
+
 if pm2 describe auto-author-backend > /dev/null 2>&1; then
-    echo "==> Restarting existing backend service..."
-    pm2 restart auto-author-backend
-else
-    echo "==> Starting new backend service..."
-    # FIXED: Use $RELEASE_DIR instead of $CURRENT_DIR
-    pm2 start "$RELEASE_DIR/backend/.venv/bin/uvicorn" \
-        --name auto-author-backend \
-        -- app.main:app --host 0.0.0.0 --port 8000
+    echo "==> Deleting existing backend service to update path..."
+    pm2 delete auto-author-backend
 fi
+
+echo "==> Starting backend service with correct Python interpreter..."
+# FIXED: Use Python interpreter directly instead of uvicorn binary
+pm2 start .venv/bin/python \
+    --name auto-author-backend \
+    --cwd "$CURRENT_DIR/backend" \
+    -- -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # ============================================
 # FIX 5: Correct Frontend Directory Path
 # ============================================
-# FIXED: Use $RELEASE_DIR instead of $CURRENT_DIR
-cd "$RELEASE_DIR/frontend"
+cd "$CURRENT_DIR/frontend"
 # Load environment variables from .env.production
 set -a
 source .env.production
 set +a
 
 if pm2 describe auto-author-frontend > /dev/null 2>&1; then
-    echo "==> Restarting existing frontend service..."
-    pm2 restart auto-author-frontend
-else
-    echo "==> Starting new frontend service..."
-    # FIXED: Use $RELEASE_DIR instead of $CURRENT_DIR
-    pm2 start npm --name auto-author-frontend --cwd "$RELEASE_DIR/frontend" -- start
+    echo "==> Deleting existing frontend service to update path..."
+    pm2 delete auto-author-frontend
 fi
+
+echo "==> Starting frontend service..."
+pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start
 
 # Save PM2 configuration
 pm2 save

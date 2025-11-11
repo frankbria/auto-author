@@ -11,34 +11,34 @@ on:
 
 env:
   NODE_VERSION: '18'
-  PYTHON_VERSION: '3.9'
+  PYTHON_VERSION: '3.13'
 
 jobs:
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
-    
+
     environment:
       name: staging
       url: https://staging.auto-author.com
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
-    
+
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PYTHON_VERSION }}
-    
+
     - name: Build frontend
       working-directory: ./frontend
       env:
@@ -47,13 +47,13 @@ jobs:
       run: |
         npm ci
         npm run build
-    
+
     - name: Run smoke tests
       working-directory: ./frontend
       env:
         NEXT_PUBLIC_API_URL: ${{ secrets.STAGING_API_URL }}
       run: npm run test:smoke
-    
+
     - name: Deploy to staging
       env:
         DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_KEY }}
@@ -61,14 +61,14 @@ jobs:
       run: |
         echo "Deploying to staging environment..."
         # Add your deployment commands here
-    
+
     - name: Run post-deployment tests
       env:
         STAGING_URL: https://staging.auto-author.com
       run: |
         # Health check
         curl -f $STAGING_URL/health || exit 1
-        
+
         # Run API tests against staging
         cd backend
         python -m pytest tests/staging/ --base-url=$STAGING_URL
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-staging]
     if: always()
-    
+
     steps:
     - name: Notify Slack
       uses: 8398a7/action-slack@v3

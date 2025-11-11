@@ -9,7 +9,7 @@ on:
 
 env:
   NODE_VERSION: '18'
-  PYTHON_VERSION: '3.9'
+  PYTHON_VERSION: '3.13'
 
 jobs:
   pre-flight:
@@ -49,7 +49,8 @@ jobs:
 
       - name: Check for TODOs/FIXMEs
         run: |
-          if grep -r "TODO\|FIXME" frontend/src backend/app --exclude-dir=node_modules --exclude-dir=.venv; then
+          # Using -- to prevent grep from interpreting matches as flags
+          if grep -r "TODO\|FIXME" -- frontend/src backend/app 2>/dev/null | grep -v node_modules | grep -v .venv; then
             echo "⚠️  Found TODO/FIXME comments - review before production"
             exit 1
           fi
@@ -188,10 +189,24 @@ jobs:
           ln -snf "$RELEASE_DIR" "$CURRENT_DIR.tmp"
           mv -Tf "$CURRENT_DIR.tmp" "$CURRENT_DIR"
 
-          # Restart services
+          # Restart services (delete and restart to update paths)
           echo "==> Restarting services..."
-          pm2 restart auto-author-backend
-          pm2 restart auto-author-frontend
+          cd "$CURRENT_DIR/backend"
+          if pm2 describe auto-author-backend > /dev/null 2>&1; then
+            pm2 delete auto-author-backend
+          fi
+          pm2 start .venv/bin/python \
+            --name auto-author-backend \
+            --cwd "$CURRENT_DIR/backend" \
+            -- -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+          cd "$CURRENT_DIR/frontend"
+          if pm2 describe auto-author-frontend > /dev/null 2>&1; then
+            pm2 delete auto-author-frontend
+          fi
+          pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start
+
+          pm2 save
 
           # Wait for services to start
           sleep 5
