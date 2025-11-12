@@ -69,7 +69,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@axe-core/react": "^4.10.2",
+    "@axe-core/react": "^4.11.0",
     "@playwright/test": "^1.56.0",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
