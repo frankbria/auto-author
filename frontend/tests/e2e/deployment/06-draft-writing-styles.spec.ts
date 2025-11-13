@@ -25,6 +25,8 @@ import { NetworkMonitor } from '../helpers/network-monitor';
 import { BookFormPage } from '../page-objects/book-form.page';
 import { DashboardPage } from '../page-objects/dashboard.page';
 import { ChapterEditorPage } from '../page-objects/chapter-editor.page';
+import { SummaryPage } from '../page-objects/summary.page';
+import { TOCWizardPage } from '../page-objects/toc-wizard.page';
 
 /**
  * Writing Styles to Test
@@ -95,8 +97,8 @@ test.describe('Draft Generation: Writing Styles', () => {
     console.log('\n🔐 Authenticating user...');
     await authenticateUser(page);
 
-    // Create test book and chapter for draft generation
-    console.log('\n📚 Setting up test book and chapter...');
+    // Create test book
+    console.log('\n📚 Setting up test book...');
     const bookForm = new BookFormPage(page);
     await bookForm.gotoNewBook();
     await bookForm.fillBookDetails({
@@ -106,13 +108,39 @@ test.describe('Draft Generation: Writing Styles', () => {
 
     const result = await bookForm.submitAndWaitForAPI();
     bookId = result.bookId!;
+    console.log(`✅ Book created with ID: ${bookId}`);
 
-    // Navigate to first chapter
+    // Add book summary and navigate to TOC generation
+    console.log('\n📝 Adding book summary...');
+    const summaryPage = new SummaryPage(page);
+    await summaryPage.goto(bookId);
+    await summaryPage.fillSummary('A comprehensive guide for city dwellers to grow fresh produce in limited spaces, covering container selection, soil preparation, and plant care techniques.');
+    await summaryPage.clickContinueToTOC();
+    console.log('✅ Book summary added and navigated to TOC generation');
+
+    // Generate TOC to create chapters
+    console.log('\n📋 Generating TOC...');
+    const tocWizard = new TOCWizardPage(page);
+    await tocWizard.completeTOCGeneration([
+      { question: 'Who is your target audience?', answer: 'Professional urban gardeners and city dwellers with limited space' },
+      { question: 'What topics will you cover?', answer: 'Introduction to urban gardening, container selection, soil preparation, watering techniques, and plant care' },
+      { question: 'What does your audience want to learn?', answer: 'They want actionable advice and practical examples' },
+      { question: 'What challenges might they face?', answer: 'Limited space, lack of gardening knowledge, and inadequate resources' },
+      { question: 'How many chapters do you envision?', answer: '5-8 chapters covering all essential topics' }
+    ], 30000);
+    console.log('✅ TOC generated and saved');
+
+    // Navigate to book detail page and get first chapter
     await page.goto(`/dashboard/books/${bookId}`);
     await page.waitForLoadState('networkidle');
 
     const firstChapter = page.locator('[data-testid="chapter-item"]').first();
+    await firstChapter.waitFor({ state: 'visible', timeout: 10000 });
     chapterId = await firstChapter.getAttribute('data-chapter-id') || '';
+
+    if (!chapterId) {
+      throw new Error('Failed to get chapter ID - no chapters found after TOC generation');
+    }
 
     console.log(`✅ Test setup complete: Book ID: ${bookId}, Chapter ID: ${chapterId}`);
   });

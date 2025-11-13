@@ -44,7 +44,7 @@ export class BookFormPage {
    * Fill description field
    */
   async fillDescription(description: string): Promise<void> {
-    await this.page.fill('[name="description"]', description);
+    await this.page.fill('textarea[name="description"]', description);
   }
 
   /**
@@ -94,9 +94,12 @@ export class BookFormPage {
 
     const status = response.status();
 
-    // Extract book ID from URL after redirect
-    await this.page.waitForURL(/\/dashboard\/books\/[a-z0-9-]+$/, { timeout: 5000 });
-    const bookId = this.page.url().split('/').pop();
+    // Extract book ID from response body
+    const responseBody = await response.json();
+    const bookId = responseBody.id;
+
+    // Wait for redirect to book detail page
+    await this.page.waitForURL(`/dashboard/books/${bookId}`, { timeout: 5000 });
 
     console.log(`✅ Book created with ID: ${bookId}, status: ${status}`);
 

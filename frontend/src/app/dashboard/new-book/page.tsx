@@ -24,16 +24,16 @@ export default function NewBook() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       // Use the book client to create a new book
-      await bookClient.createBook({
+      const newBook = await bookClient.createBook({
         title: bookData.title,
         description: bookData.description
       });
-      
-      // Redirect to dashboard after successful creation
-      router.push('/dashboard');
+
+      // Redirect to the newly created book's detail page
+      router.push(`/dashboard/books/${newBook.id}`);
     } catch (error) {
       console.error('Error creating book:', error);
     } finally {
