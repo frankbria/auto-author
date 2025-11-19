@@ -1,0 +1,13 @@
+project_name: "auto-author"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+labels: []
+milestones: []
+date_format: yyyy-mm-dd
+max_column_width: 20
+backlog_directory: "backlog"
+default_editor: "nano"
+auto_open_browser: true
+default_port: 6420
+remote_operations: true
+auto_commit: false
