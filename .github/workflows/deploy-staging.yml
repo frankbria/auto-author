@@ -247,7 +247,10 @@ jobs:
           echo "==> Restarting backend service..."
           cd "$CURRENT_DIR/backend"
           source .venv/bin/activate
-          pm2 restart auto-author-backend || pm2 start "$(which uvicorn)" --name auto-author-backend --interpreter "$(which python)" -- app.main:app --host 0.0.0.0 --port 8000
+          # Delete and restart to ensure new release directory is used
+          pm2 delete auto-author-backend || true
+          pm2 start "$(which uvicorn)" --name auto-author-backend --interpreter "$(which python)" -- app.main:app --host 0.0.0.0 --port 8000
+          pm2 save
 
           # Restart frontend service with environment loaded
           echo "==> Restarting frontend service..."
@@ -256,7 +259,10 @@ jobs:
           set -a
           source .env.production
           set +a
-          pm2 restart auto-author-frontend || pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start
+          # Delete and restart to ensure new release directory is used
+          pm2 delete auto-author-frontend || true
+          pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start
+          pm2 save
 
           # Wait for services to start (Next.js needs more time)
           echo "==> Waiting for services to initialize..."
