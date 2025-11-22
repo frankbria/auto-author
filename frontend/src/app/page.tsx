@@ -57,14 +57,14 @@ export default function Home() {
           </p>
           <div className="space-x-4">
             <SignInButton mode="modal" fallbackRedirectUrl="/dashboard">
-              <button className="px-6 py-3 text-white font-semibold bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md transition">
+              <div className="px-6 py-3 text-white font-semibold bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md transition inline-block cursor-pointer">
                 Sign In
-              </button>
+              </div>
             </SignInButton>
             <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard">
-              <button className="px-6 py-3 text-white font-semibold bg-zinc-700 hover:bg-zinc-600 rounded-lg shadow-md transition">
+              <div className="px-6 py-3 text-white font-semibold bg-zinc-700 hover:bg-zinc-600 rounded-lg shadow-md transition inline-block cursor-pointer">
                 Sign Up
-              </button>
+              </div>
             </SignUpButton>
           </div>
         </div>
@@ -81,9 +81,9 @@ export default function Home() {
               </button>
             </Link>
             <SignOutButton>
-              <button className="px-6 py-3 text-white font-semibold bg-zinc-700 hover:bg-zinc-600 rounded-lg shadow-md transition">
+              <div className="px-6 py-3 text-white font-semibold bg-zinc-700 hover:bg-zinc-600 rounded-lg shadow-md transition inline-block cursor-pointer">
                 Sign Out
-              </button>
+              </div>
             </SignOutButton>
           </div>
         </div>
