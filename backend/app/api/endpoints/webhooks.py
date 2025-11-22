@@ -18,6 +18,12 @@ async def verify_webhook_signature(
     svix_signature: str = Header(None),
 ):
     """Verify the webhook signature from Clerk"""
+    # Debug logging - print all headers
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Webhook headers received: {dict(request.headers)}")
+    logger.info(f"svix-id: {svix_id}, svix-timestamp: {svix_timestamp}, svix-signature: {svix_signature}")
+
     if not settings.CLERK_WEBHOOK_SECRET:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
