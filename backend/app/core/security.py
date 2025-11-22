@@ -189,9 +189,44 @@ async def get_current_user(
             detail=f"Error fetching user: {e}",
         )
 
+    # If user doesn't exist in database, auto-create from Clerk data
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
-        )
+        try:
+            # Fetch user details from Clerk API
+            clerk_user_data = await get_clerk_user(user_id)
+
+            if not clerk_user_data:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found in Clerk"
+                )
+
+            # Import create_user here to avoid circular imports
+            from app.db.database import create_user
+            from app.schemas.user import UserCreate
+
+            # Extract user data from Clerk response
+            user_create = UserCreate(
+                clerk_id=user_id,
+                email=clerk_user_data["email_addresses"][0]["email_address"] if clerk_user_data.get("email_addresses") else None,
+                first_name=clerk_user_data.get("first_name"),
+                last_name=clerk_user_data.get("last_name"),
+                avatar_url=clerk_user_data.get("image_url"),
+                metadata=clerk_user_data.get("public_metadata", {}),
+            )
+
+            # Create user in database
+            user = await create_user(user_create.model_dump())
+
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            # Log error and return generic unauthorized
+            print(f"Error auto-creating user {user_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Failed to create user: {str(e)}"
+            )
 
     return user
