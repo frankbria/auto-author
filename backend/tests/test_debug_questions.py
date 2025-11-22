@@ -6,12 +6,12 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from app.services.question_generation_service import get_question_generation_service
 from app.schemas.book import QuestionDifficulty
-from app.db.database import get_collection
+from app.db import base  # Use fixture-managed collections
 
 
 async def create_test_book():
     """Create a test book with TOC"""
-    books_collection = await get_collection("books")
+    books_collection = base.books_collection  # Use fixture-managed collection
     
     book = {
         "_id": ObjectId(),
@@ -39,7 +39,7 @@ async def create_test_book():
 
 
 @pytest.mark.asyncio
-async def test_question_generation_direct():
+async def test_question_generation_direct(motor_reinit_db):  # Use correct fixture name
     """Test question generation directly without HTTP layer"""
     
     # Create test book
@@ -74,11 +74,11 @@ async def test_question_generation_direct():
         raise
     finally:
         # Cleanup
-        books_collection = await get_collection("books")
+        books_collection = base.books_collection  # Use fixture-managed collection
         await books_collection.delete_one({"_id": ObjectId(book_id)})
         
         # Also cleanup questions
-        questions_collection = await get_collection("questions")
+        questions_collection = base._db.get_collection("questions")  # Use db from fixture
         await questions_collection.delete_many({"book_id": book_id})
 
 
