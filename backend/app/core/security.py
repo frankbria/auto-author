@@ -53,6 +53,13 @@ async def verify_jwt_token(token: str) -> Dict[str, Any]:
         # Decode header to get the key ID (kid)
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get('kid')
+        
+        # Decode without verification to see what's in the token
+        import time
+        unverified_payload = jwt.get_unverified_claims(token)
+        current_time = int(time.time())
+        token_exp = unverified_payload.get('exp', 0)
+        print(f"JWT Debug: current_time={current_time}, token_exp={token_exp}, diff={current_time - token_exp}s")
 
         # If JWT public key is provided, use it directly
         if settings.clerk_jwt_public_key_pem:
