@@ -178,7 +178,7 @@ export class BookClient {
    * ```
    */
   public async getUserBooks(): Promise<BookProject[]> {
-    const response = await fetch(`${this.baseUrl}/books`, {
+    const response = await fetch(`${this.baseUrl}/books/`, {  // Added trailing slash
       headers: await this.getHeaders(),
       credentials: 'include',
     });
