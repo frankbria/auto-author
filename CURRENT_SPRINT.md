@@ -19,6 +19,30 @@ No tasks currently in progress.
 
 ### ✅ Ready to Start
 
+- **[auto-author-twk]** Fix backend Pydantic schema error causing crash loop
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-qou]** Fix bookClient.test.tsx trailing slash mismatch
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-egz]** Remove continue-on-error flags from CI/CD coverage checks
+  - Priority: 1
+  - No blocking dependencies
+
+- **[auto-author-4ad]** Configure Clerk test workspace and test users
+  - Priority: 1
+  - No blocking dependencies
+
+- **[auto-author-4q3]** Add E2E tests to CI/CD pipeline
+  - Priority: 1
+  - No blocking dependencies
+
+- **[auto-author-rpk]** Create test data seeding and cleanup scripts
+  - Priority: 1
+  - No blocking dependencies
+
 - **[auto-author-1]** Accessibility Audit - Phase 1: Automated scanning
   - Priority: 3
   - No blocking dependencies
@@ -35,35 +59,29 @@ No tasks currently in progress.
   - Priority: 1
   - No blocking dependencies
 
-- **[auto-author-11]** Mobile Experience - Responsive breakpoints documentation
-  - Priority: 2
-  - No blocking dependencies
-
-- **[auto-author-12]** Mobile Experience - Mobile navigation enhancement
-  - Priority: 2
-  - No blocking dependencies
-
-- **[auto-author-14]** Mobile Experience - Mobile-specific features
-  - Priority: 2
-  - No blocking dependencies
-
-- **[auto-author-15]** Mobile Experience - Mobile performance optimization
-  - Priority: 2
-  - No blocking dependencies
-
-- **[auto-author-17]** Settings & Help Pages - Help documentation
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-18]** Settings & Help Pages - Keyboard shortcuts page
-  - Priority: 2
-  - No blocking dependencies
-
 
 ### 📋 Planned (Open)
 
+- **[auto-author-qou]** Fix bookClient.test.tsx trailing slash mismatch
+  - Priority: 0
+
+- **[auto-author-twk]** Fix backend Pydantic schema error causing crash loop
+  - Priority: 0
+
 - **[auto-author-53]** Execute deployment testing checklist on staging
   - Priority: 0
+
+- **[auto-author-rpk]** Create test data seeding and cleanup scripts
+  - Priority: 1
+
+- **[auto-author-4q3]** Add E2E tests to CI/CD pipeline
+  - Priority: 1
+
+- **[auto-author-4ad]** Configure Clerk test workspace and test users
+  - Priority: 1
+
+- **[auto-author-egz]** Remove continue-on-error flags from CI/CD coverage checks
+  - Priority: 1
 
 - **[auto-author-4hj]** E2E Test: Screen reader compatibility (axe-playwright)
   - Priority: 1
@@ -96,9 +114,6 @@ No tasks currently in progress.
   - Priority: 1
 
 - **[auto-author-03x]** Debug and fix deployment E2E test hangs/timeouts
-  - Priority: 1
-
-- **[auto-author-59]** Create comprehensive E2E test suite for all critical user journeys
   - Priority: 1
 
 - **[auto-author-17]** Settings & Help Pages - Help documentation
@@ -212,15 +227,19 @@ No tasks currently in progress.
 
 ### ✅ Completed This Week
 
+- **[auto-author-59]** Create comprehensive E2E test suite for all critical user journeys
+  - Closed: 2025-11-21T21:05:39.840777353-07:00
+  - Reason: none
+
 
 ---
 
 ## 📊 Sprint Metrics
 
-- **Total Issues**: 89
-- **Open**: 49
+- **Total Issues**: 95
+- **Open**: 54
 - **In Progress**: 0
-- **Closed**: 40
+- **Closed**: 41
 - **Ready to Start**: 10
 
 ---

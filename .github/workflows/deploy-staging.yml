@@ -247,7 +247,7 @@ jobs:
           echo "==> Restarting backend service..."
           cd "$CURRENT_DIR/backend"
           source .venv/bin/activate
-          pm2 restart auto-author-backend || pm2 start uvicorn --name auto-author-backend --interpreter python3 -- app.main:app --host 0.0.0.0 --port 8000
+          pm2 restart auto-author-backend || pm2 start "$(which uvicorn)" --name auto-author-backend --interpreter "$(which python)" -- app.main:app --host 0.0.0.0 --port 8000
 
           # Restart frontend service with environment loaded
           echo "==> Restarting frontend service..."
