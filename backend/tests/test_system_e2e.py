@@ -24,6 +24,7 @@ import time
 from datetime import datetime
 from typing import Dict, List, Any
 from unittest.mock import Mock, AsyncMock, patch
+import os
 
 import httpx
 
@@ -589,6 +590,10 @@ The key to habit change isn't massive transformation but small, consistent adjus
 # Pytest test cases
 @pytest.mark.asyncio
 @pytest.mark.timeout(TEST_TIMEOUT)
+@pytest.mark.skipif(
+    not os.getenv("OPENAI_API_KEY"),
+    reason="Requires OpenAI API key - skipping in CI/CD without key"
+)
 async def test_complete_system_workflow(auth_client_factory, mock_ai_service):
     """Test the complete authoring workflow from book creation to chapter draft"""
     client = await auth_client_factory()
