@@ -1,0 +1,22 @@
+{
+  "name": "auto-author",
+  "version": "1.0.0",
+  "description": "**Auto Author** is an AI-powered application designed to help users write long-form non-fiction books. It streamlines the writing process by guiding users from concept to draft using a unique combination of interactive interviews, voice/text input, and generative AI.",
+  "main": "ecosystem.config.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frankbria/auto-author.git"
+  },
+  "author": "Frank Bria",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/frankbria/auto-author/issues"
+  },
+  "homepage": "https://github.com/frankbria/auto-author#readme"
+}

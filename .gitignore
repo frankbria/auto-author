@@ -94,3 +94,7 @@ hive-mind-prompt-*.txt
 # Deployment archives and documentation exports
 *.tar.gz
 repomix-output.xml
+
+# Beads DB
+.beads/
+!.beads/*.jsonl

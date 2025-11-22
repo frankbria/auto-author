@@ -215,7 +215,7 @@ class CollaboratorSchema(BaseModel):
 
     user_id: str
     role: str = "viewer"  # Options: "viewer", "editor", "co-author"
-    added_at: datetime = Field(default_factory=datetime.now(timezone.utc))
+    added_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class BookResponse(BookBase):

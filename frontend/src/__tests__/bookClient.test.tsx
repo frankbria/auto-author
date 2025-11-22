@@ -298,7 +298,7 @@ describe('BookClient', () => {
       const result = await bookClient.createBook(bookData);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8000/api/v1/books',
+        'http://localhost:8000/api/v1/books/',
         {
           method: 'POST',
           headers: {
