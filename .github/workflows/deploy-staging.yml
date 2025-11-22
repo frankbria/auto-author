@@ -228,9 +228,13 @@ jobs:
           export NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT
 
           # Install dependencies and build
+          # Remove old .next cache to prevent stale builds
+          echo "==> Cleaning old build cache..."
+          rm -rf .next
+
           echo "==> Installing frontend dependencies..."
-          npm ci --production
-          
+          npm ci
+
           echo "==> Building frontend..."
           npm run build
 
