@@ -26,18 +26,7 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    // Dashboard routes (always protected)
+    // Only protect dashboard routes - leave root path (/) public for landing page
     '/dashboard/:path*',
-    
-    // API routes
-    '/(api|trpc)(.*)',
-    
-    // Exclude public routes and static assets
-    // This pattern matches all routes EXCEPT:
-    // - The root path (/)
-    // - Static files (_next/*, *.js, *.css, etc.)
-    // - Sign-in related paths (sign-in, sign-in/*)
-    // - Sign-up related paths (sign-up, sign-up/*)
-    '/((?!api|_next|.*\\.(?:jpg|jpeg|gif|svg|png|js|css|woff|woff2|ttf|ico))(?!sign-in)(?!sign-up).*)'
   ]
 };
