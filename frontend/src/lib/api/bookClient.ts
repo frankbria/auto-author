@@ -294,7 +294,7 @@ export class BookClient {
     target_audience?: string;
     cover_image_url?: string;
   }): Promise<BookProject> {
-    const response = await fetch(`${this.baseUrl}/books`, {
+    const response = await fetch(`${this.baseUrl}/books/`, {
       method: 'POST',
       headers: await this.getHeaders(),
       credentials: 'include',

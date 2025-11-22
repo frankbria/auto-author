@@ -1,6 +1,6 @@
 # Current Sprint - 
 
-**Last Updated**: 2025-11-10
+**Last Updated**: 2025-11-21
 
 **Source**: Auto-generated from bd - DO NOT EDIT MANUALLY
 
@@ -65,19 +65,40 @@ No tasks currently in progress.
 - **[auto-author-53]** Execute deployment testing checklist on staging
   - Priority: 0
 
+- **[auto-author-4hj]** E2E Test: Screen reader compatibility (axe-playwright)
+  - Priority: 1
+
+- **[auto-author-ewj]** E2E Test: Complete keyboard navigation (WCAG 2.1 compliance)
+  - Priority: 1
+
+- **[auto-author-dsm]** E2E Test: Suspicious session detection (fingerprint change)
+  - Priority: 1
+
+- **[auto-author-6co]** E2E Test: Concurrent session limits
+  - Priority: 1
+
+- **[auto-author-2e7]** E2E Test: Session timeout warnings
+  - Priority: 1
+
+- **[auto-author-ar6]** E2E Test: Draft regeneration workflow
+  - Priority: 1
+
+- **[auto-author-yrg]** E2E Test: Draft generation rate limiting
+  - Priority: 1
+
+- **[auto-author-xz2]** E2E Test: Draft generation error validation
+  - Priority: 1
+
+- **[auto-author-nwd]** Comprehensive E2E Test Suite - Close 30% Automation Gap
+  - Priority: 1
+
+- **[auto-author-6y4]** Achieve 85% test coverage across backend and frontend
+  - Priority: 1
+
 - **[auto-author-03x]** Debug and fix deployment E2E test hangs/timeouts
   - Priority: 1
 
-- **[auto-author-72]** Fix auth middleware status code precedence (5 tests)
-  - Priority: 1
-
-- **[auto-author-61]** Backend coverage sprint - Security & Auth (41% → 55%)
-  - Priority: 1
-
 - **[auto-author-59]** Create comprehensive E2E test suite for all critical user journeys
-  - Priority: 1
-
-- **[auto-author-52]** Fix remaining 2 test failures in TabStatePersistence
   - Priority: 1
 
 - **[auto-author-17]** Settings & Help Pages - Help documentation
@@ -92,7 +113,10 @@ No tasks currently in progress.
 - **[auto-author-6]** Operational Requirements - User action tracking
   - Priority: 1
 
-- **[auto-author-73]** Fix user agent parsing for iOS/mobile device detection
+- **[auto-author-5jo]** E2E Test: Profile form validation
+  - Priority: 2
+
+- **[auto-author-2nd]** E2E Test: Profile CRUD operations
   - Priority: 2
 
 - **[auto-author-63]** Review and cleanup obsolete documentation (34 files in claudedocs/)
@@ -188,71 +212,15 @@ No tasks currently in progress.
 
 ### ✅ Completed This Week
 
-- **[auto-author-71]** SECURITY: Fix auth middleware - invalid tokens being accepted
-  - Closed: 2025-11-06T17:27:02.775927832-07:00
-  - Reason: none
-
-- **[auto-author-70]** Fix MongoDB Atlas SSL connection failures in backend tests
-  - Closed: 2025-11-07T12:43:41.557318205-07:00
-  - Reason: none
-
-- **[auto-author-69]** Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
-  - Closed: 2025-11-07T09:46:01.552817744-07:00
-  - Reason: none
-
-- **[auto-author-67]** Fix bookClient.test.tsx: 'should set auth token' test failure
-  - Closed: 2025-11-07T09:46:00.316849477-07:00
-  - Reason: none
-
-- **[auto-author-66]** Add dotenv to frontend dependencies for E2E tests
-  - Closed: 2025-11-06T15:25:14.855239534-07:00
-  - Reason: none
-
-- **[auto-author-65]** Fix backend session_middleware import error
-  - Closed: 2025-11-06T15:25:14.836738327-07:00
-  - Reason: none
-
-- **[auto-author-64]** Fix TypeScript errors blocking frontend tests
-  - Closed: 2025-11-06T15:25:04.990158411-07:00
-  - Reason: none
-
-- **[auto-author-58]** Implement TDD and E2E test enforcement with pre-commit hooks
-  - Closed: 2025-11-06T15:01:28.976290408-07:00
-  - Reason: none
-
-- **[auto-author-57]** Close completed tasks and sync documentation with bd tracker
-  - Closed: 2025-11-06T16:27:39.525218427-07:00
-  - Reason: none
-
-- **[auto-author-56]** Create Playwright E2E test suite for TOC generation workflow
-  - Closed: 2025-11-06T15:12:37.630865263-07:00
-  - Reason: none
-
-- **[auto-author-55]** Verify TOC bug fix and deploy to production
-  - Closed: 2025-11-06T14:42:34.476234327-07:00
-  - Reason: none
-
-- **[auto-author-68]** Fix BookCard.test.tsx: Date formatting timezone issue
-  - Closed: 2025-11-07T10:18:28.403055141-07:00
-  - Reason: none
-
-- **[auto-author-62]** Create .pre-commit-config.yaml with test enforcement hooks
-  - Closed: 2025-11-06T14:22:04.295594198-07:00
-  - Reason: none
-
-- **[auto-author-60]** Fix 75 frontend test environmental failures
-  - Closed: 2025-11-07T10:54:09.807537853-07:00
-  - Reason: none
-
 
 ---
 
 ## 📊 Sprint Metrics
 
-- **Total Issues**: 74
-- **Open**: 41
+- **Total Issues**: 89
+- **Open**: 49
 - **In Progress**: 0
-- **Closed**: 33
+- **Closed**: 40
 - **Ready to Start**: 10
 
 ---
@@ -281,6 +249,6 @@ bd dep add <task-1> <task-2>
 
 ---
 
-**Generated**: 2025-11-10
+**Generated**: 2025-11-21
 **Command**: `./scripts/export-current-sprint.sh`
 **Source of Truth**: bd database (`.beads/*.db`)

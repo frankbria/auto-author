@@ -1,6 +1,6 @@
 # Auto-Author Implementation Plan
 
-**Last Updated**: 2025-11-10
+**Last Updated**: 2025-11-21
 **Status**: Active Development
 **Current Phase**: Feature Development (44% complete)
 
@@ -22,25 +22,25 @@ This document serves as the single source of truth for the Auto-Author implement
 
 ### Project Overview
 
-**Progress**: 33 of 74 tasks complete (44%)
+**Progress**: 40 of 89 tasks complete (44%)
 
 **Status Breakdown**:
-- ✅ Completed: 33 tasks
+- ✅ Completed: 40 tasks
 - 🚧 In Progress: 0 tasks
 - 📋 Ready to Start: 10 tasks (no blockers)
 - 🔒 Blocked: 8 tasks
-- 📝 Planned: 41 tasks
+- 📝 Planned: 49 tasks
 
 **Priority Distribution**:
 - P0 (Critical): 23 tasks
-- P1 (High): 20 tasks
-- P2 (Medium): 9 tasks
+- P1 (High): 32 tasks
+- P2 (Medium): 12 tasks
 - P3 (Low): 22 tasks
 
 **Type Breakdown**:
-- 🐛 Bugs: 14
-- ✨ Features: 41
-- 📋 Tasks: 19
+- 🐛 Bugs: 15
+- ✨ Features: 43
+- 📋 Tasks: 31
 
 ---
 
@@ -58,7 +58,7 @@ No tasks currently in progress.
 No P0 tasks ready to start.
 
 
-**P1 High Priority** (20 total):
+**P1 High Priority** (32 total):
 
 #### auto-author-6: Operational Requirements - User action tracking
 **Type**: feature
@@ -156,6 +156,115 @@ Use claudedocs/DEPLOYMENT-TESTING-CHECKLIST.md to validate staging deployment at
 
 ### P1 High Priority
 
+#### auto-author-4hj: E2E Test: Screen reader compatibility (axe-playwright)
+**Type**: task
+
+Create E2E test using axe-playwright to audit accessibility violations. Scan all major pages (dashboard, book creation, chapter editor, export). Verify no critical accessibility violations. Test screen reader announcements for key interactions. WCAG 2.1 Level AA compliance requirement. Estimated: 6 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
+
+**Dependencies**: None
+
+#### auto-author-ewj: E2E Test: Complete keyboard navigation (WCAG 2.1 compliance)
+**Type**: task
+
+Create E2E test that validates complete authoring journey using keyboard only (Tab, Enter, Escape, Arrow keys). Test book creation, TOC generation, chapter editing, and draft generation. Verify all interactive elements are keyboard accessible and focus indicators are visible. WCAG 2.1 Level AA compliance requirement. Estimated: 8 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
+
+**Dependencies**: None
+
+#### auto-author-dsm: E2E Test: Suspicious session detection (fingerprint change)
+**Type**: task
+
+Create E2E test that validates suspicious session warning when user agent changes mid-session (simulating device/browser change). Verifies security feature flagging potential session hijacking. Estimated: 3 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
+
+**Dependencies**: None
+
+#### auto-author-6co: E2E Test: Concurrent session limits
+**Type**: task
+
+Create E2E test that validates max 5 concurrent sessions per user. Create 5 sessions, then verify 6th session deactivates oldest session. Validates security feature preventing session hijacking. Estimated: 3 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
+
+**Dependencies**: None
+
+#### auto-author-2e7: E2E Test: Session timeout warnings
+**Type**: task
+
+Create E2E test that validates session timeout warning appears after 30 minutes of inactivity. Test should verify warning modal displays, contains correct message, and 'Extend Session' button works. Mock timeout to be shorter for testing. Estimated: 4 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
+
+**Dependencies**: None
+
+#### auto-author-ar6: E2E Test: Draft regeneration workflow
+**Type**: task
+
+Create E2E test that validates 'Generate New Draft' workflow: verify returns to question form, preserves previous answers, allows parameter changes, and produces different drafts. Validates user iteration workflow. Estimated: 3 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
+
+**Dependencies**: None
+
+#### auto-author-yrg: E2E Test: Draft generation rate limiting
+**Type**: task
+
+Create E2E test that generates 5 drafts (at limit), then verifies 6th attempt is blocked with rate limit error message showing retry time. Validates abuse prevention. Estimated: 4 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
+
+**Dependencies**: None
+
+#### auto-author-xz2: E2E Test: Draft generation error validation
+**Type**: task
+
+Create E2E test that verifies error message appears when user tries to generate draft without answering any questions. Validates form validation logic. Estimated: 2 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
+
+**Dependencies**: None
+
+#### auto-author-nwd: Comprehensive E2E Test Suite - Close 30% Automation Gap
+**Type**: feature
+
+Close E2E testing gaps identified in gap analysis. Currently at 70% automation coverage, targeting 95%+. Focus areas: draft generation variations (writing styles, custom questions, regeneration), session management (timeout, concurrent sessions, security), keyboard accessibility (WCAG 2.1 compliance), and profile management. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for full details. Estimated 60 hours over 4 phases.
+
+**Dependencies**: None
+
+#### auto-author-6y4: Achieve 85% test coverage across backend and frontend
+**Type**: feature
+
+Comprehensive test coverage improvement to reach 85% minimum across both backend and frontend codebases.
+
+**Current State:**
+- Backend: 43% coverage (target: 85%, gap: 42%)
+- Frontend: ~99% pass rate but coverage not measured consistently
+- Total tests: 203 backend + 732 frontend = 935 tests
+
+**Goals:**
+1. Backend: Increase from 43% to 85% coverage
+2. Frontend: Establish baseline coverage measurement and reach 85%
+3. Implement coverage gates in CI/CD pipeline
+4. Document coverage standards and exemptions
+
+**High-Priority Modules (Backend):**
+- book_cover_upload.py: 0% → 85%
+- transcription.py: 0% → 85%
+- security.py: 38% → 85% (partial progress made)
+- dependencies.py: 26% → 85%
+- sessions.py: 32% → 85%
+- webhooks.py: 24% → 85%
+
+**Acceptance Criteria:**
+- [ ] Backend coverage ≥85% overall
+- [ ] Frontend coverage ≥85% overall
+- [ ] Coverage report generated on every commit
+- [ ] Pre-commit hooks enforce coverage minimums
+- [ ] CI/CD fails if coverage drops below 85%
+- [ ] Coverage badge in README showing current %
+
+**Estimated Effort:**
+- Backend: ~250-300 new tests needed
+- Frontend: Coverage measurement + targeted improvements
+- Time: 3-4 weeks for backend, 1-2 weeks for frontend
+
+**Related Issues:**
+- auto-author-61: Security coverage (18% → 38%, partial completion)
+- auto-author-52: Frontend test fixes (completed)
+
+**Priority:** P1 (Critical for production readiness)
+**Type:** Feature (Quality Infrastructure)
+
+**Dependencies**: None
+
 #### auto-author-03x: Debug and fix deployment E2E test hangs/timeouts
 **Type**: bug
 
@@ -163,31 +272,10 @@ Deployment E2E tests hang indefinitely after 10+ minutes. Tests fail to complete
 
 **Dependencies**: None
 
-#### auto-author-72: Fix auth middleware status code precedence (5 tests)
-**Type**: bug
-
-Auth middleware must run before route resolution. 5 tests expect 403/401 but getting 404/500: test_upload_book_cover_unauthorized (403→404), test_export_unauthorized (403→404), test_missing_token (403→500), test_account_deletion_requires_authentication (exception). Route guards should check auth BEFORE returning 404. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 3.
-
-**Dependencies**: None
-
-#### auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
-**Type**: task
-
-CRITICAL: security.py from 18% → 100% (JWT verification). dependencies.py from 25% → 100%. Add 45-55 new tests. Estimated: 1 week. This is a SECURITY RISK - prioritize before other features.
-
-**Dependencies**: None
-
 #### auto-author-59: Create comprehensive E2E test suite for all critical user journeys
 **Type**: task
 
 Playwright tests for: book creation → summary → TOC generation → chapter editing → AI drafts → export. Target: 85% automation coverage per DEPLOYMENT-TESTING-CHECKLIST.md. Must run in CI/CD before deployment.
-
-**Dependencies**: None
-
-#### auto-author-52: Fix remaining 2 test failures in TabStatePersistence
-**Type**: bug
-
-2 tests failing in TabStatePersistence.test.tsx related to localStorage.setItem mocking. Currently at 99.7% pass rate (719/724)
 
 **Dependencies**: None
 
@@ -222,10 +310,17 @@ Implement user action tracking system. Estimated: 6 hours
 
 ### P2 Medium Priority
 
-#### auto-author-73: Fix user agent parsing for iOS/mobile device detection
-**Type**: bug
+#### auto-author-5jo: E2E Test: Profile form validation
+**Type**: task
 
-Session service user agent parser incorrectly identifies iPhone Safari as MacOS/desktop instead of iOS/mobile. Affects 2 tests: test_extract_session_metadata_mobile, test_metadata_for_mobile_safari. Impacts session security (suspicious activity detection based on device changes). Consider switching to 'user-agents' library or fix current parser. See docs/BACKEND_TEST_FAILURE_ANALYSIS.md Category 4.
+Create E2E test that validates profile form validation rules. Test required field validation (first name, last name), invalid email format, and error message display. Validates data integrity. Estimated: 3 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
+
+**Dependencies**: None
+
+#### auto-author-2nd: E2E Test: Profile CRUD operations
+**Type**: task
+
+Create E2E test for profile management: view profile, edit first/last name, save changes, verify persistence after reload. Test complete user profile update workflow. Estimated: 4 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
 
 **Dependencies**: None
 
@@ -447,7 +542,7 @@ Run axe-core and Lighthouse audits on all components. Component-by-component val
 
 ## Completed Work
 
-**Total Completed**: 33 tasks (44%)
+**Total Completed**: 40 tasks (44%)
 
 #### ✅ auto-author-71: SECURITY: Fix auth middleware - invalid tokens being accepted
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T17:27:02.775927832-07:00
@@ -559,6 +654,21 @@ No reason provided
 
 No reason provided
 
+#### ✅ auto-author-bo7: E2E Test: Custom questions in draft generation
+**Priority**: P1 | **Type**: task | **Closed**: 2025-11-10T22:52:10.227715676-07:00
+
+No reason provided
+
+#### ✅ auto-author-15k: E2E Test: Draft generation with different writing styles
+**Priority**: P1 | **Type**: task | **Closed**: 2025-11-10T22:47:00.600634808-07:00
+
+No reason provided
+
+#### ✅ auto-author-72: Fix auth middleware status code precedence (5 tests)
+**Priority**: P1 | **Type**: bug | **Closed**: 2025-11-10T21:56:14.506956864-07:00
+
+No reason provided
+
 #### ✅ auto-author-68: Fix BookCard.test.tsx: Date formatting timezone issue
 **Priority**: P1 | **Type**: bug | **Closed**: 2025-11-07T10:18:28.403055141-07:00
 
@@ -569,8 +679,18 @@ No reason provided
 
 No reason provided
 
+#### ✅ auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
+**Priority**: P1 | **Type**: task | **Closed**: 2025-11-10T22:32:45.479387976-07:00
+
+No reason provided
+
 #### ✅ auto-author-60: Fix 75 frontend test environmental failures
 **Priority**: P1 | **Type**: task | **Closed**: 2025-11-07T10:54:09.807537853-07:00
+
+No reason provided
+
+#### ✅ auto-author-52: Fix remaining 2 test failures in TabStatePersistence
+**Priority**: P1 | **Type**: bug | **Closed**: 2025-11-10T22:07:00.152022847-07:00
 
 No reason provided
 
@@ -614,6 +734,16 @@ No reason provided
 
 No reason provided
 
+#### ✅ auto-author-50e: Fix flaky test: test_validate_expired_session timing issue
+**Priority**: P2 | **Type**: bug | **Closed**: 2025-11-10T21:56:30.777851064-07:00
+
+No reason provided
+
+#### ✅ auto-author-73: Fix user agent parsing for iOS/mobile device detection
+**Priority**: P2 | **Type**: bug | **Closed**: 2025-11-10T21:56:14.508033544-07:00
+
+No reason provided
+
 
 ---
 
@@ -653,14 +783,26 @@ The following critical and high-priority tasks must be completed for production 
 - [x] Export Feature - PDF/DOCX (auto-author-20) - P0
 - [x] Operational Requirements - Session management (auto-author-8) - P0
 - [x] Operational Requirements - Error logging and monitoring (auto-author-7) - P0
+- [ ] E2E Test: Screen reader compatibility (axe-playwright) (auto-author-4hj) - P1
+- [ ] E2E Test: Complete keyboard navigation (WCAG 2.1 compliance) (auto-author-ewj) - P1
+- [ ] E2E Test: Suspicious session detection (fingerprint change) (auto-author-dsm) - P1
+- [ ] E2E Test: Concurrent session limits (auto-author-6co) - P1
+- [ ] E2E Test: Session timeout warnings (auto-author-2e7) - P1
+- [ ] E2E Test: Draft regeneration workflow (auto-author-ar6) - P1
+- [ ] E2E Test: Draft generation rate limiting (auto-author-yrg) - P1
+- [ ] E2E Test: Draft generation error validation (auto-author-xz2) - P1
+- [x] E2E Test: Custom questions in draft generation (auto-author-bo7) - P1
+- [x] E2E Test: Draft generation with different writing styles (auto-author-15k) - P1
+- [ ] Comprehensive E2E Test Suite - Close 30% Automation Gap (auto-author-nwd) - P1
+- [ ] Achieve 85% test coverage across backend and frontend (auto-author-6y4) - P1
 - [ ] Debug and fix deployment E2E test hangs/timeouts (auto-author-03x) - P1
-- [ ] Fix auth middleware status code precedence (5 tests) (auto-author-72) - P1
+- [x] Fix auth middleware status code precedence (5 tests) (auto-author-72) - P1
 - [x] Fix BookCard.test.tsx: Date formatting timezone issue (auto-author-68) - P1
 - [x] Create .pre-commit-config.yaml with test enforcement hooks (auto-author-62) - P1
-- [ ] Backend coverage sprint - Security & Auth (41% → 55%) (auto-author-61) - P1
+- [x] Backend coverage sprint - Security & Auth (41% → 55%) (auto-author-61) - P1
 - [x] Fix 75 frontend test environmental failures (auto-author-60) - P1
 - [ ] Create comprehensive E2E test suite for all critical user journeys (auto-author-59) - P1
-- [ ] Fix remaining 2 test failures in TabStatePersistence (auto-author-52) - P1
+- [x] Fix remaining 2 test failures in TabStatePersistence (auto-author-52) - P1
 - [x] Auto-start MongoDB on WSL shell initialization (non-blocking) (auto-author-51) - P1
 - [x] Measure test coverage after fixes (auto-author-50) - P1
 - [x] Verify E2E test execution and coverage (auto-author-49) - P1
@@ -737,6 +879,6 @@ bd close <task-id> --reason "Completed in PR #123"
 
 ---
 
-**Generated**: 2025-11-10
+**Generated**: 2025-11-21
 **Command**: `./scripts/export-implementation-plan.sh`
 **Source of Truth**: bd database (priority and status-driven)
