@@ -181,17 +181,20 @@ async def update_session_activity(session_id: str, endpoint: Optional[str] = Non
     """
     collection = base.sessions_collection
 
-    update_doc = {
-        "last_activity": datetime.now(timezone.utc),
+    # Build update operations - $set and $inc must be separate top-level operators
+    update_operations = {
+        "$set": {
+            "last_activity": datetime.now(timezone.utc),
+        },
         "$inc": {"request_count": 1}
     }
 
     if endpoint:
-        update_doc["last_endpoint"] = endpoint
+        update_operations["$set"]["last_endpoint"] = endpoint
 
     result = await collection.find_one_and_update(
         {"session_id": session_id},
-        {"$set": update_doc},
+        update_operations,
         return_document=True
     )
 

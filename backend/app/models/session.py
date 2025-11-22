@@ -4,7 +4,7 @@ Session models for tracking user sessions
 
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SessionMetadata(BaseModel):
@@ -43,6 +43,24 @@ class SessionModel(BaseModel):
 
     # Security
     csrf_token: Optional[str] = None
+
+    @field_validator('created_at', 'last_activity', 'expires_at', mode='before')
+    @classmethod
+    def ensure_timezone_aware(cls, v):
+        """Ensure datetime fields are timezone-aware (UTC)
+
+        MongoDB returns naive datetimes, so we need to convert them to
+        timezone-aware datetimes to prevent comparison errors.
+        """
+        if v is None:
+            return v
+
+        if isinstance(v, datetime):
+            # If datetime is naive (no timezone), assume UTC
+            if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
+                return v.replace(tzinfo=timezone.utc)
+
+        return v
 
     class Config:
         json_schema_extra = {
