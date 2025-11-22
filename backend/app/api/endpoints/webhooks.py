@@ -13,9 +13,9 @@ router = APIRouter()
 
 async def verify_webhook_signature(
     request: Request,
-    svix_id: str = Header(None),
-    svix_timestamp: str = Header(None),
-    svix_signature: str = Header(None),
+    svix_id: str = Header(None, alias="svix-id"),
+    svix_timestamp: str = Header(None, alias="svix-timestamp"),
+    svix_signature: str = Header(None, alias="svix-signature"),
 ):
     """Verify the webhook signature from Clerk"""
     # Debug logging - print all headers
