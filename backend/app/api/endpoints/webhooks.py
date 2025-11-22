@@ -44,19 +44,35 @@ async def verify_webhook_signature(
     timestamp = svix_timestamp
     secret = settings.CLERK_WEBHOOK_SECRET
 
-    # Get the signatures provided in the header
-    signature_header = svix_signature
-    signatures = signature_header.split(" ")
+    # Svix signatures are in the format "v1,<base64_signature> v2,<base64_signature>"
+    # Extract just the signature part (after "v1,")
+    signature_parts = svix_signature.split(" ")
 
-    # Create a new hmac with the secret and timestamp
-    hmac_message = f"{svix_id}.{timestamp}.{payload}"
-    h = hmac.new(secret.encode("utf-8"), hmac_message.encode("utf-8"), hashlib.sha256)
-    expected_signature = h.hexdigest()
+    # Create the signed content as per Svix spec
+    signed_content = f"{svix_id}.{timestamp}.{payload}"
 
-    # Compare the computed signature with the provided signatures
-    for signature in signatures:
-        if hmac.compare_digest(signature, expected_signature):
-            return True
+    # Compute expected signature
+    h = hmac.new(
+        secret.encode("utf-8"),
+        signed_content.encode("utf-8"),
+        hashlib.sha256
+    )
+    expected_signature = h.digest()  # Get bytes, not hex
+
+    # Compare each provided signature (they're base64 encoded)
+    import base64
+    for sig_part in signature_parts:
+        if "," in sig_part:
+            # Format is "v1,signature_base64"
+            version, sig_b64 = sig_part.split(",", 1)
+            try:
+                sig_bytes = base64.b64decode(sig_b64)
+                if hmac.compare_digest(sig_bytes, expected_signature):
+                    logger.info(f"Webhook signature verified successfully")
+                    return True
+            except Exception as e:
+                logger.error(f"Error decoding signature: {e}")
+                continue
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature"
