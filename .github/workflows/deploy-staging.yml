@@ -323,9 +323,9 @@ jobs:
 
           # CORS verification
           echo "Checking CORS headers..."
-          curl -I -X OPTIONS https://api.dev.autoauthor.app/api/v1/books \
+          curl -s -D - -o /dev/null -X OPTIONS https://api.dev.autoauthor.app/api/v1/books \
             -H "Origin: https://dev.autoauthor.app" \
-            -H "Access-Control-Request-Method: GET" | grep -i "access-control-allow-origin" || exit 1
+            -H "Access-Control-Request-Method: POST" | grep -i "access-control-allow-origin" || exit 1
 
       - name: Smoke tests
         run: |
