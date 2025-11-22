@@ -12,6 +12,42 @@ env:
   NODE_VERSION: '18'
   PYTHON_VERSION: '3.9'
 
+# Required GitHub Secrets:
+# SSH & Server:
+#   - SSH_KEY: Private SSH key for server access
+#   - HOST: Server hostname/IP
+#   - USER: SSH username
+#
+# URLs:
+#   - API_URL: Backend API URL (e.g., https://api.dev.autoauthor.app)
+#   - FRONTEND_URL: Frontend URL (e.g., https://dev.autoauthor.app)
+#
+# Database:
+#   - MONGODB_URI: MongoDB connection string
+#   - DATABASE_NAME: Database name (e.g., auto_author_staging)
+#
+# OpenAI:
+#   - OPENAI_API_KEY: OpenAI API key
+#
+# Clerk Authentication:
+#   - CLERK_PUBLISHABLE_KEY: Clerk publishable key (pk_*)
+#   - CLERK_SECRET_KEY: Clerk secret key (sk_*)
+#   - CLERK_API_KEY: Clerk API key
+#   - CLERK_FRONTEND_API: Clerk frontend API (e.g., your-app.clerk.accounts.dev)
+#   - CLERK_BACKEND_API: Clerk backend API (api.clerk.com)
+#   - CLERK_WEBHOOK_SECRET: Clerk webhook secret
+#
+# Optional (AWS):
+#   - AWS_ACCESS_KEY_ID
+#   - AWS_SECRET_ACCESS_KEY
+#   - AWS_REGION
+#   - AWS_S3_BUCKET
+#
+# Optional (Cloudinary):
+#   - CLOUDINARY_CLOUD_NAME
+#   - CLOUDINARY_API_KEY
+#   - CLOUDINARY_API_SECRET
+
 jobs:
   build-and-deploy:
     name: Build and Deploy to Staging
@@ -122,24 +158,59 @@ jobs:
           echo "==> Setting up backend..."
           cd "$RELEASE_DIR/backend"
 
-          # Install Python dependencies
+          # Install Python dependencies using uv
           curl -LsSf https://astral.sh/uv/install.sh | sh
           export PATH="$HOME/.local/bin:$PATH"
           uv venv
           source .venv/bin/activate
-          uv pip install -r requirements.txt
+          uv sync
 
-          # Update .env file (merge with existing)
-          if [ -f "$CURRENT_DIR/backend/.env" ]; then
-            cp "$CURRENT_DIR/backend/.env" .env
+          # Create backend .env file with all required variables
+          echo "==> Creating backend .env file..."
+          {
+            echo "# Database"
+            echo "DATABASE_URI=${{ secrets.MONGODB_URI }}"
+            echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}"
+            echo ""
+            echo "# CORS Settings"
+            echo "BACKEND_CORS_ORIGINS=[\"$FRONTEND_URL\",\"$API_URL\"]"
+            echo ""
+            echo "# OpenAI"
+            echo "OPENAI_AUTOAUTHOR_API_KEY=${{ secrets.OPENAI_API_KEY }}"
+            echo ""
+            echo "# Clerk Authentication"
+            echo "CLERK_API_KEY=${{ secrets.CLERK_API_KEY }}"
+            echo "CLERK_SECRET_KEY=$CLERK_SECRET_KEY"
+            echo "CLERK_FRONTEND_API=${{ secrets.CLERK_FRONTEND_API }}"
+            echo "CLERK_BACKEND_API=${{ secrets.CLERK_BACKEND_API }}"
+            echo "CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}"
+            echo "CLERK_JWT_ALGORITHM=RS256"
+            echo ""
+            echo "# API Settings"
+            echo "API_V1_PREFIX=/api/v1"
+            echo ""
+            echo "# AWS Settings (Optional)"
+            echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}"
+            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            echo "AWS_REGION=${{ secrets.AWS_REGION }}"
+            echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}"
+            echo ""
+            echo "# Cloudinary Settings (Optional)"
+            echo "CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}"
+            echo "CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}"
+            echo "CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}"
+          } > .env
+
+          # Verify .env file was created
+          if [ ! -f .env ]; then
+            echo "ERROR: Failed to create backend .env file"
+            exit 1
           fi
+          echo "✓ Backend .env file created"
 
           # Setup frontend environment
           echo "==> Setting up frontend..."
           cd "$RELEASE_DIR/frontend"
-
-          # Install Node dependencies (production only)
-          npm ci --production
 
           # Create/update .env.production with all required variables
           {
@@ -156,7 +227,10 @@ jobs:
           export CLERK_SECRET_KEY=$CLERK_SECRET_KEY
           export NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT
 
-          # Build frontend with environment variables
+          # Install dependencies and build
+          echo "==> Installing frontend dependencies..."
+          npm ci --production
+          
           echo "==> Building frontend..."
           npm run build
 
@@ -165,11 +239,14 @@ jobs:
           ln -snf "$RELEASE_DIR" "$CURRENT_DIR.tmp"
           mv -Tf "$CURRENT_DIR.tmp" "$CURRENT_DIR"
 
-          # Restart services
-          echo "==> Restarting services..."
-          pm2 restart auto-author-backend || pm2 start "$CURRENT_DIR/backend/.venv/bin/uvicorn" --name auto-author-backend -- app.main:app --host 0.0.0.0 --port 8000
+          # Restart backend service with environment loaded
+          echo "==> Restarting backend service..."
+          cd "$CURRENT_DIR/backend"
+          source .venv/bin/activate
+          pm2 restart auto-author-backend || pm2 start uvicorn --name auto-author-backend --interpreter python3 -- app.main:app --host 0.0.0.0 --port 8000
 
-          # Start frontend with environment variables loaded
+          # Restart frontend service with environment loaded
+          echo "==> Restarting frontend service..."
           cd "$CURRENT_DIR/frontend"
           # Load environment variables from .env.production
           set -a
@@ -177,20 +254,43 @@ jobs:
           set +a
           pm2 restart auto-author-frontend || pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start
 
-          # Wait for services to start
-          sleep 5
+          # Wait for services to start (Next.js needs more time)
+          echo "==> Waiting for services to initialize..."
+          sleep 10
 
-          # Health checks
+          # Health checks with retries
           echo "==> Running health checks..."
-          curl -f http://localhost:8000/api/v1/health || {
-            echo "ERROR: Backend health check failed"
+          
+          # Backend health check
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          until curl -f http://localhost:8000/api/v1/health || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            echo "Backend health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 2s..."
+            sleep 2
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "ERROR: Backend health check failed after $MAX_RETRIES attempts"
             exit 1
-          }
+          fi
+          echo "✓ Backend health check passed"
 
-          curl -f http://localhost:3002 || {
-            echo "ERROR: Frontend health check failed"
+          # Frontend health check with retries
+          RETRY_COUNT=0
+          until curl -f -s http://localhost:3002 >/dev/null || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            echo "Frontend health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 3s..."
+            sleep 3
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "ERROR: Frontend health check failed after $MAX_RETRIES attempts"
+            echo "Checking PM2 logs..."
+            pm2 logs auto-author-frontend --lines 50 --nostream
             exit 1
-          }
+          fi
+          echo "✓ Frontend health check passed"
 
           echo "==> Deployment successful!"
           echo "    Release: $RELEASE_ID"
