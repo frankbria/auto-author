@@ -98,3 +98,6 @@ repomix-output.xml
 # Beads DB
 .beads/
 !.beads/*.jsonl
+
+# PM2 ecosystem config (generated from template during deployment)
+ecosystem.config.js
