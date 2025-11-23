@@ -11,7 +11,7 @@ module.exports = {
       interpreter: 'none', // Don't use Node.js interpreter
       env: {
         ENVIRONMENT: '__ENVIRONMENT__',
-        MONGODB_URL: '__MONGODB_URL__',
+        MONGODB_URI: '__MONGODB_URI__',
         CLERK_PUBLISHABLE_KEY: '__CLERK_PUBLISHABLE_KEY__',
         CLERK_SECRET_KEY: '__CLERK_SECRET_KEY__',
         CLERK_WEBHOOK_SECRET: '__CLERK_WEBHOOK_SECRET__',

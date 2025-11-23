@@ -245,10 +245,10 @@ jobs:
               -e "s|__FRONTEND_CWD__|$RELEASE_DIR/frontend|g" \
               -e "s|__ENVIRONMENT__|$ENVIRONMENT|g" \
               -e "s|__API_URL__|$API_URL|g" \
-              -e "s|__MONGODB_URL__|$MONGODB_URL|g" \
-              -e "s|__CLERK_PUBLISHABLE_KEY__|$CLERK_PUBLISHABLE_KEY|g" \
-              -e "s|__CLERK_SECRET_KEY__|$CLERK_SECRET_KEY|g" \
-              -e "s|__CLERK_WEBHOOK_SECRET__|$CLERK_WEBHOOK_SECRET|g" \
+              -e "s|__MONGODB_URI__|${{ secrets.MONGODB_URI }}|g" \
+              -e "s|__CLERK_PUBLISHABLE_KEY__|${{ secrets.CLERK_PUBLISHABLE_KEY }}|g" \
+              -e "s|__CLERK_SECRET_KEY__|${{ secrets.CLERK_SECRET_KEY }}|g" \
+              -e "s|__CLERK_WEBHOOK_SECRET__|${{ secrets.CLERK_WEBHOOK_SECRET }}|g" \
               ecosystem.config.template.js > ecosystem.config.js
 
           # Update symlink atomically
