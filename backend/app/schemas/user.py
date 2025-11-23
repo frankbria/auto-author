@@ -43,6 +43,7 @@ class UserCreate(UserBase):
     """Schema for creating a new user"""
 
     clerk_id: str
+    email: Optional[EmailStr] = None  # Override to make optional for webhooks
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     class Config:

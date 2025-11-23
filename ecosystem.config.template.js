@@ -5,8 +5,8 @@ module.exports = {
   apps: [
     {
       name: 'auto-author-backend',
-      script: '.venv/bin/python',
-      args: '-m uvicorn app.main:app --host 0.0.0.0 --port 8000',
+      script: '.venv/bin/uvicorn',
+      args: 'app.main:app --host 0.0.0.0 --port 8000',
       cwd: '__BACKEND_CWD__', // Will be replaced with actual release path
       interpreter: 'none', // Don't use Node.js interpreter
       env: {

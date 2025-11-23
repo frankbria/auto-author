@@ -30,6 +30,27 @@
 
 ## Recent Changes
 
+### 2025-11-22
+- **Auto-Create Users from Clerk on First Login**: Enhanced authentication to automatically create user records
+  - **Problem**: Users authenticating via Clerk weren't being created in backend database
+  - **Solution**: Modified `security.py` to auto-create users from Clerk JWT on first login
+  - **Changes**: Enhanced `get_current_user()` to create missing users, added comprehensive logging
+  - **Impact**: Seamless user onboarding without manual database setup
+  - **Status**: ✅ Deployed to staging - authentication now fully automated
+
+- **Staging Deployment Workflow**: GitHub Actions workflow for automated staging deployments
+  - **Achievement**: Complete CI/CD pipeline for staging environment
+  - **Infrastructure**: SSH deployment, PM2 process management, health checks with retries
+  - **Configuration**: Backend on port 8000, frontend on port 3003, CORS validation
+  - **Process**: Uses `pm2 delete` + `pm2 start` instead of restart for clean release pickup
+  - **Status**: ✅ Operational at https://dev.autoauthor.app (frontend) and https://api.dev.autoauthor.app (backend)
+
+- **Public Access to Landing Page**: Fixed middleware to allow unauthenticated access to root
+  - **Problem**: Root landing page was requiring authentication
+  - **Solution**: Updated middleware.ts to explicitly allow public access to `/`
+  - **Impact**: Marketing/landing page now accessible without login
+  - **Status**: ✅ Deployed to staging
+
 ### 2025-11-07
 - **E2E Test Suite Complete**: Comprehensive automated testing with 85%+ coverage
   - **Achievement**: Created comprehensive deployment test suite (01-05) with 54+ tests
@@ -406,38 +427,24 @@ bd create "Add tests for emergency hotfix" -p 0 -t bug
 
 ---
 
-## 🚀 Available Agents (54 Total)
+## Deployment Information
+- The staging server is located at: https://dev.autoauthor.app (frontend) and https://api.dev.autoauthor.app (backend)
+- You can access the staging server with SSH with username root. The keys are local; no password is required.
+- There are deployment scripts in the git workflow directories
+- **IMPORTANT** there are other aplications on the server. Be aware of port considerations. Right now, the backend uses 8000 and the frontend uses 3002, but be aware that this could change. Check nginx settings for the latest information.
+- The applications are managed via PM2 on the server. Since the deployment has a symlinked current release directory, sometimes that needs to be checked if things are out of sync.
 
-### Core Development
-`coder`, `reviewer`, `tester`, `planner`, `researcher`
+---
 
-### Swarm Coordination
-`hierarchical-coordinator`, `mesh-coordinator`, `adaptive-coordinator`, `collective-intelligence-coordinator`, `swarm-memory-manager`
+## 🚀 Available Agents
 
-### Consensus & Distributed
-`byzantine-coordinator`, `raft-manager`, `gossip-coordinator`, `consensus-builder`, `crdt-synchronizer`, `quorum-manager`, `security-manager`
-
-### Performance & Optimization
-`perf-analyzer`, `performance-benchmarker`, `task-orchestrator`, `memory-coordinator`, `smart-agent`
-
-### GitHub & Repository
-`github-modes`, `pr-manager`, `code-review-swarm`, `issue-tracker`, `release-manager`, `workflow-automation`, `project-board-sync`, `repo-architect`, `multi-repo-swarm`
-
-### SPARC Methodology
-`sparc-coord`, `sparc-coder`, `specification`, `pseudocode`, `architecture`, `refinement`
-
-### Specialized Development
-`backend-dev`, `mobile-dev`, `ml-developer`, `cicd-engineer`, `api-docs`, `system-architect`, `code-analyzer`, `base-template-generator`
-
-### Testing & Validation
-`tdd-london-swarm`, `production-validator`
 
 ---
 
 ## 🎯 Claude Code vs MCP Tools
 
 ### Claude Code Handles ALL:
-- File operations (Read, Write, Edit, MultiEdit, Glob, Grep)
+- File operations (Read, Write, Edit, MultiEdit, Glob, Grep) unless the edits are complex or long
 - Code generation and programming
 - Bash commands and system operations
 - Implementation work

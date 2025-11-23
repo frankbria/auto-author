@@ -68,12 +68,14 @@ async def delete_user(
             {"clerk_id": clerk_id},
             {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}},
         )
+        success = result.modified_count > 0
     else:
         # Hard delete
         result = await users_collection.delete_one({"clerk_id": clerk_id})
+        success = result.deleted_count > 0
 
     # Log the deletion
-    if result.modified_count > 0 or result.deleted_count > 0:
+    if success:
         await create_audit_log(
             action="user_delete",
             actor_id=actor_id

@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional
 import hmac
 import hashlib
 import json
+import base64
 
 from app.core.config import settings
 from app.schemas.user import UserCreate
@@ -44,8 +45,14 @@ async def verify_webhook_signature(
     timestamp = svix_timestamp
     secret = settings.CLERK_WEBHOOK_SECRET
 
+    # Clerk webhook secrets start with "whsec_" and the rest is base64-encoded
+    # We need to decode it before using in HMAC
+    if secret.startswith("whsec_"):
+        secret_bytes = base64.b64decode(secret[6:])  # Remove "whsec_" prefix and decode
+    else:
+        secret_bytes = secret.encode("utf-8")
+
     # Svix signatures are in the format "v1,<base64_signature> v2,<base64_signature>"
-    # Extract just the signature part (after "v1,")
     signature_parts = svix_signature.split(" ")
 
     # Create the signed content as per Svix spec
@@ -53,14 +60,13 @@ async def verify_webhook_signature(
 
     # Compute expected signature
     h = hmac.new(
-        secret.encode("utf-8"),
+        secret_bytes,
         signed_content.encode("utf-8"),
         hashlib.sha256
     )
     expected_signature = h.digest()  # Get bytes, not hex
 
     # Compare each provided signature (they're base64 encoded)
-    import base64
     for sig_part in signature_parts:
         if "," in sig_part:
             # Format is "v1,signature_base64"
@@ -96,10 +102,15 @@ async def clerk_webhook(
         # Create a new user in our database
         clerk_user = data
 
+        # Extract email (handle case where email_addresses might be empty)
+        email = None
+        if clerk_user.get("email_addresses") and len(clerk_user["email_addresses"]) > 0:
+            email = clerk_user["email_addresses"][0]["email_address"]
+
         # Extract relevant user data
         user_data = UserCreate(
             clerk_id=clerk_user["id"],
-            email=clerk_user["email_addresses"][0]["email_address"],
+            email=email,
             first_name=clerk_user.get("first_name"),
             last_name=clerk_user.get("last_name"),
             avatar_url=clerk_user.get("image_url"),
@@ -119,9 +130,14 @@ async def clerk_webhook(
         # Only update if user exists
         existing_user = await get_user_by_clerk_id(clerk_id)
         if existing_user:
+            # Extract email (handle case where email_addresses might be empty)
+            email = None
+            if clerk_user.get("email_addresses") and len(clerk_user["email_addresses"]) > 0:
+                email = clerk_user["email_addresses"][0]["email_address"]
+
             # Extract updated fields
             update_data = {
-                "email": clerk_user["email_addresses"][0]["email_address"],
+                "email": email,
                 "first_name": clerk_user.get("first_name"),
                 "last_name": clerk_user.get("last_name"),
                 "avatar_url": clerk_user.get("image_url"),
