@@ -1,6 +1,7 @@
 {
-  "pid": 386540,
+  "pid": 220333,
+  "parent_pid": 220313,
   "database": "/home/frankbria/projects/auto-author/.beads/beads.db",
-  "version": "0.22.0",
-  "started_at": "2025-11-11T03:47:49.135868763Z"
+  "version": "0.27.0",
+  "started_at": "2025-12-03T05:05:47.018264372Z"
 }

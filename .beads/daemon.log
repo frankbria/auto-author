@@ -2281,3 +2281,50 @@ error: cannot pull with rebase: You have unstaged changes.
 error: Please commit or stash them.
 
 [2025-11-10 20:47:50] Using event-driven mode
+[2025-12-02 22:05:47] Daemon started (interval: 5s, auto-commit: false, auto-push: false)
+[2025-12-02 22:05:47] Using database: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-12-02 22:05:47] Database opened: /home/frankbria/projects/auto-author/.beads/beads.db
+[2025-12-02 22:05:47] Upgrading .beads/.gitignore...
+[2025-12-02 22:05:47] Warning: failed to upgrade .gitignore: open .beads/.gitignore: no such file or directory
+[2025-12-02 22:05:47] Repository fingerprint validated: b73d87bf
+[2025-12-02 22:05:47] Warning: Database schema version mismatch
+[2025-12-02 22:05:47]   Database version: 0.22.0
+[2025-12-02 22:05:47]   Daemon version: 0.27.0
+[2025-12-02 22:05:47]   Auto-upgrading database to daemon version...
+[2025-12-02 22:05:47]   Database version updated to 0.27.0
+[2025-12-02 22:05:47] Starting RPC server: /home/frankbria/projects/auto-author/.beads/bd.sock
+[2025-12-02 22:05:47] RPC server ready (socket listening)
+[2025-12-02 22:05:47] Registered in global registry
+[2025-12-02 22:05:47] Starting sync cycle...
+[2025-12-02 22:05:47] Pre-export validation failed: refusing to export: JSONL content has changed since last import (import first to avoid data loss)
+[2025-12-02 22:05:47] Monitoring parent process (PID 0)
+[2025-12-02 22:05:47] Using event-driven mode
+[2025-12-02 22:36:20] Mutation detected: create auto-author-9lo
+[2025-12-02 22:36:20] Mutation detected: create auto-author-at3
+[2025-12-02 22:36:20] Mutation detected: create auto-author-rqx
+[2025-12-02 22:36:21] Mutation detected: create auto-author-4e0
+[2025-12-02 22:36:21] Mutation detected: create auto-author-198
+[2025-12-02 22:36:21] Mutation detected: create auto-author-2kc
+[2025-12-02 22:36:21] Mutation detected: create auto-author-avy
+[2025-12-02 22:36:22] Export triggered by mutation events
+[2025-12-02 22:36:22] Starting export...
+[2025-12-02 22:36:22] Pre-export validation failed: refusing to export: JSONL content has changed since last import (import first to avoid data loss)
+[2025-12-02 22:36:53] Mutation detected: create auto-author-l3u
+[2025-12-02 22:36:53] Mutation detected: create auto-author-7d8
+[2025-12-02 22:36:53] Mutation detected: create auto-author-d7x
+[2025-12-02 22:36:53] Mutation detected: create auto-author-bzq
+[2025-12-02 22:36:54] Mutation detected: create auto-author-w1j
+[2025-12-02 22:36:54] Mutation detected: create auto-author-k16
+[2025-12-02 22:36:54] Mutation detected: create auto-author-a2a
+[2025-12-02 22:36:54] Mutation detected: create auto-author-cm2
+[2025-12-02 22:36:54] Export triggered by mutation events
+[2025-12-02 22:36:54] Starting export...
+[2025-12-02 22:36:54] Pre-export validation failed: refusing to export: JSONL content has changed since last import (import first to avoid data loss)
+[2025-12-02 22:37:13] Mutation detected: update auto-author-d7x
+[2025-12-02 22:37:13] Mutation detected: update auto-author-a2a
+[2025-12-02 22:37:13] Mutation detected: update auto-author-61
+[2025-12-02 22:37:14] Mutation detected: update auto-author-9
+[2025-12-02 22:37:14] Mutation detected: update auto-author-03x
+[2025-12-02 22:37:14] Export triggered by mutation events
+[2025-12-02 22:37:14] Starting export...
+[2025-12-02 22:37:14] Pre-export validation failed: refusing to export: JSONL content has changed since last import (import first to avoid data loss)
