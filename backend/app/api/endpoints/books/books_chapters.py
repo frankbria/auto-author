@@ -99,7 +99,7 @@ async def create_chapter(
         new_chapter = await add_chapter_with_transaction(
             book_id=book_id,
             chapter_data=chapter_dict,
-            parent_id=chapter_data.parent_id if chapter_data.level > 1 else None,
+            parent_chapter_id=chapter_data.parent_id if chapter_data.level > 1 else None,
             user_clerk_id=current_user.get("clerk_id")
         )
 
@@ -211,7 +211,7 @@ async def update_chapter(
         updated_chapter = await update_chapter_with_transaction(
             book_id=book_id,
             chapter_id=chapter_id,
-            updates=updates,
+            chapter_updates=updates,
             user_clerk_id=current_user.get("clerk_id")
         )
 
