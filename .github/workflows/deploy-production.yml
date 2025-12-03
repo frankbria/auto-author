@@ -1,0 +1,537 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip test suite (emergency only)'
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+
+# Required GitHub Secrets (Production):
+# SSH & Server:
+#   - PROD_SSH_KEY: Private SSH key for production server access
+#   - PROD_HOST: Production server hostname/IP
+#   - PROD_USER: SSH username
+#
+# URLs:
+#   - PROD_API_URL: Backend API URL (e.g., https://api.autoauthor.app)
+#   - PROD_FRONTEND_URL: Frontend URL (e.g., https://autoauthor.app)
+#
+# Database:
+#   - PROD_MONGODB_URI: MongoDB connection string
+#   - PROD_DATABASE_NAME: Database name (e.g., auto_author_production)
+#
+# OpenAI:
+#   - OPENAI_API_KEY: OpenAI API key
+#
+# Clerk Authentication:
+#   - PROD_CLERK_PUBLISHABLE_KEY: Clerk publishable key (pk_*)
+#   - PROD_CLERK_SECRET_KEY: Clerk secret key (sk_*)
+#   - PROD_CLERK_API_KEY: Clerk API key
+#   - PROD_CLERK_FRONTEND_API: Clerk frontend API (e.g., your-app.clerk.accounts.dev)
+#   - PROD_CLERK_BACKEND_API: Clerk backend API (api.clerk.com)
+#   - PROD_CLERK_WEBHOOK_SECRET: Clerk webhook secret
+#
+# Optional (AWS):
+#   - AWS_ACCESS_KEY_ID
+#   - AWS_SECRET_ACCESS_KEY
+#   - AWS_REGION
+#   - AWS_S3_BUCKET
+#
+# Optional (Cloudinary):
+#   - CLOUDINARY_CLOUD_NAME
+#   - CLOUDINARY_API_KEY
+#   - CLOUDINARY_API_SECRET
+#
+# Optional (Monitoring):
+#   - SLACK_WEBHOOK_URL: Slack webhook for deployment notifications
+#   - DISCORD_WEBHOOK_URL: Discord webhook for deployment notifications
+
+jobs:
+  # Pre-deployment validation
+  validate:
+    name: Pre-Deployment Validation
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_tests }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Frontend - Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Frontend - Linting
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Frontend - Type checking
+        working-directory: ./frontend
+        run: npm run typecheck
+
+      - name: Frontend - Unit tests
+        working-directory: ./frontend
+        run: npm test -- --coverage --passWithNoTests
+
+      - name: Backend - Install dependencies
+        working-directory: ./backend
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv sync
+
+      - name: Backend - Linting
+        working-directory: ./backend
+        run: |
+          source .venv/bin/activate
+          uv run ruff check app/ || true
+
+      - name: Backend - Unit tests
+        working-directory: ./backend
+        run: |
+          source .venv/bin/activate
+          uv run pytest tests/ --cov=app --cov-report=term-missing
+
+      - name: Security - Check for secrets
+        run: |
+          ./scripts/check-secrets.sh || true
+
+  # Production deployment with manual approval
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: ${{ always() && (needs.validate.result == 'success' || inputs.skip_tests) }}
+
+    environment:
+      name: production
+      url: https://autoauthor.app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Build frontend
+        working-directory: ./frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.PROD_API_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_ENVIRONMENT: production
+        run: |
+          npm ci
+          npm run build
+
+      - name: Create deployment package
+        run: |
+          # Create temporary directory
+          mkdir -p /tmp/deploy
+
+          # Copy necessary files (exclude development artifacts)
+          rsync -av --progress \
+            --exclude='node_modules' \
+            --exclude='.venv' \
+            --exclude='.next' \
+            --exclude='coverage' \
+            --exclude='*.log' \
+            --exclude='.env.local' \
+            --exclude='.env' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='.pytest_cache' \
+            --exclude='test-results' \
+            --exclude='playwright-report' \
+            --exclude='.git' \
+            . /tmp/deploy/
+
+          # Create tar archive
+          cd /tmp/deploy
+          tar -czf /tmp/deploy-package.tar.gz .
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/production_key
+          chmod 600 ~/.ssh/production_key
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Upload package to server
+        run: |
+          scp -i ~/.ssh/production_key /tmp/deploy-package.tar.gz \
+            ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}:/tmp/
+
+      - name: Deploy to production
+        run: |
+          ssh -i ~/.ssh/production_key \
+            ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} \
+            'bash -s' << 'ENDSSH'
+          set -euo pipefail
+
+          ENVIRONMENT="production"
+          RELEASE_ID="$(date +%Y%m%d-%H%M%S)"
+          API_URL="${{ secrets.PROD_API_URL }}"
+          FRONTEND_URL="${{ secrets.PROD_FRONTEND_URL }}"
+          CLERK_PUBLISHABLE_KEY="${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }}"
+          CLERK_SECRET_KEY="${{ secrets.PROD_CLERK_SECRET_KEY }}"
+
+          DEPLOY_BASE="/opt/auto-author-production"
+          RELEASE_DIR="$DEPLOY_BASE/releases/$RELEASE_ID"
+          CURRENT_DIR="$DEPLOY_BASE/current"
+          BACKUP_DIR="$DEPLOY_BASE/backup"
+
+          echo "==> Deploying PRODUCTION environment (Release: $RELEASE_ID)"
+          echo "⚠️  WARNING: Deploying to PRODUCTION - this affects live users"
+
+          # Create release directory
+          mkdir -p "$RELEASE_DIR"
+          mkdir -p "$BACKUP_DIR"
+
+          # Backup current release (for rollback)
+          if [ -L "$CURRENT_DIR" ]; then
+            CURRENT_RELEASE=$(readlink -f "$CURRENT_DIR")
+            echo "==> Backing up current release: $CURRENT_RELEASE"
+            cp -rL "$CURRENT_DIR" "$BACKUP_DIR/pre-deploy-$(date +%Y%m%d-%H%M%S)"
+          fi
+
+          # Extract uploaded package
+          echo "==> Extracting deployment package..."
+          tar -xzf /tmp/deploy-package.tar.gz -C "$RELEASE_DIR"
+
+          # Setup backend environment
+          echo "==> Setting up backend..."
+          cd "$RELEASE_DIR/backend"
+
+          # Install Python dependencies using uv
+          if ! command -v uv &> /dev/null; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+          uv venv
+          source .venv/bin/activate
+          uv sync
+
+          # Create backend .env file with all required variables
+          echo "==> Creating backend .env file..."
+          {
+            echo "# Database"
+            echo "DATABASE_URI=${{ secrets.PROD_MONGODB_URI }}"
+            echo "DATABASE_NAME=${{ secrets.PROD_DATABASE_NAME }}"
+            echo ""
+            echo "# CORS Settings"
+            echo "BACKEND_CORS_ORIGINS=[\"$FRONTEND_URL\",\"$API_URL\"]"
+            echo ""
+            echo "# OpenAI"
+            echo "OPENAI_AUTOAUTHOR_API_KEY=${{ secrets.OPENAI_API_KEY }}"
+            echo ""
+            echo "# Clerk Authentication"
+            echo "CLERK_API_KEY=${{ secrets.PROD_CLERK_API_KEY }}"
+            echo "CLERK_SECRET_KEY=$CLERK_SECRET_KEY"
+            echo "CLERK_FRONTEND_API=${{ secrets.PROD_CLERK_FRONTEND_API }}"
+            echo "CLERK_BACKEND_API=${{ secrets.PROD_CLERK_BACKEND_API }}"
+            echo "CLERK_WEBHOOK_SECRET=${{ secrets.PROD_CLERK_WEBHOOK_SECRET }}"
+            echo "CLERK_JWT_ALGORITHM=RS256"
+            echo ""
+            echo "# API Settings"
+            echo "API_V1_PREFIX=/api/v1"
+            echo ""
+            echo "# AWS Settings (Optional)"
+            echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}"
+            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            echo "AWS_REGION=${{ secrets.AWS_REGION }}"
+            echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}"
+            echo ""
+            echo "# Cloudinary Settings (Optional)"
+            echo "CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}"
+            echo "CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}"
+            echo "CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}"
+          } > .env
+
+          # Verify .env file was created
+          if [ ! -f .env ]; then
+            echo "ERROR: Failed to create backend .env file"
+            exit 1
+          fi
+          echo "✓ Backend .env file created"
+
+          # Setup frontend environment
+          echo "==> Setting up frontend..."
+          cd "$RELEASE_DIR/frontend"
+
+          # Create/update .env.production with all required variables
+          {
+            echo "NEXT_PUBLIC_API_URL=$API_URL"
+            echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY"
+            echo "CLERK_SECRET_KEY=$CLERK_SECRET_KEY"
+            echo "NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT"
+            echo "PORT=3001"
+          } > .env.production
+
+          # Export environment variables for build process
+          export NEXT_PUBLIC_API_URL=$API_URL
+          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
+          export CLERK_SECRET_KEY=$CLERK_SECRET_KEY
+          export NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT
+
+          # Install dependencies and build
+          # Remove old .next cache to prevent stale builds
+          echo "==> Cleaning old build cache..."
+          rm -rf .next
+
+          echo "==> Installing frontend dependencies..."
+          npm ci
+
+          echo "==> Building frontend..."
+          npm run build
+
+          # Generate PM2 ecosystem config for production
+          echo "==> Generating PM2 ecosystem configuration..."
+          cd "$RELEASE_DIR"
+
+          cat > ecosystem.config.production.js << 'EOFPM2'
+          module.exports = {
+            apps: [
+              {
+                name: 'auto-author-api-prod',
+                script: '.venv/bin/uvicorn',
+                args: 'app.main:app --host 0.0.0.0 --port 8001',
+                cwd: '$RELEASE_DIR/backend',
+                interpreter: 'none',
+                env: {
+                  ENVIRONMENT: 'production',
+                },
+                error_file: '~/.pm2/logs/auto-author-api-prod-error.log',
+                out_file: '~/.pm2/logs/auto-author-api-prod-out.log',
+                time: true,
+                autorestart: true,
+                max_restarts: 10,
+                min_uptime: '10s',
+                watch: false,
+              },
+              {
+                name: 'auto-author-web-prod',
+                script: 'npm',
+                args: 'start',
+                cwd: '$RELEASE_DIR/frontend',
+                interpreter: 'none',
+                env: {
+                  NODE_ENV: 'production',
+                  PORT: '3001',
+                  NEXT_PUBLIC_API_URL: '$API_URL',
+                  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '$CLERK_PUBLISHABLE_KEY',
+                  CLERK_SECRET_KEY: '$CLERK_SECRET_KEY',
+                  NEXT_PUBLIC_ENVIRONMENT: 'production',
+                },
+                error_file: '~/.pm2/logs/auto-author-web-prod-error.log',
+                out_file: '~/.pm2/logs/auto-author-web-prod-out.log',
+                time: true,
+                autorestart: true,
+                max_restarts: 10,
+                min_uptime: '10s',
+                watch: false,
+              },
+            ],
+          };
+          EOFPM2
+
+          # Replace placeholders in ecosystem config
+          sed -i "s|\$RELEASE_DIR|$RELEASE_DIR|g" ecosystem.config.production.js
+          sed -i "s|\$API_URL|$API_URL|g" ecosystem.config.production.js
+          sed -i "s|\$CLERK_PUBLISHABLE_KEY|$CLERK_PUBLISHABLE_KEY|g" ecosystem.config.production.js
+          sed -i "s|\$CLERK_SECRET_KEY|$CLERK_SECRET_KEY|g" ecosystem.config.production.js
+
+          # Update symlink atomically
+          echo "==> Switching to new release..."
+          ln -snf "$RELEASE_DIR" "$CURRENT_DIR.tmp"
+          mv -Tf "$CURRENT_DIR.tmp" "$CURRENT_DIR"
+
+          # Stop old PM2 services and start new ones
+          echo "==> Restarting PM2 services..."
+          cd "$CURRENT_DIR"
+
+          # Delete old processes (ensures clean pickup of new release)
+          pm2 delete auto-author-api-prod 2>/dev/null || true
+          pm2 delete auto-author-web-prod 2>/dev/null || true
+
+          # Start new processes
+          pm2 start ecosystem.config.production.js
+          pm2 save
+
+          # Wait for services to start (Next.js needs more time)
+          echo "==> Waiting for services to initialize..."
+          sleep 15
+
+          # Health checks with retries
+          echo "==> Running health checks..."
+
+          # Backend health check
+          MAX_RETRIES=10
+          RETRY_COUNT=0
+          until curl -f http://localhost:8001/api/v1/health || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            echo "Backend health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 3s..."
+            sleep 3
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "ERROR: Backend health check failed after $MAX_RETRIES attempts"
+            echo "Rolling back to previous release..."
+            if [ -L "$CURRENT_DIR" ] && [ -d "$BACKUP_DIR" ]; then
+              LATEST_BACKUP=$(ls -t "$BACKUP_DIR" | head -1)
+              if [ -n "$LATEST_BACKUP" ]; then
+                ln -snf "$BACKUP_DIR/$LATEST_BACKUP" "$CURRENT_DIR"
+                pm2 restart all
+                echo "Rolled back to: $LATEST_BACKUP"
+              fi
+            fi
+            exit 1
+          fi
+          echo "✓ Backend health check passed"
+
+          # Frontend health check with retries
+          RETRY_COUNT=0
+          until curl -f -s http://localhost:3001 >/dev/null || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            echo "Frontend health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 3s..."
+            sleep 3
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "ERROR: Frontend health check failed after $MAX_RETRIES attempts"
+            echo "Checking PM2 logs..."
+            pm2 logs auto-author-web-prod --lines 50 --nostream
+            echo "Rolling back to previous release..."
+            if [ -L "$CURRENT_DIR" ] && [ -d "$BACKUP_DIR" ]; then
+              LATEST_BACKUP=$(ls -t "$BACKUP_DIR" | head -1)
+              if [ -n "$LATEST_BACKUP" ]; then
+                ln -snf "$BACKUP_DIR/$LATEST_BACKUP" "$CURRENT_DIR"
+                pm2 restart all
+                echo "Rolled back to: $LATEST_BACKUP"
+              fi
+            fi
+            exit 1
+          fi
+          echo "✓ Frontend health check passed"
+
+          echo "==> ✅ PRODUCTION DEPLOYMENT SUCCESSFUL!"
+          echo "    Release: $RELEASE_ID"
+          echo "    Backend: http://localhost:8001 (proxied via $API_URL)"
+          echo "    Frontend: http://localhost:3001 (proxied via $FRONTEND_URL)"
+
+          # Cleanup old releases (keep last 5)
+          cd "$DEPLOY_BASE/releases"
+          ls -t | tail -n +6 | xargs -r rm -rf
+
+          # Cleanup old backups (keep last 3)
+          cd "$BACKUP_DIR"
+          ls -t | tail -n +4 | xargs -r rm -rf
+
+          echo "==> Cleanup complete"
+          ENDSSH
+
+      - name: Health checks (external)
+        run: |
+          # Wait for services to stabilize
+          sleep 15
+
+          # Backend health check
+          echo "Checking backend health..."
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          until curl -f ${{ secrets.PROD_API_URL }}/api/v1/health || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            echo "Attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying..."
+            sleep 5
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "ERROR: External backend health check failed"
+            exit 1
+          fi
+
+          # Frontend health check
+          echo "Checking frontend health..."
+          curl -f ${{ secrets.PROD_FRONTEND_URL }} || exit 1
+
+          # CORS verification
+          echo "Checking CORS headers..."
+          curl -s -D - -o /dev/null -X OPTIONS ${{ secrets.PROD_API_URL }}/api/v1/books \
+            -H "Origin: ${{ secrets.PROD_FRONTEND_URL }}" \
+            -H "Access-Control-Request-Method: POST" | grep -i "access-control-allow-origin" || exit 1
+
+      - name: Smoke tests
+        run: |
+          # Test API docs endpoint
+          curl -f ${{ secrets.PROD_API_URL }}/docs || exit 1
+
+          echo "✅ All smoke tests passed"
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "🎉 Production deployment successful!"
+          # Add Slack/Discord notification here if webhook configured
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+              -H 'Content-Type: application/json' \
+              -d "{\"text\":\"✅ Production deployment successful: ${{ github.ref_name }}\"}"
+          fi
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "❌ Production deployment failed!"
+          # Add Slack/Discord notification here if webhook configured
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+              -H 'Content-Type: application/json' \
+              -d "{\"text\":\"❌ Production deployment FAILED: ${{ github.ref_name }}\"}"
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/production_key
+          rm -f /tmp/deploy-package.tar.gz

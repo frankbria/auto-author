@@ -1,0 +1,282 @@
+name: Rollback Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: 'Release ID to rollback to (e.g., 20251203-120000) - leave empty for last backup'
+        required: false
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  rollback:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+
+    environment:
+      name: production
+      url: https://autoauthor.app
+
+    steps:
+      - name: Validate rollback reason
+        run: |
+          if [ -z "${{ inputs.reason }}" ]; then
+            echo "ERROR: Rollback reason is required"
+            exit 1
+          fi
+          echo "Rollback reason: ${{ inputs.reason }}"
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/production_key
+          chmod 600 ~/.ssh/production_key
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Execute rollback
+        run: |
+          ssh -i ~/.ssh/production_key \
+            ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} \
+            'bash -s' << 'ENDSSH'
+          set -euo pipefail
+
+          DEPLOY_BASE="/opt/auto-author-production"
+          BACKUP_DIR="$DEPLOY_BASE/backup"
+          CURRENT_DIR="$DEPLOY_BASE/current"
+          RELEASE_ID="${{ inputs.release_id }}"
+
+          # Colors
+          RED='\033[0;31m'
+          GREEN='\033[0;32m'
+          YELLOW='\033[1;33m'
+          NC='\033[0m'
+
+          log_info() {
+              echo -e "${GREEN}[INFO]${NC} $1"
+          }
+
+          log_warn() {
+              echo -e "${YELLOW}[WARN]${NC} $1"
+          }
+
+          log_error() {
+              echo -e "${RED}[ERROR]${NC} $1"
+          }
+
+          log_warn "⚠️  PRODUCTION ROLLBACK IN PROGRESS"
+          log_info "Reason: ${{ inputs.reason }}"
+
+          # Verify backup directory exists
+          if [ ! -d "$BACKUP_DIR" ]; then
+            log_error "Backup directory not found: $BACKUP_DIR"
+            exit 1
+          fi
+
+          # Determine which backup to use
+          if [ -n "$RELEASE_ID" ]; then
+            # Specific release requested
+            BACKUP_PATH="$BACKUP_DIR/pre-deploy-$RELEASE_ID"
+            if [ ! -d "$BACKUP_PATH" ]; then
+              log_error "Backup not found: $BACKUP_PATH"
+              log_info "Available backups:"
+              ls -lt "$BACKUP_DIR"
+              exit 1
+            fi
+            log_info "Rolling back to specific release: $RELEASE_ID"
+          else
+            # Use latest backup
+            LATEST_BACKUP=$(ls -t "$BACKUP_DIR" | head -1)
+            if [ -z "$LATEST_BACKUP" ]; then
+              log_error "No backups found in $BACKUP_DIR"
+              exit 1
+            fi
+            BACKUP_PATH="$BACKUP_DIR/$LATEST_BACKUP"
+            log_info "Rolling back to latest backup: $LATEST_BACKUP"
+          fi
+
+          # Verify backup is valid
+          if [ ! -d "$BACKUP_PATH/backend" ] || [ ! -d "$BACKUP_PATH/frontend" ]; then
+            log_error "Invalid backup structure at $BACKUP_PATH"
+            exit 1
+          fi
+
+          # Save current release info for potential re-rollback
+          if [ -L "$CURRENT_DIR" ]; then
+            CURRENT_RELEASE=$(readlink -f "$CURRENT_DIR")
+            log_info "Current release: $CURRENT_RELEASE"
+          fi
+
+          # Update symlink to backup
+          log_info "Updating symlink to backup..."
+          ln -snf "$BACKUP_PATH" "$CURRENT_DIR.tmp"
+          mv -Tf "$CURRENT_DIR.tmp" "$CURRENT_DIR"
+
+          # Restart PM2 services
+          log_info "Restarting PM2 services..."
+          cd "$CURRENT_DIR"
+
+          # Check if ecosystem config exists
+          if [ ! -f "ecosystem.config.production.js" ]; then
+            log_warn "No ecosystem config found, restarting services manually..."
+            pm2 restart auto-author-api-prod 2>/dev/null || log_error "Failed to restart backend"
+            pm2 restart auto-author-web-prod 2>/dev/null || log_error "Failed to restart frontend"
+          else
+            pm2 delete auto-author-api-prod 2>/dev/null || true
+            pm2 delete auto-author-web-prod 2>/dev/null || true
+            pm2 start ecosystem.config.production.js
+          fi
+
+          pm2 save
+
+          # Wait for services to restart
+          log_info "Waiting for services to restart..."
+          sleep 15
+
+          # Health checks
+          log_info "Running health checks..."
+
+          # Backend health check
+          MAX_RETRIES=10
+          RETRY_COUNT=0
+          until curl -f http://localhost:8001/api/v1/health || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            log_warn "Backend health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 3s..."
+            sleep 3
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            log_error "Backend health check failed after rollback"
+            log_info "Checking PM2 logs..."
+            pm2 logs auto-author-api-prod --lines 50 --nostream
+            exit 1
+          fi
+          log_info "✓ Backend health check passed"
+
+          # Frontend health check
+          RETRY_COUNT=0
+          until curl -f -s http://localhost:3001 >/dev/null || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            log_warn "Frontend health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 3s..."
+            sleep 3
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            log_error "Frontend health check failed after rollback"
+            log_info "Checking PM2 logs..."
+            pm2 logs auto-author-web-prod --lines 50 --nostream
+            exit 1
+          fi
+          log_info "✓ Frontend health check passed"
+
+          log_info "✅ ROLLBACK SUCCESSFUL"
+          log_info "    Rolled back to: $(basename $BACKUP_PATH)"
+          log_info "    Backend: http://localhost:8001"
+          log_info "    Frontend: http://localhost:3001"
+          log_info "    Reason: ${{ inputs.reason }}"
+
+          # Show PM2 status
+          log_info "PM2 process status:"
+          pm2 list | grep auto-author
+          ENDSSH
+
+      - name: External health checks
+        run: |
+          # Wait for services to stabilize
+          sleep 10
+
+          # Backend health check
+          echo "Checking backend health..."
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          until curl -f ${{ secrets.PROD_API_URL }}/api/v1/health || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            echo "Attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying..."
+            sleep 5
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "ERROR: External backend health check failed"
+            exit 1
+          fi
+          echo "✓ Backend responding"
+
+          # Frontend health check
+          echo "Checking frontend health..."
+          curl -f ${{ secrets.PROD_FRONTEND_URL }} || exit 1
+          echo "✓ Frontend responding"
+
+          # CORS verification
+          echo "Checking CORS headers..."
+          curl -s -D - -o /dev/null -X OPTIONS ${{ secrets.PROD_API_URL }}/api/v1/books \
+            -H "Origin: ${{ secrets.PROD_FRONTEND_URL }}" \
+            -H "Access-Control-Request-Method: POST" | grep -i "access-control-allow-origin" || exit 1
+          echo "✓ CORS configured correctly"
+
+          echo "✅ All external health checks passed"
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "✅ Production rollback successful!"
+          echo "Reason: ${{ inputs.reason }}"
+
+          # Send notification if webhook configured
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+              -H 'Content-Type: application/json' \
+              -d "{\"text\":\"✅ Production rollback successful\nReason: ${{ inputs.reason }}\"}"
+          fi
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "❌ Production rollback FAILED!"
+          echo "Reason: ${{ inputs.reason }}"
+          echo "⚠️  URGENT: Manual intervention required on production server"
+
+          # Send notification if webhook configured
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+              -H 'Content-Type: application/json' \
+              -d "{\"text\":\"❌ Production rollback FAILED\nReason: ${{ inputs.reason }}\n⚠️ URGENT: Manual intervention required\"}"
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/production_key
+
+      - name: Post-rollback instructions
+        if: success()
+        run: |
+          cat << EOF
+          ✅ Rollback completed successfully!
+
+          Next Steps:
+          1. Verify application functionality at ${{ secrets.PROD_FRONTEND_URL }}
+          2. Check error logs: ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} "pm2 logs"
+          3. Monitor for 15 minutes to ensure stability
+          4. Document root cause: ${{ inputs.reason }}
+          5. Create hotfix if needed or investigate failed deployment
+          6. Update team on rollback status
+
+          Rollback Information:
+          - Reason: ${{ inputs.reason }}
+          - Triggered by: ${{ github.actor }}
+          - Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          To re-deploy after fix:
+          1. Fix the issue that caused rollback
+          2. Test thoroughly in staging
+          3. Create new release tag: git tag v1.0.1
+          4. Push tag: git push origin v1.0.1
+          5. Monitor deployment workflow
+          EOF
