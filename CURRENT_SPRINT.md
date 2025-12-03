@@ -1,6 +1,6 @@
 # Current Sprint - 
 
-**Last Updated**: 2025-11-21
+**Last Updated**: 2025-12-02
 
 **Source**: Auto-generated from bd - DO NOT EDIT MANUALLY
 
@@ -19,101 +19,98 @@ No tasks currently in progress.
 
 ### ✅ Ready to Start
 
-- **[auto-author-twk]** Fix backend Pydantic schema error causing crash loop
+- **[auto-author-9lo]** GAP-CRIT-001: Fix CORS configuration for production deployment
   - Priority: 0
   - No blocking dependencies
 
-- **[auto-author-qou]** Fix bookClient.test.tsx trailing slash mismatch
+- **[auto-author-at3]** GAP-CRIT-002: Replace in-memory rate limiting with Redis
   - Priority: 0
   - No blocking dependencies
 
-- **[auto-author-egz]** Remove continue-on-error flags from CI/CD coverage checks
+- **[auto-author-rqx]** GAP-CRIT-003: Configure MongoDB connection pooling
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-4e0]** GAP-CRIT-005: Create production deployment workflow
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-198]** GAP-CRIT-006: Set up monitoring and observability infrastructure
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-2kc]** GAP-CRIT-007: Implement database backup automation
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-avy]** GAP-CRIT-008: Refactor monolithic books.py endpoint (91KB, 2000+ lines)
+  - Priority: 0
+  - No blocking dependencies
+
+- **[auto-author-l3u]** GAP-HIGH-001: Implement CSRF protection
   - Priority: 1
   - No blocking dependencies
 
-- **[auto-author-4ad]** Configure Clerk test workspace and test users
+- **[auto-author-7d8]** GAP-HIGH-002: Remove JWT debug logging from production
   - Priority: 1
   - No blocking dependencies
 
-- **[auto-author-4q3]** Add E2E tests to CI/CD pipeline
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-rpk]** Create test data seeding and cleanup scripts
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-1]** Accessibility Audit - Phase 1: Automated scanning
-  - Priority: 3
-  - No blocking dependencies
-
-- **[auto-author-6]** Operational Requirements - User action tracking
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-9]** Operational Requirements - Data backup verification
-  - Priority: 1
-  - No blocking dependencies
-
-- **[auto-author-10]** Operational Requirements - SLA monitoring setup
+- **[auto-author-bzq]** GAP-HIGH-004: Sanitize MongoDB query inputs (NoSQL injection prevention)
   - Priority: 1
   - No blocking dependencies
 
 
 ### 📋 Planned (Open)
 
-- **[auto-author-qou]** Fix bookClient.test.tsx trailing slash mismatch
+- **[auto-author-avy]** GAP-CRIT-008: Refactor monolithic books.py endpoint (91KB, 2000+ lines)
   - Priority: 0
 
-- **[auto-author-twk]** Fix backend Pydantic schema error causing crash loop
+- **[auto-author-2kc]** GAP-CRIT-007: Implement database backup automation
+  - Priority: 0
+
+- **[auto-author-198]** GAP-CRIT-006: Set up monitoring and observability infrastructure
+  - Priority: 0
+
+- **[auto-author-4e0]** GAP-CRIT-005: Create production deployment workflow
+  - Priority: 0
+
+- **[auto-author-rqx]** GAP-CRIT-003: Configure MongoDB connection pooling
+  - Priority: 0
+
+- **[auto-author-at3]** GAP-CRIT-002: Replace in-memory rate limiting with Redis
+  - Priority: 0
+
+- **[auto-author-9lo]** GAP-CRIT-001: Fix CORS configuration for production deployment
   - Priority: 0
 
 - **[auto-author-53]** Execute deployment testing checklist on staging
   - Priority: 0
 
-- **[auto-author-rpk]** Create test data seeding and cleanup scripts
+- **[auto-author-cm2]** GAP-HIGH-007: Add nginx configuration to repository
   - Priority: 1
 
-- **[auto-author-4q3]** Add E2E tests to CI/CD pipeline
+- **[auto-author-a2a]** GAP-HIGH-011: Add unique constraints on critical database fields
   - Priority: 1
 
-- **[auto-author-4ad]** Configure Clerk test workspace and test users
+- **[auto-author-k16]** GAP-HIGH-010: Create database index startup hook
   - Priority: 1
 
-- **[auto-author-egz]** Remove continue-on-error flags from CI/CD coverage checks
+- **[auto-author-w1j]** GAP-HIGH-005: Create security.txt and vulnerability disclosure policy
   - Priority: 1
 
-- **[auto-author-4hj]** E2E Test: Screen reader compatibility (axe-playwright)
+- **[auto-author-bzq]** GAP-HIGH-004: Sanitize MongoDB query inputs (NoSQL injection prevention)
   - Priority: 1
 
-- **[auto-author-ewj]** E2E Test: Complete keyboard navigation (WCAG 2.1 compliance)
+- **[auto-author-d7x]** GAP-HIGH-003: Add rate limiting to authentication endpoints
   - Priority: 1
 
-- **[auto-author-dsm]** E2E Test: Suspicious session detection (fingerprint change)
+- **[auto-author-7d8]** GAP-HIGH-002: Remove JWT debug logging from production
   - Priority: 1
 
-- **[auto-author-6co]** E2E Test: Concurrent session limits
+- **[auto-author-l3u]** GAP-HIGH-001: Implement CSRF protection
   - Priority: 1
 
-- **[auto-author-2e7]** E2E Test: Session timeout warnings
-  - Priority: 1
-
-- **[auto-author-ar6]** E2E Test: Draft regeneration workflow
-  - Priority: 1
-
-- **[auto-author-yrg]** E2E Test: Draft generation rate limiting
-  - Priority: 1
-
-- **[auto-author-xz2]** E2E Test: Draft generation error validation
-  - Priority: 1
-
-- **[auto-author-nwd]** Comprehensive E2E Test Suite - Close 30% Automation Gap
-  - Priority: 1
-
-- **[auto-author-6y4]** Achieve 85% test coverage across backend and frontend
-  - Priority: 1
-
-- **[auto-author-03x]** Debug and fix deployment E2E test hangs/timeouts
+- **[auto-author-61]** Backend coverage sprint - Security & Auth (41% → 55%)
   - Priority: 1
 
 - **[auto-author-17]** Settings & Help Pages - Help documentation
@@ -127,12 +124,6 @@ No tasks currently in progress.
 
 - **[auto-author-6]** Operational Requirements - User action tracking
   - Priority: 1
-
-- **[auto-author-5jo]** E2E Test: Profile form validation
-  - Priority: 2
-
-- **[auto-author-2nd]** E2E Test: Profile CRUD operations
-  - Priority: 2
 
 - **[auto-author-63]** Review and cleanup obsolete documentation (34 files in claudedocs/)
   - Priority: 2
@@ -227,19 +218,19 @@ No tasks currently in progress.
 
 ### ✅ Completed This Week
 
-- **[auto-author-59]** Create comprehensive E2E test suite for all critical user journeys
-  - Closed: 2025-11-21T21:05:39.840777353-07:00
-  - Reason: none
+- **[auto-author-03x]** Debug and fix deployment E2E test hangs/timeouts
+  - Closed: 2025-12-02T22:37:14.138954243-07:00
+  - Reason: Not a real issue - deployment E2E tests work correctly according to testing-coverage-review.md. 70% E2E coverage achieved with 54+ tests passing.
 
 
 ---
 
 ## 📊 Sprint Metrics
 
-- **Total Issues**: 95
-- **Open**: 54
+- **Total Issues**: 90
+- **Open**: 51
 - **In Progress**: 0
-- **Closed**: 41
+- **Closed**: 38
 - **Ready to Start**: 10
 
 ---
@@ -268,6 +259,6 @@ bd dep add <task-1> <task-2>
 
 ---
 
-**Generated**: 2025-11-21
+**Generated**: 2025-12-02
 **Command**: `./scripts/export-current-sprint.sh`
 **Source of Truth**: bd database (`.beads/*.db`)
