@@ -10,4 +10,4 @@ __pycache__/
 # Environment files - NEVER commit these
 .env
 .env.*
-!.env.example
+!.env.exampleuploads/
