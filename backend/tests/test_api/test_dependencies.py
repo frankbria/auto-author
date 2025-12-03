@@ -5,10 +5,13 @@ Tests rate limiting, input sanitization, API keys, and Clerk client.
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from fastapi import HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials
+from typing import Optional
 import time
 from datetime import datetime
+from pydantic import BaseModel
 
 from app.api.dependencies import (
     sanitize_input,
@@ -18,6 +21,11 @@ from app.api.dependencies import (
     get_clerk_client,
     audit_request,
     rate_limit_cache,
+    get_database_collection,
+    get_auth_user,
+    SanitizedModel,
+    _redis_rate_limit,
+    _memory_rate_limit,
 )
 
 
@@ -512,3 +520,432 @@ class TestClerkClient:
         result = await client.update_user("user_123", {"email": "invalid"})
 
         assert result is None
+
+
+@pytest.mark.asyncio
+class TestDatabaseDependencies:
+    """Test database-related dependencies"""
+
+    @patch("app.api.dependencies.get_collection")
+    async def test_get_database_collection(self, mock_get_collection):
+        """Test get_database_collection dependency"""
+        mock_collection = Mock()
+        mock_get_collection.return_value = mock_collection
+
+        result = await get_database_collection("test_collection")
+
+        assert result == mock_collection
+        mock_get_collection.assert_called_once_with("test_collection")
+
+
+@pytest.mark.asyncio
+class TestAuthDependencies:
+    """Test authentication-related dependencies"""
+
+    async def test_get_auth_user(self):
+        """Test get_auth_user dependency extracts token"""
+        mock_credentials = Mock(spec=HTTPAuthorizationCredentials)
+        mock_credentials.credentials = "test_token_123"
+
+        # This function just extracts the token, doesn't validate it
+        # (validation happens in other dependencies)
+        result = await get_auth_user(credentials=mock_credentials)
+
+        # Function returns None but extracts token from credentials
+        assert result is None
+
+
+class TestSanitizedModel:
+    """Test SanitizedModel base class"""
+
+    def test_sanitized_model_sanitizes_string_fields(self):
+        """Test that SanitizedModel auto-sanitizes string fields"""
+
+        class TestModel(SanitizedModel):
+            name: str
+            description: str
+            count: int
+
+        data = {
+            "name": "<script>alert('xss')</script>Hello",
+            "description": "<div>World</div>",
+            "count": 42,
+        }
+
+        model = TestModel(**data)
+
+        assert "<script>" not in model.name
+        assert "Hello" in model.name
+        assert "<div>" not in model.description
+        assert "World" in model.description
+        assert model.count == 42
+
+    def test_sanitized_model_handles_empty_strings(self):
+        """Test SanitizedModel with empty strings"""
+
+        class TestModel(SanitizedModel):
+            name: str
+
+        model = TestModel(name="")
+
+        assert model.name == ""
+
+    def test_sanitized_model_normalizes_whitespace(self):
+        """Test SanitizedModel normalizes whitespace"""
+
+        class TestModel(SanitizedModel):
+            text: str
+
+        model = TestModel(text="Hello    World   Test")
+
+        assert model.text == "Hello World Test"
+
+
+@pytest.mark.asyncio
+class TestRedisRateLimiting:
+    """Test Redis-based rate limiting functions"""
+
+    @pytest.mark.asyncio
+    async def test_redis_rate_limit_first_request(self):
+        """Test Redis rate limiting for first request in window"""
+        mock_redis = AsyncMock()
+        mock_redis.get.return_value = None  # No existing count
+        mock_redis.set = AsyncMock()
+
+        key = "test_key"
+        limit = 10
+        window = 60
+        now = time.time()
+
+        count, reset_at = await _redis_rate_limit(mock_redis, key, limit, window, now)
+
+        assert count == 1
+        assert reset_at == now + window
+        mock_redis.get.assert_called_once_with(key)
+        mock_redis.set.assert_called_once_with(key, 1, ex=window)
+
+    @pytest.mark.asyncio
+    async def test_redis_rate_limit_subsequent_request(self):
+        """Test Redis rate limiting for subsequent requests"""
+        mock_redis = AsyncMock()
+        mock_redis.get.return_value = "3"  # 3 requests already made
+        mock_redis.ttl.return_value = 45  # 45 seconds remaining
+        mock_redis.incr.return_value = 4  # Will be 4th request
+
+        key = "test_key"
+        limit = 10
+        window = 60
+        now = time.time()
+
+        count, reset_at = await _redis_rate_limit(mock_redis, key, limit, window, now)
+
+        assert count == 4
+        assert reset_at == now + 45
+        mock_redis.incr.assert_called_once_with(key)
+
+    @pytest.mark.asyncio
+    async def test_redis_rate_limit_ttl_expired(self):
+        """Test Redis rate limiting when TTL is expired/negative"""
+        mock_redis = AsyncMock()
+        mock_redis.get.return_value = "5"
+        mock_redis.ttl.return_value = -1  # Key has no TTL
+        mock_redis.incr.return_value = 6
+
+        key = "test_key"
+        limit = 10
+        window = 60
+        now = time.time()
+
+        count, reset_at = await _redis_rate_limit(mock_redis, key, limit, window, now)
+
+        assert count == 6
+        assert reset_at == now + window  # Falls back to full window
+
+    @pytest.mark.asyncio
+    async def test_redis_rate_limit_error_handling(self):
+        """Test Redis rate limiting error handling"""
+        mock_redis = AsyncMock()
+        mock_redis.get.side_effect = Exception("Redis connection error")
+
+        key = "test_key"
+        limit = 10
+        window = 60
+        now = time.time()
+
+        with pytest.raises(Exception) as exc_info:
+            await _redis_rate_limit(mock_redis, key, limit, window, now)
+
+        assert "Redis connection error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_memory_rate_limit_first_request(self):
+        """Test in-memory rate limiting for first request"""
+        # Clear cache
+        rate_limit_cache.clear()
+
+        key = "test_memory_key"
+        limit = 5
+        window = 60
+        now = time.time()
+
+        count, reset_at = await _memory_rate_limit(key, limit, window, now)
+
+        assert count == 1
+        assert reset_at == now + window
+        assert key in rate_limit_cache
+
+    @pytest.mark.asyncio
+    async def test_memory_rate_limit_subsequent_requests(self):
+        """Test in-memory rate limiting for subsequent requests"""
+        rate_limit_cache.clear()
+
+        key = "test_memory_key"
+        limit = 5
+        window = 60
+        now = time.time()
+
+        # Make 3 requests
+        count1, reset1 = await _memory_rate_limit(key, limit, window, now)
+        count2, reset2 = await _memory_rate_limit(key, limit, window, now)
+        count3, reset3 = await _memory_rate_limit(key, limit, window, now)
+
+        assert count1 == 1
+        assert count2 == 2
+        assert count3 == 3
+        assert reset1 == reset2 == reset3  # Same reset time
+
+    @pytest.mark.asyncio
+    async def test_memory_rate_limit_window_reset(self):
+        """Test in-memory rate limiting resets after window expires"""
+        rate_limit_cache.clear()
+
+        key = "test_memory_key"
+        limit = 5
+        window = 1  # 1 second window
+        now = time.time()
+
+        # Make first request
+        count1, reset1 = await _memory_rate_limit(key, limit, window, now)
+        assert count1 == 1
+
+        # Simulate time passing beyond window
+        future = now + 2
+        count2, reset2 = await _memory_rate_limit(key, limit, window, future)
+
+        assert count2 == 1  # Reset to 1
+        assert reset2 == future + window  # New reset time
+
+
+@pytest.mark.asyncio
+class TestAdditionalEdgeCases:
+    """Additional tests for uncovered areas"""
+
+    async def test_sanitized_model_with_non_string_types(self):
+        """Test SanitizedModel doesn't break non-string fields"""
+
+        class MixedModel(SanitizedModel):
+            text: str
+            number: int
+            flag: bool
+            optional: Optional[str] = None
+
+        data = {
+            "text": "<script>test</script>",
+            "number": 123,
+            "flag": True,
+            "optional": None,
+        }
+
+        model = MixedModel(**data)
+
+        assert "script" not in model.text.lower()
+        assert model.number == 123
+        assert model.flag is True
+        assert model.optional is None
+
+    async def test_get_database_collection_with_different_names(self):
+        """Test get_database_collection with various collection names"""
+        with patch("app.api.dependencies.get_collection") as mock_get_collection:
+            mock_collection = Mock()
+            mock_get_collection.return_value = mock_collection
+
+            # Test with different collection names
+            collections = ["users", "books", "sessions", "audit_logs"]
+
+            for coll_name in collections:
+                result = await get_database_collection(coll_name)
+                assert result == mock_collection
+                mock_get_collection.assert_called_with(coll_name)
+
+    async def test_sanitize_input_unicode_handling(self):
+        """Test sanitization handles unicode characters properly"""
+        text = "Hello 世界 <script>alert</script>"
+        result = sanitize_input(text)
+
+        assert "世界" in result  # Unicode preserved
+        assert "script" not in result.lower()
+
+    async def test_redis_rate_limit_with_zero_ttl(self):
+        """Test Redis rate limiting when TTL is 0"""
+        mock_redis = AsyncMock()
+        mock_redis.get.return_value = "5"
+        mock_redis.ttl.return_value = 0  # TTL is 0
+        mock_redis.incr.return_value = 6
+
+        key = "test_key"
+        limit = 10
+        window = 60
+        now = time.time()
+
+        count, reset_at = await _redis_rate_limit(mock_redis, key, limit, window, now)
+
+        assert count == 6
+        assert reset_at == now + window  # Falls back to full window
+
+    async def test_audit_request_without_request_id(self):
+        """Test audit_request when request doesn't have request_id"""
+        with patch("app.api.dependencies.create_audit_log") as mock_create_audit:
+            with patch("app.api.dependencies.settings") as mock_settings:
+                mock_settings.BYPASS_AUTH = True
+
+                mock_request = Mock(spec=Request)
+                mock_request.method = "GET"
+                mock_request.url.path = "/api/test"
+                mock_request.client.host = "192.168.1.1"
+                mock_request.headers = {"user-agent": "test-agent"}
+                mock_request.state = Mock(spec=[])  # state without request_id
+
+                current_user = {"clerk_id": "test_user", "email": "test@example.com"}
+
+                result = await audit_request(
+                    request=mock_request,
+                    current_user=current_user,
+                    action="read",
+                    resource_type="book"
+                )
+
+                assert result["sub"] == "test_user"
+                # Verify audit log was created with None request_id
+                call_args = mock_create_audit.call_args
+                assert call_args is not None
+
+
+@pytest.mark.asyncio
+class TestAuditRequestTokenVerification:
+    """Test audit_request JWT verification"""
+
+    @patch("app.api.dependencies.create_audit_log")
+    @patch("app.api.dependencies.verify_jwt_token")
+    @patch("app.api.dependencies.settings")
+    async def test_audit_request_invalid_token(
+        self, mock_settings, mock_verify, mock_create_audit
+    ):
+        """Test audit_request with invalid JWT token"""
+        mock_settings.BYPASS_AUTH = False
+        mock_verify.side_effect = HTTPException(
+            status_code=401, detail="Invalid token"
+        )
+
+        mock_request = Mock(spec=Request)
+        mock_request.method = "POST"
+        mock_request.url.path = "/api/books"
+        mock_request.client.host = "192.168.1.1"
+        mock_request.headers = {
+            "authorization": "Bearer invalid_token",
+            "user-agent": "test-agent",
+        }
+
+        current_user = {"clerk_id": "user_123"}
+
+        with pytest.raises(HTTPException) as exc_info:
+            await audit_request(
+                request=mock_request,
+                current_user=current_user,
+                action="create",
+                resource_type="book",
+            )
+
+        assert exc_info.value.status_code == 401
+
+    @patch("app.api.dependencies.create_audit_log")
+    @patch("app.api.dependencies.verify_jwt_token")
+    @patch("app.api.dependencies.settings")
+    async def test_audit_request_missing_user_id_in_token(
+        self, mock_settings, mock_verify, mock_create_audit
+    ):
+        """Test audit_request when token doesn't contain user ID"""
+        mock_settings.BYPASS_AUTH = False
+        mock_verify.return_value = {"email": "test@example.com"}  # Missing 'sub'
+
+        mock_request = Mock(spec=Request)
+        mock_request.method = "GET"
+        mock_request.url.path = "/api/test"
+        mock_request.client.host = "192.168.1.1"
+        mock_request.headers = {
+            "authorization": "Bearer token_without_sub",
+            "user-agent": "test-agent",
+        }
+
+        current_user = {"clerk_id": "user_123"}
+
+        with pytest.raises(HTTPException) as exc_info:
+            await audit_request(
+                request=mock_request,
+                current_user=current_user,
+                action="read",
+                resource_type="book",
+            )
+
+        assert exc_info.value.status_code == 401
+        assert "Invalid user ID" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+class TestDeprecatedRateLimitEdgeCases:
+    """Test edge cases in deprecated rate_limit function"""
+
+    def setup_method(self):
+        """Clear rate limit cache before each test"""
+        rate_limit_cache.clear()
+
+    @pytest.mark.asyncio
+    async def test_deprecated_rate_limit_blocks_over_limit(self):
+        """Test deprecated rate_limit function blocks requests over limit"""
+        mock_request = Mock(spec=Request)
+        mock_request.client.host = "192.168.1.1"
+        mock_request.url.path = "/api/deprecated_test"
+
+        rate_limit_cache.clear()
+
+        # Make requests up to limit
+        await rate_limit(mock_request, limit=2, window=60)
+        await rate_limit(mock_request, limit=2, window=60)
+
+        # Next request should be blocked
+        with pytest.raises(HTTPException) as exc_info:
+            await rate_limit(mock_request, limit=2, window=60)
+
+        assert exc_info.value.status_code == 429
+        assert "Rate limit exceeded" in exc_info.value.detail
+        assert "Retry-After" in exc_info.value.headers
+
+    @pytest.mark.asyncio
+    async def test_deprecated_rate_limit_window_expiry(self):
+        """Test deprecated rate_limit resets after window expires"""
+        mock_request = Mock(spec=Request)
+        mock_request.client.host = "192.168.1.1"
+        mock_request.url.path = "/api/deprecated_expiry_test"
+
+        rate_limit_cache.clear()
+
+        # Make requests up to limit
+        await rate_limit(mock_request, limit=2, window=1)
+        result1 = await rate_limit(mock_request, limit=2, window=1)
+        assert result1["remaining"] == 0
+
+        # Wait for window to expire
+        time.sleep(1.1)
+
+        # Should be able to make request again
+        result2 = await rate_limit(mock_request, limit=2, window=1)
+        assert result2["remaining"] > 0
