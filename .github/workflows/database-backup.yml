@@ -1,0 +1,169 @@
+name: MongoDB Database Backup
+
+on:
+  # Run daily at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * *'
+
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: 'Backup retention period (days)'
+        required: false
+        default: '30'
+        type: string
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install MongoDB Database Tools
+        run: |
+          wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
+          echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+          sudo apt-get update
+          sudo apt-get install -y mongodb-database-tools
+          mongodump --version
+
+      - name: Create backup directory
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_DIR="mongodb-backup-${TIMESTAMP}"
+          echo "BACKUP_DIR=${BACKUP_DIR}" >> $GITHUB_ENV
+          echo "TIMESTAMP=${TIMESTAMP}" >> $GITHUB_ENV
+          mkdir -p "${BACKUP_DIR}"
+
+      - name: Perform MongoDB backup
+        env:
+          DATABASE_URI: ${{ secrets.DATABASE_URI }}
+        run: |
+          echo "Starting MongoDB backup at $(date)"
+          START_TIME=$(date +%s)
+
+          # Extract database name from URI or use default
+          DATABASE_NAME="${{ secrets.MONGODB_DATABASE }}"
+          if [ -z "$DATABASE_NAME" ]; then
+            DATABASE_NAME="auto_author_production"
+          fi
+
+          # Perform backup using mongodump
+          mongodump \
+            --uri="${DATABASE_URI}" \
+            --db="${DATABASE_NAME}" \
+            --out="${BACKUP_DIR}" \
+            --gzip \
+            --verbose
+
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "DURATION=${DURATION}" >> $GITHUB_ENV
+          echo "DATABASE_NAME=${DATABASE_NAME}" >> $GITHUB_ENV
+
+          echo "Backup completed in ${DURATION} seconds"
+
+      - name: Calculate backup size
+        run: |
+          BACKUP_SIZE=$(du -sh "${BACKUP_DIR}" | cut -f1)
+          echo "BACKUP_SIZE=${BACKUP_SIZE}" >> $GITHUB_ENV
+          echo "Backup size: ${BACKUP_SIZE}"
+
+      - name: Create backup metadata
+        run: |
+          cat > "${BACKUP_DIR}/backup-metadata.json" << EOF
+          {
+            "timestamp": "${TIMESTAMP}",
+            "database": "${DATABASE_NAME}",
+            "size": "${BACKUP_SIZE}",
+            "duration_seconds": ${DURATION},
+            "backup_date": "$(date -u +"%Y-%m-%d %H:%M:%S UTC")",
+            "github_workflow": "${GITHUB_WORKFLOW}",
+            "github_run_id": "${GITHUB_RUN_ID}",
+            "github_run_number": "${GITHUB_RUN_NUMBER}",
+            "mongodb_tools_version": "$(mongodump --version | head -n1)"
+          }
+          EOF
+
+          cat "${BACKUP_DIR}/backup-metadata.json"
+
+      - name: Create backup archive
+        run: |
+          ARCHIVE_NAME="${BACKUP_DIR}.tar.gz"
+          tar -czf "${ARCHIVE_NAME}" "${BACKUP_DIR}"
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+
+          ARCHIVE_SIZE=$(du -sh "${ARCHIVE_NAME}" | cut -f1)
+          echo "ARCHIVE_SIZE=${ARCHIVE_SIZE}" >> $GITHUB_ENV
+          echo "Created archive: ${ARCHIVE_NAME} (${ARCHIVE_SIZE})"
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mongodb-backup-${{ env.TIMESTAMP }}
+          path: ${{ env.ARCHIVE_NAME }}
+          retention-days: ${{ github.event.inputs.retention_days || 30 }}
+          compression-level: 0  # Already compressed
+
+      - name: Cleanup temporary files
+        if: always()
+        run: |
+          rm -rf "${BACKUP_DIR}"
+          rm -f "${ARCHIVE_NAME}"
+
+      - name: Send success notification
+        if: success() && vars.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST "${{ vars.SLACK_WEBHOOK_URL }}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "✅ MongoDB Backup Successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*MongoDB Backup Completed Successfully*\n\n• *Database:* `${{ env.DATABASE_NAME }}`\n• *Backup Size:* ${{ env.BACKUP_SIZE }}\n• *Archive Size:* ${{ env.ARCHIVE_SIZE }}\n• *Duration:* ${{ env.DURATION }} seconds\n• *Timestamp:* ${{ env.TIMESTAMP }}\n• *Retention:* ${{ github.event.inputs.retention_days || 30 }} days\n• *Artifact:* `mongodb-backup-${{ env.TIMESTAMP }}`"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|#${{ github.run_number }}>"
+                    }
+                  ]
+                }
+              ]
+            }'
+
+      - name: Send failure notification
+        if: failure()
+        run: |
+          # Send email notification using GitHub API (fallback)
+          echo "❌ MongoDB Backup Failed"
+          echo "Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "Please check the workflow logs for details."
+
+          # If Slack webhook is configured, send notification
+          if [ -n "${{ vars.SLACK_WEBHOOK_URL }}" ]; then
+            curl -X POST "${{ vars.SLACK_WEBHOOK_URL }}" \
+              -H 'Content-Type: application/json' \
+              -d '{
+                "text": "❌ MongoDB Backup Failed",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*MongoDB Backup Failed*\n\n• *Database:* `${{ env.DATABASE_NAME || 'auto_author_production' }}`\n• *Timestamp:* ${{ env.TIMESTAMP }}\n• *Workflow:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Logs>"
+                    }
+                  }
+                ]
+              }'
+          fi
