@@ -18,7 +18,7 @@ from typing import Dict, Any
 from unittest.mock import AsyncMock, patch
 
 from app.db import toc_transactions
-from app.db.base import books_collection
+from app.db import base
 
 
 # ============================================================================
@@ -106,7 +106,7 @@ def sample_subchapter():
 async def test_update_toc_success(motor_reinit_db, sample_book_data):
     """Test successful TOC update with version increment"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -137,7 +137,7 @@ async def test_update_toc_success(motor_reinit_db, sample_book_data):
 async def test_update_toc_version_conflict(motor_reinit_db, sample_book_data):
     """Test optimistic locking - version conflict detection"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -183,7 +183,7 @@ async def test_update_toc_book_not_found(motor_reinit_db):
 async def test_update_toc_unauthorized(motor_reinit_db, sample_book_data):
     """Test TOC update with wrong user (not authorized)"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     wrong_user = "wrong_clerk_id"
 
@@ -202,7 +202,7 @@ async def test_update_toc_unauthorized(motor_reinit_db, sample_book_data):
 async def test_update_toc_assigns_chapter_ids(motor_reinit_db, sample_book_data):
     """Test that TOC update assigns IDs to chapters without them"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -266,7 +266,7 @@ async def test_update_toc_invalid_book_id_format():
 async def test_add_top_level_chapter(motor_reinit_db, sample_book_data, sample_chapter):
     """Test adding a top-level chapter"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     book_oid = result.inserted_id
     user_clerk_id = sample_book_data["owner_id"]
@@ -281,7 +281,7 @@ async def test_add_top_level_chapter(motor_reinit_db, sample_book_data, sample_c
     assert "updated_at" in added_chapter
 
     # Verify chapter was added to book
-    book = await books_collection.find_one({"_id": book_oid})
+    book = await base.books_collection.find_one({"_id": book_oid})
     assert book["table_of_contents"]["version"] == 2
     assert len(book["table_of_contents"]["chapters"]) == 3
 
@@ -290,7 +290,7 @@ async def test_add_top_level_chapter(motor_reinit_db, sample_book_data, sample_c
 async def test_add_subchapter(motor_reinit_db, sample_book_data, sample_subchapter):
     """Test adding a subchapter to existing chapter"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     book_oid = result.inserted_id
     user_clerk_id = sample_book_data["owner_id"]
@@ -304,7 +304,7 @@ async def test_add_subchapter(motor_reinit_db, sample_book_data, sample_subchapt
     assert added_subchapter["title"] == sample_subchapter["title"]
 
     # Verify subchapter was added
-    book = await books_collection.find_one({"_id": book_oid})
+    book = await base.books_collection.find_one({"_id": book_oid})
     ch2 = next(ch for ch in book["table_of_contents"]["chapters"] if ch["id"] == "ch2")
     assert len(ch2["subchapters"]) == 2
 
@@ -313,7 +313,7 @@ async def test_add_subchapter(motor_reinit_db, sample_book_data, sample_subchapt
 async def test_add_subchapter_parent_not_found(motor_reinit_db, sample_book_data, sample_subchapter):
     """Test adding subchapter when parent chapter doesn't exist"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
     fake_parent_id = "non-existent-chapter"
@@ -339,7 +339,7 @@ async def test_add_chapter_book_not_found(motor_reinit_db, sample_chapter):
 async def test_add_chapter_to_parent_without_subchapters(motor_reinit_db, sample_book_data):
     """Test adding first subchapter to chapter that has no subchapters array"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     book_oid = result.inserted_id
     user_clerk_id = sample_book_data["owner_id"]
@@ -358,7 +358,7 @@ async def test_add_chapter_to_parent_without_subchapters(motor_reinit_db, sample
     assert added["id"]
 
     # Verify subchapters array was created
-    book = await books_collection.find_one({"_id": book_oid})
+    book = await base.books_collection.find_one({"_id": book_oid})
     ch1 = next(ch for ch in book["table_of_contents"]["chapters"] if ch["id"] == "ch1")
     assert "subchapters" in ch1
     assert len(ch1["subchapters"]) == 1
@@ -372,7 +372,7 @@ async def test_add_chapter_to_parent_without_subchapters(motor_reinit_db, sample
 async def test_update_chapter_success(motor_reinit_db, sample_book_data):
     """Test updating a chapter"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     book_oid = result.inserted_id
     user_clerk_id = sample_book_data["owner_id"]
@@ -392,7 +392,7 @@ async def test_update_chapter_success(motor_reinit_db, sample_book_data):
     assert "updated_at" in updated_chapter
 
     # Verify TOC version incremented
-    book = await books_collection.find_one({"_id": book_oid})
+    book = await base.books_collection.find_one({"_id": book_oid})
     assert book["table_of_contents"]["version"] == 2
 
 
@@ -400,7 +400,7 @@ async def test_update_chapter_success(motor_reinit_db, sample_book_data):
 async def test_update_subchapter_success(motor_reinit_db, sample_book_data):
     """Test updating a subchapter (recursive search)"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
     subchapter_id = "ch2-1"
@@ -420,7 +420,7 @@ async def test_update_subchapter_success(motor_reinit_db, sample_book_data):
 async def test_update_chapter_not_found(motor_reinit_db, sample_book_data):
     """Test updating non-existent chapter"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
     fake_chapter_id = "non-existent-chapter"
@@ -437,7 +437,7 @@ async def test_update_chapter_not_found(motor_reinit_db, sample_book_data):
 async def test_update_chapter_unauthorized(motor_reinit_db, sample_book_data):
     """Test updating chapter with wrong user"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     wrong_user = "wrong_clerk_id"
 
@@ -457,7 +457,7 @@ async def test_update_chapter_unauthorized(motor_reinit_db, sample_book_data):
 async def test_delete_top_level_chapter(motor_reinit_db, sample_book_data):
     """Test deleting a top-level chapter"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     book_oid = result.inserted_id
     user_clerk_id = sample_book_data["owner_id"]
@@ -470,7 +470,7 @@ async def test_delete_top_level_chapter(motor_reinit_db, sample_book_data):
     assert result is True
 
     # Verify chapter was deleted
-    book = await books_collection.find_one({"_id": book_oid})
+    book = await base.books_collection.find_one({"_id": book_oid})
     assert len(book["table_of_contents"]["chapters"]) == 1
     assert book["table_of_contents"]["chapters"][0]["id"] == "ch2"
     assert book["table_of_contents"]["version"] == 2
@@ -480,7 +480,7 @@ async def test_delete_top_level_chapter(motor_reinit_db, sample_book_data):
 async def test_delete_subchapter(motor_reinit_db, sample_book_data):
     """Test deleting a subchapter"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     book_oid = result.inserted_id
     user_clerk_id = sample_book_data["owner_id"]
@@ -493,7 +493,7 @@ async def test_delete_subchapter(motor_reinit_db, sample_book_data):
     assert result is True
 
     # Verify subchapter was deleted
-    book = await books_collection.find_one({"_id": book_oid})
+    book = await base.books_collection.find_one({"_id": book_oid})
     ch2 = next(ch for ch in book["table_of_contents"]["chapters"] if ch["id"] == "ch2")
     assert len(ch2["subchapters"]) == 0
 
@@ -502,7 +502,7 @@ async def test_delete_subchapter(motor_reinit_db, sample_book_data):
 async def test_delete_chapter_cascade_subchapters(motor_reinit_db, sample_book_data):
     """Test deleting chapter with subchapters (cascade delete)"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     book_oid = result.inserted_id
     user_clerk_id = sample_book_data["owner_id"]
@@ -515,7 +515,7 @@ async def test_delete_chapter_cascade_subchapters(motor_reinit_db, sample_book_d
     assert result is True
 
     # Verify chapter and all subchapters were deleted
-    book = await books_collection.find_one({"_id": book_oid})
+    book = await base.books_collection.find_one({"_id": book_oid})
     assert len(book["table_of_contents"]["chapters"]) == 1
     assert book["table_of_contents"]["chapters"][0]["id"] == "ch1"
 
@@ -524,7 +524,7 @@ async def test_delete_chapter_cascade_subchapters(motor_reinit_db, sample_book_d
 async def test_delete_chapter_not_found(motor_reinit_db, sample_book_data):
     """Test deleting non-existent chapter"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
     fake_chapter_id = "non-existent-chapter"
@@ -543,7 +543,7 @@ async def test_delete_chapter_not_found(motor_reinit_db, sample_book_data):
 async def test_reorder_chapters_success(motor_reinit_db, sample_book_data):
     """Test reordering chapters"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -568,7 +568,7 @@ async def test_reorder_chapters_success(motor_reinit_db, sample_book_data):
 async def test_reorder_chapters_partial_list(motor_reinit_db, sample_book_data):
     """Test reordering with partial chapter list (unmentioned chapters go to end)"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -589,7 +589,7 @@ async def test_reorder_chapters_partial_list(motor_reinit_db, sample_book_data):
 async def test_reorder_chapters_gaps_in_ordering(motor_reinit_db, sample_book_data):
     """Test reordering with gaps in order values (e.g., 1, 5, 10)"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -618,7 +618,7 @@ async def test_reorder_chapters_gaps_in_ordering(motor_reinit_db, sample_book_da
 async def test_concurrent_toc_updates_version_conflict(motor_reinit_db, sample_book_data):
     """Test concurrent TOC updates - one should succeed, one should fail"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -658,7 +658,7 @@ async def test_concurrent_toc_updates_version_conflict(motor_reinit_db, sample_b
 async def test_concurrent_chapter_adds_different_chapters(motor_reinit_db, sample_book_data):
     """Test concurrent adds of different chapters (should both succeed)"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     book_oid = result.inserted_id
     user_clerk_id = sample_book_data["owner_id"]
@@ -687,7 +687,7 @@ async def test_concurrent_chapter_adds_different_chapters(motor_reinit_db, sampl
     assert all("id" in r for r in results)
 
     # Verify both chapters were added
-    book = await books_collection.find_one({"_id": book_oid})
+    book = await base.books_collection.find_one({"_id": book_oid})
     assert len(book["table_of_contents"]["chapters"]) == 4  # Original 2 + 2 new
 
 
@@ -695,7 +695,7 @@ async def test_concurrent_chapter_adds_different_chapters(motor_reinit_db, sampl
 async def test_concurrent_updates_different_chapters(motor_reinit_db, sample_book_data):
     """Test concurrent updates to different chapters (both should succeed)"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -727,7 +727,7 @@ async def test_concurrent_updates_different_chapters(motor_reinit_db, sample_boo
 async def test_update_toc_empty_chapters(motor_reinit_db, sample_book_data):
     """Test updating TOC with empty chapters list"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -748,7 +748,7 @@ async def test_update_toc_empty_chapters(motor_reinit_db, sample_book_data):
 async def test_add_chapter_with_preset_id(motor_reinit_db, sample_book_data):
     """Test adding chapter that already has an ID"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 
@@ -771,7 +771,7 @@ async def test_add_chapter_with_preset_id(motor_reinit_db, sample_book_data):
 async def test_update_chapter_preserves_other_fields(motor_reinit_db, sample_book_data):
     """Test that updating chapter preserves fields not in update"""
     # Create test book
-    result = await books_collection.insert_one(sample_book_data)
+    result = await base.books_collection.insert_one(sample_book_data)
     book_id = str(result.inserted_id)
     user_clerk_id = sample_book_data["owner_id"]
 

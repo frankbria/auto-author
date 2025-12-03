@@ -9,7 +9,8 @@ from bson.objectid import ObjectId
 import uuid
 from motor.motor_asyncio import AsyncIOMotorClientSession
 
-from .base import _client, _db, books_collection, ObjectId
+from . import base
+from .base import ObjectId
 from .audit_log import create_audit_log
 
 
@@ -25,15 +26,15 @@ async def update_toc_with_transaction(
     # Check if we're in a test environment or if transactions are not supported
     use_transaction = True
     try:
-        async with await _client.start_session() as session:
+        async with await base._client.start_session() as session:
             # Test if transactions are supported
-            info = await _client.admin.command('isMaster')
+            info = await base._client.admin.command('isMaster')
             use_transaction = info.get('setName') is not None  # Has replica set
     except Exception:
         use_transaction = False
     
     if use_transaction:
-        async with await _client.start_session() as session:
+        async with await base._client.start_session() as session:
             async with session.start_transaction():
                 return await _update_toc_internal(book_id, toc_data, user_clerk_id, session)
     else:
@@ -61,11 +62,11 @@ async def _update_toc_internal(
     logger = logging.getLogger(__name__)
     logger.info(f"Looking for book with query: {find_query}")
     
-    book = await books_collection.find_one(find_query, session=session)
+    book = await base.books_collection.find_one(find_query, session=session)
     
     if not book:
         # Try without owner check to see if it's auth or existence issue
-        book_exists = await books_collection.find_one(
+        book_exists = await base.books_collection.find_one(
             {"_id": book_oid},
             session=session
         )
@@ -112,7 +113,7 @@ async def _update_toc_internal(
     if current_toc:
         update_query["table_of_contents.version"] = current_version
     
-    update_result = await books_collection.update_one(
+    update_result = await base.books_collection.update_one(
         update_query,
         {
             "$set": {
@@ -125,7 +126,7 @@ async def _update_toc_internal(
     
     if update_result.modified_count == 0:
         # Check if it was a version conflict
-        current_book = await books_collection.find_one(
+        current_book = await base.books_collection.find_one(
             {"_id": book_oid},
             session=session
         )
@@ -162,14 +163,14 @@ async def add_chapter_with_transaction(
     """
     use_transaction = True
     try:
-        async with await _client.start_session() as session:
-            info = await _client.admin.command('isMaster')
+        async with await base._client.start_session() as session:
+            info = await base._client.admin.command('isMaster')
             use_transaction = info.get('setName') is not None
     except Exception:
         use_transaction = False
     
     if use_transaction:
-        async with await _client.start_session() as session:
+        async with await base._client.start_session() as session:
             async with session.start_transaction():
                 return await _add_chapter_internal(book_id, chapter_data, user_clerk_id, parent_chapter_id, session)
     else:
@@ -185,7 +186,7 @@ async def _add_chapter_internal(
 ) -> Dict[str, Any]:
     """Internal function to add chapter with or without transaction"""
     # Get the book
-    book = await books_collection.find_one(
+    book = await base.books_collection.find_one(
         {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
         session=session
     )
@@ -227,7 +228,7 @@ async def _add_chapter_internal(
     toc["updated_at"] = now
     
     # Update the book
-    await books_collection.update_one(
+    await base.books_collection.update_one(
         {"_id": ObjectId(book_id)},
         {
             "$set": {
@@ -252,14 +253,14 @@ async def update_chapter_with_transaction(
     """
     use_transaction = True
     try:
-        async with await _client.start_session() as session:
-            info = await _client.admin.command('isMaster')
+        async with await base._client.start_session() as session:
+            info = await base._client.admin.command('isMaster')
             use_transaction = info.get('setName') is not None
     except Exception:
         use_transaction = False
     
     if use_transaction:
-        async with await _client.start_session() as session:
+        async with await base._client.start_session() as session:
             async with session.start_transaction():
                 return await _update_chapter_internal(book_id, chapter_id, chapter_updates, user_clerk_id, session)
     else:
@@ -275,7 +276,7 @@ async def _update_chapter_internal(
 ) -> Dict[str, Any]:
     """Internal function to update chapter with or without transaction"""
     # Get the book
-    book = await books_collection.find_one(
+    book = await base.books_collection.find_one(
         {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
         session=session
     )
@@ -314,7 +315,7 @@ async def _update_chapter_internal(
     toc["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     # Update the book
-    await books_collection.update_one(
+    await base.books_collection.update_one(
         {"_id": ObjectId(book_id)},
         {
             "$set": {
@@ -338,14 +339,14 @@ async def delete_chapter_with_transaction(
     """
     use_transaction = True
     try:
-        async with await _client.start_session() as session:
-            info = await _client.admin.command('isMaster')
+        async with await base._client.start_session() as session:
+            info = await base._client.admin.command('isMaster')
             use_transaction = info.get('setName') is not None
     except Exception:
         use_transaction = False
     
     if use_transaction:
-        async with await _client.start_session() as session:
+        async with await base._client.start_session() as session:
             async with session.start_transaction():
                 return await _delete_chapter_internal(book_id, chapter_id, user_clerk_id, session)
     else:
@@ -360,7 +361,7 @@ async def _delete_chapter_internal(
 ) -> bool:
     """Internal function to delete chapter with or without transaction"""
     # Get the book
-    book = await books_collection.find_one(
+    book = await base.books_collection.find_one(
         {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
         session=session
     )
@@ -395,7 +396,7 @@ async def _delete_chapter_internal(
     toc["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     # Update the book
-    await books_collection.update_one(
+    await base.books_collection.update_one(
         {"_id": ObjectId(book_id)},
         {
             "$set": {
@@ -420,14 +421,14 @@ async def reorder_chapters_with_transaction(
     """
     use_transaction = True
     try:
-        async with await _client.start_session() as session:
-            info = await _client.admin.command('isMaster')
+        async with await base._client.start_session() as session:
+            info = await base._client.admin.command('isMaster')
             use_transaction = info.get('setName') is not None
     except Exception:
         use_transaction = False
     
     if use_transaction:
-        async with await _client.start_session() as session:
+        async with await base._client.start_session() as session:
             async with session.start_transaction():
                 return await _reorder_chapters_internal(book_id, chapter_orders, user_clerk_id, session)
     else:
@@ -442,7 +443,7 @@ async def _reorder_chapters_internal(
 ) -> Dict[str, Any]:
     """Internal function to reorder chapters with or without transaction"""
     # Get the book
-    book = await books_collection.find_one(
+    book = await base.books_collection.find_one(
         {"_id": ObjectId(book_id), "owner_id": user_clerk_id},
         session=session
     )
@@ -477,7 +478,7 @@ async def _reorder_chapters_internal(
     toc["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     # Update the book
-    await books_collection.update_one(
+    await base.books_collection.update_one(
         {"_id": ObjectId(book_id)},
         {
             "$set": {

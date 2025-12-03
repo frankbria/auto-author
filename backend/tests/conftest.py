@@ -56,33 +56,39 @@ from bson import ObjectId
 
 pytest_plugins = ["pytest_asyncio"]
 
-@pytest_asyncio.fixture(scope="function")
-def event_loop():
+# Configure pytest-asyncio to reuse the same event loop policy across tests
+# This prevents Motor from getting confused by event loop changes
+@pytest.fixture(scope="session")
+def event_loop_policy():
     """
-    Create a new event loop for each test function.
-    This ensures Motor async clients have a proper event loop context.
+    Session-scoped event loop policy to ensure consistency across all tests.
+    This prevents Motor clients from holding references to closed loops.
     """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
+    return asyncio.get_event_loop_policy()
 
 
-@pytest.fixture(autouse=False)  # Not autouse - tests must explicitly request this fixture
-def motor_reinit_db():
+@pytest_asyncio.fixture(scope="function", autouse=False)
+async def motor_reinit_db():
     """
     Every test gets its own Motor client bound to a fresh database.
     Drops the test DB before & after so you start with a clean slate.
 
-    Note: This is a SYNC fixture (not async) because autouse=True fixtures
-    need to work with both sync and async tests. Using async autouse fixtures
-    with sync tests causes pytest-asyncio to hang.
+    Made async to properly coordinate with pytest-asyncio event loop management.
+    Explicitly binds Motor client to the current event loop to prevent stale loop references.
     """
     # Drop database before test using sync client
     _sync_client.drop_database("auto-author-test")
 
-    # Create async Motor client for test use
-    base._client = motor.motor_asyncio.AsyncIOMotorClient(TEST_MONGO_URI)
+    # Get the current event loop from asyncio
+    # This is the loop that pytest-asyncio has created for this test
+    current_loop = asyncio.get_running_loop()
+
+    # Create async Motor client explicitly bound to the current event loop
+    # This prevents Motor from caching a stale loop reference
+    base._client = motor.motor_asyncio.AsyncIOMotorClient(
+        TEST_MONGO_URI,
+        io_loop=current_loop
+    )
     base._db = base._client.get_default_database()
 
     # Set up collections
@@ -96,11 +102,16 @@ def motor_reinit_db():
     users_dao.users_collection = base.users_collection
     audit_log_dao.audit_logs_collection = base.audit_logs_collection
 
+    # Yield to the test - motor client is now available
     yield
+
+    # Cleanup after test
+    # Close the Motor client properly (this doesn't close the event loop)
+    if base._client:
+        base._client.close()
 
     # Drop database after test using sync client
     _sync_client.drop_database("auto-author-test")
-    base._client.close()
 
 
 @pytest.fixture(scope="function")
