@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
+    # Redis Settings (for distributed rate limiting)
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_MAX_CONNECTIONS: int = 10
+    REDIS_SOCKET_TIMEOUT: int = 5
+    REDIS_ENABLED: bool = True  # Set to False to disable Redis (fallback to in-memory)
+
     @property
     def clerk_jwt_public_key_pem(self):
         if self.CLERK_JWT_PUBLIC_KEY:

@@ -7,6 +7,7 @@ This project is a FastAPI application designed to provide a robust backend for t
 - Python 3.13+
 - uv (Python package manager) - Install with: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - MongoDB
+- Redis (for distributed rate limiting) - Install with: `sudo apt-get install redis-server` or `brew install redis`
 
 ## Project Structure
 
@@ -54,6 +55,7 @@ uv pip install -r requirements.txt
 3. Set up environment variables:
    - Copy `.env.example` to `.env`
    - Fill in required values (MongoDB URI, API keys, etc.)
+   - Configure Redis connection (see Redis Configuration section below)
 
 ## Usage
 
@@ -96,6 +98,87 @@ This project uses `uv` as the package manager. Always use `uv` commands within t
 uv run python quick_validate.py        # Validate implementation
 uv run python test_toc_transactions.py # Test TOC transactions
 ```
+
+## Redis Configuration
+
+Redis is used for distributed rate limiting across multiple application instances (e.g., PM2 processes). This ensures that rate limits are enforced correctly even when running multiple backend servers.
+
+### Setup Redis
+
+**Local Development:**
+```bash
+# Linux/Ubuntu
+sudo apt-get install redis-server
+sudo systemctl start redis-server
+
+# macOS
+brew install redis
+brew services start redis
+
+# Verify Redis is running
+redis-cli ping
+# Expected output: PONG
+```
+
+**Production/Staging:**
+```bash
+# Check if Redis is running
+redis-cli ping
+
+# Start Redis if not running
+sudo systemctl start redis-server
+```
+
+### Environment Variables
+
+Add these to your `.env` file:
+
+```bash
+# Redis Configuration
+REDIS_URL=redis://localhost:6379/0         # Redis connection URL
+REDIS_MAX_CONNECTIONS=10                   # Maximum connections in the pool
+REDIS_SOCKET_TIMEOUT=5                     # Socket timeout in seconds
+REDIS_ENABLED=true                         # Set to false to disable Redis (fallback to in-memory)
+```
+
+### Graceful Degradation
+
+If Redis is unavailable, the rate limiter automatically falls back to in-memory rate limiting. However, this means rate limits will NOT be shared across multiple PM2 instances. For production deployments with multiple instances, Redis must be running.
+
+### Testing Redis Rate Limiting
+
+```bash
+# Run Redis rate limiting tests
+uv run pytest tests/test_api/test_redis_rate_limiting.py -v
+
+# Check Redis keys being used
+redis-cli KEYS "ratelimit:*"
+
+# Monitor Redis in real-time
+redis-cli MONITOR
+```
+
+### Troubleshooting
+
+**Problem: Tests failing with Redis connection errors**
+```bash
+# Check if Redis is running
+redis-cli ping
+
+# If not running, start it
+sudo systemctl start redis-server
+```
+
+**Problem: Rate limiting not working across PM2 instances**
+- Verify `REDIS_ENABLED=true` in `.env`
+- Check Redis connection URL is correct
+- Verify Redis is accessible from all PM2 instances
+- Check logs for Redis connection errors
+
+**Problem: Redis memory usage growing**
+- Rate limit keys automatically expire after the time window
+- Check key expiration: `redis-cli TTL ratelimit:endpoint:ip`
+- Manual cleanup (TEST ONLY): `redis-cli FLUSHDB`
 
 ## API Documentation
 

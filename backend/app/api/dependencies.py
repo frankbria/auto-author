@@ -6,16 +6,19 @@ import re
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import requests
+import logging
 
 from app.core.security import verify_jwt_token
 from app.db.database import get_collection
 from app.db.database import create_audit_log
 from app.core.config import settings
+from app.db.redis import get_redis_client
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
-# Simple in-memory cache for rate limiting
-# In production, this should be replaced with Redis or similar
+# Simple in-memory cache for rate limiting (fallback when Redis is unavailable)
 rate_limit_cache = {}
 
 
@@ -70,8 +73,74 @@ class SanitizedModel(BaseModel):
         super().__init__(**data)
 
 
+async def _redis_rate_limit(
+    redis_client, key: str, limit: int, window: int, now: float
+) -> tuple[int, float]:
+    """
+    Redis-based rate limiting using sliding window algorithm.
+
+    Args:
+        redis_client: Redis client instance
+        key: Rate limit key
+        limit: Maximum requests allowed
+        window: Time window in seconds
+        now: Current timestamp
+
+    Returns:
+        Tuple of (current_count, reset_at)
+    """
+    try:
+        # Get current count or initialize
+        count = await redis_client.get(key)
+
+        if count is None:
+            # First request in this window
+            reset_at = now + window
+            await redis_client.set(key, 1, ex=window)
+            return 1, reset_at
+
+        # Get TTL to calculate reset time
+        ttl = await redis_client.ttl(key)
+        reset_at = now + ttl if ttl > 0 else now + window
+
+        # Increment counter atomically
+        new_count = await redis_client.incr(key)
+
+        return new_count, reset_at
+
+    except Exception as e:
+        logger.error(f"Redis rate limit operation failed: {e}")
+        raise
+
+
+async def _memory_rate_limit(key: str, limit: int, window: int, now: float) -> tuple[int, float]:
+    """
+    In-memory rate limiting fallback (for when Redis is unavailable).
+
+    Args:
+        key: Rate limit key
+        limit: Maximum requests allowed
+        window: Time window in seconds
+        now: Current timestamp
+
+    Returns:
+        Tuple of (current_count, reset_at)
+    """
+    # Initialize or reset cache entry if needed
+    if key not in rate_limit_cache or rate_limit_cache[key]["reset_at"] < now:
+        rate_limit_cache[key] = {"count": 0, "reset_at": now + window}
+
+    # Increment request count
+    rate_limit_cache[key]["count"] += 1
+
+    return rate_limit_cache[key]["count"], rate_limit_cache[key]["reset_at"]
+
+
 def get_rate_limiter(limit: int = 10, window: int = 60):
     """Create a rate limiter dependency with specific limits
+
+    This rate limiter uses Redis for distributed rate limiting across multiple
+    instances. If Redis is unavailable, it falls back to in-memory rate limiting.
 
     Args:
         limit: Maximum number of requests allowed in the time window
@@ -83,31 +152,58 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
 
     async def rate_limiter(request: Request):
         """Rate limiting dependency function"""
-        # Default: use client IP
+        # Build rate limit key from client IP and endpoint
         client_ip = request.client.host
         endpoint = request.url.path
-        key = f"{client_ip}:{endpoint}"
+        key = f"ratelimit:{endpoint}:{client_ip}"
 
         # Get current timestamp
         now = time.time()
 
-        # Initialize or reset cache entry if needed
-        if key not in rate_limit_cache or rate_limit_cache[key]["reset_at"] < now:
-            rate_limit_cache[key] = {"count": 0, "reset_at": now + window}
+        try:
+            # Try to use Redis first
+            redis_client = await get_redis_client()
 
-        # Increment request count
-        rate_limit_cache[key]["count"] += 1
+            if redis_client is not None:
+                # Use Redis-based rate limiting
+                try:
+                    current_count, reset_at = await _redis_rate_limit(
+                        redis_client, key, limit, window, now
+                    )
+                    logger.debug(
+                        f"Redis rate limit check: {key} = {current_count}/{limit}"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Redis rate limit failed, falling back to memory: {e}"
+                    )
+                    current_count, reset_at = await _memory_rate_limit(
+                        key, limit, window, now
+                    )
+            else:
+                # Redis not available, use in-memory fallback
+                logger.debug("Redis unavailable, using in-memory rate limiting")
+                current_count, reset_at = await _memory_rate_limit(
+                    key, limit, window, now
+                )
+
+        except Exception as e:
+            logger.error(f"Rate limiting error: {e}")
+            # On any error, fall back to in-memory
+            current_count, reset_at = await _memory_rate_limit(
+                key, limit, window, now
+            )
 
         # Check if limit exceeded
-        if rate_limit_cache[key]["count"] > limit:
+        if current_count > limit:
             # Calculate retry-after time
-            retry_after = int(rate_limit_cache[key]["reset_at"] - now)
+            retry_after = int(reset_at - now)
 
             # Set headers for response
             headers = {
                 "X-RateLimit-Limit": str(limit),
                 "X-RateLimit-Remaining": "0",
-                "X-RateLimit-Reset": str(int(rate_limit_cache[key]["reset_at"])),
+                "X-RateLimit-Reset": str(int(reset_at)),
                 "Retry-After": str(retry_after),
             }
 
@@ -117,11 +213,14 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
                 headers=headers,
             )
 
+        # Calculate remaining requests
+        remaining = max(0, limit - current_count)
+
         # Return current rate limit status
         return {
             "limit": limit,
-            "remaining": limit - rate_limit_cache[key]["count"],
-            "reset": rate_limit_cache[key]["reset_at"],
+            "remaining": remaining,
+            "reset": reset_at,
         }
 
     return rate_limiter
