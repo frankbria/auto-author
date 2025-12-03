@@ -109,6 +109,116 @@ For detailed API documentation, please refer to:
 
 These documents provide comprehensive information about available endpoints, request/response formats, and authentication requirements.
 
+## MongoDB Connection Pooling
+
+This application uses production-ready MongoDB connection pooling configured for high availability and performance. The configuration in `app/db/base.py` includes:
+
+### Pool Configuration
+
+```python
+maxPoolSize=50              # Maximum connections in the pool
+minPoolSize=10              # Minimum connections kept warm
+serverSelectionTimeoutMS=5000   # Fast failure detection (5 seconds)
+waitQueueTimeoutMS=5000     # Prevents connection starvation (5 seconds)
+maxIdleTimeMS=60000         # Clean up idle connections (60 seconds)
+```
+
+### Rationale
+
+- **maxPoolSize=50**: Handles production load with 500+ concurrent operations
+  - Tested with 500 concurrent operations (see load tests)
+  - Prevents connection exhaustion under heavy traffic
+  - For MongoDB Atlas sharded clusters, each shard gets its own pool
+
+- **minPoolSize=10**: Maintains warm connections to reduce latency
+  - Eliminates connection handshake overhead for common operations
+  - Balances resource usage with performance
+
+- **serverSelectionTimeoutMS=5000**: Fast failure detection
+  - Quickly detects unreachable MongoDB servers
+  - Fails fast instead of hanging indefinitely
+  - Improves user experience with timely error responses
+
+- **waitQueueTimeoutMS=5000**: Prevents connection starvation
+  - Under heavy load, requests fail fast rather than queuing indefinitely
+  - Allows load balancers and retry logic to redistribute requests
+  - Prevents cascading failures
+
+- **maxIdleTimeMS=60000**: Resource optimization
+  - Closes connections idle for more than 60 seconds
+  - Frees server resources during low-traffic periods
+  - Automatically scales down during off-peak hours
+
+### Connection Pool Monitoring
+
+The application includes comprehensive connection pool monitoring:
+
+- **INFO level**: Connection creation, closure, and pool lifecycle events
+- **DEBUG level**: Connection checkout/checkin events for debugging
+- **WARNING level**: Checkout failures and pool clearing events
+
+To enable detailed monitoring, set log level to DEBUG in your environment:
+
+```bash
+LOG_LEVEL=DEBUG uv run uvicorn app.main:app --reload
+```
+
+### Load Testing
+
+Run connection pool load tests to verify behavior:
+
+```bash
+# Run all load tests
+uv run pytest tests/load_tests/test_mongodb_connection_pool.py -v
+
+# Run with detailed output
+uv run pytest tests/load_tests/test_mongodb_connection_pool.py -v -s
+
+# Run specific test
+uv run pytest tests/load_tests/test_mongodb_connection_pool.py::test_connection_pool_under_load -v
+```
+
+**Load test validation:**
+- 500 concurrent operations complete successfully
+- No connection exhaustion under load
+- Timeouts trigger within 5 seconds as configured
+- Pool respects maxPoolSize limits
+- Minimal checkout failures (<5% for cloud MongoDB)
+
+### Troubleshooting Connection Issues
+
+**Problem: "Connection timeout" errors**
+- Check MongoDB server is accessible
+- Verify `DATABASE_URI` in `.env` file
+- Ensure firewall allows connections
+- Check MongoDB Atlas IP whitelist (if using Atlas)
+
+**Problem: "Too many connections" errors**
+- Current maxPoolSize is 50 per shard
+- For sharded clusters, multiply by number of shards
+- Consider increasing maxPoolSize if consistently hitting limit
+- Review application for connection leaks (use monitoring)
+
+**Problem: Slow queries**
+- Check connection pool utilization in logs
+- If pool is exhausted, may need to increase maxPoolSize
+- Review query performance and indexing
+- Consider connection pooling at load balancer level
+
+**Problem: Connection checkout failures**
+- Small number (<5%) is normal for cloud MongoDB
+- If >10%, investigate network latency
+- Check MongoDB server health and load
+- Consider increasing waitQueueTimeoutMS for slow networks
+
+### MongoDB Atlas Sharded Clusters
+
+When using MongoDB Atlas sharded clusters (replica sets):
+- Each shard maintains its own connection pool
+- Total connections = maxPoolSize × number of shards
+- Example: 3 shards × 50 connections = 150 total connections
+- Monitor connections per shard in MongoDB Atlas dashboard
+
 ## Key Features
 
 - **Transaction-based TOC Updates**: Atomic operations for Table of Contents modifications
@@ -116,6 +226,7 @@ These documents provide comprehensive information about available endpoints, req
 - **Audit Logging**: Comprehensive activity tracking for all operations
 - **Chapter Tab Management**: Advanced chapter organization with tab states
 - **Question System**: Interview-style question generation and management
+- **Production-Ready Connection Pooling**: Handles 500+ concurrent operations with monitoring
 
 ## Contributing
 
