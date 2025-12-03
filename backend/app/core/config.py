@@ -39,13 +39,13 @@ class Settings(BaseSettings):
 
     # E2E Testing Settings
     BYPASS_AUTH: bool = False  # Set to True for E2E tests to bypass authentication
-    
+
     # AWS Settings (Optional - for transcription and storage)
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "us-east-1"
     AWS_S3_BUCKET: str = ""
-    
+
     # Cloudinary Settings (Optional - for image storage)
     CLOUDINARY_CLOUD_NAME: str = ""
     CLOUDINARY_API_KEY: str = ""
@@ -56,7 +56,7 @@ class Settings(BaseSettings):
         if self.CLERK_JWT_PUBLIC_KEY:
             return self.CLERK_JWT_PUBLIC_KEY.replace("\\n", "\n")
         return None
-    
+
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod
     def assemble_cors_origins(cls, v):
