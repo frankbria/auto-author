@@ -1,22 +1,21 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from typing import Optional
+from typing import Optional, Dict
 import logging
 from app.services.transcription_service import transcription_service
 from app.schemas.transcription import TranscriptionResponse, StreamingTranscriptionData
 from app.core.security import get_current_user
-from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/transcribe", response_model=TranscriptionResponse)
+@router.post("", response_model=TranscriptionResponse)
 async def transcribe_audio(
     audio: UploadFile = File(...),
     language: str = "en-US",
     enable_punctuation_commands: bool = False,
-    current_user: User = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user)
 ):
     """
     Transcribe uploaded audio file to text.
@@ -61,7 +60,7 @@ async def transcribe_audio(
                 detail=f"Transcription failed: {result.error_message}"
             )
         
-        logger.info(f"Transcription completed for user {current_user.id}: {len(result.transcript)} characters")
+        logger.info(f"Transcription completed for user {current_user['id']}: {len(result.transcript)} characters")
         
         return result
         
@@ -74,7 +73,7 @@ async def transcribe_audio(
             detail="Internal server error during transcription"
         )
 
-@router.websocket("/transcribe/stream")
+@router.websocket("/stream")
 async def stream_transcription(
     websocket: WebSocket,
     language: str = "en-US",
@@ -134,9 +133,9 @@ async def stream_transcription(
         logger.error(f"WebSocket transcription error: {str(e)}")
         await websocket.close(code=1011, reason="Internal server error")
 
-@router.get("/transcribe/status")
+@router.get("/status")
 async def get_transcription_status(
-    current_user: User = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user)
 ):
     """
     Get transcription service status and capabilities.
@@ -156,10 +155,10 @@ async def get_transcription_status(
         }
     }
 
-@router.post("/transcribe/validate")
+@router.post("/validate")
 async def validate_audio_file(
     audio: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user)
 ):
     """
     Validate audio file without transcribing.
