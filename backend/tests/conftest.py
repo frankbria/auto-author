@@ -51,7 +51,7 @@ import asyncio
 from datetime import datetime, timezone
 from app.core.security import get_current_user
 from app.api.endpoints import users as users_endpoint
-from app.api.endpoints import books as books_endpoint
+# Books is now a package, imported in fixtures as needed
 from bson import ObjectId
 
 pytest_plugins = ["pytest_asyncio"]
@@ -193,7 +193,13 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
             return None
 
         monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit_request)
-        monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit_request)
+        # Patch audit_request in all books sub-modules
+        from app.api.endpoints.books import books_crud, books_toc, books_chapters, books_questions, books_drafts
+        monkeypatch.setattr(books_crud, "audit_request", _noop_audit_request)
+        monkeypatch.setattr(books_toc, "audit_request", _noop_audit_request)
+        monkeypatch.setattr(books_chapters, "audit_request", _noop_audit_request)
+        monkeypatch.setattr(books_questions, "audit_request", _noop_audit_request)
+        monkeypatch.setattr(books_drafts, "audit_request", _noop_audit_request)
 
         headers = {}
         if auth:
@@ -298,7 +304,13 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
             return None
 
         monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit)
-        monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit)
+        # Patch audit_request in all books sub-modules
+        from app.api.endpoints.books import books_crud, books_toc, books_chapters, books_questions, books_drafts
+        monkeypatch.setattr(books_crud, "audit_request", _noop_audit)
+        monkeypatch.setattr(books_toc, "audit_request", _noop_audit)
+        monkeypatch.setattr(books_chapters, "audit_request", _noop_audit)
+        monkeypatch.setattr(books_questions, "audit_request", _noop_audit)
+        monkeypatch.setattr(books_drafts, "audit_request", _noop_audit)
 
         headers = {}
         if auth:

@@ -47,8 +47,8 @@ async def test_generate_chapter_draft_with_mock_book(auth_client_factory):
         "suggestions": ["Add more examples", "Consider breaking into sections"]
     }
     
-    with patch('app.api.endpoints.books.get_book_by_id', AsyncMock(return_value=mock_book)):
-        with patch('app.api.endpoints.books.ai_service.generate_chapter_draft', 
+    with patch('app.api.endpoints.books.books_drafts.get_book_by_id', AsyncMock(return_value=mock_book)):
+        with patch('app.api.endpoints.books.books_drafts.ai_service.generate_chapter_draft', 
                    AsyncMock(return_value=mock_ai_result)):
             # Generate draft
             draft_data = {
@@ -96,7 +96,7 @@ async def test_generate_draft_validates_responses(auth_client_factory):
         }
     }
     
-    with patch('app.api.endpoints.books.get_book_by_id', AsyncMock(return_value=mock_book)):
+    with patch('app.api.endpoints.books.books_drafts.get_book_by_id', AsyncMock(return_value=mock_book)):
         # Try with empty responses
         response = await client.post(
             "/api/v1/books/test_book_id/chapters/ch1/generate-draft",
@@ -122,8 +122,8 @@ async def test_generate_draft_handles_ai_errors(auth_client_factory):
     }
     
     # Mock AI service to raise an error
-    with patch('app.api.endpoints.books.get_book_by_id', AsyncMock(return_value=mock_book)):
-        with patch('app.api.endpoints.books.ai_service.generate_chapter_draft', 
+    with patch('app.api.endpoints.books.books_drafts.get_book_by_id', AsyncMock(return_value=mock_book)):
+        with patch('app.api.endpoints.books.books_drafts.ai_service.generate_chapter_draft', 
                    AsyncMock(side_effect=Exception("AI service unavailable"))):
             
             response = await client.post(
