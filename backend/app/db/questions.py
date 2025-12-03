@@ -104,12 +104,15 @@ async def get_questions_for_chapter(
         elif status == "not_answered":
             processed_questions = [q for q in processed_questions if q["response_status"] == "not_answered"]
     
+    # Calculate total pages
+    filtered_total = len(processed_questions)
+    pages = (filtered_total + limit - 1) // limit if limit > 0 else 0
+
     return QuestionListResponse(
         questions=processed_questions,
-        total=len(processed_questions),
+        total=filtered_total,
         page=page,
-        limit=limit,
-        has_more=(page * limit) < total
+        pages=pages
     )
 
 
