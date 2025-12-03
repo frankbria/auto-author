@@ -1,8 +1,8 @@
 # Auto-Author Implementation Plan
 
-**Last Updated**: 2025-11-21
+**Last Updated**: 2025-12-02
 **Status**: Active Development
-**Current Phase**: Feature Development (43% complete)
+**Current Phase**: Feature Development (42% complete)
 
 > ℹ️ **NOTE**: This is a high-level implementation roadmap organized by priority and status.
 > For current task status and details, run: `bd list` or `bd ready`
@@ -22,25 +22,25 @@ This document serves as the single source of truth for the Auto-Author implement
 
 ### Project Overview
 
-**Progress**: 41 of 95 tasks complete (43%)
+**Progress**: 38 of 90 tasks complete (42%)
 
 **Status Breakdown**:
-- ✅ Completed: 41 tasks
+- ✅ Completed: 38 tasks
 - 🚧 In Progress: 0 tasks
 - 📋 Ready to Start: 10 tasks (no blockers)
-- 🔒 Blocked: 8 tasks
-- 📝 Planned: 54 tasks
+- 🔒 Blocked: 10 tasks
+- 📝 Planned: 51 tasks
 
 **Priority Distribution**:
-- P0 (Critical): 25 tasks
-- P1 (High): 36 tasks
-- P2 (Medium): 12 tasks
+- P0 (Critical): 30 tasks
+- P1 (High): 28 tasks
+- P2 (Medium): 10 tasks
 - P3 (Low): 22 tasks
 
 **Type Breakdown**:
-- 🐛 Bugs: 17
-- ✨ Features: 43
-- 📋 Tasks: 35
+- 🐛 Bugs: 22
+- ✨ Features: 41
+- 📋 Tasks: 27
 
 ---
 
@@ -53,79 +53,77 @@ No tasks currently in progress.
 
 ### Ready to Start (No Blockers)
 
-**P0 Critical Path** (25 total):
+**P0 Critical Path** (30 total):
 
-#### auto-author-twk: Fix backend Pydantic schema error causing crash loop
+#### auto-author-9lo: GAP-CRIT-001: Fix CORS configuration for production deployment
 **Type**: bug
 
-Backend is crash-looping with Pydantic SchemaError on model field 'added_at'. Error: default_factory expects callable but received datetime.datetime instance. Backend has restarted 728 times. BLOCKS: All deployments to dev.autoauthor.app. Find model with added_at field, fix default_factory to use callable (datetime.utcnow) or field validator. Time: 2-3 hours.
+CORS origins hardcoded to localhost. Must configure for https://autoauthor.app and https://api.autoauthor.app. BLOCKS: Production deployment (app unusable without correct CORS)
 
-#### auto-author-qou: Fix bookClient.test.tsx trailing slash mismatch
+#### auto-author-at3: GAP-CRIT-002: Replace in-memory rate limiting with Redis
 **Type**: bug
 
-CI/CD failing on bookClient test. Test expects 'http://localhost:8000/api/v1/books' but code uses 'http://localhost:8000/api/v1/books/' (trailing slash). Update test line 301 to expect trailing slash. BLOCKS: CI/CD pipeline. Time: 15 minutes.
+Rate limiting uses in-memory cache (backend/app/api/dependencies.py:19) which fails in multi-instance deployment. PM2 with 3 instances = 3x bypass of limits. BLOCKS: Production scaling, cost control (unlimited OpenAI API calls)
 
+#### auto-author-rqx: GAP-CRIT-003: Configure MongoDB connection pooling
+**Type**: bug
 
-**P1 High Priority** (36 total):
+MongoDB client created without pool configuration (backend/app/db/base.py:7). Will cause connection exhaustion at ~500 users. MongoDB Atlas M0 limit: 500 connections. BLOCKS: Production scalability
 
-#### auto-author-egz: Remove continue-on-error flags from CI/CD coverage checks
+#### auto-author-4e0: GAP-CRIT-005: Create production deployment workflow
 **Type**: task
 
-**Part 1: Remove continue-on-error flags (2 hours)**
-Remove continue-on-error: true from .github/workflows/tests.yml lines 50 and 106 to enforce 85% coverage gates. Verify pre-commit hooks block bad commits.
+Only deploy-staging.yml exists. Need production workflow with blue-green deployment, smoke tests, automated rollback. BLOCKS: Safe production deployments
 
-**Part 2: Create deployment workflow (2-3 hours)**
-Create .github/workflows/deploy-staging.yml to automatically deploy to dev.autoauthor.app when tests pass.
-
-**Workflow Requirements:**
-- Trigger: on push to main (after tests pass)
-- SSH to dev.autoauthor.app (root@dev.autoauthor.app)
-- Pull latest code to /opt/auto-author/releases/
-- Restart PM2 processes (auto-author-frontend, auto-author-backend)
-- Verify deployment health
-- Run smoke tests
-
-**Deployment Target:**
-- Server: dev.autoauthor.app (47.88.89.175)
-- Frontend: PM2 process 'auto-author-frontend'
-- Backend: PM2 process 'auto-author-backend' 
-- Release dir: /opt/auto-author/releases/
-
-**Time:** 4-5 hours total
-**Blocks:** Production readiness, automated deployments
-
-#### auto-author-4ad: Configure Clerk test workspace and test users
+#### auto-author-198: GAP-CRIT-006: Set up monitoring and observability infrastructure
 **Type**: task
 
-Create dedicated Clerk test workspace for E2E testing. Create test users (test-author@autoauthor.app). Add credentials to GitHub Secrets (TEST_USER_EMAIL, TEST_USER_PASSWORD). Update E2E auth fixtures to use real Clerk auth instead of BYPASS_AUTH. Required for: Running E2E tests against dev.autoauthor.app. Time: 1-2 hours.
+No APM, log aggregation, or alerting exists. Cannot detect or debug production incidents. BLOCKS: Production operations
 
-#### auto-author-4q3: Add E2E tests to CI/CD pipeline
+#### auto-author-2kc: GAP-CRIT-007: Implement database backup automation
 **Type**: task
 
-Add E2E test execution to .github/workflows/deploy-staging.yml. Run after successful deployment to dev.autoauthor.app. Use DEPLOYMENT_URL=https://dev.autoauthor.app. Use Clerk test credentials from GitHub Secrets. Report failures to notifications. Depends on: auto-author-egz (deployment workflow), Clerk test workspace. Time: 2-3 hours.
+No automated backups or disaster recovery. Data loss risk (RPO: ∞). BLOCKS: Production data safety
 
-#### auto-author-rpk: Create test data seeding and cleanup scripts
+#### auto-author-avy: GAP-CRIT-008: Refactor monolithic books.py endpoint (91KB, 2000+ lines)
 **Type**: task
 
-Implement test database management for E2E tests. Create seed scripts for predictable test data (books, chapters, users). Add cleanup scripts to run after test suites. Mark all test data with test_data:true flag. Implement in: tests/e2e/fixtures/database.fixture.ts and tests/e2e/global-setup.ts. Target: MongoDB on dev.autoauthor.app. Time: 1 day.
+backend/app/api/endpoints/books.py is 91KB with 2000+ lines. Violates CLAUDE.md '500 lines max' principle by 400%. Impossible to test, review, maintain. BLOCKS: Team velocity, code quality
 
-#### auto-author-6: Operational Requirements - User action tracking
-**Type**: feature
 
-Implement user action tracking system. Estimated: 6 hours
+**P1 High Priority** (28 total):
 
-#### auto-author-9: Operational Requirements - Data backup verification
-**Type**: feature
+#### auto-author-l3u: GAP-HIGH-001: Implement CSRF protection
+**Type**: task
 
-Verify data backup processes and recovery. Estimated: 2 hours
+No CSRF validation on state-changing endpoints. JWT bearer tokens provide some protection but not defense-in-depth.
 
-#### auto-author-10: Operational Requirements - SLA monitoring setup
-**Type**: feature
+#### auto-author-7d8: GAP-HIGH-002: Remove JWT debug logging from production
+**Type**: bug
 
-Set up SLA monitoring and alerting. Estimated: 2 hours
+backend/app/core/security.py:58-65 has print() statements logging JWT details. PII leakage risk in production. IMMEDIATE FIX before production.
+
+#### auto-author-bzq: GAP-HIGH-004: Sanitize MongoDB query inputs (NoSQL injection prevention)
+**Type**: bug
+
+User input used in MongoDB queries without sanitization (backend/app/db/book.py:71, user.py). NoSQL injection risk.
 
 
 ### Blocked Tasks
+
+#### auto-author-a2a: GAP-HIGH-011: Add unique constraints on critical database fields
+**Priority**: P1 | **Type**: bug
+
+No unique indexes on users.clerk_id, users.email, sessions.session_id. Duplicate users/sessions possible → data corruption.
+
+**Blocked by**: auto-author-k16
+
+#### auto-author-d7x: GAP-HIGH-003: Add rate limiting to authentication endpoints
+**Priority**: P1 | **Type**: task
+
+get_current_user() has no rate limiting. Brute-force attacks and credential stuffing possible.
+
+**Blocked by**: auto-author-at3
 
 #### auto-author-16: Settings & Help Pages - Settings page implementation
 **Priority**: P2 | **Type**: feature
@@ -190,222 +188,125 @@ Accessibility statement, issue remediation plan, testing checklist updates. Esti
 
 ### P0 Critical Path
 
-#### auto-author-qou: Fix bookClient.test.tsx trailing slash mismatch
-**Type**: bug
+#### auto-author-avy: GAP-CRIT-008: Refactor monolithic books.py endpoint (91KB, 2000+ lines)
+**Type**: task
 
-CI/CD failing on bookClient test. Test expects 'http://localhost:8000/api/v1/books' but code uses 'http://localhost:8000/api/v1/books/' (trailing slash). Update test line 301 to expect trailing slash. BLOCKS: CI/CD pipeline. Time: 15 minutes.
+backend/app/api/endpoints/books.py is 91KB with 2000+ lines. Violates CLAUDE.md '500 lines max' principle by 400%. Impossible to test, review, maintain. BLOCKS: Team velocity, code quality
 
 **Dependencies**: None
 
-#### auto-author-twk: Fix backend Pydantic schema error causing crash loop
+#### auto-author-2kc: GAP-CRIT-007: Implement database backup automation
+**Type**: task
+
+No automated backups or disaster recovery. Data loss risk (RPO: ∞). BLOCKS: Production data safety
+
+**Dependencies**: None
+
+#### auto-author-198: GAP-CRIT-006: Set up monitoring and observability infrastructure
+**Type**: task
+
+No APM, log aggregation, or alerting exists. Cannot detect or debug production incidents. BLOCKS: Production operations
+
+**Dependencies**: None
+
+#### auto-author-4e0: GAP-CRIT-005: Create production deployment workflow
+**Type**: task
+
+Only deploy-staging.yml exists. Need production workflow with blue-green deployment, smoke tests, automated rollback. BLOCKS: Safe production deployments
+
+**Dependencies**: None
+
+#### auto-author-rqx: GAP-CRIT-003: Configure MongoDB connection pooling
 **Type**: bug
 
-Backend is crash-looping with Pydantic SchemaError on model field 'added_at'. Error: default_factory expects callable but received datetime.datetime instance. Backend has restarted 728 times. BLOCKS: All deployments to dev.autoauthor.app. Find model with added_at field, fix default_factory to use callable (datetime.utcnow) or field validator. Time: 2-3 hours.
+MongoDB client created without pool configuration (backend/app/db/base.py:7). Will cause connection exhaustion at ~500 users. MongoDB Atlas M0 limit: 500 connections. BLOCKS: Production scalability
+
+**Dependencies**: None
+
+#### auto-author-at3: GAP-CRIT-002: Replace in-memory rate limiting with Redis
+**Type**: bug
+
+Rate limiting uses in-memory cache (backend/app/api/dependencies.py:19) which fails in multi-instance deployment. PM2 with 3 instances = 3x bypass of limits. BLOCKS: Production scaling, cost control (unlimited OpenAI API calls)
+
+**Dependencies**: None
+
+#### auto-author-9lo: GAP-CRIT-001: Fix CORS configuration for production deployment
+**Type**: bug
+
+CORS origins hardcoded to localhost. Must configure for https://autoauthor.app and https://api.autoauthor.app. BLOCKS: Production deployment (app unusable without correct CORS)
 
 **Dependencies**: None
 
 #### auto-author-53: Execute deployment testing checklist on staging
 **Type**: task
 
-Execute deployment testing checklist on dev.autoauthor.app (staging environment).
-
-**Environment Details:**
-- URL: https://dev.autoauthor.app (frontend)
-- API: https://api.dev.autoauthor.app (backend)
-- Server: root@dev.autoauthor.app (47.88.89.175)
-- MongoDB: Local instance on server
-- PM2 Processes: auto-author-frontend, auto-author-backend
-
-**Prerequisites:**
-- auto-author-twk: Backend Pydantic error fixed (BLOCKING)
-- auto-author-qou: bookClient test fixed (BLOCKING)
-- auto-author-4ad: Clerk test credentials configured
-
-**Checklist Source:**
-Use frontend/claudedocs/DEPLOYMENT-TESTING-CHECKLIST.md
-
-**Test Approach:**
-1. Manual pre-flight checks (server health, CORS, API)
-2. Automated E2E tests (66 tests across 7 suites)
-3. Manual verification of critical paths
-4. Performance validation against budgets
-
-**Time:** 1 day (after prerequisites met)
-**Deliverable:** Validated staging environment ready for production promotion
+Use claudedocs/DEPLOYMENT-TESTING-CHECKLIST.md to validate staging deployment at dev.autoauthor.app. Test pre-flight checks, user journey, advanced features, security & performance
 
 **Dependencies**: None
 
 
 ### P1 High Priority
 
-#### auto-author-rpk: Create test data seeding and cleanup scripts
+#### auto-author-cm2: GAP-HIGH-007: Add nginx configuration to repository
 **Type**: task
 
-Implement test database management for E2E tests. Create seed scripts for predictable test data (books, chapters, users). Add cleanup scripts to run after test suites. Mark all test data with test_data:true flag. Implement in: tests/e2e/fixtures/database.fixture.ts and tests/e2e/global-setup.ts. Target: MongoDB on dev.autoauthor.app. Time: 1 day.
+Nginx configs not version-controlled. Manual server setup. Configuration drift and setup errors possible.
 
 **Dependencies**: None
 
-#### auto-author-4q3: Add E2E tests to CI/CD pipeline
-**Type**: task
-
-Add E2E test execution to .github/workflows/deploy-staging.yml. Run after successful deployment to dev.autoauthor.app. Use DEPLOYMENT_URL=https://dev.autoauthor.app. Use Clerk test credentials from GitHub Secrets. Report failures to notifications. Depends on: auto-author-egz (deployment workflow), Clerk test workspace. Time: 2-3 hours.
-
-**Dependencies**: None
-
-#### auto-author-4ad: Configure Clerk test workspace and test users
-**Type**: task
-
-Create dedicated Clerk test workspace for E2E testing. Create test users (test-author@autoauthor.app). Add credentials to GitHub Secrets (TEST_USER_EMAIL, TEST_USER_PASSWORD). Update E2E auth fixtures to use real Clerk auth instead of BYPASS_AUTH. Required for: Running E2E tests against dev.autoauthor.app. Time: 1-2 hours.
-
-**Dependencies**: None
-
-#### auto-author-egz: Remove continue-on-error flags from CI/CD coverage checks
-**Type**: task
-
-**Part 1: Remove continue-on-error flags (2 hours)**
-Remove continue-on-error: true from .github/workflows/tests.yml lines 50 and 106 to enforce 85% coverage gates. Verify pre-commit hooks block bad commits.
-
-**Part 2: Create deployment workflow (2-3 hours)**
-Create .github/workflows/deploy-staging.yml to automatically deploy to dev.autoauthor.app when tests pass.
-
-**Workflow Requirements:**
-- Trigger: on push to main (after tests pass)
-- SSH to dev.autoauthor.app (root@dev.autoauthor.app)
-- Pull latest code to /opt/auto-author/releases/
-- Restart PM2 processes (auto-author-frontend, auto-author-backend)
-- Verify deployment health
-- Run smoke tests
-
-**Deployment Target:**
-- Server: dev.autoauthor.app (47.88.89.175)
-- Frontend: PM2 process 'auto-author-frontend'
-- Backend: PM2 process 'auto-author-backend' 
-- Release dir: /opt/auto-author/releases/
-
-**Time:** 4-5 hours total
-**Blocks:** Production readiness, automated deployments
-
-**Dependencies**: None
-
-#### auto-author-4hj: E2E Test: Screen reader compatibility (axe-playwright)
-**Type**: task
-
-Create E2E test using axe-playwright to audit accessibility violations. Scan all major pages (dashboard, book creation, chapter editor, export). Verify no critical accessibility violations. Test screen reader announcements for key interactions. WCAG 2.1 Level AA compliance requirement. Estimated: 6 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
-
-#### auto-author-ewj: E2E Test: Complete keyboard navigation (WCAG 2.1 compliance)
-**Type**: task
-
-Create E2E test that validates complete authoring journey using keyboard only (Tab, Enter, Escape, Arrow keys). Test book creation, TOC generation, chapter editing, and draft generation. Verify all interactive elements are keyboard accessible and focus indicators are visible. WCAG 2.1 Level AA compliance requirement. Estimated: 8 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
-
-#### auto-author-dsm: E2E Test: Suspicious session detection (fingerprint change)
-**Type**: task
-
-Create E2E test that validates suspicious session warning when user agent changes mid-session (simulating device/browser change). Verifies security feature flagging potential session hijacking. Estimated: 3 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
-
-#### auto-author-6co: E2E Test: Concurrent session limits
-**Type**: task
-
-Create E2E test that validates max 5 concurrent sessions per user. Create 5 sessions, then verify 6th session deactivates oldest session. Validates security feature preventing session hijacking. Estimated: 3 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
-
-#### auto-author-2e7: E2E Test: Session timeout warnings
-**Type**: task
-
-Create E2E test that validates session timeout warning appears after 30 minutes of inactivity. Test should verify warning modal displays, contains correct message, and 'Extend Session' button works. Mock timeout to be shorter for testing. Estimated: 4 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
-
-#### auto-author-ar6: E2E Test: Draft regeneration workflow
-**Type**: task
-
-Create E2E test that validates 'Generate New Draft' workflow: verify returns to question form, preserves previous answers, allows parameter changes, and produces different drafts. Validates user iteration workflow. Estimated: 3 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
-
-#### auto-author-yrg: E2E Test: Draft generation rate limiting
-**Type**: task
-
-Create E2E test that generates 5 drafts (at limit), then verifies 6th attempt is blocked with rate limit error message showing retry time. Validates abuse prevention. Estimated: 4 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
-
-#### auto-author-xz2: E2E Test: Draft generation error validation
-**Type**: task
-
-Create E2E test that verifies error message appears when user tries to generate draft without answering any questions. Validates form validation logic. Estimated: 2 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
-
-#### auto-author-nwd: Comprehensive E2E Test Suite - Close 30% Automation Gap
-**Type**: feature
-
-Close E2E testing gaps identified in gap analysis. Currently at 70% automation coverage, targeting 95%+. Focus areas: draft generation variations (writing styles, custom questions, regeneration), session management (timeout, concurrent sessions, security), keyboard accessibility (WCAG 2.1 compliance), and profile management. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for full details. Estimated 60 hours over 4 phases.
-
-**Dependencies**: None
-
-#### auto-author-6y4: Achieve 85% test coverage across backend and frontend
-**Type**: feature
-
-Comprehensive test coverage improvement to reach 85% minimum across both backend and frontend codebases.
-
-**Current State (Updated 2025-11-21):**
-- Backend: ~60% coverage (target: 85%, gap: 25%) - UP FROM 43%
-- Frontend: 99.3% pass rate (730/735 tests passing)
-- Total tests: 203 backend + 735 frontend = 938 tests
-
-**Progress Made:**
-✅ Security and auth modules tested (auto-author-61 completed)
-✅ Frontend test infrastructure stabilized (auto-author-60 completed)
-✅ E2E test suite created (auto-author-59 completed)
-
-**Goals:**
-1. Backend: Increase from ~60% to 85% coverage (remaining work)
-2. Frontend: Maintain 99%+ pass rate, measure coverage
-3. Coverage gates already in CI/CD (need enforcement via auto-author-egz)
-4. Document coverage standards and exemptions
-
-**High-Priority Modules (Backend):**
-- book_cover_upload.py: 0% → 85%
-- transcription.py: 0% → 85%
-- books.py: improve coverage on edge cases
-- users.py: improve coverage on edge cases
-- export.py: improve coverage on edge cases
-
-**Acceptance Criteria:**
-- [ ] Backend coverage ≥85% overall
-- [ ] Frontend coverage ≥85% overall (measure baseline first)
-- [x] Coverage report generated on every commit
-- [x] Pre-commit hooks configured (enforcement pending)
-- [ ] CI/CD fails if coverage drops below 85% (auto-author-egz)
-- [ ] Coverage badge in README showing current %
-
-**Estimated Effort:**
-- Backend: ~150-200 new tests needed (down from 250-300)
-- Frontend: Coverage measurement + targeted improvements
-- Time: 2-3 weeks for backend, 1 week for frontend
-
-**Related Issues:**
-- auto-author-61: Security coverage (CLOSED - completed)
-- auto-author-60: Frontend test fixes (CLOSED - completed)
-- auto-author-59: E2E test suite (CLOSED - completed)
-- auto-author-egz: CI/CD enforcement (NEW - 2-3 hours)
-
-**Priority:** P1 (Critical for production readiness)
-**Type:** Feature (Quality Infrastructure)
-
-**Dependencies**: None
-
-#### auto-author-03x: Debug and fix deployment E2E test hangs/timeouts
+#### auto-author-a2a: GAP-HIGH-011: Add unique constraints on critical database fields
 **Type**: bug
 
-Deployment E2E tests hang indefinitely after 10+ minutes. Tests fail to complete even with servers running and BYPASS_AUTH enabled. Need to: 1) Identify why tests hang (likely missing data-testid attributes or incorrect selectors), 2) Fix page object selectors to match actual component structure, 3) Add missing data-testid attributes to components, 4) Verify tests complete in reasonable time (<2min each), 5) Get at least basic user journey test passing as proof-of-concept.
+No unique indexes on users.clerk_id, users.email, sessions.session_id. Duplicate users/sessions possible → data corruption.
+
+**Dependencies**: None
+
+#### auto-author-k16: GAP-HIGH-010: Create database index startup hook
+**Type**: bug
+
+ChapterTabIndexManager.create_all_indexes() defined but never called. All queries run without indexes (full collection scans). Severe performance degradation at scale.
+
+**Dependencies**: None
+
+#### auto-author-w1j: GAP-HIGH-005: Create security.txt and vulnerability disclosure policy
+**Type**: task
+
+No .well-known/security.txt or SECURITY.md. No secure channel for vulnerability reports. RFC 9116 compliance needed.
+
+**Dependencies**: None
+
+#### auto-author-bzq: GAP-HIGH-004: Sanitize MongoDB query inputs (NoSQL injection prevention)
+**Type**: bug
+
+User input used in MongoDB queries without sanitization (backend/app/db/book.py:71, user.py). NoSQL injection risk.
+
+**Dependencies**: None
+
+#### auto-author-d7x: GAP-HIGH-003: Add rate limiting to authentication endpoints
+**Type**: task
+
+get_current_user() has no rate limiting. Brute-force attacks and credential stuffing possible.
+
+**Dependencies**: None
+
+#### auto-author-7d8: GAP-HIGH-002: Remove JWT debug logging from production
+**Type**: bug
+
+backend/app/core/security.py:58-65 has print() statements logging JWT details. PII leakage risk in production. IMMEDIATE FIX before production.
+
+**Dependencies**: None
+
+#### auto-author-l3u: GAP-HIGH-001: Implement CSRF protection
+**Type**: task
+
+No CSRF validation on state-changing endpoints. JWT bearer tokens provide some protection but not defense-in-depth.
+
+**Dependencies**: None
+
+#### auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
+**Type**: task
+
+CRITICAL: security.py from 18% → 100% (JWT verification). dependencies.py from 25% → 100%. Add 45-55 new tests. Estimated: 1 week. This is a SECURITY RISK - prioritize before other features.
 
 **Dependencies**: None
 
@@ -439,20 +340,6 @@ Implement user action tracking system. Estimated: 6 hours
 
 
 ### P2 Medium Priority
-
-#### auto-author-5jo: E2E Test: Profile form validation
-**Type**: task
-
-Create E2E test that validates profile form validation rules. Test required field validation (first name, last name), invalid email format, and error message display. Validates data integrity. Estimated: 3 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
-
-#### auto-author-2nd: E2E Test: Profile CRUD operations
-**Type**: task
-
-Create E2E test for profile management: view profile, edit first/last name, save changes, verify persistence after reload. Test complete user profile update workflow. Estimated: 4 hours. See docs/E2E_TEST_COVERAGE_GAP_ANALYSIS.md for implementation example.
-
-**Dependencies**: None
 
 #### auto-author-63: Review and cleanup obsolete documentation (34 files in claudedocs/)
 **Type**: task
@@ -672,127 +559,122 @@ Run axe-core and Lighthouse audits on all components. Component-by-component val
 
 ## Completed Work
 
-**Total Completed**: 41 tasks (43%)
+**Total Completed**: 38 tasks (42%)
 
 #### ✅ auto-author-71: SECURITY: Fix auth middleware - invalid tokens being accepted
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T17:27:02.775927832-07:00
 
-No reason provided
+Fixed: Security tests now properly disable BYPASS_AUTH to test actual token verification. Updated test_invalid_token and test_missing_token to monkeypatch settings.BYPASS_AUTH=False. Also corrected test_missing_token status code from 403 to 401 (more semantically correct). All tests passing. The auth middleware itself was secure - the issue was tests not exercising the real auth flow due to BYPASS_AUTH being enabled in .env.
 
 #### ✅ auto-author-70: Fix MongoDB Atlas SSL connection failures in backend tests
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-07T12:43:41.557318205-07:00
 
-No reason provided
+MongoDB Atlas SSL connection issue resolved. Updated test infrastructure to use local MongoDB by: (1) Added sessions_collection to base.py and conftest motor_reinit_db fixture, (2) Updated session.py to reference base.sessions_collection instead of importing at module level, (3) Added motor_reinit_db fixture to all session service tests. Result: 13 tests unblocked, all SSL handshake errors eliminated. Remaining 6 session test failures are unrelated bugs (timezone comparisons and user agent parsing) tracked separately.
 
 #### ✅ auto-author-69: Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-07T09:46:01.552817744-07:00
 
-No reason provided
+Fixed by updating test expectations. Dashboard uses setTokenProvider(getToken) not setAuthToken. Updated test mock and expectations to check for setTokenProvider call.
 
 #### ✅ auto-author-67: Fix bookClient.test.tsx: 'should set auth token' test failure
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-07T09:46:00.316849477-07:00
 
-No reason provided
+Fixed by adding await to async getUserBooks() call in test. Test was calling getUserBooks() without await, causing expectation to run before fetch was called.
 
 #### ✅ auto-author-66: Add dotenv to frontend dependencies for E2E tests
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T15:25:14.855239534-07:00
 
-No reason provided
+Added dotenv to frontend/package.json devDependencies. Required by playwright.config.ts. Completed in commit 60b6b64.
 
 #### ✅ auto-author-65: Fix backend session_middleware import error
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T15:25:14.836738327-07:00
 
-No reason provided
+Fixed backend import error by renaming middleware.py to request_validation.py and creating __init__.py in middleware/ directory. Updated import in main.py. Completed in commit 60b6b64.
 
 #### ✅ auto-author-64: Fix TypeScript errors blocking frontend tests
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T15:25:04.990158411-07:00
 
-No reason provided
+Fixed TypeScript errors: added non-null assertion in SessionWarning.tsx and made middleware auth callback async. Completed in commit 60b6b64.
 
 #### ✅ auto-author-58: Implement TDD and E2E test enforcement with pre-commit hooks
 **Priority**: P0 | **Type**: task | **Closed**: 2025-11-06T15:01:28.976290408-07:00
 
-No reason provided
+Implemented TDD and E2E test enforcement with pre-commit hooks. Added comprehensive hooks for unit tests, E2E tests, and coverage checks (≥85%) for both frontend and backend. Updated CLAUDE.md documentation. Completed in commit dba9959.
 
 #### ✅ auto-author-57: Close completed tasks and sync documentation with bd tracker
 **Priority**: P0 | **Type**: task | **Closed**: 2025-11-06T16:27:39.525218427-07:00
 
-No reason provided
+Categorized all 19 backend test failures into 4 groups (MongoDB connection, invalid token validation, auth status codes, user agent parsing). Created bd issues auto-author-70 through auto-author-73 to track fixes. Documented analysis in docs/BACKEND_TEST_FAILURE_ANALYSIS.md with detailed root cause analysis and fix recommendations.
 
 #### ✅ auto-author-56: Create Playwright E2E test suite for TOC generation workflow
 **Priority**: P0 | **Type**: task | **Closed**: 2025-11-06T15:12:37.630865263-07:00
 
-No reason provided
+Enabled complete authoring journey E2E test in frontend/src/e2e/complete-authoring-journey.spec.ts. Test now validates full user workflow from book creation through draft generation, including TOC generation with AI wizard. Updated CLAUDE.md to reflect changes. Completed in commit 2b80866.
 
 #### ✅ auto-author-55: Verify TOC bug fix and deploy to production
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-11-06T14:42:34.476234327-07:00
 
-No reason provided
+TOC bug fix merged from branch claude/fix-issue-011CUqk7A7VRxceeAvKKYs6f (commit 1fb6292). Implemented token provider pattern to prevent JWT expiration during long workflows. Merged to main (commit fb4d078). GitHub Actions will run tests.
 
 #### ✅ auto-author-54: Complete staging deployment to dev.autoauthor.app
 **Priority**: P0 | **Type**: task | **Closed**: 2025-10-29T03:25:50.490944418-07:00
 
-No reason provided
+Completed: Successfully deployed release 20251029-030637 to staging. Frontend (port 3002) and backend (port 8000) operational. Health checks passing.
 
 #### ✅ auto-author-48: Start MongoDB for backend tests
 **Priority**: P0 | **Type**: task | **Closed**: 2025-10-14T16:28:18.701843573-07:00
 
-No reason provided
+✅ MongoDB started and configured. Backend tests now at 100% pass rate (171/182 passing, 11 skipped). MongoDB is running on localhost:27017. Test isolation issue in test_book_crud_actual.py also fixed (commit c778082).
 
 #### ✅ auto-author-47: Fix frontend tests: Add scrollIntoView mock to jest.setup.ts
 **Priority**: P0 | **Type**: bug | **Closed**: 2025-10-29T03:25:26.473208305-07:00
 
-No reason provided
+Completed: Select component mocks working. Test pass rate improved to 99.7% (719/724 passing, only 2 failures remain)
 
 #### ✅ auto-author-28: Keyboard Navigation Implementation
 **Priority**: P0 | **Type**: feature | **Closed**: 2025-10-14T09:12:36.635079925-07:00
 
-No reason provided
+Completed 2025-10-12. All chapter tabs and interactive elements accessible via keyboard.
 
 #### ✅ auto-author-26: Accessibility Audit Preparation
 **Priority**: P0 | **Type**: task | **Closed**: 2025-10-14T09:12:36.548177864-07:00
 
-No reason provided
+Completed 2025-10-12. Ready for 24-hour comprehensive audit.
 
 #### ✅ auto-author-24: Performance Monitoring Setup
 **Priority**: P0 | **Type**: feature | **Closed**: 2025-10-14T09:12:36.462191926-07:00
 
-No reason provided
+Completed 2025-10-12. 20/20 tests passing, integrated in 4 key operations.
 
 #### ✅ auto-author-22: API Contract Formalization
 **Priority**: P0 | **Type**: feature | **Closed**: 2025-10-14T09:12:36.375482558-07:00
 
-No reason provided
+Completed 2025-10-12. 100% alignment verified across 30+ endpoints.
 
 #### ✅ auto-author-21: Unified Error Handling Framework
 **Priority**: P0 | **Type**: feature | **Closed**: 2025-10-14T09:12:36.334750366-07:00
 
-No reason provided
+Completed 2025-10-12. Error handler with automatic retry and notification integration.
 
 #### ✅ auto-author-20: Export Feature - PDF/DOCX
 **Priority**: P0 | **Type**: feature | **Closed**: 2025-10-14T09:12:36.295630717-07:00
 
-No reason provided
+Completed 2025-10-12. All export features implemented and tested.
 
 #### ✅ auto-author-8: Operational Requirements - Session management
 **Priority**: P0 | **Type**: feature | **Closed**: 2025-11-01T14:21:04.48529933-07:00
 
-No reason provided
+Session management fully implemented with tracking, security features, timeouts, and comprehensive tests
 
 #### ✅ auto-author-7: Operational Requirements - Error logging and monitoring
 **Priority**: P0 | **Type**: feature | **Closed**: 2025-10-29T02:55:57.082313202-07:00
 
-No reason provided
+Error handling framework fully implemented with comprehensive test coverage
 
-#### ✅ auto-author-bo7: E2E Test: Custom questions in draft generation
-**Priority**: P1 | **Type**: task | **Closed**: 2025-11-10T22:52:10.227715676-07:00
+#### ✅ auto-author-03x: Debug and fix deployment E2E test hangs/timeouts
+**Priority**: P1 | **Type**: bug | **Closed**: 2025-12-02T22:37:14.138954243-07:00
 
-No reason provided
-
-#### ✅ auto-author-15k: E2E Test: Draft generation with different writing styles
-**Priority**: P1 | **Type**: task | **Closed**: 2025-11-10T22:47:00.600634808-07:00
-
-No reason provided
+Not a real issue - deployment E2E tests work correctly according to testing-coverage-review.md. 70% E2E coverage achieved with 54+ tests passing.
 
 #### ✅ auto-author-72: Fix auth middleware status code precedence (5 tests)
 **Priority**: P1 | **Type**: bug | **Closed**: 2025-11-10T21:56:14.506956864-07:00
@@ -802,27 +684,17 @@ No reason provided
 #### ✅ auto-author-68: Fix BookCard.test.tsx: Date formatting timezone issue
 **Priority**: P1 | **Type**: bug | **Closed**: 2025-11-07T10:18:28.403055141-07:00
 
-No reason provided
+Fixed by adding timeZone: 'UTC' to toLocaleDateString options in BookCard formatDate function. This ensures dates are displayed using UTC timezone, preventing timezone conversion issues where '2024-01-15T00:00:00Z' was showing as Jan 14 in timezones behind UTC. All 16 BookCard tests now pass.
 
 #### ✅ auto-author-62: Create .pre-commit-config.yaml with test enforcement hooks
 **Priority**: P1 | **Type**: task | **Closed**: 2025-11-06T14:22:04.295594198-07:00
 
-No reason provided
-
-#### ✅ auto-author-61: Backend coverage sprint - Security & Auth (41% → 55%)
-**Priority**: P1 | **Type**: task | **Closed**: 2025-11-10T22:32:45.479387976-07:00
-
-No reason provided
+Pre-commit config created with doc auto-sync, linting, and quality checks
 
 #### ✅ auto-author-60: Fix 75 frontend test environmental failures
 **Priority**: P1 | **Type**: task | **Closed**: 2025-11-07T10:54:09.807537853-07:00
 
-No reason provided
-
-#### ✅ auto-author-59: Create comprehensive E2E test suite for all critical user journeys
-**Priority**: P1 | **Type**: task | **Closed**: 2025-11-21T21:05:39.840777353-07:00
-
-No reason provided
+Task completed successfully. Investigation revealed all mocks already in place (Next.js router, ResizeObserver, TipTap, Clerk). Test suite status: 732/735 passing (99.6%), 51/51 suites passing. Excluded tests (ProfilePage, SystemIntegration) correctly excluded for unimplemented features. errorHandler.test.ts already uses Jest (43/43 passing). No fixes required - infrastructure working correctly. Updated CLAUDE.md documentation.
 
 #### ✅ auto-author-52: Fix remaining 2 test failures in TabStatePersistence
 **Priority**: P1 | **Type**: bug | **Closed**: 2025-11-10T22:07:00.152022847-07:00
@@ -832,42 +704,42 @@ No reason provided
 #### ✅ auto-author-51: Auto-start MongoDB on WSL shell initialization (non-blocking)
 **Priority**: P1 | **Type**: task | **Closed**: 2025-10-14T16:28:19.966236807-07:00
 
-No reason provided
+✅ MongoDB auto-start added to ~/.bashrc. Process check prevents duplicate starts. Auto-start runs in background with fork flag. Verified working after shell restart.
 
 #### ✅ auto-author-50: Measure test coverage after fixes
 **Priority**: P1 | **Type**: task | **Closed**: 2025-10-29T03:25:27.959146543-07:00
 
-No reason provided
+Completed: Test coverage measured. Frontend: 719/724 passing (99.7%), Backend: all tests passing
 
 #### ✅ auto-author-49: Verify E2E test execution and coverage
 **Priority**: P1 | **Type**: task | **Closed**: 2025-10-29T03:25:27.137885738-07:00
 
-No reason provided
+Completed: E2E tests verified. Infrastructure complete with 2/2 smoke tests passing. Test suite at 99.7% pass rate
 
 #### ✅ auto-author-29: Auto-save with localStorage Backup
 **Priority**: P1 | **Type**: feature | **Closed**: 2025-10-14T09:12:36.676200922-07:00
 
-No reason provided
+Completed in Sprint 3-4. Enhanced save status indicators implemented.
 
 #### ✅ auto-author-27: Responsive Design Validation
 **Priority**: P1 | **Type**: feature | **Closed**: 2025-10-14T09:12:36.593047358-07:00
 
-No reason provided
+Completed 2025-10-12. All touch targets 44x44px, supports 320px+ viewports.
 
 #### ✅ auto-author-25: Loading State Implementation
 **Priority**: P1 | **Type**: feature | **Closed**: 2025-10-14T09:12:36.505146465-07:00
 
-No reason provided
+Completed 2025-10-12. 53/53 tests passing, 100% coverage.
 
 #### ✅ auto-author-23: Book Deletion UI
 **Priority**: P1 | **Type**: feature | **Closed**: 2025-10-14T09:12:36.419825418-07:00
 
-No reason provided
+Completed 2025-10-12. 29 tests passing, 100% pass rate.
 
 #### ✅ auto-author-13: Mobile Experience - Touch target sizing
 **Priority**: P1 | **Type**: task | **Closed**: 2025-10-29T02:55:57.101093106-07:00
 
-No reason provided
+Touch targets fixed - WCAG 2.1 AAA compliant per responsive_design_audit.md
 
 #### ✅ auto-author-50e: Fix flaky test: test_validate_expired_session timing issue
 **Priority**: P2 | **Type**: bug | **Closed**: 2025-11-10T21:56:30.777851064-07:00
@@ -895,8 +767,13 @@ No tasks with dependencies.
 
 The following critical and high-priority tasks must be completed for production deployment:
 
-- [ ] Fix bookClient.test.tsx trailing slash mismatch (auto-author-qou) - P0
-- [ ] Fix backend Pydantic schema error causing crash loop (auto-author-twk) - P0
+- [ ] GAP-CRIT-008: Refactor monolithic books.py endpoint (91KB, 2000+ lines) (auto-author-avy) - P0
+- [ ] GAP-CRIT-007: Implement database backup automation (auto-author-2kc) - P0
+- [ ] GAP-CRIT-006: Set up monitoring and observability infrastructure (auto-author-198) - P0
+- [ ] GAP-CRIT-005: Create production deployment workflow (auto-author-4e0) - P0
+- [ ] GAP-CRIT-003: Configure MongoDB connection pooling (auto-author-rqx) - P0
+- [ ] GAP-CRIT-002: Replace in-memory rate limiting with Redis (auto-author-at3) - P0
+- [ ] GAP-CRIT-001: Fix CORS configuration for production deployment (auto-author-9lo) - P0
 - [x] SECURITY: Fix auth middleware - invalid tokens being accepted (auto-author-71) - P0
 - [x] Fix MongoDB Atlas SSL connection failures in backend tests (auto-author-70) - P0
 - [x] Fix DashboardBookDelete.test.tsx: Auth token not maintained during deletion (auto-author-69) - P0
@@ -920,29 +797,21 @@ The following critical and high-priority tasks must be completed for production 
 - [x] Export Feature - PDF/DOCX (auto-author-20) - P0
 - [x] Operational Requirements - Session management (auto-author-8) - P0
 - [x] Operational Requirements - Error logging and monitoring (auto-author-7) - P0
-- [ ] Create test data seeding and cleanup scripts (auto-author-rpk) - P1
-- [ ] Add E2E tests to CI/CD pipeline (auto-author-4q3) - P1
-- [ ] Configure Clerk test workspace and test users (auto-author-4ad) - P1
-- [ ] Remove continue-on-error flags from CI/CD coverage checks (auto-author-egz) - P1
-- [ ] E2E Test: Screen reader compatibility (axe-playwright) (auto-author-4hj) - P1
-- [ ] E2E Test: Complete keyboard navigation (WCAG 2.1 compliance) (auto-author-ewj) - P1
-- [ ] E2E Test: Suspicious session detection (fingerprint change) (auto-author-dsm) - P1
-- [ ] E2E Test: Concurrent session limits (auto-author-6co) - P1
-- [ ] E2E Test: Session timeout warnings (auto-author-2e7) - P1
-- [ ] E2E Test: Draft regeneration workflow (auto-author-ar6) - P1
-- [ ] E2E Test: Draft generation rate limiting (auto-author-yrg) - P1
-- [ ] E2E Test: Draft generation error validation (auto-author-xz2) - P1
-- [x] E2E Test: Custom questions in draft generation (auto-author-bo7) - P1
-- [x] E2E Test: Draft generation with different writing styles (auto-author-15k) - P1
-- [ ] Comprehensive E2E Test Suite - Close 30% Automation Gap (auto-author-nwd) - P1
-- [ ] Achieve 85% test coverage across backend and frontend (auto-author-6y4) - P1
-- [ ] Debug and fix deployment E2E test hangs/timeouts (auto-author-03x) - P1
+- [ ] GAP-HIGH-007: Add nginx configuration to repository (auto-author-cm2) - P1
+- [ ] GAP-HIGH-011: Add unique constraints on critical database fields (auto-author-a2a) - P1
+- [ ] GAP-HIGH-010: Create database index startup hook (auto-author-k16) - P1
+- [ ] GAP-HIGH-005: Create security.txt and vulnerability disclosure policy (auto-author-w1j) - P1
+- [ ] GAP-HIGH-004: Sanitize MongoDB query inputs (NoSQL injection prevention) (auto-author-bzq) - P1
+- [ ] GAP-HIGH-003: Add rate limiting to authentication endpoints (auto-author-d7x) - P1
+- [ ] GAP-HIGH-002: Remove JWT debug logging from production (auto-author-7d8) - P1
+- [ ] GAP-HIGH-001: Implement CSRF protection (auto-author-l3u) - P1
+- [x] Debug and fix deployment E2E test hangs/timeouts (auto-author-03x) - P1
 - [x] Fix auth middleware status code precedence (5 tests) (auto-author-72) - P1
 - [x] Fix BookCard.test.tsx: Date formatting timezone issue (auto-author-68) - P1
 - [x] Create .pre-commit-config.yaml with test enforcement hooks (auto-author-62) - P1
-- [x] Backend coverage sprint - Security & Auth (41% → 55%) (auto-author-61) - P1
+- [ ] Backend coverage sprint - Security & Auth (41% → 55%) (auto-author-61) - P1
 - [x] Fix 75 frontend test environmental failures (auto-author-60) - P1
-- [x] Create comprehensive E2E test suite for all critical user journeys (auto-author-59) - P1
+- [ ] Create comprehensive E2E test suite for all critical user journeys (auto-author-59) - P1
 - [x] Fix remaining 2 test failures in TabStatePersistence (auto-author-52) - P1
 - [x] Auto-start MongoDB on WSL shell initialization (non-blocking) (auto-author-51) - P1
 - [x] Measure test coverage after fixes (auto-author-50) - P1
@@ -1020,6 +889,6 @@ bd close <task-id> --reason "Completed in PR #123"
 
 ---
 
-**Generated**: 2025-11-21
+**Generated**: 2025-12-02
 **Command**: `./scripts/export-implementation-plan.sh`
 **Source of Truth**: bd database (priority and status-driven)
