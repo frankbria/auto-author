@@ -21,7 +21,19 @@ class Settings(BaseSettings):
     # API Settings
     API_V1_PREFIX: str = "/api/v1"
     BACKEND_CORS_ORIGINS: Union[List[str], str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
+        default=[
+            # Development origins
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://localhost:3002",
+            "http://localhost:3003",
+            # Staging origins
+            "https://dev.autoauthor.app",
+            "https://api.dev.autoauthor.app",
+            # Production origins
+            "https://autoauthor.app",
+            "https://api.autoauthor.app",
+        ],
         json_schema_extra={"env_parse_none_str": "null"}
     )
 

@@ -308,6 +308,8 @@
 - [ ] Notifications working (Slack/Discord)
 - [ ] Documentation updated
 - [ ] Team trained on new workflow
+- [ ] **CORS validation** passes (see `docs/pre-deployment-checklist.md`)
+- [ ] **Pre-deployment checklist** completed for first deploy
 
 ### After Merging to Develop
 
