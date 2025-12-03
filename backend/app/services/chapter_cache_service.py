@@ -9,6 +9,7 @@ intelligent cache invalidation strategies.
 
 import json
 import hashlib
+import asyncio
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 import logging
