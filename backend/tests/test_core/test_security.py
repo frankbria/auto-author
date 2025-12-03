@@ -6,7 +6,7 @@ Tests JWT verification, password hashing, authentication, and authorization.
 
 import pytest
 from unittest.mock import Mock, patch, AsyncMock, MagicMock, PropertyMock
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
 from jose import jwt
 from jose.exceptions import JWTError, ExpiredSignatureError
@@ -287,6 +287,46 @@ class TestJWTVerification:
 
         assert exc_info.value.status_code == 401
 
+    @patch("app.core.security.jwt.get_unverified_header")
+    @patch("app.core.security.settings")
+    async def test_verify_jwt_token_missing_kid(self, mock_settings, mock_get_header):
+        """Test JWT verification when kid is missing from header"""
+        mock_settings.clerk_jwt_public_key_pem = None
+        mock_get_header.return_value = {}  # No kid in header
+
+        token = "test_token"
+
+        # Should raise when trying to find key without kid
+        with patch("app.core.security.get_clerk_jwks") as mock_get_jwks:
+            mock_get_jwks.return_value = {"keys": [{"kid": "some_kid"}]}
+
+            with pytest.raises(HTTPException) as exc_info:
+                await verify_jwt_token(token)
+
+            assert exc_info.value.status_code == 401
+
+    @patch("app.core.security.jwt.decode")
+    @patch("app.core.security.jwt.get_unverified_header")
+    @patch("app.core.security.settings")
+    async def test_verify_jwt_token_debug_output(self, mock_settings, mock_get_header, mock_decode):
+        """Test that JWT debug output handles decode errors gracefully"""
+        mock_settings.clerk_jwt_public_key_pem = "test_key"
+        mock_settings.CLERK_JWT_ALGORITHM = "RS256"
+        mock_get_header.return_value = {"kid": "test_kid"}
+
+        # First call (debug decode) raises error, second call (real decode) succeeds
+        mock_decode.side_effect = [
+            Exception("Debug decode failed"),  # Debug call
+            {"sub": "user_123"}  # Actual verification call
+        ]
+
+        token = "test_token"
+        result = await verify_jwt_token(token)
+
+        assert result["sub"] == "user_123"
+        # Verify debug decode was attempted
+        assert mock_decode.call_count == 2
+
 
 @pytest.mark.asyncio
 class TestRoleChecker:
@@ -397,10 +437,10 @@ class TestGetCurrentUser:
         assert result["clerk_id"] == "user_123"
         assert result["email"] == "test@example.com"
 
-    @patch("app.core.security.settings")
+    @patch("app.core.config.settings")
     async def test_get_current_user_missing_credentials(self, mock_settings):
         """Test get_current_user without credentials"""
-        mock_settings.BYPASS_AUTH = False
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
 
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(credentials=None)
@@ -409,10 +449,10 @@ class TestGetCurrentUser:
         assert "Missing authentication credentials" in exc_info.value.detail
 
     @patch("app.core.security.verify_jwt_token")
-    @patch("app.core.security.settings")
+    @patch("app.core.config.settings")
     async def test_get_current_user_invalid_token(self, mock_settings, mock_verify):
         """Test get_current_user with invalid token"""
-        mock_settings.BYPASS_AUTH = False
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
         mock_verify.return_value = {}  # No 'sub' field
 
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid_token")
@@ -423,29 +463,47 @@ class TestGetCurrentUser:
         assert exc_info.value.status_code == 401
         assert "Invalid user ID" in exc_info.value.detail
 
+    @patch("app.core.security.get_clerk_user")
     @patch("app.core.security.verify_jwt_token")
     @patch("app.core.security.get_user_by_clerk_id")
-    @patch("app.core.security.settings")
-    async def test_get_current_user_not_found(self, mock_settings, mock_get_user, mock_verify):
-        """Test get_current_user when user not in database"""
-        mock_settings.BYPASS_AUTH = False
+    @patch("app.core.config.settings")
+    async def test_get_current_user_auto_create_success(self, mock_settings, mock_get_user, mock_verify, mock_get_clerk_user):
+        """Test get_current_user auto-creates user from Clerk"""
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
         mock_verify.return_value = {"sub": "user_123"}
-        mock_get_user.return_value = None
+        mock_get_user.return_value = None  # User not in DB
+        mock_get_clerk_user.return_value = {
+            "id": "user_123",
+            "email_addresses": [{"email_address": "newuser@example.com"}],
+            "first_name": "New",
+            "last_name": "User",
+            "image_url": "https://example.com/avatar.jpg",
+            "public_metadata": {"custom": "data"}
+        }
 
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
+        # Mock the create_user function (imported inside get_current_user)
+        with patch("app.db.database.create_user") as mock_create_user:
+            mock_create_user.return_value = {
+                "clerk_id": "user_123",
+                "email": "newuser@example.com",
+                "first_name": "New",
+                "last_name": "User",
+                "role": "user"
+            }
 
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(credentials)
+            credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
+            result = await get_current_user(credentials)
 
-        assert exc_info.value.status_code == 401
-        assert "User not found" in exc_info.value.detail
+            assert result["clerk_id"] == "user_123"
+            assert result["email"] == "newuser@example.com"
+            mock_create_user.assert_called_once()
 
     @patch("app.core.security.verify_jwt_token")
     @patch("app.core.security.get_user_by_clerk_id")
-    @patch("app.core.security.settings")
+    @patch("app.core.config.settings")
     async def test_get_current_user_database_error(self, mock_settings, mock_get_user, mock_verify):
         """Test get_current_user with database error"""
-        mock_settings.BYPASS_AUTH = False
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
         mock_verify.return_value = {"sub": "user_123"}
         mock_get_user.side_effect = Exception("Database connection error")
 
@@ -456,6 +514,119 @@ class TestGetCurrentUser:
 
         assert exc_info.value.status_code == 500
         assert "Error fetching user" in exc_info.value.detail
+
+    @patch("app.core.security.get_clerk_user")
+    @patch("app.core.security.verify_jwt_token")
+    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_auto_create_clerk_not_found(self, mock_settings, mock_get_user, mock_verify, mock_get_clerk_user):
+        """Test get_current_user when user not in DB and not in Clerk"""
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
+        mock_verify.return_value = {"sub": "user_123"}
+        mock_get_user.return_value = None  # User not in DB
+        mock_get_clerk_user.return_value = None  # User not in Clerk either
+
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(credentials)
+
+        assert exc_info.value.status_code == 401
+        assert "User not found in Clerk" in exc_info.value.detail
+
+    @patch("app.core.security.get_clerk_user")
+    @patch("app.core.security.verify_jwt_token")
+    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_auto_create_create_fails(self, mock_settings, mock_get_user, mock_verify, mock_get_clerk_user):
+        """Test get_current_user when auto-create fails"""
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
+        mock_verify.return_value = {"sub": "user_123"}
+        mock_get_user.return_value = None  # User not in DB
+        mock_get_clerk_user.return_value = {
+            "id": "user_123",
+            "email_addresses": [{"email_address": "newuser@example.com"}],
+            "first_name": "New",
+            "last_name": "User"
+        }
+
+        # Mock create_user to fail
+        with patch("app.db.database.create_user") as mock_create_user:
+            mock_create_user.side_effect = Exception("Database insert failed")
+
+            credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
+
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_user(credentials)
+
+            assert exc_info.value.status_code == 401
+            assert "Failed to create user" in exc_info.value.detail
+
+    @patch("app.core.security.get_clerk_user")
+    @patch("app.core.security.verify_jwt_token")
+    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_auto_create_http_exception_reraised(self, mock_settings, mock_get_user, mock_verify, mock_get_clerk_user):
+        """Test that HTTPExceptions are re-raised during auto-create"""
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
+        mock_verify.return_value = {"sub": "user_123"}
+        mock_get_user.return_value = None  # User not in DB
+        mock_get_clerk_user.return_value = {
+            "id": "user_123",
+            "email_addresses": [{"email_address": "newuser@example.com"}],
+            "first_name": "New",
+            "last_name": "User"
+        }
+
+        # Mock create_user to raise HTTPException
+        with patch("app.db.database.create_user") as mock_create_user:
+            mock_create_user.side_effect = HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User creation forbidden"
+            )
+
+            credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
+
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_user(credentials)
+
+            assert exc_info.value.status_code == 403
+            assert "User creation forbidden" in exc_info.value.detail
+
+    @patch("app.core.security.get_clerk_user")
+    @patch("app.core.security.verify_jwt_token")
+    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_auto_create_minimal_clerk_data(self, mock_settings, mock_get_user, mock_verify, mock_get_clerk_user):
+        """Test auto-create with minimal Clerk data (missing optional fields)"""
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
+        mock_verify.return_value = {"sub": "user_123"}
+        mock_get_user.return_value = None  # User not in DB
+        mock_get_clerk_user.return_value = {
+            "id": "user_123",
+            # No email_addresses, first_name, last_name, image_url, public_metadata
+        }
+
+        # Mock the create_user function (imported inside get_current_user)
+        with patch("app.db.database.create_user") as mock_create_user:
+            mock_create_user.return_value = {
+                "clerk_id": "user_123",
+                "email": None,
+                "first_name": None,
+                "last_name": None,
+                "role": "user"
+            }
+
+            credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
+            result = await get_current_user(credentials)
+
+            assert result["clerk_id"] == "user_123"
+            mock_create_user.assert_called_once()
+            # Verify UserCreate was called with None for missing fields
+            call_args = mock_create_user.call_args[0][0]
+            assert call_args["email"] is None
+            assert call_args["first_name"] is None
+            assert call_args["last_name"] is None
 
 
 @pytest.mark.asyncio
@@ -473,30 +644,30 @@ class TestOptionalSecurity:
 
         assert result is None
 
-    @patch("app.core.security.HTTPBearer")
-    @patch("app.core.security.settings")
-    async def test_optional_security_with_token(self, mock_settings, mock_bearer_class):
+    @patch("app.core.security.HTTPBearer.__call__", new_callable=AsyncMock)
+    @patch("app.core.config.settings")
+    async def test_optional_security_with_token(self, mock_settings, mock_bearer_call):
         """Test optional_security with valid token"""
-        mock_settings.BYPASS_AUTH = False
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
         mock_request = Mock(spec=Request)
-        mock_bearer_instance = AsyncMock()
+        mock_request.headers = {"authorization": "Bearer test_token"}
+
         mock_credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="test_token")
-        mock_bearer_instance.return_value = mock_credentials
-        mock_bearer_class.return_value = mock_bearer_instance
+        mock_bearer_call.return_value = mock_credentials
 
         result = await optional_security(mock_request)
 
+        # The function should return credentials when present
         assert result == mock_credentials
 
-    @patch("app.core.security.HTTPBearer")
-    @patch("app.core.security.settings")
-    async def test_optional_security_without_token(self, mock_settings, mock_bearer_class):
+    @patch("app.core.security.HTTPBearer.__call__", new_callable=AsyncMock)
+    @patch("app.core.config.settings")
+    async def test_optional_security_without_token(self, mock_settings, mock_bearer_call):
         """Test optional_security without token (auto_error=False)"""
-        mock_settings.BYPASS_AUTH = False
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
         mock_request = Mock(spec=Request)
-        mock_bearer_instance = AsyncMock()
-        mock_bearer_instance.return_value = None
-        mock_bearer_class.return_value = mock_bearer_instance
+        mock_request.headers = {}
+        mock_bearer_call.return_value = None
 
         result = await optional_security(mock_request)
 
