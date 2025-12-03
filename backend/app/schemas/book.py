@@ -88,11 +88,15 @@ class QuestionCreate(QuestionBase):
 
 class Question(QuestionBase):
     """Schema for a complete question"""
-    
+
     id: str
     book_id: str
     chapter_id: str
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Response tracking fields (populated by get_questions_for_chapter)
+    response_status: Optional[str] = None  # "completed", "draft", "not_answered"
+    has_response: bool = False
 
 
 class QuestionResponseMetadata(BaseModel):
@@ -358,8 +362,9 @@ class QuestionListResponse(BaseModel):
 
 class QuestionProgressResponse(BaseModel):
     """Response schema for chapter question progress"""
-    
+
     total: int
     completed: int
+    in_progress: int = 0
     progress: float  # 0.0 to 1.0
     status: str  # "not-started", "in-progress", "completed"
