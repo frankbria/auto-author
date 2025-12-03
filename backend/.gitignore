@@ -11,3 +11,4 @@ __pycache__/
 .env
 .env.*
 !.env.exampleuploads/
+archived_tests/
