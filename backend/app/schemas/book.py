@@ -16,7 +16,7 @@ class ChapterStatus(str, Enum):
 
 class QuestionType(str, Enum):
     """Types of questions that can be generated for a chapter"""
-    
+
     CHARACTER = "character"
     PLOT = "plot"
     SETTING = "setting"
@@ -26,7 +26,7 @@ class QuestionType(str, Enum):
 
 class QuestionDifficulty(str, Enum):
     """Difficulty levels for questions"""
-    
+
     EASY = "easy"
     MEDIUM = "medium"
     HARD = "hard"
@@ -34,7 +34,7 @@ class QuestionDifficulty(str, Enum):
 
 class ResponseStatus(str, Enum):
     """Status values for question responses"""
-    
+
     DRAFT = "draft"
     COMPLETED = "completed"
 
@@ -62,7 +62,7 @@ class TocItemSchema(BaseModel):
 
 class QuestionMetadata(BaseModel):
     """Metadata for questions"""
-    
+
     suggested_response_length: str
     help_text: Optional[str] = None
     examples: Optional[List[str]] = None
@@ -70,7 +70,7 @@ class QuestionMetadata(BaseModel):
 
 class QuestionBase(BaseModel):
     """Base schema for chapter questions"""
-    
+
     question_text: str = Field(..., min_length=10, max_length=1000)
     question_type: QuestionType
     difficulty: QuestionDifficulty
@@ -81,7 +81,7 @@ class QuestionBase(BaseModel):
 
 class QuestionCreate(QuestionBase):
     """Schema for creating a new question"""
-    
+
     book_id: str
     chapter_id: str
 
@@ -101,13 +101,13 @@ class Question(QuestionBase):
 
 class QuestionResponseMetadata(BaseModel):
     """Metadata for question responses including edit history"""
-    
+
     edit_history: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class QuestionResponseBase(BaseModel):
     """Base schema for question responses"""
-    
+
     response_text: str = Field(..., min_length=1)
     word_count: int = 0
     status: ResponseStatus = ResponseStatus.DRAFT
@@ -115,13 +115,13 @@ class QuestionResponseBase(BaseModel):
 
 class QuestionResponseCreate(QuestionResponseBase):
     """Schema for creating a new question response"""
-    
+
     question_id: str
 
 
 class QuestionResponse(QuestionResponseBase):
     """Schema for a complete question response"""
-    
+
     id: str
     question_id: str
     user_id: str
@@ -133,7 +133,7 @@ class QuestionResponse(QuestionResponseBase):
 
 class QuestionRating(BaseModel):
     """Schema for rating a question's relevance/quality"""
-    
+
     question_id: str
     user_id: str
     rating: int = Field(..., ge=1, le=5)  # 1-5 star rating
@@ -327,7 +327,7 @@ class BulkStatusUpdate(BaseModel):
 
 class GenerateQuestionsRequest(BaseModel):
     """Request schema for generating questions for a chapter"""
-    
+
     count: Optional[int] = Field(10, ge=1, le=50)
     difficulty: Optional[QuestionDifficulty] = None
     focus: Optional[List[QuestionType]] = None
@@ -335,15 +335,19 @@ class GenerateQuestionsRequest(BaseModel):
 
 class GenerateQuestionsResponse(BaseModel):
     """Response schema for generated questions"""
-    
+
     questions: List[Question]
     generation_id: str
     total: int
 
+    # Optional fields for question regeneration tracking
+    preserved_count: Optional[int] = None  # Number of questions preserved during regeneration
+    new_count: Optional[int] = None  # Number of new questions generated
+
 
 class QuestionListParams(BaseModel):
     """Query parameters for listing questions"""
-    
+
     status: Optional[str] = None
     category: Optional[str] = None
     question_type: Optional[QuestionType] = None
@@ -353,7 +357,7 @@ class QuestionListParams(BaseModel):
 
 class QuestionListResponse(BaseModel):
     """Response schema for listing questions"""
-    
+
     questions: List[Question]
     total: int
     page: int

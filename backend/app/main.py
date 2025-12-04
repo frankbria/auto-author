@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from app.api.endpoints.router import router as api_router
+from app.api.health import router as health_router
 from app.core.config import settings
 import logging
 import os
@@ -41,6 +42,9 @@ app.add_middleware(RequestValidationMiddleware)
 
 # Add session tracking middleware
 add_session_middleware(app)
+
+# Include health router at root level (no prefix for easy access by load balancers)
+app.include_router(health_router)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)

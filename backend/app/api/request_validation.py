@@ -4,6 +4,7 @@ import time
 import uuid
 from typing import Callable
 import logging
+from app.api.metrics import get_metrics_store
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +20,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     2. Logs request information
     3. Measures request processing time
     4. Adds security headers to responses
+    5. Records metrics for monitoring
     """
+
+    def __init__(self, app):
+        super().__init__(app)
+        self.metrics_store = get_metrics_store()
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Generate a unique request ID
@@ -65,6 +71,13 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 f"Request completed: {request.method} {request.url.path} "
                 f"[ID: {request_id}] - Status: {response.status_code}, "
                 f"Took: {process_time:.2f}ms"
+            )
+
+            # Record metrics
+            self.metrics_store.record_request(
+                endpoint=request.url.path,
+                duration_ms=process_time,
+                status_code=response.status_code,
             )
 
             return response

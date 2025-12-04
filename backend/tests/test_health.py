@@ -18,8 +18,7 @@ def test_health_check_basic(client: TestClient):
     assert "timestamp" in data
 
 
-@pytest.mark.asyncio
-async def test_readiness_check_healthy(client: TestClient):
+def test_readiness_check_healthy(client: TestClient):
     """Test readiness check when all dependencies are healthy."""
     response = client.get("/health/ready")
 
@@ -32,8 +31,7 @@ async def test_readiness_check_healthy(client: TestClient):
     assert "response_time_ms" in data["checks"]["mongodb"]
 
 
-@pytest.mark.asyncio
-async def test_readiness_check_mongodb_down(client: TestClient):
+def test_readiness_check_mongodb_down(client: TestClient):
     """Test readiness check when MongoDB is down."""
     with patch("app.api.health._client.admin.command") as mock_command:
         mock_command.side_effect = ServerSelectionTimeoutError("MongoDB timeout")
@@ -47,8 +45,7 @@ async def test_readiness_check_mongodb_down(client: TestClient):
         assert data["detail"]["checks"]["mongodb"]["status"] == "not_ready"
 
 
-@pytest.mark.asyncio
-async def test_readiness_check_database_operations_fail(client: TestClient):
+def test_readiness_check_database_operations_fail(client: TestClient):
     """Test readiness check when database operations fail."""
     with patch("app.api.health._db.command") as mock_command:
         mock_command.side_effect = ConnectionFailure("Database operations failed")
@@ -73,8 +70,7 @@ def test_liveness_check(client: TestClient):
     assert data["uptime_seconds"] > 0
 
 
-@pytest.mark.asyncio
-async def test_detailed_health_check_authenticated(client: TestClient, auth_headers: dict):
+def test_detailed_health_check_authenticated(client: TestClient, auth_headers: dict):
     """Test detailed health check with authentication."""
     response = client.get("/health/detailed", headers=auth_headers)
 
@@ -108,11 +104,10 @@ def test_detailed_health_check_unauthenticated(client: TestClient):
 
     assert response.status_code == 401
     data = response.json()
-    assert "Authentication required" in data["detail"]
+    assert "Missing authentication credentials" in data["detail"]
 
 
-@pytest.mark.asyncio
-async def test_detailed_health_check_with_warnings(client: TestClient, auth_headers: dict):
+def test_detailed_health_check_with_warnings(client: TestClient, auth_headers: dict):
     """Test detailed health check with system warnings."""
     with patch("app.api.health.psutil") as mock_psutil:
         # Mock high memory usage
@@ -143,8 +138,7 @@ async def test_detailed_health_check_with_warnings(client: TestClient, auth_head
         assert any("disk" in w.lower() for w in data["warnings"])
 
 
-@pytest.mark.asyncio
-async def test_detailed_health_check_degraded(client: TestClient, auth_headers: dict):
+def test_detailed_health_check_degraded(client: TestClient, auth_headers: dict):
     """Test detailed health check when service is degraded."""
     with patch("app.api.health._client.server_info") as mock_server_info:
         mock_server_info.side_effect = ConnectionFailure("MongoDB connection error")
@@ -169,12 +163,11 @@ def test_format_uptime():
     assert _format_uptime(0) == "0s"
 
 
-@pytest.mark.asyncio
-async def test_readiness_check_slow_response(client: TestClient):
+def test_readiness_check_slow_response(client: TestClient):
     """Test readiness check with slow MongoDB response."""
-    async def slow_command(*args, **kwargs):
-        import asyncio
-        await asyncio.sleep(0.2)  # 200ms
+    def slow_command(*args, **kwargs):
+        import time
+        time.sleep(0.2)  # 200ms
         return {"ok": 1}
 
     with patch("app.api.health._client.admin.command", side_effect=slow_command):
@@ -185,8 +178,7 @@ async def test_readiness_check_slow_response(client: TestClient):
         assert data["checks"]["mongodb"]["response_time_ms"] > 100
 
 
-@pytest.mark.asyncio
-async def test_detailed_health_connection_pool_stats(client: TestClient, auth_headers: dict):
+def test_detailed_health_connection_pool_stats(client: TestClient, auth_headers: dict):
     """Test detailed health check includes connection pool stats."""
     response = client.get("/health/detailed", headers=auth_headers)
 

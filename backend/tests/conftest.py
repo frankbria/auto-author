@@ -267,6 +267,30 @@ def invalid_jwt_token():
 
 
 @pytest.fixture
+def auth_headers(test_user, monkeypatch):
+    """
+    Fixture to provide authentication headers for synchronous TestClient tests.
+    Sets up dependency overrides to bypass JWT verification.
+    """
+    # Override get_current_user to return test_user
+    from app.core.security import get_current_user
+    app.dependency_overrides[get_current_user] = lambda: test_user
+
+    # Mock JWT verification
+    async def _fake_verify(token: str):
+        return {"sub": test_user["clerk_id"]}
+    monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
+
+    # Return headers dict
+    headers = {"Authorization": "Bearer test.jwt.token"}
+
+    yield headers
+
+    # Cleanup
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
 def test_book(test_user):
     """
     Fixture to provide a test book object.

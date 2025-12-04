@@ -12,7 +12,7 @@ from typing import Dict, Any, List, Optional
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from threading import Lock
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from app.core.security import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -81,9 +81,19 @@ class MetricsStore:
 
                 if durations:
                     durations_sorted = sorted(durations)
-                    p50_idx = len(durations_sorted) // 2
-                    p95_idx = int(len(durations_sorted) * 0.95)
-                    p99_idx = int(len(durations_sorted) * 0.99)
+                    n = len(durations_sorted)
+
+                    # Calculate percentiles using linear interpolation
+                    def percentile(data, p):
+                        """Calculate percentile using linear interpolation."""
+                        if not data:
+                            return 0
+                        k = (len(data) - 1) * p
+                        f = int(k)
+                        c = k - f
+                        if f + 1 < len(data):
+                            return data[f] + c * (data[f + 1] - data[f])
+                        return data[f]
 
                     request_metrics[endpoint] = {
                         "count": count,
@@ -93,9 +103,9 @@ class MetricsStore:
                             "min": round(min(durations), 2),
                             "max": round(max(durations), 2),
                             "mean": round(sum(durations) / len(durations), 2),
-                            "p50": round(durations_sorted[p50_idx], 2),
-                            "p95": round(durations_sorted[p95_idx], 2),
-                            "p99": round(durations_sorted[p99_idx], 2),
+                            "p50": round(percentile(durations_sorted, 0.50), 2),
+                            "p95": round(percentile(durations_sorted, 0.95), 2),
+                            "p99": round(percentile(durations_sorted, 0.99), 2),
                         },
                     }
                 else:
@@ -115,17 +125,26 @@ class MetricsStore:
 
             if db_durations:
                 db_durations_sorted = sorted(db_durations)
-                p50_idx = len(db_durations_sorted) // 2
-                p95_idx = int(len(db_durations_sorted) * 0.95)
-                p99_idx = int(len(db_durations_sorted) * 0.99)
+
+                # Calculate percentiles using linear interpolation
+                def percentile(data, p):
+                    """Calculate percentile using linear interpolation."""
+                    if not data:
+                        return 0
+                    k = (len(data) - 1) * p
+                    f = int(k)
+                    c = k - f
+                    if f + 1 < len(data):
+                        return data[f] + c * (data[f + 1] - data[f])
+                    return data[f]
 
                 db_metrics["duration_ms"] = {
                     "min": round(min(db_durations), 2),
                     "max": round(max(db_durations), 2),
                     "mean": round(sum(db_durations) / len(db_durations), 2),
-                    "p50": round(db_durations_sorted[p50_idx], 2),
-                    "p95": round(db_durations_sorted[p95_idx], 2),
-                    "p99": round(db_durations_sorted[p99_idx], 2),
+                    "p50": round(percentile(db_durations_sorted, 0.50), 2),
+                    "p95": round(percentile(db_durations_sorted, 0.95), 2),
+                    "p99": round(percentile(db_durations_sorted, 0.99), 2),
                 }
 
             # Session metrics
@@ -198,7 +217,7 @@ async def get_metrics(
 @router.get("/prometheus")
 async def get_prometheus_metrics(
     current_user: Optional[Dict[str, Any]] = Depends(get_current_user)
-) -> str:
+) -> Response:
     """
     Get metrics in Prometheus text format.
 
@@ -278,7 +297,7 @@ async def get_prometheus_metrics(
     lines.append("# TYPE sessions_expired_total counter")
     lines.append(f'sessions_expired_total {metrics["sessions"]["total_expires"]}')
 
-    return "\n".join(lines)
+    return Response(content="\n".join(lines), media_type="text/plain; charset=utf-8")
 
 
 @router.post("/reset")

@@ -688,16 +688,13 @@ class TestQuestionGenerationServiceComprehensive:
     @patch("app.services.question_generation_service.delete_questions_for_chapter")
     @patch("app.services.question_generation_service.get_book_by_id")
     @patch("app.services.question_generation_service.create_question")
-    @pytest.mark.skip(reason="Pydantic v2 doesn't allow dynamic attributes without model_config extra='allow' - this is a bug in source code")
     async def test_regenerate_questions_preserve_responses(
         self, mock_create_question, mock_get_book, mock_delete, service, mock_ai_service
     ):
         """Test regenerating questions while preserving responses.
 
-        Note: This test is skipped because the source code tries to set dynamic attributes
-        on a Pydantic model (preserved_count, new_count) which fails in Pydantic v2.
-        This is a bug that needs to be fixed in the source code by adding
-        model_config = ConfigDict(extra='allow') to GenerateQuestionsResponse.
+        This test verifies that the question regeneration feature correctly
+        tracks preserved_count and new_count when regenerating questions.
         """
         # Setup
         mock_delete.return_value = 3  # 3 questions deleted
