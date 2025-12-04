@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import bookClient from '@/lib/api/bookClient';
 
 export default function NewBook() {
+  const { getToken } = useAuth();
   const [bookData, setBookData] = useState({
     title: '',
     description: '',
@@ -26,6 +28,9 @@ export default function NewBook() {
     setIsSubmitting(true);
 
     try {
+      // Set up token provider for authenticated API calls
+      bookClient.setTokenProvider(getToken);
+
       // Use the book client to create a new book
       const newBook = await bookClient.createBook({
         title: bookData.title,

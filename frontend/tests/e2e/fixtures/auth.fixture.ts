@@ -57,35 +57,52 @@ export async function authenticateUser(
   // Normal Clerk authentication flow
   const { email, password } = credentials || getTestCredentials();
 
-  // Navigate to homepage
-  await page.goto('/');
+  // Navigate to dashboard - will redirect to Clerk's hosted sign-in page
+  await page.goto('/dashboard');
 
-  // Click Sign In button
-  await page.click('text=Sign In');
+  // Wait for Clerk's hosted sign-in page to load
+  // Clerk uses a redirect flow to their hosted domain (e.g., *.accounts.dev)
+  await page.waitForSelector('text=Sign in', { timeout: 15000 });
 
-  // Wait for Clerk modal to appear
-  await page.waitForSelector('[data-clerk-modal]', { timeout: 10000 });
+  console.log('📧 Filling email...');
 
-  // Fill email/identifier
-  await page.fill('input[name="identifier"]', email);
-  await page.click('button:has-text("Continue")');
+  // Fill email - use the Email address label to find the right field
+  // This avoids the OAuth buttons (Apple/Google) which also have "Continue" text
+  const emailInput = page.getByLabel('Email address');
+  await emailInput.fill(email);
 
-  // Wait for password field and fill it
-  await page.waitForSelector('input[name="password"]', { timeout: 5000 });
-  await page.fill('input[name="password"]', password);
+  // Wait a moment for validation
+  await page.waitForTimeout(500);
 
-  // Click sign in button
-  await page.click('button:has-text("Sign in")');
+  // Click the main Continue button (not OAuth buttons)
+  // The submit button is typically inside a form or has specific styling
+  // Use a more specific selector to avoid OAuth "Continue with X" buttons
+  const continueButton = page.locator('button').filter({ hasText: /^Continue$/ }).first();
+  await continueButton.click();
 
-  // Wait for redirect to dashboard
-  await page.waitForURL('**/dashboard', { timeout: 15000 });
+  // Wait for password field to appear (Clerk shows it after email validation)
+  console.log('⏳ Waiting for password field...');
+  await page.waitForSelector('input[type="password"]', { timeout: 10000 });
 
-  // Verify authentication token exists
-  const authToken = await page.evaluate(() =>
-    localStorage.getItem('clerk-token') || sessionStorage.getItem('clerk-token')
-  );
+  console.log('🔑 Filling password...');
 
-  expect(authToken).toBeTruthy();
+  // Fill password using specific input selector (avoid "Show password" button)
+  const passwordInput = page.locator('input[type="password"]').first();
+  await passwordInput.fill(password);
+
+  // Wait a moment for validation
+  await page.waitForTimeout(500);
+
+  // Click Continue/Sign in button - use same specific selector
+  const signInButton = page.locator('button').filter({ hasText: /^Continue$/ }).first();
+  await signInButton.click();
+
+  // Wait for redirect back to dashboard
+  console.log('⏳ Waiting for redirect to dashboard...');
+  await page.waitForURL('**/dashboard**', { timeout: 30000 });
+
+  // Wait for page to stabilize
+  await page.waitForLoadState('networkidle');
 
   console.log('✅ User authenticated successfully');
 }

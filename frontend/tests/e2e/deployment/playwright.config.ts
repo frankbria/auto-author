@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load environment variables from .env.local (for test credentials)
+dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') });
 
 /**
  * Playwright Configuration for Deployment Testing
