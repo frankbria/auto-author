@@ -9,12 +9,6 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') });
 const isDeploymentTest = !!process.env.DEPLOYMENT_URL;
 const baseURL = process.env.DEPLOYMENT_URL || 'http://localhost:3000';
 
-// When running locally (not against deployed env), enable auth bypass
-// This is set in test process so auth.fixture.ts can skip Clerk login
-if (!isDeploymentTest) {
-  process.env.NEXT_PUBLIC_BYPASS_AUTH = 'true';
-}
-
 /**
  * Playwright Configuration for E2E Testing
  *
@@ -84,22 +78,18 @@ export default defineConfig({
   webServer: isDeploymentTest ? undefined : [
     {
       // Backend API server
-      command: 'cd ../../../../backend && BYPASS_AUTH=true uv run uvicorn app.main:app --port 8000 --host 0.0.0.0',
+      command: 'cd ../../../../backend && uv run uvicorn app.main:app --port 8000 --host 0.0.0.0',
       url: 'http://localhost:8000/health',
       reuseExistingServer: !process.env.CI,
       timeout: 60000, // 60s to start backend
-      env: {
-        BYPASS_AUTH: 'true',
-      },
     },
     {
       // Frontend Next.js server
-      command: 'cd ../../.. && NEXT_PUBLIC_BYPASS_AUTH=true NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 npm run dev',
+      command: 'cd ../../.. && NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 npm run dev',
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
       timeout: 60000, // 60s to start frontend
       env: {
-        NEXT_PUBLIC_BYPASS_AUTH: 'true',
         NEXT_PUBLIC_API_URL: 'http://localhost:8000/api/v1',
       },
     },

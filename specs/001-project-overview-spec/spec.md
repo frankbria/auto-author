@@ -151,7 +151,7 @@ Authors want to manage multiple books, organize their work, and collaborate with
 - **FR-003**: System MUST detect suspicious activity based on session fingerprint changes and force re-authentication
 - **FR-004**: System MUST enforce 30-minute idle timeout and 12-hour absolute session timeout
 - **FR-005**: System MUST limit concurrent sessions per user to prevent credential sharing
-- **FR-006**: System MUST support auth bypass mode via `BYPASS_AUTH=true` environment variable for E2E testing
+- **FR-006**: System MUST support E2E testing using real Clerk authentication with test user credentials
 
 #### Book Management
 - **FR-007**: Users MUST be able to create new books with title, author, and summary metadata
@@ -380,8 +380,8 @@ Authors want to manage multiple books, organize their work, and collaborate with
 - Session idle timeout of 30 minutes non-negotiable for security compliance
 - Absolute session timeout of 12 hours enforced
 - Concurrent session limits prevent credential sharing but may inconvenience mobile/desktop users
-- Auth bypass mode (`BYPASS_AUTH=true`) must NEVER be enabled in production
 - All user data must be isolated by user ID, preventing cross-user data leakage
+- E2E tests use real Clerk authentication (no auth bypass modes)
 
 ### Business Constraints
 - Test coverage must maintain ≥85% minimum for all new features (enforced by pre-commit hooks)

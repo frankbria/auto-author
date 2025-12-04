@@ -37,9 +37,6 @@ class Settings(BaseSettings):
         json_schema_extra={"env_parse_none_str": "null"}
     )
 
-    # E2E Testing Settings
-    BYPASS_AUTH: bool = False  # Set to True for E2E tests to bypass authentication
-
     # AWS Settings (Optional - for transcription and storage)
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""

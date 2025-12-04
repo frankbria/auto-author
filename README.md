@@ -75,9 +75,8 @@ The architecture separates authentication concerns (handled by Clerk) from appli
 - Session management with configurable timeout policies
 
 **Development & Testing:**
-- Auth bypass mode available via `BYPASS_AUTH=true` environment variable
-- Enables E2E testing without real authentication credentials
-- **Security Note:** Auth bypass must NEVER be enabled in production
+- E2E tests use real Clerk authentication with test user credentials
+- Set `TEST_USER_EMAIL` and `TEST_USER_PASSWORD` environment variables for E2E tests
 
 For detailed documentation about our Clerk integration:
 - [Clerk Integration Guide](docs/clerk-integration-guide.md)
@@ -150,8 +149,9 @@ Create `.env` files for both frontend and backend:
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_*****
 CLERK_SECRET_KEY=sk_*****
-# Development only - NEVER use in production
-# BYPASS_AUTH=true
+# E2E test credentials (for Playwright tests)
+TEST_USER_EMAIL=test@example.com
+TEST_USER_PASSWORD=your-test-password
 ```
 
 **`.env` (backend)**
@@ -161,8 +161,6 @@ MONGODB_URI=mongodb://localhost:27017/auto_author
 CLERK_SECRET_KEY=sk_*****
 CLERK_WEBHOOK_SECRET=whsec_*****
 OPENAI_API_KEY=sk-...
-# Development only - NEVER use in production
-# BYPASS_AUTH=true
 ```
 
 ---

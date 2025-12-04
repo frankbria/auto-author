@@ -144,11 +144,6 @@ class RoleChecker:
 
 async def optional_security(request: Request) -> Union[HTTPAuthorizationCredentials, None]:
     """Optional security dependency that doesn't auto-error"""
-    from app.core.config import settings
-
-    if settings.BYPASS_AUTH:
-        return None
-
     bearer = HTTPBearer(auto_error=False)
     return await bearer(request)
 
@@ -156,26 +151,8 @@ async def optional_security(request: Request) -> Union[HTTPAuthorizationCredenti
 async def get_current_user(
     credentials: Union[HTTPAuthorizationCredentials, None] = Depends(optional_security),
 ) -> Dict:
-    """Get the current authenticated user
-
-    For E2E testing, set BYPASS_AUTH=true to bypass authentication and return a test user.
-    """
-    from app.core.config import settings
-
-    # E2E Test Mode: Bypass authentication
-    if settings.BYPASS_AUTH:
-        # Return a test user for E2E tests
-        return {
-            "id": "test-user-id",
-            "clerk_id": "test-clerk-id",
-            "email": "test@example.com",
-            "first_name": "Test",
-            "last_name": "User",
-            "role": "user",
-            "metadata": {}
-        }
-
-    # Normal authentication flow - require credentials
+    """Get the current authenticated user from JWT token."""
+    # Require credentials
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

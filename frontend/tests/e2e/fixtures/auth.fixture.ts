@@ -38,43 +38,7 @@ export async function authenticateUser(
   page: Page,
   credentials?: AuthCredentials
 ): Promise<void> {
-  // Check if NEXT_PUBLIC_BYPASS_AUTH is enabled (for testing without Clerk)
-  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-
-  if (bypassAuth) {
-    console.log('⚠️ NEXT_PUBLIC_BYPASS_AUTH enabled - skipping Clerk authentication');
-
-    // Navigate directly to dashboard
-    await page.goto('/dashboard');
-
-    // Wait for network to settle
-    await page.waitForLoadState('networkidle');
-
-    // Wait for the dashboard to fully hydrate and render
-    // The loading.tsx shows "Loading your dashboard..." during SSR
-    // We need to wait for the actual dashboard content to appear
-    console.log('⏳ Waiting for dashboard to hydrate...');
-
-    try {
-      // Wait for either: "My Books" heading (dashboard loaded) or "Create your first book" (empty state)
-      await Promise.race([
-        page.waitForSelector('text=My Books', { timeout: 15000 }),
-        page.waitForSelector('text=Create your first book', { timeout: 15000 }),
-        page.waitForSelector('[data-testid="books-list"]', { timeout: 15000 })
-      ]);
-    } catch (e) {
-      // If none of those appear, the dashboard may be stuck - log the current state
-      console.log('⚠️ Dashboard did not fully load. Current URL:', page.url());
-      const bodyText = await page.locator('body').innerText();
-      console.log('⚠️ Page content preview:', bodyText.substring(0, 500));
-      throw new Error('Dashboard did not load within timeout. Page may be stuck on loading state.');
-    }
-
-    console.log('✅ User authenticated successfully (NEXT_PUBLIC_BYPASS_AUTH mode)');
-    return;
-  }
-
-  // Normal Clerk authentication flow
+  // Clerk authentication flow
   const { email, password } = credentials || getTestCredentials();
 
   // Navigate to dashboard - will redirect to Clerk's hosted sign-in page

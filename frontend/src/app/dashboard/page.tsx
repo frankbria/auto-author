@@ -20,12 +20,8 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [isBookDialogOpen, setIsBookDialogOpen] = useState(false);
 
-  // E2E test mode detection
-  const isE2EMode = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-
   const fetchBooks = useCallback(async () => {
-    // In E2E mode, bypass Clerk user check
-    if (!isE2EMode && (!isUserLoaded || !user)) return;
+    if (!isUserLoaded || !user) return;
 
     setIsLoading(true);
     try {
@@ -44,9 +40,8 @@ export default function Dashboard() {
         err.message.includes('not found')
       );
 
-      // In E2E mode, treat empty list as success (no auth token = no books)
       // For 404 errors, treat as empty state (user has no books yet)
-      if (isE2EMode || is404) {
+      if (is404) {
         setProjects([]);
         setError(null);
       } else {
@@ -55,7 +50,7 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [isUserLoaded, user, getToken, isE2EMode]);
+  }, [isUserLoaded, user, getToken]);
 
   useEffect(() => {
     fetchBooks();
