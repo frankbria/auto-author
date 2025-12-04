@@ -47,8 +47,28 @@ export async function authenticateUser(
     // Navigate directly to dashboard
     await page.goto('/dashboard');
 
-    // Wait for dashboard to load
+    // Wait for network to settle
     await page.waitForLoadState('networkidle');
+
+    // Wait for the dashboard to fully hydrate and render
+    // The loading.tsx shows "Loading your dashboard..." during SSR
+    // We need to wait for the actual dashboard content to appear
+    console.log('⏳ Waiting for dashboard to hydrate...');
+
+    try {
+      // Wait for either: "My Books" heading (dashboard loaded) or "Create your first book" (empty state)
+      await Promise.race([
+        page.waitForSelector('text=My Books', { timeout: 15000 }),
+        page.waitForSelector('text=Create your first book', { timeout: 15000 }),
+        page.waitForSelector('[data-testid="books-list"]', { timeout: 15000 })
+      ]);
+    } catch (e) {
+      // If none of those appear, the dashboard may be stuck - log the current state
+      console.log('⚠️ Dashboard did not fully load. Current URL:', page.url());
+      const bodyText = await page.locator('body').innerText();
+      console.log('⚠️ Page content preview:', bodyText.substring(0, 500));
+      throw new Error('Dashboard did not load within timeout. Page may be stuck on loading state.');
+    }
 
     console.log('✅ User authenticated successfully (NEXT_PUBLIC_BYPASS_AUTH mode)');
     return;

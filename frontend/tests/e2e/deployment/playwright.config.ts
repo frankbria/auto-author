@@ -5,12 +5,21 @@ import * as path from 'path';
 // Load environment variables from .env.local (for test credentials)
 dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') });
 
+// Determine if we're testing against a deployed environment or local
+const isDeploymentTest = !!process.env.DEPLOYMENT_URL;
+const baseURL = process.env.DEPLOYMENT_URL || 'http://localhost:3000';
+
+// When running locally (not against deployed env), enable auth bypass
+// This is set in test process so auth.fixture.ts can skip Clerk login
+if (!isDeploymentTest) {
+  process.env.NEXT_PUBLIC_BYPASS_AUTH = 'true';
+}
+
 /**
- * Playwright Configuration for Deployment Testing
+ * Playwright Configuration for E2E Testing
  *
- * This config is specifically for automated deployment validation tests.
- * It runs sequentially (not parallel) to simulate real user flows and
- * supports longer timeouts for AI operations (TOC generation, draft generation).
+ * Default: Spins up local frontend + backend for true E2E testing
+ * With DEPLOYMENT_URL: Tests against deployed environment (smoke tests)
  */
 export default defineConfig({
   testDir: '../deployment',
@@ -21,7 +30,7 @@ export default defineConfig({
   // Longer timeout for AI operations (TOC generation, draft generation)
   timeout: 120000, // 2 minutes
 
-  // Sequential execution for deployment tests (simulates real user journey)
+  // Sequential execution (simulates real user journey)
   fullyParallel: false,
 
   // Retry failed tests for reliability
@@ -38,8 +47,7 @@ export default defineConfig({
   ],
 
   use: {
-    // Base URL from environment or default to dev
-    baseURL: process.env.DEPLOYMENT_URL || 'https://dev.autoauthor.app',
+    baseURL,
 
     // Trace on failure for debugging
     trace: 'retain-on-failure',
@@ -60,7 +68,7 @@ export default defineConfig({
   // Test match pattern
   testMatch: /.*\.spec\.ts/,
 
-  // Projects - Desktop Chrome only for deployment tests
+  // Projects - Desktop Chrome only for E2E tests
   projects: [
     {
       name: 'deployment-chrome',
@@ -71,10 +79,29 @@ export default defineConfig({
     },
   ],
 
-  // Web server configuration (if needed for local testing)
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
+  // Web server configuration - spins up both backend and frontend
+  // Only used when not testing against a deployed environment
+  webServer: isDeploymentTest ? undefined : [
+    {
+      // Backend API server
+      command: 'cd ../../../../backend && BYPASS_AUTH=true uv run uvicorn app.main:app --port 8000 --host 0.0.0.0',
+      url: 'http://localhost:8000/health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60000, // 60s to start backend
+      env: {
+        BYPASS_AUTH: 'true',
+      },
+    },
+    {
+      // Frontend Next.js server
+      command: 'cd ../../.. && NEXT_PUBLIC_BYPASS_AUTH=true NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 npm run dev',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60000, // 60s to start frontend
+      env: {
+        NEXT_PUBLIC_BYPASS_AUTH: 'true',
+        NEXT_PUBLIC_API_URL: 'http://localhost:8000/api/v1',
+      },
+    },
+  ],
 });
