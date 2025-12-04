@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DraftGenerator } from '@/components/chapters/DraftGenerator';
 import bookClient from '@/lib/api/bookClient';
@@ -41,10 +41,12 @@ describe('DraftGenerator', () => {
   it('opens dialog when button is clicked', async () => {
     const user = userEvent.setup();
     render(<DraftGenerator {...defaultProps} />);
-    
+
     const button = screen.getByRole('button', { name: /generate ai draft/i });
-    await user.click(button);
-    
+    await act(async () => {
+      await user.click(button);
+    });
+
     expect(screen.getByText(/Generate AI Draft for "Test Chapter"/)).toBeInTheDocument();
     expect(screen.getByText(/Answer questions about your chapter/i)).toBeInTheDocument();
   });
@@ -175,12 +177,16 @@ describe('DraftGenerator', () => {
     
     // Answer a question
     const textarea = screen.getAllByPlaceholderText(/your answer/i)[0];
-    await user.type(textarea, 'This is my answer');
+    await act(async () => {
+      await user.type(textarea, 'This is my answer');
+    });
     
     // Generate draft
     const generateButton = screen.getByRole('button', { name: /generate draft/i });
-    await user.click(generateButton);
-    
+    await act(async () => {
+      await user.click(generateButton);
+    });
+
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith({
         title: 'Generation Failed',
