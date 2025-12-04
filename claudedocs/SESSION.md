@@ -297,3 +297,94 @@ Page objects expect `data-testid` attributes that don't exist in actual componen
 1. Create test user in Clerk dashboard
 2. Configure `TEST_USER_EMAIL` and `TEST_USER_PASSWORD` in CI/CD
 3. OR: Run tests against local stack with `NEXT_PUBLIC_BYPASS_AUTH=true`
+
+---
+
+# Session Summary - December 4, 2025
+
+## Session Accomplishments
+
+### Commit Made
+**`27e2392`** - fix(e2e): Comprehensive E2E test fixes - selectors, data-testid, cleanup utilities
+- 22 files changed
+- 1,135 insertions, 106 deletions
+- 4 new infrastructure files created
+
+### Work Completed
+
+#### Phase 1: Investigation (3 Parallel Agents)
+- **playwright-expert**: Identified 100% of failures caused by missing auth config
+- **quality-engineer**: Found 50+ missing data-testid, 25 arbitrary timeouts
+- **root-cause-analyst**: Traced all failures to Clerk auth not being bypassed on deployed app
+
+#### Phase 2: Environment Fixes
+- Fixed form transparency assertion (bounding box check instead of CSS background)
+- Verified auth bypass support in middleware
+
+#### Phase 3: Critical Path Fixes (3 Parallel Agents)
+- **typescript-expert**: Added 24+ data-testid attributes to 10 component files
+- **playwright-expert**: Fixed selectors in summary, chapter-editor, toc-wizard page objects
+- **quality-engineer**: Created cleanup utilities, condition-based waiting, removed 3 arbitrary timeouts
+
+#### Phase 4: Verification
+- Preflight tests: 7/7 passing
+- User journey tests: Blocked by Clerk auth (expected - need test credentials)
+
+### Files Modified
+
+**Components (10 files):**
+- BookCard.tsx, SummaryInput.tsx, ChapterEditor.tsx, ChapterTab.tsx
+- DraftGenerator.tsx, LoadingStateManager.tsx, ClarifyingQuestions.tsx
+- TocGenerating.tsx, TocReview.tsx, dashboard/page.tsx
+
+**Page Objects (5 files):**
+- auth.page.ts, book-form.page.ts, chapter-editor.page.ts
+- summary.page.ts, toc-wizard.page.ts
+
+**Test Infrastructure (4 new files):**
+- global-teardown.ts - Test data cleanup after runs
+- condition-waiter.ts - Smart waiting utilities (11 functions)
+- cleanup-template.ts - Cleanup patterns
+- fixtures/README.md - Documentation
+
+**Config (1 file):**
+- playwright.config.ts - Added globalTeardown
+
+### Decisions Made
+
+1. **Auth approach**: Deployed app requires real Clerk credentials; bypass only works for local testing
+2. **Selector strategy**: Using semantic selectors (text, title, role) where data-testid missing
+3. **Cleanup strategy**: Registry-based tracking with global teardown
+4. **Waiting strategy**: Condition-based waiting instead of arbitrary timeouts
+
+### Known Issues / Blockers
+
+1. **Clerk test credentials needed**: User journey tests (02-07) require `TEST_USER_EMAIL` and `TEST_USER_PASSWORD`
+2. **Local stack option**: Can test locally with auth bypass by running both frontend and backend
+
+### Recommended Next Steps
+
+1. **Create Clerk test user** in dashboard
+2. **Set CI/CD secrets**: `TEST_USER_EMAIL`, `TEST_USER_PASSWORD`
+3. **Run full E2E suite** with credentials to verify all fixes work
+4. **Consider**: Deploy staging with `NEXT_PUBLIC_BYPASS_AUTH=true` for automated testing
+
+### Commands for Testing
+
+```bash
+# Option 1: With real credentials
+export TEST_USER_EMAIL="test-user@autoauthor.app"
+export TEST_USER_PASSWORD="<secure-password>"
+npx playwright test --config=tests/e2e/deployment/playwright.config.ts
+
+# Option 2: Local stack with bypass
+# Terminal 1: cd backend && BYPASS_AUTH=true uv run uvicorn app.main:app --port 8000
+# Terminal 2: cd frontend && NEXT_PUBLIC_BYPASS_AUTH=true npm run dev
+# Terminal 3: cd frontend && NEXT_PUBLIC_BYPASS_AUTH=true DEPLOYMENT_URL=http://localhost:3000 npx playwright test --config=tests/e2e/deployment/playwright.config.ts
+```
+
+---
+
+**Session End**: 2025-12-04
+**Branch**: feature/p0-blockers-quick-wins
+**Last Commit**: 27e2392
