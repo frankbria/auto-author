@@ -157,3 +157,143 @@ Tasks:
 ---
 
 **Last Updated**: 2025-12-02 23:15 UTC
+
+---
+
+# E2E Test Fix Session - December 3, 2025
+
+## Session Goal
+Fix all E2E test failures caused by selector mismatches and missing `data-testid` attributes.
+
+## Problem Analysis
+
+### Root Cause
+Page objects expect `data-testid` attributes that don't exist in actual components:
+
+| Page Object Expects | Actual Component Has |
+|---------------------|----------------------|
+| `[data-testid="books-list"]` | No testid on books grid |
+| `[data-testid="book-item"]` | `[data-testid="book-card"]` |
+| `[data-testid="toc-list"]` | No testid on chapter list |
+| `[data-testid="chapter-item"]` | No testid on chapter rows |
+| `[data-testid="chapter-number"]` | No testid |
+| `[data-testid="chapter-title"]` | No testid |
+| `[data-testid="chapter-status"]` | No testid |
+| `[data-testid="word-count"]` | No testid |
+
+### Current State
+- Only 22 `data-testid` occurrences across 9 component files
+- 66 tests skipped due to selector failures
+- Tests hang waiting for non-existent elements
+
+## Execution Plan
+
+### Phase 1: Add Missing `data-testid` Attributes (P0)
+**Target Files:**
+1. `frontend/src/app/dashboard/page.tsx` - Add `books-list`
+2. `frontend/src/components/BookCard.tsx` - Ensure `book-item` compatibility
+3. `frontend/src/app/dashboard/books/[bookId]/page.tsx` - Add `toc-list`, `chapter-item`
+4. `frontend/src/components/chapters/ChapterTabs.tsx` - Add chapter testids
+5. `frontend/src/components/chapters/ChapterTab.tsx` - Add tab testids
+6. `frontend/src/components/SummaryInput.tsx` - Add summary testids
+7. `frontend/src/components/toc/TocGenerationWizard.tsx` - Add TOC wizard testids
+8. `frontend/src/components/chapters/ChapterEditor.tsx` - Add editor testids
+9. `frontend/src/components/export/ExportOptionsModal.tsx` - Add export testids
+
+### Phase 2: Update Page Object Selectors (P1)
+**Target Files:**
+1. `frontend/tests/e2e/page-objects/dashboard.page.ts`
+2. `frontend/tests/e2e/page-objects/book-form.page.ts`
+3. `frontend/tests/e2e/page-objects/summary.page.ts`
+4. `frontend/tests/e2e/page-objects/toc-wizard.page.ts`
+5. `frontend/tests/e2e/page-objects/chapter-editor.page.ts`
+6. `frontend/tests/e2e/page-objects/export.page.ts`
+
+### Phase 3: Fix Test Dependencies (P2)
+- Convert `test.skip(!bookId, ...)` to `beforeAll` setup hooks
+- Create shared test context
+
+### Phase 4: Add Timeout Handling (P3)
+- Add explicit timeouts to wait operations
+- Implement fallback selectors
+
+### Phase 5: Verification
+- Run full E2E test suite
+- Generate report
+
+## Progress Log
+- [x] Analyzed codebase structure
+- [x] Identified 22 existing data-testid attributes
+- [x] Created execution plan
+- [ ] Phase 1: Adding data-testid attributes
+- [ ] Phase 2: Updating page objects
+- [ ] Phase 3: Fixing test dependencies
+- [ ] Phase 4: Adding timeouts
+- [ ] Phase 5: Verification
+
+---
+
+# E2E Test Comprehensive Fix - December 3, 2025
+
+## Workflow Plan (5 Phases)
+
+### Phase 1: Investigation & Diagnosis (PARALLEL)
+**Status**: 🔄 In Progress
+**Agents**: playwright-expert, quality-engineer, root-cause-analyst
+
+### Phase 2: Environment & Configuration Fixes (Sequential)
+**Status**: ⏳ Pending
+**Resource**: playwright-skill
+
+### Phase 3: Critical Path Fixes (PARALLEL)
+**Status**: ⏳ Pending
+**Agents**: typescript-expert, nextjs-expert, fastapi-expert
+
+### Phase 4: Test-Specific Fixes (PARALLEL)
+**Status**: ⏳ Pending
+**Agents**: 4x playwright-expert (preflight, advanced, security, regression)
+
+### Phase 5: Verification & Documentation (Sequential)
+**Status**: ⏳ Pending
+**Agents**: quality-engineer, reviewing-code skill, technical-writer
+
+## Phase 1 Findings
+
+### Root Cause Analysis (100% of failures):
+- **AUTH FAILURES**: Deployed app requires Clerk authentication
+- Tests get stuck on sign-in page because `NEXT_PUBLIC_BYPASS_AUTH` isn't set in production build
+
+### Secondary Issues Found:
+- 50+ missing data-testid attributes in components
+- Page object selectors mismatched with actual components
+- 25 arbitrary timeouts (anti-pattern)
+- No test data cleanup hooks
+
+## Phase 2-3 Fixes Applied
+
+### Files Modified:
+1. **book-form.page.ts** - Changed transparent background assertion to bounding box check
+2. **10+ component files** - Added 24+ missing data-testid attributes
+3. **summary.page.ts, chapter-editor.page.ts, toc-wizard.page.ts** - Fixed selectors
+4. **auth.page.ts, chapter-editor.page.ts, book-form.page.ts** - Replaced arbitrary timeouts
+5. **playwright.config.ts** - Added global teardown
+
+### New Files Created:
+- `tests/e2e/global-teardown.ts` - Cleanup test data after runs
+- `tests/e2e/helpers/condition-waiter.ts` - Smart waiting utilities
+- `tests/e2e/fixtures/cleanup-template.ts` - Cleanup patterns
+- `tests/e2e/fixtures/README.md` - Documentation
+
+## Current Status
+
+### Passing Tests:
+- **Preflight** (01): 7/7 ✅
+- All infrastructure tests work
+
+### Blocked Tests:
+- **User Journey** (02-05): Require Clerk test credentials OR local stack with auth bypass
+
+### Next Steps:
+1. Create test user in Clerk dashboard
+2. Configure `TEST_USER_EMAIL` and `TEST_USER_PASSWORD` in CI/CD
+3. OR: Run tests against local stack with `NEXT_PUBLIC_BYPASS_AUTH=true`

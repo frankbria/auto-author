@@ -83,7 +83,7 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
       </div>
 
       {/* TOC Display */}
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 mb-6 max-h-96 overflow-y-auto">
+      <div data-testid="generated-toc" className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 mb-6 max-h-96 overflow-y-auto">
         <div className="space-y-3">
           {tocResult.toc.chapters.map((chapter, index) => (
             <ChapterItem
@@ -169,17 +169,18 @@ function ChapterItem({ chapter, index, isExpanded, onToggle, expandedChapters, t
   const idx = parentIndex ? `${parentIndex}.${index}` : `${index}`;
 
   return (
-    <div className="border border-zinc-700 rounded-lg overflow-hidden">
+    <div data-testid="chapter-item" className="border border-zinc-700 rounded-lg overflow-hidden">
       <div
         className="flex items-center justify-between p-4 bg-zinc-800 hover:bg-zinc-750 cursor-pointer"
         onClick={onToggle}
-      >        <div className="flex items-center flex-1">
+      >
+        <div className="flex items-center flex-1">
           <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
             {idx}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <h4 className="text-zinc-100 font-medium">{chapter.title}</h4>
+              <h4 data-testid="chapter-title" className="text-zinc-100 font-medium">{chapter.title}</h4>
               {chapter.status && (
                 <ChapterStatusIndicator 
                   status={chapter.status} 

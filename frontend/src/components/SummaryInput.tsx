@@ -73,7 +73,8 @@ export const SummaryInput: React.FC<{
         Book Summary / Synopsis
       </label>
       <Textarea
-        id="summary-input"
+        id="summary"
+        data-testid="summary-textarea"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder="Write a brief summary of your book. For best results, include the main idea, genre, and any key themes or characters."
@@ -84,12 +85,12 @@ export const SummaryInput: React.FC<{
         aria-describedby="summary-help"
       />
       <div className="flex items-center gap-3 mt-1">
-        <Button type="button" variant="outline" onClick={isListening ? handleStop : handleVoiceInput} disabled={disabled}>
+        <Button type="button" variant="outline" onClick={isListening ? handleStop : handleVoiceInput} disabled={disabled} data-testid="voice-input-button">
           {isListening ? 'Stop Listening' : 'Speak Summary'}
         </Button>
         {isListening && <span className="text-indigo-400 animate-pulse">Listening...</span>}
         {error && <span className="text-red-400 text-xs ml-2">{error}</span>}
-        <span className="ml-auto text-xs text-zinc-400">
+        <span className="ml-auto text-xs text-zinc-400" data-testid="character-counter">
           {wordCount} words &bull; {charCount}/{maxChars} characters
         </span>
       </div>

@@ -20,7 +20,7 @@ export default function TocGenerating() {
   const currentStep = Math.floor((progress / 100) * steps.length);
 
   return (
-    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8">
+    <div data-testid="generating-toc" className="bg-zinc-800 border border-zinc-700 rounded-lg p-8">
       {/* New LoadingStateManager with progress and time estimate */}
       <LoadingStateManager
         isLoading={true}

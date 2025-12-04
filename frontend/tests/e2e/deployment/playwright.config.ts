@@ -10,6 +10,9 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: '../deployment',
 
+  // Global teardown for test data cleanup
+  globalTeardown: '../global-teardown.ts',
+
   // Longer timeout for AI operations (TOC generation, draft generation)
   timeout: 120000, // 2 minutes
 

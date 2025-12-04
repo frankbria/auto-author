@@ -21,14 +21,14 @@ export class SummaryPage {
    * Get summary textarea
    */
   summaryField(): Locator {
-    return this.page.locator('textarea#summary');
+    return this.page.locator('[data-testid="summary-textarea"]');
   }
 
   /**
    * Get character counter
    */
   characterCounter(): Locator {
-    return this.page.locator('text=/^\\d+ characters$/');
+    return this.page.locator('[data-testid="character-counter"]');
   }
 
   /**

@@ -103,3 +103,136 @@ export const FIELD_CONSTRAINTS = {
   summary: { min: 30, max: 2000 },
   chapterResponse: { min: 50, max: 500 }
 };
+
+/**
+ * Test data cleanup utilities
+ */
+
+/**
+ * Track test-created book IDs for cleanup
+ */
+const testBookIds: Set<string> = new Set();
+const testChapterIds: Set<string> = new Set();
+
+/**
+ * Register a book ID for cleanup
+ */
+export function registerTestBook(bookId: string): void {
+  testBookIds.add(bookId);
+}
+
+/**
+ * Register a chapter ID for cleanup
+ */
+export function registerTestChapter(chapterId: string): void {
+  testChapterIds.add(chapterId);
+}
+
+/**
+ * Get all registered test book IDs
+ */
+export function getTestBookIds(): string[] {
+  return Array.from(testBookIds);
+}
+
+/**
+ * Get all registered test chapter IDs
+ */
+export function getTestChapterIds(): string[] {
+  return Array.from(testChapterIds);
+}
+
+/**
+ * Clear all registered test data IDs
+ */
+export function clearTestDataRegistry(): void {
+  testBookIds.clear();
+  testChapterIds.clear();
+}
+
+/**
+ * Cleanup test books via API
+ */
+export async function cleanupTestBooks(baseUrl: string, authToken?: string): Promise<void> {
+  const bookIds = getTestBookIds();
+
+  if (bookIds.length === 0) {
+    console.log('✅ No test books to clean up');
+    return;
+  }
+
+  console.log(`🧹 Cleaning up ${bookIds.length} test books...`);
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
+  const cleanupPromises = bookIds.map(async (bookId) => {
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/books/${bookId}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (response.ok || response.status === 404) {
+        console.log(`  ✅ Deleted book: ${bookId}`);
+      } else {
+        console.warn(`  ⚠️  Failed to delete book ${bookId}: ${response.status}`);
+      }
+    } catch (error) {
+      console.warn(`  ⚠️  Error deleting book ${bookId}:`, error);
+    }
+  });
+
+  await Promise.all(cleanupPromises);
+  clearTestDataRegistry();
+
+  console.log('✅ Test book cleanup complete');
+}
+
+/**
+ * Cleanup test chapters via API
+ */
+export async function cleanupTestChapters(baseUrl: string, authToken?: string): Promise<void> {
+  const chapterIds = getTestChapterIds();
+
+  if (chapterIds.length === 0) {
+    console.log('✅ No test chapters to clean up');
+    return;
+  }
+
+  console.log(`🧹 Cleaning up ${chapterIds.length} test chapters...`);
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
+  const cleanupPromises = chapterIds.map(async (chapterId) => {
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/chapters/${chapterId}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (response.ok || response.status === 404) {
+        console.log(`  ✅ Deleted chapter: ${chapterId}`);
+      } else {
+        console.warn(`  ⚠️  Failed to delete chapter ${chapterId}: ${response.status}`);
+      }
+    } catch (error) {
+      console.warn(`  ⚠️  Error deleting chapter ${chapterId}:`, error);
+    }
+  });
+
+  await Promise.all(cleanupPromises);
+
+  console.log('✅ Test chapter cleanup complete');
+}

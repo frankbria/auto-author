@@ -175,6 +175,7 @@ export function DraftGenerator({
   return (
     <>
       <Button
+        data-testid="generate-draft-button"
         onClick={() => setIsOpen(true)}
         variant="outline"
         size="sm"
@@ -185,7 +186,7 @@ export function DraftGenerator({
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent data-testid="draft-wizard" className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Generate AI Draft for &quot;{chapterTitle}&quot;</DialogTitle>
             <DialogDescription>
@@ -259,6 +260,7 @@ export function DraftGenerator({
                           className="w-full px-3 py-2 border rounded-md"
                         />
                         <Textarea
+                          data-testid={`draft-question-${index}`}
                           placeholder="Your answer..."
                           value={qr.answer}
                           onChange={(e) => handleResponseChange(index, e.target.value)}
@@ -309,7 +311,7 @@ export function DraftGenerator({
               </div>
             </div>
           ) : isGenerating ? (
-            <div className="py-8">
+            <div data-testid="generating-draft" className="py-8">
               <LoadingStateManager
                 isLoading={true}
                 operation="Generating Chapter Draft"

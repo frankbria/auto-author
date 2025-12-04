@@ -120,7 +120,8 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 
   return (
-    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8">      <div className="mb-6">
+    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8">
+      <div className="mb-6">
         <h2 className="text-xl font-semibold text-zinc-100 mb-3">
           Clarifying Questions
         </h2>
@@ -164,12 +165,13 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         </div>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 mb-6">
+      <div data-testid="toc-question" className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 mb-6">
         <h3 className="text-zinc-100 font-medium mb-4 text-lg">
           {currentQuestion}
         </h3>
-        
+
         <textarea
+          data-testid={`toc-question-${currentQuestionIndex}`}
           value={responses[currentQuestionIndex] || ''}
           onChange={(e) => handleResponseChange(currentQuestionIndex, e.target.value)}
           placeholder="Type your answer here..."

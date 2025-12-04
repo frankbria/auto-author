@@ -357,6 +357,7 @@ export function ChapterEditor({
       <div className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center justify-between">
         <div className="flex flex-wrap gap-1 items-center">
         <Button
+          data-testid="toolbar-bold"
           variant="ghost"
           size="sm"
           onClick={() => editor?.chain().focus().toggleBold().run()}
@@ -369,8 +370,9 @@ export function ChapterEditor({
         >
           <Bold className="h-4 w-4" />
         </Button>
-        
+
         <Button
+          data-testid="toolbar-italic"
           variant="ghost"
           size="sm"
           onClick={() => editor?.chain().focus().toggleItalic().run()}
@@ -429,6 +431,7 @@ export function ChapterEditor({
         </Button>
         
         <Button
+          data-testid="toolbar-heading"
           variant="ghost"
           size="sm"
           onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
@@ -439,9 +442,9 @@ export function ChapterEditor({
           title="Heading 2"
           type="button"
         >
-          <Heading2 className="h-4 w-4" />
+          <Heading2 data-testid="heading-2" className="h-4 w-4" />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -453,7 +456,7 @@ export function ChapterEditor({
           title="Heading 3"
           type="button"
         >
-          <Heading3 className="h-4 w-4" />
+          <Heading3 data-testid="heading-3" className="h-4 w-4" />
         </Button>
         
         <div className="w-px h-6 bg-border mx-1" />
@@ -563,19 +566,20 @@ export function ChapterEditor({
       
       {/* Editor Content */}
       <div className="flex-1 p-4 bg-white overflow-auto">
-        <EditorContent 
-          editor={editor} 
-          className="w-full h-full min-h-[500px] tiptap-editor text-black" 
+        <EditorContent
+          editor={editor}
+          data-testid="chapter-editor"
+          className="w-full h-full min-h-[500px] tiptap-editor text-black"
         />
       </div>
       
       {/* Editor Footer */}
       <div className="border-t border-border p-4 flex justify-between items-center bg-muted/20">
         <div className="flex items-center gap-4">
-          <span className="text-sm text-foreground">
+          <span data-testid="word-count" className="text-sm text-foreground">
             {editor?.storage.characterCount.characters() ?? 0} characters
           </span>
-          <div className="flex items-center gap-2">
+          <div data-testid="auto-save-status" className="flex items-center gap-2">
             {isSaving && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Loader2 className="h-3 w-3 animate-spin" />

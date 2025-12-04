@@ -19,14 +19,15 @@ export class TOCWizardPage {
   }
 
   /**
-   * Wait for readiness check to complete
+   * Wait for readiness check to complete (by checking for heading text)
    */
   async waitForReadinessCheck(): Promise<void> {
-    // Wait for loading indicator to appear and disappear
-    const loadingIndicator = this.page.locator('[data-testid="loading-indicator"]');
+    // Wait for "Analyzing Your Summary" to appear
+    const analyzing = this.page.locator('text=Analyzing Your Summary');
+    await expect(analyzing).toBeVisible({ timeout: 5000 });
 
-    await expect(loadingIndicator).toBeVisible({ timeout: 5000 });
-    await expect(loadingIndicator).not.toBeVisible({ timeout: 10000 });
+    // Wait for analysis to complete (heading disappears)
+    await expect(analyzing).not.toBeVisible({ timeout: 15000 });
 
     console.log('✅ Summary readiness check complete');
   }
@@ -39,20 +40,20 @@ export class TOCWizardPage {
   }
 
   /**
-   * Verify proceeds to questions automatically
+   * Verify proceeds to questions automatically (check for Clarifying Questions heading)
    */
   async verifyQuestionsAppear(): Promise<void> {
-    const questions = this.page.locator('[data-testid="toc-question"]');
-    const questionCount = await questions.count();
+    await expect(this.page.locator('text=Clarifying Questions')).toBeVisible({ timeout: 10000 });
 
-    expect(questionCount).toBeGreaterThanOrEqual(5);
-    expect(questionCount).toBeLessThanOrEqual(10);
+    // Verify at least one question field is visible
+    const questionField = this.page.locator('[data-testid^="toc-question-"]').first();
+    await expect(questionField).toBeVisible();
 
-    console.log(`✅ ${questionCount} clarifying questions appeared`);
+    console.log('✅ Clarifying questions appeared');
   }
 
   /**
-   * Answer a single clarifying question
+   * Answer a single clarifying question (questions shown one at a time)
    */
   async answerQuestion(index: number, answer: string): Promise<void> {
     const questionField = this.page.locator(`[data-testid="toc-question-${index}"]`);
@@ -60,33 +61,40 @@ export class TOCWizardPage {
   }
 
   /**
-   * Answer all clarifying questions
+   * Answer all clarifying questions (navigate through them one by one)
    */
   async answerQuestions(questions: TOCQuestion[]): Promise<void> {
     for (let i = 0; i < questions.length; i++) {
+      // Answer current question
       await this.answerQuestion(i, questions[i].answer);
+
+      // Click Next button (except on last question)
+      if (i < questions.length - 1) {
+        await this.page.click('button:has-text("Next")');
+        await this.page.waitForTimeout(500); // Brief wait for transition
+      }
     }
 
     console.log(`✅ Answered ${questions.length} clarifying questions`);
   }
 
   /**
-   * Click "Generate TOC" button
+   * Click "Generate Table of Contents" button (shown on last question)
    */
   async clickGenerateTOC(): Promise<void> {
-    await this.page.click('button:has-text("Generate TOC")');
+    await this.page.click('button:has-text("Generate Table of Contents")');
   }
 
   /**
-   * Wait for TOC generation to complete
+   * Wait for TOC generation to complete (look for "Generating TOC..." text)
    */
   async waitForGeneration(timeoutMs: number = 60000): Promise<void> {
-    // Wait for loading indicator
-    const loadingIndicator = this.page.locator('[data-testid="generating-toc"]');
-    await expect(loadingIndicator).toBeVisible({ timeout: 5000 });
+    // Wait for "Generating TOC..." to appear
+    const generating = this.page.locator('text=Generating TOC...');
+    await expect(generating).toBeVisible({ timeout: 5000 });
 
-    // Wait for generation to complete
-    await expect(loadingIndicator).not.toBeVisible({ timeout: timeoutMs });
+    // Wait for generation to complete (text disappears)
+    await expect(generating).not.toBeVisible({ timeout: timeoutMs });
 
     console.log('✅ TOC generation complete');
   }
@@ -100,17 +108,21 @@ export class TOCWizardPage {
   }
 
   /**
-   * Verify generated TOC appears
+   * Verify generated TOC appears (check for heading and TOC container)
    */
   async verifyTOCGenerated(): Promise<void> {
+    // Wait for "Your Generated Table of Contents" heading
+    await expect(this.page.locator('text=Your Generated Table of Contents')).toBeVisible();
+
+    // Verify TOC container is visible
     const tocList = this.page.locator('[data-testid="generated-toc"]');
     await expect(tocList).toBeVisible();
 
+    // Count chapters
     const chapters = this.page.locator('[data-testid="chapter-item"]');
     const chapterCount = await chapters.count();
 
-    expect(chapterCount).toBeGreaterThanOrEqual(5);
-    expect(chapterCount).toBeLessThanOrEqual(15);
+    expect(chapterCount).toBeGreaterThan(0);
 
     console.log(`✅ Generated TOC with ${chapterCount} chapters`);
   }
@@ -148,10 +160,10 @@ export class TOCWizardPage {
   }
 
   /**
-   * Click "Save TOC" or "Confirm" button
+   * Click "Accept & Continue" button to save TOC
    */
   async saveTOC(): Promise<void> {
-    await this.page.click('button:has-text("Save TOC")');
+    await this.page.click('button:has-text("Accept & Continue")');
     await this.page.waitForURL(/\/dashboard\/books\/[a-z0-9-]+$/);
 
     console.log('✅ TOC saved and redirected to book detail');

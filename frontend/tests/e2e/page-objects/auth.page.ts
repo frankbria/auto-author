@@ -60,16 +60,9 @@ export class AuthPage {
    * Verify no CSP errors appear during authentication
    */
   async verifyNoCSPErrors(): Promise<void> {
-    const cspErrors: string[] = [];
+    const { waitForCSPValidation } = await import('../helpers/condition-waiter');
 
-    this.page.on('console', msg => {
-      const text = msg.text();
-      if (text.toLowerCase().includes('csp') || text.toLowerCase().includes('content security policy')) {
-        cspErrors.push(text);
-      }
-    });
-
-    await this.page.waitForTimeout(1000);
+    const cspErrors = await waitForCSPValidation(this.page, { timeout: 2000 });
 
     expect(cspErrors, `Expected no CSP errors, but found: ${cspErrors.join(', ')}`).toHaveLength(0);
   }

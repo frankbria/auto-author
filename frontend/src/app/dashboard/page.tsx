@@ -140,11 +140,11 @@ export default function Dashboard() {
 
         {/* Projects Grid */}
         {projects.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div data-testid="books-list" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map(project => (
-              <BookCard 
-                key={project.id} 
-                book={project} 
+              <BookCard
+                key={project.id}
+                book={project}
                 onDelete={handleDeleteBook}
               />
             ))}

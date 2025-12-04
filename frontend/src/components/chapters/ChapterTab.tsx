@@ -52,6 +52,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
           <div
             ref={ref}
             {...props}
+            data-testid={`chapter-tab-${chapter.id}`}
             role="button"
             tabIndex={0}
             aria-label={`Open chapter ${chapter.title}`}
@@ -91,7 +92,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             {/* Indicators */}
             <div className="flex items-center gap-1" data-testid="indicators-container">
               {chapter.has_unsaved_changes && (
-                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full border border-orange-700" />
+                <div data-testid="unsaved-indicator" className="w-1.5 h-1.5 bg-orange-500 rounded-full border border-orange-700" />
               )}
               
               {chapter.is_loading && (
@@ -105,6 +106,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
 
             {/* Close Button - WCAG 2.1 compliant 44x44px touch target */}
             <Button
+              data-testid={`close-tab-${chapter.id}`}
               variant="ghost"
               size="sm"
               className="h-11 w-11 p-0 border border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-destructive hover:text-destructive-foreground focus:bg-zinc-200 focus:text-zinc-900 shadow-sm"

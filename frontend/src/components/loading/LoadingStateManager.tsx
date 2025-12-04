@@ -127,6 +127,7 @@ export function LoadingStateManager({
 
   return (
     <div
+      data-testid="loading-indicator"
       role="status"
       aria-live="polite"
       aria-busy="true"

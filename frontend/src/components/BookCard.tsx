@@ -80,7 +80,8 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
   return (
     <>
       <Card
-        data-testid="book-card"
+        data-testid="book-item"
+        data-book-id={book.id}
         className="w-full max-w-[350px] bg-zinc-800 border border-zinc-700 hover:border-indigo-500 transition cursor-pointer"
         onClick={handleClick}
       >
@@ -142,6 +143,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
         </Button>
         {onDelete && (
           <Button
+            data-testid="book-menu"
             className="bg-zinc-700 hover:bg-red-600 text-zinc-100 h-11 w-11"
             onClick={(e) => {
               e.stopPropagation();

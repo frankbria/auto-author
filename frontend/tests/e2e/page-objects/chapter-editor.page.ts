@@ -19,24 +19,24 @@ export class ChapterEditorPage {
   }
 
   /**
-   * Get editor content area
+   * Get editor content area (TipTap ProseMirror editor)
    */
   editorContent(): Locator {
-    return this.page.locator('[data-testid="chapter-editor"]');
+    return this.page.locator('.tiptap-editor .ProseMirror');
   }
 
   /**
-   * Get word count display
+   * Get word count display (character count in footer)
    */
   wordCount(): Locator {
-    return this.page.locator('[data-testid="word-count"]');
+    return this.page.locator('text=/\\d+ characters/');
   }
 
   /**
-   * Get auto-save indicator
+   * Get auto-save indicator (shows Saving... or Saved status)
    */
   autoSaveIndicator(): Locator {
-    return this.page.locator('[data-testid="auto-save-status"]');
+    return this.page.locator('text=/Saving|Saved|Not saved yet/');
   }
 
   /**
@@ -57,25 +57,24 @@ export class ChapterEditorPage {
   }
 
   /**
-   * Click Bold button
+   * Click Bold button (by title attribute)
    */
   async clickBold(): Promise<void> {
-    await this.page.click('[data-testid="toolbar-bold"]');
+    await this.page.click('button[title="Bold"]');
   }
 
   /**
-   * Click Italic button
+   * Click Italic button (by title attribute)
    */
   async clickItalic(): Promise<void> {
-    await this.page.click('[data-testid="toolbar-italic"]');
+    await this.page.click('button[title="Italic"]');
   }
 
   /**
-   * Select heading level
+   * Select heading level (by title attribute)
    */
-  async selectHeading(level: 2 | 3 | 4): Promise<void> {
-    await this.page.click('[data-testid="toolbar-heading"]');
-    await this.page.click(`[data-testid="heading-${level}"]`);
+  async selectHeading(level: 1 | 2 | 3): Promise<void> {
+    await this.page.click(`button[title="Heading ${level}"]`);
   }
 
   /**
@@ -97,9 +96,8 @@ export class ChapterEditorPage {
    * Wait for auto-save cycle (3s debounce + save)
    */
   async waitForAutoSave(): Promise<void> {
-    await this.page.waitForTimeout(3000); // Debounce
-    await this.verifySaving();
-    await this.verifySaved();
+    const { waitForAutoSave } = await import('../helpers/condition-waiter');
+    await waitForAutoSave(this.page, { timeout: 10000 });
   }
 
   /**
@@ -112,38 +110,40 @@ export class ChapterEditorPage {
   }
 
   /**
-   * Open AI draft generation wizard
+   * Open AI draft generation wizard (by button text)
    */
   async openAIDraft(): Promise<void> {
-    await this.page.click('[data-testid="generate-draft-button"]');
-    await expect(this.page.locator('[data-testid="draft-wizard"]')).toBeVisible();
+    await this.page.click('button:has-text("Generate AI Draft")');
+    await expect(this.page.locator('role=dialog')).toBeVisible();
     console.log('✅ AI draft wizard opened');
   }
 
   /**
-   * Answer Q&A questions for draft generation
+   * Answer Q&A questions for draft generation (use textarea placeholders)
    */
   async answerDraftQuestions(qaData: ChapterQAData[]): Promise<void> {
-    for (let i = 0; i < qaData.length; i++) {
-      const field = this.page.locator(`[data-testid="draft-question-${i}"]`);
-      await field.fill(qaData[i].answer);
+    // Find all answer textareas by placeholder
+    const answerFields = this.page.locator('textarea[placeholder="Your answer..."]');
+    const count = await answerFields.count();
+
+    for (let i = 0; i < Math.min(qaData.length, count); i++) {
+      await answerFields.nth(i).fill(qaData[i].answer);
     }
 
     console.log(`✅ Answered ${qaData.length} draft questions`);
   }
 
   /**
-   * Generate AI draft
+   * Generate AI draft (wait for LoadingStateManager component)
    */
   async generateDraft(timeoutMs: number = 60000): Promise<void> {
     await this.page.click('button:has-text("Generate Draft")');
 
-    // Wait for loading indicator
-    const loadingIndicator = this.page.locator('[data-testid="generating-draft"]');
-    await expect(loadingIndicator).toBeVisible({ timeout: 5000 });
+    // Wait for loading state to appear (shows "Generating...")
+    await expect(this.page.locator('text=Generating...')).toBeVisible({ timeout: 5000 });
 
-    // Wait for generation to complete
-    await expect(loadingIndicator).not.toBeVisible({ timeout: timeoutMs });
+    // Wait for generation to complete (loading disappears)
+    await expect(this.page.locator('text=Generating...')).not.toBeVisible({ timeout: timeoutMs });
 
     console.log('✅ AI draft generated');
   }
@@ -160,10 +160,10 @@ export class ChapterEditorPage {
   }
 
   /**
-   * Insert draft into editor
+   * Insert draft into editor (click "Use This Draft" button)
    */
   async insertDraft(): Promise<void> {
-    await this.page.click('button:has-text("Insert Draft")');
+    await this.page.click('button:has-text("Use This Draft")');
     await this.verifyDraftContent();
   }
 
