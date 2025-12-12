@@ -1,64 +1,17 @@
 # Page snapshot
 
 ```yaml
-- generic [ref=e1]:
+- generic [active] [ref=e1]:
   - main [ref=e2]:
     - generic [ref=e5]:
       - heading "Welcome to Auto Author" [level=1] [ref=e6]
       - paragraph [ref=e7]: Your AI-powered assistant for creating nonfiction books—chapter by chapter, interview style.
       - generic [ref=e8]:
-        - button "Sign In" [ref=e9] [cursor=pointer]
-        - button "Sign Up" [ref=e10] [cursor=pointer]
+        - generic [ref=e9] [cursor=pointer]: Sign In
+        - generic [ref=e10] [cursor=pointer]: Sign Up
     - region "Notifications alt+T"
     - region "Notifications alt+T"
-  - alert [ref=e11]
-  - dialog [active] [ref=e14]:
-    - generic [ref=e16]:
-      - generic [ref=e17]:
-        - button "Close modal" [ref=e18] [cursor=pointer]:
-          - img [ref=e19]
-        - generic [ref=e22]:
-          - heading "Sign in to Auto Author" [level=1] [ref=e23]
-          - paragraph [ref=e24]: Welcome back! Please sign in to continue
-        - generic [ref=e25]:
-          - generic [ref=e27]:
-            - button "Sign in with Apple Apple" [ref=e28] [cursor=pointer]:
-              - generic [ref=e29]:
-                - img "Sign in with Apple" [ref=e31]
-                - generic [ref=e32]: Apple
-            - button "Sign in with Google Google" [ref=e33] [cursor=pointer]:
-              - generic [ref=e34]:
-                - img "Sign in with Google" [ref=e36]
-                - generic [ref=e37]: Google
-          - paragraph [ref=e40]: or
-          - generic [ref=e42]:
-            - generic [ref=e43]:
-              - generic [ref=e46]:
-                - generic [ref=e48]: Email address
-                - textbox "Email address" [ref=e49]:
-                  - /placeholder: Enter your email address
-              - generic:
-                - generic:
-                  - generic:
-                    - generic:
-                      - generic: Password
-                    - generic:
-                      - textbox "Password":
-                        - /placeholder: Enter your password
-                      - button "Show password":
-                        - img
-            - button "Continue" [ref=e52] [cursor=pointer]:
-              - generic [ref=e53]:
-                - text: Continue
-                - img [ref=e54]
-      - generic [ref=e56]:
-        - generic [ref=e57]:
-          - generic [ref=e58]: Don’t have an account?
-          - link "Sign up" [ref=e59] [cursor=pointer]:
-            - /url: https://dev.autoauthor.app/CLERK-ROUTER/VIRTUAL/sign-up
-        - generic [ref=e63]:
-          - paragraph [ref=e64]: Secured by
-          - link "Clerk logo" [ref=e65] [cursor=pointer]:
-            - /url: https://go.clerk.com/components
-            - img [ref=e66]
+  - button "Open Next.js Dev Tools" [ref=e16] [cursor=pointer]:
+    - img [ref=e17]
+  - alert [ref=e20]
 ```

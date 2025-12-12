@@ -111,6 +111,11 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
 @pytest.fixture(scope="function")
 async def redis_client():
     """Get Redis client for testing."""
+    from app.api.dependencies import rate_limit_cache
+
+    # Clear memory cache before each test
+    rate_limit_cache.clear()
+
     client = await get_redis_client()
     if client is not None:
         # Clean up before tests
@@ -125,6 +130,9 @@ async def redis_client():
             await client.flushdb()
         except Exception:
             pass  # Ignore errors during cleanup
+
+    # Clear memory cache after each test
+    rate_limit_cache.clear()
 
 
 @pytest.fixture
@@ -399,10 +407,16 @@ class TestGracefulDegradation:
     @pytest.mark.asyncio
     async def test_fallback_to_memory_when_redis_unavailable(self, mock_request):
         """Test that rate limiter falls back to in-memory when Redis is unavailable."""
+        from app.api.dependencies import rate_limit_cache
+
+        # Clear memory cache to ensure clean state
+        rate_limit_cache.clear()
+
         rate_limiter = get_rate_limiter(limit=3, window=60)
 
         # Mock Redis client to return None (simulating Redis unavailable)
-        with patch("app.api.dependencies.get_redis_client", return_value=None):
+        # Patch at the source where get_rate_limiter imports from
+        with patch("app.db.redis.get_redis_client", return_value=None):
             # Make 3 requests (at limit)
             for i in range(3):
                 result = await rate_limiter(mock_request)
@@ -417,13 +431,18 @@ class TestGracefulDegradation:
     @pytest.mark.asyncio
     async def test_fallback_on_redis_connection_error(self, mock_request):
         """Test fallback when Redis connection fails during operation."""
+        from app.api.dependencies import rate_limit_cache
+
+        # Clear memory cache to ensure clean state
+        rate_limit_cache.clear()
+
         rate_limiter = get_rate_limiter(limit=3, window=60)
 
-        # Mock Redis client to raise connection error
+        # Mock Redis client to raise connection error on incr()
         mock_redis = AsyncMock()
-        mock_redis.get.side_effect = RedisConnectionError("Connection refused")
+        mock_redis.incr.side_effect = RedisConnectionError("Connection refused")
 
-        with patch("app.api.dependencies.get_redis_client", return_value=mock_redis):
+        with patch("app.db.redis.get_redis_client", return_value=mock_redis):
             # Should fall back to in-memory and still work
             result = await rate_limiter(mock_request)
             assert result["limit"] == 3

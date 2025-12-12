@@ -9,8 +9,8 @@
 
 import { test, expect } from '@playwright/test';
 
-const API_BASE_URL = process.env.DEPLOYMENT_URL?.replace('https://', 'https://api.') || 'https://api.dev.autoauthor.app';
-const FRONTEND_URL = process.env.DEPLOYMENT_URL || 'https://dev.autoauthor.app';
+const API_BASE_URL = process.env.DEPLOYMENT_URL?.replace('https://', 'https://api.') || 'http://localhost:8000';
+const FRONTEND_URL = process.env.DEPLOYMENT_URL || 'http://localhost:3000';
 
 test.describe('Pre-Flight Health Checks', () => {
   test('Backend API Health', async ({ request }) => {

@@ -13,8 +13,9 @@ export default function NewBook() {
     genre: '',
     targetAudience: '',
   });
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -26,9 +27,20 @@ export default function NewBook() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
 
     try {
-      // Set up token provider for authenticated API calls
+      // Layer 3: Explicit Validation - Check token availability before API call
+      const token = await getToken();
+
+      if (!token) {
+        throw new Error('Authentication session not ready. Please wait a moment and try again.');
+      }
+
+      console.log('[NewBook] Token validated, proceeding with book creation');
+
+      // Token provider should already be set by dashboard layout,
+      // but we set it again here for redundancy
       bookClient.setTokenProvider(getToken);
 
       // Use the book client to create a new book
@@ -41,6 +53,8 @@ export default function NewBook() {
       router.push(`/dashboard/books/${newBook.id}`);
     } catch (error) {
       console.error('Error creating book:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -52,6 +66,11 @@ export default function NewBook() {
         <h1 className="text-3xl font-bold text-zinc-100 mb-6">Create New Book</h1>
 
         <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 shadow-xl">
+          {error && (
+            <div className="mb-4 p-4 bg-red-900/50 border border-red-700 rounded-md">
+              <p className="text-red-200 text-sm">{error}</p>
+            </div>
+          )}
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label htmlFor="title" className="block text-sm font-medium text-zinc-300 mb-1">

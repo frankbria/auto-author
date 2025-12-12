@@ -30,10 +30,9 @@ test.describe('Advanced Features', () => {
   });
 
   test.describe('Auto-Save Functionality', () => {
-    test.beforeAll(async ({ browser }) => {
-      // Create a test book for auto-save tests
-      const page = await browser.newPage();
-      await authenticateUser(page);
+    // Setup test: Create a book for auto-save tests
+    test('Setup: Create test book for auto-save tests', async ({ page }) => {
+      console.log('\n📚 Creating test book for auto-save tests');
 
       const bookForm = new BookFormPage(page);
       await bookForm.gotoNewBook();
@@ -52,10 +51,17 @@ test.describe('Advanced Features', () => {
       const firstChapter = page.locator('[data-testid="chapter-item"]').first();
       chapterId = await firstChapter.getAttribute('data-chapter-id') || '';
 
-      await page.close();
+      console.log(`✅ Test book created: ${bookId}, chapter: ${chapterId}`);
+
+      // Verify book and chapter IDs are set
+      expect(bookId).toBeTruthy();
+      expect(chapterId).toBeTruthy();
     });
 
     test('Auto-save: Normal Operation (3s debounce)', async ({ page }) => {
+      // Skip if book wasn't created
+      test.skip(!bookId || !chapterId, 'Requires test book from setup');
+
       console.log('\n💾 Testing normal auto-save with 3s debounce');
 
       const editor = new ChapterEditorPage(page);
@@ -108,6 +114,9 @@ test.describe('Advanced Features', () => {
     });
 
     test('Auto-save: Network Failure with localStorage Backup', async ({ page, context }) => {
+      // Skip if book wasn't created
+      test.skip(!bookId || !chapterId, 'Requires test book from setup');
+
       console.log('\n📡 Testing auto-save with network failure (localStorage backup)');
 
       const editor = new ChapterEditorPage(page);
@@ -170,6 +179,9 @@ test.describe('Advanced Features', () => {
     });
 
     test('Auto-save: Rapid Typing (debounce resets)', async ({ page }) => {
+      // Skip if book wasn't created
+      test.skip(!bookId || !chapterId, 'Requires test book from setup');
+
       console.log('\n⚡ Testing auto-save debounce reset with rapid typing');
 
       const editor = new ChapterEditorPage(page);

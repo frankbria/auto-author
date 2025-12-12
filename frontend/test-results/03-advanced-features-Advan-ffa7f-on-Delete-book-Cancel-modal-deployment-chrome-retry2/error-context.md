@@ -1,0 +1,45 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - heading "Sign in" [level=1] [ref=e8]
+      - paragraph [ref=e9]: to continue to Auto Author
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - button "Sign in with Apple Continue with Apple" [ref=e12] [cursor=pointer]:
+          - img "Sign in with Apple" [ref=e14]
+          - generic [ref=e16]: Continue with Apple
+          - img [ref=e17]
+        - button "Sign in with Google Continue with Google" [ref=e19] [cursor=pointer]:
+          - img "Sign in with Google" [ref=e21]
+          - generic [ref=e23]: Continue with Google
+          - img [ref=e24]
+      - paragraph [ref=e28]: or
+      - generic [ref=e30]:
+        - generic [ref=e32]:
+          - generic [ref=e34]: Email address
+          - textbox "Email address" [ref=e35]:
+            - /placeholder: ""
+        - generic:
+          - generic:
+            - generic:
+              - generic: Password
+            - generic:
+              - textbox "Password":
+                - /placeholder: ""
+              - button "Show password":
+                - img
+        - button "Continue" [ref=e36] [cursor=pointer]
+    - generic [ref=e38]:
+      - generic [ref=e39]: No account?
+      - link "Sign up" [ref=e40] [cursor=pointer]:
+        - /url: https://delicate-ladybird-47.accounts.dev/sign-up#/?redirect_url=http%3A%2F%2Flocalhost%3A3000%2Fdashboard%2Fnew-book%3F__dev_session%3Ddvb_36P0z4nvfGreMupjdpXZnOt0lyU%26__clerk_db_jwt%3Ddvb_36P0z4nvfGreMupjdpXZnOt0lyU%23__clerk_db_jwt%5Bdvb_36P0z4nvfGreMupjdpXZnOt0lyU%5D
+    - generic [ref=e41]:
+      - paragraph [ref=e42]: Secured by
+      - link "Clerk logo" [ref=e43] [cursor=pointer]:
+        - /url: https://www.clerk.com?utm_source=clerk&utm_medium=components
+        - img [ref=e44]
+  - alert [ref=e47]
+```

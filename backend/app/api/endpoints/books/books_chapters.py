@@ -914,14 +914,13 @@ async def batch_get_chapter_content(
             }
 
             if include_metadata:
-                # Calculate reading time
-                reading_time = await chapter_status_service.calculate_reading_time(
-                    chapter.get("content", "")
-                )
+                # Calculate reading time using word count, not content
+                word_count = chapter.get("word_count", 0)
+                reading_time = chapter_status_service.calculate_reading_time(word_count)
 
                 chapter_info["metadata"] = {
                     "status": chapter.get("status", "draft"),
-                    "word_count": chapter.get("word_count", 0),
+                    "word_count": word_count,
                     "estimated_reading_time": reading_time,
                     "last_modified": chapter.get("last_modified"),
                     "is_active_tab": chapter.get("is_active_tab", False),

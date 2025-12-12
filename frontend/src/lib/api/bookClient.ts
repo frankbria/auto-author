@@ -107,17 +107,33 @@ export class BookClient {
   }
 
   /**
-   * Get authentication token
+   * Get authentication token with defensive retry logic
    *
    * Internal method that returns either the cached token or fetches a fresh one
-   * from the token provider if available.
+   * from the token provider if available. Implements retry logic to handle race
+   * conditions where Clerk session may not be fully initialized.
    *
    * @private
    * @returns Promise resolving to token string or undefined
    */
   private async getAuthToken(): Promise<string | undefined> {
     if (this.tokenProvider) {
-      const token = await this.tokenProvider();
+      // Layer 2: Defensive Retry - Try to get token
+      let token = await this.tokenProvider();
+
+      // If null, wait and retry once (gives Clerk time to initialize)
+      if (!token) {
+        console.warn('[BookClient] Token not ready, waiting 500ms for Clerk session initialization...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        token = await this.tokenProvider();
+
+        if (token) {
+          console.log('[BookClient] Token retrieved successfully after retry');
+        } else {
+          console.error('[BookClient] Token still null after retry - Clerk session may not be ready');
+        }
+      }
+
       return token || undefined;
     }
     return this.authToken;

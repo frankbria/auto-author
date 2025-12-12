@@ -1,10 +1,11 @@
 'use client';
 
-import { UserButton } from '@clerk/nextjs';
+import { UserButton, useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import bookClient from '@/lib/api/bookClient';
 
 export default function DashboardLayout({
   children,
@@ -13,6 +14,8 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { getToken, isLoaded } = useAuth();
+  const [isTokenReady, setIsTokenReady] = useState(false);
   
   // Navigation items with active state detection
   const navItems = [
@@ -21,6 +24,15 @@ export default function DashboardLayout({
     { name: 'Help', href: '/dashboard/help', active: pathname === '/dashboard/help' },
   ];
 
+  // Layer 1: Global Setup - Set token provider only when Clerk session is fully loaded
+  useEffect(() => {
+    if (isLoaded) {
+      bookClient.setTokenProvider(getToken);
+      setIsTokenReady(true);
+      console.log('[Dashboard Layout] Token provider initialized successfully');
+    }
+  }, [isLoaded, getToken]);
+
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
@@ -28,6 +40,39 @@ export default function DashboardLayout({
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
   };
+
+  // Show loading state while Clerk initializes
+  if (!isTokenReady) {
+    return (
+      <ProtectedRoute>
+        <div className="flex items-center justify-center min-h-screen bg-zinc-950">
+          <div className="text-center">
+            <svg
+              className="animate-spin h-12 w-12 text-indigo-500 mx-auto mb-4"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <p className="text-zinc-400">Initializing authentication...</p>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
   return (
     <ProtectedRoute>
       <div className="flex flex-col min-h-screen">

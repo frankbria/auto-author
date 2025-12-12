@@ -77,7 +77,7 @@ async def _redis_rate_limit(
     redis_client, key: str, limit: int, window: int, now: float
 ) -> tuple[int, float]:
     """
-    Redis-based rate limiting using sliding window algorithm.
+    Redis-based rate limiting using sliding window algorithm with atomic operations.
 
     Args:
         redis_client: Redis client instance
@@ -90,21 +90,17 @@ async def _redis_rate_limit(
         Tuple of (current_count, reset_at)
     """
     try:
-        # Get current count or initialize
-        count = await redis_client.get(key)
-
-        if count is None:
-            # First request in this window
-            reset_at = now + window
-            await redis_client.set(key, 1, ex=window)
-            return 1, reset_at
-
-        # Get TTL to calculate reset time
-        ttl = await redis_client.ttl(key)
-        reset_at = now + ttl if ttl > 0 else now + window
-
-        # Increment counter atomically
+        # Use INCR which is atomic - creates key if doesn't exist and increments
         new_count = await redis_client.incr(key)
+
+        # If this is the first request (count == 1), set expiration
+        if new_count == 1:
+            await redis_client.expire(key, window)
+            reset_at = now + window
+        else:
+            # Get TTL to calculate reset time
+            ttl = await redis_client.ttl(key)
+            reset_at = now + ttl if ttl > 0 else now + window
 
         return new_count, reset_at
 
