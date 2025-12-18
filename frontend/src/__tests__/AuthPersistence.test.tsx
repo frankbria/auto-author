@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { useSession } from '@/lib/auth-client';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useRouter } from 'next/navigation';
@@ -42,8 +42,10 @@ describe('Authentication State Persistence', () => {
       </ProtectedRoute>
     );
 
-    // Expect router.push to be called with the sign-in route
-    expect(mockRouter.push).toHaveBeenCalledWith('/sign-in');
+    // Expect router.push to be called with the sign-in route (better-auth uses /auth/sign-in)
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith('/auth/sign-in');
+    });
 
     // Should not render protected content
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();

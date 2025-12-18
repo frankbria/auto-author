@@ -365,7 +365,7 @@ describe('Dashboard - Book Deletion', () => {
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
-      expect(bookClient.setTokenProvider).toHaveBeenCalledWith(mockGetToken);
+      // With better-auth, tokens are automatically included - no need for setTokenProvider
       expect(bookClient.deleteBook).toHaveBeenCalledWith('book-1');
     });
   });
