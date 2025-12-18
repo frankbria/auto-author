@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { useSearchParams } from 'next/navigation';
 import bookClient from '@/lib/api/bookClient';
 import { BookProject } from '@/components/BookCard';
@@ -85,7 +85,7 @@ const convertTocToChapters = (tocData: TocData | null): Chapter[] => {
 };
 
 export default function BookPage({ params }: { params: Promise<{ bookId: string }> }) {
-  const { getToken } = useAuth();
+  const { data: session } = useSession();
   const searchParams = useSearchParams();
   const initialChapter = searchParams.get('chapter');
 
@@ -96,13 +96,14 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);
-  
+
   useEffect(() => {
     const fetchBookData = async () => {
       setIsLoading(true);
       try {
         // Set up token provider for automatic token refresh
-        bookClient.setTokenProvider(getToken);
+        const tokenProvider = async () => session?.session.token || null;
+        bookClient.setTokenProvider(tokenProvider);
 
         // Fetch book details
         const bookData: BookProject = await bookClient.getBook(bookId);
@@ -151,7 +152,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     };
 
     fetchBookData();
-  }, [bookId, getToken]);
+  }, [bookId, session]);
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 

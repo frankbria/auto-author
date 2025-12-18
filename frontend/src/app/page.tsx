@@ -1,20 +1,20 @@
 // app/page.tsx
 'use client';
 
-import { SignedIn, SignedOut, SignInButton, SignUpButton, SignOutButton, useUser } from '@clerk/nextjs';
+import { useSession, authClient } from '@/lib/auth-client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 export default function Home() {
-  const { isLoaded } = useUser();
+  const { data: session, isPending } = useSession();
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isLoaded) {
+    if (!isPending) {
       setIsAuthReady(true);
     }
-  }, [isLoaded]);
+  }, [isPending]);
 
   // Show loading state while Clerk is initializing
   if (!isAuthReady) {
@@ -47,7 +47,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center text-center p-6 min-h-screen">
-      <SignedOut>
+      {!session ? (
         <div className="space-y-6">
           <h1 className="text-4xl font-extrabold text-white tracking-tight sm:text-5xl">
             Welcome to <span className="text-indigo-500">Auto Author</span>
@@ -56,21 +56,19 @@ export default function Home() {
             Your AI-powered assistant for creating nonfiction books—chapter by chapter, interview style.
           </p>
           <div className="space-x-4">
-            <SignInButton mode="modal" fallbackRedirectUrl="/dashboard">
+            <Link href="/auth/sign-in">
               <div className="px-6 py-3 text-white font-semibold bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md transition inline-block cursor-pointer">
                 Sign In
               </div>
-            </SignInButton>
-            <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard">
+            </Link>
+            <Link href="/auth/sign-up">
               <div className="px-6 py-3 text-white font-semibold bg-zinc-700 hover:bg-zinc-600 rounded-lg shadow-md transition inline-block cursor-pointer">
                 Sign Up
               </div>
-            </SignUpButton>
+            </Link>
           </div>
         </div>
-      </SignedOut>
-
-      <SignedIn>
+      ) : (
         <div className="space-y-6">
           <h1 className="text-4xl font-bold text-white">Welcome Back 👋</h1>
           <p className="text-zinc-400 mb-6">Continue working on your book projects.</p>
@@ -80,14 +78,17 @@ export default function Home() {
                 Go to Dashboard
               </button>
             </Link>
-            <SignOutButton>
-              <div className="px-6 py-3 text-white font-semibold bg-zinc-700 hover:bg-zinc-600 rounded-lg shadow-md transition inline-block cursor-pointer">
-                Sign Out
-              </div>
-            </SignOutButton>
+            <button
+              onClick={async () => {
+                await authClient.signOut();
+              }}
+              className="px-6 py-3 text-white font-semibold bg-zinc-700 hover:bg-zinc-600 rounded-lg shadow-md transition inline-block cursor-pointer"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
-      </SignedIn>
+      )}
     </div>
   );
 }

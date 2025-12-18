@@ -9,10 +9,10 @@
 
 import { useEffect, useState } from "react";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "@/lib/auth-client";
 
 export function ClientComponentExample() {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const { authFetch, loading, error } = useAuthFetch();
   const [data, setData] = useState<unknown>(null);
 
@@ -27,14 +27,14 @@ export function ClientComponentExample() {
       }
     }
 
-    if (user) {
+    if (session?.user) {
       fetchData();
     }
-  }, [user, authFetch]);
+  }, [session?.user, authFetch]);
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
-  if (!user) return <div>Please sign in</div>;
+  if (!session?.user) return <div>Please sign in</div>;
 
   return (
     <div>
