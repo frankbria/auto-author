@@ -2,7 +2,7 @@
  * Helper functions for better-auth authentication
  * These are server-side helper functions for working with better-auth
  */
-import { auth } from "@/lib/auth";
+import { getAuth } from "@/lib/auth";
 
 /**
  * Get authentication token from better-auth session
@@ -11,7 +11,8 @@ import { auth } from "@/lib/auth";
  */
 export async function getAuthToken(): Promise<string | null> {
   try {
-    // Get the session from better-auth
+    // Get the connected auth instance and session
+    const auth = await getAuth();
     const session = await auth.api.getSession();
     return session?.session?.token || null;
   } catch (error) {
@@ -26,6 +27,7 @@ export async function getAuthToken(): Promise<string | null> {
  */
 export async function getUserInfo() {
   try {
+    const auth = await getAuth();
     const session = await auth.api.getSession();
     return session?.user || null;
   } catch (error) {
@@ -59,6 +61,7 @@ export async function hasRole(role: string): Promise<boolean> {
  */
 export async function isAuthenticated(): Promise<boolean> {
   try {
+    const auth = await getAuth();
     const session = await auth.api.getSession();
     return !!session?.user;
   } catch (error) {

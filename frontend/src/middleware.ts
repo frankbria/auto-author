@@ -1,7 +1,7 @@
 // frontend/src/middleware.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getAuth } from '@/lib/auth';
 
 // Middleware for route protection using better-auth
 // This will:
@@ -40,8 +40,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Get session from better-auth
+  // Get session from better-auth with connected MongoDB client
   try {
+    const auth = await getAuth();
     const session = await auth.api.getSession({
       headers: request.headers
     });
