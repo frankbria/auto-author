@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import bookClient from '@/lib/api/bookClient';
 import { toast } from 'sonner';
 import { BookProject } from '@/components/BookCard';
@@ -30,7 +30,7 @@ type ChapterStatus = {
 export default function ExportBookPage({ params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = use(params);
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState(true);
   const [book, setBook] = useState<BookProject | null>(null);
   const [formats, setFormats] = useState<ExportFormat[]>([]);
@@ -54,13 +54,14 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
   }, [isExporting, selectedFormat, chapters, includeEmptyChapters]);
 
   const exportProgress = getProgress ? getProgress() : { progress: 0, estimatedTimeRemaining: 0 };
-  
+
   // Fetch book details and export options
   useEffect(() => {
     const fetchBookDetails = async () => {
       try {
         // Set up token provider for automatic token refresh
-        bookClient.setTokenProvider(getToken);
+        const tokenProvider = async () => session?.session.token || null;
+        bookClient.setTokenProvider(tokenProvider);
 
         // Fetch book details
         const bookData = await bookClient.getBook(bookId);
@@ -102,7 +103,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
       }
     };
       fetchBookDetails();
-  }, [bookId]);
+  }, [bookId, session]);
   
   const handleExport = async () => {
   

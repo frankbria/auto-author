@@ -1,7 +1,7 @@
 """
 Comprehensive tests for API dependencies module
 
-Tests rate limiting, input sanitization, API keys, and Clerk client.
+Tests rate limiting, input sanitization, API keys, and better-auth integration.
 """
 
 import pytest
@@ -15,7 +15,6 @@ from app.api.dependencies import (
     get_rate_limiter,
     rate_limit,
     get_api_key,
-    get_clerk_client,
     audit_request,
     rate_limit_cache,
 )
@@ -117,7 +116,7 @@ class TestRateLimiting:
         """Test that requests over limit are blocked"""
         # Clear cache and use unique identifiers
         rate_limit_cache.clear()
-        
+
         mock_request = Mock(spec=Request)
         mock_request.client = Mock()
         mock_request.client.host = "10.99.99.1"  # Unique IP
@@ -131,7 +130,7 @@ class TestRateLimiting:
         for i in range(3):
             result = await limiter(mock_request)
             results.append(result)
-        
+
         # Verify requests were allowed
         assert results[0]["remaining"] == 2
         assert results[1]["remaining"] == 1
@@ -150,7 +149,7 @@ class TestRateLimiting:
         """Test that rate limit response includes proper headers"""
         # Clear cache and use unique identifiers
         rate_limit_cache.clear()
-        
+
         mock_request = Mock(spec=Request)
         mock_request.client = Mock()
         mock_request.client.host = "10.99.99.2"  # Unique IP
@@ -314,7 +313,7 @@ class TestAuditRequest:
         mock_request.client.host = "192.168.1.1"
         mock_request.headers = {"user-agent": "test-agent"}
 
-        current_user = {"clerk_id": "test_user", "email": "test@example.com"}
+        current_user = {"auth_id": "test_user", "email": "test@example.com"}
 
         result = await audit_request(
             request=mock_request,
@@ -346,7 +345,7 @@ class TestAuditRequest:
         mock_request.state = Mock()
         mock_request.state.request_id = "req_123"
 
-        current_user = {"clerk_id": "user_123"}
+        current_user = {"auth_id": "user_123"}
 
         result = await audit_request(
             request=mock_request,
@@ -374,7 +373,7 @@ class TestAuditRequest:
         mock_request.client = Mock()
         mock_request.client.host = "192.168.1.1"
         mock_request.headers = {}
-        current_user = {"clerk_id": "user_123"}
+        current_user = {"auth_id": "user_123"}
 
         with pytest.raises(HTTPException) as exc_info:
             await audit_request(
@@ -401,7 +400,7 @@ class TestAuditRequest:
         mock_request.client = Mock()
         mock_request.client.host = "192.168.1.1"
         mock_request.headers = {"authorization": "InvalidFormat"}
-        current_user = {"clerk_id": "user_123"}
+        current_user = {"auth_id": "user_123"}
 
         with pytest.raises(HTTPException) as exc_info:
             await audit_request(
@@ -412,103 +411,3 @@ class TestAuditRequest:
             )
 
         assert exc_info.value.status_code == 401
-
-
-@pytest.mark.asyncio
-class TestClerkClient:
-    """Test Clerk API client"""
-
-    @patch("app.api.dependencies.requests.delete")
-    async def test_clerk_client_delete_user_success(self, mock_delete):
-        """Test Clerk client delete user success"""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_delete.return_value = mock_response
-
-        client = await get_clerk_client()
-        result = await client.delete_user("user_123")
-
-        assert result["deleted"] is True
-
-    @patch("app.api.dependencies.requests.delete")
-    async def test_clerk_client_delete_user_no_content(self, mock_delete):
-        """Test Clerk client delete user with 204 response"""
-        mock_response = Mock()
-        mock_response.status_code = 204
-        mock_delete.return_value = mock_response
-
-        client = await get_clerk_client()
-        result = await client.delete_user("user_123")
-
-        assert result["deleted"] is True
-
-    @patch("app.api.dependencies.requests.delete")
-    async def test_clerk_client_delete_user_failure(self, mock_delete):
-        """Test Clerk client delete user failure"""
-        mock_response = Mock()
-        mock_response.status_code = 404
-        mock_response.json.return_value = {"error": "User not found"}
-        mock_delete.return_value = mock_response
-
-        client = await get_clerk_client()
-        result = await client.delete_user("user_123")
-
-        assert result["deleted"] is False
-        assert "error" in result
-
-    @patch("app.api.dependencies.requests.get")
-    async def test_clerk_client_get_user_success(self, mock_get):
-        """Test Clerk client get user success"""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "id": "user_123",
-            "email": "test@example.com"
-        }
-        mock_get.return_value = mock_response
-
-        client = await get_clerk_client()
-        result = await client.get_user("user_123")
-
-        assert result["id"] == "user_123"
-        assert result["email"] == "test@example.com"
-
-    @patch("app.api.dependencies.requests.get")
-    async def test_clerk_client_get_user_not_found(self, mock_get):
-        """Test Clerk client get user not found"""
-        mock_response = Mock()
-        mock_response.status_code = 404
-        mock_get.return_value = mock_response
-
-        client = await get_clerk_client()
-        result = await client.get_user("user_123")
-
-        assert result is None
-
-    @patch("app.api.dependencies.requests.patch")
-    async def test_clerk_client_update_user_success(self, mock_patch):
-        """Test Clerk client update user success"""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "id": "user_123",
-            "email": "updated@example.com"
-        }
-        mock_patch.return_value = mock_response
-
-        client = await get_clerk_client()
-        result = await client.update_user("user_123", {"email": "updated@example.com"})
-
-        assert result["email"] == "updated@example.com"
-
-    @patch("app.api.dependencies.requests.patch")
-    async def test_clerk_client_update_user_failure(self, mock_patch):
-        """Test Clerk client update user failure"""
-        mock_response = Mock()
-        mock_response.status_code = 400
-        mock_patch.return_value = mock_response
-
-        client = await get_clerk_client()
-        result = await client.update_user("user_123", {"email": "invalid"})
-
-        assert result is None

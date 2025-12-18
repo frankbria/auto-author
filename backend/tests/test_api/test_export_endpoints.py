@@ -223,8 +223,8 @@ class TestExportEndpoints:
         await client1.patch(f"/api/v1/books/{book_id}", json=update_data)
         
         # Try to export with second user
-        # Create a client with a different clerk_id
-        client2 = await auth_client_factory(overrides={"clerk_id": "different_clerk_id"})
+        # Create a client with a different auth_id
+        client2 = await auth_client_factory(overrides={"auth_id": "different_auth_id"})
         response = await client2.get(f"/api/v1/books/{book_id}/export/pdf")
         
         # Debug output if not 403

@@ -121,7 +121,6 @@ test.describe('Pre-Flight Health Checks', () => {
     expect(csp).toContain('connect-src');
     expect(csp).toContain('api.dev.autoauthor.app');
     expect(csp).toContain('script-src');
-    expect(csp).toContain('clerk.accounts.dev');
 
     console.log('✅ Frontend CSP headers are configured');
   });

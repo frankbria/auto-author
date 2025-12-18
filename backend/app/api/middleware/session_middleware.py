@@ -40,7 +40,8 @@ class SessionMiddleware(BaseHTTPMiddleware):
             "/redoc",
             "/openapi.json",
             "/health",
-            "/api/v1/webhooks",  # Clerk webhooks
+            "/api/v1/webhooks",  # Webhooks
+            "/api/auth",         # Better-auth API routes
         ]
 
         if any(request.url.path.startswith(path) for path in skip_paths):
@@ -56,7 +57,12 @@ class SessionMiddleware(BaseHTTPMiddleware):
         # Try to get user ID from state (set by auth middleware)
         user_id = None
         if hasattr(request.state, "user"):
-            user_id = request.state.user.get("clerk_id") or request.state.user.get("id")
+            # Better-auth uses auth_id, support clerk_id for migration period
+            user_id = (
+                request.state.user.get("auth_id")
+                or request.state.user.get("clerk_id")
+                or request.state.user.get("id")
+            )
 
         session = None
 
@@ -83,8 +89,9 @@ class SessionMiddleware(BaseHTTPMiddleware):
                 session = await get_active_session_by_user(user_id)
                 if not session:
                     # Create new session
-                    clerk_session_id = request.headers.get("X-Clerk-Session-ID")
-                    session = await create_user_session(user_id, request, clerk_session_id)
+                    # Better-auth session ID may be in headers (similar to Clerk)
+                    auth_session_id = request.headers.get("X-Auth-Session-ID") or request.headers.get("X-Clerk-Session-ID")
+                    session = await create_user_session(user_id, request, auth_session_id)
                     logger.info(f"Created new session {session.session_id} for user {user_id}")
 
                 # Attach session to request state

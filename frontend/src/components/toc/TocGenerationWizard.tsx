@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import bookClient from '@/lib/api/bookClient';
 import {
   WizardStep,
@@ -23,7 +23,7 @@ interface TocGenerationWizardProps {
 
 export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps) {
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { data: session } = useSession();
   const { trackOperation } = usePerformanceTracking();
   const [wizardState, setWizardState] = useState<WizardState>({
     step: WizardStep.CHECKING_READINESS,
@@ -33,8 +33,11 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
 
   // Set up token provider for automatic token refresh
   useEffect(() => {
+    const getToken = async () => {
+      return session?.session.token ?? null;
+    };
     bookClient.setTokenProvider(getToken);
-  }, [getToken]);
+  }, [session?.session.token]);
 
   const generateQuestions = useCallback(async () => {
     try {

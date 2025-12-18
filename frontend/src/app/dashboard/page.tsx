@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { useUser, useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { PlusIcon, BookIcon } from 'lucide-react';
 import BookCard, { BookProject } from '@/components/BookCard';
@@ -13,8 +13,7 @@ import bookClient from '@/lib/api/bookClient';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user, isLoaded: isUserLoaded } = useUser();
-  const { getToken } = useAuth();
+  const { data: session, isPending: isSessionPending } = useSession();
   const [projects, setProjects] = useState<BookProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,13 +23,12 @@ export default function Dashboard() {
   const isE2EMode = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   const fetchBooks = useCallback(async () => {
-    // In E2E mode, bypass Clerk user check
-    if (!isE2EMode && (!isUserLoaded || !user)) return;
+    // In E2E mode, bypass session user check
+    if (!isE2EMode && (!session)) return;
 
     setIsLoading(true);
     try {
-      // Set up token provider for automatic token refresh
-      bookClient.setTokenProvider(getToken);
+      // Token is automatically included in requests via better-auth client
       const books = await bookClient.getUserBooks();
       setProjects(books);
       setError(null);
@@ -55,7 +53,7 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [isUserLoaded, user, getToken, isE2EMode]);
+  }, [session, isE2EMode]);
 
   useEffect(() => {
     fetchBooks();
@@ -77,12 +75,10 @@ export default function Dashboard() {
   
   const handleDeleteBook = async (bookId: string) => {
     try {
-      // Set up token provider for automatic token refresh
-      bookClient.setTokenProvider(getToken);
-
+      // Token is automatically included in requests via better-auth client
       await bookClient.deleteBook(bookId);
       toast.success('Book deleted successfully');
-      
+
       // Update the local state to remove the deleted book
       setProjects(prevProjects => prevProjects.filter(book => book.id !== bookId));
     } catch (err) {

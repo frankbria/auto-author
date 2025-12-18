@@ -29,7 +29,7 @@ class UserPreferences(BaseModel):
 class UserBase(BaseModel):
     """Base user model with common fields"""
 
-    clerk_id: str
+    auth_id: str  # better-auth user ID (UUID from better-auth)
     email: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None

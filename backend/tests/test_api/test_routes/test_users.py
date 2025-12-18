@@ -21,7 +21,7 @@ async def test_read_users_me(auth_client_factory, test_user):
     assert response.status_code == 200
     data = response.json()
     assert data["email"] == test_user["email"]
-    assert data["clerk_id"] == test_user["clerk_id"]
+    assert data["auth_id"] == test_user["auth_id"]
 
 
 def test_missing_token(client, monkeypatch):

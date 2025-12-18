@@ -59,8 +59,8 @@ test.describe('Complete Authoring Journey E2E', () => {
       // Navigate to the application root
       await page.goto('/');
 
-      // Wait for Clerk authentication to complete
-      // In development mode, Clerk may auto-authenticate
+      // Wait for better-auth authentication to complete
+      // In development mode with BYPASS_AUTH, authentication is skipped
       await page.waitForLoadState('networkidle');
 
       // Verify we're on the dashboard or login page
@@ -459,7 +459,7 @@ test.describe('Complete Authoring Journey E2E', () => {
 /**
  * Test Coverage Summary:
  *
- * ✅ User Authentication (Clerk integration)
+ * ✅ User Authentication (better-auth integration with BYPASS_AUTH support)
  * ✅ Book Creation (metadata input and validation)
  * ✅ AI TOC Generation (OpenAI integration)
  * ✅ Chapter Navigation (UI routing)
@@ -478,14 +478,14 @@ test.describe('Complete Authoring Journey E2E', () => {
  * - Integrates with existing E2E structure
  *
  * Assumptions & Limitations:
- * 1. Authentication: Assumes Clerk development mode or test account
+ * 1. Authentication: Assumes BYPASS_AUTH=true for E2E testing or better-auth test account
  * 2. AI Services: Requires real OpenAI API access (not mocked)
  * 3. Execution Time: Full test takes 2-3 minutes due to AI operations
  * 4. Data-TestIDs: Some selectors use role/text as data-testid may not be available
  * 5. Browser Setup: Requires Playwright browsers to be installed
  *
  * Verification Approach:
- * - Can be run locally with `npx playwright test complete-authoring-journey`
+ * - Can be run locally with `NEXT_PUBLIC_BYPASS_AUTH=true npx playwright test complete-authoring-journey`
  * - Requires backend server running at http://localhost:3000
  * - Test will create real data (optional cleanup step provided)
  * - Visual verification available via Playwright trace viewer

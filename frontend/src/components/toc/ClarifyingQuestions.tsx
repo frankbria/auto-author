@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { QuestionResponse } from '@/types/toc';
 import { bookClient } from '@/lib/api/bookClient';
 
@@ -11,7 +11,7 @@ interface ClarifyingQuestionsProps {
 }
 
 export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bookId }: ClarifyingQuestionsProps) {
-  const { getToken } = useAuth();
+  const { data: session } = useSession();
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -19,8 +19,11 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
 
   // Set up token provider for automatic token refresh
   useEffect(() => {
+    const getToken = async () => {
+      return session?.session.token ?? null;
+    };
     bookClient.setTokenProvider(getToken);
-  }, [getToken]);
+  }, [session?.session.token]);
 
   // Load existing responses when component mounts
   useEffect(() => {

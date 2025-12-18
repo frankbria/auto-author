@@ -3,7 +3,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import bookClient from '@/lib/api/bookClient';
 import { triggerTocUpdateEvent } from '@/hooks/useTocSync';
 import { ChapterStatusIndicator } from '@/components/ui/ChapterStatusIndicator';
@@ -141,7 +141,7 @@ const convertChaptersToTocData = (chapters: Chapter[]) => {
 export default function EditTOCPage({ params }: { params: Promise<{ bookId: string }> }) {
   const router = useRouter();
   const { bookId } = use(params);
-  const { getToken } = useAuth();
+  const { data: session } = useSession();
   const [toc, setToc] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -151,7 +151,8 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     const fetchTOC = async () => {
       try {
         // Set up token provider for automatic token refresh
-        bookClient.setTokenProvider(getToken);
+        const tokenProvider = async () => session?.session.token || null;
+        bookClient.setTokenProvider(tokenProvider);
 
         // Fetch TOC from the backend API
         const response = await bookClient.getToc(bookId);
@@ -173,7 +174,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     };
     
     fetchTOC();
-  }, [bookId, getToken]);
+  }, [bookId, session]);
 
   const addNewChapter = () => {
     const newId = `ch${toc.length + 1}`;    const newChapter: Chapter = {
@@ -410,7 +411,8 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
 
     try {
       // Set up token provider for automatic token refresh
-      bookClient.setTokenProvider(getToken);
+      const tokenProvider = async () => session?.session.token || null;
+      bookClient.setTokenProvider(tokenProvider);
 
       // Convert local Chapter format to API TocData format
       const tocData = convertChaptersToTocData(toc);

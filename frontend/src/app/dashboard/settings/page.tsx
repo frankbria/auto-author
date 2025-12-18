@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,8 @@ import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function SettingsPage() {
-  const { user } = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
   const { toast } = useToast();
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [autoSave, setAutoSave] = useState(true);
@@ -39,22 +40,22 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                value={user?.primaryEmailAddress?.emailAddress || ''} 
-                disabled 
+              <Input
+                id="email"
+                type="email"
+                value={user?.email || ''}
+                disabled
               />
               <p className="text-sm text-muted-foreground">
-                Email cannot be changed here. Update it in your Clerk account.
+                Email cannot be changed here. Update it in your account settings.
               </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Display Name</Label>
-              <Input 
-                id="name" 
-                value={user?.fullName || user?.firstName || ''} 
-                disabled 
+              <Input
+                id="name"
+                value={user?.name || ''}
+                disabled
               />
             </div>
           </CardContent>

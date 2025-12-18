@@ -1,14 +1,13 @@
 from passlib.context import CryptContext
-import requests
-import json
-from jose import jwt, jwk
+from jose import jwt
 from jose.exceptions import JWTError
 from typing import Optional, Dict, Any, List, Union
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import settings
-from app.db.database import get_user_by_clerk_id
-from functools import lru_cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Create a password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -27,83 +26,55 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-async def get_clerk_user(clerk_id: str) -> Optional[Dict]:
-    """Fetch user information from Clerk API"""
-    url = f"https://api.clerk.dev/v1/users/{clerk_id}"
-    headers = {"Authorization": f"Bearer {settings.CLERK_API_KEY}"}
-
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        return response.json()
-    return None
-
-
-@lru_cache(maxsize=1)
-def get_clerk_jwks() -> Dict[str, Any]:
-    """Fetch JWKS from Clerk (cached)"""
-    jwks_uri = f"https://{settings.CLERK_FRONTEND_API.replace('https://', '')}/.well-known/jwks.json"
-    response = requests.get(jwks_uri)
-    response.raise_for_status()
-    return response.json()
-
-
 async def verify_jwt_token(token: str) -> Dict[str, Any]:
-    """Verify a JWT token from Clerk."""
+    """Verify a JWT token from better-auth.
+
+    Better-auth uses HS256 algorithm with a shared secret,
+    unlike Clerk which used RS256 with public key verification.
+
+    Args:
+        token: JWT token string from Authorization header
+
+    Returns:
+        Dict containing token payload with user claims
+
+    Raises:
+        HTTPException: If token is invalid, expired, or malformed
+    """
     try:
-        # Decode header to get the key ID (kid)
-        unverified_header = jwt.get_unverified_header(token)
-        kid = unverified_header.get('kid')
-
-        # Decode without verification to see what's in the token (for debugging)
-        import time
-        try:
-            unverified_payload = jwt.decode(token, "", options={"verify_signature": False})
-            current_time = int(time.time())
-            token_exp = unverified_payload.get('exp', 0)
-            print(f"JWT Debug: current_time={current_time}, token_exp={token_exp}, diff={current_time - token_exp}s")
-        except Exception as e:
-            print(f"JWT Debug: Could not decode token for debugging: {e}")
-
-        # If JWT public key is provided, use it directly
-        if settings.clerk_jwt_public_key_pem:
-            key = settings.clerk_jwt_public_key_pem
-        else:
-            # Otherwise, fetch from JWKS endpoint
-            jwks = get_clerk_jwks()
-            # Find the key with matching kid
-            key_data = None
-            for key in jwks['keys']:
-                if key.get('kid') == kid:
-                    key_data = key
-                    break
-
-            if not key_data:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Unable to find appropriate key in JWKS",
-                )
-
-            # Construct the key from JWKS
-            key = jwk.construct(key_data)
-
+        # Decode and verify the token using shared secret
         payload = jwt.decode(
             token,
-            key,
-            algorithms=[settings.CLERK_JWT_ALGORITHM],
+            settings.BETTER_AUTH_SECRET,  # Shared secret, not public key
+            algorithms=["HS256"],           # HS256 for better-auth (not RS256)
             options={
                 "verify_signature": True,
                 "verify_exp": True,
-                "verify_aud": False,
-                "leeway": 300,
+                "verify_aud": False,        # Better-auth doesn't use audience claim by default
+                "leeway": 60,               # 60 seconds leeway for clock skew
             },
         )
+
+        logger.debug(f"JWT token verified successfully for user: {payload.get('sub')}")
         return payload
-    except JWTError as e:
-        # Log the specific error for debugging
-        print(f"JWT verification failed: {str(e)}")
+
+    except jwt.ExpiredSignatureError:
+        logger.warning("JWT token has expired")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid authentication credentials: {str(e)}",
+            detail="Authentication token has expired. Please sign in again.",
+        )
+    except jwt.JWTClaimsError as e:
+        logger.warning(f"JWT claims validation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token claims: {str(e)}",
+        )
+    except JWTError as e:
+        logger.error(f"JWT verification failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid authentication token: {str(e)}",
         )
 
 
@@ -116,10 +87,12 @@ class RoleChecker:
     async def __call__(
         self, credentials: HTTPAuthorizationCredentials = Depends(security)
     ):
+        from app.db.user import get_user_by_auth_id
+
         token = credentials.credentials
         payload = await verify_jwt_token(token)
 
-        # Get user from database based on Clerk ID
+        # Get user from database based on better-auth user ID
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(
@@ -127,14 +100,14 @@ class RoleChecker:
                 detail="Invalid user ID in token",
             )
 
-        user = await get_user_by_clerk_id(user_id)
+        user = await get_user_by_auth_id(user_id)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
             )
 
         # Check if user has one of the allowed roles
-        if user["role"] not in self.allowed_roles:
+        if user.get("role") not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
             )
@@ -156,9 +129,18 @@ async def optional_security(request: Request) -> Union[HTTPAuthorizationCredenti
 async def get_current_user(
     credentials: Union[HTTPAuthorizationCredentials, None] = Depends(optional_security),
 ) -> Dict:
-    """Get the current authenticated user
+    """Get the current authenticated user from better-auth JWT token.
 
     For E2E testing, set BYPASS_AUTH=true to bypass authentication and return a test user.
+
+    Args:
+        credentials: HTTP Authorization credentials containing JWT token
+
+    Returns:
+        Dict containing user data from database
+
+    Raises:
+        HTTPException: If authentication fails or user not found
     """
     from app.core.config import settings
 
@@ -167,7 +149,7 @@ async def get_current_user(
         # Return a test user for E2E tests
         return {
             "id": "test-user-id",
-            "clerk_id": "test-clerk-id",
+            "auth_id": "test-auth-id",  # better-auth user ID
             "email": "test@example.com",
             "first_name": "Test",
             "last_name": "User",
@@ -185,58 +167,40 @@ async def get_current_user(
     token = credentials.credentials
     payload = await verify_jwt_token(token)
 
+    # Extract user ID from better-auth token (sub claim)
     user_id = payload.get("sub")
     if not user_id:
+        logger.error("JWT token missing 'sub' claim")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID in token"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID in token"
         )
 
     try:
-        user = await get_user_by_clerk_id(user_id)
+        from app.db.user import get_user_by_auth_id
+
+        user = await get_user_by_auth_id(user_id)
     except Exception as e:
+        logger.error(f"Error fetching user {user_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching user: {e}",
         )
 
-    # If user doesn't exist in database, auto-create from Clerk data
+    # SECURITY: Require explicit registration - do NOT auto-create users
+    # This prevents unauthorized account creation from stolen/forged JWTs
     if not user:
-        try:
-            # Fetch user details from Clerk API
-            clerk_user_data = await get_clerk_user(user_id)
-
-            if not clerk_user_data:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User not found in Clerk"
-                )
-
-            # Import create_user here to avoid circular imports
-            from app.db.database import create_user
-            from app.schemas.user import UserCreate
-
-            # Extract user data from Clerk response
-            user_create = UserCreate(
-                clerk_id=user_id,
-                email=clerk_user_data["email_addresses"][0]["email_address"] if clerk_user_data.get("email_addresses") else None,
-                first_name=clerk_user_data.get("first_name"),
-                last_name=clerk_user_data.get("last_name"),
-                avatar_url=clerk_user_data.get("image_url"),
-                metadata=clerk_user_data.get("public_metadata", {}),
+        logger.warning(
+            f"User {user_id} authenticated with valid JWT but not registered in database. "
+            "This could indicate: (1) User needs to complete registration, or "
+            "(2) Compromised/stolen JWT token for non-existent user."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "User account not found. Please complete registration first. "
+                "If you have already registered, please contact support."
             )
-
-            # Create user in database
-            user = await create_user(user_create.model_dump())
-
-        except HTTPException:
-            # Re-raise HTTP exceptions
-            raise
-        except Exception as e:
-            # Log error and return generic unauthorized
-            print(f"Error auto-creating user {user_id}: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Failed to create user: {str(e)}"
-            )
+        )
 
     return user

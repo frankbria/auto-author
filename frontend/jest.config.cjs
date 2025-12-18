@@ -10,10 +10,13 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/src/jest.setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // Mock better-auth to avoid ESM issues
+    '^better-auth/client$': '<rootDir>/src/__mocks__/better-auth-client.ts',
+    '^better-auth/react$': '<rootDir>/src/__mocks__/better-auth-react.ts',
   },
   transformIgnorePatterns: [
-    // Transform @clerk packages (they use ES modules in v6+)
-    'node_modules/(?!(@clerk/.*)/)',
+    // Transform better-auth and @clerk packages (they use ES modules)
+    'node_modules/(?!(better-auth|@clerk/.*)/)',
   ],
   testPathIgnorePatterns: [
     '<rootDir>/src/e2e/',

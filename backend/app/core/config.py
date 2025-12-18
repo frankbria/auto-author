@@ -1,22 +1,29 @@
 from pydantic_settings import BaseSettings
-from pydantic import field_validator, Field
+from pydantic import field_validator, Field, ValidationError
 from typing import List, Union
+import os
 
 
 class Settings(BaseSettings):
-    DATABASE_URI: str = "mongodb://localhost:27017"
+    DATABASE_URI: str = Field(
+        default="mongodb://localhost:27017",
+        validation_alias="MONGODB_URL"  # Accept both DATABASE_URI and MONGODB_URL from env
+    )
     DATABASE_NAME: str = "auto_author_test"
     OPENAI_AUTOAUTHOR_API_KEY: str = "test-key"  # Default for testing
 
-    # Clerk Authentication Settings
-    CLERK_API_KEY: str = "test-clerk-api-key"
-    CLERK_PUBLISHABLE_KEY: str = "pk_test_test"
-    CLERK_JWT_PUBLIC_KEY: str | None = None  # Optional: Will fetch from JWKS if not provided
-    CLERK_FRONTEND_API: str = "clerk.test.api"
-    CLERK_BACKEND_API: str = "clerk.test.backend"
-    CLERK_JWT_ALGORITHM: str = "RS256"
-    CLERK_SECRET_KEY: str = ""  # Secret key for Clerk
-    CLERK_WEBHOOK_SECRET: str = ""  # Secret for validating webhooks
+    # Better Auth Settings
+    # CRITICAL: BETTER_AUTH_SECRET must be set in .env file
+    # Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'
+    # For CI/testing: use "test-secret-for-ci-minimum-32-characters-long-safe-for-testing"
+    BETTER_AUTH_SECRET: str = Field(
+        default="test-secret-for-ci-minimum-32-characters-long-safe-for-testing",
+        min_length=32,
+        description="JWT signing secret - MUST be strong random value, minimum 32 characters"
+    )
+    BETTER_AUTH_URL: str = "http://localhost:3000"  # Base URL of the application
+    BETTER_AUTH_ISSUER: str = "better-auth"  # Issuer identifier for JWT tokens
+    JWT_ALGORITHM: str = "HS256"  # Changed from RS256 (Clerk) to HS256 (better-auth)
 
     # API Settings
     API_V1_PREFIX: str = "/api/v1"
@@ -27,24 +34,18 @@ class Settings(BaseSettings):
 
     # E2E Testing Settings
     BYPASS_AUTH: bool = False  # Set to True for E2E tests to bypass authentication
-    
+
     # AWS Settings (Optional - for transcription and storage)
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "us-east-1"
     AWS_S3_BUCKET: str = ""
-    
+
     # Cloudinary Settings (Optional - for image storage)
     CLOUDINARY_CLOUD_NAME: str = ""
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
-    @property
-    def clerk_jwt_public_key_pem(self):
-        if self.CLERK_JWT_PUBLIC_KEY:
-            return self.CLERK_JWT_PUBLIC_KEY.replace("\\n", "\n")
-        return None
-    
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod
     def assemble_cors_origins(cls, v):
@@ -56,6 +57,54 @@ class Settings(BaseSettings):
         elif isinstance(v, list):
             return v
         raise ValueError(v)
+
+    @field_validator('BETTER_AUTH_SECRET')
+    @classmethod
+    def validate_jwt_secret(cls, v: str) -> str:
+        """Validate JWT secret strength and reject weak/default values."""
+        # Check minimum length (already enforced by Field, but double-check)
+        if len(v) < 32:
+            raise ValueError(
+                "BETTER_AUTH_SECRET must be at least 32 characters. "
+                "Generate a strong secret with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
+
+        # Allow specific test secret for CI/testing environments
+        ci_test_secret = "test-secret-for-ci-minimum-32-characters-long-safe-for-testing"
+        if v == ci_test_secret:
+            # Only allow in test/CI environments, not production
+            if os.getenv("NODE_ENV") == "production":
+                raise ValueError(
+                    "FATAL: Cannot use test secret in production environment. "
+                    "Generate a strong secret with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+                )
+            return v  # Allow in test/CI
+
+        # Reject known weak/test secrets (except our specific CI secret)
+        weak_secrets = [
+            "test-better-auth-secret-key",
+            "secret",
+            "changeme",
+            "development",
+            "password",
+            "123456",
+        ]
+        # More permissive check - only reject if it's exactly a weak secret or very short "test"
+        if v.lower() in weak_secrets or v.lower() == "test":
+            raise ValueError(
+                "BETTER_AUTH_SECRET cannot be a weak/default value. "
+                "Generate a strong secret with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
+
+        # Warn if running in production without proper secret
+        if os.getenv("NODE_ENV") == "production" and len(v) < 64:
+            import warnings
+            warnings.warn(
+                f"BETTER_AUTH_SECRET should be at least 64 characters in production. "
+                f"Current length: {len(v)}. Recommend regenerating with stronger secret."
+            )
+
+        return v
 
     class Config:
         env_file = ".env"

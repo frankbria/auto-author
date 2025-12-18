@@ -152,7 +152,8 @@ test.describe('Security & Performance', () => {
       // Measure time from click to response
       const start = performance.now();
       await page.click('text=Sign In');
-      await page.waitForSelector('[data-clerk-modal]', { timeout: 5000 });
+      // Wait for navigation to sign-in page (better-auth)
+      await page.waitForURL('**/auth/sign-in', { timeout: 5000 });
       const fid = performance.now() - start;
 
       console.log(`📊 FID Simulation: ${fid.toFixed(0)}ms`);

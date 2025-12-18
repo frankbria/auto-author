@@ -17,8 +17,6 @@ from app.core.security import (
     hash_password,
     verify_password,
     verify_jwt_token,
-    get_clerk_jwks,
-    get_clerk_user,
     RoleChecker,
     get_current_user,
     optional_security,
@@ -70,130 +68,14 @@ class TestPasswordHashing:
 
 
 @pytest.mark.asyncio
-class TestClerkUser:
-    """Test Clerk API user fetching"""
-
-    @patch("app.core.security.requests.get")
-    async def test_get_clerk_user_success(self, mock_get):
-        """Test successful Clerk user fetch"""
-        clerk_id = "test_clerk_id_123"
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "id": clerk_id,
-            "email": "test@example.com",
-            "first_name": "Test",
-            "last_name": "User"
-        }
-        mock_get.return_value = mock_response
-
-        result = await get_clerk_user(clerk_id)
-
-        assert result is not None
-        assert result["id"] == clerk_id
-        assert result["email"] == "test@example.com"
-
-    @patch("app.core.security.requests.get")
-    async def test_get_clerk_user_not_found(self, mock_get):
-        """Test Clerk user not found"""
-        clerk_id = "nonexistent_id"
-        mock_response = Mock()
-        mock_response.status_code = 404
-        mock_get.return_value = mock_response
-
-        result = await get_clerk_user(clerk_id)
-
-        assert result is None
-
-    @patch("app.core.security.requests.get")
-    async def test_get_clerk_user_api_error(self, mock_get):
-        """Test Clerk API error"""
-        clerk_id = "test_id"
-        mock_response = Mock()
-        mock_response.status_code = 500
-        mock_get.return_value = mock_response
-
-        result = await get_clerk_user(clerk_id)
-
-        assert result is None
-
-
-class TestClerkJWKS:
-    """Test JWKS fetching and caching"""
-
-    @patch("app.core.security.requests.get")
-    def test_get_clerk_jwks_success(self, mock_get):
-        """Test successful JWKS fetch"""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "keys": [
-                {
-                    "kid": "test_key_id",
-                    "kty": "RSA",
-                    "use": "sig",
-                    "alg": "RS256",
-                    "n": "test_modulus",
-                    "e": "AQAB"
-                }
-            ]
-        }
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
-
-        # Clear cache before test
-        get_clerk_jwks.cache_clear()
-
-        result = get_clerk_jwks()
-
-        assert result is not None
-        assert "keys" in result
-        assert len(result["keys"]) == 1
-
-    @patch("app.core.security.requests.get")
-    def test_get_clerk_jwks_caching(self, mock_get):
-        """Test that JWKS is cached"""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"keys": []}
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
-
-        # Clear cache
-        get_clerk_jwks.cache_clear()
-
-        # First call
-        get_clerk_jwks()
-        # Second call
-        get_clerk_jwks()
-
-        # Should only call API once due to caching
-        assert mock_get.call_count == 1
-
-    @patch("app.core.security.requests.get")
-    def test_get_clerk_jwks_network_error(self, mock_get):
-        """Test JWKS fetch with network error"""
-        mock_get.side_effect = Exception("Network error")
-
-        # Clear cache
-        get_clerk_jwks.cache_clear()
-
-        with pytest.raises(Exception, match="Network error"):
-            get_clerk_jwks()
-
-
-@pytest.mark.asyncio
 class TestJWTVerification:
-    """Test JWT token verification"""
+    """Test JWT token verification for better-auth (HS256)"""
 
     @patch("app.core.security.jwt.decode")
-    @patch("app.core.security.jwt.get_unverified_header")
     @patch("app.core.security.settings")
-    async def test_verify_jwt_token_with_pem_key(self, mock_settings, mock_get_header, mock_decode):
-        """Test JWT verification with PEM key"""
-        mock_settings.clerk_jwt_public_key_pem = "-----BEGIN PUBLIC KEY-----\ntest_key\n-----END PUBLIC KEY-----"
-        mock_settings.CLERK_JWT_ALGORITHM = "RS256"
-        mock_get_header.return_value = {"kid": "test_kid"}
+    async def test_verify_jwt_token_success(self, mock_settings, mock_decode):
+        """Test JWT verification with valid HS256 token"""
+        mock_settings.BETTER_AUTH_SECRET = "test-secret-key-minimum-32-chars-long"
         mock_decode.return_value = {
             "sub": "user_123",
             "email": "test@example.com"
@@ -204,62 +86,13 @@ class TestJWTVerification:
 
         assert result["sub"] == "user_123"
         assert result["email"] == "test@example.com"
-
-    @patch("app.core.security.jwk.construct")
-    @patch("app.core.security.get_clerk_jwks")
-    @patch("app.core.security.jwt.decode")
-    @patch("app.core.security.jwt.get_unverified_header")
-    @patch("app.core.security.settings")
-    async def test_verify_jwt_token_with_jwks(self, mock_settings, mock_get_header, mock_decode, mock_get_jwks, mock_jwk_construct):
-        """Test JWT verification with JWKS"""
-        mock_settings.clerk_jwt_public_key_pem = None
-        mock_settings.CLERK_JWT_ALGORITHM = "RS256"
-        mock_get_header.return_value = {"kid": "test_kid"}
-        mock_get_jwks.return_value = {
-            "keys": [
-                {"kid": "test_kid", "kty": "RSA", "use": "sig"}
-            ]
-        }
-        mock_jwk_construct.return_value = "constructed_key"
-        mock_decode.return_value = {
-            "sub": "user_123",
-            "email": "test@example.com"
-        }
-
-        token = "test_token"
-        result = await verify_jwt_token(token)
-
-        assert result["sub"] == "user_123"
-
-    @patch("app.core.security.get_clerk_jwks")
-    @patch("app.core.security.jwt.get_unverified_header")
-    @patch("app.core.security.settings")
-    async def test_verify_jwt_token_key_not_found(self, mock_settings, mock_get_header, mock_get_jwks):
-        """Test JWT verification when kid not in JWKS"""
-        mock_settings.clerk_jwt_public_key_pem = None
-        mock_get_header.return_value = {"kid": "missing_kid"}
-        mock_get_jwks.return_value = {
-            "keys": [
-                {"kid": "different_kid", "kty": "RSA"}
-            ]
-        }
-
-        token = "test_token"
-
-        with pytest.raises(HTTPException) as exc_info:
-            await verify_jwt_token(token)
-
-        assert exc_info.value.status_code == 401
-        assert "Unable to find appropriate key" in exc_info.value.detail
+        mock_decode.assert_called_once()
 
     @patch("app.core.security.jwt.decode")
-    @patch("app.core.security.jwt.get_unverified_header")
     @patch("app.core.security.settings")
-    async def test_verify_jwt_token_expired(self, mock_settings, mock_get_header, mock_decode):
+    async def test_verify_jwt_token_expired(self, mock_settings, mock_decode):
         """Test JWT verification with expired token"""
-        mock_settings.clerk_jwt_public_key_pem = "test_key"
-        mock_settings.CLERK_JWT_ALGORITHM = "RS256"
-        mock_get_header.return_value = {"kid": "test_kid"}
+        mock_settings.BETTER_AUTH_SECRET = "test-secret-key-minimum-32-chars-long"
         mock_decode.side_effect = ExpiredSignatureError("Token has expired")
 
         token = "expired_token"
@@ -268,16 +101,13 @@ class TestJWTVerification:
             await verify_jwt_token(token)
 
         assert exc_info.value.status_code == 401
-        assert "Invalid authentication credentials" in exc_info.value.detail
+        assert "expired" in exc_info.value.detail.lower()
 
     @patch("app.core.security.jwt.decode")
-    @patch("app.core.security.jwt.get_unverified_header")
     @patch("app.core.security.settings")
-    async def test_verify_jwt_token_invalid(self, mock_settings, mock_get_header, mock_decode):
+    async def test_verify_jwt_token_invalid(self, mock_settings, mock_decode):
         """Test JWT verification with invalid token"""
-        mock_settings.clerk_jwt_public_key_pem = "test_key"
-        mock_settings.CLERK_JWT_ALGORITHM = "RS256"
-        mock_get_header.return_value = {"kid": "test_kid"}
+        mock_settings.BETTER_AUTH_SECRET = "test-secret-key-minimum-32-chars-long"
         mock_decode.side_effect = JWTError("Invalid signature")
 
         token = "invalid_token"
@@ -286,6 +116,7 @@ class TestJWTVerification:
             await verify_jwt_token(token)
 
         assert exc_info.value.status_code == 401
+        assert "Invalid authentication token" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
@@ -293,12 +124,12 @@ class TestRoleChecker:
     """Test role-based access control"""
 
     @patch("app.core.security.verify_jwt_token")
-    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.db.user.get_user_by_auth_id")
     async def test_role_checker_allowed(self, mock_get_user, mock_verify):
         """Test RoleChecker allows authorized role"""
         mock_verify.return_value = {"sub": "user_123"}
         mock_get_user.return_value = {
-            "clerk_id": "user_123",
+            "auth_id": "user_123",
             "role": "admin",
             "email": "admin@example.com"
         }
@@ -311,12 +142,12 @@ class TestRoleChecker:
         assert result["role"] == "admin"
 
     @patch("app.core.security.verify_jwt_token")
-    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.db.user.get_user_by_auth_id")
     async def test_role_checker_forbidden(self, mock_get_user, mock_verify):
         """Test RoleChecker denies unauthorized role"""
         mock_verify.return_value = {"sub": "user_123"}
         mock_get_user.return_value = {
-            "clerk_id": "user_123",
+            "auth_id": "user_123",
             "role": "user",
             "email": "user@example.com"
         }
@@ -331,7 +162,7 @@ class TestRoleChecker:
         assert "Not enough permissions" in exc_info.value.detail
 
     @patch("app.core.security.verify_jwt_token")
-    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.db.user.get_user_by_auth_id")
     async def test_role_checker_user_not_found(self, mock_get_user, mock_verify):
         """Test RoleChecker when user not in database"""
         mock_verify.return_value = {"sub": "user_123"}
@@ -373,19 +204,19 @@ class TestGetCurrentUser:
 
         result = await get_current_user(credentials=None)
 
-        assert result["clerk_id"] == "test-clerk-id"
+        assert result["auth_id"] == "test-auth-id"
         assert result["email"] == "test@example.com"
         assert result["role"] == "user"
 
     @patch("app.core.security.verify_jwt_token")
-    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.db.user.get_user_by_auth_id")
     @patch("app.core.config.settings")
     async def test_get_current_user_valid_token(self, mock_settings, mock_get_user, mock_verify):
         """Test get_current_user with valid token"""
         type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
         mock_verify.return_value = {"sub": "user_123"}
         mock_get_user.return_value = {
-            "clerk_id": "user_123",
+            "auth_id": "user_123",
             "email": "test@example.com",
             "role": "user"
         }
@@ -394,7 +225,7 @@ class TestGetCurrentUser:
 
         result = await get_current_user(credentials)
 
-        assert result["clerk_id"] == "user_123"
+        assert result["auth_id"] == "user_123"
         assert result["email"] == "test@example.com"
 
     @patch("app.core.security.settings")
@@ -424,10 +255,10 @@ class TestGetCurrentUser:
         assert "Invalid user ID" in exc_info.value.detail
 
     @patch("app.core.security.verify_jwt_token")
-    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.db.user.get_user_by_auth_id")
     @patch("app.core.security.settings")
     async def test_get_current_user_not_found(self, mock_settings, mock_get_user, mock_verify):
-        """Test get_current_user when user not in database"""
+        """Test get_current_user when user not in database - should return 403"""
         mock_settings.BYPASS_AUTH = False
         mock_verify.return_value = {"sub": "user_123"}
         mock_get_user.return_value = None
@@ -437,11 +268,11 @@ class TestGetCurrentUser:
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(credentials)
 
-        assert exc_info.value.status_code == 401
-        assert "User not found" in exc_info.value.detail
+        assert exc_info.value.status_code == 403
+        assert "not found" in exc_info.value.detail.lower()
 
     @patch("app.core.security.verify_jwt_token")
-    @patch("app.core.security.get_user_by_clerk_id")
+    @patch("app.db.user.get_user_by_auth_id")
     @patch("app.core.security.settings")
     async def test_get_current_user_database_error(self, mock_settings, mock_get_user, mock_verify):
         """Test get_current_user with database error"""

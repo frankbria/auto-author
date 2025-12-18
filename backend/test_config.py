@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import os
 os.environ['OPENAI_AUTOAUTHOR_API_KEY'] = 'test-key'
-os.environ['CLERK_API_KEY'] = 'test-key'
-os.environ['CLERK_JWT_PUBLIC_KEY'] = 'test-key'
-os.environ['CLERK_FRONTEND_API'] = 'test.clerk.com'
-os.environ['CLERK_BACKEND_API'] = 'api.clerk.com'
+os.environ['BETTER_AUTH_SECRET'] = 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
+os.environ['BETTER_AUTH_URL'] = 'http://localhost:3000'
+os.environ['BETTER_AUTH_ISSUER'] = 'better-auth'
 
 try:
     from app.core.config import settings

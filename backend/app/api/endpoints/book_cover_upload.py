@@ -26,7 +26,7 @@ async def upload_book_cover_image(
 ):
     """
     Upload a cover image for a book.
-    
+
     Accepts image files (JPEG, PNG, WebP, GIF) up to 5MB.
     Returns URLs for the uploaded image and thumbnail.
     """
@@ -34,35 +34,35 @@ async def upload_book_cover_image(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to upload cover image for this book"
         )
-    
+
     try:
         # Process and save the cover image
         image_url, thumbnail_url = await file_upload_service.process_and_save_cover_image(
             file=file,
             book_id=book_id
         )
-        
+
         # Delete old cover image if exists
         old_cover_url = book.get("cover_image_url")
         old_thumbnail_url = book.get("cover_thumbnail_url")
         if old_cover_url:
             await file_upload_service.delete_cover_image(
-                old_cover_url, 
+                old_cover_url,
                 old_thumbnail_url
             )
-        
+
         # Update book with new cover image URLs
         update_data = {
             "cover_image_url": image_url,
             "cover_thumbnail_url": thumbnail_url,
             "updated_at": datetime.now(timezone.utc),
         }
-        await update_book(book_id, update_data, current_user.get("clerk_id"))
-        
+        await update_book(book_id, update_data, current_user.get("auth_id"))
+
         # Log the upload
         if request:
             await audit_request(
@@ -77,14 +77,14 @@ async def upload_book_cover_image(
                     "image_url": image_url,
                 }
             )
-        
+
         return {
             "message": "Cover image uploaded successfully",
             "cover_image_url": image_url,
             "cover_thumbnail_url": thumbnail_url,
             "book_id": book_id,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

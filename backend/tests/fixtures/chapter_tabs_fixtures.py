@@ -26,9 +26,9 @@ def book_with_chapters(test_book):
     """Create a test book with multiple chapters for tab testing"""
     chapters = []
     for i in range(1, 6):
-        status_map = {1: ChapterStatus.DRAFT, 2: ChapterStatus.IN_PROGRESS, 
+        status_map = {1: ChapterStatus.DRAFT, 2: ChapterStatus.IN_PROGRESS,
                      3: ChapterStatus.COMPLETED, 4: ChapterStatus.REVIEW, 5: ChapterStatus.PUBLISHED}
-        
+
         chapters.append({
             "id": f"ch-{i}",
             "title": f"Chapter {i}",
@@ -42,7 +42,7 @@ def book_with_chapters(test_book):
             "content": f"Content for chapter {i}" if i > 1 else "",
             "parent_id": None
         })
-    
+
     # Add nested chapter (subchapter)
     chapters.append({
         "id": "ch-2-1",
@@ -114,16 +114,16 @@ def tab_state_data():
 async def chapter_access_logs_fixture(test_user, test_book):
     """Generate sample chapter access logs for testing"""
     from app.db.database import get_collection
-    
+
     logs = []
     chapter_ids = [f"ch-{i}" for i in range(1, 6)]
     access_types = ["view", "edit", "tab_state", "status_update"]
-    
+
     for i, chapter_id in enumerate(chapter_ids):
         for access_type in access_types:
             logs.append(
                 ChapterAccessLog(
-                    user_id=test_user["clerk_id"],
+                    user_id=test_user["auth_id"],
                     book_id=test_book["id"],
                     chapter_id=chapter_id,
                     access_type=access_type,
@@ -131,9 +131,9 @@ async def chapter_access_logs_fixture(test_user, test_book):
                     metadata={"test": True, "chapter_index": i}
                 ).model_dump(by_alias=True)
             )
-    
+
     # Insert logs into test database
     collection = await get_collection("chapter_access_logs")
     await collection.insert_many(logs)
-    
+
     return logs

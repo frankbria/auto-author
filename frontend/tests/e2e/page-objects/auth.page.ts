@@ -1,7 +1,7 @@
 /**
  * Authentication Page Object
  *
- * Handles homepage and Clerk authentication interactions.
+ * Handles homepage and better-auth authentication interactions.
  */
 
 import { Page, expect } from '@playwright/test';
@@ -18,35 +18,42 @@ export class AuthPage {
   }
 
   /**
-   * Click the Sign In button
+   * Navigate to sign-in page
+   */
+  async gotoSignIn(): Promise<void> {
+    await this.page.goto('/auth/sign-in');
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  /**
+   * Click the Sign In button on homepage
    */
   async clickSignIn(): Promise<void> {
     await this.page.click('text=Sign In');
 
-    // Wait for Clerk modal to appear
-    await this.page.waitForSelector('[data-clerk-modal]', { timeout: 10000 });
+    // Wait for sign-in page to load
+    await this.page.waitForURL('**/auth/sign-in', { timeout: 10000 });
   }
 
   /**
-   * Fill in Clerk authentication form
+   * Fill in better-auth authentication form
    */
   async fillCredentials(email: string, password: string): Promise<void> {
-    // Fill email/identifier
-    await this.page.fill('input[name="identifier"]', email);
-    await this.page.click('button:has-text("Continue")');
+    // Wait for form to be visible
+    await this.page.waitForSelector('form', { timeout: 5000 });
 
-    // Wait for password field
-    await this.page.waitForSelector('input[name="password"]', { timeout: 5000 });
+    // Fill email field
+    await this.page.fill('input[type="email"]', email);
 
-    // Fill password
-    await this.page.fill('input[name="password"]', password);
+    // Fill password field
+    await this.page.fill('input[type="password"]', password);
   }
 
   /**
-   * Click the sign in button in Clerk modal
+   * Click the sign in button on the sign-in form
    */
   async submitSignIn(): Promise<void> {
-    await this.page.click('button:has-text("Sign in")');
+    await this.page.click('button[type="submit"]');
   }
 
   /**
@@ -75,14 +82,14 @@ export class AuthPage {
   }
 
   /**
-   * Verify Clerk button is visible
+   * Verify Sign In button is visible on homepage
    */
   async verifySignInButtonVisible(): Promise<void> {
     await expect(this.page.locator('text=Sign In')).toBeVisible();
   }
 
   /**
-   * Full authentication flow
+   * Full authentication flow (from homepage)
    */
   async authenticate(email: string, password: string): Promise<void> {
     await this.clickSignIn();
@@ -94,14 +101,26 @@ export class AuthPage {
   }
 
   /**
+   * Direct authentication flow (go straight to sign-in page)
+   */
+  async authenticateDirect(email: string, password: string): Promise<void> {
+    await this.gotoSignIn();
+    await this.fillCredentials(email, password);
+    await this.submitSignIn();
+    await this.waitForAuthComplete();
+
+    console.log('✅ Authentication successful');
+  }
+
+  /**
    * Sign out
    */
   async signOut(): Promise<void> {
-    // Click user menu
-    await this.page.click('[data-testid="user-menu"]');
+    // Click user menu button (avatar button)
+    await this.page.click('button[class*="rounded-full"]');
 
-    // Click sign out
-    await this.page.click('text=Sign Out');
+    // Click sign out option
+    await this.page.click('text=Sign out');
 
     // Wait for redirect to homepage
     await this.page.waitForURL('/', { timeout: 10000 });
@@ -110,24 +129,24 @@ export class AuthPage {
   }
 
   /**
-   * Verify authentication token exists
+   * Verify authentication session exists
    */
-  async verifyAuthToken(): Promise<void> {
-    const authToken = await this.page.evaluate(() =>
-      localStorage.getItem('clerk-token') || sessionStorage.getItem('clerk-token')
-    );
+  async verifyAuthSession(): Promise<void> {
+    const hasSession = await this.page.evaluate(async () => {
+      return document.cookie.includes('better-auth');
+    });
 
-    expect(authToken, 'Expected authentication token to exist').toBeTruthy();
+    expect(hasSession, 'Expected authentication session to exist').toBeTruthy();
   }
 
   /**
-   * Verify Clerk session is cleared
+   * Verify better-auth session is cleared
    */
   async verifySessionCleared(): Promise<void> {
-    const authToken = await this.page.evaluate(() =>
-      localStorage.getItem('clerk-token') || sessionStorage.getItem('clerk-token')
-    );
+    const hasSession = await this.page.evaluate(async () => {
+      return document.cookie.includes('better-auth');
+    });
 
-    expect(authToken, 'Expected authentication token to be cleared').toBeNull();
+    expect(hasSession, 'Expected authentication session to be cleared').toBeFalsy();
   }
 }

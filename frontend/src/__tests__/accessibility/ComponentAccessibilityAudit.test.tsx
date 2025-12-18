@@ -27,19 +27,28 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
-// Mock Clerk
-jest.mock('@clerk/nextjs', () => ({
-  useAuth: () => ({
-    isLoaded: true,
-    isSignedIn: true,
-    userId: 'test-user',
-    getToken: jest.fn().mockResolvedValue('mock-token'),
+// Mock better-auth
+jest.mock('@/lib/auth-client', () => ({
+  useSession: () => ({
+    data: {
+      user: {
+        id: 'test-user',
+        email: 'test@example.com',
+        name: 'Test User',
+      },
+      session: {
+        token: 'mock-token',
+        id: 'session-123',
+      },
+    },
+    isPending: false,
+    error: null,
   }),
-  useUser: () => ({
-    isLoaded: true,
-    user: { id: 'test-user', emailAddresses: [{ emailAddress: 'test@example.com' }] },
-  }),
-  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
+  authClient: {
+    signIn: { email: jest.fn() },
+    signUp: { email: jest.fn() },
+    signOut: jest.fn(),
+  },
 }));
 
 describe('Component Accessibility Audit - Phase 1', () => {

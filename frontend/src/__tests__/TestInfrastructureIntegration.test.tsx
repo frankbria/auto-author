@@ -20,26 +20,28 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
-// Mock Clerk authentication
-jest.mock('@clerk/nextjs', () => ({
-  useAuth: () => ({
-    isLoaded: true,
-    isSignedIn: true,
-    userId: 'test-user-id',
-    getToken: jest.fn().mockResolvedValue('mock-token'),
-  }),
-  useUser: () => ({
-    isLoaded: true,
-    user: {
-      id: 'test-user-id',
-      emailAddresses: [{ emailAddress: 'test@example.com' }],
-      firstName: 'Test',
-      lastName: 'User',
+// Mock better-auth
+jest.mock('@/lib/auth-client', () => ({
+  useSession: () => ({
+    data: {
+      user: {
+        id: 'test-user-id',
+        email: 'test@example.com',
+        name: 'Test User',
+      },
+      session: {
+        token: 'mock-token',
+        id: 'session-123',
+      },
     },
+    isPending: false,
+    error: null,
   }),
-  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
-  SignInButton: ({ children }: { children: React.ReactNode }) => children,
-  UserButton: () => <div data-testid="user-button">User Button</div>,
+  authClient: {
+    signIn: { email: jest.fn() },
+    signUp: { email: jest.fn() },
+    signOut: jest.fn(),
+  },
 }));
 
 // Mock fetch for API calls
@@ -84,16 +86,16 @@ describe('Test Infrastructure Integration', () => {
       expect(typeof router.pathname).toBe('string');
     });
 
-    it('should have Clerk authentication mocked correctly', () => {
-      const { useAuth, useUser } = require('@clerk/nextjs');
-      const auth = useAuth();
-      const user = useUser();
-      
-      expect(auth.isLoaded).toBe(true);
-      expect(auth.isSignedIn).toBe(true);
-      expect(auth.userId).toBe('test-user-id');
-      expect(user.isLoaded).toBe(true);
-      expect(user.user.id).toBe('test-user-id');
+    it('should have better-auth mocked correctly', () => {
+      const { useSession } = require('@/lib/auth-client');
+      const session = useSession();
+
+      expect(session.data).toBeDefined();
+      expect(session.data.user.id).toBe('test-user-id');
+      expect(session.data.user.email).toBe('test@example.com');
+      expect(session.data.session.token).toBe('mock-token');
+      expect(session.isPending).toBe(false);
+      expect(session.error).toBeNull();
     });
 
     it('should have fetch mocked correctly', () => {
@@ -289,21 +291,29 @@ export const testUtils = {
   renderWithErrorBoundary,
   mockAuth: {
     authenticated: () => {
-      const { useAuth } = require('@clerk/nextjs');
-      useAuth.mockReturnValue({
-        isLoaded: true,
-        isSignedIn: true,
-        userId: 'test-user-id',
-        getToken: jest.fn().mockResolvedValue('mock-token'),
+      const { useSession } = require('@/lib/auth-client');
+      useSession.mockReturnValue({
+        data: {
+          user: {
+            id: 'test-user-id',
+            email: 'test@example.com',
+            name: 'Test User',
+          },
+          session: {
+            token: 'mock-token',
+            id: 'session-123',
+          },
+        },
+        isPending: false,
+        error: null,
       });
     },
     unauthenticated: () => {
-      const { useAuth } = require('@clerk/nextjs');
-      useAuth.mockReturnValue({
-        isLoaded: true,
-        isSignedIn: false,
-        userId: null,
-        getToken: jest.fn().mockResolvedValue(null),
+      const { useSession } = require('@/lib/auth-client');
+      useSession.mockReturnValue({
+        data: null,
+        isPending: false,
+        error: null,
       });
     },
   },

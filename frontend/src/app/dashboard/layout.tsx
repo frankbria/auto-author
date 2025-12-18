@@ -1,6 +1,6 @@
 'use client';
 
-import { UserButton } from '@clerk/nextjs';
+import { UserButton } from '@/components/ui/user-button';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -56,12 +56,12 @@ export default function DashboardLayout({
                   ))}
                 </ul>
               </nav>
-              <UserButton afterSignOutUrl="/" />
+              <UserButton />
             </div>
 
             {/* Mobile Navigation */}
             <div className="md:hidden flex items-center gap-4">
-              <UserButton afterSignOutUrl="/" />
+              <UserButton />
               <button
                 onClick={toggleMobileMenu}
                 className="text-zinc-400 hover:text-zinc-100 transition-colors p-2"

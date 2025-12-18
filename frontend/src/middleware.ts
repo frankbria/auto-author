@@ -1,32 +1,74 @@
 // frontend/src/middleware.ts
 
-import { clerkMiddleware } from '@clerk/nextjs/server';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuth } from '@/lib/auth';
 
-// Export the Clerk middleware for route protection
+// Middleware for route protection using better-auth
 // This will:
 // 1. Verify authentication for protected routes
 // 2. Redirect unauthenticated users to sign-in page
-// 3. Provide auth context to your application
+// 3. Provide session context to your application
 //
-// For E2E testing: Set NEXT_PUBLIC_BYPASS_AUTH=true to skip authentication
-export default clerkMiddleware(async (auth, req) => {
-  // Allow bypassing auth for E2E tests
-  // NOTE: Must use NEXT_PUBLIC_ prefix to be available in middleware
-  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true' || process.env.NEXT_PUBLIC_ENVIRONMENT === 'test') {
+// For E2E testing: Set BYPASS_AUTH=true (server-only) to skip authentication
+export async function middleware(request: NextRequest) {
+  // SECURITY: Use server-side only env var (NOT NEXT_PUBLIC_)
+  // This prevents exposing test mode to client-side code
+  const bypassAuth = process.env.BYPASS_AUTH === 'true';
+
+  // Production safety check - prevent accidental bypass in production
+  if (bypassAuth && process.env.NODE_ENV === 'production') {
+    console.error('FATAL: BYPASS_AUTH cannot be enabled in production environment');
+    throw new Error(
+      'FATAL SECURITY ERROR: BYPASS_AUTH is enabled in production. ' +
+      'This completely disables authentication. Set BYPASS_AUTH=false immediately.'
+    );
+  }
+
+  // Allow bypass for E2E tests (development/test environments only)
+  if (bypassAuth) {
+    console.warn('⚠️  BYPASS_AUTH enabled - authentication is disabled for testing');
     return NextResponse.next();
   }
 
-  // Enforce authentication for protected routes
-  // This will redirect unauthenticated users to the sign-in page
-  await auth.protect();
+  const { pathname } = request.nextUrl;
 
-  return NextResponse.next();
-});
+  // Define protected routes
+  const isProtectedRoute = pathname.startsWith('/dashboard');
+
+  // Skip session check for public routes
+  if (!isProtectedRoute) {
+    return NextResponse.next();
+  }
+
+  // Get session from better-auth with connected MongoDB client
+  try {
+    const auth = await getAuth();
+    const session = await auth.api.getSession({
+      headers: request.headers
+    });
+
+    // Redirect to sign-in if accessing protected route without session
+    if (!session) {
+      const signInUrl = new URL('/auth/sign-in', request.url);
+      signInUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(signInUrl);
+    }
+
+    // Allow request to proceed
+    return NextResponse.next();
+  } catch (error) {
+    // If session check fails, redirect to sign-in
+    console.error('Session validation error:', error);
+    const signInUrl = new URL('/auth/sign-in', request.url);
+    signInUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(signInUrl);
+  }
+}
 
 export const config = {
   matcher: [
-    // Only protect dashboard routes - leave root path (/) public for landing page
-    '/dashboard/:path*',
+    // Match all routes except static files and API routes
+    // This allows public routes while protecting dashboard routes
+    '/((?!_next/static|_next/image|favicon.ico|api/).*)',
   ]
 };

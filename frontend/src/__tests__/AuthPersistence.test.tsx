@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { useAuth } from '@clerk/nextjs';
+import { render, screen, waitFor } from '@testing-library/react';
+import { useSession } from '@/lib/auth-client';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useRouter } from 'next/navigation';
 
@@ -8,9 +8,14 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 
-// Mock Clerk's useAuth hook
-jest.mock('@clerk/nextjs', () => ({
-  useAuth: jest.fn(),
+// Mock better-auth's useSession hook
+jest.mock('@/lib/auth-client', () => ({
+  useSession: jest.fn(),
+  authClient: {
+    signIn: { email: jest.fn() },
+    signUp: { email: jest.fn() },
+    signOut: jest.fn(),
+  },
 }));
 
 describe('Authentication State Persistence', () => {
@@ -21,14 +26,16 @@ describe('Authentication State Persistence', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
+    // Ensure auth bypass is disabled for these tests
+    delete process.env.NEXT_PUBLIC_BYPASS_AUTH;
   });
 
   test('redirects to sign-in when user is not authenticated', async () => {
-    // Mock the useAuth hook to simulate an unauthenticated state
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: true,
-      userId: null,
-      isSignedIn: false,
+    // Mock unauthenticated state
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: false,
+      error: null,
     });
 
     render(
@@ -37,18 +44,21 @@ describe('Authentication State Persistence', () => {
       </ProtectedRoute>
     );
 
-    // Expect router.push to be called with the sign-in route
-    expect(mockRouter.push).toHaveBeenCalledWith('/sign-in');
+    // Expect router.push to be called with the sign-in route (better-auth uses /auth/sign-in)
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith('/auth/sign-in');
+    });
 
     // Should not render protected content
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
+
   test('shows loading spinner while auth state is loading', async () => {
-    // Mock the useAuth hook to simulate a loading state
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: false,
-      userId: null,
-      isSignedIn: false,
+    // Mock loading state
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: true,
+      error: null,
     });
 
     render(
@@ -58,16 +68,28 @@ describe('Authentication State Persistence', () => {
     );
 
     // Look for the loading spinner element directly using its class
-    const loadingElement = document.querySelector('.animate-spin');
-    expect(loadingElement).toBeInTheDocument();
+    await waitFor(() => {
+      const loadingElement = document.querySelector('.animate-spin');
+      expect(loadingElement).toBeInTheDocument();
+    });
   });
 
   test('renders protected content when user is authenticated', async () => {
-    // Mock the useAuth hook to simulate an authenticated state
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: true,
-      userId: 'user_123',
-      isSignedIn: true,
+    // Mock authenticated state
+    (useSession as jest.Mock).mockReturnValue({
+      data: {
+        user: {
+          id: 'user_123',
+          email: 'test@example.com',
+          name: 'Test User',
+        },
+        session: {
+          token: 'test-token',
+          id: 'session_123',
+        },
+      },
+      isPending: false,
+      error: null,
     });
 
     render(
@@ -78,22 +100,28 @@ describe('Authentication State Persistence', () => {
 
     // Should render protected content
     expect(screen.getByText('Protected Content')).toBeInTheDocument();
-    
+
     // Should not redirect
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
   test('preserves auth state across component renders', async () => {
-    // Mock the useAuth hook to simulate an authenticated state
-    const mockAuthState = {
-      isLoaded: true,
-      userId: 'user_123',
-      isSignedIn: true,
-      sessionId: 'session_123',
-      getToken: jest.fn().mockResolvedValue('mock_token'),
-    };
-    
-    (useAuth as jest.Mock).mockReturnValue(mockAuthState);
+    // Mock authenticated state
+    (useSession as jest.Mock).mockReturnValue({
+      data: {
+        user: {
+          id: 'user_123',
+          email: 'test@example.com',
+          name: 'Test User',
+        },
+        session: {
+          token: 'test-token',
+          id: 'session_123',
+        },
+      },
+      isPending: false,
+      error: null,
+    });
 
     const { rerender } = render(
       <ProtectedRoute>
@@ -103,14 +131,14 @@ describe('Authentication State Persistence', () => {
 
     // First render should show the content
     expect(screen.getByText('Protected Content')).toBeInTheDocument();
-    
+
     // Re-render with the same auth state
     rerender(
       <ProtectedRoute>
         <div>Updated Protected Content</div>
       </ProtectedRoute>
     );
-    
+
     // Should keep the authenticated state and show the updated content
     expect(screen.getByText('Updated Protected Content')).toBeInTheDocument();
     expect(mockRouter.push).not.toHaveBeenCalled();
