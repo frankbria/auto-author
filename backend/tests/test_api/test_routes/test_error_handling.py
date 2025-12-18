@@ -79,9 +79,9 @@ async def test_error_handling_race_condition(
     # 1) get a raw client (no auto authentication)
     client = await auth_client_factory(auth=False)
 
-    # 2) need to stub JWT -> clerk_id
+    # 2) need to stub JWT -> auth_id
     async def fake_verify(token):
-        return {"sub": test_user["clerk_id"]}
+        return {"sub": test_user["auth_id"]}
 
     monkeypatch.setattr(security, "verify_jwt_token", fake_verify)
 
@@ -93,11 +93,11 @@ async def test_error_handling_race_condition(
 
     # 4) path the DB lookup to simulate: 1st call OK, 2nd call "deleted"
     get_user_mock = MagicMock(side_effect=[test_user, None])
-    monkeypatch.setattr(database, "get_user_by_clerk_id", get_user_mock)
-    monkeypatch.setattr(users_endpoint, "get_user_by_clerk_id", get_user_mock)
+    monkeypatch.setattr(database, "get_user_by_auth_id", get_user_mock)
+    monkeypatch.setattr(users_endpoint, "get_user_by_auth_id", get_user_mock)
 
     # 5) patch update_user so it looks like a successful write
-    async def fake_update_user(clerk_id, user_data, actor_id):
+    async def fake_update_user(auth_id, user_data, actor_id):
         return get_user_mock.return_value
 
     monkeypatch.setattr(database, "update_user", fake_update_user)
@@ -119,29 +119,27 @@ async def test_error_handling_race_condition(
 @pytest.mark.asyncio
 async def test_error_handling_third_party_service(auth_client_factory, monkeypatch):
     """
-    Test error handling when a third-party service (like Clerk) fails.
+    Test error handling when a third-party service fails.
     Verifies proper error response when external dependencies fail.
     """
 
     api_client = await auth_client_factory()
 
-    # Mock clerk client that throws an error
-    async def api_failure(*args, **kwargs):
-        return None
+    # Mock database operation that throws an error
+    async def db_failure(*args, **kwargs):
+        raise Exception("External service unavailable")
 
-    # Patch the module where get_clerk_user is defined
-    import app.core.security as sec_module
-    monkeypatch.setattr(sec_module, "get_clerk_user", api_failure)
+    # Patch database operation to simulate external service failure
+    import app.db.database as db_module
+    monkeypatch.setattr(db_module, "get_user_by_auth_id", db_failure)
 
-    # Make request that will trigger clerk error
-    response = await api_client.get("/api/v1/users/me/clerk-data")
+    # Make request that will trigger external service error
+    response = await api_client.get("/api/v1/users/me")
 
     # Assert server error response
-    # When Clerk fails to retrieve,
-    assert response.status_code == 404
+    assert response.status_code == 500
     data = response.json()
     assert "detail" in data
-    assert "not found" in data["detail"].lower()
 
 
 @pytest.mark.skip(reason="Skipping test: Test code is invliad")
@@ -158,9 +156,9 @@ def test_error_handling_concurrent_updates(auth_client_factory, test_user):
     # Mock the necessary dependencies
     with patch(
         "app.core.security.verify_jwt_token",
-        return_value={"sub": test_user["clerk_id"]},
-    ), patch("app.core.security.get_user_by_clerk_id", return_value=test_user), patch(
-        "app.db.database.get_user_by_clerk_id", return_value=test_user
+        return_value={"sub": test_user["auth_id"]},
+    ), patch("app.db.user.get_user_by_auth_id", return_value=test_user), patch(
+        "app.db.database.get_user_by_auth_id", return_value=test_user
     ), patch(
         "app.api.endpoints.users.get_current_user", return_value=test_user
     ), patch(

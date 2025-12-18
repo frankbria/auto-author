@@ -63,7 +63,7 @@ async def test_update_all_profile_fields(auth_client_factory, test_user):
 
         # Verify fields that shouldn't change
         assert data["email"] == test_user["email"]
-        assert data["clerk_id"] == test_user["clerk_id"]
+        assert data["auth_id"] == test_user["auth_id"]
         assert data["role"] == test_user["role"]
 
 
