@@ -123,17 +123,19 @@ async def test_error_handling_third_party_service(auth_client_factory, monkeypat
     Verifies proper error response when external dependencies fail.
     """
 
-    api_client = await auth_client_factory()
-
-    # Mock database operation that throws an error
+    # Mock database operation that throws an error BEFORE creating client
     async def db_failure(*args, **kwargs):
         raise Exception("External service unavailable")
 
     # Patch database operation to simulate external service failure
-    import app.db.database as db_module
-    monkeypatch.setattr(db_module, "get_user_by_auth_id", db_failure)
+    # Must patch before auth_client_factory() is called
+    import app.db.user as user_module
+    monkeypatch.setattr(user_module, "get_user_by_auth_id", db_failure)
 
-    # Make request that will trigger external service error
+    # Now create client - this will use the patched database
+    api_client = await auth_client_factory()
+
+    # Make request that will trigger external service error during auth
     response = await api_client.get("/api/v1/users/me")
 
     # Assert server error response
