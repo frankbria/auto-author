@@ -106,6 +106,22 @@ class Settings(BaseSettings):
 
         return v
 
+    @field_validator('BYPASS_AUTH')
+    @classmethod
+    def validate_bypass_auth(cls, v: bool) -> bool:
+        """Validate BYPASS_AUTH is not enabled in production environment.
+
+        BYPASS_AUTH allows skipping authentication for E2E testing but must
+        NEVER be enabled in production as it would expose all user data.
+        """
+        if v is True and os.getenv("NODE_ENV") == "production":
+            raise ValueError(
+                "FATAL SECURITY ERROR: BYPASS_AUTH cannot be enabled in production environment. "
+                "This would allow unauthorized access to all user data and features. "
+                "Remove BYPASS_AUTH=true from your production configuration."
+            )
+        return v
+
     class Config:
         env_file = ".env"
         case_sensitive = True

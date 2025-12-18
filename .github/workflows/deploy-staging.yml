@@ -127,6 +127,23 @@ jobs:
           scp -i ~/.ssh/staging_key /tmp/deploy-package.tar.gz \
             ${{ secrets.USER }}@${{ secrets.HOST }}:/tmp/
 
+      - name: Validate security configuration
+        run: |
+          # SECURITY CHECK: Ensure BYPASS_AUTH is never enabled in deployment secrets
+          # BYPASS_AUTH must NEVER be enabled in staging or production environments
+          # as it would allow unauthorized access to all user data.
+          BYPASS_AUTH_VALUE="${BYPASS_AUTH:-false}"
+          BYPASS_AUTH_NORMALIZED=$(echo "$BYPASS_AUTH_VALUE" | tr '[:upper:]' '[:lower:]')
+
+          if [[ "$BYPASS_AUTH_NORMALIZED" == "true" ]]; then
+            echo "FATAL SECURITY ERROR: BYPASS_AUTH is set to 'true' in deployment environment"
+            echo "This setting must NEVER be enabled in staging or production."
+            exit 1
+          fi
+          echo "✓ Security check passed: BYPASS_AUTH is not enabled (value: ${BYPASS_AUTH_VALUE})"
+        env:
+          BYPASS_AUTH: ${{ secrets.BYPASS_AUTH }}
+
       - name: Deploy to staging
         run: |
           ssh -i ~/.ssh/staging_key \
