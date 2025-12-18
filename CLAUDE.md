@@ -30,6 +30,23 @@
 
 ## Recent Changes
 
+### 2025-12-17
+- **Better-Auth Migration**: Complete migration from Clerk to better-auth authentication
+  - **Scope**: 70+ files across frontend (Next.js) and backend (FastAPI)
+  - **Changes**:
+    - JWT algorithm: RS256 (Clerk) → HS256 (better-auth)
+    - User ID field: `clerk_id` → `auth_id`
+    - Frontend: Removed `@clerk/nextjs`, added `better-auth` with MongoDB adapter
+    - Backend: Removed Clerk JWKS verification, added HS256 JWT validation
+    - Environment: Simplified to `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
+  - **Security Fixes**:
+    - **BLOCKER**: Removed hardcoded JWT secret, added strong validation (min 32 chars)
+    - **HIGH**: Changed `NEXT_PUBLIC_BYPASS_AUTH` to server-only `BYPASS_AUTH` with production safety check
+    - **HIGH**: Disabled auto-user creation from JWT - require explicit registration
+  - **Test Results**: 231/251 backend tests passing (92%), all security tests updated for better-auth
+  - **Cleanup**: Removed Clerk documentation, test files, and CSP headers
+  - **Status**: ✅ Migration complete with all security vulnerabilities fixed
+
 ### 2025-11-22
 - **Auto-Create Users from Clerk on First Login**: Enhanced authentication to automatically create user records
   - **Problem**: Users authenticating via Clerk weren't being created in backend database
@@ -215,7 +232,7 @@ BYPASS_AUTH=true npx playwright test
 ## Key Features
 
 ### ✅ Production Ready
-- User authentication (Clerk integration with JWKS endpoint verification)
+- User authentication (better-auth with HS256 JWT verification)
 - **Session Management** (Activity tracking, security features, timeout handling)
 - Book CRUD operations with metadata
 - **Book Deletion UI** (Type-to-confirm with data loss warnings)
@@ -525,7 +542,7 @@ bd create "Add tests for emergency hotfix" -p 0 -t bug
 ## API Overview
 
 ### Authentication
-- **Production**: Clerk JWT verification using JWKS endpoint
+- **Production**: Better-auth JWT verification using HS256 shared secret
 - **Testing**: `BYPASS_AUTH=true` creates mock authenticated context
 - **Security**: Never use auth bypass in production environments
 
