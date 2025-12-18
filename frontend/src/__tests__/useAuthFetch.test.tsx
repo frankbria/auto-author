@@ -93,9 +93,9 @@ describe('useAuthFetch Hook', () => {
     
     // Second call headers
     expect(calls[1][1].headers).toHaveProperty('Authorization', `Bearer ${mockToken}`);
-    
-    // The token should have been requested only once if caching is implemented
-    expect(useAuth().getToken).toHaveBeenCalledTimes(2);
+
+    // The session should be used for both requests (better-auth uses session tokens)
+    expect(useSession).toHaveBeenCalled();
   });
 
   test('handles token refreshing when token expires', async () => {
