@@ -1,7 +1,7 @@
 /**
  * Authentication Fixture
  *
- * Handles Clerk authentication for deployment tests.
+ * Handles better-auth authentication for deployment tests.
  * Requires TEST_USER_EMAIL and TEST_USER_PASSWORD environment variables.
  */
 
@@ -29,7 +29,7 @@ export function getTestCredentials(): AuthCredentials {
 }
 
 /**
- * Authenticate user with Clerk and wait for dashboard
+ * Authenticate user with better-auth and wait for dashboard
  *
  * @param page Playwright page object
  * @param credentials Optional credentials (defaults to env vars)
@@ -38,11 +38,11 @@ export async function authenticateUser(
   page: Page,
   credentials?: AuthCredentials
 ): Promise<void> {
-  // Check if NEXT_PUBLIC_BYPASS_AUTH is enabled (for testing without Clerk)
+  // Check if NEXT_PUBLIC_BYPASS_AUTH is enabled (for testing without auth)
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   if (bypassAuth) {
-    console.log('⚠️ NEXT_PUBLIC_BYPASS_AUTH enabled - skipping Clerk authentication');
+    console.log('⚠️ NEXT_PUBLIC_BYPASS_AUTH enabled - skipping authentication');
 
     // Navigate directly to dashboard
     await page.goto('/dashboard');
@@ -54,38 +54,34 @@ export async function authenticateUser(
     return;
   }
 
-  // Normal Clerk authentication flow
+  // Normal better-auth authentication flow
   const { email, password } = credentials || getTestCredentials();
 
-  // Navigate to homepage
-  await page.goto('/');
+  // Navigate to sign-in page
+  await page.goto('/auth/sign-in');
 
-  // Click Sign In button
-  await page.click('text=Sign In');
+  // Wait for sign-in form to appear
+  await page.waitForSelector('form', { timeout: 10000 });
 
-  // Wait for Clerk modal to appear
-  await page.waitForSelector('[data-clerk-modal]', { timeout: 10000 });
+  // Fill email field
+  await page.fill('input[type="email"]', email);
 
-  // Fill email/identifier
-  await page.fill('input[name="identifier"]', email);
-  await page.click('button:has-text("Continue")');
-
-  // Wait for password field and fill it
-  await page.waitForSelector('input[name="password"]', { timeout: 5000 });
-  await page.fill('input[name="password"]', password);
+  // Fill password field
+  await page.fill('input[type="password"]', password);
 
   // Click sign in button
-  await page.click('button:has-text("Sign in")');
+  await page.click('button[type="submit"]');
 
   // Wait for redirect to dashboard
   await page.waitForURL('**/dashboard', { timeout: 15000 });
 
-  // Verify authentication token exists
-  const authToken = await page.evaluate(() =>
-    localStorage.getItem('clerk-token') || sessionStorage.getItem('clerk-token')
-  );
+  // Verify authentication session exists
+  const hasSession = await page.evaluate(async () => {
+    // better-auth stores session in cookies, check if we have session cookies
+    return document.cookie.includes('better-auth');
+  });
 
-  expect(authToken).toBeTruthy();
+  expect(hasSession).toBeTruthy();
 
   console.log('✅ User authenticated successfully');
 }
@@ -96,21 +92,21 @@ export async function authenticateUser(
  * @param page Playwright page object
  */
 export async function signOut(page: Page): Promise<void> {
-  // Click user menu
-  await page.click('[data-testid="user-menu"]');
+  // Click user menu button (avatar button)
+  await page.click('button[class*="rounded-full"]');
 
-  // Click sign out
-  await page.click('text=Sign Out');
+  // Click sign out option
+  await page.click('text=Sign out');
 
   // Wait for redirect to homepage
   await page.waitForURL('/', { timeout: 10000 });
 
-  // Verify Clerk session cleared
-  const authToken = await page.evaluate(() =>
-    localStorage.getItem('clerk-token') || sessionStorage.getItem('clerk-token')
-  );
+  // Verify better-auth session cleared
+  const hasSession = await page.evaluate(async () => {
+    return document.cookie.includes('better-auth');
+  });
 
-  expect(authToken).toBeNull();
+  expect(hasSession).toBeFalsy();
 
   console.log('✅ User signed out successfully');
 }
@@ -122,9 +118,9 @@ export async function signOut(page: Page): Promise<void> {
  * @returns True if authenticated, false otherwise
  */
 export async function isAuthenticated(page: Page): Promise<boolean> {
-  const authToken = await page.evaluate(() =>
-    localStorage.getItem('clerk-token') || sessionStorage.getItem('clerk-token')
-  );
+  const hasSession = await page.evaluate(async () => {
+    return document.cookie.includes('better-auth');
+  });
 
-  return authToken !== null;
+  return hasSession;
 }

@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useRouter } from 'next/navigation';
 
@@ -8,9 +8,14 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 
-// Mock Clerk's useAuth hook
-jest.mock('@clerk/nextjs', () => ({
-  useAuth: jest.fn(),
+// Mock better-auth's useSession hook
+jest.mock('@/lib/auth-client', () => ({
+  useSession: jest.fn(),
+  authClient: {
+    signIn: { email: jest.fn() },
+    signUp: { email: jest.fn() },
+    signOut: jest.fn(),
+  },
 }));
 
 describe('ProtectedRoute Component', () => {
@@ -24,18 +29,19 @@ describe('ProtectedRoute Component', () => {
   });
 
   test('displays loading state when auth is still loading', () => {
-    // Mock auth loading state
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: false,
-      userId: null,
-      isSignedIn: false,
+    // Mock loading state
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: true,
+      error: null,
     });
 
     render(
       <ProtectedRoute>
         <div>Protected Content</div>
       </ProtectedRoute>
-    );    // Should show a loading spinner
+    );
+    // Should show a loading spinner
     const spinner = document.querySelector('.animate-spin');
     expect(spinner).toBeInTheDocument();
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
@@ -43,10 +49,10 @@ describe('ProtectedRoute Component', () => {
 
   test('redirects to sign-in page when user is not authenticated', () => {
     // Mock unauthenticated state
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: true,
-      userId: null,
-      isSignedIn: false,
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: false,
+      error: null,
     });
 
     render(
@@ -62,10 +68,20 @@ describe('ProtectedRoute Component', () => {
 
   test('renders children when user is authenticated', () => {
     // Mock authenticated state
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: true,
-      userId: 'user_123',
-      isSignedIn: true,
+    (useSession as jest.Mock).mockReturnValue({
+      data: {
+        user: {
+          id: 'user_123',
+          email: 'test@example.com',
+          name: 'Test User',
+        },
+        session: {
+          token: 'test-token',
+          id: 'session-123',
+        },
+      },
+      isPending: false,
+      error: null,
     });
 
     render(
@@ -80,10 +96,10 @@ describe('ProtectedRoute Component', () => {
 
   test('handles auth state changes correctly', async () => {
     // First render with loading state
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: false,
-      userId: null,
-      isSignedIn: false,
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: true,
+      error: null,
     });
 
     const { rerender } = render(
@@ -96,10 +112,20 @@ describe('ProtectedRoute Component', () => {
     expect(document.querySelector('.animate-spin')).toBeInTheDocument();
 
     // Update to authenticated state
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: true,
-      userId: 'user_123',
-      isSignedIn: true,
+    (useSession as jest.Mock).mockReturnValue({
+      data: {
+        user: {
+          id: 'user_123',
+          email: 'test@example.com',
+          name: 'Test User',
+        },
+        session: {
+          token: 'test-token',
+          id: 'session-123',
+        },
+      },
+      isPending: false,
+      error: null,
     });
 
     // Rerender component
@@ -115,10 +141,10 @@ describe('ProtectedRoute Component', () => {
     });
 
     // Update to unauthenticated state
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: true,
-      userId: null,
-      isSignedIn: false,
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: false,
+      error: null,
     });
 
     // Rerender component

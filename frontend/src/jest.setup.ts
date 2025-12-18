@@ -494,46 +494,76 @@ jest.mock('@tiptap/extension-character-count', () => {
   return jest.fn(() => ({ name: 'characterCount' }));
 });
 
-// Mock Clerk for Next.js v6+ (uses ES modules)
-jest.mock('@clerk/nextjs', () => {
-  const React = require('react');
-
-  return {
-    ClerkProvider: ({ children }: any) => React.createElement('div', null, children),
-    UserButton: () => React.createElement('div', { 'data-testid': 'clerk-user-button' }, 'UserButton'),
-    SignInButton: ({ children }: any) => React.createElement('div', { 'data-testid': 'clerk-sign-in-button' }, children || 'Sign In'),
-    SignUpButton: ({ children }: any) => React.createElement('div', { 'data-testid': 'clerk-sign-up-button' }, children || 'Sign Up'),
-    SignOutButton: ({ children }: any) => React.createElement('div', { 'data-testid': 'clerk-sign-out-button' }, children || 'Sign Out'),
-    useUser: jest.fn(() => ({
-      isSignedIn: true,
+// Mock better-auth for all tests
+jest.mock('@/lib/auth-client', () => ({
+  useSession: jest.fn(() => ({
+    data: {
       user: {
         id: 'test-user-id',
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
-        firstName: 'Test',
-        lastName: 'User',
+        email: 'test@example.com',
+        name: 'Test User',
+        image: null,
       },
-      isLoaded: true,
-    })),
-    useAuth: jest.fn(() => ({
-      isSignedIn: true,
-      userId: 'test-user-id',
-      sessionId: 'test-session-id',
-      getToken: jest.fn(() => Promise.resolve('test-token')),
-      isLoaded: true,
-    })),
-    useClerk: jest.fn(() => ({
-      signOut: jest.fn(),
-      openSignIn: jest.fn(),
-      openSignUp: jest.fn(),
-    })),
-    auth: jest.fn(() => Promise.resolve({
-      userId: 'test-user-id',
-      sessionId: 'test-session-id',
-      getToken: jest.fn(() => Promise.resolve('test-token')),
-    })),
-    currentUser: jest.fn(() => Promise.resolve({
-      id: 'test-user-id',
-      emailAddresses: [{ emailAddress: 'test@example.com' }],
-    })),
-  };
-});
+      session: {
+        token: 'test-token',
+        id: 'test-session-id',
+        expiresAt: new Date(Date.now() + 86400000),
+        fresh: true,
+      },
+    },
+    isPending: false,
+    error: null,
+  })),
+  authClient: {
+    signIn: {
+      email: jest.fn().mockResolvedValue({
+        data: {
+          user: {
+            id: 'test-user-id',
+            email: 'test@example.com',
+            name: 'Test User',
+          },
+          session: {
+            token: 'test-token',
+            id: 'test-session-id',
+          },
+        },
+        error: null,
+      }),
+    },
+    signUp: {
+      email: jest.fn().mockResolvedValue({
+        data: {
+          user: {
+            id: 'test-user-id',
+            email: 'test@example.com',
+            name: 'Test User',
+          },
+          session: {
+            token: 'test-token',
+            id: 'test-session-id',
+          },
+        },
+        error: null,
+      }),
+    },
+    signOut: jest.fn().mockResolvedValue({
+      data: {},
+      error: null,
+    }),
+    getSession: jest.fn().mockResolvedValue({
+      data: {
+        user: {
+          id: 'test-user-id',
+          email: 'test@example.com',
+          name: 'Test User',
+        },
+        session: {
+          token: 'test-token',
+          id: 'test-session-id',
+        },
+      },
+      error: null,
+    }),
+  },
+}));

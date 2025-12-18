@@ -1,13 +1,13 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { useUser, useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import Dashboard from '@/app/dashboard/page';
 import bookClient from '@/lib/api/bookClient';
 import { toast } from 'sonner';
 
 // Mock dependencies
-jest.mock('@clerk/nextjs');
+jest.mock('@/lib/auth-client');
 jest.mock('@/lib/api/bookClient');
 jest.mock('sonner');
 jest.mock('next/navigation', () => ({
@@ -118,11 +118,7 @@ jest.mock('@/components/BookCard', () => ({
 
 describe('Dashboard - Book Deletion', () => {
   const mockPush = jest.fn();
-  const mockGetToken = jest.fn();
-  const mockUser = {
-    id: 'user-123',
-    emailAddresses: [{ emailAddress: 'test@example.com' }],
-  };
+  const mockGetToken = jest.fn().mockResolvedValue('test-token');
 
   const mockBooks = [
     {
@@ -156,24 +152,30 @@ describe('Dashboard - Book Deletion', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     (useRouter as jest.Mock).mockReturnValue({
       push: mockPush,
     });
-    
-    (useUser as jest.Mock).mockReturnValue({
-      user: mockUser,
-      isLoaded: true,
+
+    (useSession as jest.Mock).mockReturnValue({
+      data: {
+        user: {
+          id: 'user-123',
+          email: 'test@example.com',
+          name: 'Test User',
+        },
+        session: {
+          token: 'test-token',
+          id: 'session-123',
+        },
+      },
+      isPending: false,
+      error: null,
     });
-    
-    (useAuth as jest.Mock).mockReturnValue({
-      getToken: mockGetToken,
-    });
-    
-    mockGetToken.mockResolvedValue('test-token');
+
     (bookClient.getUserBooks as jest.Mock).mockResolvedValue(mockBooks);
     (bookClient.setAuthToken as jest.Mock).mockImplementation(() => {});
-    (bookClient.setTokenProvider as jest.Mock).mockImplementation(() => {});
+    (bookClient.setTokenProvider as jest.Mock).mockImplementation(() => mockGetToken);
     (bookClient.deleteBook as jest.Mock).mockResolvedValue({ success: true });
 
     // Mock toast

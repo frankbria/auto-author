@@ -4,11 +4,16 @@
 
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useSession, SessionStatus } from "@/hooks/useSession";
-import { useAuth } from "@clerk/nextjs";
+import { useSession as useAuthSession } from "@/lib/auth-client";
 
-// Mock Clerk's useAuth hook
-jest.mock("@clerk/nextjs", () => ({
-  useAuth: jest.fn(),
+// Mock better-auth's useSession hook
+jest.mock("@/lib/auth-client", () => ({
+  useSession: jest.fn(),
+  authClient: {
+    signIn: { email: jest.fn() },
+    signUp: { email: jest.fn() },
+    signOut: jest.fn(),
+  },
 }));
 
 // Mock fetch
@@ -33,9 +38,20 @@ const mockSessionStatus: SessionStatus = {
 describe("useSession", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAuth as jest.Mock).mockReturnValue({
-      getToken: mockGetToken,
-      isSignedIn: true,
+    (useAuthSession as jest.Mock).mockReturnValue({
+      data: {
+        user: {
+          id: "test-user-123",
+          email: "test@example.com",
+          name: "Test User",
+        },
+        session: {
+          token: "test-token",
+          id: "session-123",
+        },
+      },
+      isPending: false,
+      error: null,
     });
     mockGetToken.mockResolvedValue("test-token");
   });
@@ -236,9 +252,10 @@ describe("useSession", () => {
   });
 
   it("should not fetch status when user is not signed in", async () => {
-    (useAuth as jest.Mock).mockReturnValue({
-      getToken: mockGetToken,
-      isSignedIn: false,
+    (useAuthSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: false,
+      error: null,
     });
 
     renderHook(() => useSession());

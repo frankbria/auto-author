@@ -140,8 +140,8 @@ test.describe.skip('Editing & Auto-save Flow (NEEDS TEST IDS)', () => {
     await page.evaluate(() => localStorage.clear());
 
     // Mock authentication if needed
-    // In real scenarios, you'd handle Clerk authentication here
-    // For now, assume dev mode auto-authenticates
+    // In real scenarios, you'd handle better-auth authentication here
+    // For now, assume dev mode auto-authenticates or BYPASS_AUTH is enabled
   });
 
   test.afterEach(async ({ page }) => {
