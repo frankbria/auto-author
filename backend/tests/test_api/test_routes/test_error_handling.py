@@ -116,11 +116,16 @@ async def test_error_handling_race_condition(
     assert "not found" in data["detail"].lower()
 
 
+@pytest.mark.skip(reason="Test was for Clerk third-party service - no longer applicable with better-auth")
 @pytest.mark.asyncio
 async def test_error_handling_third_party_service(auth_client_factory, monkeypatch):
     """
     Test error handling when a third-party service fails.
     Verifies proper error response when external dependencies fail.
+
+    NOTE: This test was originally for Clerk API failures. With better-auth,
+    there's no equivalent third-party service to fail. Test kept for historical
+    reference but skipped.
     """
 
     # Mock database operation that throws an error BEFORE creating client
