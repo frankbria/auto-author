@@ -17,6 +17,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def validate_production_security() -> None:
+    """Validate critical security settings before application startup.
+
+    This function provides fail-fast behavior for security-critical
+    configuration errors that could expose user data.
+
+    Raises:
+        RuntimeError: If BYPASS_AUTH is enabled in production environment
+    """
+    node_env = os.getenv("NODE_ENV")
+
+    if node_env == "production":
+        if settings.BYPASS_AUTH:
+            logger.critical(
+                "FATAL SECURITY ERROR: BYPASS_AUTH is enabled in production. "
+                "Application startup blocked to prevent unauthorized access."
+            )
+            raise RuntimeError(
+                "Application startup blocked: BYPASS_AUTH is enabled in production environment. "
+                "This would allow unauthorized access to all user data. "
+                "Remove BYPASS_AUTH=true from your production configuration."
+            )
+        logger.info("Production security validation passed: BYPASS_AUTH is disabled")
+    elif settings.BYPASS_AUTH:
+        logger.warning(
+            f"BYPASS_AUTH is enabled in {node_env or 'unset'} environment. "
+            "Authentication will be bypassed - DO NOT use in production."
+        )
+
+
+# Validate security settings before creating the app
+validate_production_security()
+
 # Create FastAPI app
 app = FastAPI(
     title="Auto Author API",

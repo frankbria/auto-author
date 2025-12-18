@@ -1,5 +1,43 @@
 # Environment Variable Refactoring Summary
 
+## Security Enhancement: BYPASS_AUTH Production Protection (2025-12-18)
+
+### Overview
+
+Added production environment validation for `BYPASS_AUTH` to prevent accidental exposure of authentication bypass in production deployments.
+
+### Changes
+
+- **Pydantic Validator**: Added `@field_validator('BYPASS_AUTH')` in `app/core/config.py` that raises `ValueError` if `BYPASS_AUTH=true` when `NODE_ENV=production`
+- **Startup Validation**: Added `validate_production_security()` function in `app/main.py` that provides fail-fast behavior with clear error messages
+- **Deployment Workflow**: Added security check step in `.github/workflows/deploy-staging.yml` to detect if `BYPASS_AUTH` secret is accidentally configured
+- **Documentation**: Updated `.env.example` with clear warnings about production usage
+
+### Validation Behavior
+
+| Environment | BYPASS_AUTH=true | BYPASS_AUTH=false |
+|-------------|------------------|-------------------|
+| `production` | ❌ Startup blocked | ✅ Normal operation |
+| `staging` | ✅ Allowed (for E2E tests) | ✅ Normal operation |
+| `development` | ✅ Allowed | ✅ Normal operation |
+| `test` | ✅ Allowed | ✅ Normal operation |
+| (not set) | ✅ Allowed (backward compat) | ✅ Normal operation |
+
+### Error Messages
+
+When `BYPASS_AUTH=true` in production:
+
+1. **Config validation error**: "FATAL SECURITY ERROR: BYPASS_AUTH cannot be enabled in production environment. This would allow unauthorized access to all user data and features."
+
+2. **Startup error**: "Application startup blocked: BYPASS_AUTH is enabled in production environment."
+
+### Test Coverage
+
+- `tests/test_core/test_security.py`: `TestProductionSecurityValidation` class with 6 test cases
+- `tests/test_main.py`: `TestStartupSecurityValidation` class with 5 test cases
+
+---
+
 ## Clerk to Better Auth Migration (2025-12-17)
 
 ### Removed Clerk Configuration

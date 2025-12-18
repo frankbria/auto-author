@@ -332,3 +332,87 @@ class TestOptionalSecurity:
         result = await optional_security(mock_request)
 
         assert result is None
+
+
+class TestProductionSecurityValidation:
+    """Test production environment security validation for BYPASS_AUTH"""
+
+    def test_bypass_auth_blocked_in_production(self, monkeypatch):
+        """Test that BYPASS_AUTH=true is blocked when NODE_ENV=production"""
+        from pydantic import ValidationError as PydanticValidationError
+        from app.core.config import Settings
+
+        # Set production environment with a valid secret (not the test secret)
+        # to ensure we're testing BYPASS_AUTH validation, not secret validation
+        monkeypatch.setenv("NODE_ENV", "production")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "production-secret-that-is-at-least-32-characters-long")
+
+        with pytest.raises(PydanticValidationError) as exc_info:
+            Settings()
+
+        # Verify the error message mentions BYPASS_AUTH security issue
+        error_str = str(exc_info.value)
+        assert "BYPASS_AUTH" in error_str
+
+    def test_bypass_auth_allowed_in_development(self, monkeypatch):
+        """Test that BYPASS_AUTH=true is allowed when NODE_ENV=development"""
+        from app.core.config import Settings
+
+        # Set development environment
+        monkeypatch.setenv("NODE_ENV", "development")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+
+        # Should not raise - just verify it doesn't error
+        settings = Settings()
+        assert settings.BYPASS_AUTH is True
+
+    def test_bypass_auth_allowed_in_test(self, monkeypatch):
+        """Test that BYPASS_AUTH=true is allowed when NODE_ENV=test"""
+        from app.core.config import Settings
+
+        # Set test environment
+        monkeypatch.setenv("NODE_ENV", "test")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+
+        # Should not raise - just verify it doesn't error
+        settings = Settings()
+        assert settings.BYPASS_AUTH is True
+
+    def test_bypass_auth_allowed_in_staging(self, monkeypatch):
+        """Test that BYPASS_AUTH=true is allowed when NODE_ENV=staging (for E2E tests)"""
+        from app.core.config import Settings
+
+        # Set staging environment
+        monkeypatch.setenv("NODE_ENV", "staging")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+
+        # Should not raise - staging may need E2E testing capability
+        settings = Settings()
+        assert settings.BYPASS_AUTH is True
+
+    def test_bypass_auth_allowed_when_env_not_set(self, monkeypatch):
+        """Test that BYPASS_AUTH=true is allowed when NODE_ENV is not set (backward compatibility)"""
+        from app.core.config import Settings
+
+        # Ensure NODE_ENV is not set
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+
+        # Should not raise - default/unset environment should allow testing
+        settings = Settings()
+        assert settings.BYPASS_AUTH is True
+
+    def test_bypass_auth_false_allowed_in_production(self, monkeypatch):
+        """Test that BYPASS_AUTH=false is allowed in production (normal secure operation)"""
+        from app.core.config import Settings
+
+        # Set production environment with auth bypass disabled
+        # Also need a production-valid secret (not the test secret)
+        monkeypatch.setenv("NODE_ENV", "production")
+        monkeypatch.setenv("BYPASS_AUTH", "false")
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "production-secret-that-is-at-least-32-characters-long")
+
+        # Should not raise - this is the expected secure configuration
+        settings = Settings()
+        assert settings.BYPASS_AUTH is False
