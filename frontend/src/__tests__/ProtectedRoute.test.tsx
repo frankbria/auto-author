@@ -26,6 +26,8 @@ describe('ProtectedRoute Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
+    // Ensure auth bypass is disabled for these tests
+    delete process.env.NEXT_PUBLIC_BYPASS_AUTH;
   });
 
   test('displays loading state when auth is still loading', async () => {

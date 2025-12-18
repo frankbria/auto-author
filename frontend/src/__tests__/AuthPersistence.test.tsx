@@ -26,6 +26,8 @@ describe('Authentication State Persistence', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
+    // Ensure auth bypass is disabled for these tests
+    delete process.env.NEXT_PUBLIC_BYPASS_AUTH;
   });
 
   test('redirects to sign-in when user is not authenticated', async () => {
@@ -66,8 +68,10 @@ describe('Authentication State Persistence', () => {
     );
 
     // Look for the loading spinner element directly using its class
-    const loadingElement = document.querySelector('.animate-spin');
-    expect(loadingElement).toBeInTheDocument();
+    await waitFor(() => {
+      const loadingElement = document.querySelector('.animate-spin');
+      expect(loadingElement).toBeInTheDocument();
+    });
   });
 
   test('renders protected content when user is authenticated', async () => {
