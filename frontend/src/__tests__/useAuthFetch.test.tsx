@@ -98,8 +98,13 @@ describe('useAuthFetch Hook', () => {
     expect(useSession).toHaveBeenCalled();
   });
 
-  test('handles token refreshing when token expires', async () => {
-    // Mock fetch to first return unauthorized, then success with new token
+  test('handles 401 unauthorized errors and allows retry', async () => {
+    // Note: This tests error handling for 401 responses, not actual token refresh.
+    // In better-auth, token refresh is handled automatically by the auth client at a different layer,
+    // not by the useAuthFetch hook. This test verifies that 401 errors are properly surfaced
+    // so the application can handle them (e.g., by triggering a re-authentication flow).
+
+    // Mock fetch to first return unauthorized, then success on retry
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
         ok: false,
@@ -119,16 +124,15 @@ describe('useAuthFetch Hook', () => {
 
     const { result } = renderHook(() => useAuthFetch());
 
-    // This should simulate a token expiration scenario
     await act(async () => {
       try {
         await result.current.authFetch(mockUrl);
       } catch (error) {
-        // Expected to throw on the first attempt
+        // Expected to throw on the first attempt with 401 error
         const err = error as Error;
         expect(err.message).toContain('Token expired');
 
-        // Try again with refreshed token
+        // Manual retry after handling the 401 (e.g., after user re-authenticates)
         const secondResponse = await result.current.authFetch(mockUrl);
         expect(secondResponse).toEqual(mockFetchResponse);
       }

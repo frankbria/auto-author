@@ -102,7 +102,7 @@ Auto Author supports concurrent sessions across multiple devices with:
 
 ### Token Security
 
-- **Signing**: RS256 algorithm with 2048-bit keys
+- **Signing**: HS256 algorithm with shared secret (BETTER_AUTH_SECRET)
 - **Claims**: Minimal necessary user data and permissions
 - **Verification**: Backend validation on every request
 - **Expiration**: Short timeframes with explicit renewal
@@ -125,34 +125,55 @@ Auto Author supports concurrent sessions across multiple devices with:
 
 ## Configuration Options
 
+### Core Authentication Settings
+
+Essential better-auth environment variables:
+
+```bash
+# Authentication secret (required) - used for HS256 JWT signing
+BETTER_AUTH_SECRET=your-secret-key-min-32-chars
+
+# Base URL for your application
+BETTER_AUTH_URL=http://localhost:3000
+
+# Database connection (MongoDB)
+DATABASE_URL=mongodb://localhost:27017/auto_author
+DATABASE_NAME=auto_author
+```
+
 ### Session Timeouts
 
-Customizable session durations through environment variables:
+Session configuration is defined in `src/lib/auth.ts`:
 
-```
-CLERK_SESSION_TOKEN_EXPIRATION=86400  # 24 hours in seconds
-CLERK_REMEMBER_ME_EXPIRATION=2592000  # 30 days in seconds
-CLERK_SESSION_INACTIVITY_TIMEOUT=1800  # 30 minutes in seconds
+```typescript
+session: {
+  expiresIn: 60 * 60 * 24 * 7,  // 7 days (604,800 seconds)
+  updateAge: 60 * 60 * 24,       // Refresh every 24 hours
+  cookieCache: {
+    enabled: true,
+    maxAge: 5 * 60,              // Cache for 5 minutes
+  },
+}
 ```
 
 ### Cookie Settings
 
-Session cookie configuration:
+Session cookie configuration in `src/lib/auth.ts`:
 
-```
-CLERK_COOKIE_DOMAIN=yourdomain.com
-CLERK_COOKIE_SECURE=true
-CLERK_COOKIE_SAMESITE=lax
+```typescript
+advanced: {
+  defaultCookieAttributes: {
+    sameSite: "lax",                              // CSRF protection
+    secure: process.env.NODE_ENV === "production", // HTTPS only in production
+    httpOnly: true,                               // Prevent XSS attacks
+  },
+}
 ```
 
 ### Rate Limiting
 
-Protection against brute force attacks:
-
-```
-CLERK_MAX_LOGIN_ATTEMPTS=5
-CLERK_LOGIN_LOCKOUT_MINUTES=15
-```
+Better-auth provides built-in rate limiting through middleware.
+Configure additional protection in `src/middleware.ts` as needed.
 
 ## Developer Usage
 
