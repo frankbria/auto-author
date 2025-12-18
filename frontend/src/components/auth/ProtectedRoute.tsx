@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -15,7 +15,7 @@ interface ProtectedRouteProps {
  * Can be bypassed with NEXT_PUBLIC_BYPASS_AUTH=true for E2E testing.
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isLoaded, userId, isSignedIn } = useAuth();
+  const { data: session, isPending } = useSession();
   const router = useRouter();
 
   // Check if auth bypass is enabled for E2E testing
@@ -25,14 +25,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     // Skip auth checks if bypass is enabled
     if (bypassAuth) return;
 
-    // Wait for auth to load before making decisions
-    if (!isLoaded) return;
+    // Wait for session to load before making decisions
+    if (isPending) return;
 
     // If not signed in, redirect to sign-in page
-    if (!isSignedIn) {
-      router.push('/sign-in');
+    if (!session) {
+      router.push('/auth/sign-in');
     }
-  }, [bypassAuth, isLoaded, isSignedIn, router, userId]);
+  }, [bypassAuth, isPending, session, router]);
 
   // If auth bypass is enabled, render children immediately
   if (bypassAuth) {
@@ -40,7 +40,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // Show nothing while loading or if not authenticated
-  if (!isLoaded || !isSignedIn) {
+  if (isPending || !session) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>

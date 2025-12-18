@@ -1,7 +1,7 @@
 "use client";
 
+import { useSession as useBetterAuthSession } from "@/lib/auth-client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useAuth } from "@clerk/nextjs";
 
 export interface SessionStatus {
   session_id: string;
@@ -40,7 +40,7 @@ export function useSession(options: UseSessionOptions = {}) {
     onSuspiciousActivity,
   } = options;
 
-  const { getToken, isSignedIn } = useAuth();
+  const { data: session, isPending } = useBetterAuthSession();
   const [sessionStatus, setSessionStatus] = useState<SessionStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -56,12 +56,12 @@ export function useSession(options: UseSessionOptions = {}) {
    * Fetch current session status from backend
    */
   const fetchSessionStatus = useCallback(async () => {
-    if (!isSignedIn) {
+    if (!session) {
       return;
     }
 
     try {
-      const token = await getToken();
+      const token = session.session?.token;
       if (!token) return;
 
       const response = await fetch("/api/v1/sessions/current", {
@@ -76,7 +76,10 @@ export function useSession(options: UseSessionOptions = {}) {
         setError(null);
 
         // Check for callbacks
-        if (status.time_until_expiry_seconds !== null && status.time_until_expiry_seconds < 300) {
+        if (
+          status.time_until_expiry_seconds !== null &&
+          status.time_until_expiry_seconds < 300
+        ) {
           // Less than 5 minutes until expiry
           if (!callbacksCalledRef.current.expiring && onSessionExpiring) {
             callbacksCalledRef.current.expiring = true;
@@ -93,7 +96,11 @@ export function useSession(options: UseSessionOptions = {}) {
           callbacksCalledRef.current.idle = false;
         }
 
-        if (status.is_suspicious && !callbacksCalledRef.current.suspicious && onSuspiciousActivity) {
+        if (
+          status.is_suspicious &&
+          !callbacksCalledRef.current.suspicious &&
+          onSuspiciousActivity
+        ) {
           callbacksCalledRef.current.suspicious = true;
           onSuspiciousActivity();
         }
@@ -104,13 +111,13 @@ export function useSession(options: UseSessionOptions = {}) {
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [isSignedIn, getToken, onSessionExpiring, onSessionIdle, onSuspiciousActivity]);
+  }, [session, onSessionExpiring, onSessionIdle, onSuspiciousActivity]);
 
   /**
    * Refresh the current session to extend its expiry
    */
   const refreshSession = useCallback(async () => {
-    if (!isSignedIn) {
+    if (!session) {
       throw new Error("User is not signed in");
     }
 
@@ -118,7 +125,7 @@ export function useSession(options: UseSessionOptions = {}) {
     setError(null);
 
     try {
-      const token = await getToken();
+      const token = session.session?.token;
       if (!token) {
         throw new Error("No authentication token");
       }
@@ -147,13 +154,13 @@ export function useSession(options: UseSessionOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [isSignedIn, getToken, fetchSessionStatus]);
+  }, [session, fetchSessionStatus]);
 
   /**
    * Logout from the current session
    */
   const logout = useCallback(async () => {
-    if (!isSignedIn) {
+    if (!session) {
       return;
     }
 
@@ -161,7 +168,7 @@ export function useSession(options: UseSessionOptions = {}) {
     setError(null);
 
     try {
-      const token = await getToken();
+      const token = session.session?.token;
       if (!token) return;
 
       await fetch("/api/v1/sessions/logout", {
@@ -177,14 +184,14 @@ export function useSession(options: UseSessionOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [isSignedIn, getToken]);
+  }, [session]);
 
   /**
    * Logout from all sessions (except current if keepCurrent is true)
    */
   const logoutAll = useCallback(
     async (keepCurrent: boolean = true) => {
-      if (!isSignedIn) {
+      if (!session) {
         throw new Error("User is not signed in");
       }
 
@@ -192,7 +199,7 @@ export function useSession(options: UseSessionOptions = {}) {
       setError(null);
 
       try {
-        const token = await getToken();
+        const token = session.session?.token;
         if (!token) {
           throw new Error("No authentication token");
         }
@@ -208,7 +215,9 @@ export function useSession(options: UseSessionOptions = {}) {
         );
 
         if (!response.ok) {
-          throw new Error(`Failed to logout all sessions: ${response.statusText}`);
+          throw new Error(
+            `Failed to logout all sessions: ${response.statusText}`
+          );
         }
 
         if (!keepCurrent) {
@@ -224,12 +233,12 @@ export function useSession(options: UseSessionOptions = {}) {
         setLoading(false);
       }
     },
-    [isSignedIn, getToken]
+    [session]
   );
 
   // Fetch session status on mount and at regular intervals
   useEffect(() => {
-    if (!isSignedIn) {
+    if (!session) {
       setSessionStatus(null);
       return;
     }
@@ -241,18 +250,25 @@ export function useSession(options: UseSessionOptions = {}) {
     const interval = setInterval(fetchSessionStatus, statusCheckInterval);
 
     return () => clearInterval(interval);
-  }, [isSignedIn, fetchSessionStatus, statusCheckInterval]);
+  }, [session, fetchSessionStatus, statusCheckInterval]);
 
   // Auto-refresh session before expiry
   useEffect(() => {
-    if (!autoRefresh || !sessionStatus || sessionStatus.time_until_expiry_seconds === null) {
+    if (
+      !autoRefresh ||
+      !sessionStatus ||
+      sessionStatus.time_until_expiry_seconds === null
+    ) {
       return;
     }
 
     // Refresh when 10 minutes remaining
     const refreshThreshold = 600; // 10 minutes in seconds
 
-    if (sessionStatus.time_until_expiry_seconds < refreshThreshold && sessionStatus.time_until_expiry_seconds > 0) {
+    if (
+      sessionStatus.time_until_expiry_seconds < refreshThreshold &&
+      sessionStatus.time_until_expiry_seconds > 0
+    ) {
       refreshSession().catch((err) => {
         console.error("Auto-refresh failed:", err);
       });
