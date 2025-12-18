@@ -4,7 +4,7 @@ This document outlines the session management approaches used in Auto Author, pr
 
 ## Overview
 
-Auto Author implements a robust session management system using Clerk, with custom integrations for our FastAPI backend. This provides secure, scalable, and user-friendly authentication across all application components.
+Auto Author implements a robust session management system using better-auth, a TypeScript-first authentication framework integrated with our FastAPI backend. This provides secure, scalable, and user-friendly authentication across all application components.
 
 ## Session Architecture
 
@@ -160,20 +160,20 @@ CLERK_LOGIN_LOCKOUT_MINUTES=15
 
 ```typescript
 // Check authentication state
-import { useAuth } from '@clerk/nextjs';
+import { useSession } from '@/lib/auth-client';
 
 export function MyComponent() {
-  const { isLoaded, userId, sessionId, isSignedIn } = useAuth();
-  
-  if (!isLoaded) {
+  const { data: session, isPending } = useSession();
+
+  if (isPending) {
     return <div>Loading...</div>;
   }
-  
-  if (!isSignedIn) {
+
+  if (!session) {
     return <div>Please sign in</div>;
   }
-  
-  return <div>Welcome, user {userId}</div>;
+
+  return <div>Welcome, {session.user.name || session.user.email}</div>;
 }
 ```
 
