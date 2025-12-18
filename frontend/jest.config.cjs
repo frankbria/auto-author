@@ -12,8 +12,8 @@ const customJestConfig = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transformIgnorePatterns: [
-    // Transform @clerk packages (they use ES modules in v6+)
-    'node_modules/(?!(@clerk/.*)/)',
+    // Transform better-auth and @clerk packages (they use ES modules)
+    'node_modules/(?!(better-auth|@clerk/.*)/)',
   ],
   testPathIgnorePatterns: [
     '<rootDir>/src/e2e/',
