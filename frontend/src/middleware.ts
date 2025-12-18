@@ -9,11 +9,24 @@ import { auth } from '@/lib/auth';
 // 2. Redirect unauthenticated users to sign-in page
 // 3. Provide session context to your application
 //
-// For E2E testing: Set NEXT_PUBLIC_BYPASS_AUTH=true to skip authentication
+// For E2E testing: Set BYPASS_AUTH=true (server-only) to skip authentication
 export async function middleware(request: NextRequest) {
-  // Allow bypassing auth for E2E tests
-  // NOTE: Must use NEXT_PUBLIC_ prefix to be available in middleware
-  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true' || process.env.NEXT_PUBLIC_ENVIRONMENT === 'test') {
+  // SECURITY: Use server-side only env var (NOT NEXT_PUBLIC_)
+  // This prevents exposing test mode to client-side code
+  const bypassAuth = process.env.BYPASS_AUTH === 'true';
+
+  // Production safety check - prevent accidental bypass in production
+  if (bypassAuth && process.env.NODE_ENV === 'production') {
+    console.error('FATAL: BYPASS_AUTH cannot be enabled in production environment');
+    throw new Error(
+      'FATAL SECURITY ERROR: BYPASS_AUTH is enabled in production. ' +
+      'This completely disables authentication. Set BYPASS_AUTH=false immediately.'
+    );
+  }
+
+  // Allow bypass for E2E tests (development/test environments only)
+  if (bypassAuth) {
+    console.warn('⚠️  BYPASS_AUTH enabled - authentication is disabled for testing');
     return NextResponse.next();
   }
 

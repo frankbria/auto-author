@@ -187,52 +187,20 @@ async def get_current_user(
             detail=f"Error fetching user: {e}",
         )
 
-    # If user doesn't exist in database, auto-create from better-auth token data
+    # SECURITY: Require explicit registration - do NOT auto-create users
+    # This prevents unauthorized account creation from stolen/forged JWTs
     if not user:
-        try:
-            # Import here to avoid circular imports
-            from app.db.user import create_user
-            from app.schemas.user import UserCreate
-
-            # Extract user data from better-auth JWT payload
-            # Better-auth typically includes email, name in the token payload
-            email = payload.get("email")
-            name = payload.get("name", "")
-
-            if not email:
-                logger.error(f"JWT token for user {user_id} missing email claim")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token: missing email"
-                )
-
-            # Split name into first/last if available
-            name_parts = name.split(" ", 1) if name else ["", ""]
-            first_name = name_parts[0] if len(name_parts) > 0 else None
-            last_name = name_parts[1] if len(name_parts) > 1 else None
-
-            # Create user in database
-            user_create = UserCreate(
-                auth_id=user_id,           # better-auth user ID
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-                avatar_url=payload.get("picture"),  # Optional avatar from token
-                metadata={},
+        logger.warning(
+            f"User {user_id} authenticated with valid JWT but not registered in database. "
+            "This could indicate: (1) User needs to complete registration, or "
+            "(2) Compromised/stolen JWT token for non-existent user."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "User account not found. Please complete registration first. "
+                "If you have already registered, please contact support."
             )
-
-            user = await create_user(user_create.model_dump())
-            logger.info(f"Auto-created user {user_id} from better-auth token")
-
-        except HTTPException:
-            # Re-raise HTTP exceptions
-            raise
-        except Exception as e:
-            # Log error and return generic unauthorized
-            logger.error(f"Error auto-creating user {user_id}: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Failed to create user: {str(e)}"
-            )
+        )
 
     return user
