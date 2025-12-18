@@ -10,7 +10,7 @@ def user_data():
     Sample user data for testing
     """
     return {
-        "clerk_id": "clerk_user_123",
+        "auth_id": "auth_user_123",
         "email": "test@example.com",
         "first_name": "Test",
         "last_name": "User",
@@ -28,7 +28,7 @@ async def test_user_creation(user_data):
     user = UserCreate(**user_data)
 
     # Verify user attributes
-    assert user.clerk_id == user_data["clerk_id"]
+    assert user.auth_id == user_data["auth_id"]
     assert user.email == user_data["email"]
     assert user.first_name == user_data["first_name"]
     assert user.last_name == user_data["last_name"]

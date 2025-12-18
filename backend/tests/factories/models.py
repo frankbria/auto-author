@@ -13,15 +13,15 @@ fake = Faker()
 
 class MongoFactory(factory.Factory):
     """Base factory for MongoDB documents."""
-    
+
     class Meta:
         abstract = True
-    
+
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
         """Create and return a MongoDB document."""
         return kwargs
-    
+
     @classmethod
     def create_in_db(cls, collection, **kwargs):
         """Create document and insert into MongoDB collection."""
@@ -34,8 +34,8 @@ class MongoFactory(factory.Factory):
 
 class UserFactory(MongoFactory):
     """Factory for User documents."""
-    
-    clerk_id = factory.LazyFunction(lambda: f"clerk_{fake.uuid4()}")
+
+    auth_id = factory.LazyFunction(lambda: str(__import__('uuid').uuid4()))
     email = factory.LazyAttribute(lambda obj: f"test_{fake.user_name()}@example.com")
     first_name = factory.Faker("first_name")
     last_name = factory.Faker("last_name")
@@ -46,7 +46,7 @@ class UserFactory(MongoFactory):
     created_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
     updated_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
     books = factory.LazyFunction(list)  # Empty list by default
-    
+
     @factory.lazy_attribute
     def preferences(self):
         """Generate user preferences."""
@@ -55,7 +55,7 @@ class UserFactory(MongoFactory):
             "email_notifications": random.choice([True, False]),
             "marketing_emails": random.choice([True, False]),
         }
-    
+
     @factory.lazy_attribute
     def metadata(self):
         """Generate user metadata."""
@@ -67,12 +67,12 @@ class UserFactory(MongoFactory):
 
 class BookFactory(MongoFactory):
     """Factory for Book documents."""
-    
+
     title = factory.Faker("sentence", nb_words=4)
     subtitle = factory.LazyFunction(lambda: fake.sentence(nb_words=6) if random.choice([True, False]) else None)
     description = factory.Faker("text", max_nb_chars=500)
     genre = factory.Iterator([
-        "Fiction", "Non-Fiction", "Science Fiction", "Fantasy", "Mystery", 
+        "Fiction", "Non-Fiction", "Science Fiction", "Fantasy", "Mystery",
         "Romance", "Thriller", "Biography", "History", "Science", "Technology"
     ])
     target_audience = factory.Iterator(["General", "Young Adult", "Children", "Academic", "Professional"])
@@ -81,7 +81,7 @@ class BookFactory(MongoFactory):
     created_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
     updated_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
     chapters = factory.LazyFunction(list)  # Empty list by default
-    
+
     @factory.lazy_attribute
     def metadata(self):
         """Generate book metadata."""
@@ -95,7 +95,7 @@ class BookFactory(MongoFactory):
 
 class ChapterFactory(MongoFactory):
     """Factory for Chapter documents."""
-    
+
     title = factory.Faker("sentence", nb_words=3)
     content = factory.Faker("text", max_nb_chars=2000)
     order = factory.Sequence(lambda n: n + 1)
@@ -103,7 +103,7 @@ class ChapterFactory(MongoFactory):
     book_id = factory.LazyFunction(lambda: str(ObjectId()))  # Will be overridden in tests
     created_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
     updated_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
-    
+
     @factory.lazy_attribute
     def metadata(self):
         """Generate chapter metadata."""
@@ -116,7 +116,7 @@ class ChapterFactory(MongoFactory):
 
 class QuestionFactory(MongoFactory):
     """Factory for Question documents."""
-    
+
     text = factory.LazyFunction(lambda: fake.sentence() + "?")
     question_type = factory.Iterator([
         "open-ended", "multiple-choice", "yes-no", "scale", "reflection"
@@ -128,7 +128,7 @@ class QuestionFactory(MongoFactory):
     chapter_id = factory.LazyFunction(lambda: str(ObjectId()))  # Will be overridden in tests
     book_id = factory.LazyFunction(lambda: str(ObjectId()))  # Will be overridden in tests
     created_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
-    
+
     @factory.lazy_attribute
     def options(self):
         """Generate options for multiple choice questions."""
@@ -137,7 +137,7 @@ class QuestionFactory(MongoFactory):
         elif hasattr(self, 'question_type') and self.question_type == "scale":
             return {"min": 1, "max": 10, "step": 1}
         return None
-    
+
     @factory.lazy_attribute
     def metadata(self):
         """Generate question metadata."""
@@ -149,7 +149,7 @@ class QuestionFactory(MongoFactory):
 
 class ResponseFactory(MongoFactory):
     """Factory for Response documents."""
-    
+
     content = factory.Faker("text", max_nb_chars=1000)
     question_id = factory.LazyFunction(lambda: str(ObjectId()))  # Will be overridden in tests
     user_id = factory.LazyFunction(lambda: str(ObjectId()))  # Will be overridden in tests
@@ -157,7 +157,7 @@ class ResponseFactory(MongoFactory):
     time_taken = factory.LazyFunction(lambda: random.randint(30, 900))  # seconds
     created_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
     updated_at = factory.LazyFunction(lambda: datetime.now(timezone.utc))
-    
+
     @factory.lazy_attribute
     def metadata(self):
         """Generate response metadata."""
@@ -171,7 +171,7 @@ class ResponseFactory(MongoFactory):
 
 class AuditLogFactory(MongoFactory):
     """Factory for Audit Log documents."""
-    
+
     action = factory.Iterator([
         "user.created", "user.updated", "user.deleted",
         "book.created", "book.updated", "book.deleted",
@@ -182,7 +182,7 @@ class AuditLogFactory(MongoFactory):
     resource_type = factory.Iterator(["user", "book", "chapter", "question", "response"])
     resource_id = factory.LazyFunction(lambda: str(ObjectId()))
     timestamp = factory.LazyFunction(lambda: datetime.now(timezone.utc))
-    
+
     @factory.lazy_attribute
     def details(self):
         """Generate audit log details."""
@@ -204,13 +204,13 @@ def generate_realistic_book_content(word_count: int = 1000) -> str:
     paragraphs = []
     words_per_paragraph = random.randint(50, 150)
     current_word_count = 0
-    
+
     while current_word_count < word_count:
         paragraph_words = min(words_per_paragraph, word_count - current_word_count)
         paragraph = fake.text(max_nb_chars=paragraph_words * 6)  # Rough estimate
         paragraphs.append(paragraph)
         current_word_count += len(paragraph.split())
-    
+
     return "\n\n".join(paragraphs)
 
 def generate_interview_questions(category: str, count: int = 5) -> List[Dict[str, Any]]:
@@ -245,10 +245,10 @@ def generate_interview_questions(category: str, count: int = 5) -> List[Dict[str
             "What questions does your book raise?"
         ]
     }
-    
+
     questions = question_templates.get(category, question_templates["character_development"])
     selected_questions = random.sample(questions, min(count, len(questions)))
-    
+
     return [
         QuestionFactory.create(
             text=q,
@@ -266,26 +266,26 @@ def create_test_user_with_books(
 ) -> List[Dict[str, Any]]:
     """Create a complete test dataset with users, books, chapters, and questions."""
     users = []
-    
+
     for _ in range(user_count):
         user = UserFactory.create()
         user_books = []
-        
+
         for _ in range(books_per_user):
             book = BookFactory.create(owner_id=user.get('id', str(ObjectId())))
             book_chapters = []
-            
+
             for chapter_order in range(1, chapters_per_book + 1):
                 chapter = ChapterFactory.create(
                     book_id=book.get('id', str(ObjectId())),
                     order=chapter_order,
                     content=generate_realistic_book_content(random.randint(500, 2000))
                 )
-                
+
                 # Generate questions for this chapter
                 categories = ["character_development", "plot", "setting", "theme"]
                 chapter_questions = []
-                
+
                 for q_order in range(1, questions_per_chapter + 1):
                     category = random.choice(categories)
                     question = QuestionFactory.create(
@@ -295,16 +295,16 @@ def create_test_user_with_books(
                         order=q_order
                     )
                     chapter_questions.append(question)
-                
+
                 chapter['questions'] = chapter_questions
                 book_chapters.append(chapter)
-            
+
             book['chapters'] = book_chapters
             user_books.append(book)
-        
+
         user['books'] = user_books
         users.append(user)
-    
+
     return users
 
 # Data seeding configurations for different test environments
@@ -346,7 +346,7 @@ def clean_mongodb_test_data(db, collections: List[str] = None):
     """Clean test data from MongoDB collections."""
     if collections is None:
         collections = ["users", "books", "chapters", "questions", "responses", "audit_logs"]
-    
+
     for collection_name in collections:
         collection = db.get_collection(collection_name)
         collection.delete_many({})
@@ -355,20 +355,20 @@ def seed_mongodb_test_data(db, environment: str = "unit"):
     """Seed MongoDB with test data for specified environment."""
     config = get_test_data_config(environment)
     users = create_test_user_with_books(**config)
-    
+
     # Insert users and related data into MongoDB
     users_collection = db.get_collection("users")
     books_collection = db.get_collection("books")
     chapters_collection = db.get_collection("chapters")
     questions_collection = db.get_collection("questions")
-    
+
     for user in users:
         # Insert user
         user_doc = {k: v for k, v in user.items() if k != 'books'}
         user_doc['_id'] = ObjectId()
         user_doc['id'] = str(user_doc['_id'])
         users_collection.insert_one(user_doc)
-        
+
         # Insert books and chapters
         for book in user.get('books', []):
             book_doc = {k: v for k, v in book.items() if k != 'chapters'}
@@ -376,7 +376,7 @@ def seed_mongodb_test_data(db, environment: str = "unit"):
             book_doc['id'] = str(book_doc['_id'])
             book_doc['owner_id'] = user_doc['id']
             books_collection.insert_one(book_doc)
-            
+
             # Insert chapters and questions
             for chapter in book.get('chapters', []):
                 chapter_doc = {k: v for k, v in chapter.items() if k != 'questions'}
@@ -384,7 +384,7 @@ def seed_mongodb_test_data(db, environment: str = "unit"):
                 chapter_doc['id'] = str(chapter_doc['_id'])
                 chapter_doc['book_id'] = book_doc['id']
                 chapters_collection.insert_one(chapter_doc)
-                
+
                 # Insert questions
                 for question in chapter.get('questions', []):
                     question_doc = dict(question)
@@ -393,5 +393,5 @@ def seed_mongodb_test_data(db, environment: str = "unit"):
                     question_doc['chapter_id'] = chapter_doc['id']
                     question_doc['book_id'] = book_doc['id']
                     questions_collection.insert_one(question_doc)
-    
+
     return len(users)

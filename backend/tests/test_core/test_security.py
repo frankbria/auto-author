@@ -17,8 +17,6 @@ from app.core.security import (
     hash_password,
     verify_password,
     verify_jwt_token,
-    get_clerk_jwks,
-    get_clerk_user,
     RoleChecker,
     get_current_user,
     optional_security,

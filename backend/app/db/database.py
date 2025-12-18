@@ -23,7 +23,7 @@ __all__ = [
 # Late imports to avoid circular dependencies
 
 from .user import (
-    get_user_by_clerk_id,
+    get_user_by_auth_id,
     get_user_by_id,
     get_user_by_email,
     create_user,
@@ -31,6 +31,9 @@ from .user import (
     delete_user,
     delete_user_books,
 )
+
+# Backward compatibility alias for migration period
+get_user_by_clerk_id = get_user_by_auth_id
 
 from .book import (
     create_book,
@@ -77,7 +80,7 @@ from .session import (
 
 __all__ += [
     # User DAOs
-    "get_user_by_clerk_id",
+    "get_user_by_auth_id",
     "get_user_by_id",
     "get_user_by_email",
     "create_user",

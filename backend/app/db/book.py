@@ -10,11 +10,11 @@ from app.models.user import UserDB
 
 
 # Book-related database operations
-async def create_book(book_data: Dict, user_clerk_id: str) -> Dict:
+async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
     """Create a new book in the database and associate it with a user"""
     try:
         # 1) Set owner ID
-        book_data["owner_id"] = user_clerk_id
+        book_data["owner_id"] = user_auth_id
 
         # 2) build the Pydantic model
         book_obj = BookDB(**book_data)
@@ -33,14 +33,14 @@ async def create_book(book_data: Dict, user_clerk_id: str) -> Dict:
 
         # Associate the book with the user
         await users_collection.update_one(
-            {"clerk_id": user_clerk_id}, {"$push": {"book_ids": str(book_obj.id)}}
+            {"auth_id": user_auth_id}, {"$push": {"book_ids": str(book_obj.id)}}
         )
 
-        print(f"Audit log: {user_clerk_id}")
+        print(f"Audit log: {user_auth_id}")
         # Create audit log entry
         await create_audit_log(
             action="book_create",
-            actor_id=user_clerk_id,
+            actor_id=user_auth_id,
             target_id=str(book_obj.id),
             resource_type="book",
             details={"title": book_obj.title},
@@ -65,16 +65,16 @@ async def get_book_by_id(book_id: str) -> Optional[Dict]:
 
 
 async def get_books_by_user(
-    user_clerk_id: str, skip: int = 0, limit: int = 100
+    user_auth_id: str, skip: int = 0, limit: int = 100
 ) -> List[Dict]:
     """Get all books owned by a user"""
-    cursor = books_collection.find({"owner_id": user_clerk_id}).skip(skip).limit(limit)
+    cursor = books_collection.find({"owner_id": user_auth_id}).skip(skip).limit(limit)
     books = await cursor.to_list(length=limit)
     return books
 
 
 async def update_book(
-    book_id: str, book_data: Dict, user_clerk_id: str
+    book_id: str, book_data: Dict, user_auth_id: str
 ) -> Optional[Dict]:
     """Update an existing book"""
     # Add updated_at timestamp
@@ -82,7 +82,7 @@ async def update_book(
 
     # Update the book
     updated_book = await books_collection.find_one_and_update(
-        {"_id": ObjectId(book_id), "owner_id": user_clerk_id},  # Only owner can update
+        {"_id": ObjectId(book_id), "owner_id": user_auth_id},  # Only owner can update
         {"$set": book_data},
         return_document=True,
     )
@@ -91,7 +91,7 @@ async def update_book(
     if updated_book:
         await create_audit_log(
             action="book_update",
-            actor_id=user_clerk_id,
+            actor_id=user_auth_id,
             target_id=book_id,
             resource_type="book",
             details={"updated_fields": list(book_data.keys())},
@@ -100,11 +100,11 @@ async def update_book(
     return updated_book
 
 
-async def delete_book(book_id: str, user_clerk_id: str) -> bool:
+async def delete_book(book_id: str, user_auth_id: str) -> bool:
     """Delete a book and remove its association from the user"""
     # First check if user owns the book
     book = await books_collection.find_one(
-        {"_id": ObjectId(book_id), "owner_id": user_clerk_id}
+        {"_id": ObjectId(book_id), "owner_id": user_auth_id}
     )
     if not book:
         return False
@@ -115,13 +115,13 @@ async def delete_book(book_id: str, user_clerk_id: str) -> bool:
     # Remove book association from user
     if result.deleted_count > 0:
         await users_collection.update_one(
-            {"clerk_id": user_clerk_id}, {"$pull": {"book_ids": book_id}}
+            {"auth_id": user_auth_id}, {"$pull": {"book_ids": book_id}}
         )
 
         # Create audit log entry
         await create_audit_log(
             action="book_delete",
-            actor_id=user_clerk_id,
+            actor_id=user_auth_id,
             target_id=book_id,
             resource_type="book",
             details={"title": book.get("title", "Untitled")},

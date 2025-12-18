@@ -9,11 +9,11 @@ async def test_generate_chapter_draft_with_mock_book(auth_client_factory):
     """Test successful draft generation with mocked book operations"""
     # Create client
     client = await auth_client_factory()
-    
+
     # Mock the book and chapter retrieval to bypass transaction issues
     mock_book = {
         "_id": "test_book_id",
-        "owner_id": "test_clerk_id",
+        "owner_id": "test-auth-id-123",
         "title": "Test Book",
         "table_of_contents": {
             "chapters": [
@@ -30,7 +30,7 @@ async def test_generate_chapter_draft_with_mock_book(auth_client_factory):
             "version": 1
         }
     }
-    
+
     # Mock the AI service result
     mock_ai_result = {
         "success": True,
@@ -46,9 +46,9 @@ async def test_generate_chapter_draft_with_mock_book(auth_client_factory):
         },
         "suggestions": ["Add more examples", "Consider breaking into sections"]
     }
-    
+
     with patch('app.api.endpoints.books.get_book_by_id', AsyncMock(return_value=mock_book)):
-        with patch('app.api.endpoints.books.ai_service.generate_chapter_draft', 
+        with patch('app.api.endpoints.books.ai_service.generate_chapter_draft',
                    AsyncMock(return_value=mock_ai_result)):
             # Generate draft
             draft_data = {
@@ -65,15 +65,15 @@ async def test_generate_chapter_draft_with_mock_book(auth_client_factory):
                 "writing_style": "educational",
                 "target_length": 2000
             }
-            
+
             response = await client.post(
                 f"/api/v1/books/test_book_id/chapters/ch1/generate-draft",
                 json=draft_data
             )
-            
+
             assert response.status_code == 200
             result = response.json()
-            
+
             assert result["success"] is True
             assert result["book_id"] == "test_book_id"
             assert result["chapter_id"] == "ch1"
@@ -86,46 +86,46 @@ async def test_generate_chapter_draft_with_mock_book(auth_client_factory):
 async def test_generate_draft_validates_responses(auth_client_factory):
     """Test that draft generation validates question responses"""
     client = await auth_client_factory()
-    
+
     mock_book = {
         "_id": "test_book_id",
-        "owner_id": "test_clerk_id",
+        "owner_id": "test-auth-id-123",
         "title": "Test Book",
         "table_of_contents": {
             "chapters": [{"id": "ch1", "title": "Chapter 1"}]
         }
     }
-    
+
     with patch('app.api.endpoints.books.get_book_by_id', AsyncMock(return_value=mock_book)):
         # Try with empty responses
         response = await client.post(
             "/api/v1/books/test_book_id/chapters/ch1/generate-draft",
             json={"question_responses": []}
         )
-        
+
         assert response.status_code == 400
         assert "Question responses are required" in response.json()["detail"]
 
 
-@pytest.mark.asyncio  
+@pytest.mark.asyncio
 async def test_generate_draft_handles_ai_errors(auth_client_factory):
     """Test draft generation handles AI service errors gracefully"""
     client = await auth_client_factory()
-    
+
     mock_book = {
         "_id": "test_book_id",
-        "owner_id": "test_clerk_id",
+        "owner_id": "test-auth-id-123",
         "title": "Test Book",
         "table_of_contents": {
             "chapters": [{"id": "ch1", "title": "Chapter 1"}]
         }
     }
-    
+
     # Mock AI service to raise an error
     with patch('app.api.endpoints.books.get_book_by_id', AsyncMock(return_value=mock_book)):
-        with patch('app.api.endpoints.books.ai_service.generate_chapter_draft', 
+        with patch('app.api.endpoints.books.ai_service.generate_chapter_draft',
                    AsyncMock(side_effect=Exception("AI service unavailable"))):
-            
+
             response = await client.post(
                 "/api/v1/books/test_book_id/chapters/ch1/generate-draft",
                 json={
@@ -134,6 +134,6 @@ async def test_generate_draft_handles_ai_errors(auth_client_factory):
                     ]
                 }
             )
-            
+
             assert response.status_code == 500
             assert "Error generating draft" in response.json()["detail"]

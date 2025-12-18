@@ -5,7 +5,6 @@ import time
 import re
 from datetime import datetime, timedelta
 from pydantic import BaseModel
-import requests
 
 from app.core.security import verify_jwt_token
 from app.db.database import get_collection
@@ -196,9 +195,9 @@ async def audit_request(
     resource_type: str,
     target_id: Optional[str] = None,
     metadata: Optional[Dict] = None,
-):
+) -> Dict[str, Any]:
     """
-    Log an audit entry for the current request
+    Log an audit entry for the current request and validate authentication
 
     Args:
         request: The FastAPI request object
@@ -207,7 +206,41 @@ async def audit_request(
         resource_type: The type of resource being accessed (e.g., "user", "book")
         target_id: The ID of the resource being accessed (if applicable)
         metadata: Optional dictionary of additional metadata to include in the audit log
+
+    Returns:
+        User payload from JWT token
+
+    Raises:
+        HTTPException: If authentication fails (missing or invalid token)
     """
+    # Check if auth bypass is enabled (uses module-level import)
+    if not settings.BYPASS_AUTH:
+        # Validate authorization header
+        auth_header = request.headers.get("authorization", "")
+
+        if not auth_header:
+            raise HTTPException(
+                status_code=401,
+                detail="Authorization header missing"
+            )
+
+        # Verify Bearer token format
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authorization header format. Expected 'Bearer <token>'"
+            )
+
+        # Extract token and verify it (uses module-level import)
+        token = auth_header.split(" ", 1)[1]
+        user_payload = await verify_jwt_token(token)
+    else:
+        # BYPASS_AUTH enabled - create payload from current_user
+        user_payload = {
+            "sub": current_user.get("auth_id") or current_user.get("clerk_id") or current_user.get("id"),
+            "email": current_user.get("email", "")
+        }
+
     # Extract request details
     method = request.method
     path = request.url.path
@@ -231,85 +264,18 @@ async def audit_request(
     if metadata:
         details.update(metadata)
 
+    # Get user ID - better-auth uses auth_id instead of clerk_id
+    # Support both for migration period
+    user_id = current_user.get("auth_id") or current_user.get("clerk_id") or current_user.get("id")
+
     # Create audit log
     await create_audit_log(
         action=action,
-        actor_id=current_user["clerk_id"],
+        actor_id=user_id,
         target_id=target_id or "unknown",
         resource_type=resource_type,
         details=details,
     )
 
-    # E2E Test Mode: Skip token verification
-    if settings.BYPASS_AUTH:
-        return {
-            "sub": current_user["clerk_id"],
-            "email": current_user.get("email", "test@example.com")
-        }
-
-    # Extract token from Authorization header
-    auth_header = request.headers.get("authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing or invalid",
-        )
-    token = auth_header.split(" ", 1)[1]
-
-    # Verify the token
-    payload = await verify_jwt_token(token)
-
-    # Get the user ID from the token
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID in token"
-        )
-
-    # At this point, we've validated the token
-    # We could get the user from the database if needed
-    return payload
-
-
-# Add this function to end of file
-async def get_clerk_client():
-    """
-    Returns a client to interact with Clerk API.
-    Since we're using basic HTTP requests rather than a full Clerk SDK,
-    this function returns a simple object with methods to interact with Clerk.
-    """
-
-    class ClerkClient:
-        def __init__(self, api_key):
-            self.api_key = api_key
-            self.base_url = "https://api.clerk.dev/v1"
-            self.headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
-
-        async def delete_user(self, user_id):
-            """Delete a user in Clerk"""
-            url = f"{self.base_url}/users/{user_id}"
-            response = requests.delete(url, headers=self.headers)
-            if response.status_code == 200 or response.status_code == 204:
-                return {"deleted": True}
-            return {"deleted": False, "error": response.json()}
-
-        async def get_user(self, user_id):
-            """Get a user's details from Clerk"""
-            url = f"{self.base_url}/users/{user_id}"
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                return response.json()
-            return None
-
-        async def update_user(self, user_id, data):
-            """Update a user's details in Clerk"""
-            url = f"{self.base_url}/users/{user_id}"
-            response = requests.patch(url, headers=self.headers, json=data)
-            if response.status_code == 200:
-                return response.json()
-            return None
-
-    return ClerkClient(settings.CLERK_API_KEY)
+    # Return user payload
+    return user_payload

@@ -23,7 +23,7 @@ async def export_book_pdf(
     book_id: str,
     current_user: Dict = Depends(get_current_user),
     include_empty_chapters: bool = Query(
-        False, 
+        False,
         description="Include chapters without content"
     ),
     page_size: str = Query(
@@ -35,24 +35,24 @@ async def export_book_pdf(
 ):
     """
     Export a book as a PDF file.
-    
+
     Returns a PDF file with all book content formatted for reading.
     """
     # Get book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    
-    if book.get("owner_id") != current_user.get("clerk_id"):
+
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403,
             detail="Not authorized to export this book"
         )
-    
+
     # Log the export request
     try:
         await chapter_access_service.log_access(
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             book_id=book_id,
             chapter_id=None,  # Book-level access
             access_type="export_pdf",
@@ -64,7 +64,7 @@ async def export_book_pdf(
         )
     except Exception as e:
         print(f"Failed to log export access: {e}")
-    
+
     try:
         # Generate PDF
         pdf_content = await export_service.export_book(
@@ -73,14 +73,14 @@ async def export_book_pdf(
             include_empty_chapters=include_empty_chapters,
             page_size=page_size
         )
-        
+
         # Create filename
         safe_title = "".join(
-            c for c in book.get("title", "untitled") 
+            c for c in book.get("title", "untitled")
             if c.isalnum() or c in (' ', '-', '_')
         ).rstrip()
         filename = f"{safe_title}.pdf"
-        
+
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(pdf_content),
@@ -90,7 +90,7 @@ async def export_book_pdf(
                 "Content-Length": str(len(pdf_content)),
             }
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -110,24 +110,24 @@ async def export_book_docx(
 ):
     """
     Export a book as a DOCX (Microsoft Word) file.
-    
+
     Returns a DOCX file with all book content formatted for editing.
     """
     # Get book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    
-    if book.get("owner_id") != current_user.get("clerk_id"):
+
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403,
             detail="Not authorized to export this book"
         )
-    
+
     # Log the export request
     try:
         await chapter_access_service.log_access(
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             book_id=book_id,
             chapter_id=None,  # Book-level access
             access_type="export_docx",
@@ -138,7 +138,7 @@ async def export_book_docx(
         )
     except Exception as e:
         print(f"Failed to log export access: {e}")
-    
+
     try:
         # Generate DOCX
         docx_content = await export_service.export_book(
@@ -146,14 +146,14 @@ async def export_book_docx(
             format="docx",
             include_empty_chapters=include_empty_chapters
         )
-        
+
         # Create filename
         safe_title = "".join(
             c for c in book.get("title", "untitled")
             if c.isalnum() or c in (' ', '-', '_')
         ).rstrip()
         filename = f"{safe_title}.docx"
-        
+
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(docx_content),
@@ -163,7 +163,7 @@ async def export_book_docx(
                 "Content-Length": str(len(docx_content)),
             }
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -183,13 +183,13 @@ async def get_export_formats(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    
-    if book.get("owner_id") != current_user.get("clerk_id"):
+
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403,
             detail="Not authorized to access this book"
         )
-    
+
     # Return available formats
     return {
         "formats": [

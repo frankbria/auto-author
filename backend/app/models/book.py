@@ -28,7 +28,7 @@ class TocItem(BaseModel):
 
 class QuestionMetadata(BaseModel):
     """Metadata for questions"""
-    
+
     suggested_response_length: str
     help_text: Optional[str] = None
     examples: Optional[List[str]] = None
@@ -36,7 +36,7 @@ class QuestionMetadata(BaseModel):
 
 class Question(BaseModel):
     """Database model for chapter questions"""
-    
+
     id: str
     chapter_id: str
     question_text: str
@@ -50,20 +50,20 @@ class Question(BaseModel):
 
 class QuestionResponseEditHistory(BaseModel):
     """Model for tracking edits to question responses"""
-    
+
     timestamp: datetime
     word_count: int
 
 
 class QuestionResponseMetadata(BaseModel):
     """Metadata for question responses"""
-    
+
     edit_history: List[QuestionResponseEditHistory] = Field(default_factory=list)
 
 
 class QuestionResponse(BaseModel):
     """Database model for question responses"""
-    
+
     id: str
     question_id: str
     user_id: str
@@ -78,7 +78,7 @@ class QuestionResponse(BaseModel):
 
 class QuestionRating(BaseModel):
     """Database model for question ratings"""
-    
+
     id: str
     question_id: str
     user_id: str
@@ -97,7 +97,7 @@ class BookBase(BaseModel):
     target_audience: Optional[str] = Field(None, max_length=100)
     cover_image_url: Optional[str] = Field(None, max_length=2083)
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    owner_id: str  # Reference to the user's clerk_id
+    owner_id: str  # Reference to the user's auth_id (better-auth user ID)
 
 
 class BookCreate(BookBase):

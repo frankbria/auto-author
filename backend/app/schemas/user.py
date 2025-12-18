@@ -27,7 +27,7 @@ class UserResponse(UserBase):
     """Schema for user data returned from API"""
 
     id: Optional[str] = None
-    clerk_id: str
+    auth_id: str  # better-auth user ID
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     role: str = "user"
@@ -42,14 +42,14 @@ class UserResponse(UserBase):
 class UserCreate(UserBase):
     """Schema for creating a new user"""
 
-    clerk_id: str
+    auth_id: str  # better-auth user ID
     email: Optional[EmailStr] = None  # Override to make optional for webhooks
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     class Config:
         json_schema_extra = {
             "example": {
-                "clerk_id": "user_2NxAa1pyy8THf937QUAhKR2tXCI",
+                "auth_id": "550e8400-e29b-41d4-a716-446655440000",
                 "email": "user@example.com",
                 "first_name": "John",
                 "last_name": "Doe",

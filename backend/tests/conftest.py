@@ -116,7 +116,7 @@ def test_user():
     return {
         "_id": "507f1f77bcf86cd799439011",
         "id": "507f1f77bcf86cd799439011",
-        "clerk_id": "test_clerk_id",
+        "auth_id": "test-auth-id-123",
         "email": "tester@example.com",
         "first_name": "Test",
         "last_name": "User",
@@ -140,7 +140,7 @@ def fake_user():
     return {
         "_id": "123456",
         "id": "123456",
-        "clerk_id": "fake_clerk_id",
+        "auth_id": "fake-auth-id-456",
         "email": "faker@example.com",
         "first_name": "Fake",
         "last_name": "User",
@@ -180,8 +180,6 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
     async def make_client(*, overrides: dict = None, auth: bool = True):
         user = _seed_user(overrides)
 
-        # monkeypatch.setattr(db, "get_user_by_clerk_id", lambda: user["clerk_id"])
-
         async def _noop_audit_request(
             request: Request,
             current_user: Dict,
@@ -201,11 +199,11 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
 
             app.dependency_overrides[get_current_user] = lambda: user
             monkeypatch.setattr(
-                users_dao, "get_user_by_clerk_id", lambda: user["clerk_id"]
+                users_dao, "get_user_by_auth_id", lambda: user["auth_id"]
             )
 
             async def _fake_verify(token: str):
-                return {"sub": user["clerk_id"]}
+                return {"sub": user["auth_id"]}
             monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
             headers["Authorization"] = "Bearer aaa.bbb.ccc"
 
@@ -265,7 +263,7 @@ def test_book(test_user):
         "target_audience": "Adults",
         "cover_image_url": None,
         "metadata": {},
-        "owner_id": test_user["clerk_id"],
+        "owner_id": test_user["auth_id"],
         "toc_items": [],
         "published": False,
         "created_at": datetime.now(timezone.utc),
@@ -306,11 +304,11 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
 
             app.dependency_overrides[get_current_user] = lambda: user
             monkeypatch.setattr(
-                users_dao, "get_user_by_clerk_id", lambda: user["clerk_id"]
+                users_dao, "get_user_by_auth_id", lambda: user["auth_id"]
             )
 
             async def _fake_verify(token: str):
-                return {"sub": user["clerk_id"]}
+                return {"sub": user["auth_id"]}
             monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
             headers["Authorization"] = "Bearer dummy.token.here"
 

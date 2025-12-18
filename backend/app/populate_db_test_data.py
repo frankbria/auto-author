@@ -51,7 +51,7 @@ def get_or_create_user(db):
         user = {
             "email": FAKE_USER_EMAIL,
             "hashed_password": FAKE_USER_PASSWORD,
-            "clerk_id": "user_2bO9mdpVyITmb4CSuFzZAMMj1gN",
+            "auth_id": "550e8400-e29b-41d4-a716-446655440000",  # better-auth user ID (UUID)
             "role": "admin",
             "first_name": "Frank",
             "last_name": "Bria",
@@ -71,7 +71,7 @@ def create_fake_books(db, user):
         if not existing:
             book = {
                 **book_data,
-                "owner_id": "user_2bO9mdpVyITmb4CSuFzZAMMj1gN",
+                "owner_id": "550e8400-e29b-41d4-a716-446655440000",  # better-auth user ID
             }
             books.insert_one(book)
 

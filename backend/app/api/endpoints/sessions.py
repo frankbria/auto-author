@@ -123,7 +123,7 @@ async def logout_all_sessions(
     Args:
         keep_current: If True, keeps the current session active
     """
-    user_id = current_user.get("clerk_id") or current_user.get("id")
+    user_id = current_user.get("auth_id") or current_user.get("id")
 
     current_session_id = None
     if keep_current and hasattr(request.state, "session"):
@@ -153,7 +153,7 @@ async def list_user_sessions(
     Returns:
         List of sessions ordered by most recent activity
     """
-    user_id = current_user.get("clerk_id") or current_user.get("id")
+    user_id = current_user.get("auth_id") or current_user.get("id")
 
     sessions = await get_user_sessions(user_id, active_only, limit)
 
@@ -184,7 +184,7 @@ async def delete_session(
     Args:
         session_id: The ID of the session to delete
     """
-    user_id = current_user.get("clerk_id") or current_user.get("id")
+    user_id = current_user.get("auth_id") or current_user.get("id")
 
     # Verify the session belongs to the current user
     session = await get_session_by_id(session_id)

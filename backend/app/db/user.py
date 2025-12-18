@@ -8,9 +8,9 @@ from .audit_log import create_audit_log
 
 
 # User-related database operations
-async def get_user_by_clerk_id(clerk_id: str) -> Optional[Dict]:
-    """Get a user by their Clerk ID"""
-    user = await users_collection.find_one({"clerk_id": clerk_id})
+async def get_user_by_auth_id(auth_id: str) -> Optional[Dict]:
+    """Get a user by their better-auth ID"""
+    user = await users_collection.find_one({"auth_id": auth_id})
     return user
 
 
@@ -34,7 +34,7 @@ async def create_user(user_data: Dict) -> Dict:
 
 
 async def update_user(
-    clerk_id: str, user_data: Dict, actor_id: str = None
+    auth_id: str, user_data: Dict, actor_id: str = None
 ) -> Optional[Dict]:
     """Update an existing user"""
     # Add updated_at timestamp
@@ -42,7 +42,7 @@ async def update_user(
 
     # Update the user
     updated_user = await users_collection.find_one_and_update(
-        {"clerk_id": clerk_id}, {"$set": user_data}, return_document=True
+        {"auth_id": auth_id}, {"$set": user_data}, return_document=True
     )
 
     # Log the change if user was found and updated
@@ -50,7 +50,7 @@ async def update_user(
         await create_audit_log(
             action="user_update",
             actor_id=actor_id,
-            target_id=clerk_id,
+            target_id=auth_id,
             resource_type="user",
             details={"updated_fields": list(user_data.keys())},
         )
@@ -59,19 +59,19 @@ async def update_user(
 
 
 async def delete_user(
-    clerk_id: str, actor_id: str = None, soft_delete: bool = True
+    auth_id: str, actor_id: str = None, soft_delete: bool = True
 ) -> bool:
     """Delete a user (soft delete by default)"""
     if soft_delete:
         # Mark user as inactive instead of deleting
         result = await users_collection.update_one(
-            {"clerk_id": clerk_id},
+            {"auth_id": auth_id},
             {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}},
         )
         success = result.modified_count > 0
     else:
         # Hard delete
-        result = await users_collection.delete_one({"clerk_id": clerk_id})
+        result = await users_collection.delete_one({"auth_id": auth_id})
         success = result.deleted_count > 0
 
     # Log the deletion
@@ -79,8 +79,8 @@ async def delete_user(
         await create_audit_log(
             action="user_delete",
             actor_id=actor_id
-            or clerk_id,  # If no actor specified, user deleted themselves
-            target_id=clerk_id,
+            or auth_id,  # If no actor specified, user deleted themselves
+            target_id=auth_id,
             resource_type="user",
             details={"soft_delete": soft_delete},
         )
@@ -93,7 +93,7 @@ async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
     Delete books associated with a user
 
     Args:
-        user_id: The user's ID (clerk_id)
+        user_id: The user's ID (auth_id or MongoDB _id)
         book_ids: Optional list of specific book IDs to delete. If None, deletes all user's books.
 
     Returns:

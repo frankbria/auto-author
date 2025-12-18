@@ -44,7 +44,7 @@ from app.schemas.book import (
     QuestionProgressResponse,
 )
 from app.db.database import (
-    create_book, get_book_by_id, get_books_by_user, 
+    create_book, get_book_by_id, get_books_by_user,
     update_book, delete_book
 )
 from app.db.toc_transactions import (
@@ -99,7 +99,7 @@ async def create_new_book(
     try:
         new_book = await create_book(
             book_data=book_data,
-            user_clerk_id=current_user.get("clerk_id")
+            user_auth_id=current_user.get("auth_id")
         )
 
         # Log the book creation
@@ -146,7 +146,7 @@ async def get_user_books(
     """Get all books for the current user"""
     try:
         books = await get_books_by_user(
-            user_clerk_id=current_user.get("clerk_id"),
+            user_auth_id=current_user.get("auth_id"),
             skip=skip,
             limit=limit
         )
@@ -195,7 +195,7 @@ async def get_book(
             )
 
         # Check if user has access to this book
-        if book.get("owner_id") != current_user.get("clerk_id"):
+        if book.get("owner_id") != current_user.get("auth_id"):
             # Check for collaborator access later
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -258,7 +258,7 @@ async def update_book_details(
         updated_book = await update_book(
             book_id=book_id,
             book_data=update_data,
-            user_clerk_id=current_user.get("clerk_id")
+            user_auth_id=current_user.get("auth_id")
         )
 
         # Check if book was found and updated
@@ -348,7 +348,7 @@ async def patch_book_details(
         updated_book = await update_book(
             book_id=book_id,
             book_data=update_data,
-            user_clerk_id=current_user.get("clerk_id"),
+            user_auth_id=current_user.get("auth_id"),
         )
 
         if not updated_book:
@@ -431,7 +431,7 @@ async def delete_book_endpoint(
             )
 
         # Check if user has permission to delete this book
-        if book.get("owner_id") != current_user.get("clerk_id"):
+        if book.get("owner_id") != current_user.get("auth_id"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have permission to delete this book",
@@ -440,7 +440,7 @@ async def delete_book_endpoint(
         # Delete the book
         success = await delete_book(
             book_id=book_id,
-            user_clerk_id=current_user.get("clerk_id")
+            user_auth_id=current_user.get("auth_id")
         )
 
         if not success:
@@ -485,37 +485,37 @@ async def upload_book_cover_image(
     try:
         # Validate book ownership
         book = await get_book_by_id(book_id)
-        if not book or book.get("owner_id") != current_user.get("clerk_id"):
+        if not book or book.get("owner_id") != current_user.get("auth_id"):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Book not found"
             )
-        
+
         # Process and save the cover image
         from app.services.file_upload_service import FileUploadService
         file_upload_service = FileUploadService()
         image_url, thumbnail_url = await file_upload_service.process_and_save_cover_image(
-            file, 
+            file,
             book_id
         )
-        
+
         # Delete old cover images if they exist
         old_cover_url = book.get("cover_image_url")
         old_thumbnail_url = book.get("cover_thumbnail_url")
         if old_cover_url:
             await file_upload_service.delete_cover_image(
-                old_cover_url, 
+                old_cover_url,
                 old_thumbnail_url
             )
-        
+
         # Update book with new cover image URLs
         update_data = {
             "cover_image_url": image_url,
             "cover_thumbnail_url": thumbnail_url,
             "updated_at": datetime.now(timezone.utc),
         }
-        await update_book(book_id, update_data, current_user.get("clerk_id"))
-        
+        await update_book(book_id, update_data, current_user.get("auth_id"))
+
         # Log the upload
         if request:
             await audit_request(
@@ -530,14 +530,14 @@ async def upload_book_cover_image(
                     "image_url": image_url,
                 }
             )
-        
+
         return {
             "message": "Cover image uploaded successfully",
             "cover_image_url": image_url,
             "cover_thumbnail_url": thumbnail_url,
             "book_id": book_id,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -561,7 +561,7 @@ async def get_book_summary(
 
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book"
         )
@@ -610,7 +610,7 @@ async def update_book_summary(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to update this book"
         )
@@ -628,7 +628,7 @@ async def update_book_summary(
         "summary_history": summary_history[-20:],  # Keep last 20 revisions
         "updated_at": datetime.now(timezone.utc),
     }
-    await update_book(book_id, update_data, current_user.get("clerk_id"))
+    await update_book(book_id, update_data, current_user.get("auth_id"))
     return {"summary": summary, "summary_history": summary_history[-20:]}
 
 
@@ -645,7 +645,7 @@ async def patch_book_summary(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to update this book"
         )
@@ -677,7 +677,7 @@ async def patch_book_summary(
             "summary_history": summary_history[-20:],
             "updated_at": datetime.now(timezone.utc),
         }
-        await update_book(book_id, update_data, current_user.get("clerk_id"))
+        await update_book(book_id, update_data, current_user.get("auth_id"))
         return {"summary": summary, "summary_history": summary_history[-20:]}
     # If no summary provided, return current summary
     return {
@@ -700,7 +700,7 @@ async def analyze_book_summary(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to analyze this book"
         )
@@ -731,7 +731,7 @@ async def analyze_book_summary(
             },
             "updated_at": datetime.now(timezone.utc),
         }
-        await update_book(book_id, update_data, current_user.get("clerk_id"))
+        await update_book(book_id, update_data, current_user.get("auth_id"))
 
         return {
             "book_id": book_id,
@@ -760,7 +760,7 @@ async def generate_clarifying_questions(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to generate questions for this book"
         )
@@ -801,7 +801,7 @@ async def generate_clarifying_questions(
             "clarifying_questions": questions_data,
             "updated_at": datetime.now(timezone.utc),
         }
-        await update_book(book_id, update_data, current_user.get("clerk_id"))
+        await update_book(book_id, update_data, current_user.get("auth_id"))
 
         return {
             "book_id": book_id,
@@ -829,7 +829,7 @@ async def get_question_responses(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access responses for this book"
         )
@@ -861,7 +861,7 @@ async def save_question_responses(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to update responses for this book"
         )
@@ -906,7 +906,7 @@ async def save_question_responses(
         "clarifying_questions": clarifying_questions,
         "updated_at": datetime.now(timezone.utc),
     }
-    await update_book(book_id, update_data, current_user.get("clerk_id"))
+    await update_book(book_id, update_data, current_user.get("auth_id"))
 
     return {
         "book_id": book_id,
@@ -929,7 +929,7 @@ async def check_toc_generation_readiness(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to check readiness for this book"
         )
@@ -1033,7 +1033,7 @@ async def generate_table_of_contents(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to generate TOC for this book"
         )
@@ -1078,7 +1078,7 @@ async def generate_table_of_contents(
             "table_of_contents": toc_data,
             "updated_at": datetime.now(timezone.utc),
         }
-        await update_book(book_id, update_data, current_user.get("clerk_id"))
+        await update_book(book_id, update_data, current_user.get("auth_id"))
 
         return {
             "book_id": book_id,
@@ -1107,7 +1107,7 @@ async def get_book_toc(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's TOC"
         )
@@ -1184,13 +1184,13 @@ async def update_book_toc(
         # Debug logging
         import logging
         logger = logging.getLogger(__name__)
-        logger.info(f"Updating TOC for book_id={book_id}, user_clerk_id={current_user.get('clerk_id')}")
-        
+        logger.info(f"Updating TOC for book_id={book_id}, user_auth_id={current_user.get('auth_id')}")
+
         # Update TOC with transaction
         updated_toc = await update_toc_with_transaction(
             book_id=book_id,
             toc_data=toc_data,
-            user_clerk_id=current_user.get("clerk_id")
+            user_auth_id=current_user.get("auth_id")
         )
 
         return {
@@ -1248,24 +1248,24 @@ async def create_chapter(
             "estimated_reading_time": 0,
             "is_active_tab": False,
         }
-        
+
         # Add chapter with transaction
         new_chapter = await add_chapter_with_transaction(
             book_id=book_id,
             chapter_data=chapter_dict,
             parent_id=chapter_data.parent_id if chapter_data.level > 1 else None,
-            user_clerk_id=current_user.get("clerk_id")
+            user_auth_id=current_user.get("auth_id")
         )
-        
+
         # Log chapter creation
         await chapter_access_service.log_access(
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             book_id=book_id,
             chapter_id=new_chapter["id"],
             access_type="create",
             metadata={"chapter_title": chapter_data.title, "level": chapter_data.level},
         )
-        
+
         return {
             "book_id": book_id,
             "chapter": new_chapter,
@@ -1302,7 +1302,7 @@ async def get_chapter(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's chapters"
         )  # Get TOC and find the chapter
@@ -1326,7 +1326,7 @@ async def get_chapter(
 
     # Log chapter access
     await chapter_access_service.log_access(
-        user_id=current_user.get("clerk_id"),
+        user_id=current_user.get("auth_id"),
         book_id=book_id,
         chapter_id=chapter_id,
         access_type="view",
@@ -1360,18 +1360,18 @@ async def update_chapter(
             updates["order"] = chapter_data.order
         if chapter_data.metadata is not None:
             updates["metadata"] = chapter_data.metadata
-            
+
         # Update chapter with transaction
         updated_chapter = await update_chapter_with_transaction(
             book_id=book_id,
             chapter_id=chapter_id,
             updates=updates,
-            user_clerk_id=current_user.get("clerk_id")
+            user_auth_id=current_user.get("auth_id")
         )
-        
+
         # Log chapter update
         await chapter_access_service.log_access(
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             book_id=book_id,
             chapter_id=chapter_id,
             access_type="edit",
@@ -1385,7 +1385,7 @@ async def update_chapter(
                 }
             },
         )
-        
+
         return {
             "book_id": book_id,
             "chapter_id": chapter_id,
@@ -1430,11 +1430,11 @@ async def delete_chapter(
         success = await delete_chapter_with_transaction(
             book_id=book_id,
             chapter_id=chapter_id,
-            user_clerk_id=current_user.get("clerk_id")
+            user_auth_id=current_user.get("auth_id")
         )
-        
+
         # Log chapter access for deletion was moved to transaction
-        
+
         return {
             "book_id": book_id,
             "chapter_id": chapter_id,
@@ -1480,7 +1480,7 @@ async def list_chapters(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's chapters"
         )
@@ -1546,7 +1546,7 @@ async def get_chapters_metadata(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's chapters"
         )
@@ -1594,7 +1594,7 @@ async def get_chapters_metadata(
 
     # Get last active chapter from recent access logs
     recent_chapters = await chapter_access_service.get_user_recent_chapters(
-        current_user.get("clerk_id"), book_id, limit=1
+        current_user.get("auth_id"), book_id, limit=1
     )
     last_active_chapter = recent_chapters[0]["_id"] if recent_chapters else None
 
@@ -1621,7 +1621,7 @@ async def update_chapter_status_bulk(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to modify this book's chapters"
         )
@@ -1676,12 +1676,12 @@ async def update_chapter_status_bulk(
         "table_of_contents": updated_toc,
         "updated_at": datetime.now(timezone.utc),
     }
-    await update_book(book_id, update_book_data, current_user.get("clerk_id"))
+    await update_book(book_id, update_book_data, current_user.get("auth_id"))
 
     # Log the bulk status change
     for chapter_id in updated_chapters:
         await chapter_access_service.log_access(
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             book_id=book_id,
             chapter_id=chapter_id,
             access_type="status_update",
@@ -1714,9 +1714,9 @@ async def save_tab_state(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         print(
-            f"User {current_user.get('clerk_id')} is not authorized to access book {book_id}"
+            f"User {current_user.get('auth_id')} is not authorized to access book {book_id}"
         )
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book"
@@ -1724,7 +1724,7 @@ async def save_tab_state(
 
     # Save tab state via access logging service
     log_id = await chapter_access_service.save_tab_state(
-        user_id=current_user.get("clerk_id"),
+        user_id=current_user.get("auth_id"),
         book_id=book_id,
         active_chapter_id=tab_state.active_chapter_id,
         open_tab_ids=tab_state.open_tab_ids,
@@ -1748,9 +1748,9 @@ async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_u
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         print(
-            f"User {current_user.get('clerk_id')} is not authorized to access book {book_id}"
+            f"User {current_user.get('auth_id')} is not authorized to access book {book_id}"
         )
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book"
@@ -1758,7 +1758,7 @@ async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_u
 
     # Get latest tab state
     tab_state = await chapter_access_service.get_user_tab_state(
-        current_user.get("clerk_id"), book_id
+        current_user.get("auth_id"), book_id
     )
 
     if not tab_state:
@@ -1800,7 +1800,7 @@ async def get_chapter_content(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's content"
         )
@@ -1826,7 +1826,7 @@ async def get_chapter_content(
         )  # Log chapter access
     try:
         await chapter_access_service.log_access(
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             book_id=book_id,
             chapter_id=chapter_id,
             access_type="read_content",
@@ -1884,7 +1884,7 @@ async def update_chapter_content(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to modify this book's content"
         )
@@ -1931,7 +1931,7 @@ async def update_chapter_content(
         )  # Log chapter access
     try:
         await chapter_access_service.log_access(
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             book_id=book_id,
             chapter_id=chapter_id,
             access_type="update_content",
@@ -1958,7 +1958,7 @@ async def update_chapter_content(
         "table_of_contents": updated_toc,
         "updated_at": datetime.now(timezone.utc),
     }
-    await update_book(book_id, update_data, current_user.get("clerk_id"))
+    await update_book(book_id, update_data, current_user.get("auth_id"))
 
     return {
         "book_id": book_id,
@@ -1985,7 +1985,7 @@ async def get_chapter_analytics(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's analytics"
         )
@@ -1993,7 +1993,7 @@ async def get_chapter_analytics(
     try:
         # Get chapter analytics
         analytics = await chapter_access_service.get_chapter_analytics(
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             book_id=book_id,
             chapter_id=chapter_id,
             days=days,
@@ -2033,7 +2033,7 @@ async def batch_get_chapter_content(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's content"
         )
@@ -2086,7 +2086,7 @@ async def batch_get_chapter_content(
     # Log batch access
     try:
         await chapter_access_service.log_access(
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             book_id=book_id,
             chapter_id="batch_request",
             access_type="batch_read_content",
@@ -2121,11 +2121,11 @@ async def generate_chapter_questions(
 ):
     """
     Generate interview-style questions for a specific chapter based on its content and metadata.
-    
+
     This endpoint uses AI to create contextually relevant questions that help authors develop
     chapter content through a guided Q&A process. Questions are generated based on the chapter title,
     description, and book metadata (genre, audience, etc.).
-    
+
     - Supports filtering by difficulty level (easy, medium, hard)
     - Allows focusing on specific question types (character, plot, setting, theme, research)
     - Returns a batch of questions with metadata to guide the author
@@ -2134,14 +2134,14 @@ async def generate_chapter_questions(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to generate questions for this book"
         )
-    
+
     # Get question generation service
     question_service = get_question_generation_service()
-    
+
     try:
         # Generate questions
         result = await question_service.generate_questions_for_chapter(
@@ -2150,9 +2150,9 @@ async def generate_chapter_questions(
             count=request_data.count,
             difficulty=request_data.difficulty.value if request_data.difficulty else None,
             focus=[q_type.value for q_type in request_data.focus] if request_data.focus else None,
-            user_id=current_user.get("clerk_id")
+            user_id=current_user.get("auth_id")
         )
-        
+
         # Log question generation
         await audit_request(
             request=None,  # Request object not available in this context
@@ -2168,9 +2168,9 @@ async def generate_chapter_questions(
                 "questions_generated": len(result.questions),
             }
         )
-        
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error generating questions: {str(e)}"
@@ -2190,7 +2190,7 @@ async def list_chapter_questions(
 ):
     """
     List questions for a specific chapter with optional filtering and pagination.
-    
+
     This endpoint retrieves questions that have been generated for a chapter, with options to:
     - Filter by response status (questions with/without responses)
     - Filter by category (specific aspects of writing like "character motivation")
@@ -2201,14 +2201,14 @@ async def list_chapter_questions(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's questions"
         )
-    
+
     # Get question service
     question_service = get_question_generation_service()
-    
+
     try:
         # Get questions with filters
         result = await question_service.get_questions_for_chapter(
@@ -2220,9 +2220,9 @@ async def list_chapter_questions(
             page=page,
             limit=limit
         )
-        
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error retrieving questions: {str(e)}"
@@ -2242,7 +2242,7 @@ async def save_question_response(
 ):
     """
     Save or update a response to a specific question.
-    
+
     This endpoint allows authors to save their responses to interview-style questions.
     - Supports saving draft responses for later completion
     - Tracks editing history and word count
@@ -2253,14 +2253,14 @@ async def save_question_response(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to save responses for this book"
         )
-    
+
     # Get question service
     question_service = get_question_generation_service()
-    
+
     try:
         # Save response
         result = await question_service.save_question_response(
@@ -2268,12 +2268,12 @@ async def save_question_response(
             chapter_id=chapter_id,
             question_id=question_id,
             response_data=response_data,
-            user_id=current_user.get("clerk_id")
+            user_id=current_user.get("auth_id")
         )
-        
+
         # Calculate word count for logging
         word_count = len(response_data.response_text.split()) if response_data.response_text else 0
-        
+
         # Log response save
         await audit_request(
             request=None,
@@ -2289,13 +2289,13 @@ async def save_question_response(
                 "is_update": "id" in result,
             }
         )
-        
+
         return {
             "response": result,
             "success": True,
             "message": "Response saved successfully",
         }
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -2316,7 +2316,7 @@ async def get_question_response(
 ):
     """
     Get the author's response to a specific question.
-    
+
     This endpoint retrieves the saved response for a question, if one exists.
     Returns null if no response has been saved yet.
     """
@@ -2324,27 +2324,27 @@ async def get_question_response(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access responses for this book"
         )
-    
+
     # Get question service
     question_service = get_question_generation_service()
-    
+
     try:
         # Get response
         result = await question_service.get_question_response(
             question_id=question_id,
-            user_id=current_user.get("clerk_id")
+            user_id=current_user.get("auth_id")
         )
-        
+
         return {
             "response": result,
             "has_response": result is not None,
             "success": True,
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error retrieving response: {str(e)}"
@@ -2364,7 +2364,7 @@ async def rate_question(
 ):
     """
     Rate a question's relevance and quality.
-    
+
     This endpoint allows authors to provide feedback on questions to improve future generation.
     - Uses a 1-5 star rating system
     - Accepts optional feedback comments
@@ -2374,22 +2374,22 @@ async def rate_question(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to rate questions for this book"
         )
-    
+
     # Get question service
     question_service = get_question_generation_service()
-    
+
     try:
         # Save rating
         result = await question_service.save_question_rating(
             question_id=question_id,
             rating_data=rating_data,
-            user_id=current_user.get("clerk_id")
+            user_id=current_user.get("auth_id")
         )
-        
+
         # Log rating
         await audit_request(
             request=None,
@@ -2404,13 +2404,13 @@ async def rate_question(
                 "has_feedback": rating_data.feedback is not None,
             }
         )
-        
+
         return {
             "rating": result,
             "success": True,
             "message": "Question rated successfully",
         }
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -2430,37 +2430,37 @@ async def get_chapter_question_progress(
 ):
     """
     Get progress information for a chapter's questions.
-    
+
     This endpoint provides statistics about question completion status:
     - Total number of questions
     - Number of completed questions
     - Progress percentage
     - Overall status (not-started, in-progress, completed)
-    
+
     Used for progress tracking and visual indicators in the chapter tabs.
     """
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's questions"
         )
-    
+
     # Get question service
     question_service = get_question_generation_service()
-    
+
     try:
         # Get progress
         result = await question_service.get_chapter_question_progress(
             book_id=book_id,
             chapter_id=chapter_id,
-            user_id=current_user.get("clerk_id")
+            user_id=current_user.get("auth_id")
         )
-        
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error retrieving question progress: {str(e)}"
@@ -2481,7 +2481,7 @@ async def regenerate_chapter_questions(
 ):
     """
     Regenerate questions for a chapter, optionally preserving existing responses.
-    
+
     This endpoint allows authors to get fresh questions while keeping their progress:
     - Can preserve questions that already have responses
     - Deletes questions without responses
@@ -2492,14 +2492,14 @@ async def regenerate_chapter_questions(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to regenerate questions for this book"
         )
-    
+
     # Get question service
     question_service = get_question_generation_service()
-    
+
     try:
         # Regenerate questions
         result = await question_service.regenerate_chapter_questions(
@@ -2508,10 +2508,10 @@ async def regenerate_chapter_questions(
             count=request_data.count,
             difficulty=request_data.difficulty.value if request_data.difficulty else None,
             focus=[q_type.value for q_type in request_data.focus] if request_data.focus else None,
-            user_id=current_user.get("clerk_id"),
+            user_id=current_user.get("auth_id"),
             preserve_responses=preserve_responses
         )
-        
+
         # Log question regeneration
         await audit_request(
             request=None,
@@ -2530,9 +2530,9 @@ async def regenerate_chapter_questions(
                 "total_count": result.get("total", 0),
             }
         )
-        
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error regenerating questions: {str(e)}"
@@ -2557,15 +2557,15 @@ async def generate_chapter_draft(
     book = await get_book_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("clerk_id"):
+    if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to generate draft for this book"
         )
-    
+
     # Get chapter information from TOC
     toc = book.get("table_of_contents", {})
     chapters = toc.get("chapters", [])
-    
+
     # Find the chapter
     chapter_info = None
     for chapter in chapters:
@@ -2577,22 +2577,22 @@ async def generate_chapter_draft(
             if subchapter.get("id") == chapter_id:
                 chapter_info = subchapter
                 break
-    
+
     if not chapter_info:
         raise HTTPException(status_code=404, detail="Chapter not found in table of contents")
-    
+
     # Get question responses from request or book data
     question_responses = data.get("question_responses", [])
-    
+
     # If no responses provided, try to get from stored chapter questions
     if not question_responses:
         # This would require implementing a question storage system
         # For now, we'll require responses to be provided
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="Question responses are required for draft generation. Please provide Q&A pairs."
         )
-    
+
     # Validate question responses format
     for response in question_responses:
         if not isinstance(response, dict) or "question" not in response or "answer" not in response:
@@ -2600,22 +2600,22 @@ async def generate_chapter_draft(
                 status_code=400,
                 detail="Each question response must have 'question' and 'answer' fields"
             )
-    
+
     # Get optional parameters
     writing_style = data.get("writing_style", None)
     target_length = data.get("target_length", 2000)
-    
+
     # Validate target length
     if not isinstance(target_length, int) or target_length < 100 or target_length > 10000:
         target_length = 2000
-    
+
     # Prepare book metadata for context
     book_metadata = {
         "title": book.get("title", ""),
         "genre": book.get("genre", ""),
         "target_audience": book.get("target_audience", ""),
     }
-    
+
     try:
         # Generate draft using AI service
         result = await ai_service.generate_chapter_draft(
@@ -2626,13 +2626,13 @@ async def generate_chapter_draft(
             writing_style=writing_style,
             target_length=target_length
         )
-        
+
         if not result.get("success"):
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to generate draft: {result.get('error', 'Unknown error')}"
             )
-        
+
         # Log the draft generation
         await audit_request(
             request=Request(
@@ -2657,7 +2657,7 @@ async def generate_chapter_draft(
                 "writing_style": writing_style or "default"
             }
         )
-        
+
         return {
             "success": True,
             "book_id": book_id,
@@ -2667,7 +2667,7 @@ async def generate_chapter_draft(
             "suggestions": result.get("suggestions", []),
             "message": "Draft generated successfully"
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error generating draft: {str(e)}"

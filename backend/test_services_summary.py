@@ -10,10 +10,9 @@ import sys
 os.environ['DATABASE_URI'] = 'mongodb://localhost:27017'
 os.environ['DATABASE_NAME'] = 'auto_author_test'
 os.environ['OPENAI_AUTOAUTHOR_API_KEY'] = 'test-key'
-os.environ['CLERK_API_KEY'] = 'test-key'
-os.environ['CLERK_JWT_PUBLIC_KEY'] = 'test-key'
-os.environ['CLERK_FRONTEND_API'] = 'test.clerk.com'
-os.environ['CLERK_BACKEND_API'] = 'api.clerk.com'
+os.environ['BETTER_AUTH_SECRET'] = 'test-secret-key-for-better-auth'
+os.environ['BETTER_AUTH_URL'] = 'http://localhost:3000'
+os.environ['BETTER_AUTH_ISSUER'] = 'better-auth'
 
 print("=" * 80)
 print("AUTO AUTHOR BACKEND - TEST COVERAGE SUMMARY")
@@ -33,7 +32,7 @@ features = {
             "Handles errors gracefully"
         ]
     },
-    
+
     "2. Transcription Service": {
         "status": "✅ IMPLEMENTED",
         "details": [
@@ -44,7 +43,7 @@ features = {
             "Handles different audio lengths appropriately"
         ]
     },
-    
+
     "3. AWS Transcription Service": {
         "status": "✅ IMPLEMENTED",
         "details": [
@@ -56,7 +55,7 @@ features = {
             "Error handling for all failure scenarios"
         ]
     },
-    
+
     "4. Cloud Storage Service": {
         "status": "✅ IMPLEMENTED",
         "details": [
@@ -67,7 +66,7 @@ features = {
             "Automatic provider selection based on credentials"
         ]
     },
-    
+
     "5. File Upload Service": {
         "status": "✅ IMPLEMENTED",
         "details": [
@@ -79,7 +78,7 @@ features = {
             "Upload statistics tracking"
         ]
     },
-    
+
     "6. Book Cover Upload API": {
         "status": "✅ IMPLEMENTED",
         "details": [
