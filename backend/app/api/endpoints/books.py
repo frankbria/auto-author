@@ -58,6 +58,13 @@ from app.api.dependencies import (
     rate_limit, audit_request, sanitize_input, get_rate_limiter
 )
 from app.services.ai_service import ai_service
+from app.services.ai_errors import (
+    AIServiceError,
+    AIRateLimitError,
+    AINetworkError,
+    AIServiceUnavailableError,
+    AIInvalidRequestError
+)
 from app.services.chapter_access_service import chapter_access_service
 from app.services.chapter_status_service import chapter_status_service
 from app.services.question_generation_service import get_question_generation_service
@@ -810,9 +817,67 @@ async def generate_clarifying_questions(
             "total_questions": len(questions),
         }
 
-    except Exception as e:
+    except AIRateLimitError as e:
+        # Rate limit error - return 429 with retry information
         raise HTTPException(
-            status_code=500, detail=f"Error generating questions: {str(e)}"
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retry_after": e.retry_after,
+                "cached_content_available": e.cached_content_available,
+                "correlation_id": e.correlation_id
+            }
+        )
+    except AIServiceUnavailableError as e:
+        # Service unavailable - return 503
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retry_after": e.retry_after,
+                "cached_content_available": e.cached_content_available,
+                "correlation_id": e.correlation_id
+            }
+        )
+    except AINetworkError as e:
+        # Network error - return 503
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retryable": e.retryable,
+                "correlation_id": e.correlation_id
+            }
+        )
+    except AIInvalidRequestError as e:
+        # Invalid request - return 400
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "correlation_id": e.correlation_id
+            }
+        )
+    except AIServiceError as e:
+        # Generic AI service error - return 500 with structured info
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retryable": e.retryable,
+                "correlation_id": e.correlation_id
+            }
+        )
+    except Exception as e:
+        # Unexpected error
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error generating questions: {str(e)}"
         )
 
 
@@ -1089,8 +1154,62 @@ async def generate_table_of_contents(
             "success": toc_result["success"],
         }
 
+    except AIRateLimitError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retry_after": e.retry_after,
+                "cached_content_available": e.cached_content_available,
+                "correlation_id": e.correlation_id
+            }
+        )
+    except AIServiceUnavailableError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retry_after": e.retry_after,
+                "cached_content_available": e.cached_content_available,
+                "correlation_id": e.correlation_id
+            }
+        )
+    except AINetworkError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retryable": e.retryable,
+                "correlation_id": e.correlation_id
+            }
+        )
+    except AIInvalidRequestError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "correlation_id": e.correlation_id
+            }
+        )
+    except AIServiceError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retryable": e.retryable,
+                "correlation_id": e.correlation_id
+            }
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating TOC: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error generating TOC: {str(e)}"
+        )
 
 
 @router.get("/{book_id}/toc", status_code=status.HTTP_200_OK)
