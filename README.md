@@ -287,8 +287,15 @@ python -c "import redis; r = redis.from_url('redis://localhost:6379/0'); print(r
 
 **AI Service Errors:**
 ```bash
-# Check backend logs for retry attempts
-tail -f backend/logs/app.log | grep "AI Service"
+# Check backend logs for retry attempts (logs go to stdout/stderr)
+# Development (local):
+cd backend && uv run uvicorn app.main:app --reload 2>&1 | grep "AI Service"
+
+# Production (PM2):
+pm2 logs auto-author-backend | grep "AI Service"
+
+# Docker:
+docker-compose logs -f backend | grep "AI Service"
 
 # Monitor cache statistics
 redis-cli info stats

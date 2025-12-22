@@ -11,6 +11,7 @@
 'use client';
 
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Sparkles, RefreshCw, Database } from 'lucide-react';
@@ -193,7 +194,7 @@ export function ChapterDraftExample({ bookId, chapterId }: AIErrorHandlingExampl
       {draft && (
         <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
           <div className="prose prose-invert max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: draft }} />
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(draft) }} />
           </div>
         </div>
       )}

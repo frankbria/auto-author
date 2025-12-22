@@ -93,8 +93,16 @@ test.describe('AI Error Handling', () => {
     const countdownText = await countdown.textContent();
     expect(countdownText).toMatch(/Retry in [12]:\d{2}/);
 
-    // Wait 2 seconds and verify countdown decreased
-    await page.waitForTimeout(2000);
+    // Wait for countdown to decrease (poll until text changes)
+    await page.waitForFunction(
+      (initialText) => {
+        const countdownElement = document.querySelector('[role="alert"]')?.textContent || '';
+        return countdownElement.includes('Retry in') && !countdownElement.includes(initialText);
+      },
+      countdownText,
+      { timeout: 5000 }
+    );
+
     const newCountdownText = await countdown.textContent();
     expect(newCountdownText).toMatch(/Retry in [01]:[45]\d/);
   });
@@ -200,15 +208,13 @@ test.describe('AI Error Handling', () => {
     // Wait for countdown to appear
     await page.waitForSelector('text=/Retry in/');
 
-    // Wait for countdown to reach 0 (5 seconds + buffer)
-    await page.waitForTimeout(6000);
+    // Wait for "Retry Now" button to appear (countdown reaches 0)
+    // Using condition-based waiting instead of arbitrary timeout
+    const retryNowButton = page.locator('button:has-text("Retry Now")');
+    await expect(retryNowButton).toBeVisible({ timeout: 10000 });
 
     // Mock successful response
     await mockAISuccess(page, 'generate-questions', successData);
-
-    // Verify "Retry Now" button appears when countdown reaches 0
-    const retryNowButton = page.locator('button:has-text("Retry Now")');
-    await expect(retryNowButton).toBeVisible({ timeout: 2000 });
 
     // Click retry
     await retryNowButton.click();

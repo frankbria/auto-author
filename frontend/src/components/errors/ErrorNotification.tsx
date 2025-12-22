@@ -101,6 +101,8 @@ export function showErrorNotification(
       });
     } else if (retryAfter && retryAfter > 0) {
       // Rate limited - show countdown
+      // Ensure toast stays visible for entire countdown by using max of retryAfter and default duration
+      const countdownDuration = Math.max(retryAfter * 1000, defaultDuration);
       toast.error(error.message, {
         description: (
           <div className="space-y-2">
@@ -108,7 +110,7 @@ export function showErrorNotification(
             {onRetry && <RetryCountdown initialSeconds={retryAfter} onRetry={onRetry} />}
           </div>
         ),
-        duration: Math.min(retryAfter * 1000, defaultDuration),
+        duration: countdownDuration,
         onDismiss,
       });
     } else {
