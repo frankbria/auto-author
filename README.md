@@ -175,7 +175,7 @@ AI_MAX_RETRIES=3
 
 Redis is **required** for optimal AI service performance. It provides response caching and error recovery capabilities.
 
-**Option 1: Docker (Recommended for Development)**
+### Option 1: Docker (Recommended for Development)
 
 ```bash
 # Run Redis in a Docker container
@@ -185,7 +185,7 @@ docker run -d --name auto-author-redis -p 6379:6379 redis:latest
 docker ps | grep redis
 ```
 
-**Option 2: Native Installation**
+### Option 2: Native Installation
 
 ```bash
 # macOS
@@ -200,7 +200,7 @@ sudo systemctl start redis-server
 redis-cli ping  # Should return "PONG"
 ```
 
-**Option 3: Disable Caching (Not Recommended)**
+### Option 3: Disable Caching (Not Recommended)
 
 If you cannot run Redis, you can disable caching by setting `AI_CACHE_ENABLED=false` in your `.env` file. Note that this will:
 - Increase AI service API costs (no response reuse)
@@ -247,7 +247,7 @@ AI_CACHE_ENABLED=true               # Enable/disable caching
 - `InternalServerError`: Retry with backoff
 
 **Example Error Flow:**
-```
+```text
 1. AI request fails (timeout)
 2. Retry #1 after 1 second
 3. Retry #2 after 2 seconds (if still failing)
@@ -320,7 +320,7 @@ Cache keys are generated using MD5 hashing of:
 - Sorted for consistency
 
 **Example cache key:**
-```
+```text
 ai_cache:toc:hash:a3f5c8d9e2b1f4a6c7e8d9f0a1b2c3d4
 ```
 

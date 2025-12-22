@@ -34,31 +34,38 @@ export function TOCQuestionsExample({ bookId }: AIErrorHandlingExampleProps) {
     setIsLoading(true);
     setIsFromCachedContent(false);
 
-    // Use the error-handling version of the API call
-    const result = await bookClient.generateQuestionsWithErrorHandling(
-      bookId,
-      generateQuestions // Pass retry callback
-    );
+    try {
+      // Use the error-handling version of the API call
+      const result = await bookClient.generateQuestionsWithErrorHandling(
+        bookId,
+        generateQuestions // Pass retry callback
+      );
 
-    setIsLoading(false);
+      // Check if we got cached content
+      if (isFromCache(result)) {
+        setQuestions(result.data.questions);
+        setIsFromCachedContent(true);
+        return;
+      }
 
-    // Check if we got cached content
-    if (isFromCache(result)) {
-      setQuestions(result.data.questions);
-      setIsFromCachedContent(true);
-      return;
+      // Check if we got fresh data
+      if (result.data) {
+        setQuestions(result.data.questions);
+        setIsFromCachedContent(false);
+        return;
+      }
+
+      // Error occurred - notification already shown by error handler
+      // You can add additional UI feedback here if needed
+      console.error('Failed to generate questions:', result.error);
+    } catch (error) {
+      // Handle any unexpected errors
+      console.error('Unexpected error generating questions:', error);
+      // Error notification is handled by the error handler
+    } finally {
+      // Always clear loading state
+      setIsLoading(false);
     }
-
-    // Check if we got fresh data
-    if (result.data) {
-      setQuestions(result.data.questions);
-      setIsFromCachedContent(false);
-      return;
-    }
-
-    // Error occurred - notification already shown by error handler
-    // You can add additional UI feedback here if needed
-    console.error('Failed to generate questions:', result.error);
   };
 
   return (
@@ -129,34 +136,41 @@ export function ChapterDraftExample({ bookId, chapterId }: AIErrorHandlingExampl
     setIsLoading(true);
     setIsFromCachedContent(false);
 
-    const result = await bookClient.generateChapterDraftWithErrorHandling(
-      bookId,
-      chapterId,
-      {
-        question_responses: [
-          { question: 'Main topic?', answer: 'Example topic' },
-        ],
-        writing_style: 'conversational',
-        target_length: 2000,
-      },
-      generateDraft // Retry callback
-    );
+    try {
+      const result = await bookClient.generateChapterDraftWithErrorHandling(
+        bookId,
+        chapterId,
+        {
+          question_responses: [
+            { question: 'Main topic?', answer: 'Example topic' },
+          ],
+          writing_style: 'conversational',
+          target_length: 2000,
+        },
+        generateDraft // Retry callback
+      );
 
-    setIsLoading(false);
+      if (isFromCache(result)) {
+        setDraft(result.data.draft);
+        setIsFromCachedContent(true);
+        return;
+      }
 
-    if (isFromCache(result)) {
-      setDraft(result.data.draft);
-      setIsFromCachedContent(true);
-      return;
+      if (result.data) {
+        setDraft(result.data.draft);
+        setIsFromCachedContent(false);
+        return;
+      }
+
+      console.error('Failed to generate draft:', result.error);
+    } catch (error) {
+      // Handle any unexpected errors
+      console.error('Unexpected error generating draft:', error);
+      // Error notification is handled by the error handler
+    } finally {
+      // Always clear loading state
+      setIsLoading(false);
     }
-
-    if (result.data) {
-      setDraft(result.data.draft);
-      setIsFromCachedContent(false);
-      return;
-    }
-
-    console.error('Failed to generate draft:', result.error);
   };
 
   return (
@@ -219,26 +233,33 @@ export function SummaryAnalysisExample({ bookId }: AIErrorHandlingExampleProps) 
     setIsLoading(true);
     setIsFromCachedContent(false);
 
-    const result = await bookClient.analyzeSummaryWithErrorHandling(
-      bookId,
-      analyzeSummary
-    );
+    try {
+      const result = await bookClient.analyzeSummaryWithErrorHandling(
+        bookId,
+        analyzeSummary
+      );
 
-    setIsLoading(false);
+      if (isFromCache(result)) {
+        setAnalysis(result.data.analysis);
+        setIsFromCachedContent(true);
+        return;
+      }
 
-    if (isFromCache(result)) {
-      setAnalysis(result.data.analysis);
-      setIsFromCachedContent(true);
-      return;
+      if (result.data) {
+        setAnalysis(result.data.analysis);
+        setIsFromCachedContent(false);
+        return;
+      }
+
+      console.error('Failed to analyze summary:', result.error);
+    } catch (error) {
+      // Handle any unexpected errors
+      console.error('Unexpected error analyzing summary:', error);
+      // Error notification is handled by the error handler
+    } finally {
+      // Always clear loading state
+      setIsLoading(false);
     }
-
-    if (result.data) {
-      setAnalysis(result.data.analysis);
-      setIsFromCachedContent(false);
-      return;
-    }
-
-    console.error('Failed to analyze summary:', result.error);
   };
 
   return (
@@ -319,7 +340,7 @@ export function SummaryAnalysisExample({ bookId }: AIErrorHandlingExampleProps) 
  * Usage Example:
  *
  * ```tsx
- * import { TOCQuestionsExample, ChapterDraftExample, SummaryAnalysisExample } from '@/components/examples/AIErrorHandlingExample';
+ * import { TOCQuestionsExample, ChapterDraftExample, SummaryAnalysisExample } from '@/components/examples/ai-error-handling-example';
  *
  * function MyComponent() {
  *   const bookId = 'book-123';
