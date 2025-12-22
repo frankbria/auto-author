@@ -25,8 +25,8 @@ ANALYSIS: The summary provides clear structure and main topics for a technical b
 SUGGESTIONS: Consider adding more specific examples for each chapter.
         """))
     ]
-    
-    with patch.object(ai_service, '_make_openai_request', 
+
+    with patch.object(ai_service, '_make_openai_request',
                       AsyncMock(return_value=mock_response)):
         result = await ai_service.analyze_summary_for_toc(
             summary="A comprehensive guide to Python programming",
@@ -36,7 +36,7 @@ SUGGESTIONS: Consider adding more specific examples for each chapter.
                 "target_audience": "Developers"
             }
         )
-        
+
         assert result["is_ready_for_toc"] == True
         assert result["confidence_score"] == 0.9
         assert "clear structure" in result["analysis"]
@@ -55,8 +55,8 @@ async def test_generate_clarifying_questions(ai_service):
 4. How deep will you go into advanced topics?
         """))
     ]
-    
-    with patch.object(ai_service, '_make_openai_request', 
+
+    with patch.object(ai_service, '_make_openai_request',
                       AsyncMock(return_value=mock_response)):
         questions = await ai_service.generate_clarifying_questions(
             summary="A book about Python programming",
@@ -65,7 +65,7 @@ async def test_generate_clarifying_questions(ai_service):
                 "target_audience": "Beginners"
             }
         )
-        
+
         assert len(questions) == 4
         assert "Python topics" in questions[0]
         assert "practical examples" in questions[1]
@@ -114,8 +114,8 @@ async def test_generate_toc_from_summary_and_responses(ai_service):
     }
 }"""))
     ]
-    
-    with patch.object(ai_service, '_make_openai_request', 
+
+    with patch.object(ai_service, '_make_openai_request',
                       AsyncMock(return_value=mock_response)):
         result = await ai_service.generate_toc_from_summary_and_responses(
             summary="A comprehensive Python guide",
@@ -128,7 +128,7 @@ async def test_generate_toc_from_summary_and_responses(ai_service):
                 "genre": "Technical"
             }
         )
-        
+
         assert "toc" in result
         assert len(result["toc"]["chapters"]) >= 2
         assert result["toc"]["total_chapters"] >= 2
@@ -170,8 +170,8 @@ async def test_generate_chapter_questions(ai_service):
     ]
 }"""))
     ]
-    
-    with patch.object(ai_service, '_make_openai_request', 
+
+    with patch.object(ai_service, '_make_openai_request',
                       AsyncMock(return_value=mock_response)):
         # Build prompt from chapter data
         prompt = f"Generate questions for chapter: The Beginning - Introduction to the story"
@@ -179,7 +179,7 @@ async def test_generate_chapter_questions(ai_service):
             prompt=prompt,
             count=2
         )
-        
+
         # The method returns a list directly, not a dict with questions key
         assert isinstance(result, list)
         assert len(result) == 2
@@ -201,8 +201,8 @@ It was a dark and stormy night when Sarah first discovered her powers. The rain 
 She had always known she was different, but tonight everything would change...
         """))
     ]
-    
-    with patch.object(ai_service, '_make_openai_request', 
+
+    with patch.object(ai_service, '_make_openai_request',
                       AsyncMock(return_value=mock_response)):
         result = await ai_service.generate_chapter_draft(
             chapter_title="The Beginning",
@@ -223,7 +223,7 @@ She had always known she was different, but tonight everything would change...
             },
             writing_style="Descriptive and atmospheric"
         )
-        
+
         assert result["success"] == True
         assert "draft" in result
         assert "Sarah" in result["draft"]
@@ -234,19 +234,21 @@ She had always known she was different, but tonight everything would change...
 @pytest.mark.asyncio
 async def test_ai_service_error_handling(ai_service):
     """Test error handling in AI service"""
-    # Test rate limit error with retry
-    with patch.object(ai_service, '_make_openai_request', 
+    from app.services.ai_errors import AIServiceError
+
+    # Test that AIServiceError is raised on API error
+    with patch.object(ai_service, '_make_openai_request',
                       AsyncMock(side_effect=Exception("API Error"))):
-        # Should return fallback questions on error
-        questions = await ai_service.generate_clarifying_questions(
-            summary="Test summary",
-            book_metadata={}
-        )
-        
-        # Should return default fallback questions
-        assert len(questions) == 4
-        assert "main problem" in questions[0]
-        assert "target audience" in questions[1]
+        # Should raise AIServiceError
+        with pytest.raises(AIServiceError) as exc_info:
+            await ai_service.generate_clarifying_questions(
+                summary="Test summary",
+                book_metadata={}
+            )
+
+        # Verify error details
+        assert exc_info.value.error_code == "AI_UNEXPECTED_ERROR"
+        assert exc_info.value.correlation_id is not None
 
 
 @pytest.mark.asyncio
@@ -259,9 +261,9 @@ async def test_parse_questions_response(ai_service):
 3. What unique perspective do you bring?
 4. How will readers benefit from your book?
     """
-    
+
     questions = ai_service._parse_questions_response(questions_text)
-    
+
     assert len(questions) == 4
     assert "main theme" in questions[0]
     assert "target readers" in questions[1]

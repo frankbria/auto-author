@@ -8,6 +8,7 @@ Tests the AI service with comprehensive error handling and caching.
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import openai
+import httpx
 from app.services.ai_service import AIService
 from app.services.ai_cache_service import AICacheService
 from app.services.ai_errors import (
@@ -45,7 +46,7 @@ class TestAIServiceRateLimitHandling:
         with patch.object(
             ai_service_with_mock_cache.client.chat.completions,
             'create',
-            side_effect=openai.RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
+            side_effect=openai.RateLimitError("Rate limit exceeded", response=httpx.Response(429, request=httpx.Request("POST", "https://api.openai.com")), body=None)
         ):
             with pytest.raises(AIRateLimitError) as exc_info:
                 await ai_service_with_mock_cache.generate_clarifying_questions(
@@ -79,7 +80,7 @@ class TestAIServiceRateLimitHandling:
             with patch.object(
                 ai_service_with_mock_cache.client.chat.completions,
                 'create',
-                side_effect=openai.RateLimitError("Rate limit exceeded", response=MagicMock(), body=None)
+                side_effect=openai.RateLimitError("Rate limit exceeded", response=httpx.Response(429, request=httpx.Request("POST", "https://api.openai.com")), body=None)
             ):
                 # Should return cached questions instead of raising error
                 result = await ai_service_with_mock_cache.generate_clarifying_questions(
@@ -99,7 +100,7 @@ class TestAIServiceNetworkErrorHandling:
         with patch.object(
             ai_service_with_mock_cache.client.chat.completions,
             'create',
-            side_effect=openai.APIConnectionError("Connection failed", request=MagicMock())
+            side_effect=openai.APIConnectionError(message="Connection failed", request=httpx.Request("POST", "https://api.openai.com"))
         ):
             with pytest.raises(AINetworkError) as exc_info:
                 await ai_service_with_mock_cache.generate_clarifying_questions(
@@ -117,7 +118,7 @@ class TestAIServiceNetworkErrorHandling:
         with patch.object(
             ai_service_with_mock_cache.client.chat.completions,
             'create',
-            side_effect=openai.APITimeoutError("Request timeout", request=MagicMock())
+            side_effect=openai.APITimeoutError(request=httpx.Request("POST", "https://api.openai.com"))
         ):
             with pytest.raises(AINetworkError) as exc_info:
                 await ai_service_with_mock_cache.generate_clarifying_questions(
@@ -248,7 +249,7 @@ class TestTOCGenerationWithErrorHandling:
             with patch.object(
                 ai_service_with_mock_cache.client.chat.completions,
                 'create',
-                side_effect=openai.RateLimitError("Rate limit", response=MagicMock(), body=None)
+                side_effect=openai.RateLimitError("Rate limit", response=httpx.Response(429, request=httpx.Request("POST", "https://api.openai.com")), body=None)
             ):
                 result = await ai_service_with_mock_cache.generate_toc_from_summary_and_responses(
                     summary="Test summary",
@@ -264,7 +265,7 @@ class TestTOCGenerationWithErrorHandling:
             with patch.object(
                 ai_service_with_mock_cache.client.chat.completions,
                 'create',
-                side_effect=openai.RateLimitError("Rate limit", response=MagicMock(), body=None)
+                side_effect=openai.RateLimitError("Rate limit", response=httpx.Response(429, request=httpx.Request("POST", "https://api.openai.com")), body=None)
             ):
                 with pytest.raises(AIRateLimitError):
                     await ai_service_with_mock_cache.generate_toc_from_summary_and_responses(
@@ -282,7 +283,7 @@ class TestCorrelationIDTracking:
         with patch.object(
             ai_service_with_mock_cache.client.chat.completions,
             'create',
-            side_effect=openai.RateLimitError("Rate limit", response=MagicMock(), body=None)
+            side_effect=openai.RateLimitError("Rate limit", response=httpx.Response(429, request=httpx.Request("POST", "https://api.openai.com")), body=None)
         ):
             with pytest.raises(AIServiceError) as exc_info:
                 await ai_service_with_mock_cache.generate_clarifying_questions(
@@ -310,7 +311,7 @@ class TestRetryMechanism:
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise openai.APIConnectionError("Connection failed", request=MagicMock())
+                raise openai.APIConnectionError(message="Connection failed", request=httpx.Request("POST", "https://api.openai.com"))
             return mock_response
 
         with patch('app.services.ai_service.get_questions_cache', return_value=None):
@@ -336,7 +337,7 @@ class TestRetryMechanism:
         with patch.object(
             ai_service_with_mock_cache.client.chat.completions,
             'create',
-            side_effect=openai.APIConnectionError("Connection failed", request=MagicMock())
+            side_effect=openai.APIConnectionError(message="Connection failed", request=httpx.Request("POST", "https://api.openai.com"))
         ):
             with pytest.raises(AINetworkError):
                 await ai_service_with_mock_cache.generate_clarifying_questions(

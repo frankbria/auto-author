@@ -162,7 +162,9 @@ SUGGESTIONS: Consider adding more specific examples. Include target audience det
     async def test_generate_questions_with_error_returns_fallback(
         self, ai_service_with_mock_client
     ):
-        """Test fallback questions when API call fails."""
+        """Test that AIServiceError is raised when API call fails."""
+        from app.services.ai_errors import AIServiceError
+
         ai_service_with_mock_client.client.chat.completions.create.side_effect = (
             Exception("API Error")
         )
@@ -170,12 +172,13 @@ SUGGESTIONS: Consider adding more specific examples. Include target audience det
         summary = "Test summary"
         book_metadata = {"title": "Test Book"}
 
-        result = await ai_service_with_mock_client.generate_clarifying_questions(
-            summary, book_metadata, 3
-        )
+        with pytest.raises(AIServiceError) as exc_info:
+            await ai_service_with_mock_client.generate_clarifying_questions(
+                summary, book_metadata, 3
+            )
 
-        assert len(result) == 4  # Default fallback count
-        assert all(question.endswith("?") for question in result)
+        assert exc_info.value.error_code == "AI_UNEXPECTED_ERROR"
+        assert exc_info.value.correlation_id is not None
 
     @pytest.mark.asyncio
     async def test_generate_toc_from_summary_and_responses_success(
@@ -255,12 +258,15 @@ SUGGESTIONS: Consider adding more specific examples. Include target audience det
             {"question": "Question 2", "answer": "Answer 2"},
         ]
 
-        with pytest.raises(Exception) as exc_info:
+        from app.services.ai_errors import AIServiceError
+
+        with pytest.raises(AIServiceError) as exc_info:
             await ai_service_with_mock_client.generate_toc_from_summary_and_responses(
                 summary, question_responses, book_metadata
             )
 
-        assert "Failed to generate TOC" in str(exc_info.value)
+        assert exc_info.value.error_code == "AI_UNEXPECTED_ERROR"
+        assert exc_info.value.correlation_id is not None
 
     def test_parse_analysis_response(self):
         """Test parsing of AI analysis response."""
@@ -555,9 +561,14 @@ SUGGESTIONS: Add more concrete examples. Define target audience clearly. Include
                 "Rate limit exceeded", response=mock_response, body=None
             )
 
-        # Should raise exception after max retries
-        with pytest.raises(openai.RateLimitError):
+        # Should raise AIRateLimitError after max retries
+        from app.services.ai_errors import AIRateLimitError
+
+        with pytest.raises(AIRateLimitError) as exc_info:
             await ai_service_instance._retry_with_backoff(mock_func)
+
+        assert exc_info.value.error_code == "AI_RATE_LIMIT"
+        assert exc_info.value.retry_after is not None
 
         assert len(attempts) == 3  # Should have tried max_retries times
 
@@ -573,11 +584,14 @@ SUGGESTIONS: Add more concrete examples. Define target audience clearly. Include
             attempts.append(len(attempts) + 1)
             raise ValueError("Invalid input")
 
-        # Should raise exception immediately without retries
-        with pytest.raises(ValueError):
+        # Should raise AIServiceError wrapping the ValueError
+        from app.services.ai_errors import AIServiceError
+
+        with pytest.raises(AIServiceError) as exc_info:
             await ai_service_instance._retry_with_backoff(mock_func)
 
-        assert len(attempts) == 1  # Should have tried only once
+        assert exc_info.value.error_code == "AI_UNEXPECTED_ERROR"
+        assert len(attempts) == 1  # Should not retry non-retryable errors
 
     @pytest.mark.asyncio
     @patch("app.services.ai_service.AIService._make_openai_request")
