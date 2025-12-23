@@ -5,6 +5,7 @@ import { BookProject } from '@/components/BookCard';
 import { ChapterStatus } from '@/types/chapter-tabs';
 // Import only what we use to satisfy linting
 import {
+  Question,
   QuestionResponse,
   QuestionProgressResponse,
   GenerateQuestionsRequest,
@@ -1698,6 +1699,97 @@ export class BookClient {
     } catch (error) {
       return handleAIServiceError(error, onRetry);
     }
+  }
+
+  /**
+   * Fetch all questions with their completed responses for draft generation
+   *
+   * This method retrieves all questions for a chapter and their associated responses,
+   * filtering to only include questions that have been answered. The result is formatted
+   * as Q&A pairs suitable for passing to the draft generation API.
+   *
+   * Uses iterative pagination to fetch all questions regardless of chapter size.
+   *
+   * @param bookId - The book ID
+   * @param chapterId - The chapter ID
+   * @returns Promise resolving to an array of question/answer pairs
+   *
+   * @example
+   * ```typescript
+   * const qaResponses = await bookClient.getChapterQAResponses(bookId, chapterId);
+   * // Returns: [{ question: "What is...", answer: "The answer is..." }, ...]
+   * ```
+   */
+  public async getChapterQAResponses(
+    bookId: string,
+    chapterId: string
+  ): Promise<{
+    responses: Array<{ question: string; answer: string; questionId: string; status: string }>;
+    totalQuestions: number;
+    completedCount: number;
+    inProgressCount: number;
+  }> {
+    // Fetch all questions using pagination
+    const allQuestions: Question[] = [];
+    const PAGE_SIZE = 50;
+    let currentPage = 1;
+    let totalPages = 1;
+
+    // Iteratively fetch all pages of questions
+    do {
+      const questionsResponse = await this.getChapterQuestions(bookId, chapterId, {
+        page: currentPage,
+        limit: PAGE_SIZE
+      });
+
+      allQuestions.push(...questionsResponse.questions);
+      totalPages = questionsResponse.pages;
+      currentPage++;
+    } while (currentPage <= totalPages);
+
+    // Fetch responses for each question that has one
+    const qaResponses: Array<{ question: string; answer: string; questionId: string; status: string }> = [];
+    let completedCount = 0;
+    let inProgressCount = 0;
+
+    for (const question of allQuestions) {
+      try {
+        const responseData = await this.getQuestionResponse(bookId, chapterId, question.id);
+
+        if (responseData.has_response && responseData.response) {
+          const status = responseData.response.status;
+
+          if (status === 'completed') {
+            completedCount++;
+            qaResponses.push({
+              question: question.question_text,
+              answer: responseData.response.response_text,
+              questionId: question.id,
+              status: status
+            });
+          } else if (status === 'draft') {
+            inProgressCount++;
+            // Include draft responses too, but mark them
+            qaResponses.push({
+              question: question.question_text,
+              answer: responseData.response.response_text,
+              questionId: question.id,
+              status: status
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching response for question ${question.id}:`, error);
+        // Continue fetching other responses even if one fails
+      }
+    }
+
+    return {
+      responses: qaResponses,
+      totalQuestions: allQuestions.length,
+      completedCount,
+      inProgressCount
+    };
   }
 
   /**

@@ -2,26 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-
-// Stub components for UI elements that will be properly implemented later
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const Tabs = ({ className, children, defaultValue }: { className?: string, children: React.ReactNode, defaultValue?: string }) => (
-  <div className={className}>{children}</div>
-);
-
-const TabsList = ({ className, children }: { className?: string, children: React.ReactNode }) => (
-  <div className={`flex space-x-2 mb-4 ${className}`}>{children}</div>
-);
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const TabsTrigger = ({ children, value, className, onClick }: { children: React.ReactNode, value?: string, className?: string, onClick?: () => void }) => (
-  <div className={`px-4 py-2 border rounded cursor-pointer hover:bg-gray-100 ${className}`} onClick={onClick}>{children}</div>
-);
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const TabsContent = ({ className, children, value }: { className?: string, children: React.ReactNode, value?: string }) => (
-  <div className={className}>{children}</div>
-);
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AlertCircle, BookOpen, PenTool } from 'lucide-react';
 import QuestionContainer from './QuestionContainer';
 import { bookClient } from '@/lib/api/bookClient';
@@ -33,6 +14,7 @@ interface ChapterQuestionsProps {
   chapterId: string;
   chapterTitle: string;
   onSwitchToEditor?: () => void;
+  onDraftGenerated?: (draft: string) => void;
 }
 
 /**
@@ -44,7 +26,8 @@ export default function ChapterQuestions({
   bookId,
   chapterId,
   chapterTitle,
-  onSwitchToEditor
+  onSwitchToEditor,
+  onDraftGenerated
 }: ChapterQuestionsProps) {
   const [progress, setProgress] = useState<QuestionProgressResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -133,11 +116,13 @@ export default function ChapterQuestions({
               </Button>
             </Card>
           ) : (
-            <QuestionContainer 
+            <QuestionContainer
               bookId={bookId}
               chapterId={chapterId}
               chapterTitle={chapterTitle}
               onResponseSaved={handleResponseSaved}
+              onDraftGenerated={onDraftGenerated}
+              onSwitchToEditor={onSwitchToEditor}
             />
           )}
         </TabsContent>
