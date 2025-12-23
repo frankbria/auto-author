@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 interface TabsContextValue {
   value: string;
   onValueChange: (value: string) => void;
+  idPrefix: string;
 }
 
 const TabsContext = React.createContext<TabsContextValue | undefined>(undefined);
@@ -16,6 +17,13 @@ function useTabsContext() {
     throw new Error('Tabs components must be used within a Tabs provider');
   }
   return context;
+}
+
+// Generate a stable unique ID prefix for each Tabs instance
+let tabsIdCounter = 0;
+function useTabsId() {
+  const [id] = React.useState(() => `tabs-${++tabsIdCounter}`);
+  return id;
 }
 
 interface TabsProps {
@@ -34,6 +42,7 @@ export function Tabs({
   children
 }: TabsProps) {
   const [uncontrolledValue, setUncontrolledValue] = React.useState(defaultValue || '');
+  const idPrefix = useTabsId();
 
   const isControlled = controlledValue !== undefined;
   const value = isControlled ? controlledValue : uncontrolledValue;
@@ -46,7 +55,7 @@ export function Tabs({
   }, [isControlled, onValueChange]);
 
   return (
-    <TabsContext.Provider value={{ value, onValueChange: handleValueChange }}>
+    <TabsContext.Provider value={{ value, onValueChange: handleValueChange, idPrefix }}>
       <div className={cn('', className)}>
         {children}
       </div>
@@ -88,8 +97,11 @@ export function TabsTrigger({
   disabled,
   onClick
 }: TabsTriggerProps) {
-  const { value: selectedValue, onValueChange } = useTabsContext();
+  const { value: selectedValue, onValueChange, idPrefix } = useTabsContext();
   const isSelected = selectedValue === value;
+
+  const triggerId = `${idPrefix}-trigger-${value}`;
+  const panelId = `${idPrefix}-panel-${value}`;
 
   const handleClick = () => {
     if (!disabled) {
@@ -102,7 +114,9 @@ export function TabsTrigger({
     <button
       type="button"
       role="tab"
+      id={triggerId}
       aria-selected={isSelected}
+      aria-controls={panelId}
       disabled={disabled}
       onClick={handleClick}
       className={cn(
@@ -133,8 +147,11 @@ export function TabsContent({
   children,
   forceMount
 }: TabsContentProps) {
-  const { value: selectedValue } = useTabsContext();
+  const { value: selectedValue, idPrefix } = useTabsContext();
   const isSelected = selectedValue === value;
+
+  const triggerId = `${idPrefix}-trigger-${value}`;
+  const panelId = `${idPrefix}-panel-${value}`;
 
   if (!isSelected && !forceMount) {
     return null;
@@ -143,6 +160,9 @@ export function TabsContent({
   return (
     <div
       role="tabpanel"
+      id={panelId}
+      aria-labelledby={triggerId}
+      tabIndex={0}
       hidden={!isSelected}
       className={cn(
         'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
