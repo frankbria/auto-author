@@ -34,3 +34,6 @@ locust>=2.14.0
 faker>=18.0.0
 gevent>=23.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
 h11>=0.16.0 # not directly required, pinned by Snyk to avoid a vulnerability
+
+# Redis for caching
+redis>=5.0.0

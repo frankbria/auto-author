@@ -8,11 +8,13 @@
  * - Transient: Temporary errors that may succeed on retry (network, timeouts)
  * - Permanent: Errors requiring user action (validation, permissions)
  * - System: Infrastructure errors requiring technical support
+ * - AI_SERVICE: AI service errors with cached content fallback support
  */
 export enum ErrorType {
   TRANSIENT = 'transient',
   PERMANENT = 'permanent',
   SYSTEM = 'system',
+  AI_SERVICE = 'ai_service',
 }
 
 /**
@@ -120,7 +122,7 @@ export const HTTP_STATUS_TO_ERROR_TYPE: Record<number, ErrorType> = {
   404: ErrorType.PERMANENT, // Not Found
   409: ErrorType.PERMANENT, // Conflict
   422: ErrorType.PERMANENT, // Unprocessable Entity (validation)
-  429: ErrorType.TRANSIENT, // Too Many Requests (rate limit)
+  429: ErrorType.AI_SERVICE, // Too Many Requests (rate limit) - special handling for AI services
 
   // 5xx - Server errors (usually transient or system)
   500: ErrorType.SYSTEM, // Internal Server Error
@@ -136,4 +138,5 @@ export const ERROR_TYPE_TO_SEVERITY: Record<ErrorType, ErrorSeverity> = {
   [ErrorType.TRANSIENT]: ErrorSeverity.MEDIUM,
   [ErrorType.PERMANENT]: ErrorSeverity.HIGH,
   [ErrorType.SYSTEM]: ErrorSeverity.CRITICAL,
+  [ErrorType.AI_SERVICE]: ErrorSeverity.MEDIUM,
 };

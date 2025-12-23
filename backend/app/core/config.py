@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # E2E Testing Settings
     BYPASS_AUTH: bool = False  # Set to True for E2E tests to bypass authentication
 
+    # Redis Cache Settings
+    REDIS_URL: str = "redis://localhost:6379/0"
+    AI_CACHE_TTL: int = 86400  # 24 hours in seconds
+    AI_CACHE_ENABLED: bool = True
+    AI_MAX_RETRIES: int = 3
+
     # AWS Settings (Optional - for transcription and storage)
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""

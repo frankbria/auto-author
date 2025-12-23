@@ -14,6 +14,7 @@ import {
   QuestionRatingRequest,
   QuestionType
 } from '@/types/chapter-questions';
+import { handleAIServiceError, AIServiceResult } from '@/lib/api/aiErrorHandler';
 
 /**
  * API client for book operations
@@ -1496,10 +1497,147 @@ export class BookClient {
         credentials: 'include',
       }
     );
-    
+
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to delete chapter: ${response.status} ${error}`);
+    }
+  }
+
+  // ============= AI Service Methods with Error Handling =============
+
+  /**
+   * Analyze summary with AI error handling and cached content support
+   */
+  public async analyzeSummaryWithErrorHandling(
+    bookId: string,
+    onRetry?: () => void | Promise<void>
+  ): Promise<AIServiceResult<{
+    book_id: string;
+    analysis: {
+      is_ready_for_toc: boolean;
+      confidence_score: number;
+      analysis: string;
+      suggestions: string[];
+      word_count: number;
+      character_count: number;
+      meets_minimum_requirements: boolean;
+    };
+    analyzed_at: string;
+  }>> {
+    try {
+      const result = await this.analyzeSummary(bookId);
+      return { data: result };
+    } catch (error) {
+      return handleAIServiceError(error, onRetry);
+    }
+  }
+
+  /**
+   * Generate questions with AI error handling and cached content support
+   */
+  public async generateQuestionsWithErrorHandling(
+    bookId: string,
+    onRetry?: () => void | Promise<void>
+  ): Promise<AIServiceResult<{ questions: string[] }>> {
+    try {
+      const result = await this.generateQuestions(bookId);
+      return { data: result };
+    } catch (error) {
+      return handleAIServiceError(error, onRetry);
+    }
+  }
+
+  /**
+   * Generate TOC with AI error handling and cached content support
+   */
+  public async generateTocWithErrorHandling(
+    bookId: string,
+    questionResponses: Array<{ question: string; answer: string }>,
+    onRetry?: () => void | Promise<void>
+  ): Promise<AIServiceResult<{
+    toc: {
+      chapters: Array<{
+        id: string;
+        title: string;
+        description: string;
+        level: number;
+        order: number;
+        subchapters: Array<{
+          id: string;
+          title: string;
+          description: string;
+          level: number;
+          order: number;
+        }>;
+      }>;
+      total_chapters: number;
+      estimated_pages: number;
+      structure_notes: string;
+    };
+    success: boolean;
+    chapters_count: number;
+    has_subchapters: boolean;
+  }>> {
+    try {
+      const result = await this.generateToc(bookId, questionResponses);
+      return { data: result };
+    } catch (error) {
+      return handleAIServiceError(error, onRetry);
+    }
+  }
+
+  /**
+   * Generate chapter questions with AI error handling and cached content support
+   */
+  public async generateChapterQuestionsWithErrorHandling(
+    bookId: string,
+    chapterId: string,
+    options: GenerateQuestionsRequest = {},
+    onRetry?: () => void | Promise<void>
+  ): Promise<AIServiceResult<GenerateQuestionsResponse>> {
+    try {
+      const result = await this.generateChapterQuestions(bookId, chapterId, options);
+      return { data: result };
+    } catch (error) {
+      return handleAIServiceError(error, onRetry);
+    }
+  }
+
+  /**
+   * Generate chapter draft with AI error handling and cached content support
+   */
+  public async generateChapterDraftWithErrorHandling(
+    bookId: string,
+    chapterId: string,
+    data: {
+      question_responses: Array<{ question: string; answer: string }>;
+      writing_style?: string;
+      target_length?: number;
+    },
+    onRetry?: () => void | Promise<void>
+  ): Promise<AIServiceResult<{
+    success: boolean;
+    book_id: string;
+    chapter_id: string;
+    draft: string;
+    metadata: {
+      word_count: number;
+      estimated_reading_time: number;
+      generated_at: string;
+      model_used: string;
+      writing_style: string;
+      target_length: number;
+      actual_length: number;
+    };
+    suggestions: string[];
+    message: string;
+  }>> {
+    try {
+      const result = await this.generateChapterDraft(bookId, chapterId, data);
+      return { data: result };
+    } catch (error) {
+      return handleAIServiceError(error, onRetry);
     }
   }
 }

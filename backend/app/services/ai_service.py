@@ -3,9 +3,26 @@ import openai
 import logging
 import asyncio
 import time
+import uuid
+import hashlib
 from typing import Dict, List, Optional, Any
 from openai import OpenAI
 from app.core.config import settings
+from app.services.ai_errors import (
+    AIServiceError,
+    AIRateLimitError,
+    AINetworkError,
+    AIServiceUnavailableError,
+    AIInvalidRequestError,
+    AIResponseParsingError
+)
+from app.services.ai_cache_service import (
+    AICacheService,
+    get_toc_generation_cache,
+    set_toc_generation_cache,
+    get_questions_cache,
+    set_questions_cache
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,38 +30,48 @@ logger = logging.getLogger(__name__)
 class AIService:
     """
     AI Service for handling OpenAI API interactions for summary analysis and TOC generation.
-    Includes retry mechanism for failed requests.
+    Includes retry mechanism for failed requests and response caching.
     """
 
-    def __init__(self):
-        """Initialize the AI service with OpenAI client."""
+    def __init__(self, cache_service: Optional[AICacheService] = None):
+        """Initialize the AI service with OpenAI client and cache."""
         self.client = OpenAI(api_key=settings.OPENAI_AUTOAUTHOR_API_KEY)
         self.model = "gpt-4"  # Using GPT-4 for better analysis capabilities
-        self.max_retries = 3
+        self.max_retries = settings.AI_MAX_RETRIES
         self.base_delay = 1.0  # Base delay for exponential backoff
         self.max_delay = 60.0  # Maximum delay between retries
+        self.cache_service = cache_service or AICacheService()
 
-    async def _retry_with_backoff(self, func, *args, **kwargs):
+    async def _retry_with_backoff(
+        self,
+        func,
+        *args,
+        correlation_id: Optional[str] = None,
+        **kwargs
+    ):
         """
         Execute a function with exponential backoff retry mechanism.
 
         Args:
             func: The function to execute
             *args: Arguments to pass to the function
+            correlation_id: Optional correlation ID for tracking
             **kwargs: Keyword arguments to pass to the function
 
         Returns:
             The result of the function execution
 
         Raises:
-            Exception: If all retry attempts fail
+            AIServiceError: Structured error with retry information
         """
         last_exception = None
+        correlation_id = correlation_id or str(uuid.uuid4())
 
         for attempt in range(self.max_retries):
             try:
                 logger.info(
-                    f"Attempting API call (attempt {attempt + 1}/{self.max_retries})"
+                    f"Attempting API call (attempt {attempt + 1}/{self.max_retries}) "
+                    f"[correlation_id={correlation_id}]"
                 )
                 return await func(*args, **kwargs)
 
@@ -52,42 +79,92 @@ class AIService:
                 last_exception = e
                 delay = min(self.base_delay * (2**attempt), self.max_delay)
                 logger.warning(
-                    f"Rate limit hit, retrying in {delay}s (attempt {attempt + 1}/{self.max_retries})"
+                    f"Rate limit hit, retrying in {delay}s (attempt {attempt + 1}/{self.max_retries}) "
+                    f"[correlation_id={correlation_id}]"
                 )
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(delay)
                 else:
-                    logger.error("Max retries reached for rate limit error")
+                    logger.error(
+                        f"Max retries reached for rate limit error [correlation_id={correlation_id}]"
+                    )
+                    raise AIRateLimitError(
+                        retry_after=int(delay),
+                        original_exception=e,
+                        correlation_id=correlation_id
+                    )
 
             except (openai.APITimeoutError, openai.APIConnectionError) as e:
                 last_exception = e
                 delay = min(self.base_delay * (2**attempt), self.max_delay)
                 logger.warning(
-                    f"API timeout/connection error, retrying in {delay}s (attempt {attempt + 1}/{self.max_retries})"
+                    f"API timeout/connection error, retrying in {delay}s "
+                    f"(attempt {attempt + 1}/{self.max_retries}) [correlation_id={correlation_id}]"
                 )
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(delay)
                 else:
-                    logger.error("Max retries reached for API timeout/connection error")
+                    logger.error(
+                        f"Max retries reached for network error [correlation_id={correlation_id}]"
+                    )
+                    raise AINetworkError(
+                        retry_after=int(delay),
+                        original_exception=e,
+                        correlation_id=correlation_id
+                    )
 
             except openai.InternalServerError as e:
                 last_exception = e
                 delay = min(self.base_delay * (2**attempt), self.max_delay)
                 logger.warning(
-                    f"OpenAI server error, retrying in {delay}s (attempt {attempt + 1}/{self.max_retries})"
+                    f"OpenAI server error, retrying in {delay}s "
+                    f"(attempt {attempt + 1}/{self.max_retries}) [correlation_id={correlation_id}]"
                 )
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(delay)
                 else:
-                    logger.error("Max retries reached for server error")
+                    logger.error(
+                        f"Max retries reached for server error [correlation_id={correlation_id}]"
+                    )
+                    raise AIServiceUnavailableError(
+                        retry_after=int(delay),
+                        original_exception=e,
+                        correlation_id=correlation_id
+                    )
+
+            except openai.BadRequestError as e:
+                logger.error(
+                    f"Invalid request to AI service: {str(e)} [correlation_id={correlation_id}]"
+                )
+                raise AIInvalidRequestError(
+                    message=f"Invalid request: {str(e)}",
+                    original_exception=e,
+                    correlation_id=correlation_id
+                )
+
+            except AIServiceError:
+                # Re-raise our custom errors without wrapping
+                raise
 
             except Exception as e:
-                # For other exceptions, don't retry
-                logger.error(f"Non-retryable error occurred: {str(e)}")
-                raise e
+                logger.error(
+                    f"Unexpected error in AI service: {str(e)} [correlation_id={correlation_id}]"
+                )
+                raise AIServiceError(
+                    message=f"Unexpected AI service error: {str(e)}",
+                    error_code="AI_UNEXPECTED_ERROR",
+                    original_exception=e,
+                    correlation_id=correlation_id
+                )
 
-        # If we've exhausted all retries, raise the last exception
-        raise last_exception
+        # If we've exhausted all retries, raise the last exception as structured error
+        if last_exception:
+            raise AIServiceError(
+                message=f"AI service failed after {self.max_retries} retries",
+                error_code="AI_MAX_RETRIES_EXCEEDED",
+                original_exception=last_exception,
+                correlation_id=correlation_id
+            )
 
     async def _make_openai_request(
         self, messages: List[Dict], temperature: float = 0.3, max_tokens: int = 1000
@@ -180,8 +257,29 @@ class AIService:
 
         Returns:
             List of clarifying questions
+
+        Raises:
+            AIServiceError: If generation fails and no cached content available
         """
+        correlation_id = str(uuid.uuid4())
+
         try:
+            # Try cache first
+            cached_questions = await get_questions_cache(
+                self.cache_service,
+                summary=summary,
+                book_metadata=book_metadata,
+                num_questions=num_questions
+            )
+
+            if cached_questions:
+                logger.info(
+                    f"Retrieved {len(cached_questions)} questions from cache "
+                    f"[correlation_id={correlation_id}]"
+                )
+                return cached_questions
+
+            # Generate new questions
             prompt = self._build_questions_prompt(summary, book_metadata, num_questions)
 
             messages = [
@@ -192,27 +290,55 @@ class AIService:
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self._make_openai_request(
-                messages=messages, temperature=0.4, max_tokens=800
+            response = await self._retry_with_backoff(
+                self._make_openai_request,
+                messages=messages,
+                temperature=0.4,
+                max_tokens=800,
+                correlation_id=correlation_id
             )
 
             questions_text = response.choices[0].message.content
             questions = self._parse_questions_response(questions_text)
 
-            logger.info(f"Generated {len(questions)} clarifying questions for summary")
+            # Cache the result
+            await set_questions_cache(
+                self.cache_service,
+                summary=summary,
+                questions=questions,
+                book_metadata=book_metadata,
+                num_questions=num_questions
+            )
+
+            logger.info(
+                f"Generated and cached {len(questions)} clarifying questions "
+                f"[correlation_id={correlation_id}]"
+            )
             return questions
 
-        except Exception as e:
-            logger.error(
-                f"Error generating clarifying questions after all retries: {str(e)}"
+        except AIServiceError as e:
+            # Try to get cached content as fallback
+            e.cached_content_available = False
+            cached_questions = await get_questions_cache(
+                self.cache_service,
+                summary=summary,
+                book_metadata=book_metadata,
+                num_questions=num_questions
             )
-            # Return fallback questions
-            return [
-                "What is the main problem or challenge your book addresses?",
-                "Who is your target audience and what level of expertise do they have?",
-                "What are the 3-5 key concepts or topics you want to cover?",
-                "What practical outcomes should readers achieve after reading your book?",
-            ]
+
+            if cached_questions:
+                e.cached_content_available = True
+                logger.warning(
+                    f"AI service error, returning cached questions "
+                    f"[correlation_id={correlation_id}]"
+                )
+                return cached_questions
+
+            logger.error(
+                f"Error generating clarifying questions and no cache available "
+                f"[correlation_id={correlation_id}]: {str(e)}"
+            )
+            raise
 
     def _build_summary_analysis_prompt(
         self, summary: str, book_metadata: Optional[Dict]
@@ -371,9 +497,28 @@ Make questions specific, actionable, and focused on content structure rather tha
 
         Returns:
             Dict containing the generated TOC structure
+
+        Raises:
+            AIServiceError: If generation fails and no cached content available
         """
+        correlation_id = str(uuid.uuid4())
+
         try:
-            # Prepare the prompt for TOC generation
+            # Try cache first
+            cached_toc = await get_toc_generation_cache(
+                self.cache_service,
+                summary=summary,
+                question_responses=question_responses,
+                book_metadata=book_metadata
+            )
+
+            if cached_toc:
+                logger.info(
+                    f"Retrieved TOC from cache [correlation_id={correlation_id}]"
+                )
+                return cached_toc
+
+            # Generate new TOC
             prompt = self._build_toc_generation_prompt(
                 summary, question_responses, book_metadata
             )
@@ -386,16 +531,53 @@ Make questions specific, actionable, and focused on content structure rather tha
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self._make_openai_request(
-                messages=messages, temperature=0.4, max_tokens=1500
+            response = await self._retry_with_backoff(
+                self._make_openai_request,
+                messages=messages,
+                temperature=0.4,
+                max_tokens=1500,
+                correlation_id=correlation_id
             )
 
             toc_text = response.choices[0].message.content
-            return self._parse_toc_response(toc_text)
+            toc_result = self._parse_toc_response(toc_text)
 
-        except Exception as e:
-            logger.error(f"Error generating TOC after all retries: {str(e)}")
-            raise Exception(f"Failed to generate TOC: {str(e)}")
+            # Cache the result
+            await set_toc_generation_cache(
+                self.cache_service,
+                summary=summary,
+                question_responses=question_responses,
+                response=toc_result,
+                book_metadata=book_metadata
+            )
+
+            logger.info(
+                f"Generated and cached TOC [correlation_id={correlation_id}]"
+            )
+            return toc_result
+
+        except AIServiceError as e:
+            # Try to get cached content as fallback
+            e.cached_content_available = False
+            cached_toc = await get_toc_generation_cache(
+                self.cache_service,
+                summary=summary,
+                question_responses=question_responses,
+                book_metadata=book_metadata
+            )
+
+            if cached_toc:
+                e.cached_content_available = True
+                logger.warning(
+                    f"AI service error, returning cached TOC [correlation_id={correlation_id}]"
+                )
+                return cached_toc
+
+            logger.error(
+                f"Error generating TOC and no cache available "
+                f"[correlation_id={correlation_id}]: {str(e)}"
+            )
+            raise
 
     def _build_toc_generation_prompt(
         self,
