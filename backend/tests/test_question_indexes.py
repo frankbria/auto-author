@@ -5,7 +5,7 @@ from app.db.base import get_collection
 
 
 @pytest.mark.asyncio
-async def test_ensure_question_indexes():
+async def test_ensure_question_indexes(motor_reinit_db):
     """Test that indexes are created successfully."""
     # Create indexes
     await ensure_question_indexes()
@@ -36,7 +36,7 @@ async def test_ensure_question_indexes():
 
 
 @pytest.mark.asyncio
-async def test_indexes_are_idempotent():
+async def test_indexes_are_idempotent(motor_reinit_db):
     """Test that running ensure_question_indexes multiple times is safe."""
     # Run twice - should not raise any errors
     await ensure_question_indexes()
@@ -54,7 +54,7 @@ async def test_indexes_are_idempotent():
 
 
 @pytest.mark.asyncio
-async def test_question_query_uses_index():
+async def test_question_query_uses_index(motor_reinit_db):
     """Test that question queries can use the compound index."""
     questions_collection = await get_collection("questions")
 

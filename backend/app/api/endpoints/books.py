@@ -2890,9 +2890,9 @@ async def regenerate_chapter_questions(
                 "difficulty": request_data.difficulty.value if request_data.difficulty else None,
                 "focus": [q_type.value for q_type in request_data.focus] if request_data.focus else None,
                 "preserve_responses": preserve_responses,
-                "preserved_count": result.get("preserved_count", 0),
-                "new_count": result.get("new_count", 0),
-                "total_count": result.get("total", 0),
+                "preserved_count": getattr(result, "preserved_count", 0),
+                "new_count": getattr(result, "new_count", 0),
+                "total_count": result.total,
                 "request_id": request_id,
             }
         )
@@ -3085,28 +3085,49 @@ async def save_question_responses_batch_endpoint(
         - failed: Number of responses that failed
         - results: Array of per-response results with success status
         - errors: Array of error details for failed responses (if any)
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - VALIDATION_FAILED (422): Invalid request data
+        - RESPONSE_SAVE_FAILED (500): Error saving batch responses
     """
+    # Generate request ID for tracking
+    request_id = generate_request_id()
+
     # Import the batch save function
     from app.db.questions import save_question_responses_batch as db_save_batch
+
+    # Validate request - check for empty responses
+    if not responses:
+        raise handle_validation_error(
+            field="responses",
+            message="No responses provided",
+            value=responses,
+            request_id=request_id
+        )
+
+    # Validate batch size
+    if len(responses) > 100:
+        raise handle_validation_error(
+            field="responses",
+            message="Batch size exceeds maximum of 100 responses",
+            value=len(responses),
+            request_id=request_id
+        )
 
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise handle_book_not_found(book_id, request_id)
+
     if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to save responses for this book"
-        )
-
-    # Validate request
-    if not responses:
-        raise HTTPException(
-            status_code=400, detail="No responses provided"
-        )
-
-    if len(responses) > 100:
-        raise HTTPException(
-            status_code=400, detail="Batch size exceeds maximum of 100 responses"
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
         )
 
     try:
@@ -3130,6 +3151,7 @@ async def save_question_responses_batch_endpoint(
                 "saved": result["saved"],
                 "failed": result["failed"],
                 "success": result["success"],
+                "request_id": request_id,
             }
         )
 
@@ -3140,12 +3162,23 @@ async def save_question_responses_batch_endpoint(
             "failed": result["failed"],
             "results": result["results"],
             "errors": result.get("errors"),
-            "message": f"Batch save completed: {result['saved']}/{result['total']} responses saved successfully"
+            "message": f"Batch save completed: {result['saved']}/{result['total']} responses saved successfully",
+            "request_id": request_id
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Handle validation errors from the database layer
+        raise handle_validation_error(
+            field="responses",
+            message=str(e),
+            value=None,
+            request_id=request_id
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error saving batch responses: {str(e)}"
+        # Handle all other errors with centralized error handler
+        raise handle_response_save_error(
+            error=e,
+            question_id=None,  # Batch operation, no single question
+            user_id=current_user.get("auth_id"),
+            request_id=request_id
         )

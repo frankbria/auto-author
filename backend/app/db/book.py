@@ -101,13 +101,24 @@ async def update_book(
 
 
 async def delete_book(book_id: str, user_auth_id: str) -> bool:
-    """Delete a book and remove its association from the user"""
+    """Delete a book and remove its association from the user.
+
+    This performs a cascade deletion, removing:
+    - The book document
+    - All questions for the book
+    - All question responses for the book
+    - Book association from the user
+    """
     # First check if user owns the book
     book = await books_collection.find_one(
         {"_id": ObjectId(book_id), "owner_id": user_auth_id}
     )
     if not book:
         return False
+
+    # Cascade delete: Remove all questions and responses for this book
+    from app.db.questions import delete_questions_for_book
+    await delete_questions_for_book(book_id=book_id, user_id=user_auth_id)
 
     # Delete the book
     result = await books_collection.delete_one({"_id": ObjectId(book_id)})

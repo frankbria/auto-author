@@ -4,7 +4,7 @@ Session models for tracking user sessions
 
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class SessionMetadata(BaseModel):
@@ -62,8 +62,8 @@ class SessionModel(BaseModel):
 
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "session_id": "sess_abc123xyz",
                 "user_id": "user_clerk_123",
@@ -85,6 +85,7 @@ class SessionModel(BaseModel):
                 "csrf_token": "csrf_token_here"
             }
         }
+    )
 
 
 class SessionCreate(BaseModel):
@@ -120,8 +121,8 @@ class SessionResponse(BaseModel):
     is_suspicious: bool
     request_count: int
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "session_id": "sess_abc123xyz",
                 "user_id": "user_clerk_123",
@@ -133,3 +134,4 @@ class SessionResponse(BaseModel):
                 "request_count": 42
             }
         }
+    )

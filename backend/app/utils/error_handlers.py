@@ -56,7 +56,7 @@ def handle_book_not_found(
 
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=error_response.model_dump()
+        detail=error_response.model_dump(mode='json')
     )
 
 
@@ -104,7 +104,7 @@ def handle_unauthorized_access(
 
     return HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail=error_response.model_dump()
+        detail=error_response.model_dump(mode='json')
     )
 
 
@@ -154,7 +154,7 @@ def handle_validation_error(
 
     return HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        detail=error_response.model_dump()
+        detail=error_response.model_dump(mode='json')
     )
 
 
@@ -226,7 +226,7 @@ def handle_question_generation_error(
 
     return HTTPException(
         status_code=status_code,
-        detail=error_response.model_dump()
+        detail=error_response.model_dump(mode='json')
     )
 
 
@@ -282,7 +282,7 @@ def handle_database_error(
 
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=error_response.model_dump()
+        detail=error_response.model_dump(mode='json')
     )
 
 
@@ -321,7 +321,7 @@ def handle_question_not_found(
 
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=error_response.model_dump()
+        detail=error_response.model_dump(mode='json')
     )
 
 
@@ -374,7 +374,7 @@ def handle_response_save_error(
 
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=error_response.model_dump()
+        detail=error_response.model_dump(mode='json')
     )
 
 
@@ -430,7 +430,7 @@ def handle_rating_save_error(
 
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=error_response.model_dump()
+        detail=error_response.model_dump(mode='json')
     )
 
 
@@ -472,7 +472,7 @@ def handle_generic_error(
             )
 
     error_response = create_error_response(
-        error_code=ErrorCode.INTERNAL_SERVER_ERROR,
+        error_code=ErrorCode.OPERATION_FAILED,
         message=f"Error during {operation}",
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         details=details,
@@ -486,5 +486,5 @@ def handle_generic_error(
 
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=error_response.model_dump()
+        detail=error_response.model_dump(mode='json')
     )

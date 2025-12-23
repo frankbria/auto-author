@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
 
 
@@ -19,11 +19,11 @@ class ChapterAccessLog(BaseModel):
     tab_order: Optional[int] = None  # For tab ordering persistence
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    class Config:
-        from_attributes = True
-        validate_by_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        arbitrary_types_allowed=True
+    )
 
 
 class ChapterAccessCreate(BaseModel):
@@ -51,5 +51,6 @@ class ChapterAccessRead(BaseModel):
     tab_order: Optional[int] = None
     metadata: Dict[str, Any] = {}
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True
+    )

@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Mic, 
-  Type, 
+import {
+  Mic,
+  Type,
   Square
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 type InputMode = 'text' | 'voice';
 
 interface VoiceTextInputProps {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   onModeChange?: (mode: InputMode) => void;
@@ -49,6 +50,7 @@ interface SpeechRecognition extends EventTarget {
 
 
 export function VoiceTextInput({
+  id,
   value,
   onChange,
   onModeChange,
@@ -85,7 +87,7 @@ export function VoiceTextInput({
     if (!SpeechRecognition) return null;
 
     const recognition = new SpeechRecognition();
-    
+
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
@@ -120,7 +122,7 @@ export function VoiceTextInput({
           const end = textarea.selectionEnd;
           const newValue = value.slice(0, start) + finalTranscript + ' ' + value.slice(end);
           onChange(newValue);
-          
+
           // Move cursor to end of inserted text
           setTimeout(() => {
             const newPosition = start + finalTranscript.length + 1;
@@ -155,7 +157,7 @@ export function VoiceTextInput({
     if (onModeChange) {
       onModeChange(newMode);
     }
-    
+
     // Stop recording if switching away from voice mode
     if (newMode === 'text' && isRecording) {
       stopRecording();
@@ -171,7 +173,7 @@ export function VoiceTextInput({
     try {
       // Request microphone permission
       await navigator.mediaDevices.getUserMedia({ audio: true });
-      
+
       setError(null);
       const recognition = initializeSpeechRecognition();
       if (recognition) {
@@ -224,7 +226,7 @@ export function VoiceTextInput({
               </>
             )}
           </Button>
-          
+
           {currentMode === 'voice' && !isSupported && (
             <span className="text-sm text-muted-foreground">
               Voice input not supported
@@ -277,7 +279,7 @@ export function VoiceTextInput({
 
       {/* Recording Status */}
       {isRecording && (
-        <div 
+        <div
           className="bg-green-50 border border-green-200 text-green-800 px-4 py-2 text-sm rounded-md"
           role="status"
           aria-live="polite"
@@ -292,6 +294,7 @@ export function VoiceTextInput({
       {/* Content Area */}
       {currentMode === 'text' ? (
         <Textarea
+          id={id}
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}

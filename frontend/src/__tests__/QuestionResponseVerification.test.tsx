@@ -182,12 +182,12 @@ describe('QuestionDisplay - Response Save Verification', () => {
     const saveDraftButton = screen.getByRole('button', { name: /save draft/i });
     await user.click(saveDraftButton);
 
-    // Wait for verification warning
+    // Wait for verification warning (from catch block)
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: 'Warning: Save Verification Failed',
-          description: expect.stringContaining('could not be verified'),
+          title: 'Verification Warning',
+          description: expect.stringContaining('verification failed'),
           variant: 'destructive'
         })
       );

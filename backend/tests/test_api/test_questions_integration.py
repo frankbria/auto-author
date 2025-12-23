@@ -29,39 +29,89 @@ from app.schemas.book import (
 
 # Helper functions for test data creation
 
-async def create_test_book_with_chapter(client: AsyncClient) -> tuple[str, str]:
-    """Create a test book with a chapter for question testing."""
-    from unittest.mock import patch, AsyncMock
+async def create_test_book(client: AsyncClient, book_data: dict) -> dict:
+    """Create a test book via API."""
+    response = await client.post(
+        "/api/v1/books/",  # Add trailing slash to match route definition
+        json={
+            "title": book_data.get("title", "Test Book"),
+            "description": book_data.get("description", "Test Description"),
+            "genre": book_data.get("genre", "Fiction"),
+            "target_audience": book_data.get("target_audience", "General"),
+        }
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+async def add_test_chapter(
+    client: AsyncClient,
+    book_id: str,
+    title: str = "Test Chapter",
+    description: str = "Test chapter description"
+) -> str:
+    """Add a test chapter to a book and return chapter ID."""
     from bson import ObjectId
 
-    # Generate IDs
-    book_id = str(ObjectId())
-    chapter_id = "ch-test-chapter"
+    chapter_id = f"ch-{str(ObjectId())}"
 
-    # Mock book data with chapter
-    mock_book = {
-        "_id": book_id,
-        "id": book_id,
-        "owner_id": "test-auth-id-123",
+    # Get current book
+    response = await client.get(f"/api/v1/books/{book_id}")
+    assert response.status_code == 200
+    book = response.json()
+
+    # Add chapter to TOC
+    if "table_of_contents" not in book or book["table_of_contents"] is None:
+        book["table_of_contents"] = {"chapters": []}
+
+    if "chapters" not in book["table_of_contents"]:
+        book["table_of_contents"]["chapters"] = []
+
+    book["table_of_contents"]["chapters"].append({
+        "id": chapter_id,
+        "title": title,
+        "description": description,
+        "level": 1,
+        "order": len(book["table_of_contents"]["chapters"]) + 1,
+        "subchapters": []
+    })
+
+    # Update book with all required fields
+    update_response = await client.put(
+        f"/api/v1/books/{book_id}",
+        json={
+            "title": book["title"],
+            "description": book.get("description"),
+            "genre": book.get("genre"),
+            "target_audience": book.get("target_audience"),
+            "table_of_contents": book["table_of_contents"]
+        }
+    )
+    assert update_response.status_code == 200
+
+    return chapter_id
+
+
+async def create_test_book_with_chapter(client: AsyncClient) -> tuple[str, str]:
+    """Create a test book with a chapter for question testing."""
+    # Create a real book
+    book = await create_test_book(client, {
         "title": "Test Book for Questions",
         "description": "A book to test the question generation system",
         "genre": "Non-fiction",
-        "target_audience": "Developers",
-        "table_of_contents": {
-            "chapters": [
-                {
-                    "id": chapter_id,
-                    "title": "Character Development",
-                    "description": "How to create compelling characters",
-                    "level": 1,
-                    "order": 1,
-                    "subchapters": []
-                }
-            ]
-        }
-    }
+        "target_audience": "Developers"
+    })
+    book_id = book["id"]
 
-    return book_id, chapter_id, mock_book
+    # Add a chapter
+    chapter_id = await add_test_chapter(
+        client,
+        book_id,
+        "Character Development",
+        "How to create compelling characters"
+    )
+
+    return book_id, chapter_id
 
 
 # ===========================
@@ -80,17 +130,13 @@ async def test_complete_question_lifecycle(auth_client_factory, motor_reinit_db)
     4. Responses can be updated
     5. Questions and responses can be deleted (cascade)
     """
-    from unittest.mock import patch, AsyncMock
-
     client = await auth_client_factory()
 
-    # 1. Create test book and chapter (mocked)
-    book_id, chapter_id, mock_book = await create_test_book_with_chapter(client)
+    # 1. Create test book and chapter
+    book_id, chapter_id = await create_test_book_with_chapter(client)
 
-    # Mock the book lookup to return our test book
-    with patch('app.api.endpoints.books.get_book_by_id', AsyncMock(return_value=mock_book)):
-        # 2. Generate questions for the chapter
-        gen_response = await client.post(
+    # 2. Generate questions for the chapter
+    gen_response = await client.post(
         f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-questions",
         json={
             "count": 5,
@@ -110,15 +156,15 @@ async def test_complete_question_lifecycle(auth_client_factory, motor_reinit_db)
     # 3. Save a response to the first question
     response_text = "This is my detailed response to the first question. It explores character motivation and development."
     save_response = await client.put(
-        f"/api/v1/books/{book_id}/question-responses",
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question_id}/response",
         json={
-            "question_id": question_id,
             "response_text": response_text,
             "status": "draft"
         }
     )
     assert save_response.status_code == 200
-    saved_response = save_response.json()
+    saved_response_data = save_response.json()
+    saved_response = saved_response_data["response"]
 
     # Verify response was saved
     assert saved_response["response_text"] == response_text
@@ -143,15 +189,15 @@ async def test_complete_question_lifecycle(auth_client_factory, motor_reinit_db)
 
     # 5. Update the response to "completed"
     update_response = await client.put(
-        f"/api/v1/books/{book_id}/question-responses",
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question_id}/response",
         json={
-            "question_id": question_id,
             "response_text": response_text + " Updated with more details.",
             "status": "completed"
         }
     )
     assert update_response.status_code == 200
-    updated = update_response.json()
+    updated_data = update_response.json()
+    updated = updated_data["response"]
 
     # Verify response was updated
     assert updated["status"] == "completed"
@@ -292,9 +338,8 @@ async def test_question_retrieval_with_filters(auth_client_factory, motor_reinit
     # Save responses to some questions (mark as draft)
     for i in range(3):
         await client.put(
-            f"/api/v1/books/{book_id}/question-responses",
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{questions[i]['id']}/response",
             json={
-                "question_id": questions[i]["id"],
                 "response_text": f"Draft response {i}",
                 "status": "draft"
             }
@@ -302,9 +347,8 @@ async def test_question_retrieval_with_filters(auth_client_factory, motor_reinit
 
     # Mark one as completed
     await client.put(
-        f"/api/v1/books/{book_id}/question-responses",
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{questions[0]['id']}/response",
         json={
-            "question_id": questions[0]["id"],
             "response_text": "Completed response",
             "status": "completed"
         }
@@ -381,15 +425,15 @@ async def test_batch_save_multiple_responses_atomically(auth_client_factory, mot
     saved_responses = []
     for i, question in enumerate(questions):
         response = await client.put(
-            f"/api/v1/books/{book_id}/question-responses",
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question['id']}/response",
             json={
-                "question_id": question["id"],
                 "response_text": f"Batch response {i} with detailed content",
                 "status": "draft"
             }
         )
         assert response.status_code == 200
-        saved_responses.append(response.json())
+        response_data = response.json()
+        saved_responses.append(response_data["response"])
 
     # Verify all responses were saved
     assert len(saved_responses) == len(questions)
@@ -429,9 +473,8 @@ async def test_batch_operations_with_large_datasets(auth_client_factory, motor_r
     # Save responses to all questions
     for question in questions:
         response = await client.put(
-            f"/api/v1/books/{book_id}/question-responses",
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question['id']}/response",
             json={
-                "question_id": question["id"],
                 "response_text": "Large dataset response with sufficient content for word count",
                 "status": "draft"
             }
@@ -507,21 +550,11 @@ async def test_invalid_data_handling(auth_client_factory, motor_reinit_db):
     # This may return 200 with empty questions or 404 depending on implementation
     assert response.status_code in [200, 404]
 
-    # Test saving response with missing question_id
-    response = await client.put(
-        f"/api/v1/books/{book_id}/question-responses",
-        json={
-            "response_text": "Response without question ID",
-            "status": "draft"
-        }
-    )
-    assert response.status_code == 422
-
     # Test saving response with empty text
+    # Note: question_id is now in the URL path, so we test with an invalid ID
     response = await client.put(
-        f"/api/v1/books/{book_id}/question-responses",
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/invalid-question-id/response",
         json={
-            "question_id": "some-question-id",
             "response_text": "",
             "status": "draft"
         }
@@ -545,7 +578,7 @@ async def test_missing_permissions_unauthorized_access(auth_client_factory, moto
 
     # User 1 creates a book and questions
     book_response = await client1.post(
-        "/api/v1/books",
+        "/api/v1/books/",  # Add trailing slash to match route definition
         json={
             "title": "User 1 Book",
             "description": "Private book"
@@ -641,9 +674,8 @@ async def test_cascade_delete_book_deletes_questions(auth_client_factory, motor_
     # Save responses
     for question in questions:
         await client.put(
-            f"/api/v1/books/{book_id}/question-responses",
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question['id']}/response",
             json={
-                "question_id": question["id"],
                 "response_text": "Response to be deleted",
                 "status": "draft"
             }
@@ -747,9 +779,8 @@ async def test_user_isolation_cannot_access_other_users_questions(
 
     # User 2 tries to save response to User 1's question
     response_response = await client2.put(
-        f"/api/v1/books/{book1_id}/question-responses",
+        f"/api/v1/books/{book1_id}/chapters/{chapter1_id}/questions/{user1_questions[0]['id']}/response",
         json={
-            "question_id": user1_questions[0]["id"],
             "response_text": "Trying to access other user's question",
             "status": "draft"
         }
@@ -796,9 +827,8 @@ async def test_question_progress_tracking(auth_client_factory, motor_reinit_db):
     # Complete 5 questions
     for i in range(5):
         await client.put(
-            f"/api/v1/books/{book_id}/question-responses",
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{questions[i]['id']}/response",
             json={
-                "question_id": questions[i]["id"],
                 "response_text": f"Completed response {i}",
                 "status": "completed"
             }
@@ -807,9 +837,8 @@ async def test_question_progress_tracking(auth_client_factory, motor_reinit_db):
     # Draft 3 questions
     for i in range(5, 8):
         await client.put(
-            f"/api/v1/books/{book_id}/question-responses",
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{questions[i]['id']}/response",
             json={
-                "question_id": questions[i]["id"],
                 "response_text": f"Draft response {i}",
                 "status": "draft"
             }
@@ -873,42 +902,39 @@ async def test_response_edit_history_tracking(auth_client_factory, motor_reinit_
 
     # Save initial response
     response1 = await client.put(
-        f"/api/v1/books/{book_id}/question-responses",
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question_id}/response",
         json={
-            "question_id": question_id,
             "response_text": "Initial short response",
             "status": "draft"
         }
     )
     assert response1.status_code == 200
-    data1 = response1.json()
+    data1 = response1.json()["response"]
     initial_word_count = data1["word_count"]
 
     # Update response multiple times
     for i in range(3):
         update_response = await client.put(
-            f"/api/v1/books/{book_id}/question-responses",
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question_id}/response",
             json={
-                "question_id": question_id,
                 "response_text": f"Updated response version {i+1} with more detailed content and additional words",
                 "status": "draft" if i < 2 else "completed"
             }
         )
         assert update_response.status_code == 200
-        data = update_response.json()
+        data = update_response.json()["response"]
         assert data["word_count"] > initial_word_count
 
     # Verify final response has edit history
     final_response = await client.put(
-        f"/api/v1/books/{book_id}/question-responses",
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question_id}/response",
         json={
-            "question_id": question_id,
             "response_text": "Final version of the response with comprehensive content",
             "status": "completed"
         }
     )
     assert final_response.status_code == 200
-    final_data = final_response.json()
+    final_data = final_response.json()["response"]
 
     # Metadata should include edit history
     assert "metadata" in final_data

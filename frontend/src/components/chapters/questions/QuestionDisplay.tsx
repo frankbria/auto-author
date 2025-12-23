@@ -49,6 +49,8 @@ export default function QuestionDisplay({
   const [rating, setRating] = useState(0);
   // State for retry attempts
   const [retryCount, setRetryCount] = useState(0);
+  // State to track last attempted action for proper retry behavior
+  const [lastAction, setLastAction] = useState<'draft' | 'complete' | null>(null);
 
   // Online status
   const { isOnline, wasOffline } = useOnlineStatus();
@@ -168,11 +170,8 @@ export default function QuestionDisplay({
 
         if (!verificationResult.has_response || !verificationResult.response) {
           console.error('Verification failed: Response not found in database after save');
-          toast({
-            title: 'Warning: Save Verification Failed',
-            description: 'Response was saved but could not be verified. Please refresh to confirm.',
-            variant: 'destructive',
-          });
+          // Throw error to trigger centralized error handler (catch block below)
+          // which will display a single "Verification Warning" toast
           throw new Error('Failed to verify response persistence');
         }
 
@@ -217,6 +216,7 @@ export default function QuestionDisplay({
   const handleSaveDraft = useCallback(async () => {
     if (!responseText.trim()) return;
 
+    setLastAction('draft'); // Track that we're attempting a draft save
     setIsSaving(true);
     setSaveStatus('saving');
     setSaveError('');
@@ -236,6 +236,7 @@ export default function QuestionDisplay({
             onSuccess: () => {
               setSaveStatus('saved');
               setSaveError('');
+              setLastAction(null); // Clear last action on queued success
               onResponseSaved();
               // Auto-clear saved status after 3 seconds
               setTimeout(() => setSaveStatus('idle'), 3000);
@@ -261,6 +262,7 @@ export default function QuestionDisplay({
       setSaveStatus('saved');
       setSaveError('');
       setRetryCount(0);
+      setLastAction(null); // Clear last action on success
 
       // Notify parent component that response was saved
       onResponseSaved();
@@ -316,6 +318,7 @@ export default function QuestionDisplay({
       return;
     }
 
+    setLastAction('complete'); // Track that we're attempting to complete
     setIsSaving(true);
     setSaveStatus('saving');
     setSaveError('');
@@ -336,6 +339,7 @@ export default function QuestionDisplay({
               setIsCompleted(true);
               setSaveStatus('saved');
               setSaveError('');
+              setLastAction(null); // Clear last action on queued success
               onResponseSaved();
               setTimeout(() => setSaveStatus('idle'), 3000);
             },
@@ -361,6 +365,7 @@ export default function QuestionDisplay({
       setSaveStatus('saved');
       setSaveError('');
       setRetryCount(0);
+      setLastAction(null); // Clear last action on success
 
       // Notify parent component that response was saved
       onResponseSaved();
@@ -477,6 +482,7 @@ export default function QuestionDisplay({
           </div>
 
           <VoiceTextInput
+            id="response"
             value={responseText}
             onChange={setResponseText}
             placeholder="Type your response here or use voice input..."
@@ -542,7 +548,7 @@ export default function QuestionDisplay({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleSaveDraft}
+                  onClick={lastAction === 'complete' ? handleMarkCompleted : handleSaveDraft}
                   className="ml-2 h-8"
                 >
                   Retry

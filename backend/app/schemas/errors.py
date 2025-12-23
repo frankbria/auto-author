@@ -7,8 +7,8 @@ providing consistent error formatting and detailed debugging information.
 """
 
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
-from datetime import datetime
+from pydantic import BaseModel, Field, ConfigDict
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -74,12 +74,12 @@ class ErrorResponse(BaseModel):
     error_code: ErrorCode = Field(..., description="Machine-readable error code")
     status_code: int = Field(..., description="HTTP status code")
     details: Optional[List[ErrorDetail]] = Field(None, description="Additional error details")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="When the error occurred")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When the error occurred")
     request_id: Optional[str] = Field(None, description="Request correlation ID for tracking")
     help_url: Optional[str] = Field(None, description="URL to documentation for this error")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "Failed to generate questions for chapter",
                 "error_code": "QUESTION_GENERATION_FAILED",
@@ -97,6 +97,7 @@ class ErrorResponse(BaseModel):
                 "help_url": "https://docs.autoauthor.app/errors/question-generation-failed"
             }
         }
+    )
 
 
 class ValidationErrorResponse(ErrorResponse):
@@ -104,8 +105,8 @@ class ValidationErrorResponse(ErrorResponse):
 
     error_code: ErrorCode = ErrorCode.VALIDATION_FAILED
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "Request validation failed",
                 "error_code": "VALIDATION_FAILED",
@@ -128,6 +129,7 @@ class ValidationErrorResponse(ErrorResponse):
                 "request_id": "req_abc123"
             }
         }
+    )
 
 
 class AuthorizationErrorResponse(ErrorResponse):
@@ -136,8 +138,8 @@ class AuthorizationErrorResponse(ErrorResponse):
     error_code: ErrorCode = ErrorCode.FORBIDDEN_OPERATION
     status_code: int = 403
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "You are not authorized to perform this operation",
                 "error_code": "FORBIDDEN_OPERATION",
@@ -152,6 +154,7 @@ class AuthorizationErrorResponse(ErrorResponse):
                 "request_id": "req_abc123"
             }
         }
+    )
 
 
 class ResourceNotFoundErrorResponse(ErrorResponse):
@@ -159,8 +162,8 @@ class ResourceNotFoundErrorResponse(ErrorResponse):
 
     status_code: int = 404
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "Resource not found",
                 "error_code": "BOOK_NOT_FOUND",
@@ -176,6 +179,7 @@ class ResourceNotFoundErrorResponse(ErrorResponse):
                 "request_id": "req_abc123"
             }
         }
+    )
 
 
 class RateLimitErrorResponse(ErrorResponse):
@@ -185,8 +189,8 @@ class RateLimitErrorResponse(ErrorResponse):
     status_code: int = 429
     retry_after: Optional[int] = Field(None, description="Seconds to wait before retrying")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "Rate limit exceeded for question generation",
                 "error_code": "RATE_LIMIT_EXCEEDED",
@@ -202,6 +206,7 @@ class RateLimitErrorResponse(ErrorResponse):
                 "request_id": "req_abc123"
             }
         }
+    )
 
 
 def create_error_response(

@@ -1,21 +1,22 @@
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any, Annotated
+from pydantic import BaseModel, Field, ConfigDict, PlainValidator
 from bson import ObjectId
 
 
-class PyObjectId(str):
-    """Custom ObjectId type for MongoDB IDs"""
-
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
+def validate_object_id(v: Any) -> str:
+    """Validate and convert ObjectId to string"""
+    if isinstance(v, ObjectId):
+        return str(v)
+    if isinstance(v, str):
         if not ObjectId.is_valid(v):
             raise ValueError("Invalid ObjectId")
-        return str(v)
+        return v
+    raise ValueError("Invalid ObjectId type")
+
+
+# Pydantic v2 compatible ObjectId type
+PyObjectId = Annotated[str, PlainValidator(validate_object_id)]
 
 
 class UserPreferences(BaseModel):
@@ -58,11 +59,11 @@ class UserDB(UserBase):
     )  # Store book IDs instead of direct references
     is_active: bool = True
 
-    class Config:
-        from_attributes = True
-        validate_by_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        arbitrary_types_allowed=True
+    )
 
 
 class UserRead(UserBase):
@@ -73,5 +74,6 @@ class UserRead(UserBase):
     updated_at: datetime
     book_ids: List[str] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True
+    )

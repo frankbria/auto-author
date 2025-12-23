@@ -4,7 +4,7 @@
  * Monitors network connectivity and provides real-time online/offline status
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export interface OnlineStatus {
   isOnline: boolean;
@@ -21,6 +21,7 @@ export function useOnlineStatus(): OnlineStatus {
     typeof window !== 'undefined' ? window.navigator.onLine : true
   );
   const [wasOffline, setWasOffline] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Only run in browser environment
@@ -29,13 +30,23 @@ export function useOnlineStatus(): OnlineStatus {
     }
 
     const handleOnline = () => {
-      setIsOnline(true);
-      // If we were offline, mark that we've recovered
-      if (!isOnline) {
-        setWasOffline(true);
-        // Reset the wasOffline flag after a delay
-        setTimeout(() => setWasOffline(false), 5000);
-      }
+      // Use functional form to read latest state and avoid stale closure
+      setIsOnline(prevIsOnline => {
+        // If we were offline, mark that we've recovered
+        if (!prevIsOnline) {
+          setWasOffline(true);
+          // Clear any existing timeout before starting new one
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+          // Reset the wasOffline flag after a delay
+          timeoutRef.current = setTimeout(() => {
+            setWasOffline(false);
+            timeoutRef.current = null; // Reset ref when timer completes
+          }, 5000);
+        }
+        return true;
+      });
     };
 
     const handleOffline = () => {
@@ -50,8 +61,12 @@ export function useOnlineStatus(): OnlineStatus {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      // Clear timeout on unmount to prevent memory leaks
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
     };
-  }, [isOnline]);
+  }, []); // Removed isOnline from dependencies - no longer needed with functional setState
 
   return { isOnline, wasOffline };
 }

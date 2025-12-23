@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from bson import ObjectId
 import logging
+import math
 
 from .base import get_collection
 from app.schemas.book import (
@@ -17,6 +18,17 @@ from app.schemas.book import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def serialize_datetime(obj: Any) -> Any:
+    """Convert datetime objects to ISO format strings for JSON serialization."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: serialize_datetime(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_datetime(item) for item in obj]
+    return obj
 
 
 async def ensure_question_indexes() -> None:
@@ -178,16 +190,16 @@ async def create_questions_batch(
             question_dict = question_dicts[i].copy()
             question_dict["id"] = str(inserted_id)
             question_dict.pop("_id", None)
+            # Serialize datetime objects to ISO format strings
+            question_dict = serialize_datetime(question_dict)
             created_questions.append(question_dict)
 
         return created_questions
 
     except Exception as e:
-        # Log the error and re-raise to ensure caller knows operation failed
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Failed to insert questions batch: {str(e)}")
-        raise Exception(f"Failed to create questions batch: {str(e)}")
+        # Log the error with traceback and re-raise to ensure caller knows operation failed
+        logger.exception(f"Failed to insert questions batch: {str(e)}")
+        raise Exception(f"Failed to create questions batch: {str(e)}") from e
 
 
 async def get_questions_for_chapter(
@@ -255,12 +267,16 @@ async def get_questions_for_chapter(
         elif status == "not_answered":
             processed_questions = [q for q in processed_questions if q["response_status"] == "not_answered"]
 
+    # Calculate total pages
+    pages = math.ceil(total / limit) if limit > 0 else 1
+    has_more = page < pages
+
     return QuestionListResponse(
         questions=processed_questions,
         total=len(processed_questions),
         page=page,
-        limit=limit,
-        has_more=(page * limit) < total
+        pages=pages,
+        has_more=has_more
     )
 
 
@@ -438,6 +454,41 @@ async def get_chapter_question_progress(
         progress=progress,
         status=status
     )
+
+
+async def delete_questions_for_book(
+    book_id: str,
+    user_id: str
+) -> int:
+    """Delete all questions and responses for a book (cascade deletion)."""
+    questions_collection = await get_collection("questions")
+    responses_collection = await get_collection("question_responses")
+
+    # Get all questions for the book
+    questions = await questions_collection.find({
+        "book_id": book_id,
+        "user_id": user_id
+    }).to_list(length=None)
+
+    # Extract question IDs
+    question_ids = [str(q["_id"]) for q in questions]
+
+    # Delete all responses for these questions
+    if question_ids:
+        await responses_collection.delete_many({
+            "question_id": {"$in": question_ids},
+            "user_id": user_id
+        })
+
+    # Delete all questions for the book
+    result = await questions_collection.delete_many({
+        "book_id": book_id,
+        "user_id": user_id
+    })
+
+    logger.info(f"Cascade delete: Removed {result.deleted_count} questions and their responses for book {book_id}")
+
+    return result.deleted_count
 
 
 async def delete_questions_for_chapter(
