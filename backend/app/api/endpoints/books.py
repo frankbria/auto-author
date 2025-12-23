@@ -2611,7 +2611,7 @@ async def get_question_response(
             "success": True,
         }
 
-    except ValueError as e:
+    except ValueError:
         # Handle question not found errors
         raise handle_question_not_found(question_id, request_id)
     except Exception as e:

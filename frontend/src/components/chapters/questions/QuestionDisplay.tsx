@@ -4,7 +4,7 @@ import { Question, QuestionType, QuestionDifficulty, ResponseStatus } from '@/ty
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, BookOpen, Map, MessageSquare, Search, Star, StarHalf, StarOff, WifiOff, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, BookOpen, Map as MapIcon, MessageSquare, Search, Star, StarHalf, StarOff, WifiOff, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { bookClient } from '@/lib/api/bookClient';
 import { VoiceTextInput } from '@/components/chapters/VoiceTextInput';
@@ -105,7 +105,7 @@ export default function QuestionDisplay({
       case QuestionType.PLOT:
         return <BookOpen className="h-5 w-5 text-blue-500" />;
       case QuestionType.SETTING:
-        return <Map className="h-5 w-5 text-green-500" />;
+        return <MapIcon className="h-5 w-5 text-green-500" />;
       case QuestionType.THEME:
         return <Star className="h-5 w-5 text-amber-500" />;
       case QuestionType.RESEARCH:
