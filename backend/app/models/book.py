@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
 from app.models.user import PyObjectId
 
@@ -116,11 +116,11 @@ class BookDB(BookBase):
     published: bool = False
     collaborators: List[Dict[str, str]] = Field(default_factory=list)
 
-    class Config:
-        from_attributes = True
-        validate_by_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        arbitrary_types_allowed=True
+    )
 
 
 class BookRead(BookBase):
@@ -132,5 +132,6 @@ class BookRead(BookBase):
     toc_items: List[TocItem] = []
     published: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True
+    )

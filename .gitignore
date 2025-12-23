@@ -16,6 +16,9 @@ backend/*.pyc
 backend/.env
 backend/.env.*
 !backend/.env.example
+backend/.coverage
+backend/htmlcov/
+backend/.pytest_cache/
 
 # Frontend (Next.js)
 frontend/node_modules/
@@ -36,6 +39,8 @@ frontend/.yarn/install-state.gz
 
 # testing
 frontend/coverage
+frontend/playwright-report/
+frontend/test-results/
 
 # next.js
 frontend/.next/

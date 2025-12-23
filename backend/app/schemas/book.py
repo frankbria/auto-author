@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from enum import Enum
 from app.schemas.user import UserResponse
 
@@ -16,7 +16,7 @@ class ChapterStatus(str, Enum):
 
 class QuestionType(str, Enum):
     """Types of questions that can be generated for a chapter"""
-    
+
     CHARACTER = "character"
     PLOT = "plot"
     SETTING = "setting"
@@ -26,7 +26,7 @@ class QuestionType(str, Enum):
 
 class QuestionDifficulty(str, Enum):
     """Difficulty levels for questions"""
-    
+
     EASY = "easy"
     MEDIUM = "medium"
     HARD = "hard"
@@ -34,7 +34,7 @@ class QuestionDifficulty(str, Enum):
 
 class ResponseStatus(str, Enum):
     """Status values for question responses"""
-    
+
     DRAFT = "draft"
     COMPLETED = "completed"
 
@@ -62,7 +62,7 @@ class TocItemSchema(BaseModel):
 
 class QuestionMetadata(BaseModel):
     """Metadata for questions"""
-    
+
     suggested_response_length: str
     help_text: Optional[str] = None
     examples: Optional[List[str]] = None
@@ -70,7 +70,7 @@ class QuestionMetadata(BaseModel):
 
 class QuestionBase(BaseModel):
     """Base schema for chapter questions"""
-    
+
     question_text: str = Field(..., min_length=10, max_length=1000)
     question_type: QuestionType
     difficulty: QuestionDifficulty
@@ -81,29 +81,33 @@ class QuestionBase(BaseModel):
 
 class QuestionCreate(QuestionBase):
     """Schema for creating a new question"""
-    
+
     book_id: str
     chapter_id: str
 
 
 class Question(QuestionBase):
     """Schema for a complete question"""
-    
+
     id: str
     book_id: str
     chapter_id: str
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    # Response status fields (populated when querying questions)
+    has_response: Optional[bool] = None
+    response_status: Optional[str] = None  # "not_answered", "draft", "completed"
+
 
 class QuestionResponseMetadata(BaseModel):
     """Metadata for question responses including edit history"""
-    
+
     edit_history: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class QuestionResponseBase(BaseModel):
     """Base schema for question responses"""
-    
+
     response_text: str = Field(..., min_length=1)
     word_count: int = 0
     status: ResponseStatus = ResponseStatus.DRAFT
@@ -111,13 +115,13 @@ class QuestionResponseBase(BaseModel):
 
 class QuestionResponseCreate(QuestionResponseBase):
     """Schema for creating a new question response"""
-    
-    question_id: str
+
+    question_id: Optional[str] = None  # Made optional since it can come from URL path
 
 
 class QuestionResponse(QuestionResponseBase):
     """Schema for a complete question response"""
-    
+
     id: str
     question_id: str
     user_id: str
@@ -129,7 +133,7 @@ class QuestionResponse(QuestionResponseBase):
 
 class QuestionRating(BaseModel):
     """Schema for rating a question's relevance/quality"""
-    
+
     question_id: str
     user_id: str
     rating: int = Field(..., ge=1, le=5)  # 1-5 star rating
@@ -152,8 +156,8 @@ class BookBase(BaseModel):
 class BookCreate(BookBase):
     """Schema for creating a new book"""
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "title": "My Awesome Book",
                 "subtitle": "A Journey Through Words",
@@ -164,6 +168,7 @@ class BookCreate(BookBase):
                 "metadata": {"draft_version": "1.0"},
             }
         }
+    )
 
 
 class BookUpdate(BaseModel):
@@ -178,14 +183,15 @@ class BookUpdate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     published: Optional[bool] = None
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "title": "Updated Book Title",
                 "description": "A revised description of the book",
                 "published": True,
             }
         }
+    )
 
 
 class TocItemCreate(BaseModel):
@@ -229,9 +235,10 @@ class BookResponse(BookBase):
     published: bool = False
     collaborators: List[Dict[str, Any]] = []
 
-    class Config:
-        from_attributes = True
-        validate_by_name = True
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 
 class BookDetailResponse(BookResponse):
@@ -270,7 +277,7 @@ class TabStateRequest(BaseModel):
     """Schema for saving tab state"""
 
     active_chapter_id: str
-    open_tab_ids: List[str] = Field(max_items=20)  # Limit open tabs
+    open_tab_ids: List[str] = Field(max_length=20)  # Limit open tabs
     tab_order: List[str]
 
     @field_validator("tab_order")
@@ -323,7 +330,7 @@ class BulkStatusUpdate(BaseModel):
 
 class GenerateQuestionsRequest(BaseModel):
     """Request schema for generating questions for a chapter"""
-    
+
     count: Optional[int] = Field(10, ge=1, le=50)
     difficulty: Optional[QuestionDifficulty] = None
     focus: Optional[List[QuestionType]] = None
@@ -331,15 +338,19 @@ class GenerateQuestionsRequest(BaseModel):
 
 class GenerateQuestionsResponse(BaseModel):
     """Response schema for generated questions"""
-    
+
     questions: List[Question]
     generation_id: str
     total: int
 
+    # Optional fields for regeneration metadata
+    preserved_count: Optional[int] = None
+    new_count: Optional[int] = None
+
 
 class QuestionListParams(BaseModel):
     """Query parameters for listing questions"""
-    
+
     status: Optional[str] = None
     category: Optional[str] = None
     question_type: Optional[QuestionType] = None
@@ -349,16 +360,17 @@ class QuestionListParams(BaseModel):
 
 class QuestionListResponse(BaseModel):
     """Response schema for listing questions"""
-    
+
     questions: List[Question]
     total: int
     page: int
     pages: int
+    has_more: bool = False  # True if there are more pages available
 
 
 class QuestionProgressResponse(BaseModel):
     """Response schema for chapter question progress"""
-    
+
     total: int
     completed: int
     progress: float  # 0.0 to 1.0

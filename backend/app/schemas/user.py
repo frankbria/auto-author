@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 
 class UserPreferences(BaseModel):
@@ -34,9 +34,10 @@ class UserResponse(UserBase):
     book_ids: List[str] = []
     preferences: Optional[UserPreferences] = Field(default_factory=UserPreferences)
 
-    class Config:
-        from_attributes = True
-        validate_by_name = True
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 
 class UserCreate(UserBase):
@@ -46,8 +47,8 @@ class UserCreate(UserBase):
     email: Optional[EmailStr] = None  # Override to make optional for webhooks
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "auth_id": "550e8400-e29b-41d4-a716-446655440000",
                 "email": "user@example.com",
@@ -58,6 +59,7 @@ class UserCreate(UserBase):
                 "metadata": {},
             }
         }
+    )
 
 
 class UserUpdate(BaseModel):
@@ -73,8 +75,8 @@ class UserUpdate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     role: Optional[str] = None
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "email": "updated@example.com",
                 "first_name": "Updated",
@@ -91,6 +93,7 @@ class UserUpdate(BaseModel):
                 "role": "admin",
             }
         }
+    )
 
 
 class UserInDB(UserResponse):

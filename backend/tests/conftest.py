@@ -165,8 +165,13 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
     Returns an async function `make_client(overrides: dict = None)`
     that gives you an AsyncClient whose get_current_user
     always returns `test_user` updated with your overrides.
+
+    Each client gets a unique token based on the user's auth_id,
+    and the dependency override uses the token to determine which user to return.
+    This allows multiple clients with different users to coexist.
     """
     created_clients = []
+    user_map = {}  # Map from token to user
 
     def _seed_user(overrides: dict = None):
         user = test_user.copy()
@@ -178,6 +183,9 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
         return user
 
     async def make_client(*, overrides: dict = None, auth: bool = True):
+        from fastapi import Request as FastAPIRequest
+        from app.core.security import get_current_user
+
         user = _seed_user(overrides)
 
         async def _noop_audit_request(
@@ -195,17 +203,41 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
 
         headers = {}
         if auth:
-            from app.core.security import get_current_user
 
-            app.dependency_overrides[get_current_user] = lambda: user
+            # Create a unique token for this user
+            token = f"Bearer {user['auth_id']}"
+            user_map[user['auth_id']] = user
+
+            # Override get_current_user to extract token from request and return the right user
+            async def _get_user_from_request(request: FastAPIRequest = None):
+                """Extract user from Authorization header."""
+                if not request:
+                    # Fallback to current user
+                    return user
+
+                auth_header = request.headers.get("Authorization", "")
+                if not auth_header.startswith("Bearer "):
+                    from fastapi import HTTPException
+                    raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+
+                token_value = auth_header[7:]  # Remove "Bearer " prefix
+                if token_value in user_map:
+                    return user_map[token_value]
+                # Default to the current user if token not found (shouldn't happen in tests)
+                return user
+
+            app.dependency_overrides[get_current_user] = _get_user_from_request
+
             monkeypatch.setattr(
-                users_dao, "get_user_by_auth_id", lambda: user["auth_id"]
+                users_dao, "get_user_by_auth_id", lambda auth_id: user_map.get(auth_id, user)
             )
 
-            async def _fake_verify(token: str):
-                return {"sub": user["auth_id"]}
+            async def _fake_verify(token_str: str):
+                # Extract auth_id from token and return it as the 'sub' claim
+                return {"sub": token_str}
             monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
-            headers["Authorization"] = "Bearer aaa.bbb.ccc"
+
+            headers["Authorization"] = token
 
         client = AsyncClient(
             transport=ASGITransport(app=app),

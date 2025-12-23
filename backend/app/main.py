@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
+from contextlib import asynccontextmanager
 from app.api.endpoints.router import router as api_router
 from app.core.config import settings
 import logging
@@ -51,11 +52,35 @@ def validate_production_security() -> None:
 # Validate security settings before creating the app
 validate_production_security()
 
-# Create FastAPI app
+
+# Lifespan context manager for startup and shutdown tasks
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan events (startup and shutdown)."""
+    # Startup tasks
+    logger.info("Running startup tasks...")
+
+    # Import here to avoid circular dependencies
+    from app.db.questions import ensure_question_indexes
+
+    # Create indexes for question collections
+    await ensure_question_indexes()
+
+    logger.info("Startup tasks completed")
+
+    # Application runs here
+    yield
+
+    # Shutdown tasks (if needed)
+    logger.info("Application shutdown")
+
+
+# Create FastAPI app with lifespan handler
 app = FastAPI(
     title="Auto Author API",
     description="API for the Auto Author application",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Set up CORS
