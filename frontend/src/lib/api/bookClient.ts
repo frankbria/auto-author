@@ -1701,6 +1701,81 @@ export class BookClient {
   }
 
   /**
+   * Fetch all questions with their completed responses for draft generation
+   *
+   * This method retrieves all questions for a chapter and their associated responses,
+   * filtering to only include questions that have been answered. The result is formatted
+   * as Q&A pairs suitable for passing to the draft generation API.
+   *
+   * @param bookId - The book ID
+   * @param chapterId - The chapter ID
+   * @returns Promise resolving to an array of question/answer pairs
+   *
+   * @example
+   * ```typescript
+   * const qaResponses = await bookClient.getChapterQAResponses(bookId, chapterId);
+   * // Returns: [{ question: "What is...", answer: "The answer is..." }, ...]
+   * ```
+   */
+  public async getChapterQAResponses(
+    bookId: string,
+    chapterId: string
+  ): Promise<{
+    responses: Array<{ question: string; answer: string; questionId: string; status: string }>;
+    totalQuestions: number;
+    completedCount: number;
+    inProgressCount: number;
+  }> {
+    // Fetch all questions for the chapter (using a high limit to get all)
+    const questionsResponse = await this.getChapterQuestions(bookId, chapterId, { limit: 50 });
+    const questions = questionsResponse.questions;
+
+    // Fetch responses for each question that has one
+    const qaResponses: Array<{ question: string; answer: string; questionId: string; status: string }> = [];
+    let completedCount = 0;
+    let inProgressCount = 0;
+
+    for (const question of questions) {
+      try {
+        const responseData = await this.getQuestionResponse(bookId, chapterId, question.id);
+
+        if (responseData.has_response && responseData.response) {
+          const status = responseData.response.status;
+
+          if (status === 'completed') {
+            completedCount++;
+            qaResponses.push({
+              question: question.question_text,
+              answer: responseData.response.response_text,
+              questionId: question.id,
+              status: status
+            });
+          } else if (status === 'draft') {
+            inProgressCount++;
+            // Include draft responses too, but mark them
+            qaResponses.push({
+              question: question.question_text,
+              answer: responseData.response.response_text,
+              questionId: question.id,
+              status: status
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching response for question ${question.id}:`, error);
+        // Continue fetching other responses even if one fails
+      }
+    }
+
+    return {
+      responses: qaResponses,
+      totalQuestions: questions.length,
+      completedCount,
+      inProgressCount
+    };
+  }
+
+  /**
    * Generate chapter draft with AI error handling and cached content support
    */
   public async generateChapterDraftWithErrorHandling(

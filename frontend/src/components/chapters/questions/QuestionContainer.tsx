@@ -13,6 +13,7 @@ import QuestionGenerator from './QuestionGenerator';
 import QuestionDisplay from './QuestionDisplay';
 import QuestionProgress from './QuestionProgress';
 import QuestionNavigation from './QuestionNavigation';
+import { DraftGenerationButton } from './DraftGenerationButton';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, AlertCircle } from 'lucide-react';
@@ -24,13 +25,17 @@ interface QuestionContainerProps {
   chapterId: string;
   chapterTitle: string;
   onResponseSaved?: () => void; // Optional callback when a response is saved
+  onDraftGenerated?: (draft: string) => void; // Callback when a draft is generated
+  onSwitchToEditor?: () => void; // Callback to switch to editor view
 }
 
 export default function QuestionContainer({
   bookId,
   chapterId,
   chapterTitle,
-  onResponseSaved: parentResponseSaved
+  onResponseSaved: parentResponseSaved,
+  onDraftGenerated,
+  onSwitchToEditor
 }: QuestionContainerProps) {
   const { toast } = useToast();
 
@@ -420,6 +425,20 @@ export default function QuestionContainer({
           progress={progress}
           currentIndex={currentQuestionIndex}
           totalQuestions={questions.length}
+        />
+      )}
+
+      {/* Draft generation button - shows when there are enough completed responses */}
+      {progress && questions.length > 0 && (
+        <DraftGenerationButton
+          bookId={bookId}
+          chapterId={chapterId}
+          chapterTitle={chapterTitle}
+          completedCount={progress.completed}
+          totalQuestions={progress.total}
+          onDraftGenerated={onDraftGenerated}
+          onSwitchToEditor={onSwitchToEditor}
+          minimumResponses={3}
         />
       )}
 
