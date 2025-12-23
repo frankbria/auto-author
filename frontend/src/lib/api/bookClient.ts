@@ -145,7 +145,7 @@ export class BookClient {
 
     return headers;
   }
-  
+
   /**
    * Fetch all books for the current authenticated user
    *
@@ -937,8 +937,8 @@ export class BookClient {
    * Save chapter content
    */
   public async saveChapterContent(
-    bookId: string, 
-    chapterId: string, 
+    bookId: string,
+    chapterId: string,
     content: string,
     autoUpdateMetadata: boolean = true
   ): Promise<{
@@ -952,7 +952,7 @@ export class BookClient {
       method: 'PATCH',
       headers: await this.getHeaders(),
       credentials: 'include',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         content,
         auto_update_metadata: autoUpdateMetadata
       }),
@@ -987,7 +987,7 @@ export class BookClient {
       include_metadata: includeMetadata.toString(),
       track_access: trackAccess.toString()
     });
-    
+
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content?${params}`, {
       method: 'GET',
       headers: await this.getHeaders(),
@@ -1162,12 +1162,12 @@ export class BookClient {
         body: JSON.stringify(data),
       }
     );
-    
+
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to generate draft: ${response.status} ${error}`);
     }
-    
+
     return response.json();
   }
 
@@ -1278,6 +1278,102 @@ export class BookClient {
   }
 
   /**
+   * Save multiple question responses in a batch operation
+   *
+   * Efficiently saves multiple question responses in a single API call.
+   * This method provides better performance and UX when saving many responses at once.
+   *
+   * @param bookId - Unique identifier for the book
+   * @param chapterId - Unique identifier for the chapter
+   * @param responses - Array of response objects to save
+   * @returns Promise resolving to batch save results
+   *
+   * @throws {Error} When batch save fails
+   *   - 400: Invalid request data or batch size exceeds limit (100 max)
+   *   - 401: User is not authenticated
+   *   - 403: User does not have permission to save responses for this book
+   *   - 404: Book not found
+   *   - 500: Server error occurred
+   *
+   * @example
+   * ```typescript
+   * const responses = [
+   *   {
+   *     question_id: 'q1',
+   *     response_text: 'Answer to question 1',
+   *     status: 'completed'
+   *   },
+   *   {
+   *     question_id: 'q2',
+   *     response_text: 'Draft answer to question 2',
+   *     status: 'draft'
+   *   }
+   * ];
+   *
+   * const result = await bookClient.saveQuestionResponsesBatch(
+   *   bookId,
+   *   chapterId,
+   *   responses
+   * );
+   *
+   * console.log(`Saved ${result.saved}/${result.total} responses`);
+   *
+   * // Check for partial failures
+   * if (result.failed > 0) {
+   *   console.error('Failed responses:', result.errors);
+   *   result.results.forEach(r => {
+   *     if (!r.success) {
+   *       console.error(`Question ${r.question_id}: ${r.error}`);
+   *     }
+   *   });
+   * }
+   * ```
+   */
+  public async saveQuestionResponsesBatch(
+    bookId: string,
+    chapterId: string,
+    responses: Array<{
+      question_id: string;
+      response_text: string;
+      status?: 'draft' | 'completed';
+    }>
+  ): Promise<{
+    success: boolean;
+    total: number;
+    saved: number;
+    failed: number;
+    results: Array<{
+      index: number;
+      question_id: string;
+      response_id?: string;
+      success: boolean;
+      is_update?: boolean;
+      error?: string;
+    }>;
+    errors?: Array<{
+      index: number;
+      question_id?: string;
+      error: string;
+    }>;
+    message: string;
+  }> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/responses/batch`,
+      {
+        method: 'POST',
+        headers: await this.getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(responses),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to save question responses batch: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
+  /**
    * Rate a question's relevance and quality
    */
   public async rateQuestion(
@@ -1375,12 +1471,12 @@ export class BookClient {
         credentials: 'include',
       }
     );
-    
+
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to export PDF: ${response.status} ${error}`);
     }
-    
+
     return response.blob();
   }
 
@@ -1405,12 +1501,12 @@ export class BookClient {
         credentials: 'include',
       }
     );
-    
+
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to export DOCX: ${response.status} ${error}`);
     }
-    
+
     return response.blob();
   }
 
@@ -1441,12 +1537,12 @@ export class BookClient {
         credentials: 'include',
       }
     );
-    
+
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to get export formats: ${response.status} ${error}`);
     }
-    
+
     return response.json();
   }
 
@@ -1476,12 +1572,12 @@ export class BookClient {
         body: JSON.stringify(chapterData),
       }
     );
-    
+
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to create chapter: ${response.status} ${error}`);
     }
-    
+
     return await response.json();
   }
 

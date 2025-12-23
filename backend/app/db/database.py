@@ -47,6 +47,7 @@ from .audit_log import create_audit_log
 
 from .questions import (
     create_question,
+    create_questions_batch,
     get_questions_for_chapter,
     save_question_response,
     get_question_response,
@@ -97,6 +98,7 @@ __all__ += [
     "create_audit_log",
     # Question DAOs
     "create_question",
+    "create_questions_batch",
     "get_questions_for_chapter",
     "save_question_response",
     "get_question_response",

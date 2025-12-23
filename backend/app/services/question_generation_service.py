@@ -21,6 +21,7 @@ from app.services.ai_service import AIService
 from app.utils.validators import validate_text_safety
 from app.db.database import (
     create_question,
+    create_questions_batch,
     get_questions_for_chapter as db_get_questions_for_chapter,
     save_question_response as db_save_question_response,
     get_question_response as db_get_question_response,
@@ -136,21 +137,63 @@ class QuestionGenerationService:
                 focus_types=focus_types
             )
 
-            # Save questions to database
-            saved_questions = []
-            for question in questions:
-                saved_question_dict = await create_question(question, user_id or current_user.get("auth_id"))
-                try:
-                    # Convert dict to Question object
-                    saved_question = Question(**saved_question_dict)
-                    saved_questions.append(saved_question)
-                except Exception as e:
-                    logger.error(f"Error converting question dict to Question object: {e}")
-                    logger.error(f"Question dict keys: {list(saved_question_dict.keys())}")
-                    logger.error(f"Question dict: {saved_question_dict}")
-                    raise
+            # Save questions to database atomically using batch insert
+            user_auth_id = user_id or current_user.get("auth_id")
 
-            logger.info(f"Saved {len(saved_questions)} questions to database")
+            try:
+                # Use atomic batch insertion to prevent partial saves
+                saved_question_dicts = await create_questions_batch(questions, user_auth_id)
+
+                # Convert dicts to Question objects
+                saved_questions = []
+                for saved_question_dict in saved_question_dicts:
+                    try:
+                        saved_question = Question(**saved_question_dict)
+                        saved_questions.append(saved_question)
+                    except Exception as e:
+                        logger.error(f"Error converting question dict to Question object: {e}")
+                        logger.error(f"Question dict keys: {list(saved_question_dict.keys())}")
+                        logger.error(f"Question dict: {saved_question_dict}")
+                        raise
+
+                logger.info(f"Atomically saved {len(saved_questions)} questions to database")
+
+                # VERIFICATION: Query database to confirm all questions were saved
+                try:
+                    verification_response = await db_get_questions_for_chapter(
+                        book_id=book_id,
+                        chapter_id=chapter_id,
+                        user_id=user_auth_id,
+                        page=1,
+                        limit=count + 10  # Request more than we saved to ensure we get all
+                    )
+
+                    verified_count = verification_response.total
+                    expected_count = len(saved_questions)
+
+                    if verified_count < expected_count:
+                        discrepancy_msg = (
+                            f"Data persistence verification failed: "
+                            f"Expected {expected_count} questions, but only {verified_count} found in database. "
+                            f"Discrepancy: {expected_count - verified_count} questions missing."
+                        )
+                        logger.error(discrepancy_msg)
+                        raise Exception(discrepancy_msg)
+
+                    logger.info(
+                        f"Verification successful: All {expected_count} questions confirmed in database "
+                        f"(book_id={book_id}, chapter_id={chapter_id}, user_id={user_auth_id})"
+                    )
+
+                except Exception as verify_error:
+                    logger.error(f"Verification query failed: {str(verify_error)}")
+                    # If verification fails, we should still raise an error
+                    raise Exception(f"Failed to verify question persistence: {str(verify_error)}")
+
+            except Exception as e:
+                logger.error(f"Failed to save questions batch: {str(e)}")
+                # Re-raise to ensure caller knows the operation failed
+                raise Exception(f"Failed to save questions: {str(e)}")
 
             try:
                 response = GenerateQuestionsResponse(
@@ -173,6 +216,7 @@ class QuestionGenerationService:
         self,
         book_id: str,
         chapter_id: str,
+        user_id: str,
         status: Optional[str] = None,
         category: Optional[str] = None,
         question_type: Optional[str] = None,
@@ -180,9 +224,6 @@ class QuestionGenerationService:
         limit: int = 10
     ) -> QuestionListResponse:
         """Get questions for a specific chapter with optional filtering."""
-        # Use current user ID - this should be passed in or retrieved from context
-        user_id = "current_user_id"  # TODO: Get from request context
-
         return await db_get_questions_for_chapter(
             book_id=book_id,
             chapter_id=chapter_id,

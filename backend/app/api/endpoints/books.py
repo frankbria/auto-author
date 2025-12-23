@@ -15,6 +15,20 @@ from fastapi import (
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
+# Error handling utilities
+from app.utils.error_handlers import (
+    handle_book_not_found,
+    handle_unauthorized_access,
+    handle_validation_error,
+    handle_question_generation_error,
+    handle_question_not_found,
+    handle_response_save_error,
+    handle_rating_save_error,
+    handle_generic_error,
+    generate_request_id,
+)
+from app.schemas.errors import ErrorCode
+
 from app.core.security import get_current_user, RoleChecker
 from app.schemas.book import (
     BookCreate,
@@ -2248,14 +2262,37 @@ async def generate_chapter_questions(
     - Supports filtering by difficulty level (easy, medium, hard)
     - Allows focusing on specific question types (character, plot, setting, theme, research)
     - Returns a batch of questions with metadata to guide the author
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - VALIDATION_FAILED (422): Invalid request parameters
+        - QUESTION_GENERATION_FAILED (500/503): Question generation failed
+        - RATE_LIMIT_EXCEEDED (429): Too many requests
     """
+    request_id = generate_request_id()
+
+    # Validate request parameters
+    if request_data.count and (request_data.count < 1 or request_data.count > 50):
+        raise handle_validation_error(
+            field="count",
+            message="Question count must be between 1 and 50",
+            value=request_data.count,
+            request_id=request_id
+        )
+
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise handle_book_not_found(book_id, request_id)
+
     if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to generate questions for this book"
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
         )
 
     # Get question generation service
@@ -2285,14 +2322,27 @@ async def generate_chapter_questions(
                 "difficulty": request_data.difficulty.value if request_data.difficulty else None,
                 "focus": [q_type.value for q_type in request_data.focus] if request_data.focus else None,
                 "questions_generated": len(result.questions),
+                "request_id": request_id,
             }
         )
 
         return result
 
+    except ValueError as e:
+        # Handle validation errors from the service
+        raise handle_validation_error(
+            field="chapter_id",
+            message=str(e),
+            value=chapter_id,
+            request_id=request_id
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error generating questions: {str(e)}"
+        # Handle all other errors including AI service errors
+        raise handle_question_generation_error(
+            error=e,
+            book_id=book_id,
+            chapter_id=chapter_id,
+            request_id=request_id
         )
 
 
@@ -2315,14 +2365,44 @@ async def list_chapter_questions(
     - Filter by category (specific aspects of writing like "character motivation")
     - Filter by question type (character, plot, setting, theme, research)
     - Paginate results for better performance with large question sets
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - VALIDATION_FAILED (422): Invalid filter or pagination parameters
+        - OPERATION_FAILED (500): Error retrieving questions
     """
+    request_id = generate_request_id()
+
+    # Validate pagination parameters
+    if page < 1:
+        raise handle_validation_error(
+            field="page",
+            message="Page number must be greater than 0",
+            value=page,
+            request_id=request_id
+        )
+
+    if limit < 1 or limit > 50:
+        raise handle_validation_error(
+            field="limit",
+            message="Limit must be between 1 and 50",
+            value=limit,
+            request_id=request_id
+        )
+
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise handle_book_not_found(book_id, request_id)
+
     if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book's questions"
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
         )
 
     # Get question service
@@ -2333,6 +2413,7 @@ async def list_chapter_questions(
         result = await question_service.get_questions_for_chapter(
             book_id=book_id,
             chapter_id=chapter_id,
+            user_id=current_user.get("auth_id"),
             status=status,
             category=category,
             question_type=question_type.value if question_type else None,
@@ -2342,9 +2423,28 @@ async def list_chapter_questions(
 
         return result
 
+    except ValueError as e:
+        # Handle validation errors from the service
+        raise handle_validation_error(
+            field="filters",
+            message=str(e),
+            request_id=request_id
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving questions: {str(e)}"
+        # Handle all other errors
+        raise handle_generic_error(
+            error=e,
+            operation="retrieving questions",
+            context={
+                "book_id": book_id,
+                "chapter_id": chapter_id,
+                "filters": {
+                    "status": status,
+                    "category": category,
+                    "question_type": question_type.value if question_type else None,
+                }
+            },
+            request_id=request_id
         )
 
 
@@ -2367,14 +2467,37 @@ async def save_question_response(
     - Tracks editing history and word count
     - Validates response content
     - Auto-saves metadata like timestamps and word count
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - QUESTION_NOT_FOUND (404): Question does not exist
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - VALIDATION_FAILED (422): Invalid response data
+        - RESPONSE_SAVE_FAILED (500): Error saving response
     """
+    request_id = generate_request_id()
+
+    # Validate response data
+    if not response_data.response_text or not response_data.response_text.strip():
+        raise handle_validation_error(
+            field="response_text",
+            message="Response text cannot be empty",
+            value=response_data.response_text,
+            request_id=request_id
+        )
+
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise handle_book_not_found(book_id, request_id)
+
     if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to save responses for this book"
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
         )
 
     # Get question service
@@ -2406,6 +2529,7 @@ async def save_question_response(
                 "status": response_data.status,
                 "word_count": word_count,
                 "is_update": "id" in result,
+                "request_id": request_id,
             }
         )
 
@@ -2416,10 +2540,20 @@ async def save_question_response(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Handle validation errors from the service
+        raise handle_response_save_error(
+            error=e,
+            question_id=question_id,
+            user_id=current_user.get("auth_id"),
+            request_id=request_id
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error saving response: {str(e)}"
+        # Handle all other errors
+        raise handle_response_save_error(
+            error=e,
+            question_id=question_id,
+            user_id=current_user.get("auth_id"),
+            request_id=request_id
         )
 
 
@@ -2438,14 +2572,27 @@ async def get_question_response(
 
     This endpoint retrieves the saved response for a question, if one exists.
     Returns null if no response has been saved yet.
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - QUESTION_NOT_FOUND (404): Question does not exist
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - OPERATION_FAILED (500): Error retrieving response
     """
+    request_id = generate_request_id()
+
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise handle_book_not_found(book_id, request_id)
+
     if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access responses for this book"
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
         )
 
     # Get question service
@@ -2464,9 +2611,20 @@ async def get_question_response(
             "success": True,
         }
 
+    except ValueError as e:
+        # Handle question not found errors
+        raise handle_question_not_found(question_id, request_id)
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving response: {str(e)}"
+        # Handle all other errors
+        raise handle_generic_error(
+            error=e,
+            operation="retrieving question response",
+            context={
+                "book_id": book_id,
+                "chapter_id": chapter_id,
+                "question_id": question_id,
+            },
+            request_id=request_id
         )
 
 
@@ -2488,14 +2646,37 @@ async def rate_question(
     - Uses a 1-5 star rating system
     - Accepts optional feedback comments
     - Updates existing ratings if already provided
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - QUESTION_NOT_FOUND (404): Question does not exist
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - VALIDATION_FAILED (422): Invalid rating value
+        - RATING_SAVE_FAILED (500): Error saving rating
     """
+    request_id = generate_request_id()
+
+    # Validate rating value
+    if rating_data.rating < 1 or rating_data.rating > 5:
+        raise handle_validation_error(
+            field="rating",
+            message="Rating must be between 1 and 5",
+            value=rating_data.rating,
+            request_id=request_id
+        )
+
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise handle_book_not_found(book_id, request_id)
+
     if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to rate questions for this book"
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
         )
 
     # Get question service
@@ -2521,6 +2702,7 @@ async def rate_question(
                 "chapter_id": chapter_id,
                 "rating": rating_data.rating,
                 "has_feedback": rating_data.feedback is not None,
+                "request_id": request_id,
             }
         )
 
@@ -2531,10 +2713,22 @@ async def rate_question(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Handle validation errors from the service
+        raise handle_rating_save_error(
+            error=e,
+            question_id=question_id,
+            user_id=current_user.get("auth_id"),
+            rating_value=rating_data.rating,
+            request_id=request_id
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error saving rating: {str(e)}"
+        # Handle all other errors
+        raise handle_rating_save_error(
+            error=e,
+            question_id=question_id,
+            user_id=current_user.get("auth_id"),
+            rating_value=rating_data.rating,
+            request_id=request_id
         )
 
 
@@ -2557,14 +2751,27 @@ async def get_chapter_question_progress(
     - Overall status (not-started, in-progress, completed)
 
     Used for progress tracking and visual indicators in the chapter tabs.
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - CHAPTER_NOT_FOUND (404): Chapter does not exist
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - OPERATION_FAILED (500): Error retrieving progress
     """
+    request_id = generate_request_id()
+
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise handle_book_not_found(book_id, request_id)
+
     if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book's questions"
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
         )
 
     # Get question service
@@ -2580,9 +2787,24 @@ async def get_chapter_question_progress(
 
         return result
 
+    except ValueError as e:
+        # Handle chapter not found errors
+        raise handle_validation_error(
+            field="chapter_id",
+            message=str(e),
+            value=chapter_id,
+            request_id=request_id
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving question progress: {str(e)}"
+        # Handle all other errors
+        raise handle_generic_error(
+            error=e,
+            operation="retrieving question progress",
+            context={
+                "book_id": book_id,
+                "chapter_id": chapter_id,
+            },
+            request_id=request_id
         )
 
 
@@ -2606,14 +2828,38 @@ async def regenerate_chapter_questions(
     - Deletes questions without responses
     - Generates new questions to replace deleted ones
     - Applies the same filtering options as the generation endpoint
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - CHAPTER_NOT_FOUND (404): Chapter does not exist
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - VALIDATION_FAILED (422): Invalid request parameters
+        - QUESTION_GENERATION_FAILED (500/503): Question regeneration failed
+        - RATE_LIMIT_EXCEEDED (429): Too many requests
     """
+    request_id = generate_request_id()
+
+    # Validate request parameters
+    if request_data.count and (request_data.count < 1 or request_data.count > 50):
+        raise handle_validation_error(
+            field="count",
+            message="Question count must be between 1 and 50",
+            value=request_data.count,
+            request_id=request_id
+        )
+
     # Get the book and verify ownership
     book = await get_book_by_id(book_id)
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise handle_book_not_found(book_id, request_id)
+
     if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to regenerate questions for this book"
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
         )
 
     # Get question service
@@ -2647,14 +2893,27 @@ async def regenerate_chapter_questions(
                 "preserved_count": result.get("preserved_count", 0),
                 "new_count": result.get("new_count", 0),
                 "total_count": result.get("total", 0),
+                "request_id": request_id,
             }
         )
 
         return result
 
+    except ValueError as e:
+        # Handle validation errors from the service
+        raise handle_validation_error(
+            field="chapter_id",
+            message=str(e),
+            value=chapter_id,
+            request_id=request_id
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error regenerating questions: {str(e)}"
+        # Handle all other errors including AI service errors
+        raise handle_question_generation_error(
+            error=e,
+            book_id=book_id,
+            chapter_id=chapter_id,
+            request_id=request_id
         )
 
 
@@ -2790,4 +3049,103 @@ async def generate_chapter_draft(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error generating draft: {str(e)}"
+        )
+
+@router.post(
+    "/{book_id}/chapters/{chapter_id}/questions/responses/batch",
+    response_model=Dict[str, Any]
+)
+async def save_question_responses_batch_endpoint(
+    book_id: str,
+    chapter_id: str,
+    responses: List[Dict[str, Any]] = Body(...),
+    current_user: Dict = Depends(get_current_user),
+):
+    """
+    Save multiple question responses in a single batch operation.
+
+    This endpoint provides efficient batch saving of question responses:
+    - Validates all responses before saving
+    - Uses bulk write operations for better performance
+    - Handles partial failures gracefully
+    - Returns detailed results for each response
+    - Tracks edit history for updates
+    - Auto-calculates word counts
+
+    Request body:
+        responses: Array of objects with:
+            - question_id: The question being answered
+            - response_text: The response content
+            - status: "draft" or "completed" (defaults to "draft")
+
+    Returns:
+        - success: Overall operation success (false if any response failed)
+        - total: Total number of responses provided
+        - saved: Number of responses successfully saved
+        - failed: Number of responses that failed
+        - results: Array of per-response results with success status
+        - errors: Array of error details for failed responses (if any)
+    """
+    # Import the batch save function
+    from app.db.questions import save_question_responses_batch as db_save_batch
+
+    # Get the book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to save responses for this book"
+        )
+
+    # Validate request
+    if not responses:
+        raise HTTPException(
+            status_code=400, detail="No responses provided"
+        )
+
+    if len(responses) > 100:
+        raise HTTPException(
+            status_code=400, detail="Batch size exceeds maximum of 100 responses"
+        )
+
+    try:
+        # Save responses using batch function
+        result = await db_save_batch(
+            responses=responses,
+            user_id=current_user.get("auth_id")
+        )
+
+        # Log batch save operation
+        await audit_request(
+            request=None,
+            current_user=current_user,
+            action="save_question_responses_batch",
+            resource_type="question_responses",
+            target_id=chapter_id,
+            metadata={
+                "book_id": book_id,
+                "chapter_id": chapter_id,
+                "total": result["total"],
+                "saved": result["saved"],
+                "failed": result["failed"],
+                "success": result["success"],
+            }
+        )
+
+        return {
+            "success": result["success"],
+            "total": result["total"],
+            "saved": result["saved"],
+            "failed": result["failed"],
+            "results": result["results"],
+            "errors": result.get("errors"),
+            "message": f"Batch save completed: {result['saved']}/{result['total']} responses saved successfully"
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error saving batch responses: {str(e)}"
         )
