@@ -5,6 +5,7 @@ import { BookProject } from '@/components/BookCard';
 import { ChapterStatus } from '@/types/chapter-tabs';
 // Import only what we use to satisfy linting
 import {
+  Question,
   QuestionResponse,
   QuestionProgressResponse,
   GenerateQuestionsRequest,
@@ -1707,6 +1708,8 @@ export class BookClient {
    * filtering to only include questions that have been answered. The result is formatted
    * as Q&A pairs suitable for passing to the draft generation API.
    *
+   * Uses iterative pagination to fetch all questions regardless of chapter size.
+   *
    * @param bookId - The book ID
    * @param chapterId - The chapter ID
    * @returns Promise resolving to an array of question/answer pairs
@@ -1726,16 +1729,30 @@ export class BookClient {
     completedCount: number;
     inProgressCount: number;
   }> {
-    // Fetch all questions for the chapter (using a high limit to get all)
-    const questionsResponse = await this.getChapterQuestions(bookId, chapterId, { limit: 50 });
-    const questions = questionsResponse.questions;
+    // Fetch all questions using pagination
+    const allQuestions: Question[] = [];
+    const PAGE_SIZE = 50;
+    let currentPage = 1;
+    let totalPages = 1;
+
+    // Iteratively fetch all pages of questions
+    do {
+      const questionsResponse = await this.getChapterQuestions(bookId, chapterId, {
+        page: currentPage,
+        limit: PAGE_SIZE
+      });
+
+      allQuestions.push(...questionsResponse.questions);
+      totalPages = questionsResponse.pages;
+      currentPage++;
+    } while (currentPage <= totalPages);
 
     // Fetch responses for each question that has one
     const qaResponses: Array<{ question: string; answer: string; questionId: string; status: string }> = [];
     let completedCount = 0;
     let inProgressCount = 0;
 
-    for (const question of questions) {
+    for (const question of allQuestions) {
       try {
         const responseData = await this.getQuestionResponse(bookId, chapterId, question.id);
 
@@ -1769,7 +1786,7 @@ export class BookClient {
 
     return {
       responses: qaResponses,
-      totalQuestions: questions.length,
+      totalQuestions: allQuestions.length,
       completedCount,
       inProgressCount
     };
