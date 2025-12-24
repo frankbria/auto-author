@@ -4,8 +4,9 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import ResetPasswordPage from "@/app/auth/reset-password/page";
 
-// Get the mock function - will be accessed in tests
-let mockResetPassword: jest.Mock;
+// Import the mock function directly from the better-auth mock
+import { mockResetPassword } from "../__mocks__/better-auth-react";
+
 const mockPush = jest.fn();
 let mockSearchParams = new Map<string, string>();
 
@@ -24,9 +25,6 @@ jest.mock("next/navigation", () => ({
 describe("ResetPasswordPage", () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    // Get fresh reference to the mock each time
-    const { authClient } = jest.requireMock("@/lib/auth-client");
-    mockResetPassword = authClient.resetPassword;
     mockResetPassword.mockReset();
     mockResetPassword.mockResolvedValue({
       data: {},
@@ -43,9 +41,13 @@ describe("ResetPasswordPage", () => {
   it("renders the reset password form with valid token", () => {
     render(<ResetPasswordPage />);
 
-    expect(screen.getByText(/reset password/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/new password/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/confirm new password/i)).toBeInTheDocument();
+    // Check title - use getAllByText since both title and button have "Reset Password"
+    const resetPasswordElements = screen.getAllByText(/reset password/i);
+    expect(resetPasswordElements.length).toBeGreaterThanOrEqual(2);
+
+    // Check form fields using exact label text
+    expect(screen.getByLabelText("New Password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Confirm New Password")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /reset password/i })).toBeInTheDocument();
   });
 
@@ -86,8 +88,8 @@ describe("ResetPasswordPage", () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<ResetPasswordPage />);
 
-    const passwordInput = screen.getByLabelText(/new password/i);
-    const confirmInput = screen.getByLabelText(/confirm new password/i);
+    const passwordInput = screen.getByLabelText("New Password");
+    const confirmInput = screen.getByLabelText("Confirm New Password");
 
     await user.type(passwordInput, "ValidPass1");
     await user.type(confirmInput, "DifferentPass1");
@@ -106,8 +108,8 @@ describe("ResetPasswordPage", () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<ResetPasswordPage />);
 
-    const passwordInput = screen.getByLabelText(/new password/i);
-    const confirmInput = screen.getByLabelText(/confirm new password/i);
+    const passwordInput = screen.getByLabelText("New Password");
+    const confirmInput = screen.getByLabelText("Confirm New Password");
 
     await user.type(passwordInput, "ValidPass1");
     await user.type(confirmInput, "ValidPass1");
@@ -120,8 +122,8 @@ describe("ResetPasswordPage", () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<ResetPasswordPage />);
 
-    const passwordInput = screen.getByLabelText(/new password/i);
-    const confirmInput = screen.getByLabelText(/confirm new password/i);
+    const passwordInput = screen.getByLabelText("New Password");
+    const confirmInput = screen.getByLabelText("Confirm New Password");
     const submitButton = screen.getByRole("button", { name: /reset password/i });
 
     await user.type(passwordInput, "ValidPass1");
@@ -140,8 +142,8 @@ describe("ResetPasswordPage", () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<ResetPasswordPage />);
 
-    const passwordInput = screen.getByLabelText(/new password/i);
-    const confirmInput = screen.getByLabelText(/confirm new password/i);
+    const passwordInput = screen.getByLabelText("New Password");
+    const confirmInput = screen.getByLabelText("Confirm New Password");
     const submitButton = screen.getByRole("button", { name: /reset password/i });
 
     await user.type(passwordInput, "ValidPass1");
@@ -155,8 +157,8 @@ describe("ResetPasswordPage", () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<ResetPasswordPage />);
 
-    const passwordInput = screen.getByLabelText(/new password/i);
-    const confirmInput = screen.getByLabelText(/confirm new password/i);
+    const passwordInput = screen.getByLabelText("New Password");
+    const confirmInput = screen.getByLabelText("Confirm New Password");
     const submitButton = screen.getByRole("button", { name: /reset password/i });
 
     await user.type(passwordInput, "ValidPass1");
@@ -182,8 +184,8 @@ describe("ResetPasswordPage", () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<ResetPasswordPage />);
 
-    const passwordInput = screen.getByLabelText(/new password/i);
-    const confirmInput = screen.getByLabelText(/confirm new password/i);
+    const passwordInput = screen.getByLabelText("New Password");
+    const confirmInput = screen.getByLabelText("Confirm New Password");
     const submitButton = screen.getByRole("button", { name: /reset password/i });
 
     await user.type(passwordInput, "ValidPass1");
@@ -197,7 +199,7 @@ describe("ResetPasswordPage", () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<ResetPasswordPage />);
 
-    const passwordInput = screen.getByLabelText(/new password/i);
+    const passwordInput = screen.getByLabelText("New Password");
     expect(passwordInput).toHaveAttribute("type", "password");
 
     // Find and click the show password button (first one)
@@ -218,7 +220,7 @@ describe("ResetPasswordPage", () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<ResetPasswordPage />);
 
-    const passwordInput = screen.getByLabelText(/new password/i);
+    const passwordInput = screen.getByLabelText("New Password");
     await user.type(passwordInput, "ValidPass1");
 
     expect(screen.getByText(/password strength/i)).toBeInTheDocument();
