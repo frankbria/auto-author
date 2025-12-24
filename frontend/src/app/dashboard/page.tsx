@@ -29,7 +29,10 @@ export default function Dashboard() {
 
     setIsLoading(true);
     try {
-      // Token is automatically included in requests via better-auth client
+      // Set up token provider for authenticated requests
+      const tokenProvider = async () => session?.session.token || null;
+      bookClient.setTokenProvider(tokenProvider);
+
       const books = await bookClient.getUserBooks();
       setProjects(books);
       setError(null);
@@ -76,7 +79,10 @@ export default function Dashboard() {
   
   const handleDeleteBook = async (bookId: string) => {
     try {
-      // Token is automatically included in requests via better-auth client
+      // Set up token provider for authenticated requests
+      const tokenProvider = async () => session?.session.token || null;
+      bookClient.setTokenProvider(tokenProvider);
+
       await bookClient.deleteBook(bookId);
       toast.success('Book deleted successfully');
 

@@ -187,20 +187,58 @@ async def get_current_user(
             detail=f"Error fetching user: {e}",
         )
 
-    # SECURITY: Require explicit registration - do NOT auto-create users
-    # This prevents unauthorized account creation from stolen/forged JWTs
+    # Auto-create user if they have a valid JWT but no backend record
+    # This happens when users sign up via better-auth but haven't been synced to backend yet
     if not user:
-        logger.warning(
-            f"User {user_id} authenticated with valid JWT but not registered in database. "
-            "This could indicate: (1) User needs to complete registration, or "
-            "(2) Compromised/stolen JWT token for non-existent user."
+        logger.info(
+            f"User {user_id} authenticated with valid JWT but not found in backend. "
+            "Auto-creating user record from JWT claims."
         )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "User account not found. Please complete registration first. "
-                "If you have already registered, please contact support."
+
+        try:
+            from app.db.user import create_user
+            from datetime import datetime, timezone
+
+            # Extract user info from JWT payload
+            email = payload.get("email")
+            name = payload.get("name", "")
+
+            if not email:
+                logger.error(f"JWT payload missing email for user {user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid token: missing email claim. Please sign up again."
+                )
+
+            # Split name into first/last (fallback to email username if no name)
+            name_parts = name.split(" ", 1) if name else [email.split("@")[0]]
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+            # Create user in backend database
+            user_data = {
+                "auth_id": user_id,  # better-auth user ID
+                "email": email,
+                "first_name": first_name,
+                "last_name": last_name,
+                "role": "user",  # Default role
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+                "metadata": {}
+            }
+
+            user = await create_user(user_data)
+            logger.info(f"Successfully created backend user record for {email} (auth_id: {user_id})")
+
+        except HTTPException:
+            # Re-raise HTTP exceptions (like missing email)
+            raise
+        except Exception as e:
+            logger.error(f"Failed to auto-create user {user_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create user account. Please try signing in again or contact support."
             )
-        )
 
     return user
