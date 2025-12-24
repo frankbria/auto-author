@@ -30,7 +30,7 @@ export async function sendPasswordResetEmail({
   const textContent = generatePasswordResetText({ name, resetUrl });
 
   // Development mode: log to console if no provider configured
-  if (!provider || provider === "console" || process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === "development" && (!provider || provider === "console")) {
     console.log("=".repeat(60));
     console.log("PASSWORD RESET EMAIL (Development Mode)");
     console.log("=".repeat(60));
