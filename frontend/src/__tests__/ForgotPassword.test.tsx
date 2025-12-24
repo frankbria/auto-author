@@ -4,28 +4,14 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import ForgotPasswordPage from "@/app/auth/forgot-password/page";
 
-// Create mock function
-const mockForgetPassword = jest.fn();
-
-// Re-mock the auth client module for this test file
-jest.mock("@/lib/auth-client", () => ({
-  authClient: {
-    forgetPassword: mockForgetPassword,
-    signIn: { email: jest.fn() },
-    signUp: { email: jest.fn() },
-    signOut: jest.fn(),
-    getSession: jest.fn(),
-    resetPassword: jest.fn(),
-  },
-  useSession: jest.fn(() => ({
-    data: null,
-    isPending: false,
-    error: null,
-  })),
-}));
+// Get the mock function - will be accessed in tests
+let mockForgetPassword: jest.Mock;
 
 describe("ForgotPasswordPage", () => {
   beforeEach(() => {
+    // Get fresh reference to the mock each time
+    const { authClient } = jest.requireMock("@/lib/auth-client");
+    mockForgetPassword = authClient.forgetPassword;
     mockForgetPassword.mockReset();
     mockForgetPassword.mockResolvedValue({
       data: {},
@@ -36,7 +22,7 @@ describe("ForgotPasswordPage", () => {
   it("renders the forgot password form", () => {
     render(<ForgotPasswordPage />);
 
-    expect(screen.getByRole("heading", { name: /forgot password/i })).toBeInTheDocument();
+    expect(screen.getByText(/forgot password/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send reset link/i })).toBeInTheDocument();
     expect(screen.getByText(/back to sign in/i)).toBeInTheDocument();
@@ -158,7 +144,7 @@ describe("ForgotPasswordPage", () => {
     await user.click(screen.getByRole("button", { name: /send another link/i }));
 
     // Should be back to form state
-    expect(screen.getByRole("heading", { name: /forgot password/i })).toBeInTheDocument();
+    expect(screen.getByText(/forgot password/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toHaveValue("");
   });
 

@@ -495,83 +495,99 @@ jest.mock('@tiptap/extension-character-count', () => {
 });
 
 // Mock better-auth for all tests
-jest.mock('@/lib/auth-client', () => ({
-  useSession: jest.fn(() => ({
-    data: {
-      user: {
-        id: 'test-user-id',
-        email: 'test@example.com',
-        name: 'Test User',
-        image: null,
-      },
-      session: {
-        token: 'test-token',
-        id: 'test-session-id',
-        expiresAt: new Date(Date.now() + 86400000),
-        fresh: true,
-      },
-    },
-    isPending: false,
+jest.mock('@/lib/auth-client', () => {
+  const mockForgetPassword = jest.fn().mockResolvedValue({
+    data: {},
     error: null,
-  })),
-  authClient: {
-    signIn: {
-      email: jest.fn().mockResolvedValue({
-        data: {
-          user: {
-            id: 'test-user-id',
-            email: 'test@example.com',
-            name: 'Test User',
-          },
-          session: {
-            token: 'test-token',
-            id: 'test-session-id',
-          },
-        },
-        error: null,
-      }),
-    },
-    signUp: {
-      email: jest.fn().mockResolvedValue({
-        data: {
-          user: {
-            id: 'test-user-id',
-            email: 'test@example.com',
-            name: 'Test User',
-          },
-          session: {
-            token: 'test-token',
-            id: 'test-session-id',
-          },
-        },
-        error: null,
-      }),
-    },
-    signOut: jest.fn().mockResolvedValue({
-      data: {},
-      error: null,
-    }),
-    getSession: jest.fn().mockResolvedValue({
+  });
+  const mockResetPassword = jest.fn().mockResolvedValue({
+    data: {},
+    error: null,
+  });
+
+  return {
+    useSession: jest.fn(() => ({
       data: {
         user: {
           id: 'test-user-id',
           email: 'test@example.com',
           name: 'Test User',
+          image: null,
         },
         session: {
           token: 'test-token',
           id: 'test-session-id',
+          expiresAt: new Date(Date.now() + 86400000),
+          fresh: true,
         },
       },
+      isPending: false,
       error: null,
-    }),
-    forgetPassword: jest.fn().mockResolvedValue({
-      data: {},
-      error: null,
-    }),
-    resetPassword: jest.fn().mockResolvedValue({
-      data: {},
-      error: null,
-    }),
-  },
-}));
+    })),
+    authClient: {
+      signIn: {
+        email: jest.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'test-user-id',
+              email: 'test@example.com',
+              name: 'Test User',
+            },
+            session: {
+              token: 'test-token',
+              id: 'test-session-id',
+            },
+          },
+          error: null,
+        }),
+      },
+      signUp: {
+        email: jest.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'test-user-id',
+              email: 'test@example.com',
+              name: 'Test User',
+            },
+            session: {
+              token: 'test-token',
+              id: 'test-session-id',
+            },
+          },
+          error: null,
+        }),
+      },
+      signOut: jest.fn().mockResolvedValue({
+        data: {},
+        error: null,
+      }),
+      getSession: jest.fn().mockResolvedValue({
+        data: {
+          user: {
+            id: 'test-user-id',
+            email: 'test@example.com',
+            name: 'Test User',
+          },
+          session: {
+            token: 'test-token',
+            id: 'test-session-id',
+          },
+        },
+        error: null,
+      }),
+      forgetPassword: mockForgetPassword,
+      resetPassword: mockResetPassword,
+    },
+    // Direct exports for password reset methods
+    forgetPassword: mockForgetPassword,
+    resetPassword: mockResetPassword,
+    // Re-export auth methods that match the module exports
+    signIn: {
+      email: jest.fn().mockResolvedValue({ data: {}, error: null }),
+    },
+    signUp: {
+      email: jest.fn().mockResolvedValue({ data: {}, error: null }),
+    },
+    signOut: jest.fn().mockResolvedValue({ data: {}, error: null }),
+  };
+});

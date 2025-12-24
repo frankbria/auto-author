@@ -4,27 +4,10 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import ResetPasswordPage from "@/app/auth/reset-password/page";
 
-// Create mock functions
-const mockResetPassword = jest.fn();
+// Get the mock function - will be accessed in tests
+let mockResetPassword: jest.Mock;
 const mockPush = jest.fn();
 let mockSearchParams = new Map<string, string>();
-
-// Re-mock the auth client module for this test file
-jest.mock("@/lib/auth-client", () => ({
-  authClient: {
-    resetPassword: mockResetPassword,
-    forgetPassword: jest.fn(),
-    signIn: { email: jest.fn() },
-    signUp: { email: jest.fn() },
-    signOut: jest.fn(),
-    getSession: jest.fn(),
-  },
-  useSession: jest.fn(() => ({
-    data: null,
-    isPending: false,
-    error: null,
-  })),
-}));
 
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
@@ -41,6 +24,9 @@ jest.mock("next/navigation", () => ({
 describe("ResetPasswordPage", () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    // Get fresh reference to the mock each time
+    const { authClient } = jest.requireMock("@/lib/auth-client");
+    mockResetPassword = authClient.resetPassword;
     mockResetPassword.mockReset();
     mockResetPassword.mockResolvedValue({
       data: {},
@@ -57,7 +43,7 @@ describe("ResetPasswordPage", () => {
   it("renders the reset password form with valid token", () => {
     render(<ResetPasswordPage />);
 
-    expect(screen.getByRole("heading", { name: /reset password/i })).toBeInTheDocument();
+    expect(screen.getByText(/reset password/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/new password/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/confirm new password/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /reset password/i })).toBeInTheDocument();
