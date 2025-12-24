@@ -92,7 +92,7 @@ The deployment workflow automatically creates the following files on the server:
 ### Backend: `/opt/auto-author/current/backend/.env`
 ```bash
 # Database
-DATABASE_URI=<from MONGODB_URI secret>
+DATABASE_URL=<from MONGODB_URI secret>
 DATABASE_NAME=<from DATABASE_NAME secret>
 
 # CORS Settings

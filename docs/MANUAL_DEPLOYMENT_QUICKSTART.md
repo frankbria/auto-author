@@ -41,7 +41,7 @@ This loads:
 - FRONTEND_URL
 - CLERK_PUBLISHABLE_KEY
 - CLERK_SECRET_KEY
-- DATABASE_URI
+- DATABASE_URL
 - DATABASE_NAME
 - OPENAI_API_KEY
 - CLERK_WEBHOOK_SECRET
@@ -283,7 +283,7 @@ export CLERK_SECRET_KEY=sk_test_...
 export CLERK_WEBHOOK_SECRET=whsec_...  # Optional
 
 # Database (MongoDB)
-export DATABASE_URI=mongodb+srv://...
+export DATABASE_URL=mongodb+srv://...
 export DATABASE_NAME=auto_author_staging
 
 # OpenAI

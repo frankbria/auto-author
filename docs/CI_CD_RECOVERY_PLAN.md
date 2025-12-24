@@ -366,7 +366,7 @@ CLERK_SECRET_KEY=sk_test_...
 CLERK_WEBHOOK_SECRET=whsec_...
 
 # Database
-DATABASE_URI=mongodb://localhost:27017
+DATABASE_URL=mongodb://localhost:27017
 DATABASE_NAME=auto_author_staging
 
 # OpenAI
@@ -394,7 +394,7 @@ export API_URL=https://api.dev.autoauthor.app
 export FRONTEND_URL=https://dev.autoauthor.app
 export CLERK_PUBLISHABLE_KEY=pk_test_...
 export CLERK_SECRET_KEY=sk_test_...
-export DATABASE_URI=mongodb://localhost:27017
+export DATABASE_URL=mongodb://localhost:27017
 export DATABASE_NAME=auto_author_staging
 export OPENAI_API_KEY=sk-...
 export CLERK_WEBHOOK_SECRET=whsec_...
@@ -450,7 +450,7 @@ The `scripts/deploy.sh` script (restored in commit f11798a) performs:
 echo "==> Creating backend .env file..."
 {
     echo "ENVIRONMENT=staging"
-    echo "DATABASE_URI=$DATABASE_URI"
+    echo "DATABASE_URL=$DATABASE_URL"
     echo "DATABASE_NAME=$DATABASE_NAME"
     echo "OPENAI_AUTOAUTHOR_API_KEY=$OPENAI_API_KEY"
     echo "CLERK_API_KEY=$CLERK_SECRET_KEY"
@@ -816,7 +816,7 @@ jobs:
         if: steps.changes.outputs.backend == 'true'
         working-directory: backend
         env:
-          DATABASE_URI: mongodb://localhost:27017
+          DATABASE_URL: mongodb://localhost:27017
           DATABASE_NAME: autoauthor_test
           OPENAI_AUTOAUTHOR_API_KEY: test-key-mock
           CLERK_API_KEY: test-key-mock
@@ -913,7 +913,7 @@ jobs:
              export FRONTEND_URL='${{ secrets.FRONTEND_URL }}' && \
              export CLERK_PUBLISHABLE_KEY='${{ secrets.CLERK_PUBLISHABLE_KEY }}' && \
              export CLERK_SECRET_KEY='${{ secrets.CLERK_SECRET_KEY }}' && \
-             export DATABASE_URI='${{ secrets.DATABASE_URI }}' && \
+             export DATABASE_URL='${{ secrets.DATABASE_URL }}' && \
              export DATABASE_NAME='${{ secrets.DATABASE_NAME }}' && \
              export OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}' && \
              export CLERK_WEBHOOK_SECRET='${{ secrets.CLERK_WEBHOOK_SECRET }}' && \
@@ -1038,7 +1038,7 @@ jobs:
 
           pytest tests/ -m "e2e or openai" -v --tb=short
         env:
-          DATABASE_URI: mongodb://localhost:27017
+          DATABASE_URL: mongodb://localhost:27017
           DATABASE_NAME: autoauthor_e2e_test
           OPENAI_AUTOAUTHOR_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CLERK_API_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -1190,7 +1190,7 @@ main (stable production)
 - [ ] `CLERK_PUBLISHABLE_KEY` - pk_test_...
 - [ ] `CLERK_SECRET_KEY` - sk_test_...
 - [ ] `CLERK_WEBHOOK_SECRET` - whsec_...
-- [ ] `DATABASE_URI` - MongoDB connection string
+- [ ] `DATABASE_URL` - MongoDB connection string
 - [ ] `DATABASE_NAME` - auto_author_staging
 - [ ] `OPENAI_API_KEY` - sk-...
 - [ ] `TEST_USER_EMAIL` - Test user for E2E

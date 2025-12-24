@@ -28,7 +28,7 @@ Complete deployment script that includes:
 - Backend `.env` file creation with all required variables:
   ```bash
   ENVIRONMENT=staging
-  DATABASE_URI=$DATABASE_URI
+  DATABASE_URL=$DATABASE_URL
   DATABASE_NAME=$DATABASE_NAME
   OPENAI_AUTOAUTHOR_API_KEY=$OPENAI_API_KEY
   CLERK_API_KEY=$CLERK_SECRET_KEY
@@ -52,7 +52,7 @@ Updated to pass all required secrets to the deploy script:
 - FRONTEND_URL
 - CLERK_PUBLISHABLE_KEY
 - CLERK_SECRET_KEY
-- DATABASE_URI
+- DATABASE_URL
 - DATABASE_NAME
 - OPENAI_API_KEY
 - CLERK_WEBHOOK_SECRET

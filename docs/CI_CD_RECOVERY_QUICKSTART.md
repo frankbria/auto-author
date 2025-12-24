@@ -138,7 +138,7 @@ CLERK_SECRET_KEY=sk_test_...
 CLERK_WEBHOOK_SECRET=whsec_...
 
 # Database
-DATABASE_URI=mongodb://localhost:27017
+DATABASE_URL=mongodb://localhost:27017
 DATABASE_NAME=auto_author_staging
 
 # OpenAI
@@ -163,7 +163,7 @@ export API_URL=https://api.dev.autoauthor.app
 export FRONTEND_URL=https://dev.autoauthor.app
 export CLERK_PUBLISHABLE_KEY=<your-key>
 export CLERK_SECRET_KEY=<your-key>
-export DATABASE_URI=mongodb://localhost:27017
+export DATABASE_URL=mongodb://localhost:27017
 export DATABASE_NAME=auto_author_staging
 export OPENAI_API_KEY=<your-key>
 export CLERK_WEBHOOK_SECRET=<your-secret>

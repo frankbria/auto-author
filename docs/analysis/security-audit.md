@@ -88,8 +88,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_cors_for_production(cls, v, info):
         """Ensure production CORS origins are configured when not in development"""
-        # If DATABASE_URI contains production MongoDB Atlas URL, enforce production CORS
-        db_uri = info.data.get('DATABASE_URI', '')
+        # If DATABASE_URL contains production MongoDB Atlas URL, enforce production CORS
+        db_uri = info.data.get('DATABASE_URL', '')
         if 'mongodb+srv' in db_uri or 'mongodb.net' in db_uri:
             # Production database detected
             if not any('dev.autoauthor.app' in origin or 'autoauthor.app' in origin for origin in v):
@@ -1624,7 +1624,7 @@ user = await users_collection.find_one({"email": email})
 ### Environment Variables ✅
 **Backend** (`backend/.env.example`):
 ```bash
-DATABASE_URI=mongodb://localhost:27017
+DATABASE_URL=mongodb://localhost:27017
 OPENAI_AUTOAUTHOR_API_KEY=sk-your-openai-api-key-here
 CLERK_API_KEY=sk_test_your_clerk_api_key_here
 CLERK_SECRET_KEY=sk_your_clerk_secret_key_here

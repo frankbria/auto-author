@@ -76,7 +76,7 @@ Split `books.py` into domain-specific routers:
 **Evidence:**
 ```python
 # backend/app/db/base.py
-_client = AsyncIOMotorClient(settings.DATABASE_URI)  # No pooling config
+_client = AsyncIOMotorClient(settings.DATABASE_URL)  # No pooling config
 _db = _client[settings.DATABASE_NAME]
 ```
 
@@ -92,7 +92,7 @@ _db = _client[settings.DATABASE_NAME]
 **Recommendation:**
 ```python
 _client = AsyncIOMotorClient(
-    settings.DATABASE_URI,
+    settings.DATABASE_URL,
     maxPoolSize=50,          # Limit per instance
     minPoolSize=10,          # Keep warm connections
     maxIdleTimeMS=45000,     # 45s idle timeout

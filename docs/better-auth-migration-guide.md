@@ -233,7 +233,7 @@ if not user:
 #### Backend (.env)
 ```bash
 # Database
-DATABASE_URI=mongodb://localhost:27017
+DATABASE_URL=mongodb://localhost:27017
 DATABASE_NAME=auto_author
 
 # Better-Auth (REQUIRED)

@@ -909,7 +909,7 @@ jobs:
         if: steps.changes.outputs.backend == 'true'
         working-directory: backend
         env:
-          DATABASE_URI: mongodb://localhost:27017
+          DATABASE_URL: mongodb://localhost:27017
           DATABASE_NAME: autoauthor_test
           OPENAI_AUTOAUTHOR_API_KEY: test-key
           CLERK_API_KEY: test-key
@@ -997,7 +997,7 @@ jobs:
              export FRONTEND_URL='${{ secrets.FRONTEND_URL }}' && \
              export CLERK_PUBLISHABLE_KEY='${{ secrets.CLERK_PUBLISHABLE_KEY }}' && \
              export CLERK_SECRET_KEY='${{ secrets.CLERK_SECRET_KEY }}' && \
-             export DATABASE_URI='${{ secrets.DATABASE_URI }}' && \
+             export DATABASE_URL='${{ secrets.DATABASE_URL }}' && \
              export DATABASE_NAME='${{ secrets.DATABASE_NAME }}' && \
              export OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}' && \
              export CLERK_WEBHOOK_SECRET='${{ secrets.CLERK_WEBHOOK_SECRET }}' && \
@@ -1136,7 +1136,7 @@ jobs:
             tests/test_api/test_routes/test_toc_generation.py::test_toc_generation_workflow_e2e \
             -v --tb=short
         env:
-          DATABASE_URI: mongodb://localhost:27017
+          DATABASE_URL: mongodb://localhost:27017
           DATABASE_NAME: autoauthor_e2e_test
           OPENAI_AUTOAUTHOR_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CLERK_API_KEY: ${{ secrets.CLERK_SECRET_KEY }}

@@ -128,13 +128,13 @@ async def create_unique_constraints(self):
 
 **Current Code:**
 ```python
-_client = AsyncIOMotorClient(settings.DATABASE_URI)  # Uses defaults
+_client = AsyncIOMotorClient(settings.DATABASE_URL)  # Uses defaults
 ```
 
 **Recommendation:**
 ```python
 _client = AsyncIOMotorClient(
-    settings.DATABASE_URI,
+    settings.DATABASE_URL,
     maxPoolSize=50,           # Max concurrent connections
     minPoolSize=10,           # Keep warm connections
     maxIdleTimeMS=45000,      # Close idle connections after 45s
@@ -691,7 +691,7 @@ books_collection.find({...}).max_time_ms(5000)  # 5 second timeout
 
 # Add to config
 _client = AsyncIOMotorClient(
-    settings.DATABASE_URI,
+    settings.DATABASE_URL,
     socketTimeoutMS=60000,  # Overall query timeout
     maxTimeMS=30000,        # Max execution time for operations
 )
@@ -1156,7 +1156,7 @@ Benefits:
    ```python
    # backend/app/db/base.py
    _client = AsyncIOMotorClient(
-       settings.DATABASE_URI,
+       settings.DATABASE_URL,
        maxPoolSize=50,
        minPoolSize=10,
        serverSelectionTimeoutMS=5000,

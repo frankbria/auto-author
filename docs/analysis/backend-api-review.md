@@ -659,7 +659,7 @@ app.add_middleware(
 2. **Add Connection Pool Limits** (2-3 hours)
    ```python
    motor_client = AsyncIOMotorClient(
-       settings.DATABASE_URI,
+       settings.DATABASE_URL,
        maxPoolSize=50,
        minPoolSize=10
    )

@@ -117,7 +117,7 @@ curl -I -X OPTIONS \
 
 #### GAP-CRIT-003: MongoDB Connection Pool Not Configured
 - **Category:** Database / Scalability
-- **Current State:** `AsyncIOMotorClient(settings.DATABASE_URI)` with no pool config
+- **Current State:** `AsyncIOMotorClient(settings.DATABASE_URL)` with no pool config
 - **Required State:** Connection pool with limits (maxPoolSize=50, minPoolSize=10)
 - **Impact:**
   - Connection exhaustion at ~500 concurrent users

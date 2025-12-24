@@ -11,14 +11,14 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv("d:\\Projects\\auto-author\\backend\\.env")
 
-DATABASE_URI = os.getenv("DATABASE_URI")
+DATABASE_URL = os.getenv("DATABASE_URL")
 DATABASE_NAME = os.getenv("DATABASE_NAME")
 
 
 def get_books_from_db():
     """Get books directly from database to find real book IDs"""
     try:
-        client = MongoClient(DATABASE_URI)
+        client = MongoClient(DATABASE_URL)
         db = client[DATABASE_NAME]
         books = list(db["books"].find({}, {"_id": 1, "title": 1}).limit(5))
         client.close()

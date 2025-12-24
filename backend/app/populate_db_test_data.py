@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 # Load environment variables from .env file
 load_dotenv(os.path.join(os.path.dirname(__file__), "../.env"))
 
-DATABASE_URI = os.getenv("DATABASE_URI")
+DATABASE_URL = os.getenv("DATABASE_URL")
 DATABASE_NAME = os.getenv("DATABASE_NAME")
 
 FAKE_USER_EMAIL = "frank.bria@gmail.com"
@@ -77,10 +77,10 @@ def create_fake_books(db, user):
 
 
 def main():
-    if not DATABASE_URI or not DATABASE_NAME:
-        print("DATABASE_URI or DATABASE_NAME not set in environment.")
+    if not DATABASE_URL or not DATABASE_NAME:
+        print("DATABASE_URL or DATABASE_NAME not set in environment.")
         return
-    client = MongoClient(DATABASE_URI)
+    client = MongoClient(DATABASE_URL)
     db = client[DATABASE_NAME]
     user = get_or_create_user(db)
     create_fake_books(db, user)

@@ -4,7 +4,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bson.objectid import ObjectId
 from app.core.config import settings
 
-_client = AsyncIOMotorClient(settings.DATABASE_URI)
+_client = AsyncIOMotorClient(settings.DATABASE_URL)
 _db = _client[settings.DATABASE_NAME]
 
 users_collection = _db.get_collection("users")

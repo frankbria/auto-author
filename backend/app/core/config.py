@@ -5,10 +5,7 @@ import os
 
 
 class Settings(BaseSettings):
-    DATABASE_URI: str = Field(
-        default="mongodb://localhost:27017",
-        validation_alias="MONGODB_URL"  # Accept both DATABASE_URI and MONGODB_URL from env
-    )
+    DATABASE_URL: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "auto_author_test"
     OPENAI_AUTOAUTHOR_API_KEY: str = "test-key"  # Default for testing
 

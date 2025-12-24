@@ -186,7 +186,7 @@ jobs:
           echo "==> Creating backend .env file..."
           {
             echo "# Database"
-            echo "DATABASE_URI=${{ secrets.MONGODB_URI }}"
+            echo "DATABASE_URL=${{ secrets.MONGODB_URI }}"
             echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}"
             echo ""
             echo "# CORS Settings"

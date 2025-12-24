@@ -46,7 +46,7 @@ export API_URL='https://api.dev.autoauthor.app'
 export FRONTEND_URL='https://dev.autoauthor.app'
 export CLERK_PUBLISHABLE_KEY='pk_...'
 export CLERK_SECRET_KEY='sk_...'
-export DATABASE_URI='mongodb://...'
+export DATABASE_URL='mongodb://...'
 export DATABASE_NAME='auto_author_staging'
 export OPENAI_API_KEY='sk-...'
 
@@ -73,7 +73,7 @@ ssh user@dev.autoauthor.app "
   export FRONTEND_URL='https://dev.autoauthor.app' && \
   export CLERK_PUBLISHABLE_KEY='pk_...' && \
   export CLERK_SECRET_KEY='sk_...' && \
-  export DATABASE_URI='mongodb://...' && \
+  export DATABASE_URL='mongodb://...' && \
   export DATABASE_NAME='auto_author_staging' && \
   export OPENAI_API_KEY='sk-...' && \
   bash /opt/auto-author/releases/$RELEASE_ID/scripts/deploy.sh /opt/auto-author/releases/$RELEASE_ID
@@ -132,7 +132,7 @@ For manual deployments, you need these variables:
 ```bash
 API_URL='https://api.dev.autoauthor.app'
 FRONTEND_URL='https://dev.autoauthor.app'
-DATABASE_URI='mongodb://...'
+DATABASE_URL='mongodb://...'
 DATABASE_NAME='auto_author_staging'
 OPENAI_API_KEY='sk-...'
 ```
