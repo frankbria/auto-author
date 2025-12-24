@@ -269,24 +269,6 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
 
 
 @pytest.fixture
-def mock_jwt_token():
-    """
-    Fixture to provide a mock JWT token for testing.
-    This token is not valid and should not be used in production.
-    """
-    return "mock.jwt.token"
-
-
-@pytest.fixture
-def invalid_jwt_token():
-    """
-    Fixture to provide an invalid JWT token for testing.
-    This token is intentionally malformed and should not be used in production.
-    """
-    return "invalid.jwt_token"
-
-
-@pytest.fixture
 def test_book(test_user):
     """
     Fixture to provide a test book object.
