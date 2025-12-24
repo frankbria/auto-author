@@ -16,14 +16,13 @@ jest.mock('@/lib/auth-client', () => ({
 }));
 
 describe('useAuthFetch Hook', () => {
-  const mockToken = 'test_token_123';
   const mockFetchResponse = { data: 'test data' };
   const mockUrl = '/test'; // This path will be appended to baseUrl in the hook
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Mock the useSession hook to return a session with token
+    // Mock the useSession hook to return a session with user
     (useSession as jest.Mock).mockReturnValue({
       data: {
         user: {
@@ -32,7 +31,6 @@ describe('useAuthFetch Hook', () => {
           name: 'Test User',
         },
         session: {
-          token: mockToken,
           id: 'session-123',
         },
       },
@@ -49,67 +47,84 @@ describe('useAuthFetch Hook', () => {
       }),
     });
   });
-  test('includes auth token in request headers when authenticated', async () => {
+
+  test('includes credentials: include for cookie-based authentication', async () => {
     const { result } = renderHook(() => useAuthFetch());
-    
+
     // Call the authFetch method
     let responseData;
     await act(async () => {
       responseData = await result.current.authFetch(mockUrl);
     });
-      // Verify that fetch was called with the auth token and correct URL
+
+    // Verify that fetch was called with credentials: 'include' for cookie-based auth
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/test', // The hook prepends '/api' to the path
       expect.objectContaining({
+        credentials: 'include', // For cookie-based authentication
         headers: expect.objectContaining({
-          'Authorization': `Bearer ${mockToken}`,
+          'Content-Type': 'application/json',
         }),
       })
     );
-    
+
     // Verify the response data
     expect(responseData).toEqual(mockFetchResponse);
   });
 
+  test('uses credentials: omit when skipAuth is true', async () => {
+    const { result } = renderHook(() => useAuthFetch());
+
+    await act(async () => {
+      await result.current.authFetch(mockUrl, { skipAuth: true });
+    });
+
+    // Verify that fetch was called with credentials: 'omit' when skipAuth is true
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/test',
+      expect.objectContaining({
+        credentials: 'omit',
+      })
+    );
+  });
+
   test('persists authentication across multiple requests', async () => {
     const { result } = renderHook(() => useAuthFetch());
-    
+
     // First request
     await act(async () => {
       await result.current.authFetch('/api/first');
     });
-    
+
     // Second request with different URL
     await act(async () => {
       await result.current.authFetch('/api/second');
     });
-    
-    // Both requests should include the same auth token
+
+    // Both requests should use credentials: 'include' for cookie auth
     const calls = (global.fetch as jest.Mock).mock.calls;
     expect(calls.length).toBe(2);
-    
-    // First call headers
-    expect(calls[0][1].headers).toHaveProperty('Authorization', `Bearer ${mockToken}`);
-    
-    // Second call headers
-    expect(calls[1][1].headers).toHaveProperty('Authorization', `Bearer ${mockToken}`);
 
-    // The session should be used for both requests (better-auth uses session tokens)
+    // Both calls should have credentials: 'include'
+    expect(calls[0][1].credentials).toBe('include');
+    expect(calls[1][1].credentials).toBe('include');
+
+    // The session should be checked (to determine isAuthenticated status)
     expect(useSession).toHaveBeenCalled();
   });
 
   test('handles 401 unauthorized errors and allows retry', async () => {
-    // Note: This tests error handling for 401 responses, not actual token refresh.
-    // In better-auth, token refresh is handled automatically by the auth client at a different layer,
-    // not by the useAuthFetch hook. This test verifies that 401 errors are properly surfaced
-    // so the application can handle them (e.g., by triggering a re-authentication flow).
+    // Note: This tests error handling for 401 responses.
+    // In cookie-based auth, session refresh is handled automatically by better-auth,
+    // but 401 errors are still surfaced so the application can handle them
+    // (e.g., by redirecting to login page).
 
     // Mock fetch to first return unauthorized, then success on retry
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
         ok: false,
         status: 401,
-        json: jest.fn().mockResolvedValue({ detail: 'Token expired' }),
+        json: jest.fn().mockResolvedValue({ detail: 'Session expired' }),
         headers: new Headers({
           'content-type': 'application/json',
         }),
@@ -130,12 +145,71 @@ describe('useAuthFetch Hook', () => {
       } catch (error) {
         // Expected to throw on the first attempt with 401 error
         const err = error as Error;
-        expect(err.message).toContain('Token expired');
+        expect(err.message).toContain('Session expired');
 
-        // Manual retry after handling the 401 (e.g., after user re-authenticates)
+        // Manual retry after handling the 401 (e.g., after session refresh)
         const secondResponse = await result.current.authFetch(mockUrl);
         expect(secondResponse).toEqual(mockFetchResponse);
       }
     });
+  });
+
+  test('returns isAuthenticated based on session state', async () => {
+    // With valid session
+    const { result: resultWithSession } = renderHook(() => useAuthFetch());
+    expect(resultWithSession.current.isAuthenticated).toBe(true);
+
+    // Without session
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: false,
+      error: null,
+    });
+
+    const { result: resultWithoutSession } = renderHook(() => useAuthFetch());
+    expect(resultWithoutSession.current.isAuthenticated).toBe(false);
+  });
+
+  test('handles non-JSON responses', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      text: jest.fn().mockResolvedValue('plain text response'),
+      headers: new Headers({
+        'content-type': 'text/plain',
+      }),
+    });
+
+    const { result } = renderHook(() => useAuthFetch());
+
+    let responseData;
+    await act(async () => {
+      responseData = await result.current.authFetch(mockUrl);
+    });
+
+    expect(responseData).toBe('plain text response');
+  });
+
+  test('sets error state on failure', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: jest.fn().mockResolvedValue({ detail: 'Internal server error' }),
+      headers: new Headers({
+        'content-type': 'application/json',
+      }),
+    });
+
+    const { result } = renderHook(() => useAuthFetch());
+
+    await act(async () => {
+      try {
+        await result.current.authFetch(mockUrl);
+      } catch (error) {
+        // Expected to throw
+      }
+    });
+
+    expect(result.current.error).toBeTruthy();
+    expect(result.current.error?.message).toContain('Internal server error');
   });
 });

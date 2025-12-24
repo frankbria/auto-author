@@ -18,8 +18,11 @@ from app.core.security import (
     verify_password,
     verify_jwt_token,
     RoleChecker,
+    SessionRoleChecker,
     get_current_user,
+    get_current_user_from_session,
     optional_security,
+    optional_session_security,
 )
 
 

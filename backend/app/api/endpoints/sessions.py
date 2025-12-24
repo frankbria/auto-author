@@ -5,7 +5,7 @@ Session management API endpoints
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from typing import List, Dict, Any
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user_from_session
 from app.models.session import SessionResponse
 from app.services.session_service import (
     get_session_status,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 @router.get("/current", response_model=Dict[str, Any])
 async def get_current_session_status(
     request: Request,
-    current_user: Dict = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user_from_session)
 ):
     """Get current session status
 
@@ -55,7 +55,7 @@ async def get_current_session_status(
 @router.post("/refresh", response_model=Dict[str, Any])
 async def refresh_current_session(
     request: Request,
-    current_user: Dict = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user_from_session)
 ):
     """Refresh the current session's expiry time
 
@@ -87,7 +87,7 @@ async def refresh_current_session(
 @router.post("/logout")
 async def logout_current_session(
     request: Request,
-    current_user: Dict = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user_from_session)
 ):
     """Logout from the current session
 
@@ -112,7 +112,7 @@ async def logout_current_session(
 @router.post("/logout-all")
 async def logout_all_sessions(
     request: Request,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     keep_current: bool = True
 ):
     """Logout from all sessions
@@ -140,7 +140,7 @@ async def logout_all_sessions(
 
 @router.get("/list", response_model=List[SessionResponse])
 async def list_user_sessions(
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     active_only: bool = False,
     limit: int = 10
 ):
@@ -175,7 +175,7 @@ async def list_user_sessions(
 @router.delete("/{session_id}")
 async def delete_session(
     session_id: str,
-    current_user: Dict = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user_from_session)
 ):
     """Delete a specific session
 

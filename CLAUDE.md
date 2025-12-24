@@ -30,6 +30,26 @@
 
 ## Recent Changes
 
+### 2025-12-24
+- **Cookie-Based Authentication Reconciliation**: Aligned backend auth with better-auth's cookie-based session management
+  - **Problem**: Backend expected JWT tokens in Authorization headers, but better-auth uses httpOnly session cookies
+  - **Solution**: Created new session validation module to read and validate better-auth session cookies
+  - **Changes**:
+    - New module: `backend/app/core/better_auth_session.py` for session cookie validation
+    - New dependency: `get_current_user_from_session()` replaces JWT-based authentication
+    - New role checker: `SessionRoleChecker` for cookie-based authorization
+    - Updated all 25+ protected endpoints to use session-based auth
+    - Frontend: Removed Bearer token logic, uses `credentials: 'include'` for cookies
+  - **Files Modified**:
+    - `backend/app/core/security.py` - Added session-based auth functions
+    - `backend/app/core/better_auth_session.py` - New session validator
+    - `backend/app/api/endpoints/*.py` - Updated all endpoints
+    - `frontend/src/hooks/useAuthFetch.ts` - Cookie-based fetch
+    - `frontend/src/lib/api/bookClient.ts` - Deprecated token methods
+  - **Test Updates**: All test fixtures updated to mock session-based auth
+  - **Documentation**: Updated migration guide with cookie-based auth section
+  - **Status**: ✅ Complete - Backend now validates session cookies from better-auth
+
 ### 2025-12-17
 - **Better-Auth Migration**: Complete migration from Clerk to better-auth authentication
   - **Scope**: 70+ files across frontend (Next.js) and backend (FastAPI)

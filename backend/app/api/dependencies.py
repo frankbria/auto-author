@@ -6,6 +6,8 @@ import re
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 
+# Note: verify_jwt_token is kept for backward compatibility but deprecated
+# Authentication is now handled via session cookies in get_current_user_from_session
 from app.core.security import verify_jwt_token
 from app.db.database import get_collection
 from app.db.database import create_audit_log
@@ -189,7 +191,7 @@ async def rate_limit(
 
 
 async def audit_request(
-    request: Request,
+    request: Optional[Request],
     current_user: Dict,
     action: str,
     resource_type: str,
@@ -197,55 +199,46 @@ async def audit_request(
     metadata: Optional[Dict] = None,
 ) -> Dict[str, Any]:
     """
-    Log an audit entry for the current request and validate authentication
+    Log an audit entry for the current request.
+
+    Note: Authentication is handled by get_current_user_from_session via session cookies.
+    This function trusts that current_user has already been authenticated.
 
     Args:
-        request: The FastAPI request object
-        current_user: The authenticated user making the request
+        request: The FastAPI request object (may be None in some contexts)
+        current_user: The authenticated user making the request (already validated)
         action: The action being performed (e.g., "create", "update", "delete")
         resource_type: The type of resource being accessed (e.g., "user", "book")
         target_id: The ID of the resource being accessed (if applicable)
         metadata: Optional dictionary of additional metadata to include in the audit log
 
     Returns:
-        User payload from JWT token
-
-    Raises:
-        HTTPException: If authentication fails (missing or invalid token)
+        User payload dictionary with sub and email fields
     """
-    # Check if auth bypass is enabled (uses module-level import)
-    if not settings.BYPASS_AUTH:
-        # Validate authorization header
-        auth_header = request.headers.get("authorization", "")
+    # Create user payload from current_user (already authenticated via session)
+    user_payload = {
+        "sub": current_user.get("auth_id") or current_user.get("clerk_id") or current_user.get("id"),
+        "email": current_user.get("email", "")
+    }
 
-        if not auth_header:
-            raise HTTPException(
-                status_code=401,
-                detail="Authorization header missing"
-            )
-
-        # Verify Bearer token format
-        if not auth_header.startswith("Bearer "):
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid authorization header format. Expected 'Bearer <token>'"
-            )
-
-        # Extract token and verify it (uses module-level import)
-        token = auth_header.split(" ", 1)[1]
-        user_payload = await verify_jwt_token(token)
+    # Extract request details (request may be None in some contexts)
+    if request is not None:
+        method = request.method
+        path = request.url.path
+        client = getattr(request, "client", None)
+        ip_address = getattr(client, "host", None) if client else None
+        user_agent = request.headers.get("user-agent", "")
+        request_id = (
+            str(getattr(request.state, "request_id", None))
+            if hasattr(request, "state")
+            else None
+        )
     else:
-        # BYPASS_AUTH enabled - create payload from current_user
-        user_payload = {
-            "sub": current_user.get("auth_id") or current_user.get("clerk_id") or current_user.get("id"),
-            "email": current_user.get("email", "")
-        }
-
-    # Extract request details
-    method = request.method
-    path = request.url.path
-    ip_address = request.client.host
-    user_agent = request.headers.get("user-agent", "")
+        method = None
+        path = None
+        ip_address = None
+        user_agent = ""
+        request_id = None
 
     # Build details dictionary with request info
     details = {
@@ -253,11 +246,7 @@ async def audit_request(
         "path": path,
         "ip_address": ip_address,
         "user_agent": user_agent,
-        "request_id": (
-            str(request.state.request_id)
-            if hasattr(request.state, "request_id")
-            else None
-        ),
+        "request_id": request_id,
     }
 
     # Merge in any additional metadata

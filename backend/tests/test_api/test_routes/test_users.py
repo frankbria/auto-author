@@ -24,48 +24,49 @@ async def test_read_users_me(auth_client_factory, test_user):
     assert data["auth_id"] == test_user["auth_id"]
 
 
-def test_missing_token(client, monkeypatch):
+def test_missing_session_cookie(client, monkeypatch):
     """
-    Test that the /users/me endpoint returns a 401 error when no token is provided
+    Test that the /users/me endpoint returns a 401 error when no session cookie is provided.
+
+    With cookie-based authentication (better-auth), authentication is via httpOnly session cookies.
+    When no valid session cookie is present, the endpoint returns 401 Unauthorized.
     """
-    # CRITICAL: Disable BYPASS_AUTH to test actual token verification
+    # CRITICAL: Disable BYPASS_AUTH to test actual session verification
     from app.core.config import settings
     monkeypatch.setattr(settings, "BYPASS_AUTH", False)
 
     response = client.get("/api/v1/users/me")
 
-    # Should return 401 Unauthorized when no authentication is provided
+    # Should return 401 Unauthorized when no session cookie is provided
     assert response.status_code == 401
     assert "detail" in response.json()
-    assert "missing authentication credentials" in response.json()["detail"].lower()
+    # Cookie-based auth returns "Not authenticated. Please sign in." message
+    assert "not authenticated" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
-async def test_invalid_token(auth_client_factory, invalid_jwt_token, monkeypatch):
+async def test_invalid_session_cookie(auth_client_factory, monkeypatch):
     """
-    Test that the /users/me endpoint returns a 401 error when an invalid token is provided
+    Test that the /users/me endpoint returns a 401 error when an invalid session cookie is provided.
+
+    With cookie-based authentication (better-auth), session validation happens via MongoDB lookup.
+    When the session cookie doesn't correspond to a valid session, the endpoint returns 401.
     """
-    # CRITICAL: Disable BYPASS_AUTH to test actual token verification
+    # CRITICAL: Disable BYPASS_AUTH to test actual session verification
     from app.core.config import settings
     monkeypatch.setattr(settings, "BYPASS_AUTH", False)
 
-    # 1) Force verify_jwt_token to blow up with an HTTPException(401)
-    def fail_verify(token: str):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-        )
-
-    monkeypatch.setattr(security, "verify_jwt_token", fail_verify)
-
-    # 2) Set up the security module to reject the token
-    # Provide headers with the test token
+    # Create client without auth (no valid session)
     client = await auth_client_factory(auth=False)
-    client.headers.update({"Authorization": f"Bearer {invalid_jwt_token}"})
+
+    # Set an invalid session cookie
+    client.cookies.set("better-auth.session_token", "invalid-session-token")
+
     response = await client.get("/api/v1/users/me")
 
     # Should return 401 Unauthorized
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     body = response.json()
     assert "detail" in body
-    assert "invalid authentication credentials" in body["detail"].lower()
+    # Cookie-based auth returns "Not authenticated" message
+    assert "not authenticated" in body["detail"].lower()

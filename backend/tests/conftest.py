@@ -49,7 +49,7 @@ from app.main import app
 import app.core.security as sec
 import asyncio
 from datetime import datetime, timezone
-from app.core.security import get_current_user
+from app.core.security import get_current_user_from_session
 from app.api.endpoints import users as users_endpoint
 from app.api.endpoints import books as books_endpoint
 from bson import ObjectId
@@ -163,15 +163,18 @@ def fake_user():
 async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
     """
     Returns an async function `make_client(overrides: dict = None)`
-    that gives you an AsyncClient whose get_current_user
+    that gives you an AsyncClient whose get_current_user_from_session
     always returns `test_user` updated with your overrides.
 
-    Each client gets a unique token based on the user's auth_id,
-    and the dependency override uses the token to determine which user to return.
-    This allows multiple clients with different users to coexist.
+    Authentication is mocked by overriding the get_current_user_from_session dependency.
+    This simulates cookie-based session authentication without requiring actual session cookies.
+
+    Multi-user support: When multiple clients are created with different users,
+    the session token cookie is used to determine which user to return.
     """
     created_clients = []
-    user_map = {}  # Map from token to user
+    user_map = {}  # Map from session_token to user
+    override_installed = False
 
     def _seed_user(overrides: dict = None):
         user = test_user.copy()
@@ -183,8 +186,9 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
         return user
 
     async def make_client(*, overrides: dict = None, auth: bool = True):
+        nonlocal override_installed
         from fastapi import Request as FastAPIRequest
-        from app.core.security import get_current_user
+        from app.core.security import get_current_user_from_session
 
         user = _seed_user(overrides)
 
@@ -201,48 +205,51 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
         monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit_request)
         monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit_request)
 
-        headers = {}
+        cookies = {}
         if auth:
+            # Create unique session token for this user
+            session_token = f"test-session-{user['auth_id']}"
 
-            # Create a unique token for this user
-            token = f"Bearer {user['auth_id']}"
-            user_map[user['auth_id']] = user
+            # Store user in map keyed by session token for multi-user tests
+            user_map[session_token] = user
 
-            # Override get_current_user to extract token from request and return the right user
-            async def _get_user_from_request(request: FastAPIRequest = None):
-                """Extract user from Authorization header."""
-                if not request:
-                    # Fallback to current user
-                    return user
+            # Only install the dependency override once
+            # The override reads the session cookie to determine which user to return
+            if not override_installed:
+                async def _get_user_from_session(request: FastAPIRequest = None):
+                    """Return test user based on session cookie (simulating cookie-based auth)."""
+                    if request is None:
+                        # If no request, return the first user in the map
+                        if user_map:
+                            return next(iter(user_map.values()))
+                        return None
 
-                auth_header = request.headers.get("Authorization", "")
-                if not auth_header.startswith("Bearer "):
-                    from fastapi import HTTPException
-                    raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+                    # Get session token from cookies
+                    session_token = request.cookies.get("better-auth.session_token")
+                    if session_token and session_token in user_map:
+                        return user_map[session_token]
 
-                token_value = auth_header[7:]  # Remove "Bearer " prefix
-                if token_value in user_map:
-                    return user_map[token_value]
-                # Default to the current user if token not found (shouldn't happen in tests)
-                return user
+                    # Fallback: return first user (for backward compatibility)
+                    if user_map:
+                        return next(iter(user_map.values()))
+                    return None
 
-            app.dependency_overrides[get_current_user] = _get_user_from_request
+                app.dependency_overrides[get_current_user_from_session] = _get_user_from_session
+                override_installed = True
 
             monkeypatch.setattr(
-                users_dao, "get_user_by_auth_id", lambda auth_id: user_map.get(auth_id, user)
+                users_dao, "get_user_by_auth_id", lambda auth_id: next(
+                    (u for u in user_map.values() if u.get('auth_id') == auth_id), None
+                )
             )
 
-            async def _fake_verify(token_str: str):
-                # Extract auth_id from token and return it as the 'sub' claim
-                return {"sub": token_str}
-            monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
-
-            headers["Authorization"] = token
+            # Set the session cookie with the user's unique token
+            cookies["better-auth.session_token"] = session_token
 
         client = AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
-            headers=headers,
+            cookies=cookies,
         )
         created_clients.append(client)
         return client
@@ -259,24 +266,6 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
         except Exception as e:
             print(f"Error closing client: {e}")
     app.dependency_overrides.clear()
-
-
-@pytest.fixture
-def mock_jwt_token():
-    """
-    Fixture to provide a mock JWT token for testing.
-    This token is not valid and should not be used in production.
-    """
-    return "mock.jwt.token"
-
-
-@pytest.fixture
-def invalid_jwt_token():
-    """
-    Fixture to provide an invalid JWT token for testing.
-    This token is intentionally malformed and should not be used in production.
-    """
-    return "invalid.jwt_token"
 
 
 @pytest.fixture
@@ -307,10 +296,18 @@ def test_book(test_user):
 async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
     """
     Returns an async function make_client(overrides: dict = None, auth: bool = True)
-    that yields an AsyncClient whose get_current_user always returns test_user
+    that yields an AsyncClient whose get_current_user_from_session always returns test_user
     (with optional overrides), and which writes into a real MongoDB test DB.
+
+    Authentication is mocked by overriding the get_current_user_from_session dependency.
+    This simulates cookie-based session authentication.
+
+    Multi-user support: When multiple clients are created with different users,
+    the session token cookie is used to determine which user to return.
     """
     created_clients = []
+    user_map = {}  # Map from session_token to user
+    override_installed = False
 
     def _seed_user(overrides: dict | None):
         user = test_user.copy()
@@ -322,6 +319,7 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
         return user
 
     async def make_client(*, overrides: dict | None = None, auth: bool = True):
+        nonlocal override_installed
         user = _seed_user(overrides)
 
         async def _noop_audit(*args, **kwargs):
@@ -330,24 +328,52 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
         monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit)
         monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit)
 
-        headers = {}
+        cookies = {}
         if auth:
-            from app.core.security import get_current_user
+            from app.core.security import get_current_user_from_session
 
-            app.dependency_overrides[get_current_user] = lambda: user
+            # Create unique session token for this user
+            session_token = f"test-session-{user['auth_id']}"
+
+            # Store user in map keyed by session token for multi-user tests
+            user_map[session_token] = user
+
+            # Only install the dependency override once
+            # The override reads the session cookie to determine which user to return
+            if not override_installed:
+                async def _get_user_from_session(request=None):
+                    """Return test user based on session cookie."""
+                    if request is None:
+                        if user_map:
+                            return next(iter(user_map.values()))
+                        return None
+
+                    # Get session token from cookies
+                    session_token = request.cookies.get("better-auth.session_token")
+                    if session_token and session_token in user_map:
+                        return user_map[session_token]
+
+                    # Fallback: return first user
+                    if user_map:
+                        return next(iter(user_map.values()))
+                    return None
+
+                app.dependency_overrides[get_current_user_from_session] = _get_user_from_session
+                override_installed = True
+
             monkeypatch.setattr(
-                users_dao, "get_user_by_auth_id", lambda: user["auth_id"]
+                users_dao, "get_user_by_auth_id", lambda auth_id: next(
+                    (u for u in user_map.values() if u.get('auth_id') == auth_id), None
+                )
             )
 
-            async def _fake_verify(token: str):
-                return {"sub": user["auth_id"]}
-            monkeypatch.setattr(sec, "verify_jwt_token", _fake_verify)
-            headers["Authorization"] = "Bearer dummy.token.here"
+            # Set the session cookie with the user's unique token
+            cookies["better-auth.session_token"] = session_token
 
         client = AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
-            headers=headers,
+            cookies=cookies,
         )
         created_clients.append(client)
         return client

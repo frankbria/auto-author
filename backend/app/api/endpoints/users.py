@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
-from app.core.security import get_current_user, RoleChecker
+from app.core.security import get_current_user_from_session, SessionRoleChecker
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserPreferences
 from app.db.database import (
     get_user_by_auth_id,
@@ -24,14 +24,14 @@ router = APIRouter()
 security = HTTPBearer()
 
 # Role-based access controls
-allow_admins = RoleChecker(["admin"])
-allow_users_and_admins = RoleChecker(["user", "admin"])
+allow_admins = SessionRoleChecker(["admin"])
+allow_users_and_admins = SessionRoleChecker(["user", "admin"])
 
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(
     request: Request,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=20, window=60)),
 ):
     """Get the current authenticated user's information"""
@@ -96,7 +96,7 @@ async def read_users_me(
 async def update_profile(
     request: Request,
     user_update: UserUpdate,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=5, window=60)),
 ):
     """Update the current user's profile information"""
@@ -155,7 +155,7 @@ async def update_profile(
 @router.delete("/me")
 async def delete_profile(
     request: Request,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=3, window=300)),
 ):
     """Delete the current user's account"""
@@ -231,7 +231,7 @@ async def create_new_user(user: UserCreate):
 async def update_user_data(
     auth_id: str,
     user_update: UserUpdate,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """Update a user's information
 
@@ -273,7 +273,7 @@ async def update_user_data(
         for k, v in user_update.model_dump(exclude_unset=True).items()
         if v is not None
     }
-    update_data["updated_at"] = datetime.now(datetime.timezone.utc)
+    update_data["updated_at"] = datetime.now(timezone.utc)
 
     try:
         updated_user = await update_user(auth_id, update_data)
@@ -300,7 +300,7 @@ async def get_all_users(_: Dict = Depends(allow_admins)):
 
 @router.delete("/{auth_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user_account(
-    auth_id: str, current_user: Dict = Depends(get_current_user)
+    auth_id: str, current_user: Dict = Depends(get_current_user_from_session)
 ):
     """Delete a user account
 

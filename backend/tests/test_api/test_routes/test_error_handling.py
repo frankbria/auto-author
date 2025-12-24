@@ -6,7 +6,7 @@ from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.main import app
 from app.core import security
-from app.core.security import get_current_user
+from app.core.security import get_current_user_from_session
 from app.db import database
 from app.api.endpoints import users as users_endpoint
 import app.db.user as users_dao
@@ -22,12 +22,12 @@ async def test_error_handling_database_connection(auth_client_factory, monkeypat
     api_client = await auth_client_factory()
     
     # Define the function that will raise an exception with the correct signature
-    from app.core.security import security as http_security
-    async def explode(credentials: HTTPAuthorizationCredentials = Depends(http_security)):
+    # Create a function that raises an exception (simulating database error)
+    async def explode(request=None):
         raise Exception("Database connection error")
 
     # Override AFTER client creation to ensure it takes precedence
-    app.dependency_overrides[get_current_user] = explode
+    app.dependency_overrides[get_current_user_from_session] = explode
 
     # Make request that will trigger database error
     try:
@@ -44,7 +44,7 @@ async def test_error_handling_database_connection(auth_client_factory, monkeypat
         # Test is still considered a success if we catch the expected exception
 
     # Clean up dependency override to avoid affecting other tests
-    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_current_user_from_session, None)
 
 
 @pytest.mark.asyncio

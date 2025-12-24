@@ -4,7 +4,7 @@ from typing import Optional
 import logging
 from app.services.transcription_service import transcription_service
 from app.schemas.transcription import TranscriptionResponse, StreamingTranscriptionData
-from app.core.security import get_current_user
+from app.core.security import get_current_user_from_session
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ async def transcribe_audio(
     audio: UploadFile = File(...),
     language: str = "en-US",
     enable_punctuation_commands: bool = False,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_session)
 ):
     """
     Transcribe uploaded audio file to text.
@@ -136,7 +136,7 @@ async def stream_transcription(
 
 @router.get("/transcribe/status")
 async def get_transcription_status(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_session)
 ):
     """
     Get transcription service status and capabilities.
@@ -159,7 +159,7 @@ async def get_transcription_status(
 @router.post("/transcribe/validate")
 async def validate_audio_file(
     audio: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_session)
 ):
     """
     Validate audio file without transcribing.

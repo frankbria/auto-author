@@ -327,25 +327,26 @@ class TestAuditRequest:
         assert result["email"] == "test@example.com"
 
     @patch("app.api.dependencies.create_audit_log")
-    @patch("app.api.dependencies.verify_jwt_token")
     @patch("app.api.dependencies.settings")
-    async def test_audit_request_with_token(self, mock_settings, mock_verify, mock_create_audit):
-        """Test audit_request with valid token"""
+    async def test_audit_request_with_authenticated_user(self, mock_settings, mock_create_audit):
+        """Test audit_request with pre-authenticated user (cookie-based auth)
+
+        Note: Authentication is now handled by get_current_user_from_session via session cookies.
+        audit_request trusts that current_user has already been authenticated.
+        """
         mock_settings.BYPASS_AUTH = False
-        mock_verify.return_value = {"sub": "user_123", "email": "test@example.com"}
 
         mock_request = Mock(spec=Request)
         mock_request.method = "POST"
         mock_request.url.path = "/api/books"
         mock_request.client.host = "192.168.1.1"
         mock_request.headers = {
-            "authorization": "Bearer valid_token",
             "user-agent": "test-agent"
         }
         mock_request.state = Mock()
         mock_request.state.request_id = "req_123"
 
-        current_user = {"auth_id": "user_123"}
+        current_user = {"auth_id": "user_123", "email": "test@example.com"}
 
         result = await audit_request(
             request=mock_request,
@@ -357,57 +358,39 @@ class TestAuditRequest:
         )
 
         assert result["sub"] == "user_123"
+        assert result["email"] == "test@example.com"
         mock_create_audit.assert_called_once()
 
     @patch("app.api.dependencies.create_audit_log")
     @patch("app.api.dependencies.settings")
-    async def test_audit_request_missing_auth_header(self, mock_settings, mock_create_audit):
-        """Test audit_request without authorization header"""
+    async def test_audit_request_logs_request_details(self, mock_settings, mock_create_audit):
+        """Test that audit_request logs all request details correctly"""
         mock_settings.BYPASS_AUTH = False
-        mock_create_audit.return_value = None  # Mock the audit logging
 
         mock_request = Mock(spec=Request)
-        mock_request.method = "GET"
-        mock_request.url = Mock()
-        mock_request.url.path = "/api/test"
-        mock_request.client = Mock()
-        mock_request.client.host = "192.168.1.1"
-        mock_request.headers = {}
-        current_user = {"auth_id": "user_123"}
+        mock_request.method = "DELETE"
+        mock_request.url.path = "/api/books/123"
+        mock_request.client.host = "10.0.0.1"
+        mock_request.headers = {"user-agent": "Mozilla/5.0"}
+        mock_request.state = Mock()
+        mock_request.state.request_id = "req_456"
 
-        with pytest.raises(HTTPException) as exc_info:
-            await audit_request(
-                request=mock_request,
-                current_user=current_user,
-                action="read",
-                resource_type="book"
-            )
+        current_user = {"auth_id": "admin_user", "email": "admin@example.com"}
 
-        assert exc_info.value.status_code == 401
-        assert "Authorization header missing" in exc_info.value.detail
+        result = await audit_request(
+            request=mock_request,
+            current_user=current_user,
+            action="delete",
+            resource_type="book",
+            target_id="123"
+        )
 
-    @patch("app.api.dependencies.create_audit_log")
-    @patch("app.api.dependencies.settings")
-    async def test_audit_request_invalid_auth_header(self, mock_settings, mock_create_audit):
-        """Test audit_request with invalid authorization header format"""
-        mock_settings.BYPASS_AUTH = False
-        mock_create_audit.return_value = None  # Mock the audit logging
+        assert result["sub"] == "admin_user"
+        mock_create_audit.assert_called_once()
 
-        mock_request = Mock(spec=Request)
-        mock_request.method = "GET"
-        mock_request.url = Mock()
-        mock_request.url.path = "/api/test"
-        mock_request.client = Mock()
-        mock_request.client.host = "192.168.1.1"
-        mock_request.headers = {"authorization": "InvalidFormat"}
-        current_user = {"auth_id": "user_123"}
-
-        with pytest.raises(HTTPException) as exc_info:
-            await audit_request(
-                request=mock_request,
-                current_user=current_user,
-                action="read",
-                resource_type="book"
-            )
-
-        assert exc_info.value.status_code == 401
+        # Verify the audit log was called with correct parameters
+        call_kwargs = mock_create_audit.call_args.kwargs
+        assert call_kwargs["action"] == "delete"
+        assert call_kwargs["actor_id"] == "admin_user"
+        assert call_kwargs["resource_type"] == "book"
+        assert call_kwargs["target_id"] == "123"

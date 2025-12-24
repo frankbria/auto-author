@@ -21,7 +21,11 @@ import { handleAIServiceError, AIServiceResult } from '@/lib/api/aiErrorHandler'
  * API client for book operations
  *
  * Provides a comprehensive interface for interacting with the Auto-Author backend API.
- * All methods include automatic authentication header injection and consistent error handling.
+ *
+ * AUTHENTICATION:
+ * - Primary: Cookie-based authentication via better-auth session cookies
+ * - Cookies are automatically included with `credentials: 'include'`
+ * - Token-based auth (setAuthToken) is deprecated but kept for backward compatibility
  *
  * @class BookClient
  * @see {@link frontend/src/types/book.ts} - Type definitions
@@ -32,10 +36,7 @@ import { handleAIServiceError, AIServiceResult } from '@/lib/api/aiErrorHandler'
  * // Initialize client (typically done once)
  * import { bookClient } from '@/lib/api/bookClient';
  *
- * // Set auth token (from Clerk or other auth provider)
- * bookClient.setAuthToken(authToken);
- *
- * // Make API calls
+ * // Make API calls - authentication handled via session cookies
  * const books = await bookClient.getUserBooks();
  * const book = await bookClient.getBook(bookId);
  * ```
@@ -69,21 +70,12 @@ export class BookClient {
   /**
    * Set authentication token for API calls
    *
-   * All subsequent API calls will include this token in the Authorization header.
-   * Call this method after user authentication to enable authenticated requests.
+   * @deprecated Use cookie-based authentication instead.
+   * Authentication is now handled automatically via session cookies set by better-auth.
+   * This method is kept for backward compatibility but tokens are not required
+   * when using cookie-based authentication (credentials: 'include').
    *
    * @param token - JWT or Bearer token from authentication provider
-   *
-   * @example
-   * ```typescript
-   * // With Clerk
-   * const { getToken } = useAuth();
-   * const token = await getToken();
-   * bookClient.setAuthToken(token);
-   *
-   * // Manual token
-   * bookClient.setAuthToken('eyJhbGc...');
-   * ```
    */
   public setAuthToken(token: string) {
     this.authToken = token;
@@ -92,17 +84,11 @@ export class BookClient {
   /**
    * Set a token provider function for automatic token refresh
    *
-   * This allows the client to fetch fresh tokens before each API call,
-   * preventing token expiration issues during long-running operations.
+   * @deprecated Use cookie-based authentication instead.
+   * Authentication is now handled automatically via session cookies.
+   * Token providers are no longer needed for standard API calls.
    *
    * @param provider - Function that returns a promise resolving to a token or null
-   *
-   * @example
-   * ```typescript
-   * // With Clerk
-   * const { getToken } = useAuth();
-   * bookClient.setTokenProvider(getToken);
-   * ```
    */
   public setTokenProvider(provider: () => Promise<string | null>) {
     this.tokenProvider = provider;
@@ -129,16 +115,19 @@ export class BookClient {
    * Get default headers for API requests
    *
    * Internal method that constructs headers for all API calls.
-   * Includes Content-Type and Authorization headers.
+   * Authentication is handled via cookies (credentials: 'include'),
+   * not via Authorization headers.
    *
    * @private
-   * @returns Promise resolving to headers object with Content-Type and optional Authorization
+   * @returns Promise resolving to headers object with Content-Type
    */
   private async getHeaders(): Promise<HeadersInit> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
 
+    // Note: Authorization header is deprecated for cookie-based auth
+    // but kept for backward compatibility if token is explicitly set
     const token = await this.getAuthToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
