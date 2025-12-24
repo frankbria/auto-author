@@ -79,11 +79,8 @@ async def test_error_handling_race_condition(
     # 1) get a raw client (no auto authentication)
     client = await auth_client_factory(auth=False)
 
-    # 2) need to stub JWT -> auth_id
-    async def fake_verify(token):
-        return {"sub": test_user["auth_id"]}
-
-    monkeypatch.setattr(security, "verify_jwt_token", fake_verify)
+    # 2) Override session authentication to return test user
+    app.dependency_overrides[get_current_user_from_session] = lambda: test_user
 
     # 3) no audit noise
     async def noop_audit(*args, **kwargs):
@@ -149,39 +146,15 @@ async def test_error_handling_third_party_service(auth_client_factory, monkeypat
     assert "detail" in data
 
 
-@pytest.mark.skip(reason="Skipping test: Test code is invliad")
+@pytest.mark.skip(reason="Skipping test: Test code is invalid - concurrent conflict detection not implemented")
 def test_error_handling_concurrent_updates(auth_client_factory, test_user):
     """
     Test error handling for concurrent updates to the same resource.
     Verifies proper handling of potential conflicts.
+
+    NOTE: This test is skipped as conflict detection is not yet implemented in the API.
     """
-    # Mock database update to simulate a version conflict
-    update_mock = MagicMock(
-        side_effect=Exception("Version conflict: Resource was modified")
-    )
-
-    # Mock the necessary dependencies
-    with patch(
-        "app.core.security.verify_jwt_token",
-        return_value={"sub": test_user["auth_id"]},
-    ), patch("app.db.user.get_user_by_auth_id", return_value=test_user), patch(
-        "app.db.database.get_user_by_auth_id", return_value=test_user
-    ), patch(
-        "app.api.endpoints.users.get_current_user", return_value=test_user
-    ), patch(
-        "app.db.database.update_user", new=update_mock
-    ):
-        # Update data
-        update_data = {"first_name": "New Name"}
-
-        # Make request that will encounter version conflict
-        response = auth_client_factory().patch("/api/v1/users/me", json=update_data)
-
-        # Assert conflict error
-        assert response.status_code == 409  # Conflict
-        data = response.json()
-        assert "detail" in data
-        assert "conflict" in data["detail"].lower()
+    pass
 
 
 @pytest.mark.asyncio

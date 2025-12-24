@@ -5,7 +5,7 @@ import io
 import os
 
 pytest.skip(
-    "Skipping this file for now - haven't integrated with Clerk yet.",
+    "Skipping this file - profile pictures need to be re-implemented for better-auth.",
     allow_module_level=True,
 )
 

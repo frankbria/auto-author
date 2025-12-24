@@ -1,19 +1,11 @@
-from fastapi import Depends, Header, HTTPException, status, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Header, HTTPException, status, Request
 from typing import Dict, Optional, Callable, Any
 import time
 import re
-from datetime import datetime, timedelta
 from pydantic import BaseModel
 
-# Note: verify_jwt_token is kept for backward compatibility but deprecated
-# Authentication is now handled via session cookies in get_current_user_from_session
-from app.core.security import verify_jwt_token
 from app.db.database import get_collection
 from app.db.database import create_audit_log
-from app.core.config import settings
-
-security = HTTPBearer()
 
 # Simple in-memory cache for rate limiting
 # In production, this should be replaced with Redis or similar
@@ -36,11 +28,6 @@ async def get_api_key(x_api_key: str = Header(None)):
     # You would validate the API key against your stored value here
     # For now, this is a placeholder
     return x_api_key
-
-
-async def get_auth_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Get the authenticated user from the JWT token"""
-    token = credentials.credentials
 
 
 def sanitize_input(text: str) -> str:
