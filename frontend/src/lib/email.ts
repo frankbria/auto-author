@@ -7,6 +7,101 @@ interface PasswordResetEmailParams {
 }
 
 /**
+ * Performs a fetch request with timeout, retry logic, and exponential backoff.
+ *
+ * @param url - The URL to fetch
+ * @param options - Fetch options (method, headers, body, etc.)
+ * @param retries - Number of retry attempts (default: 3)
+ * @param timeout - Request timeout in milliseconds (default: 10000)
+ * @returns The successful Response object
+ * @throws Error with detailed message after exhausting retries
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries: number = 3,
+  timeout: number = 10000
+): Promise<Response> {
+  const transientStatusCodes = [429, 500, 502, 503, 504];
+  let lastError: Error | null = null;
+  let lastResponseBody: string | null = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // If response is OK, return it
+      if (response.ok) {
+        return response;
+      }
+
+      // Check if this is a transient error that should be retried
+      if (transientStatusCodes.includes(response.status)) {
+        lastResponseBody = await response.text().catch(() => null);
+        lastError = new Error(
+          `HTTP ${response.status}: ${response.statusText}${lastResponseBody ? ` - ${lastResponseBody}` : ""}`
+        );
+
+        // Don't retry on last attempt
+        if (attempt < retries) {
+          const backoffMs = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
+          continue;
+        }
+      } else {
+        // Non-transient error (4xx except 429), throw immediately
+        const errorBody = await response.text().catch(() => null);
+        throw new Error(
+          `HTTP ${response.status}: ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`
+        );
+      }
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      // Handle abort/timeout errors
+      if (error instanceof Error && error.name === "AbortError") {
+        lastError = new Error(`Request timeout after ${timeout}ms`);
+      } else if (
+        error instanceof TypeError &&
+        (error.message.includes("network") || error.message.includes("fetch"))
+      ) {
+        // Network error (e.g., no internet connection)
+        lastError = new Error(`Network error: ${error.message}`);
+      } else if (error instanceof Error) {
+        // Re-throw non-transient errors immediately
+        if (!transientStatusCodes.some((code) => error.message.includes(`HTTP ${code}`))) {
+          throw error;
+        }
+        lastError = error;
+      } else {
+        throw error;
+      }
+
+      // Don't retry on last attempt
+      if (attempt < retries) {
+        const backoffMs = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
+    }
+  }
+
+  // All retries exhausted
+  throw new Error(
+    `Failed after ${retries + 1} attempts: ${lastError?.message || "Unknown error"}${
+      lastResponseBody ? ` (Response: ${lastResponseBody})` : ""
+    }`
+  );
+}
+
+/**
  * Sends a password reset email to the user.
  *
  * This function supports multiple email providers configured via environment variables:
@@ -52,24 +147,24 @@ export async function sendPasswordResetEmail({
       throw new Error("EMAIL_SERVICE_API_KEY is required for Resend provider");
     }
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: `${fromName} <${fromAddress}>`,
-        to: [to],
-        subject,
-        html: htmlContent,
-        text: textContent,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Resend API error: ${JSON.stringify(errorData)}`);
+    try {
+      await fetchWithRetry("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: `${fromName} <${fromAddress}>`,
+          to: [to],
+          subject,
+          html: htmlContent,
+          text: textContent,
+        }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Resend API error: ${message}`);
     }
 
     return;
@@ -82,32 +177,39 @@ export async function sendPasswordResetEmail({
       throw new Error("EMAIL_SERVICE_API_KEY is required for SendGrid provider");
     }
 
-    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        personalizations: [{ to: [{ email: to }] }],
-        from: { email: fromAddress, name: fromName },
-        subject,
-        content: [
-          { type: "text/plain", value: textContent },
-          { type: "text/html", value: htmlContent },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error");
-      throw new Error(`SendGrid API error: ${errorText}`);
+    try {
+      await fetchWithRetry("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: to }] }],
+          from: { email: fromAddress, name: fromName },
+          subject,
+          content: [
+            { type: "text/plain", value: textContent },
+            { type: "text/html", value: htmlContent },
+          ],
+        }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`SendGrid API error: ${message}`);
     }
 
     return;
   }
 
   // Unknown provider
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      `Unknown email provider: ${provider}. Configure EMAIL_SERVICE_PROVIDER to 'resend' or 'sendgrid'.`
+    );
+  }
+
+  // In development, log a warning and return silently for convenience
   console.warn(`Unknown email provider: ${provider}. Email not sent.`);
 }
 
