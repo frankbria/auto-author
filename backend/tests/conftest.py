@@ -168,9 +168,13 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
 
     Authentication is mocked by overriding the get_current_user_from_session dependency.
     This simulates cookie-based session authentication without requiring actual session cookies.
+
+    Multi-user support: When multiple clients are created with different users,
+    the session token cookie is used to determine which user to return.
     """
     created_clients = []
-    user_map = {}  # Map from auth_id to user
+    user_map = {}  # Map from session_token to user
+    override_installed = False
 
     def _seed_user(overrides: dict = None):
         user = test_user.copy()
@@ -182,6 +186,7 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
         return user
 
     async def make_client(*, overrides: dict = None, auth: bool = True):
+        nonlocal override_installed
         from fastapi import Request as FastAPIRequest
         from app.core.security import get_current_user_from_session
 
@@ -202,25 +207,44 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
 
         cookies = {}
         if auth:
-            # Store user in map for potential multi-user tests
-            user_map[user['auth_id']] = user
+            # Create unique session token for this user
+            session_token = f"test-session-{user['auth_id']}"
 
-            # Override get_current_user_from_session to return the test user
-            # This simulates successful session validation without requiring real cookies
-            async def _get_user_from_session(request: FastAPIRequest = None):
-                """Return test user (simulating valid session cookie)."""
-                # In tests, we always return the current test user
-                # In production, this would validate the session cookie
-                return user
+            # Store user in map keyed by session token for multi-user tests
+            user_map[session_token] = user
 
-            app.dependency_overrides[get_current_user_from_session] = _get_user_from_session
+            # Only install the dependency override once
+            # The override reads the session cookie to determine which user to return
+            if not override_installed:
+                async def _get_user_from_session(request: FastAPIRequest = None):
+                    """Return test user based on session cookie (simulating cookie-based auth)."""
+                    if request is None:
+                        # If no request, return the first user in the map
+                        if user_map:
+                            return next(iter(user_map.values()))
+                        return None
+
+                    # Get session token from cookies
+                    session_token = request.cookies.get("better-auth.session_token")
+                    if session_token and session_token in user_map:
+                        return user_map[session_token]
+
+                    # Fallback: return first user (for backward compatibility)
+                    if user_map:
+                        return next(iter(user_map.values()))
+                    return None
+
+                app.dependency_overrides[get_current_user_from_session] = _get_user_from_session
+                override_installed = True
 
             monkeypatch.setattr(
-                users_dao, "get_user_by_auth_id", lambda auth_id: user_map.get(auth_id, user)
+                users_dao, "get_user_by_auth_id", lambda auth_id: next(
+                    (u for u in user_map.values() if u.get('auth_id') == auth_id), None
+                )
             )
 
-            # Set a test session cookie (for completeness, though not validated in tests)
-            cookies["better-auth.session_token"] = f"test-session-{user['auth_id']}"
+            # Set the session cookie with the user's unique token
+            cookies["better-auth.session_token"] = session_token
 
         client = AsyncClient(
             transport=ASGITransport(app=app),
@@ -295,8 +319,13 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
 
     Authentication is mocked by overriding the get_current_user_from_session dependency.
     This simulates cookie-based session authentication.
+
+    Multi-user support: When multiple clients are created with different users,
+    the session token cookie is used to determine which user to return.
     """
     created_clients = []
+    user_map = {}  # Map from session_token to user
+    override_installed = False
 
     def _seed_user(overrides: dict | None):
         user = test_user.copy()
@@ -308,6 +337,7 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
         return user
 
     async def make_client(*, overrides: dict | None = None, auth: bool = True):
+        nonlocal override_installed
         user = _seed_user(overrides)
 
         async def _noop_audit(*args, **kwargs):
@@ -320,17 +350,43 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
         if auth:
             from app.core.security import get_current_user_from_session
 
-            # Override session-based auth to return test user
-            async def _get_user_from_session(request=None):
-                return user
+            # Create unique session token for this user
+            session_token = f"test-session-{user['auth_id']}"
 
-            app.dependency_overrides[get_current_user_from_session] = _get_user_from_session
+            # Store user in map keyed by session token for multi-user tests
+            user_map[session_token] = user
+
+            # Only install the dependency override once
+            # The override reads the session cookie to determine which user to return
+            if not override_installed:
+                async def _get_user_from_session(request=None):
+                    """Return test user based on session cookie."""
+                    if request is None:
+                        if user_map:
+                            return next(iter(user_map.values()))
+                        return None
+
+                    # Get session token from cookies
+                    session_token = request.cookies.get("better-auth.session_token")
+                    if session_token and session_token in user_map:
+                        return user_map[session_token]
+
+                    # Fallback: return first user
+                    if user_map:
+                        return next(iter(user_map.values()))
+                    return None
+
+                app.dependency_overrides[get_current_user_from_session] = _get_user_from_session
+                override_installed = True
+
             monkeypatch.setattr(
-                users_dao, "get_user_by_auth_id", lambda auth_id: user
+                users_dao, "get_user_by_auth_id", lambda auth_id: next(
+                    (u for u in user_map.values() if u.get('auth_id') == auth_id), None
+                )
             )
 
-            # Set test session cookie (for completeness)
-            cookies["better-auth.session_token"] = f"test-session-{user['auth_id']}"
+            # Set the session cookie with the user's unique token
+            cookies["better-auth.session_token"] = session_token
 
         client = AsyncClient(
             transport=ASGITransport(app=app),
