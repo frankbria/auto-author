@@ -29,7 +29,7 @@ from app.utils.error_handlers import (
 )
 from app.schemas.errors import ErrorCode
 
-from app.core.security import get_current_user, RoleChecker
+from app.core.security import get_current_user_from_session, SessionRoleChecker
 from app.schemas.book import (
     BookCreate,
     BookUpdate,
@@ -87,7 +87,7 @@ from bson import ObjectId
 router = APIRouter()
 
 # Role-based access controls
-allow_users_and_admins = RoleChecker(["user", "admin"])
+allow_users_and_admins = SessionRoleChecker(["user", "admin"])
 
 
 # Helper to load offensive words from JSON
@@ -102,7 +102,7 @@ with open(OFFENSIVE_WORDS_PATH, encoding="utf-8") as f:
 async def create_new_book(
     book: BookCreate,
     request: Request,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=60)),
 ):
     """Create a new book"""
@@ -160,7 +160,7 @@ async def get_user_books(
     request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=20, window=60)),
 ):
 
@@ -190,7 +190,7 @@ async def get_user_books(
 async def get_book(
     book_id: str,
     request: Request,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=20, window=60)),
 ):
     """Get a specific book by ID"""
@@ -253,7 +253,7 @@ async def update_book_details(
     book_id: str,
     book_update: BookUpdate,
     request: Request,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=15, window=60)),
 ):
     """Update a book's details"""
@@ -344,7 +344,7 @@ async def patch_book_details(
     book_id: str,
     book_update: BookUpdate,
     request: Request,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=20, window=60)),
 ):
     """Partially update a book's details (PATCH)"""
@@ -429,7 +429,7 @@ async def patch_book_details(
 async def delete_book_endpoint(
     book_id: str,
     request: Request,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=5, window=60)),
 ):
     """Delete a book"""
@@ -496,7 +496,7 @@ async def delete_book_endpoint(
 async def upload_book_cover_image(
     book_id: str,
     file: UploadFile = File(...),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     request: Request = None,
 ):
     """
@@ -571,7 +571,7 @@ async def upload_book_cover_image(
 @router.get("/{book_id}/summary", status_code=status.HTTP_200_OK)
 async def get_book_summary(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Retrieve the summary and its revision history for a book.
@@ -595,7 +595,7 @@ async def get_book_summary(
 async def update_book_summary(
     book_id: str,
     data: dict = Body(...),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Save or update the summary for a book, and store revision history.
@@ -657,7 +657,7 @@ async def update_book_summary(
 async def patch_book_summary(
     book_id: str,
     data: dict = Body(...),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Partially update the summary for a book. Only updates the summary field if provided.
@@ -710,7 +710,7 @@ async def patch_book_summary(
 @router.post("/{book_id}/analyze-summary", status_code=status.HTTP_200_OK)
 async def analyze_book_summary(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=5, window=60)),
 ):
     """
@@ -770,7 +770,7 @@ async def analyze_book_summary(
 async def generate_clarifying_questions(
     book_id: str,
     data: dict = Body(default={}),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=3, window=60)),
 ):
     """
@@ -898,7 +898,7 @@ async def generate_clarifying_questions(
 @router.get("/{book_id}/question-responses", status_code=status.HTTP_200_OK)
 async def get_question_responses(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Get saved question responses for a book.
@@ -930,7 +930,7 @@ async def get_question_responses(
 async def save_question_responses(
     book_id: str,
     data: dict = Body(...),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Save user responses to clarifying questions for TOC generation.
@@ -998,7 +998,7 @@ async def save_question_responses(
 @router.get("/{book_id}/toc-readiness", status_code=status.HTTP_200_OK)
 async def check_toc_generation_readiness(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Check if a book is ready for TOC generation based on summary analysis and question responses.
@@ -1099,7 +1099,7 @@ async def check_toc_generation_readiness(
 async def generate_table_of_contents(
     book_id: str,
     data: dict = Body(default={}),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(
         get_rate_limiter(limit=2, window=300)
     ),  # 2 per 5 minutes
@@ -1229,7 +1229,7 @@ async def generate_table_of_contents(
 @router.get("/{book_id}/toc", status_code=status.HTTP_200_OK)
 async def get_book_toc(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Get the Table of Contents for a book.
@@ -1283,7 +1283,7 @@ async def get_book_toc(
 async def update_book_toc(
     book_id: str,
     data: dict = Body(...),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Update the Table of Contents for a book.
@@ -1362,7 +1362,7 @@ async def update_book_toc(
 async def create_chapter(
     book_id: str,
     chapter_data: TocItemCreate,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Create a new chapter in the book's TOC.
@@ -1426,7 +1426,7 @@ async def create_chapter(
 async def get_chapter(
     book_id: str,
     chapter_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Get a specific chapter by ID from the book's TOC.
@@ -1474,7 +1474,7 @@ async def update_chapter(
     book_id: str,
     chapter_id: str,
     chapter_data: TocItemUpdate,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Update a specific chapter in the book's TOC.
@@ -1551,7 +1551,7 @@ async def update_chapter(
 async def delete_chapter(
     book_id: str,
     chapter_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Delete a specific chapter from the book's TOC.
@@ -1600,7 +1600,7 @@ async def delete_chapter(
 @router.get("/{book_id}/chapters", response_model=dict)
 async def list_chapters(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     flat: bool = Query(
         False, description="Return flat list instead of hierarchical structure"
     ),
@@ -1666,7 +1666,7 @@ async def list_chapters(
 @router.get("/{book_id}/chapters/metadata", response_model=ChapterMetadataResponse)
 async def get_chapters_metadata(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     include_content_stats: bool = Query(
         False, description="Include word count and reading time"
     ),
@@ -1744,7 +1744,7 @@ async def get_chapters_metadata(
 async def update_chapter_status_bulk(
     book_id: str,
     update_data: BulkStatusUpdate,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Update status for multiple chapters simultaneously.
@@ -1838,7 +1838,7 @@ async def update_chapter_status_bulk(
 async def save_tab_state(
     book_id: str,
     tab_state: TabStateRequest,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Save current tab state for persistence across sessions.
@@ -1873,7 +1873,7 @@ async def save_tab_state(
 
 
 @router.get("/{book_id}/chapters/tab-state", response_model=dict)
-async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_user)):
+async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_user_from_session)):
     """
     Retrieve saved tab state for restoration.
     """
@@ -1921,7 +1921,7 @@ async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_u
 async def get_chapter_content(
     book_id: str,
     chapter_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     include_metadata: bool = Query(
         True, description="Include chapter metadata in response"
     ),
@@ -2008,7 +2008,7 @@ async def update_chapter_content(
     chapter_id: str,
     content: str = Body(..., embed=True),
     auto_update_metadata: bool = Body(True, embed=True),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Update chapter content with automatic metadata updates.
@@ -2106,7 +2106,7 @@ async def update_chapter_content(
 async def get_chapter_analytics(
     book_id: str,
     chapter_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     days: int = Query(
         30, description="Number of days to include in analytics", ge=1, le=365
     ),
@@ -2150,7 +2150,7 @@ async def get_chapter_analytics(
 async def batch_get_chapter_content(
     book_id: str,
     chapter_ids: List[str] = Body(..., embed=True),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     include_metadata: bool = Body(True, embed=True),
 ):
     """
@@ -2249,7 +2249,7 @@ async def generate_chapter_questions(
     book_id: str,
     chapter_id: str,
     request_data: GenerateQuestionsRequest = Body(...),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=3, window=120)), # 3 per 2 minutes
 ):
     """
@@ -2355,7 +2355,7 @@ async def list_chapter_questions(
     question_type: Optional[QuestionType] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=50),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     List questions for a specific chapter with optional filtering and pagination.
@@ -2457,7 +2457,7 @@ async def save_question_response(
     chapter_id: str,
     question_id: str,
     response_data: QuestionResponseCreate,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Save or update a response to a specific question.
@@ -2565,7 +2565,7 @@ async def get_question_response(
     book_id: str,
     chapter_id: str,
     question_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Get the author's response to a specific question.
@@ -2637,7 +2637,7 @@ async def rate_question(
     chapter_id: str,
     question_id: str,
     rating_data: QuestionRating,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Rate a question's relevance and quality.
@@ -2739,7 +2739,7 @@ async def rate_question(
 async def get_chapter_question_progress(
     book_id: str,
     chapter_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Get progress information for a chapter's questions.
@@ -2817,7 +2817,7 @@ async def regenerate_chapter_questions(
     chapter_id: str,
     request_data: GenerateQuestionsRequest = Body(...),
     preserve_responses: bool = Query(True, description="Preserve questions with responses"),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=2, window=180)), # 2 per 3 minutes
 ):
     """
@@ -2922,7 +2922,7 @@ async def generate_chapter_draft(
     book_id: str,
     chapter_id: str,
     data: dict = Body(default={}),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(
         get_rate_limiter(limit=5, window=3600)
     ),  # 5 per hour
@@ -3059,7 +3059,7 @@ async def save_question_responses_batch_endpoint(
     book_id: str,
     chapter_id: str,
     responses: List[Dict[str, Any]] = Body(...),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Save multiple question responses in a single batch operation.

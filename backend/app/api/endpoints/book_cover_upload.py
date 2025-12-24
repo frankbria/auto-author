@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFi
 from typing import Dict
 from datetime import datetime, timezone
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user_from_session
 from app.db.database import get_book_by_id, update_book
 from app.api.dependencies import get_rate_limiter, audit_request
 from app.services.file_upload_service import file_upload_service
@@ -20,7 +20,7 @@ router = APIRouter()
 async def upload_book_cover_image(
     book_id: str,
     file: UploadFile = File(...),
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     request: Request = None,
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=5, window=60)),
 ):

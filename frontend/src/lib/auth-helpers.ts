@@ -1,13 +1,26 @@
 /**
  * Helper functions for better-auth authentication
  * These are server-side helper functions for working with better-auth
+ *
+ * AUTHENTICATION FLOW:
+ * - Authentication is handled via httpOnly session cookies set by better-auth
+ * - API calls automatically include cookies when using credentials: 'include'
+ * - No manual token management is required for authenticated API calls
+ * - See useAuthFetch hook for client-side authenticated requests
  */
 import { getAuth } from "@/lib/auth";
 
 /**
- * Get authentication token from better-auth session
- * Note: This is a placeholder for future server-side token retrieval
- * Client-side token retrieval uses the useSession hook from auth-client.ts
+ * Get authentication token from better-auth session.
+ *
+ * DEPRECATED: This function is no longer needed for API calls.
+ * Authentication is now handled automatically via session cookies.
+ * The browser sends httpOnly cookies with requests when credentials: 'include' is set.
+ *
+ * This function is kept for backward compatibility and potential future use cases
+ * where a token is needed for external services.
+ *
+ * @deprecated Use cookie-based authentication instead
  */
 export async function getAuthToken(): Promise<string | null> {
   try {

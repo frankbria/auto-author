@@ -5,7 +5,7 @@ from typing import Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from app.api.dependencies import get_rate_limiter
-from app.core.security import get_current_user
+from app.core.security import get_current_user_from_session
 from app.db.book import get_book_by_id
 from app.services.export_service import export_service
 from app.services.chapter_access_service import chapter_access_service
@@ -21,7 +21,7 @@ router = APIRouter(
 @router.get("/pdf")
 async def export_book_pdf(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     include_empty_chapters: bool = Query(
         False,
         description="Include chapters without content"
@@ -101,7 +101,7 @@ async def export_book_pdf(
 @router.get("/docx")
 async def export_book_docx(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
     include_empty_chapters: bool = Query(
         False,
         description="Include chapters without content"
@@ -174,7 +174,7 @@ async def export_book_docx(
 @router.get("/formats")
 async def get_export_formats(
     book_id: str,
-    current_user: Dict = Depends(get_current_user),
+    current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Get available export formats and their options.

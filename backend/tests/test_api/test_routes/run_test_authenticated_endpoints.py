@@ -46,7 +46,7 @@ def create_test_user():
     """Create a test user in the database."""
     user = {
         "_id": ObjectId(),
-        "clerk_id": "test_clerk_id_endpoint_test",
+        "auth_id": "test_auth_id_endpoint_test",
         "email": "test@example.com",
         "first_name": "Test",
         "last_name": "User",
@@ -66,7 +66,7 @@ def create_test_user():
     user["id"] = str(user["_id"])
 
     # Insert or update the user
-    _sync_users.replace_one({"clerk_id": user["clerk_id"]}, user, upsert=True)
+    _sync_users.replace_one({"auth_id": user["auth_id"]}, user, upsert=True)
     return user
 
 
@@ -79,7 +79,7 @@ def create_test_book(user):
         "description": "This is a test book for endpoint testing.",
         "genre": "Fiction",
         "target_audience": "Adults",
-        "owner_id": user["clerk_id"],
+        "owner_id": user["auth_id"],
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
         "toc": {
@@ -160,17 +160,16 @@ async def main():
         # Override the JWT verification
         sec.verify_jwt_token = fake_verify_jwt
 
-        # Override get_current_user to return our test user
-        from app.core.security import get_current_user
+        # Override get_current_user_from_session to return our test user
+        from app.core.security import get_current_user_from_session
 
-        app.dependency_overrides[get_current_user] = lambda: user
+        app.dependency_overrides[get_current_user_from_session] = lambda: user
 
-        # Create authenticated client
-        headers = {"Authorization": "Bearer test.jwt.token"}
+        # Create authenticated client with session cookie
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
-            headers=headers,
+            cookies={"better-auth.session_token": "test-session-token"},
         ) as client:
 
             # Test endpoints

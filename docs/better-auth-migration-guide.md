@@ -226,6 +226,110 @@ if not user:
 
 ---
 
+## Cookie-Based Authentication Reconciliation (2025-12-24)
+
+### Background
+
+After the initial better-auth migration, there was a mismatch between the frontend and backend authentication mechanisms:
+- Frontend: better-auth stores sessions in httpOnly cookies
+- Backend: Still expected JWT tokens in Authorization headers
+
+This caused authentication failures because the frontend was sending session tokens as Bearer tokens, but these are session identifiers, not JWTs.
+
+### Solution: Cookie-Based Authentication
+
+The backend was updated to validate better-auth session cookies instead of JWT tokens.
+
+#### Key Changes
+
+| Component | Before | After |
+|-----------|--------|-------|
+| Backend Auth | JWT in Authorization header | Session cookie validation |
+| Frontend Fetch | `Authorization: Bearer <token>` | `credentials: 'include'` |
+| Session Validation | JWT decode and verify | MongoDB session lookup |
+| Dependency | `get_current_user()` | `get_current_user_from_session()` |
+
+#### Backend Changes
+
+**New Module**: `backend/app/core/better_auth_session.py`
+- `validate_better_auth_session()`: Validates session cookies against MongoDB
+- `get_better_auth_user()`: Fetches user data from better-auth user collection
+- `get_session_token_from_cookies()`: Extracts session token from request cookies
+
+**Updated Security Module**: `backend/app/core/security.py`
+- Added `get_current_user_from_session()`: New authentication dependency using cookies
+- Added `SessionRoleChecker`: Role-based access control using sessions
+- Added `optional_session_security()`: Optional authentication for mixed endpoints
+- Deprecated `get_current_user()`: Kept for backward compatibility
+
+**Updated Endpoints**: All protected endpoints now use `Depends(get_current_user_from_session)`:
+- `users.py` - User management endpoints
+- `books.py` - Book CRUD operations
+- `export.py` - Export functionality
+- `sessions.py` - Session management
+- `transcription.py` - Audio transcription
+- `book_cover_upload.py` - Cover image uploads
+
+#### Frontend Changes
+
+**Updated useAuthFetch Hook**: `frontend/src/hooks/useAuthFetch.ts`
+- Removed Authorization header construction
+- Added `credentials: 'include'` for cookie transmission
+- Added `isAuthenticated` property for convenience
+
+**Updated bookClient**: `frontend/src/lib/api/bookClient.ts`
+- Token methods (`setAuthToken`, `setTokenProvider`) marked as deprecated
+- Primary authentication via cookies with `credentials: 'include'`
+- Token-based auth kept for backward compatibility
+
+### Session Cookie Flow
+
+```
+1. User signs in via better-auth
+   → better-auth creates session in MongoDB
+   → Session cookie set in browser (httpOnly)
+
+2. Frontend makes API request
+   → Browser automatically includes session cookie
+   → `credentials: 'include'` ensures cookies are sent
+
+3. Backend validates session
+   → Extract session token from cookie
+   → Look up session in MongoDB `session` collection
+   → Verify session hasn't expired
+   → Fetch user data from `user` collection and app database
+
+4. Request processed with authenticated user context
+```
+
+### Cookie Names
+
+better-auth uses the following cookie names:
+- Production (HTTPS): `__Secure-better-auth.session_token`
+- Development (HTTP): `better-auth.session_token`
+
+### CORS Configuration
+
+For cookie-based authentication to work across origins, CORS must be configured with:
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_credentials=True,  # Required for cookies
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+### Testing Updates
+
+Test fixtures updated to use session-based authentication:
+- `conftest.py`: Uses `get_current_user_from_session` in dependency overrides
+- Test clients include session cookies instead of Authorization headers
+- `BYPASS_AUTH` mode still works for E2E testing
+
+---
+
 ## Environment Variables
 
 ### Required Variables

@@ -13,7 +13,7 @@ try:
     from app.main import app
 
     print("✓ App imported")
-    from app.core.security import get_current_user
+    from app.core.security import get_current_user_from_session
 
     print("✓ Security imported")
     from bson import ObjectId
@@ -27,7 +27,7 @@ except Exception as e:
 MOCK_USER = {
     "_id": ObjectId(),
     "id": str(ObjectId()),
-    "clerk_id": "test_clerk_id_simple",
+    "auth_id": "test_auth_id_simple",
     "email": "test@example.com",
     "first_name": "Test",
     "last_name": "User",
@@ -45,16 +45,16 @@ async def test_endpoints():
     print("Starting simplified endpoint tests...")
 
     try:
-        # Override authentication
+        # Override authentication (session-based)
         print("Setting up authentication override...")
-        app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+        app.dependency_overrides[get_current_user_from_session] = lambda: MOCK_USER
         print("✓ Authentication override set")
 
         print("Creating HTTP client...")
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",
-            headers={"Authorization": "Bearer test.token"},
+            cookies={"better-auth.session_token": "test-session-token"},
         ) as client:
             print("✓ Client created")
 

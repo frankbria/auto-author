@@ -9,13 +9,18 @@ interface UseAuthFetchOptions {
 }
 
 interface FetchOptions extends RequestInit {
-  /** If true, the auth token won't be included in the request */
+  /** If true, cookies won't be included in the request */
   skipAuth?: boolean;
 }
 
 /**
- * Hook to make authenticated API requests
- * This hook should only be used in Client Components
+ * Hook to make authenticated API requests using cookie-based authentication.
+ *
+ * Authentication is handled automatically via httpOnly session cookies set by better-auth.
+ * The browser will automatically include these cookies in requests when credentials: 'include'
+ * is set.
+ *
+ * This hook should only be used in Client Components.
  */
 export function useAuthFetch(options: UseAuthFetchOptions = {}) {
   const { data: session } = useSession();
@@ -25,7 +30,11 @@ export function useAuthFetch(options: UseAuthFetchOptions = {}) {
   const { baseUrl = "/api" } = options;
 
   /**
-   * Make an authenticated fetch request
+   * Make an authenticated fetch request.
+   *
+   * Authentication is handled automatically via session cookies.
+   * The browser includes httpOnly cookies with the request when
+   * credentials: 'include' is specified.
    */
   const authFetch = useCallback(
     async <T = unknown>(
@@ -41,31 +50,23 @@ export function useAuthFetch(options: UseAuthFetchOptions = {}) {
         // Construct the full URL
         const url = path.startsWith("http") ? path : `${baseUrl}${path}`;
 
-        // Prepare headers - using let to allow reassignment
-        let headersObj: Record<string, string> = {
+        // Prepare headers
+        const headersObj: Record<string, string> = {
           "Content-Type": "application/json",
           ...(restOptions.headers as Record<string, string>),
         };
 
-        // Add auth token if authentication is not skipped
-        if (!skipAuth) {
-          const token = session?.session?.token;
-          if (token) {
-            // Add authorization header
-            headersObj = {
-              ...headersObj,
-              Authorization: `Bearer ${token}`,
-            };
-          }
-        }
-
         // Convert to HeadersInit
         const headers: HeadersInit = headersObj;
 
-        // Make the request
+        // Make the request with credentials included for cookie-based auth
+        // Browser automatically sends httpOnly cookies when credentials: 'include' is set
         const response = await fetch(url, {
           ...restOptions,
           headers,
+          // Include credentials (cookies) for authenticated requests
+          // This enables the browser to automatically send session cookies
+          credentials: skipAuth ? "omit" : "include",
         });
 
         // Parse the response
@@ -95,13 +96,20 @@ export function useAuthFetch(options: UseAuthFetchOptions = {}) {
         setLoading(false);
       }
     },
-    [baseUrl, session]
+    [baseUrl]
   );
+
+  /**
+   * Check if user is authenticated based on session state.
+   * Note: This is a convenience check - actual authentication is validated server-side.
+   */
+  const isAuthenticated = !!session?.user;
 
   return {
     authFetch,
     loading,
     error,
+    isAuthenticated,
   };
 }
 
