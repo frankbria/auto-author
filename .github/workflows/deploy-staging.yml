@@ -19,7 +19,7 @@ env:
 #   - USER: SSH username
 #
 # URLs:
-#   - API_URL: Backend API URL (e.g., https://api.dev.autoauthor.app)
+#   - API_URL: Backend API URL (e.g., https://api.dev.autoauthor.app/api/v1)
 #   - FRONTEND_URL: Frontend URL (e.g., https://dev.autoauthor.app)
 #
 # Database:
@@ -29,13 +29,9 @@ env:
 # OpenAI:
 #   - OPENAI_API_KEY: OpenAI API key
 #
-# Clerk Authentication:
-#   - CLERK_PUBLISHABLE_KEY: Clerk publishable key (pk_*)
-#   - CLERK_SECRET_KEY: Clerk secret key (sk_*)
-#   - CLERK_API_KEY: Clerk API key
-#   - CLERK_FRONTEND_API: Clerk frontend API (e.g., your-app.clerk.accounts.dev)
-#   - CLERK_BACKEND_API: Clerk backend API (api.clerk.com)
-#   - CLERK_WEBHOOK_SECRET: Clerk webhook secret
+# Better Auth Authentication:
+#   - BETTER_AUTH_SECRET: Shared secret for JWT signing/verification (min 64 chars)
+#     Generate with: python -c 'import secrets; print(secrets.token_urlsafe(64))'
 #
 # Optional (AWS):
 #   - AWS_ACCESS_KEY_ID
@@ -83,7 +79,7 @@ jobs:
         working-directory: ./frontend
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_BETTER_AUTH_URL: ${{ secrets.FRONTEND_URL }}
           NEXT_PUBLIC_ENVIRONMENT: staging
         run: |
           npm ci
@@ -155,8 +151,6 @@ jobs:
           RELEASE_ID="$(date +%Y%m%d-%H%M%S)"
           API_URL="${{ secrets.API_URL }}"
           FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
-          CLERK_PUBLISHABLE_KEY="${{ secrets.CLERK_PUBLISHABLE_KEY }}"
-          CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
 
           DEPLOY_BASE="/opt/auto-author"
           RELEASE_DIR="$DEPLOY_BASE/releases/$RELEASE_ID"
@@ -195,13 +189,10 @@ jobs:
             echo "# OpenAI"
             echo "OPENAI_AUTOAUTHOR_API_KEY=${{ secrets.OPENAI_API_KEY }}"
             echo ""
-            echo "# Clerk Authentication"
-            echo "CLERK_API_KEY=${{ secrets.CLERK_API_KEY }}"
-            echo "CLERK_SECRET_KEY=$CLERK_SECRET_KEY"
-            echo "CLERK_FRONTEND_API=${{ secrets.CLERK_FRONTEND_API }}"
-            echo "CLERK_BACKEND_API=${{ secrets.CLERK_BACKEND_API }}"
-            echo "CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}"
-            echo "CLERK_JWT_ALGORITHM=RS256"
+            echo "# Better Auth Authentication"
+            echo "BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}"
+            echo "BETTER_AUTH_URL=$FRONTEND_URL"
+            echo "BETTER_AUTH_ISSUER=better-auth"
             echo ""
             echo "# API Settings"
             echo "API_V1_PREFIX=/api/v1"
@@ -232,16 +223,20 @@ jobs:
           # Create/update .env.production with all required variables
           {
             echo "NEXT_PUBLIC_API_URL=$API_URL"
-            echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY"
-            echo "CLERK_SECRET_KEY=$CLERK_SECRET_KEY"
+            echo "NEXT_PUBLIC_BETTER_AUTH_URL=$FRONTEND_URL"
+            echo "BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}"
+            echo "DATABASE_URL=${{ secrets.MONGODB_URI }}"
+            echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}"
             echo "NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT"
             echo "PORT=3002"
           } > .env.production
 
           # Export environment variables for build process
           export NEXT_PUBLIC_API_URL=$API_URL
-          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
-          export CLERK_SECRET_KEY=$CLERK_SECRET_KEY
+          export NEXT_PUBLIC_BETTER_AUTH_URL=$FRONTEND_URL
+          export BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}
+          export DATABASE_URL=${{ secrets.MONGODB_URI }}
+          export DATABASE_NAME=${{ secrets.DATABASE_NAME }}
           export NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT
 
           # Install dependencies and build
@@ -263,9 +258,6 @@ jobs:
               -e "s|__ENVIRONMENT__|$ENVIRONMENT|g" \
               -e "s|__API_URL__|$API_URL|g" \
               -e "s|__MONGODB_URI__|${{ secrets.MONGODB_URI }}|g" \
-              -e "s|__CLERK_PUBLISHABLE_KEY__|${{ secrets.CLERK_PUBLISHABLE_KEY }}|g" \
-              -e "s|__CLERK_SECRET_KEY__|${{ secrets.CLERK_SECRET_KEY }}|g" \
-              -e "s|__CLERK_WEBHOOK_SECRET__|${{ secrets.CLERK_WEBHOOK_SECRET }}|g" \
               ecosystem.config.template.js > ecosystem.config.js
 
           # Update symlink atomically
@@ -287,7 +279,7 @@ jobs:
 
           # Health checks with retries
           echo "==> Running health checks..."
-          
+
           # Backend health check
           MAX_RETRIES=5
           RETRY_COUNT=0
@@ -296,7 +288,7 @@ jobs:
             echo "Backend health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 2s..."
             sleep 2
           done
-          
+
           if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
             echo "ERROR: Backend health check failed after $MAX_RETRIES attempts"
             exit 1
@@ -310,7 +302,7 @@ jobs:
             echo "Frontend health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 3s..."
             sleep 3
           done
-          
+
           if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
             echo "ERROR: Frontend health check failed after $MAX_RETRIES attempts"
             echo "Checking PM2 logs..."

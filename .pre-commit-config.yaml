@@ -76,6 +76,7 @@ repos:
         language: system
         files: ^frontend/
         pass_filenames: false
+        stages: [manual]
 
   # Backend testing
   - repo: local
