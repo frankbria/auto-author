@@ -74,4 +74,19 @@ export const authClient = {
     },
     error: null,
   }),
+  forgetPassword: jest.fn().mockResolvedValue({
+    data: {},
+    error: null,
+  }),
+  resetPassword: jest.fn().mockResolvedValue({
+    data: {},
+    error: null,
+  }),
 };
+
+// Export convenience methods
+export const signIn = authClient.signIn;
+export const signUp = authClient.signUp;
+export const signOut = authClient.signOut;
+export const forgetPassword = authClient.forgetPassword;
+export const resetPassword = authClient.resetPassword;

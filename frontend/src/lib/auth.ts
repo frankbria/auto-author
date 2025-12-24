@@ -109,6 +109,25 @@ export async function getAuth() {
       emailAndPassword: {
         enabled: true,
         autoSignIn: true,
+        // Password reset configuration
+        sendResetPassword: async ({ user, url }) => {
+          // Send password reset email
+          // Use void to prevent timing attacks (don't reveal if email exists)
+          void (async () => {
+            try {
+              // Import email service dynamically to avoid issues during build
+              const { sendPasswordResetEmail } = await import("@/lib/email");
+              await sendPasswordResetEmail({
+                to: user.email,
+                name: user.name || "User",
+                resetUrl: url,
+              });
+              console.log(`Password reset email sent to ${user.email}`);
+            } catch (error) {
+              console.error("Failed to send password reset email:", error);
+            }
+          })();
+        },
       },
       session: {
         expiresIn: 60 * 60 * 24 * 7, // 7 days

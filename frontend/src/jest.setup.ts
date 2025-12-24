@@ -565,5 +565,13 @@ jest.mock('@/lib/auth-client', () => ({
       },
       error: null,
     }),
+    forgetPassword: jest.fn().mockResolvedValue({
+      data: {},
+      error: null,
+    }),
+    resetPassword: jest.fn().mockResolvedValue({
+      data: {},
+      error: null,
+    }),
   },
 }));
