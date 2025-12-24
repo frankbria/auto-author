@@ -256,27 +256,27 @@ jobs:
           echo "==> Building frontend..."
           npm run build
 
-          # Generate PM2 ecosystem config from template
+          # Update symlink atomically BEFORE generating ecosystem config
+          echo "==> Switching to new release..."
+          ln -snf "$RELEASE_DIR" "$CURRENT_DIR.tmp"
+          mv -Tf "$CURRENT_DIR.tmp" "$CURRENT_DIR"
+
+          # Generate PM2 ecosystem config using symlink paths (not release-specific paths)
           echo "==> Generating PM2 ecosystem configuration..."
-          cd "$RELEASE_DIR"
-          sed -e "s|__BACKEND_CWD__|$RELEASE_DIR/backend|g" \
-              -e "s|__FRONTEND_CWD__|$RELEASE_DIR/frontend|g" \
+          cd "$CURRENT_DIR"
+          sed -e "s|__BACKEND_CWD__|$CURRENT_DIR/backend|g" \
+              -e "s|__FRONTEND_CWD__|$CURRENT_DIR/frontend|g" \
               -e "s|__ENVIRONMENT__|$ENVIRONMENT|g" \
               -e "s|__API_URL__|$API_URL|g" \
               -e "s|__MONGODB_URI__|${{ secrets.MONGODB_URI }}|g" \
               ecosystem.config.template.js > ecosystem.config.js
 
-          # Update symlink atomically
-          echo "==> Switching to new release..."
-          ln -snf "$RELEASE_DIR" "$CURRENT_DIR.tmp"
-          mv -Tf "$CURRENT_DIR.tmp" "$CURRENT_DIR"
-
           # Reload PM2 services using ecosystem file
           echo "==> Reloading PM2 services with ecosystem config..."
-          cd "$CURRENT_DIR"
 
-          # Use startOrReload to handle both new deployments and updates
-          pm2 startOrReload ecosystem.config.js --update-env
+          # Use delete + start instead of reload to force fresh start with new config
+          pm2 delete auto-author-backend auto-author-frontend || true
+          pm2 start ecosystem.config.js
           pm2 save
 
           # Wait for services to start (Next.js needs more time)
