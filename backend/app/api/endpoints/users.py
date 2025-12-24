@@ -273,7 +273,7 @@ async def update_user_data(
         for k, v in user_update.model_dump(exclude_unset=True).items()
         if v is not None
     }
-    update_data["updated_at"] = datetime.now(datetime.timezone.utc)
+    update_data["updated_at"] = datetime.now(timezone.utc)
 
     try:
         updated_user = await update_user(auth_id, update_data)
