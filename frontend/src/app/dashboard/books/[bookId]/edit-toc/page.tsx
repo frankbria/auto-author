@@ -438,9 +438,9 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     const isDragOver = dragOverItem === chapter.id;
     
     return (
-      <div 
+      <div
         key={chapter.id}
-        className={`border border-zinc-700 rounded-lg mb-3 transition-all duration-200 ${
+        className={`border border-gray-700 rounded-lg mb-3 transition-all duration-200 ${
           isDragging ? 'opacity-50 transform scale-95' : ''
         } ${
           isDragOver ? 'border-indigo-500 bg-indigo-900/20' : ''
@@ -452,26 +452,27 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         onDragEnter={() => handleDragEnter(chapter.id)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, chapter.id)}
-      >        <div className="bg-zinc-800 p-3 rounded-t-lg flex items-center justify-between">
+      >
+        <div className="bg-gray-800 p-3 rounded-t-lg flex items-center justify-between">
           <div className="flex items-center gap-2 flex-1">
             <input
               type="text"
               value={chapter.title}
               onChange={(e) => updateChapter(chapter.id, 'title', e.target.value)}
-              className="bg-zinc-800 border-none focus:ring-1 focus:ring-indigo-500 outline-none text-zinc-100 font-medium flex-1"
+              className="bg-gray-800 border-none focus:ring-1 focus:ring-indigo-500 outline-none text-gray-100 font-medium flex-1"
             />
             {chapter.status && (
-              <ChapterStatusIndicator 
-                status={chapter.status} 
-                size="sm" 
-                showLabel 
+              <ChapterStatusIndicator
+                status={chapter.status}
+                size="sm"
+                showLabel
               />
             )}
           </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={() => addSubchapter(chapter.id)}
-              className="text-zinc-400 hover:text-indigo-400 p-1"
+              className="text-gray-400 hover:text-indigo-400 p-1"
               title="Add Subchapter"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -481,7 +482,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
             </button>
             <button
               onClick={() => deleteChapter(chapter.id)}
-              className="text-zinc-400 hover:text-red-400 p-1"
+              className="text-gray-400 hover:text-red-400 p-1"
               title="Delete Chapter"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -489,7 +490,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
               </svg>
             </button>
             <button
-              className="text-zinc-400 hover:text-zinc-300 p-1 cursor-move"
+              className="text-gray-400 hover:text-gray-300 p-1 cursor-move"
               title="Drag to reorder"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -498,12 +499,12 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
             </button>
           </div>
         </div>
-        <div className="p-3 bg-zinc-900 rounded-b-lg">
+        <div className="p-3 bg-gray-900 rounded-b-lg">
           <textarea
             value={chapter.description || ''}
             onChange={(e) => updateChapter(chapter.id, 'description', e.target.value)}
             placeholder="Chapter description (optional)"
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-md py-2 px-3 text-zinc-400 text-sm"
+            className="w-full bg-gray-900 border border-gray-800 rounded-md py-2 px-3 text-gray-400 text-sm"
             rows={2}
           ></textarea>
         </div>
@@ -516,7 +517,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       <div className="container mx-auto flex-1 p-6 flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-          <p className="text-zinc-400">Loading table of contents...</p>
+          <p className="text-gray-400">Loading table of contents...</p>
         </div>
       </div>
     );
@@ -525,8 +526,8 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-zinc-100 mb-3">Edit Table of Contents</h1>
-        <p className="text-zinc-400">
+        <h1 className="text-3xl font-bold text-gray-100 mb-3">Edit Table of Contents</h1>
+        <p className="text-gray-400">
           Customize your book's structure by editing, adding, or rearranging chapters and subchapters.
         </p>
       </div>
@@ -549,7 +550,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         </button>
       </div>
       
-      <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6">
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="space-y-3">
           {toc.map(chapter => (
             <div key={chapter.id}>
@@ -560,10 +561,10 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
             </div>
           ))}
         </div>
-        
+
         {toc.length === 0 && (
           <div className="text-center py-10">
-            <p className="text-zinc-400 mb-4">No chapters yet. Add your first chapter to get started.</p>
+            <p className="text-gray-400 mb-4">No chapters yet. Add your first chapter to get started.</p>
             <button
               onClick={addNewChapter}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
@@ -577,7 +578,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       <div className="mt-8 flex justify-between">
         <button
           onClick={() => router.back()}
-          className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-md"
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-100 rounded-md"
         >
           Back
         </button>
@@ -589,10 +590,10 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
           {isLoading ? 'Saving...' : 'Save & Continue'}
         </button>
       </div>
-      
-      <div className="mt-8 bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
-        <h3 className="text-zinc-300 font-medium mb-2">💡 Table of Contents Tips:</h3>
-        <ul className="text-zinc-400 text-sm list-disc list-inside space-y-1">
+
+      <div className="mt-8 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+        <h3 className="text-gray-300 font-medium mb-2">Table of Contents Tips:</h3>
+        <ul className="text-gray-400 text-sm list-disc list-inside space-y-1">
           <li>Drag chapters to reorder them</li>
           <li>Add subchapters to create a nested structure</li>
           <li>Keep chapter titles clear and descriptive</li>

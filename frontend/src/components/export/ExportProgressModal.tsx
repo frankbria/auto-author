@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Download, XCircle, CheckCircle2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Loading03Icon, Download01Icon, CancelCircleIcon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
 import {
   Dialog,
   DialogContent,
@@ -89,13 +90,13 @@ export function ExportProgressModal({
   const getStatusIcon = () => {
     switch (status) {
       case 'completed':
-        return <CheckCircle2 className="h-12 w-12 text-green-500" />;
+        return <HugeiconsIcon icon={CheckmarkCircle02Icon} size={48} className="text-green-500" />;
       case 'failed':
-        return <XCircle className="h-12 w-12 text-red-500" />;
+        return <HugeiconsIcon icon={CancelCircleIcon} size={48} className="text-red-500" />;
       case 'processing':
       case 'pending':
       default:
-        return <Loader2 className="h-12 w-12 text-primary animate-spin" />;
+        return <HugeiconsIcon icon={Loading03Icon} size={48} className="text-primary animate-spin" />;
     }
   };
 
@@ -182,7 +183,7 @@ export function ExportProgressModal({
           {status === 'completed' && (
             <div className="flex justify-center pt-2">
               <Button onClick={onClose} className="min-w-[120px]">
-                <Download className="h-4 w-4 mr-2" />
+                <HugeiconsIcon icon={Download01Icon} size={16} className="mr-2" />
                 Done
               </Button>
             </div>

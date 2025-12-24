@@ -4,7 +4,24 @@ import { Question, QuestionType, QuestionDifficulty, ResponseStatus } from '@/ty
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ThumbsUp, ThumbsDown, RefreshCw, HelpCircle, BookOpen, Map as MapIcon, MessageSquare, Search, Star, StarHalf, StarOff, WifiOff, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  ThumbsUpIcon,
+  ThumbsDownIcon,
+  RefreshIcon,
+  HelpCircleIcon,
+  BookOpen01Icon,
+  ViewIcon,
+  Message01Icon,
+  SearchIcon,
+  StarIcon,
+  StarHalfIcon,
+  StarOffIcon,
+  WifiOff01Icon,
+  CheckmarkCircle01Icon,
+  AlertCircleIcon,
+  Loading03Icon
+} from '@hugeicons/core-free-icons';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { bookClient } from '@/lib/api/bookClient';
 import { VoiceTextInput } from '@/components/chapters/VoiceTextInput';
@@ -101,17 +118,17 @@ export default function QuestionDisplay({
   const getQuestionTypeIcon = (type: QuestionType) => {
     switch (type) {
       case QuestionType.CHARACTER:
-        return <MessageSquare className="h-5 w-5 text-purple-500" />;
+        return <HugeiconsIcon icon={Message01Icon} size={20} className="text-purple-500" />;
       case QuestionType.PLOT:
-        return <BookOpen className="h-5 w-5 text-blue-500" />;
+        return <HugeiconsIcon icon={BookOpen01Icon} size={20} className="text-blue-500" />;
       case QuestionType.SETTING:
-        return <MapIcon className="h-5 w-5 text-green-500" />;
+        return <HugeiconsIcon icon={ViewIcon} size={20} className="text-green-500" />;
       case QuestionType.THEME:
-        return <Star className="h-5 w-5 text-amber-500" />;
+        return <HugeiconsIcon icon={StarIcon} size={20} className="text-amber-500" />;
       case QuestionType.RESEARCH:
-        return <Search className="h-5 w-5 text-red-500" />;
+        return <HugeiconsIcon icon={SearchIcon} size={20} className="text-red-500" />;
       default:
-        return <HelpCircle className="h-5 w-5 text-gray-500" />;
+        return <HugeiconsIcon icon={HelpCircleIcon} size={20} className="text-gray-500" />;
     }
   };
 
@@ -120,22 +137,22 @@ export default function QuestionDisplay({
     switch (difficulty) {
       case QuestionDifficulty.EASY:
         return {
-          icon: <StarOff className="h-5 w-5 text-green-500" />,
+          icon: <HugeiconsIcon icon={StarOffIcon} size={20} className="text-green-500" />,
           text: 'Easy'
         };
       case QuestionDifficulty.MEDIUM:
         return {
-          icon: <StarHalf className="h-5 w-5 text-amber-500" />,
+          icon: <HugeiconsIcon icon={StarHalfIcon} size={20} className="text-amber-500" />,
           text: 'Medium'
         };
       case QuestionDifficulty.HARD:
         return {
-          icon: <Star className="h-5 w-5 text-red-500" />,
+          icon: <HugeiconsIcon icon={StarIcon} size={20} className="text-red-500" />,
           text: 'Hard'
         };
       default:
         return {
-          icon: <StarHalf className="h-5 w-5 text-gray-500" />,
+          icon: <HugeiconsIcon icon={StarHalfIcon} size={20} className="text-gray-500" />,
           text: 'Medium'
         };
     }
@@ -498,25 +515,25 @@ export default function QuestionDisplay({
               <div className="flex items-center gap-2 text-xs">
                 {saveStatus === 'saving' && (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin text-blue-600" />
                     <span className="text-blue-600">Saving...</span>
                   </>
                 )}
                 {saveStatus === 'saved' && (
                   <>
-                    <Check className="h-4 w-4 text-green-600" />
+                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="text-green-600" />
                     <span className="text-green-600">Saved successfully</span>
                   </>
                 )}
                 {saveStatus === 'error' && (
                   <>
-                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <HugeiconsIcon icon={AlertCircleIcon} size={16} className="text-red-600" />
                     <span className="text-red-600">Save failed</span>
                   </>
                 )}
                 {saveStatus === 'queued' && (
                   <>
-                    <WifiOff className="h-4 w-4 text-amber-600" />
+                    <HugeiconsIcon icon={WifiOff01Icon} size={16} className="text-amber-600" />
                     <span className="text-amber-600">Queued for retry</span>
                   </>
                 )}
@@ -526,7 +543,7 @@ export default function QuestionDisplay({
             {/* Offline indicator */}
             {!isOnline && (
               <div className="flex items-center gap-2 text-xs text-amber-600">
-                <WifiOff className="h-4 w-4" />
+                <HugeiconsIcon icon={WifiOff01Icon} size={16} />
                 <span>Offline mode</span>
               </div>
             )}
@@ -534,7 +551,7 @@ export default function QuestionDisplay({
             {/* Reconnected notification */}
             {wasOffline && (
               <div className="flex items-center gap-2 text-xs text-green-600">
-                <Check className="h-4 w-4" />
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
                 <span>Connection restored</span>
               </div>
             )}
@@ -607,7 +624,7 @@ export default function QuestionDisplay({
               className={`min-h-[44px] min-w-[44px] ${rating === 1 ? 'bg-red-100 dark:bg-red-900/20' : ''}`}
               aria-label="Rate question as poor"
             >
-              <ThumbsDown className="h-4 w-4 text-red-500" />
+              <HugeiconsIcon icon={ThumbsDownIcon} size={16} className="text-red-500" />
             </Button>
 
             <Button
@@ -617,7 +634,7 @@ export default function QuestionDisplay({
               className={`min-h-[44px] min-w-[44px] ${rating === 5 ? 'bg-green-100 dark:bg-green-900/20' : ''}`}
               aria-label="Rate question as good"
             >
-              <ThumbsUp className="h-4 w-4 text-green-500" />
+              <HugeiconsIcon icon={ThumbsUpIcon} size={16} className="text-green-500" />
             </Button>
 
             <Button
@@ -628,7 +645,7 @@ export default function QuestionDisplay({
               className="min-h-[44px] min-w-[44px]"
               aria-label="Generate a new question"
             >
-              <RefreshCw className="h-4 w-4" />
+              <HugeiconsIcon icon={RefreshIcon} size={16} />
             </Button>
           </div>
         </div>

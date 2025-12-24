@@ -68,8 +68,8 @@ export const SummaryInput: React.FC<{
   const maxChars = 2000;
 
   return (
-    <div className="space-y-2">
-      <label htmlFor="summary-input" className="text-lg font-semibold">
+    <div className="space-y-2" data-slot="summary-input-container">
+      <label htmlFor="summary-input" className="text-lg font-semibold transition-all">
         Book Summary / Synopsis
       </label>
       <Textarea
@@ -79,23 +79,29 @@ export const SummaryInput: React.FC<{
         placeholder="Write a brief summary of your book. For best results, include the main idea, genre, and any key themes or characters."
         rows={7}
         maxLength={maxChars}
-        className="text-zinc-100 placeholder:text-zinc-400 bg-zinc-900 border-zinc-700"
+        className="text-gray-100 placeholder:text-gray-400 bg-gray-900 border-gray-700 transition-all focus-visible:ring-[3px]"
         disabled={disabled || isListening}
         aria-describedby="summary-help"
       />
       <div className="flex items-center gap-3 mt-1">
-        <Button type="button" variant="outline" onClick={isListening ? handleStop : handleVoiceInput} disabled={disabled}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={isListening ? handleStop : handleVoiceInput}
+          disabled={disabled}
+          className="transition-all"
+        >
           {isListening ? 'Stop Listening' : 'Speak Summary'}
         </Button>
-        {isListening && <span className="text-indigo-400 animate-pulse">Listening...</span>}
-        {error && <span className="text-red-400 text-xs ml-2">{error}</span>}
-        <span className="ml-auto text-xs text-zinc-400">
+        {isListening && <span className="text-primary animate-pulse transition-all">Listening...</span>}
+        {error && <span className="text-destructive text-xs ml-2 transition-all">{error}</span>}
+        <span className="ml-auto text-xs text-muted-foreground transition-all">
           {wordCount} words &bull; {charCount}/{maxChars} characters
         </span>
       </div>
-      <div id="summary-help" className="text-xs text-zinc-400 mt-2">
+      <div id="summary-help" className="text-xs text-muted-foreground mt-2 transition-all">
         <div>Guidelines: Aim for 1-3 paragraphs. Include the main idea, genre, and any key themes or characters. Minimum 30 words recommended.</div>
-        <div className="italic text-zinc-500 mt-1">
+        <div className="italic text-gray-500 dark:text-gray-600 mt-1 transition-all">
           &quot;A young orphan discovers a hidden world of magic and must stop a dark sorcerer from conquering both realms. The story explores friendship, courage, and the power of believing in oneself.&quot;
         </div>
       </div>

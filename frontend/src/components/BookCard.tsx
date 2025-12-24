@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Card, CardContent, CardFooter, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Delete02Icon } from '@hugeicons/core-free-icons';
 import { DeleteBookModal } from '@/components/books';
 
 export type BookProject = {
@@ -81,22 +82,22 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
     <>
       <Card
         data-testid="book-card"
-        className="w-full max-w-[350px] bg-zinc-800 border border-zinc-700 hover:border-indigo-500 transition cursor-pointer"
+        className="w-full max-w-[350px] bg-gray-800 border border-gray-700 hover:border-indigo-500 transition cursor-pointer"
         onClick={handleClick}
       >
       <div className="p-5">
-        <CardTitle className="text-xl font-semibold text-zinc-100 mb-2 truncate" title={book.title}>
+        <CardTitle className="text-xl font-semibold text-gray-100 mb-2 truncate" title={book.title}>
           {book.title}
         </CardTitle>
       </div>
         <CardContent>
         {book.description && (
-          <p className="text-zinc-400 text-sm mb-3 line-clamp-2" title={book.description}>
+          <p className="text-gray-400 text-sm mb-3 line-clamp-2" title={book.description}>
             {book.description}
           </p>
         )}
-        
-        <div className="flex items-center text-sm text-zinc-400 mb-4">
+
+        <div className="flex items-center text-sm text-gray-400 mb-4">
           <span>Last edited {formatDate(book.updated_at ?? book.created_at ?? '')}</span>
           <span className="mx-2">•</span>
           <span>
@@ -107,7 +108,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
             )}
           </span>
         </div>
-        
+
         {book.chapters === 0 ? (
           <div className="bg-indigo-900/20 border border-indigo-800/50 rounded-md p-3 mb-4">
             <p className="text-indigo-300 text-sm font-medium">
@@ -116,23 +117,23 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
           </div>
         ) : (
           <div className="mb-4">
-            <div className="w-full bg-zinc-700 rounded-full h-2">
-              <div 
-                className="bg-indigo-600 h-2 rounded-full" 
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div
+                className="bg-indigo-600 h-2 rounded-full"
                 style={{ width: `${book.progress}%` }}
               ></div>
             </div>
-            <div className="flex justify-between mt-1 text-sm text-zinc-400">
+            <div className="flex justify-between mt-1 text-sm text-gray-400">
               <span>Progress</span>
               <span>{book.progress}%</span>
             </div>
           </div>
         )}
       </CardContent>
-      
+
       <CardFooter className="px-5 pt-0 flex gap-2">
         <Button
-          className="flex-1 bg-zinc-700 hover:bg-indigo-600 text-zinc-100 h-11"
+          className="flex-1 bg-gray-700 hover:bg-indigo-600 text-gray-100 h-11"
           onClick={(e) => {
             e.stopPropagation();
             router.push(`/dashboard/books/${book.id}`);
@@ -142,7 +143,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
         </Button>
         {onDelete && (
           <Button
-            className="bg-zinc-700 hover:bg-red-600 text-zinc-100 h-11 w-11"
+            className="bg-gray-700 hover:bg-red-600 text-gray-100 h-11 w-11"
             onClick={(e) => {
               e.stopPropagation();
               setShowDeleteDialog(true);
@@ -150,7 +151,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
             disabled={isDeleting}
             aria-label="Delete book"
           >
-            <Trash2 className="h-4 w-4" />
+            <HugeiconsIcon icon={Delete02Icon} size={16} />
           </Button>
         )}
       </CardFooter>

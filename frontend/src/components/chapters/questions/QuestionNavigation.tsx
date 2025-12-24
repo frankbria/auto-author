@@ -2,7 +2,8 @@
 
 import { Question } from '@/types/chapter-questions';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Check, SkipForward, Menu } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon, ArrowRight01Icon, Tick02Icon, FastForward, Menu01Icon } from '@hugeicons/core-free-icons';
 import { useState } from 'react';
 
 interface QuestionNavigationProps {
@@ -55,7 +56,7 @@ export default function QuestionNavigation({
   };
   
   return (
-    <div className="flex flex-col space-y-2">
+    <div className="flex flex-col space-y-2 transition-all" data-slot="question-navigation">
       {/* Main navigation controls */}
       <div className="flex items-center justify-between">
         <Button
@@ -63,9 +64,9 @@ export default function QuestionNavigation({
           size="sm"
           onClick={onPrevious}
           disabled={isFirstQuestion}
-          className="flex items-center space-x-1 min-h-[44px] min-w-[44px]"
+          className="flex items-center space-x-1 min-h-[44px] min-w-[44px] transition-all focus-visible:ring-[3px]"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
           <span>Previous</span>
         </Button>
 
@@ -74,21 +75,21 @@ export default function QuestionNavigation({
             variant="outline"
             size="sm"
             onClick={() => setShowQuestionList(!showQuestionList)}
-            className="flex items-center space-x-1 min-h-[44px] min-w-[44px]"
+            className="flex items-center space-x-1 min-h-[44px] min-w-[44px] transition-all focus-visible:ring-[3px]"
           >
-            <Menu className="h-4 w-4" />
+            <HugeiconsIcon icon={Menu01Icon} size={16} />
             <span>Question {currentIndex + 1} of {totalQuestions}</span>
           </Button>
-          
+
           {/* Question list dropdown */}
           {showQuestionList && (
-            <div className="absolute z-10 mt-1 w-64 max-h-80 overflow-y-auto bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className="absolute z-10 mt-1 w-64 max-h-80 overflow-y-auto bg-background border border-border rounded-md shadow-lg transition-all">
               <ul className="py-1">
                 {questions.map((_, index) => (
-                  <li 
+                  <li
                     key={index}
-                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                      index === currentIndex ? 'bg-gray-100 dark:bg-gray-700' : ''
+                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-accent transition-all ${
+                      index === currentIndex ? 'bg-accent' : ''
                     }`}
                     onClick={() => {
                       onGoToQuestion(index);
@@ -102,25 +103,25 @@ export default function QuestionNavigation({
             </div>
           )}
         </div>
-        
+
         <Button
           variant="outline"
           size="sm"
           onClick={onNext}
           disabled={isLastQuestion}
-          className="flex items-center space-x-1 min-h-[44px] min-w-[44px]"
+          className="flex items-center space-x-1 min-h-[44px] min-w-[44px] transition-all focus-visible:ring-[3px]"
         >
           <span>Next</span>
-          <ChevronRight className="h-4 w-4" />
+          <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
         </Button>
       </div>
-      
+
       {/* Secondary actions */}
       <div className="flex justify-center space-x-2">
         <Button
           variant="ghost"
           size="sm"
-          className="text-xs min-h-[44px] min-w-[44px]"
+          className="text-xs min-h-[44px] min-w-[44px] transition-all focus-visible:ring-[3px]"
           onClick={() => {
             // If we're at the last question, go back to the first one
             // Otherwise, go to the next question
@@ -133,12 +134,12 @@ export default function QuestionNavigation({
         >
           {isLastQuestion ? (
             <>
-              <Check className="h-3 w-3 mr-1" />
+              <HugeiconsIcon icon={Tick02Icon} size={12} className="mr-1" />
               <span>Finish and restart</span>
             </>
           ) : (
             <>
-              <SkipForward className="h-3 w-3 mr-1" />
+              <HugeiconsIcon icon={FastForward} size={12} className="mr-1" />
               <span>Skip this question</span>
             </>
           )}

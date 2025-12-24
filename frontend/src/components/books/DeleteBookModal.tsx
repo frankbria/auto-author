@@ -12,7 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Alert02Icon, Loading03Icon } from '@hugeicons/core-free-icons';
 
 /**
  * Delete book modal props
@@ -93,24 +94,25 @@ export function DeleteBookModal({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-[500px] bg-background border-destructive/50"
+        className="sm:max-w-[500px] bg-background border-destructive/50 transition-all"
         onPointerDownOutside={(e) => isDeleting && e.preventDefault()}
         onEscapeKeyDown={(e) => isDeleting && e.preventDefault()}
+        data-slot="delete-modal"
       >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 text-destructive transition-all">
+            <HugeiconsIcon icon={Alert02Icon} size={20} />
             Delete Book Permanently?
           </DialogTitle>
-          <DialogDescription className="text-base">
+          <DialogDescription className="text-base transition-all">
             This action cannot be undone. This will permanently delete the book and all
             its content from your account.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 transition-all">
           {/* Book Information */}
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 space-y-2">
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 space-y-2 transition-all">
             <div className="font-semibold text-foreground">{bookTitle}</div>
             {bookStats && (
               <div className="text-sm text-muted-foreground space-y-1">
@@ -121,9 +123,9 @@ export function DeleteBookModal({
           </div>
 
           {/* Data Loss Warning */}
-          <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
+          <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 transition-all">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+              <HugeiconsIcon icon={Alert02Icon} size={16} color="rgb(234 179 8)" className="mt-0.5 flex-shrink-0" />
               <div className="text-sm text-foreground">
                 <p className="font-medium mb-1">All data will be permanently deleted:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
@@ -138,8 +140,8 @@ export function DeleteBookModal({
           </div>
 
           {/* Confirmation Input */}
-          <div className="space-y-2">
-            <Label htmlFor="confirm-delete" className="text-foreground">
+          <div className="space-y-2 transition-all">
+            <Label htmlFor="confirm-delete" className="text-foreground transition-all">
               Type <span className="font-mono font-bold">{bookTitle}</span> to confirm
             </Label>
             <Input
@@ -149,23 +151,24 @@ export function DeleteBookModal({
               onChange={(e) => setConfirmationText(e.target.value)}
               placeholder="Enter book title exactly"
               disabled={isDeleting}
-              className="font-mono"
+              className="font-mono transition-all focus-visible:ring-[3px]"
               autoComplete="off"
               autoFocus
             />
             {confirmationText && !isConfirmed && (
-              <p className="text-xs text-destructive">
+              <p className="text-xs text-destructive transition-all">
                 Title must match exactly (case-sensitive)
               </p>
             )}
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="transition-all">
           <Button
             variant="outline"
             onClick={handleCancel}
             disabled={isDeleting}
+            className="transition-all focus-visible:ring-[3px]"
           >
             Cancel
           </Button>
@@ -173,10 +176,11 @@ export function DeleteBookModal({
             variant="destructive"
             onClick={handleConfirm}
             disabled={!isConfirmed || isDeleting}
+            className="transition-all focus-visible:ring-[3px]"
           >
             {isDeleting ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <HugeiconsIcon icon={Loading03Icon} size={16} className="mr-2 animate-spin" />
                 Deleting...
               </>
             ) : (

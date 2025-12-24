@@ -1,7 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { FileText, Clock, CheckCircle, BookOpen } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { FileEditIcon, Loading03Icon, CheckmarkCircle01Icon, Book02Icon } from '@hugeicons/core-free-icons';
 import { ChapterStatus } from '@/types/chapter-tabs';
 
 interface ChapterStatusIndicatorProps {
@@ -13,29 +14,29 @@ interface ChapterStatusIndicatorProps {
 }
 
 const statusConfig = {
-  [ChapterStatus.DRAFT]: { 
-    color: 'bg-gray-500', 
-    textColor: 'text-gray-600',
-    icon: FileText, 
-    label: 'Draft' 
+  [ChapterStatus.DRAFT]: {
+    color: 'bg-gray-500',
+    textColor: 'text-gray-600 dark:text-gray-400',
+    icon: FileEditIcon,
+    label: 'Draft'
   },
-  [ChapterStatus.IN_PROGRESS]: { 
-    color: 'bg-blue-500', 
-    textColor: 'text-blue-600',
-    icon: Clock, 
-    label: 'In Progress' 
+  [ChapterStatus.IN_PROGRESS]: {
+    color: 'bg-blue-500',
+    textColor: 'text-blue-600 dark:text-blue-400',
+    icon: Loading03Icon,
+    label: 'In Progress'
   },
-  [ChapterStatus.COMPLETED]: { 
-    color: 'bg-green-500', 
-    textColor: 'text-green-600',
-    icon: CheckCircle, 
-    label: 'Completed' 
+  [ChapterStatus.COMPLETED]: {
+    color: 'bg-green-500',
+    textColor: 'text-green-600 dark:text-green-400',
+    icon: CheckmarkCircle01Icon,
+    label: 'Completed'
   },
-  [ChapterStatus.PUBLISHED]: { 
-    color: 'bg-purple-500', 
-    textColor: 'text-purple-600',
-    icon: BookOpen, 
-    label: 'Published' 
+  [ChapterStatus.PUBLISHED]: {
+    color: 'bg-purple-500',
+    textColor: 'text-purple-600 dark:text-purple-400',
+    icon: Book02Icon,
+    label: 'Published'
   }
 };
 
@@ -57,21 +58,20 @@ const sizeConfig = {
   }
 };
 
-export function ChapterStatusIndicator({ 
-  status, 
-  size = 'sm', 
-  showLabel = false, 
+export function ChapterStatusIndicator({
+  status,
+  size = 'sm',
+  showLabel = false,
   showIcon = false,
-  className 
+  className
 }: ChapterStatusIndicatorProps) {
   const config = statusConfig[status];
   const sizes = sizeConfig[size];
-  const StatusIcon = config.icon;
 
   if (showIcon && showLabel) {
     return (
-      <div className={cn("flex items-center gap-2", className)}>
-        <StatusIcon className={cn(sizes.icon, config.textColor)} />
+      <div data-slot="status-indicator" className={cn("flex items-center gap-2 transition-all", className)}>
+        <HugeiconsIcon icon={config.icon} size={parseInt(sizes.icon.split('-')[1])} className={config.textColor} />
         <span className={cn(sizes.text, config.textColor)}>{config.label}</span>
       </div>
     );
@@ -79,13 +79,18 @@ export function ChapterStatusIndicator({
 
   if (showIcon) {
     return (
-      <StatusIcon className={cn(sizes.icon, config.textColor, className)} />
+      <HugeiconsIcon
+        data-slot="status-icon"
+        icon={config.icon}
+        size={parseInt(sizes.icon.split('-')[1])}
+        className={cn(config.textColor, 'transition-all', className)}
+      />
     );
   }
 
   if (showLabel) {
     return (
-      <span className={cn(sizes.text, config.textColor, className)}>
+      <span data-slot="status-label" className={cn(sizes.text, config.textColor, 'transition-all', className)}>
         {config.label}
       </span>
     );
@@ -93,14 +98,17 @@ export function ChapterStatusIndicator({
 
   // Default: just show colored dot
   return (
-    <div 
+    <div
+      data-slot="status-dot"
       className={cn(
-        "rounded-full flex-shrink-0",
+        "rounded-full flex-shrink-0 transition-all",
         sizes.dot,
         config.color,
         className
       )}
       title={config.label}
+      role="status"
+      aria-label={config.label}
     />
   );
 }

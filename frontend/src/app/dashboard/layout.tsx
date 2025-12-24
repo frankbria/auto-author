@@ -32,22 +32,22 @@ export default function DashboardLayout({
     <ProtectedRoute>
       <div className="flex flex-col min-h-screen">
         {/* Header/Navigation */}
-        <header className="bg-zinc-900 border-b border-zinc-800 py-4 px-6 sticky top-0 z-50">
+        <header className="bg-gray-900 border-b border-gray-800 py-4 px-6 sticky top-0 z-50">
           <div className="container mx-auto flex justify-between items-center">
             <Link href="/dashboard" className="text-2xl font-bold text-indigo-500">Auto Author</Link>
-            
+
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-4">
               <nav>
                 <ul className="flex items-center gap-6">
                   {navItems.map((item) => (
                     <li key={item.name}>
-                      <Link 
-                        href={item.href} 
+                      <Link
+                        href={item.href}
                         className={`${
-                          item.active 
-                            ? 'text-indigo-400 font-medium' 
-                            : 'text-zinc-400 hover:text-indigo-400'
+                          item.active
+                            ? 'text-indigo-400 font-medium'
+                            : 'text-gray-400 hover:text-indigo-400'
                         } transition-colors`}
                       >
                         {item.name}
@@ -64,7 +64,7 @@ export default function DashboardLayout({
               <UserButton />
               <button
                 onClick={toggleMobileMenu}
-                className="text-zinc-400 hover:text-zinc-100 transition-colors p-2"
+                className="text-gray-400 hover:text-gray-100 transition-colors p-2"
                 aria-label="Toggle mobile menu"
               >
                 <svg 
@@ -93,13 +93,13 @@ export default function DashboardLayout({
               />
               
               {/* Menu Panel */}
-              <div className="fixed top-0 right-0 h-full w-64 bg-zinc-900 border-l border-zinc-800 z-50 md:hidden transform transition-transform duration-300 ease-in-out">
+              <div className="fixed top-0 right-0 h-full w-64 bg-gray-900 border-l border-gray-800 z-50 md:hidden transform transition-transform duration-300 ease-in-out">
                 <div className="p-6">
                   <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-lg font-semibold text-zinc-100">Menu</h2>
+                    <h2 className="text-lg font-semibold text-gray-100">Menu</h2>
                     <button
                       onClick={closeMobileMenu}
-                      className="text-zinc-400 hover:text-zinc-100 transition-colors p-1"
+                      className="text-gray-400 hover:text-gray-100 transition-colors p-1"
                       aria-label="Close menu"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,18 +107,18 @@ export default function DashboardLayout({
                       </svg>
                     </button>
                   </div>
-                  
+
                   <nav>
                     <ul className="space-y-4">
                       {navItems.map((item) => (
                         <li key={item.name}>
-                          <Link 
+                          <Link
                             href={item.href}
                             onClick={closeMobileMenu}
                             className={`block py-3 px-4 rounded-lg transition-colors ${
-                              item.active 
-                                ? 'bg-indigo-600 text-white font-medium' 
-                                : 'text-zinc-300 hover:bg-zinc-800 hover:text-indigo-400'
+                              item.active
+                                ? 'bg-indigo-600 text-white font-medium'
+                                : 'text-gray-300 hover:bg-gray-800 hover:text-indigo-400'
                             }`}
                           >
                             {item.name}
@@ -134,13 +134,13 @@ export default function DashboardLayout({
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 bg-zinc-950">
+        <div className="flex-1 bg-gray-950">
           {children}
         </div>
 
         {/* Footer */}
-        <footer className="bg-zinc-900 border-t border-zinc-800 py-4 px-6">
-          <div className="container mx-auto text-center text-zinc-500 text-sm">
+        <footer className="bg-gray-900 border-t border-gray-800 py-4 px-6">
+          <div className="container mx-auto text-center text-gray-500 text-sm">
             <p>© 2025 Noatak Enterprises, LLC, dba Auto Author. All rights reserved.</p>
           </div>
         </footer>

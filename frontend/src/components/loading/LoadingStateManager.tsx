@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Loading03Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -138,11 +139,10 @@ export function LoadingStateManager({
     >
       {/* Spinner */}
       <div className="relative">
-        <Loader2
-          className={cn(
-            'animate-spin text-indigo-500',
-            inline ? 'h-8 w-8' : 'h-12 w-12'
-          )}
+        <HugeiconsIcon
+          icon={Loading03Icon}
+          size={inline ? 32 : 48}
+          className="animate-spin text-indigo-500"
           aria-label={`Loading: ${operation}`}
         />
       </div>
@@ -205,7 +205,7 @@ export function LoadingStateManager({
           className="mt-2"
           aria-label={`Cancel ${operation}`}
         >
-          <X className="mr-2 h-4 w-4" />
+          <HugeiconsIcon icon={Cancel01Icon} size={16} className="mr-2" />
           Cancel
         </Button>
       )}

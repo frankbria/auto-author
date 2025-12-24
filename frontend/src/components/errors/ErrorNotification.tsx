@@ -2,7 +2,8 @@
 
 import { toast } from 'sonner';
 import { ClassifiedError, ErrorType } from '@/lib/errors';
-import { AlertCircle, RefreshCw, X, Clock, Database } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { AlertCircleIcon, RefreshIcon, Cancel01Icon, Clock01Icon, Database01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 
@@ -45,13 +46,13 @@ function RetryCountdown({ initialSeconds, onRetry }: { initialSeconds: number; o
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      <Clock className="h-4 w-4" />
+      <HugeiconsIcon icon={Clock01Icon} size={16} />
       <span>
         {secondsLeft > 0 ? (
           `Retry in ${minutes}:${seconds.toString().padStart(2, '0')}`
         ) : (
           <Button size="sm" variant="outline" onClick={onRetry}>
-            <RefreshCw className="h-3 w-3 mr-1" />
+            <HugeiconsIcon icon={RefreshIcon} size={12} className="mr-1" />
             Retry Now
           </Button>
         )}
@@ -92,7 +93,7 @@ export function showErrorNotification(
       toast.warning(error.message, {
         description: error.details || 'AI service temporarily unavailable. Showing cached content.',
         duration: defaultDuration,
-        icon: <Database className="h-5 w-5" />,
+        icon: <HugeiconsIcon icon={Database01Icon} size={20} />,
         action: onRetry && {
           label: 'Generate Fresh',
           onClick: onRetry,
@@ -219,9 +220,9 @@ export function ErrorNotification({
     >
       <div className="flex items-start gap-3">
         {error.type === ErrorType.AI_SERVICE && isFromCache ? (
-          <Database className={`h-5 w-5 flex-shrink-0 mt-0.5 ${iconColor}`} />
+          <HugeiconsIcon icon={Database01Icon} size={20} className={`flex-shrink-0 mt-0.5 ${iconColor}`} />
         ) : (
-          <AlertCircle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${iconColor}`} />
+          <HugeiconsIcon icon={AlertCircleIcon} size={20} className={`flex-shrink-0 mt-0.5 ${iconColor}`} />
         )}
 
         <div className="flex-1 min-w-0">
@@ -229,18 +230,18 @@ export function ErrorNotification({
             <h4 className="font-semibold text-white">{error.message}</h4>
             {isFromCache && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                <Database className="h-3 w-3" />
+                <HugeiconsIcon icon={Database01Icon} size={12} />
                 Cached Content
               </span>
             )}
           </div>
 
           {error.details && (
-            <p className="text-sm text-zinc-300 mb-2">{error.details}</p>
+            <p className="text-sm text-gray-300 mb-2">{error.details}</p>
           )}
 
           {error.fieldErrors && Object.keys(error.fieldErrors).length > 0 && (
-            <ul className="text-sm text-zinc-300 space-y-1 mb-2">
+            <ul className="text-sm text-gray-300 space-y-1 mb-2">
               {Object.entries(error.fieldErrors).map(([field, message]) => (
                 <li key={field} className="flex items-start">
                   <span className="font-medium mr-2">{field}:</span>
@@ -251,7 +252,7 @@ export function ErrorNotification({
           )}
 
           {error.suggestedActions && error.suggestedActions.length > 0 && (
-            <div className="text-sm text-zinc-400 mt-2">
+            <div className="text-sm text-gray-400 mt-2">
               <p className="font-medium mb-1">What you can do:</p>
               <ul className="list-disc list-inside space-y-0.5">
                 {error.suggestedActions.map((action, index) => (
@@ -262,7 +263,7 @@ export function ErrorNotification({
           )}
 
           {error.type === ErrorType.SYSTEM && (
-            <p className="text-xs text-zinc-500 mt-2">
+            <p className="text-xs text-gray-500 mt-2">
               Reference ID: {error.correlationId}
             </p>
           )}
@@ -277,7 +278,7 @@ export function ErrorNotification({
                 onClick={onRetry}
                 className="text-white border-white/20 hover:bg-white/10"
               >
-                <RefreshCw className="h-3 w-3 mr-1" />
+                <HugeiconsIcon icon={RefreshIcon} size={12} className="mr-1" />
                 {isFromCache ? 'Generate Fresh' : 'Retry'}
               </Button>
             ) : null}
@@ -287,7 +288,7 @@ export function ErrorNotification({
                 size="sm"
                 variant="ghost"
                 onClick={onDismiss}
-                className="text-zinc-400 hover:text-white"
+                className="text-gray-400 hover:text-white"
               >
                 Dismiss
               </Button>
@@ -298,10 +299,10 @@ export function ErrorNotification({
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="flex-shrink-0 text-zinc-400 hover:text-white transition-colors"
+            className="flex-shrink-0 text-gray-400 hover:text-white transition-colors"
             aria-label="Dismiss"
           >
-            <X className="h-4 w-4" />
+            <HugeiconsIcon icon={Cancel01Icon} size={16} />
           </button>
         )}
       </div>

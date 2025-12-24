@@ -27,24 +27,25 @@ declare module '@tiptap/react' {
 }
 import { Button } from '@/components/ui/button';
 import bookClient from '@/lib/api/bookClient';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
+  TextBoldIcon,
+  TextItalicIcon,
+  TextUnderlineIcon,
   Strikethrough,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  Quote,
-  Code,
-  Undo,
-  Redo,
-  Minus,
-  Check,
-  Loader2
-} from 'lucide-react';
+  Heading01Icon,
+  Heading02Icon,
+  Heading03Icon,
+  ListViewIcon,
+  MenuSquareIcon,
+  QuoteUpIcon,
+  CodeIcon,
+  Undo02Icon,
+  Redo02Icon,
+  MinusSignIcon,
+  CheckmarkCircle01Icon,
+  Loading03Icon
+} from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { DraftGenerator } from './DraftGenerator';
@@ -367,7 +368,7 @@ export function ChapterEditor({
           title="Bold"
           type="button"
         >
-          <Bold className="h-4 w-4" />
+          <HugeiconsIcon icon={TextBoldIcon} size={16} />
         </Button>
         
         <Button
@@ -381,7 +382,7 @@ export function ChapterEditor({
           title="Italic"
           type="button"
         >
-          <Italic className="h-4 w-4" />
+          <HugeiconsIcon icon={TextItalicIcon} size={16} />
         </Button>
         
         <Button
@@ -395,7 +396,7 @@ export function ChapterEditor({
           title="Underline"
           type="button"
         >
-          <UnderlineIcon className="h-4 w-4" />
+          <HugeiconsIcon icon={TextUnderlineIcon} size={16} />
         </Button>
         
         <Button
@@ -409,7 +410,7 @@ export function ChapterEditor({
           title="Strikethrough"
           type="button"
         >
-          <Strikethrough className="h-4 w-4" />
+          <HugeiconsIcon icon={Strikethrough} size={16} />
         </Button>
         
         <div className="w-px h-6 bg-border mx-1" />
@@ -425,7 +426,7 @@ export function ChapterEditor({
           title="Heading 1"
           type="button"
         >
-          <Heading1 className="h-4 w-4" />
+          <HugeiconsIcon icon={Heading01Icon} size={16} />
         </Button>
         
         <Button
@@ -439,7 +440,7 @@ export function ChapterEditor({
           title="Heading 2"
           type="button"
         >
-          <Heading2 className="h-4 w-4" />
+          <HugeiconsIcon icon={Heading02Icon} size={16} />
         </Button>
         
         <Button
@@ -453,7 +454,7 @@ export function ChapterEditor({
           title="Heading 3"
           type="button"
         >
-          <Heading3 className="h-4 w-4" />
+          <HugeiconsIcon icon={Heading03Icon} size={16} />
         </Button>
         
         <div className="w-px h-6 bg-border mx-1" />
@@ -469,7 +470,7 @@ export function ChapterEditor({
           title="Bullet List"
           type="button"
         >
-          <List className="h-4 w-4" />
+          <HugeiconsIcon icon={ListViewIcon} size={16} />
         </Button>
         
         <Button
@@ -483,7 +484,7 @@ export function ChapterEditor({
           title="Ordered List"
           type="button"
         >
-          <ListOrdered className="h-4 w-4" />
+          <HugeiconsIcon icon={MenuSquareIcon} size={16} />
         </Button>
         
         <Button
@@ -497,7 +498,7 @@ export function ChapterEditor({
           title="Blockquote"
           type="button"
         >
-          <Quote className="h-4 w-4" />
+          <HugeiconsIcon icon={QuoteUpIcon} size={16} />
         </Button>
         
         <Button
@@ -511,7 +512,7 @@ export function ChapterEditor({
           title="Code Block"
           type="button"
         >
-          <Code className="h-4 w-4" />
+          <HugeiconsIcon icon={CodeIcon} size={16} />
         </Button>
         
         <div className="w-px h-6 bg-border mx-1" />
@@ -525,7 +526,7 @@ export function ChapterEditor({
           title="Undo"
           type="button"
         >
-          <Undo className="h-4 w-4" />
+          <HugeiconsIcon icon={Undo02Icon} size={16} />
         </Button>
         
         <Button
@@ -537,7 +538,7 @@ export function ChapterEditor({
           title="Redo"
           type="button"
         >
-          <Redo className="h-4 w-4" />
+          <HugeiconsIcon icon={Redo02Icon} size={16} />
         </Button>
         
         <Button
@@ -548,7 +549,7 @@ export function ChapterEditor({
           title="Horizontal Rule"
           type="button"
         >
-          <Minus className="h-4 w-4" />
+          <HugeiconsIcon icon={MinusSignIcon} size={16} />
         </Button>
         </div>
         
@@ -578,13 +579,13 @@ export function ChapterEditor({
           <div className="flex items-center gap-2">
             {isSaving && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" />
                 Saving...
               </span>
             )}
             {!isSaving && lastSaved && (
               <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                <Check className="h-3 w-3" />
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={12} />
                 Saved {lastSaved.toLocaleTimeString()}
               </span>
             )}

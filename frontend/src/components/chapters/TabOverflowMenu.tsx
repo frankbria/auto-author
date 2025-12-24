@@ -2,7 +2,8 @@
 
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { MoreHorizontalIcon } from '@hugeicons/core-free-icons';
 import { ChapterTabMetadata } from '@/types/chapter-tabs';
 
 interface TabOverflowMenuProps {
@@ -28,7 +29,7 @@ export function TabOverflowMenu({
     <DropdownMenu open={visible} onOpenChange={onVisibilityChange}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="px-2">
-          <MoreHorizontal className="h-4 w-4" />
+          <HugeiconsIcon icon={MoreHorizontalIcon} size={16} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

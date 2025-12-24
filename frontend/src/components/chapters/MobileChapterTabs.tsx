@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Menu } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Menu01Icon } from '@hugeicons/core-free-icons';
 import { ChapterTabMetadata } from '@/types/chapter-tabs';
 import { cn } from '@/lib/utils';
 
@@ -57,7 +58,7 @@ export function MobileChapterTabs({
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
           <Button variant="outline" size="sm" className="mt-2 w-full">
-            <Menu className="w-4 h-4 mr-2" />
+            <HugeiconsIcon icon={Menu01Icon} size={16} className="mr-2" />
             Chapter Options
           </Button>
         </SheetTrigger>

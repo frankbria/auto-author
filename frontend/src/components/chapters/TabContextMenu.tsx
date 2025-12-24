@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Edit, Trash2, Copy, Eye } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { MoreVerticalIcon, Edit01Icon, Delete02Icon, Copy01Icon, ViewIcon } from '@hugeicons/core-free-icons';
 import { ChapterStatus } from '@/types/chapter-tabs';
 
 interface TabContextMenuProps {
@@ -40,13 +41,13 @@ export default function TabContextMenu({
 
   return (
     <div className="relative">
-      <Button 
-        variant="ghost" 
-        size="sm" 
+      <Button
+        variant="ghost"
+        size="sm"
         className="h-6 w-6 p-0"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <MoreVertical className="h-3 w-3" />
+        <HugeiconsIcon icon={MoreVerticalIcon} size={12} />
       </Button>
       
       {isOpen && (
@@ -61,7 +62,7 @@ export default function TabContextMenu({
                 className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
                 onClick={() => handleAction(() => onPreview(chapterId))}
               >
-                <Eye className="w-4 h-4 mr-2" />
+                <HugeiconsIcon icon={ViewIcon} size={16} className="mr-2" />
                 Preview
               </button>
             )}
@@ -70,7 +71,7 @@ export default function TabContextMenu({
               className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleAction(() => console.log('Edit chapter', chapterId))}
             >
-              <Edit className="w-4 h-4 mr-2" />
+              <HugeiconsIcon icon={Edit01Icon} size={16} className="mr-2" />
               Edit
             </button>
 
@@ -79,7 +80,7 @@ export default function TabContextMenu({
                 className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
                 onClick={() => handleAction(() => onDuplicate(chapterId))}
               >
-                <Copy className="w-4 h-4 mr-2" />
+                <HugeiconsIcon icon={Copy01Icon} size={16} className="mr-2" />
                 Duplicate
               </button>
             )}
@@ -118,7 +119,7 @@ export default function TabContextMenu({
                 className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground"
                 onClick={() => handleAction(() => onDelete(chapterId))}
               >
-                <Trash2 className="w-4 h-4 mr-2" />
+                <HugeiconsIcon icon={Delete02Icon} size={16} className="mr-2" />
                 Delete
               </button>
             )}

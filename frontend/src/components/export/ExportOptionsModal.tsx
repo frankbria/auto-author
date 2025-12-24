@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Download, FileText, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Download01Icon, File01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -121,7 +122,7 @@ export function ExportOptionsModal({
       <DialogContent className="sm:max-w-[500px] bg-background border-input">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Download className="h-5 w-5" />
+            <HugeiconsIcon icon={Download01Icon} size={20} />
             Export Book
           </DialogTitle>
           <DialogDescription>
@@ -175,7 +176,7 @@ export function ExportOptionsModal({
                     Portable Document Format - ideal for printing and sharing. Preserves formatting.
                   </p>
                 </div>
-                <FileText className="h-5 w-5 text-red-500" />
+                <HugeiconsIcon icon={File01Icon} size={20} className="text-red-500" />
               </div>
 
               <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent">
@@ -191,7 +192,7 @@ export function ExportOptionsModal({
                     Microsoft Word format - editable and compatible with most word processors.
                   </p>
                 </div>
-                <FileText className="h-5 w-5 text-blue-500" />
+                <HugeiconsIcon icon={File01Icon} size={20} className="text-blue-500" />
               </div>
             </RadioGroup>
           </div>
@@ -252,7 +253,7 @@ export function ExportOptionsModal({
             variant="outline"
             onClick={() => onOpenChange(false)}
           >
-            <X className="h-4 w-4 mr-2" />
+            <HugeiconsIcon icon={Cancel01Icon} size={16} className="mr-2" />
             Cancel
           </Button>
           <Button
@@ -260,7 +261,7 @@ export function ExportOptionsModal({
             onClick={handleExport}
             disabled={loadingStats}
           >
-            <Download className="h-4 w-4 mr-2" />
+            <HugeiconsIcon icon={Download01Icon} size={16} className="mr-2" />
             Export {format.toUpperCase()}
           </Button>
         </DialogFooter>

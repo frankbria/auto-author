@@ -4,7 +4,8 @@ import { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { X, FileText, Clock, AlertCircle } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Cancel01Icon, File01Icon, Clock01Icon, AlertCircleIcon } from '@hugeicons/core-free-icons';
 import { ChapterTabMetadata, ChapterStatus } from '@/types/chapter-tabs';
 
 interface ChapterTabProps {
@@ -17,32 +18,33 @@ interface ChapterTabProps {
 }
 
 const statusConfig = {
-  [ChapterStatus.DRAFT]: { 
-    color: 'bg-muted', 
-    icon: FileText, 
-    label: 'Draft' 
+  [ChapterStatus.DRAFT]: {
+    color: 'bg-muted',
+    icon: File01Icon,
+    label: 'Draft'
   },
-  [ChapterStatus.IN_PROGRESS]: { 
-    color: 'bg-blue-500', 
-    icon: Clock, 
-    label: 'In Progress' 
+  [ChapterStatus.IN_PROGRESS]: {
+    color: 'bg-blue-500',
+    icon: Clock01Icon,
+    label: 'In Progress'
   },
-  [ChapterStatus.COMPLETED]: { 
+  [ChapterStatus.COMPLETED]: {
     color: 'bg-green-500',
-    icon: Clock, 
-    label: 'Completed' 
+    icon: Clock01Icon,
+    label: 'Completed'
   },
-  [ChapterStatus.PUBLISHED]: { 
-    color: 'bg-purple-500', 
-    icon: Clock, 
-    label: 'Published' 
+  [ChapterStatus.PUBLISHED]: {
+    color: 'bg-purple-500',
+    icon: Clock01Icon,
+    label: 'Published'
   }
 };
 
 export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
   ({ chapter, isActive, isDragging, onSelect, onClose, orientation = 'vertical', ...props }, ref) => {
     const config = statusConfig[chapter.status];
-    const StatusIcon = config.icon;    const truncatedTitle = orientation === 'horizontal' && chapter.title.length > 20 
+    const statusIcon = config.icon;
+    const truncatedTitle = orientation === 'horizontal' && chapter.title.length > 20 
       ? `${chapter.title.substring(0, 20)}...` 
       : chapter.title;
 
@@ -99,7 +101,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
               )}
 
               {chapter.error && (
-                <AlertCircle className="w-3 h-3 text-red-600" />
+                <HugeiconsIcon icon={AlertCircleIcon} size={12} className="text-red-600" />
               )}
             </div>
 
@@ -122,7 +124,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
               }}
               aria-label="Close chapter"
             >
-              <X className="h-4 w-4" />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} />
             </Button>
           </div>
         </TooltipTrigger>
@@ -130,7 +132,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
           <div className="space-y-1">
             <p className="font-medium text-foreground">{chapter.title}</p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <StatusIcon className="w-3 h-3" />
+              <HugeiconsIcon icon={statusIcon} size={12} />
               <span>{config.label}</span>
               <span>•</span>
               <span>{chapter.word_count} words</span>
