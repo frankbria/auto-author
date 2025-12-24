@@ -191,7 +191,7 @@ async def rate_limit(
 
 
 async def audit_request(
-    request: Request,
+    request: Optional[Request],
     current_user: Dict,
     action: str,
     resource_type: str,
@@ -205,7 +205,7 @@ async def audit_request(
     This function trusts that current_user has already been authenticated.
 
     Args:
-        request: The FastAPI request object
+        request: The FastAPI request object (may be None in some contexts)
         current_user: The authenticated user making the request (already validated)
         action: The action being performed (e.g., "create", "update", "delete")
         resource_type: The type of resource being accessed (e.g., "user", "book")
@@ -221,11 +221,24 @@ async def audit_request(
         "email": current_user.get("email", "")
     }
 
-    # Extract request details
-    method = request.method
-    path = request.url.path
-    ip_address = request.client.host
-    user_agent = request.headers.get("user-agent", "")
+    # Extract request details (request may be None in some contexts)
+    if request is not None:
+        method = request.method
+        path = request.url.path
+        client = getattr(request, "client", None)
+        ip_address = getattr(client, "host", None) if client else None
+        user_agent = request.headers.get("user-agent", "")
+        request_id = (
+            str(getattr(request.state, "request_id", None))
+            if hasattr(request, "state")
+            else None
+        )
+    else:
+        method = None
+        path = None
+        ip_address = None
+        user_agent = ""
+        request_id = None
 
     # Build details dictionary with request info
     details = {
@@ -233,11 +246,7 @@ async def audit_request(
         "path": path,
         "ip_address": ip_address,
         "user_agent": user_agent,
-        "request_id": (
-            str(request.state.request_id)
-            if hasattr(request.state, "request_id")
-            else None
-        ),
+        "request_id": request_id,
     }
 
     # Merge in any additional metadata
