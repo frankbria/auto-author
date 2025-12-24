@@ -300,18 +300,22 @@ class TestAPIKey:
 
 @pytest.mark.asyncio
 class TestAuditRequest:
-    """Test audit logging functionality"""
+    """Test audit logging functionality
+
+    Note: audit_request no longer uses settings - it trusts that current_user
+    has been authenticated by get_current_user_from_session via session cookies.
+    """
 
     @patch("app.api.dependencies.create_audit_log")
-    @patch("app.api.dependencies.settings")
-    async def test_audit_request_bypass_auth(self, mock_settings, mock_create_audit):
-        """Test audit_request with BYPASS_AUTH enabled"""
-        mock_settings.BYPASS_AUTH = True
+    async def test_audit_request_with_user(self, mock_create_audit):
+        """Test audit_request logs user actions correctly"""
         mock_request = Mock(spec=Request)
         mock_request.method = "GET"
         mock_request.url.path = "/api/test"
         mock_request.client.host = "192.168.1.1"
         mock_request.headers = {"user-agent": "test-agent"}
+        mock_request.state = Mock()
+        mock_request.state.request_id = None
 
         current_user = {"auth_id": "test_user", "email": "test@example.com"}
 
@@ -325,17 +329,15 @@ class TestAuditRequest:
 
         assert result["sub"] == "test_user"
         assert result["email"] == "test@example.com"
+        mock_create_audit.assert_called_once()
 
     @patch("app.api.dependencies.create_audit_log")
-    @patch("app.api.dependencies.settings")
-    async def test_audit_request_with_authenticated_user(self, mock_settings, mock_create_audit):
+    async def test_audit_request_with_authenticated_user(self, mock_create_audit):
         """Test audit_request with pre-authenticated user (cookie-based auth)
 
         Note: Authentication is now handled by get_current_user_from_session via session cookies.
         audit_request trusts that current_user has already been authenticated.
         """
-        mock_settings.BYPASS_AUTH = False
-
         mock_request = Mock(spec=Request)
         mock_request.method = "POST"
         mock_request.url.path = "/api/books"
@@ -362,11 +364,8 @@ class TestAuditRequest:
         mock_create_audit.assert_called_once()
 
     @patch("app.api.dependencies.create_audit_log")
-    @patch("app.api.dependencies.settings")
-    async def test_audit_request_logs_request_details(self, mock_settings, mock_create_audit):
+    async def test_audit_request_logs_request_details(self, mock_create_audit):
         """Test that audit_request logs all request details correctly"""
-        mock_settings.BYPASS_AUTH = False
-
         mock_request = Mock(spec=Request)
         mock_request.method = "DELETE"
         mock_request.url.path = "/api/books/123"
