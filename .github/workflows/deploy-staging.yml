@@ -268,7 +268,6 @@ jobs:
               -e "s|__FRONTEND_CWD__|$CURRENT_DIR/frontend|g" \
               -e "s|__ENVIRONMENT__|$ENVIRONMENT|g" \
               -e "s|__API_URL__|$API_URL|g" \
-              -e "s|__MONGODB_URI__|${{ secrets.MONGODB_URI }}|g" \
               ecosystem.config.template.js > ecosystem.config.js
 
           # Reload PM2 services using ecosystem file

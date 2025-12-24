@@ -11,7 +11,6 @@ module.exports = {
       interpreter: 'none', // Don't use Node.js interpreter
       env: {
         ENVIRONMENT: '__ENVIRONMENT__',
-        DATABASE_URI: '__MONGODB_URI__',
       },
       error_file: '~/.pm2/logs/auto-author-backend-error.log',
       out_file: '~/.pm2/logs/auto-author-backend-out.log',
