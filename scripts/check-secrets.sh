@@ -61,9 +61,18 @@ for FILE in $FILES; do
             ;;
     esac
     
-    # Skip files larger than 100KB
-    FILE_SIZE=$(git diff --cached --numstat "$FILE" | awk '{print $1 + $2}')
-    if [ -n "$FILE_SIZE" ] && [ "$FILE_SIZE" -gt 100000 ]; then
+    # Skip files larger than 100KB (byte size check)
+    if [ -f "$FILE" ]; then
+        # Try GNU stat first, fall back to macOS stat
+        FILE_BYTES=$(stat -c%s "$FILE" 2>/dev/null || stat -f%z "$FILE" 2>/dev/null || echo 0)
+        if [ "$FILE_BYTES" -gt 102400 ]; then
+            continue
+        fi
+    fi
+    
+    # Additional safeguard: skip files with very large diffs (>10000 lines changed)
+    LINES_CHANGED=$(git diff --cached --numstat "$FILE" | awk '{print $1 + $2}')
+    if [ -n "$LINES_CHANGED" ] && [ "$LINES_CHANGED" -gt 10000 ]; then
         continue
     fi
 

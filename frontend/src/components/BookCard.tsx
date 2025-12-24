@@ -151,7 +151,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
             disabled={isDeleting}
             aria-label="Delete book"
           >
-            <HugeiconsIcon icon={Delete02Icon} size={16} />
+            <HugeiconsIcon icon={Delete02Icon} size={16} data-testid="trash-icon" />
           </Button>
         )}
       </CardFooter>

@@ -142,7 +142,10 @@ export function LoadingStateManager({
         <HugeiconsIcon
           icon={Loading03Icon}
           size={inline ? 32 : 48}
-          className="animate-spin text-indigo-500"
+          className={cn(
+            "animate-spin text-indigo-500",
+            inline ? "h-8 w-8" : "h-12 w-12"
+          )}
           aria-label={`Loading: ${operation}`}
         />
       </div>

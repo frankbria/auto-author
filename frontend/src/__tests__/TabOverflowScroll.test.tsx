@@ -72,12 +72,13 @@ describe('Tab Overflow and Scrolling', () => {
     };
     
     const originalQuerySelector = HTMLElement.prototype.querySelector;
-    HTMLElement.prototype.querySelector = jest.fn((selector) => {
+    HTMLElement.prototype.querySelector = jest.fn(function(this: HTMLElement, selector: string) {
       if (selector === '[data-radix-scroll-area-viewport]') {
         return mockViewport as any;
       }
-      return originalQuerySelector.call(this, selector);
-    });
+      // Return null for other selectors instead of calling original to avoid context issues
+      return null;
+    }) as any;
     
     render(
       <TabBar
@@ -170,9 +171,13 @@ describe('Tab Overflow and Scrolling', () => {
     // Mock querySelector to return elements with scrollIntoView
     const originalQuerySelector = HTMLElement.prototype.querySelector;
     HTMLElement.prototype.querySelector = jest.fn(function(this: HTMLElement, selector: string) {
-      if (selector.includes('[data-chapter-id="ch-15"]')) {
+      if (selector.includes('data-rfd-draggable-id')) {
+        // Return a mock element for draggable items
         return {
-          scrollIntoView: scrollIntoViewMock
+          scrollIntoView: scrollIntoViewMock,
+          getAttribute: jest.fn(),
+          addEventListener: jest.fn(),
+          removeEventListener: jest.fn()
         } as any;
       }
       if (selector === '[data-radix-scroll-area-viewport]') {
@@ -184,8 +189,9 @@ describe('Tab Overflow and Scrolling', () => {
           removeEventListener: jest.fn()
         } as any;
       }
-      return originalQuerySelector.call(this, selector);
-    });
+      // Return null for other selectors instead of calling original to avoid context issues
+      return null;
+    }) as any;
     
     render(
       <TabBar
