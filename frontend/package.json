@@ -57,7 +57,6 @@
     "clsx": "^2.0.0",
     "date-fns": "^4.1.0",
     "dompurify": "^3.2.6",
-    "hugeicons-react": "^0.3.0",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.555.0",
     "mongodb": "^6.21.0",

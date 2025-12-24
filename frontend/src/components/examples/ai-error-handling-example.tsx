@@ -80,12 +80,12 @@ export function TOCQuestionsExample({ bookId }: AIErrorHandlingExampleProps) {
         >
           {isLoading ? (
             <>
-              <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2 animate-spin" />
+              <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2 animate-spin" aria-hidden="true" />
               Generating...
             </>
           ) : (
             <>
-              <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" />
+              <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" aria-hidden="true" />
               Generate Questions
             </>
           )}
@@ -94,7 +94,7 @@ export function TOCQuestionsExample({ bookId }: AIErrorHandlingExampleProps) {
 
       {isFromCachedContent && (
         <Alert className="bg-blue-900/20 border-blue-500">
-          <HugeiconsIcon icon={Database01Icon} size={16} />
+          <HugeiconsIcon icon={Database01Icon} size={16} aria-hidden="true" />
           <AlertDescription>
             Using previously generated content (AI service temporarily unavailable)
             <Button
@@ -185,12 +185,12 @@ export function ChapterDraftExample({ bookId, chapterId }: AIErrorHandlingExampl
         >
           {isLoading ? (
             <>
-              <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2 animate-spin" />
+              <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2 animate-spin" aria-hidden="true" />
               Generating...
             </>
           ) : (
             <>
-              <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" />
+              <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" aria-hidden="true" />
               Generate Draft
             </>
           )}
@@ -199,7 +199,7 @@ export function ChapterDraftExample({ bookId, chapterId }: AIErrorHandlingExampl
 
       {isFromCachedContent && (
         <Alert className="bg-blue-900/20 border-blue-500">
-          <HugeiconsIcon icon={Database01Icon} size={16} />
+          <HugeiconsIcon icon={Database01Icon} size={16} aria-hidden="true" />
           <AlertDescription>
             Using previously generated draft (AI service temporarily unavailable)
           </AlertDescription>
@@ -274,12 +274,12 @@ export function SummaryAnalysisExample({ bookId }: AIErrorHandlingExampleProps) 
         >
           {isLoading ? (
             <>
-              <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2 animate-spin" />
+              <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2 animate-spin" aria-hidden="true" />
               Analyzing...
             </>
           ) : (
             <>
-              <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" />
+              <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" aria-hidden="true" />
               Analyze Summary
             </>
           )}
@@ -288,7 +288,7 @@ export function SummaryAnalysisExample({ bookId }: AIErrorHandlingExampleProps) 
 
       {isFromCachedContent && (
         <Alert className="bg-blue-900/20 border-blue-500">
-          <HugeiconsIcon icon={Database01Icon} size={16} />
+          <HugeiconsIcon icon={Database01Icon} size={16} aria-hidden="true" />
           <AlertDescription>
             Using previously generated analysis
           </AlertDescription>

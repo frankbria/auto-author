@@ -49,11 +49,12 @@ function TocItem({ chapter, level, isActive, isExpanded, onToggle, onSelect, act
               onToggle();
             }}
             className="p-0.5 hover:bg-zinc-700/50 rounded"
+            aria-label={isExpanded ? "Collapse subchapters" : "Expand subchapters"}
           >
             {isExpanded ? (
-              <HugeiconsIcon icon={ArrowDown01Icon} size={12} />
+              <HugeiconsIcon icon={ArrowDown01Icon} size={12} aria-hidden="true" />
             ) : (
-              <HugeiconsIcon icon={ArrowRight01Icon} size={12} />
+              <HugeiconsIcon icon={ArrowRight01Icon} size={12} aria-hidden="true" />
             )}
           </button>
         ) : (
@@ -128,7 +129,7 @@ export function TocSidebar({
     return (
       <div className={cn("w-64 border-r border-zinc-800 bg-zinc-900", className)}>
         <div className="p-4 text-center text-zinc-500">
-          <HugeiconsIcon icon={BookOpen01Icon} size={32} className="mx-auto mb-2 opacity-50" />
+          <HugeiconsIcon icon={BookOpen01Icon} size={32} className="mx-auto mb-2 opacity-50" aria-hidden="true" />
           <p className="text-sm">No chapters available</p>
         </div>
       </div>
@@ -141,9 +142,9 @@ export function TocSidebar({
         <button
           onClick={() => setIsCollapsed(false)}
           className="p-3 hover:bg-zinc-800 transition-colors"
-          title="Expand TOC"
+          aria-label="Expand table of contents"
         >
-          <HugeiconsIcon icon={Menu01Icon} size={20} className="text-zinc-400" />
+          <HugeiconsIcon icon={Menu01Icon} size={20} className="text-zinc-400" aria-hidden="true" />
         </button>
       </div>
     );
@@ -154,16 +155,16 @@ export function TocSidebar({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-zinc-800">
         <div className="flex items-center gap-2">
-          <HugeiconsIcon icon={BookOpen01Icon} size={16} className="text-indigo-400" />
+          <HugeiconsIcon icon={BookOpen01Icon} size={16} className="text-indigo-400" aria-hidden="true" />
           <h3 className="font-medium text-zinc-100">Table of Contents</h3>
         </div>
         {isCollapsible && (
           <button
             onClick={() => setIsCollapsed(true)}
             className="p-1 hover:bg-zinc-800 rounded transition-colors"
-            title="Collapse TOC"
+            aria-label="Collapse table of contents"
           >
-            <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-zinc-400" />
+            <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-zinc-400" aria-hidden="true" />
           </button>
         )}
       </div>

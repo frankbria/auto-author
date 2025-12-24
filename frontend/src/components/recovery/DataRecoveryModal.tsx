@@ -78,7 +78,7 @@ export function DataRecoveryModal({
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <HugeiconsIcon icon={Alert02Icon} size={20} className="text-yellow-500" />
+            <HugeiconsIcon icon={Alert02Icon} size={20} className="text-yellow-500" aria-hidden="true" />
             Unsaved Changes Detected
           </DialogTitle>
           <DialogDescription id="recovery-modal-description">
@@ -90,7 +90,7 @@ export function DataRecoveryModal({
         <div className="space-y-4 py-4">
           {/* Timestamp Info */}
           <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-            <HugeiconsIcon icon={Clock01Icon} size={16} className="text-muted-foreground mt-0.5" />
+            <HugeiconsIcon icon={Clock01Icon} size={16} className="text-muted-foreground mt-0.5" aria-hidden="true" />
             <div className="flex-1 text-sm">
               <p className="font-medium">Last saved locally:</p>
               <p className="text-muted-foreground">{timeAgo}</p>
@@ -103,7 +103,7 @@ export function DataRecoveryModal({
           {/* Error Context (if available) */}
           {recoveredData.error && (
             <div className="flex items-start gap-3 p-3 bg-destructive/10 rounded-lg">
-              <HugeiconsIcon icon={Alert02Icon} size={16} className="text-destructive mt-0.5" />
+              <HugeiconsIcon icon={Alert02Icon} size={16} className="text-destructive mt-0.5" aria-hidden="true" />
               <div className="flex-1 text-sm">
                 <p className="font-medium text-destructive">Previous save failed:</p>
                 <p className="text-muted-foreground">{recoveredData.error}</p>
@@ -113,7 +113,7 @@ export function DataRecoveryModal({
 
           {/* Content Preview */}
           <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-            <HugeiconsIcon icon={File01Icon} size={16} className="text-muted-foreground mt-0.5" />
+            <HugeiconsIcon icon={File01Icon} size={16} className="text-muted-foreground mt-0.5" aria-hidden="true" />
             <div className="flex-1 text-sm">
               <p className="font-medium mb-2">Content preview:</p>
               <p className="text-muted-foreground italic">

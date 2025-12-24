@@ -84,6 +84,8 @@ export function ChapterStatusIndicator({
         icon={config.icon}
         size={parseInt(sizes.icon.split('-')[1])}
         className={cn(config.textColor, 'transition-all', className)}
+        role="status"
+        aria-label={config.label}
       />
     );
   }

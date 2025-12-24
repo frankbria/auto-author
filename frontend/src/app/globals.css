@@ -47,10 +47,6 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
-body {
-  @apply bg-gray-950 text-gray-100;
-}
-
 :root {
   --radius: 0.625rem;
   --card: oklch(1 0 0);
@@ -123,19 +119,10 @@ body {
 @layer base {
   * {
     border-color: var(--color-border);
+    outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
   }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-    outline-color: hsl(var(--ring) / 0.5);
-  }
-  body {
-    @apply bg-background text-foreground;
   }
 }

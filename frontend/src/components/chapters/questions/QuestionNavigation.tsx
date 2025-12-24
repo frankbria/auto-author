@@ -3,7 +3,7 @@
 import { Question } from '@/types/chapter-questions';
 import { Button } from '@/components/ui/button';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowLeft01Icon, ArrowRight01Icon, Tick02Icon, FastForward, Menu01Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, ArrowRight01Icon, Tick02Icon, Forward01Icon, Menu01Icon } from '@hugeicons/core-free-icons';
 import { useState } from 'react';
 
 interface QuestionNavigationProps {
@@ -139,7 +139,7 @@ export default function QuestionNavigation({
             </>
           ) : (
             <>
-              <HugeiconsIcon icon={FastForward} size={12} className="mr-1" />
+              <HugeiconsIcon icon={Forward01Icon} size={12} className="mr-1" />
               <span>Skip this question</span>
             </>
           )}
