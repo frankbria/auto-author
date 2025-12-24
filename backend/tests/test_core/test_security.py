@@ -257,10 +257,47 @@ class TestGetCurrentUser:
     @patch("app.core.security.verify_jwt_token")
     @patch("app.db.user.get_user_by_auth_id")
     @patch("app.core.security.settings")
-    async def test_get_current_user_not_found(self, mock_settings, mock_get_user, mock_verify):
-        """Test get_current_user when user not in database - should return 403"""
+    @patch("app.db.user.create_user")
+    async def test_get_current_user_not_found(self, mock_create_user, mock_settings, mock_get_user, mock_verify):
+        """Test get_current_user auto-creates user when not in database"""
         mock_settings.BYPASS_AUTH = False
-        mock_verify.return_value = {"sub": "user_123"}
+        mock_verify.return_value = {
+            "sub": "user_123",
+            "email": "test@example.com",
+            "name": "Test User"
+        }
+        # First call returns None (user not found), second call returns the created user
+        created_user = {
+            "id": "new_user_id",
+            "auth_id": "user_123",
+            "email": "test@example.com",
+            "first_name": "Test",
+            "last_name": "User"
+        }
+        mock_get_user.return_value = None
+        mock_create_user.return_value = created_user
+
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
+
+        user = await get_current_user(credentials)
+
+        # Verify user was auto-created
+        assert user == created_user
+        mock_create_user.assert_called_once()
+        # Verify the user data passed to create_user
+        call_args = mock_create_user.call_args[0][0]
+        assert call_args["auth_id"] == "user_123"
+        assert call_args["email"] == "test@example.com"
+        assert call_args["first_name"] == "Test"
+        assert call_args["last_name"] == "User"
+
+    @patch("app.core.security.verify_jwt_token")
+    @patch("app.db.user.get_user_by_auth_id")
+    @patch("app.core.security.settings")
+    async def test_get_current_user_missing_email_in_jwt(self, mock_settings, mock_get_user, mock_verify):
+        """Test get_current_user when JWT is missing email claim - should return 400"""
+        mock_settings.BYPASS_AUTH = False
+        mock_verify.return_value = {"sub": "user_123"}  # No email
         mock_get_user.return_value = None
 
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
@@ -268,8 +305,8 @@ class TestGetCurrentUser:
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(credentials)
 
-        assert exc_info.value.status_code == 403
-        assert "not found" in exc_info.value.detail.lower()
+        assert exc_info.value.status_code == 400
+        assert "missing email" in exc_info.value.detail.lower()
 
     @patch("app.core.security.verify_jwt_token")
     @patch("app.db.user.get_user_by_auth_id")
