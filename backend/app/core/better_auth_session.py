@@ -18,11 +18,10 @@ Better-auth stores sessions in the 'session' collection with the following schem
 
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
-from motor.motor_asyncio import AsyncIOMotorClient
 from fastapi import Request, HTTPException, status
 import logging
 
-from app.core.config import settings
+from app.db.base import get_collection
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +30,6 @@ SESSION_COOKIE_NAMES = [
     "__Secure-better-auth.session_token",  # Production (HTTPS)
     "better-auth.session_token",            # Development (HTTP)
 ]
-
-
-def _get_mongo_client() -> AsyncIOMotorClient:
-    """Get MongoDB client for session validation.
-
-    Note: This creates a separate client to avoid circular imports with db.base.
-    In production, consider using a shared connection pool.
-    """
-    return AsyncIOMotorClient(settings.DATABASE_URL)
 
 
 async def get_session_token_from_cookies(request: Request) -> Optional[str]:
@@ -89,10 +79,8 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
         return None
 
     try:
-        # Connect to MongoDB and look up the session
-        client = _get_mongo_client()
-        db = client[settings.DATABASE_NAME]
-        session_collection = db.get_collection("session")
+        # Get the session collection using the shared MongoDB client
+        session_collection = await get_collection("session")
 
         # Find session by token
         session = await session_collection.find_one({"token": session_token})
@@ -159,9 +147,8 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
         Dict containing user data, or None if not found
     """
     try:
-        client = _get_mongo_client()
-        db = client[settings.DATABASE_NAME]
-        user_collection = db.get_collection("user")
+        # Get the user collection using the shared MongoDB client
+        user_collection = await get_collection("user")
 
         # Find user by ID (better-auth stores ID as 'id' field, not '_id')
         user = await user_collection.find_one({"id": user_id})
