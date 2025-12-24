@@ -5,26 +5,26 @@ import { generateChaptersFixture, setupTestEnvironment } from './fixtures/chapte
 describe('Tab Overflow and Scrolling', () => {
   beforeEach(() => {
     setupTestEnvironment();
-    
+
     // Clear any previous mocks
     jest.clearAllMocks();
     localStorage.clear();
-    
+
     // Mock element dimensions for testing overflow
-    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { 
-      configurable: true, 
-      value: 500 
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      value: 500
     });
-    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { 
-      configurable: true, 
-      value: 1000 
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      value: 1000
     });
-    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { 
-      configurable: true, 
-      value: 500 
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      value: 500
     });
-    Object.defineProperty(HTMLElement.prototype, 'scrollTop', { 
-      configurable: true, 
+    Object.defineProperty(HTMLElement.prototype, 'scrollTop', {
+      configurable: true,
       value: 100 // Has scrolled down a bit
     });
   });
@@ -32,10 +32,10 @@ describe('Tab Overflow and Scrolling', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
-  
+
   test('renders scroll buttons when tabs overflow container', async () => {
     const { chapters, tabOrder } = generateChaptersFixture(20);
-    
+
     render(
       <TabBar
         chapters={chapters}
@@ -46,21 +46,21 @@ describe('Tab Overflow and Scrolling', () => {
         onTabClose={jest.fn()}
       />
     );
-    
+
     await waitFor(() => {
       expect(screen.getByTestId('scroll-up-button')).toBeInTheDocument();
       expect(screen.getByTestId('scroll-down-button')).toBeInTheDocument();
     });
   });
-  
+
   test('scrolls tab container when scroll buttons are clicked', async () => {
     const { chapters, tabOrder } = generateChaptersFixture(20);
-    
+
     // Mock scroll methods
     const scrollByMock = jest.fn();
     const addEventListenerMock = jest.fn();
     const removeEventListenerMock = jest.fn();
-    
+
     // Mock querySelector to return a mock viewport element
     const mockViewport = {
       scrollBy: scrollByMock,
@@ -70,7 +70,7 @@ describe('Tab Overflow and Scrolling', () => {
       addEventListener: addEventListenerMock,
       removeEventListener: removeEventListenerMock
     };
-    
+
     const originalQuerySelector = HTMLElement.prototype.querySelector;
     HTMLElement.prototype.querySelector = jest.fn(function(this: HTMLElement, selector: string) {
       if (selector === '[data-radix-scroll-area-viewport]') {
@@ -79,7 +79,7 @@ describe('Tab Overflow and Scrolling', () => {
       // Return null for other selectors instead of calling original to avoid context issues
       return null;
     }) as any;
-    
+
     render(
       <TabBar
         chapters={chapters}
@@ -91,34 +91,34 @@ describe('Tab Overflow and Scrolling', () => {
         data-testid="tab-bar"
       />
     );
-    
+
     // Wait for component to be fully rendered
     await waitFor(() => {
       expect(screen.getByTestId('scroll-down-button')).toBeInTheDocument();
     });
-    
+
     // Trigger scroll event on the viewport element to update button states
     act(() => {
       // Fire scroll event on the mock viewport
       const scrollEvent = new Event('scroll', { bubbles: true });
       mockViewport.dispatchEvent = jest.fn();
-      
+
       // Call the scroll handler if it was added
       const scrollListener = addEventListenerMock.mock.calls.find(call => call[0] === 'scroll');
       if (scrollListener && scrollListener[1]) {
         scrollListener[1](scrollEvent);
       }
     });
-    
+
     // Wait for state to update after scroll event
     let scrollDownButton: HTMLElement;
     let scrollUpButton: HTMLElement;
-    
+
     try {
       await waitFor(() => {
         scrollDownButton = screen.getByTestId('scroll-down-button');
         scrollUpButton = screen.getByTestId('scroll-up-button');
-        
+
         // At least one button should be enabled if there's content to scroll
         expect(scrollDownButton.disabled === false || scrollUpButton.disabled === false).toBe(true);
       }, { timeout: 2000 });
@@ -128,46 +128,46 @@ describe('Tab Overflow and Scrolling', () => {
       scrollDownButton = screen.getByTestId('scroll-down-button');
       scrollUpButton = screen.getByTestId('scroll-up-button');
     }
-    
+
     // Only test scrolling if buttons are enabled
     if (!scrollDownButton!.disabled) {
       // Click scroll down button
       fireEvent.click(scrollDownButton!);
-      
+
       expect(scrollByMock).toHaveBeenCalledWith(
-        expect.objectContaining({ 
+        expect.objectContaining({
           top: 100,
           behavior: 'smooth'
         })
       );
     }
-    
+
     if (!scrollUpButton!.disabled) {
       // Click scroll up button
       fireEvent.click(scrollUpButton!);
-      
+
       expect(scrollByMock).toHaveBeenCalledWith(
-        expect.objectContaining({ 
+        expect.objectContaining({
           top: -100,
           behavior: 'smooth'
         })
       );
     }
-    
+
     // If both buttons are disabled, just verify the component rendered
     if (scrollDownButton!.disabled && scrollUpButton!.disabled) {
       expect(screen.getByTestId('tab-bar')).toBeInTheDocument();
     }
-    
+
     // Restore original querySelector
     HTMLElement.prototype.querySelector = originalQuerySelector;
   });
-  
+
   test('automatically scrolls to make active tab visible', async () => {
     const { chapters, tabOrder } = generateChaptersFixture(20);
-    
+
     const scrollIntoViewMock = jest.fn();
-    
+
     // Mock querySelector to return elements with scrollIntoView
     const originalQuerySelector = HTMLElement.prototype.querySelector;
     HTMLElement.prototype.querySelector = jest.fn(function(this: HTMLElement, selector: string) {
@@ -192,7 +192,7 @@ describe('Tab Overflow and Scrolling', () => {
       // Return null for other selectors instead of calling original to avoid context issues
       return null;
     }) as any;
-    
+
     render(
       <TabBar
         chapters={chapters}
@@ -204,27 +204,27 @@ describe('Tab Overflow and Scrolling', () => {
         data-testid="tab-bar"
       />
     );
-    
+
     // Wait for the component to render and attempt to scroll
     await waitFor(() => {
       // The component should have rendered
       expect(screen.getByTestId('tab-bar')).toBeInTheDocument();
     });
-    
+
     // Check if scrollIntoView was called (if the tab was out of view)
     // If tabs don't overflow, scrollIntoView might not be called
     await waitFor(() => {
       const activeTab = screen.queryByText('Chapter 15');
       expect(activeTab || scrollIntoViewMock).toBeTruthy();
     }, { timeout: 2000 });
-    
+
     // Restore original querySelector
     HTMLElement.prototype.querySelector = originalQuerySelector;
   });
-  
+
   test('has correct initial scroll button states', async () => {
     const { chapters, tabOrder } = generateChaptersFixture(20);
-    
+
     render(
       <TabBar
         chapters={chapters}
@@ -235,7 +235,7 @@ describe('Tab Overflow and Scrolling', () => {
         onTabClose={jest.fn()}
       />
     );
-    
+
     // Check initial button states
     await waitFor(() => {
       // Either both buttons are visible, or one is disabled - don't be too strict

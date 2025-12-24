@@ -36,7 +36,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   const formatDate = (dateString: string) => {
     if (!dateString) {
       return 'Never';
@@ -54,7 +54,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
       timeZone: 'UTC'
     });
   };
-  
+
   const handleClick = () => {
     if (onClick) {
       onClick();
@@ -62,10 +62,10 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
       router.push(`/dashboard/books/${book.id}`);
     }
   };
-  
+
   const handleDelete = async () => {
     if (!onDelete) return;
-    
+
     setIsDeleting(true);
     try {
       await onDelete(book.id);
@@ -77,7 +77,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
       setIsDeleting(false);
     }
   };
-  
+
   return (
     <>
       <Card
@@ -156,7 +156,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
         )}
       </CardFooter>
       </Card>
-      
+
       <DeleteBookModal
         isOpen={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
