@@ -40,8 +40,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check for better-auth session cookie
-  // better-auth sets 'better-auth.session_token' cookie on successful authentication
-  const sessionToken = request.cookies.get('better-auth.session_token');
+  // In production (HTTPS), better-auth sets '__Secure-better-auth.session_token'
+  // In development (HTTP), it sets 'better-auth.session_token'
+  const sessionToken = request.cookies.get('__Secure-better-auth.session_token')
+    || request.cookies.get('better-auth.session_token');
 
   // Redirect to sign-in if accessing protected route without session
   if (!sessionToken) {
