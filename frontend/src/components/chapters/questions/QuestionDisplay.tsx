@@ -549,7 +549,7 @@ export default function QuestionDisplay({
                   variant="outline"
                   size="sm"
                   onClick={lastAction === 'complete' ? handleMarkCompleted : handleSaveDraft}
-                  className="ml-2 h-8"
+                  className="ml-2 h-8 min-h-[44px] min-w-[44px]"
                 >
                   Retry
                 </Button>

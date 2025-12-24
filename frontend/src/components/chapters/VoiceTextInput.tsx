@@ -240,7 +240,7 @@ export function VoiceTextInput({
               <Button
                 onClick={startRecording}
                 disabled={disabled}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 min-h-[44px] min-w-[44px]"
                 aria-label="Start voice recording"
               >
                 <Mic className="h-4 w-4" />
@@ -251,7 +251,7 @@ export function VoiceTextInput({
                 variant="destructive"
                 onClick={stopRecording}
                 disabled={disabled}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 min-h-[44px] min-w-[44px]"
                 aria-label="Stop voice recording"
               >
                 <Square className="h-4 w-4" />
@@ -270,7 +270,7 @@ export function VoiceTextInput({
             variant="link"
             size="sm"
             onClick={handleRetry}
-            className="ml-2 p-0 h-auto text-destructive underline"
+            className="ml-2 p-0 h-auto text-destructive underline min-h-[44px] min-w-[44px]"
           >
             Retry
           </Button>

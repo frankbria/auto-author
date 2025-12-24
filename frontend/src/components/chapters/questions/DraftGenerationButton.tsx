@@ -231,7 +231,7 @@ export function DraftGenerationButton({
           onClick={handleOpenDialog}
           disabled={!canGenerate}
           variant={canGenerate ? "default" : "outline"}
-          className="w-full gap-2"
+          className="w-full gap-2 min-h-[44px]"
         >
           <Sparkles className="h-4 w-4" />
           Generate Draft from Answers
