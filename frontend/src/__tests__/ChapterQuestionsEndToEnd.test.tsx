@@ -35,8 +35,10 @@ jest.mock('../lib/api/bookClient', () => {
     getChaptersMetadata: jest.fn(),
     getTabState: jest.fn(),
     saveTabState: jest.fn(),
+    generateChapterDraft: jest.fn(),
+    getChapterQAResponses: jest.fn(),
   };
-  
+
   return {
     __esModule: true,
     default: mockBookClient,
@@ -630,12 +632,21 @@ describe('Chapter Questions End-to-End Tests', () => {
         progress: 1.0,
         status: 'completed'
       });
-      (mockDraftClient.generateChapterDraft as jest.Mock).mockResolvedValue({
-        draft_content: 'Generated draft content based on question responses...',
+      (mockBookClient.getChapterQAResponses as jest.Mock).mockResolvedValue({
+        responses: [
+          { question: 'Question 1?', answer: 'Answer 1', status: 'completed' },
+          { question: 'Question 2?', answer: 'Answer 2', status: 'completed' },
+          { question: 'Question 3?', answer: 'Answer 3', status: 'completed' }
+        ]
+      });
+      (mockBookClient.generateChapterDraft as jest.Mock).mockResolvedValue({
+        draft: 'Generated draft content based on question responses...',
         metadata: {
-          generation_source: 'questions',
-          processing_time: 3500
-        }
+          word_count: 500,
+          estimated_reading_time: 2,
+          writing_style: 'professional'
+        },
+        suggestions: []
       });
 
       render(
@@ -652,35 +663,38 @@ describe('Chapter Questions End-to-End Tests', () => {
         expect(screen.getByText(/All questions completed/i)).toBeInTheDocument();
       }, { timeout: 15000 });
 
-      // Should show option to generate draft
-      const generateDraftButton = screen.queryByRole('button', { name: /Generate Chapter Draft/i }) ||
-                                screen.queryByText('Generate Chapter Draft') ||
-                                screen.queryByRole('button', { name: /generate.*draft/i });
-      if (generateDraftButton) {
-        fireEvent.click(generateDraftButton);
-      } else {
-        // If no generate draft button, just check completion message exists
-        expect(screen.getByText(/All questions completed/i)).toBeInTheDocument();
-      }
+      // Should show option to generate draft - look for the button that opens the dialog
+      const openDialogButton = screen.queryByRole('button', { name: /Generate Draft from Answers/i }) ||
+                               screen.queryByText(/Generate Draft from Answers/i);
 
-      if (generateDraftButton) {
+      if (openDialogButton) {
+        // Click to open the dialog
+        fireEvent.click(openDialogButton);
+
+        // Wait for dialog to open and find the "Generate Draft" button inside
         await waitFor(() => {
-          expect(mockDraftClient.generateChapterDraft).toHaveBeenCalledWith(
+          expect(screen.getByRole('dialog')).toBeInTheDocument();
+        });
+
+        // Click the "Generate Draft" button inside the dialog
+        const generateButton = screen.getByRole('button', { name: /^Generate Draft$/i });
+        fireEvent.click(generateButton);
+
+        // Verify the API was called with correct parameters
+        await waitFor(() => {
+          expect(mockBookClient.generateChapterDraft).toHaveBeenCalledWith(
             'test-book-id',
             'test-chapter-id',
             expect.objectContaining({
-              source: 'questions',
-              include_responses: true
+              question_responses: expect.any(Array),
+              writing_style: expect.any(String),
+              target_length: expect.any(Number)
             })
           );
         });
-
-        // Should redirect to draft tab
-        await waitFor(() => {
-          expect(mockPush).toHaveBeenCalledWith(
-            '/books/test-book-id/chapters/test-chapter-id?tab=draft'
-          );
-        });
+      } else {
+        // If no generate draft button, just check completion message exists
+        expect(screen.getByText(/All questions completed/i)).toBeInTheDocument();
       }
     });
 

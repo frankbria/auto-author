@@ -401,7 +401,7 @@ export default function QuestionContainer({
               size="sm"
               onClick={() => fetchQuestions(true)}
               disabled={isRefreshing}
-              className="shrink-0"
+              className="shrink-0 min-h-[44px] min-w-[44px]"
             >
               {isRefreshing ? (
                 <>
