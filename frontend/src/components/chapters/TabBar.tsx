@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowUp01Icon, ArrowDown01Icon } from '@hugeicons/core-free-icons';
 import { ChapterTab } from './ChapterTab';
 import { TabOverflowMenu } from './TabOverflowMenu';
 import { ChapterTabMetadata } from '@/types/chapter-tabs';
@@ -134,7 +135,7 @@ export function TabBar({
             size="sm"
             variant="ghost"
           >
-            <ChevronUp className="h-4 w-4" />
+            <HugeiconsIcon icon={ArrowUp01Icon} size={16} />
           </Button>
           
           <Button
@@ -145,7 +146,7 @@ export function TabBar({
             size="sm"
             variant="ghost"
           >
-            <ChevronDown className="h-4 w-4" />
+            <HugeiconsIcon icon={ArrowDown01Icon} size={16} />
           </Button>
         </>
       )}

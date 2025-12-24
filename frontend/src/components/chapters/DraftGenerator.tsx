@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sparkles, Loader2, AlertCircle, FileText } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { SparklesIcon, Loading03Icon, AlertCircleIcon, File01Icon } from '@hugeicons/core-free-icons';
 import { useToast } from '@/components/ui/use-toast';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import bookClient from '@/lib/api/bookClient';
@@ -180,7 +181,7 @@ export function DraftGenerator({
         size="sm"
         className={cn("gap-2", className)}
       >
-        <Sparkles className="h-4 w-4" />
+        <HugeiconsIcon icon={SparklesIcon} size={16} />
         Generate AI Draft
       </Button>
 
@@ -296,12 +297,12 @@ export function DraftGenerator({
                 >
                   {isGenerating ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <HugeiconsIcon icon={Loading03Icon} size={16} className="mr-2 animate-spin" />
                       Generating...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="mr-2 h-4 w-4" />
+                      <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" />
                       Generate Draft
                     </>
                   )}
@@ -342,7 +343,7 @@ export function DraftGenerator({
               {suggestions.length > 0 && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
+                    <HugeiconsIcon icon={AlertCircleIcon} size={16} />
                     Improvement Suggestions
                   </Label>
                   <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
@@ -373,7 +374,7 @@ export function DraftGenerator({
                     Close
                   </Button>
                   <Button onClick={handleUseDraft}>
-                    <FileText className="mr-2 h-4 w-4" />
+                    <HugeiconsIcon icon={File01Icon} size={16} className="mr-2" />
                     Use This Draft
                   </Button>
                 </div>

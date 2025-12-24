@@ -3,7 +3,6 @@
 Thumbs.db
 .env
 node_modules
-package-lock.json
 
 # IDE-specific files
 .vscode/

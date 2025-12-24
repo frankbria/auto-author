@@ -3,22 +3,23 @@
 import { type Editor } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Bold,
-  Italic,
-  Underline,
+  TextBoldIcon,
+  TextItalicIcon,
+  TextUnderlineIcon,
   Strikethrough,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  Quote,
-  Code,
-  Undo,
-  Redo,
-  Minus
-} from 'lucide-react';
+  Heading01Icon,
+  Heading02Icon,
+  Heading03Icon,
+  ListViewIcon,
+  MenuSquareIcon,
+  QuoteUpIcon,
+  CodeIcon,
+  Undo02Icon,
+  Redo02Icon,
+  MinusSignIcon
+} from '@hugeicons/core-free-icons';
 
 // Required types declaration to avoid TypeScript errors
 declare module '@tiptap/react' {
@@ -60,7 +61,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Bold"
         type="button"
       >
-        <Bold className="h-4 w-4" />
+        <HugeiconsIcon icon={TextBoldIcon} size={16} />
       </Button>
 
       <Button
@@ -74,7 +75,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Italic"
         type="button"
       >
-        <Italic className="h-4 w-4" />
+        <HugeiconsIcon icon={TextItalicIcon} size={16} />
       </Button>
 
       <Button
@@ -88,7 +89,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Underline"
         type="button"
       >
-        <Underline className="h-4 w-4" />
+        <HugeiconsIcon icon={TextUnderlineIcon} size={16} />
       </Button>
 
       <Button
@@ -102,7 +103,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Strikethrough"
         type="button"
       >
-        <Strikethrough className="h-4 w-4" />
+        <HugeiconsIcon icon={Strikethrough} size={16} />
       </Button>
 
       <div className="w-px h-6 bg-border mx-1" />
@@ -118,7 +119,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Heading 1"
         type="button"
       >
-        <Heading1 className="h-4 w-4" />
+        <HugeiconsIcon icon={Heading01Icon} size={16} />
       </Button>
 
       <Button
@@ -132,7 +133,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Heading 2"
         type="button"
       >
-        <Heading2 className="h-4 w-4" />
+        <HugeiconsIcon icon={Heading02Icon} size={16} />
       </Button>
 
       <Button
@@ -146,7 +147,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Heading 3"
         type="button"
       >
-        <Heading3 className="h-4 w-4" />
+        <HugeiconsIcon icon={Heading03Icon} size={16} />
       </Button>
 
       <div className="w-px h-6 bg-border mx-1" />
@@ -162,7 +163,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Bullet List"
         type="button"
       >
-        <List className="h-4 w-4" />
+        <HugeiconsIcon icon={ListViewIcon} size={16} />
       </Button>
 
       <Button
@@ -176,7 +177,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Ordered List"
         type="button"
       >
-        <ListOrdered className="h-4 w-4" />
+        <HugeiconsIcon icon={MenuSquareIcon} size={16} />
       </Button>
 
       <Button
@@ -190,7 +191,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Blockquote"
         type="button"
       >
-        <Quote className="h-4 w-4" />
+        <HugeiconsIcon icon={QuoteUpIcon} size={16} />
       </Button>
 
       <Button
@@ -204,7 +205,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Code Block"
         type="button"
       >
-        <Code className="h-4 w-4" />
+        <HugeiconsIcon icon={CodeIcon} size={16} />
       </Button>
 
       <div className="w-px h-6 bg-border mx-1" />
@@ -218,7 +219,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Undo"
         type="button"
       >
-        <Undo className="h-4 w-4" />
+        <HugeiconsIcon icon={Undo02Icon} size={16} />
       </Button>
 
       <Button
@@ -230,7 +231,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Redo"
         type="button"
       >
-        <Redo className="h-4 w-4" />
+        <HugeiconsIcon icon={Redo02Icon} size={16} />
       </Button>
 
       <Button
@@ -241,7 +242,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title="Horizontal Rule"
         type="button"
       >
-        <Minus className="h-4 w-4" />
+        <HugeiconsIcon icon={MinusSignIcon} size={16} />
       </Button>
     </div>
   );

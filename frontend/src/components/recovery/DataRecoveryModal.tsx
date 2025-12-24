@@ -10,7 +10,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Clock, FileText } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Alert02Icon, Clock01Icon, File01Icon } from '@hugeicons/core-free-icons';
 import { formatDistanceToNow } from 'date-fns';
 
 export interface RecoveredData {
@@ -77,7 +78,7 @@ export function DataRecoveryModal({
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+            <HugeiconsIcon icon={Alert02Icon} size={20} className="text-yellow-500" aria-hidden="true" />
             Unsaved Changes Detected
           </DialogTitle>
           <DialogDescription id="recovery-modal-description">
@@ -89,7 +90,7 @@ export function DataRecoveryModal({
         <div className="space-y-4 py-4">
           {/* Timestamp Info */}
           <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-            <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
+            <HugeiconsIcon icon={Clock01Icon} size={16} className="text-muted-foreground mt-0.5" aria-hidden="true" />
             <div className="flex-1 text-sm">
               <p className="font-medium">Last saved locally:</p>
               <p className="text-muted-foreground">{timeAgo}</p>
@@ -102,7 +103,7 @@ export function DataRecoveryModal({
           {/* Error Context (if available) */}
           {recoveredData.error && (
             <div className="flex items-start gap-3 p-3 bg-destructive/10 rounded-lg">
-              <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
+              <HugeiconsIcon icon={Alert02Icon} size={16} className="text-destructive mt-0.5" aria-hidden="true" />
               <div className="flex-1 text-sm">
                 <p className="font-medium text-destructive">Previous save failed:</p>
                 <p className="text-muted-foreground">{recoveredData.error}</p>
@@ -112,7 +113,7 @@ export function DataRecoveryModal({
 
           {/* Content Preview */}
           <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-            <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+            <HugeiconsIcon icon={File01Icon} size={16} className="text-muted-foreground mt-0.5" aria-hidden="true" />
             <div className="flex-1 text-sm">
               <p className="font-medium mb-2">Content preview:</p>
               <p className="text-muted-foreground italic">

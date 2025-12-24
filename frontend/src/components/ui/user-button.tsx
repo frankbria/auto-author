@@ -13,7 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Settings, LogOut } from "lucide-react";
+import { HugeiconsIcon } from '@hugeicons/react';
+import { User02Icon, Settings01Icon, Logout01Icon } from '@hugeicons/core-free-icons';
 
 /**
  * Custom UserButton component that replaces Clerk's UserButton
@@ -69,16 +70,16 @@ export function UserButton() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-          <User className="mr-2 h-4 w-4" />
+          <HugeiconsIcon icon={User02Icon} size={16} className="mr-2" />
           <span>Profile</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-          <Settings className="mr-2 h-4 w-4" />
+          <HugeiconsIcon icon={Settings01Icon} size={16} className="mr-2" />
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut}>
-          <LogOut className="mr-2 h-4 w-4" />
+          <HugeiconsIcon icon={Logout01Icon} size={16} className="mr-2" />
           <span>Sign out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Mic,
-  Type,
-  Square
-} from 'lucide-react';
+  Mic01Icon,
+  TextIcon,
+  Square01Icon
+} from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 
 type InputMode = 'text' | 'voice';
@@ -216,12 +217,12 @@ export function VoiceTextInput({
           >
             {currentMode === 'text' ? (
               <>
-                <Mic className="h-4 w-4" />
+                <HugeiconsIcon icon={Mic01Icon} size={16} />
                 Switch to Voice
               </>
             ) : (
               <>
-                <Type className="h-4 w-4" />
+                <HugeiconsIcon icon={TextIcon} size={16} />
                 Switch to Text
               </>
             )}
@@ -243,7 +244,7 @@ export function VoiceTextInput({
                 className="flex items-center gap-2 min-h-[44px] min-w-[44px]"
                 aria-label="Start voice recording"
               >
-                <Mic className="h-4 w-4" />
+                <HugeiconsIcon icon={Mic01Icon} size={16} />
                 Start Recording
               </Button>
             ) : (
@@ -254,7 +255,7 @@ export function VoiceTextInput({
                 className="flex items-center gap-2 min-h-[44px] min-w-[44px]"
                 aria-label="Stop voice recording"
               >
-                <Square className="h-4 w-4" />
+                <HugeiconsIcon icon={Square01Icon} size={16} />
                 Stop Recording
               </Button>
             )}

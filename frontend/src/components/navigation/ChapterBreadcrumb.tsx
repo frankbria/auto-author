@@ -10,7 +10,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { Home, Book, FileText } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Home01Icon, Book02Icon, File01Icon } from '@hugeicons/core-free-icons';
 
 interface ChapterBreadcrumbProps {
   bookId?: string;
@@ -44,7 +45,7 @@ export function ChapterBreadcrumb({
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
             <Link href="/dashboard" className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200">
-              <Home className="h-4 w-4" />
+              <HugeiconsIcon icon={Home01Icon} size={16} />
               Dashboard
             </Link>
           </BreadcrumbLink>
@@ -57,11 +58,11 @@ export function ChapterBreadcrumb({
           <>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link 
-                  href={`/dashboard/books/${bookId}`} 
+                <Link
+                  href={`/dashboard/books/${bookId}`}
                   className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200"
                 >
-                  <Book className="h-4 w-4" />
+                  <HugeiconsIcon icon={Book02Icon} size={16} />
                   {bookTitle}
                 </Link>
               </BreadcrumbLink>
@@ -107,7 +108,7 @@ export function ChapterBreadcrumb({
             
             <BreadcrumbItem>
               <BreadcrumbPage className="text-zinc-100 flex items-center gap-1.5">
-                <FileText className="h-4 w-4" />
+                <HugeiconsIcon icon={File01Icon} size={16} />
                 {chapterTitle}
               </BreadcrumbPage>
             </BreadcrumbItem>
@@ -132,7 +133,7 @@ export function ChapterBreadcrumb({
             
             <BreadcrumbItem>
               <BreadcrumbPage className="text-zinc-100 flex items-center gap-1.5">
-                <FileText className="h-4 w-4" />
+                <HugeiconsIcon icon={File01Icon} size={16} />
                 {chapterTitle} (Legacy)
               </BreadcrumbPage>
             </BreadcrumbItem>

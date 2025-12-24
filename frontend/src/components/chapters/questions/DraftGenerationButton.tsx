@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Sparkles, AlertCircle, CheckCircle, Edit3 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { SparklesIcon, AlertCircleIcon, CheckmarkCircle01Icon, PencilEdit01Icon } from '@hugeicons/core-free-icons';
 import { useToast } from '@/components/ui/use-toast';
 import { bookClient } from '@/lib/api/bookClient';
 import { LoadingStateManager } from '@/components/loading';
@@ -207,20 +208,20 @@ export function DraftGenerationButton({
 
   return (
     <>
-      <div className={cn("flex flex-col gap-2", className)}>
+      <div className={cn("flex flex-col gap-2 transition-all", className)} data-slot="draft-generation">
         {/* Progress indicator */}
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-sm transition-all">
           <span className="text-muted-foreground">
             {completedCount} of {totalQuestions} questions completed
           </span>
           {canGenerate ? (
-            <span className="flex items-center text-green-600 dark:text-green-400">
-              <CheckCircle className="h-4 w-4 mr-1" />
+            <span className="flex items-center text-green-600 dark:text-green-400 transition-all">
+              <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="mr-1" />
               Ready to generate draft
             </span>
           ) : (
-            <span className="flex items-center text-amber-600 dark:text-amber-400">
-              <AlertCircle className="h-4 w-4 mr-1" />
+            <span className="flex items-center text-amber-600 dark:text-amber-400 transition-all">
+              <HugeiconsIcon icon={AlertCircleIcon} size={16} className="mr-1" />
               Need {minimumResponses - completedCount} more responses
             </span>
           )}
@@ -231,18 +232,18 @@ export function DraftGenerationButton({
           onClick={handleOpenDialog}
           disabled={!canGenerate}
           variant={canGenerate ? "default" : "outline"}
-          className="w-full gap-2 min-h-[44px]"
+          className="w-full gap-2 min-h-[44px] transition-all focus-visible:ring-[3px]"
         >
-          <Sparkles className="h-4 w-4" />
+          <HugeiconsIcon icon={SparklesIcon} size={16} />
           Generate Draft from Answers
         </Button>
       </div>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto transition-all">
           <DialogHeader>
-            <DialogTitle>Generate AI Draft for &quot;{chapterTitle}&quot;</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="transition-all">Generate AI Draft for &quot;{chapterTitle}&quot;</DialogTitle>
+            <DialogDescription className="transition-all">
               {step === 'options' && 'Configure your draft settings and generate content from your answers.'}
               {step === 'generating' && 'Creating your draft...'}
               {step === 'preview' && 'Review your generated draft before adding it to the editor.'}
@@ -356,7 +357,7 @@ export function DraftGenerationButton({
               {suggestions.length > 0 && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
+                    <HugeiconsIcon icon={AlertCircleIcon} size={16} />
                     Improvement Suggestions
                   </Label>
                   <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
@@ -369,36 +370,36 @@ export function DraftGenerationButton({
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="transition-all">
             {step === 'options' && (
               <>
-                <Button variant="outline" onClick={() => setIsOpen(false)}>
+                <Button variant="outline" onClick={() => setIsOpen(false)} className="transition-all focus-visible:ring-[3px]">
                   Cancel
                 </Button>
-                <Button onClick={handleGenerateDraft} disabled={isGenerating}>
-                  <Sparkles className="mr-2 h-4 w-4" />
+                <Button onClick={handleGenerateDraft} disabled={isGenerating} className="transition-all focus-visible:ring-[3px]">
+                  <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" />
                   Generate Draft
                 </Button>
               </>
             )}
 
             {step === 'generating' && (
-              <Button variant="outline" onClick={() => setIsOpen(false)} disabled>
+              <Button variant="outline" onClick={() => setIsOpen(false)} disabled className="transition-all">
                 Generating...
               </Button>
             )}
 
             {step === 'preview' && (
               <>
-                <Button variant="outline" onClick={handleRegenerateDraft}>
-                  <Sparkles className="mr-2 h-4 w-4" />
+                <Button variant="outline" onClick={handleRegenerateDraft} className="transition-all focus-visible:ring-[3px]">
+                  <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" />
                   Regenerate
                 </Button>
-                <Button variant="outline" onClick={() => setIsOpen(false)}>
+                <Button variant="outline" onClick={() => setIsOpen(false)} className="transition-all focus-visible:ring-[3px]">
                   Close
                 </Button>
-                <Button onClick={handleUseDraft}>
-                  <Edit3 className="mr-2 h-4 w-4" />
+                <Button onClick={handleUseDraft} className="transition-all focus-visible:ring-[3px]">
+                  <HugeiconsIcon icon={PencilEdit01Icon} size={16} className="mr-2" />
                   Use This Draft
                 </Button>
               </>

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, BookOpen, HelpCircle, Brain, Sparkles } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { AlertCircleIcon, BookOpen01Icon, HelpCircleIcon, BrainIcon, SparklesIcon } from '@hugeicons/core-free-icons';
 import { QuestionDifficulty, QuestionType } from '@/types/chapter-questions';
 import { Label } from '@/components/ui/label';
 
@@ -101,25 +102,25 @@ export default function QuestionGenerator({
       type: QuestionType.CHARACTER,
       label: 'Character',
       description: 'Questions about characters, their motivations, development, and relationships',
-      icon: <BookOpen className="h-4 w-4" />
+      icon: <HugeiconsIcon icon={BookOpen01Icon} size={16} />
     },
     {
       type: QuestionType.PLOT,
       label: 'Plot',
       description: 'Questions about story structure, events, conflicts, and resolutions',
-      icon: <Sparkles className="h-4 w-4" />
+      icon: <HugeiconsIcon icon={SparklesIcon} size={16} />
     },
     {
       type: QuestionType.SETTING,
       label: 'Setting',
       description: 'Questions about world-building, locations, time periods, and atmosphere',
-      icon: <HelpCircle className="h-4 w-4" />
+      icon: <HugeiconsIcon icon={HelpCircleIcon} size={16} />
     },
     {
       type: QuestionType.THEME,
       label: 'Theme',
       description: 'Questions about central ideas, messages, symbolism, and deeper meaning',
-      icon: <Brain className="h-4 w-4" />
+      icon: <HugeiconsIcon icon={BrainIcon} size={16} />
     }
   ];
 
@@ -240,7 +241,7 @@ export default function QuestionGenerator({
         {/* Error message */}
         {error && (
           <div className="bg-destructive/10 p-3 rounded-md text-destructive text-sm flex items-center">
-            <AlertCircle className="h-4 w-4 mr-2" />
+            <HugeiconsIcon icon={AlertCircleIcon} size={16} className="mr-2" />
             {error}
           </div>
         )}

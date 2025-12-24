@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChapterEditor } from '@/components/chapters/ChapterEditor';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, LayoutGrid, ExternalLink } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon, LayoutGridIcon, LinkSquare02Icon } from '@hugeicons/core-free-icons';
 
 interface ChapterContentPageProps {
   params: Promise<{ bookId: string; chapterId: string }>;
@@ -35,7 +36,7 @@ export default function ChapterContentPage({ params }: ChapterContentPageProps) 
     <div className="container mx-auto h-[calc(100vh-4rem)] flex flex-col">
       <div className="mb-4 px-4 py-2 border-b">          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <ExternalLink className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <HugeiconsIcon icon={LinkSquare02Icon} size={20} className="text-blue-600 dark:text-blue-400" />
               <div className="flex-1">
                 <h3 className="font-medium text-blue-900 dark:text-blue-100">Redirecting to Tabbed Interface</h3>
                 <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
@@ -69,13 +70,13 @@ export default function ChapterContentPage({ params }: ChapterContentPageProps) 
         <div className="flex items-center gap-2">
           <Link href={`/dashboard/books/${bookId}?chapter=${chapterId}`}>
             <Button variant="outline" size="sm">
-              <LayoutGrid className="w-4 h-4 mr-2" />
+              <HugeiconsIcon icon={LayoutGridIcon} size={16} className="mr-2" />
               Open in Tabs
             </Button>
           </Link>
           <Link href={`/dashboard/books/${bookId}`}>
             <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={16} className="mr-2" />
               Back to Book
             </Button>
           </Link>

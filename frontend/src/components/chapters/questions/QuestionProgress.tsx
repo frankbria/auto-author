@@ -1,7 +1,8 @@
 'use client';
 
 import { QuestionProgressResponse } from '@/types/chapter-questions';
-import { CheckCircle, Circle, Clock } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { CheckmarkCircle01Icon, CircleIcon, Loading03Icon } from '@hugeicons/core-free-icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Stub component for Progress since the real one isn't available
@@ -60,20 +61,20 @@ export default function QuestionProgress({
   );
   
   return (
-    <section aria-label="Question progress" className="space-y-2" role="region">
+    <section aria-label="Question progress" className="space-y-2 transition-all" role="region" data-slot="question-progress">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium">Progress</h4>
-        
+        <h4 className="text-sm font-medium transition-all">Progress</h4>
+
         <div className="flex items-center space-x-2">
-          <span className={`text-sm ${statusColor} font-medium`}>
+          <span className={`text-sm ${statusColor} font-medium transition-all`}>
             {statusLabel}
           </span>
-          
+
           {progress.status === 'completed' ? (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger aria-label="All questions completed">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="text-green-600 dark:text-green-400 transition-all" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>All questions completed</p>
@@ -84,7 +85,7 @@ export default function QuestionProgress({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger aria-label="Some questions still need answers">
-                  <Clock className="h-4 w-4 text-amber-600" />
+                  <HugeiconsIcon icon={Loading03Icon} size={16} className="text-amber-600 dark:text-amber-400 transition-all" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Some questions still need answers</p>
@@ -95,7 +96,7 @@ export default function QuestionProgress({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger aria-label="No questions answered yet">
-                  <Circle className="h-4 w-4 text-gray-400" />
+                  <HugeiconsIcon icon={CircleIcon} size={16} className="text-gray-400 transition-all" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>No questions answered yet</p>
@@ -113,43 +114,43 @@ export default function QuestionProgress({
         aria-valuenow={isNaN(progressPercentage) ? 0 : Math.round(progressPercentage)}
         aria-valuemin={0}
         aria-valuemax={100}
-        className="w-full"
+        className="w-full transition-all"
         data-testid="question-progressbar"
       >
-        <Progress value={progressPercentage} className="h-2" />
+        <Progress value={progressPercentage} className="h-2 transition-all" />
       </div>
-      
+
       {/* Question position indicator */}
-      <div className="flex justify-between text-xs text-muted-foreground">
+      <div className="flex justify-between text-xs text-muted-foreground transition-all">
         <span>Question {currentPosition} of {totalQuestions}</span>
         <span>{isNaN(progressPercentage) ? 0 : Math.round(progressPercentage)}% complete</span>
       </div>
       
       {/* Question dots - visual representation of each question's status */}
-      <div className="flex items-center justify-center space-x-1 mt-2">
+      <div className="flex items-center justify-center space-x-1 mt-2 transition-all">
         {Array.from({ length: totalQuestions }).map((_, index) => {
           // For each question, show its status
           const isCompleted = index < progress.completed;
           const isInProgress = index === progress.completed && progress.in_progress > 0;
           const isCurrent = index === currentIndex;
-          
-          let dotClasses = "w-2 h-2 rounded-full ";
-          
+
+          let dotClasses = "w-2 h-2 rounded-full transition-all ";
+
           if (isCompleted) {
-            dotClasses += "bg-green-600";
+            dotClasses += "bg-green-600 dark:bg-green-500";
           } else if (isInProgress) {
-            dotClasses += "bg-amber-600";
+            dotClasses += "bg-amber-600 dark:bg-amber-500";
           } else if (isCurrent) {
-            dotClasses += "bg-blue-600";
+            dotClasses += "bg-blue-600 dark:bg-blue-500";
           } else {
-            dotClasses += "bg-gray-300";
+            dotClasses += "bg-gray-300 dark:bg-gray-700";
           }
-          
-          // Add subtle pulsing effect to current question
+
+          // Add subtle pulsing effect to current question with enhanced focus
           if (isCurrent) {
-            dotClasses += " ring-2 ring-blue-300 ring-opacity-50";
+            dotClasses += " ring-[3px] ring-blue-300 dark:ring-blue-700 ring-opacity-50";
           }
-          
+
           return (
             <StubTooltip
               key={index}
@@ -160,7 +161,7 @@ export default function QuestionProgress({
                 "Not started"
               }
             >
-              <div className={dotClasses}></div>
+              <div className={dotClasses} data-slot="progress-dot"></div>
             </StubTooltip>
           );
         })}

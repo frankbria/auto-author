@@ -1,13 +1,12 @@
 // frontend/src/middleware.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from '@/lib/auth';
 
-// Middleware for route protection using better-auth
+// Middleware for route protection using better-auth session cookies
 // This will:
-// 1. Verify authentication for protected routes
+// 1. Verify authentication for protected routes by checking session cookie
 // 2. Redirect unauthenticated users to sign-in page
-// 3. Provide session context to your application
+// 3. Keep middleware Edge Runtime compatible (no better-auth imports)
 //
 // For E2E testing: Set BYPASS_AUTH=true (server-only) to skip authentication
 export async function middleware(request: NextRequest) {
@@ -40,29 +39,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Get session from better-auth with connected MongoDB client
-  try {
-    const auth = await getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers
-    });
+  // Check for better-auth session cookie
+  // better-auth sets 'better-auth.session_token' cookie on successful authentication
+  const sessionToken = request.cookies.get('better-auth.session_token');
 
-    // Redirect to sign-in if accessing protected route without session
-    if (!session) {
-      const signInUrl = new URL('/auth/sign-in', request.url);
-      signInUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(signInUrl);
-    }
-
-    // Allow request to proceed
-    return NextResponse.next();
-  } catch (error) {
-    // If session check fails, redirect to sign-in
-    console.error('Session validation error:', error);
+  // Redirect to sign-in if accessing protected route without session
+  if (!sessionToken) {
     const signInUrl = new URL('/auth/sign-in', request.url);
     signInUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(signInUrl);
   }
+
+  // Allow request to proceed - actual session validation happens in API routes
+  return NextResponse.next();
 }
 
 export const config = {

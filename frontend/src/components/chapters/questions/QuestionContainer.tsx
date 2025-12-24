@@ -16,7 +16,8 @@ import QuestionNavigation from './QuestionNavigation';
 import { DraftGenerationButton } from './DraftGenerationButton';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { RefreshIcon, AlertCircleIcon } from '@hugeicons/core-free-icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorHandler, classifyError, ErrorType } from '@/lib/errors/errorHandler';
 
@@ -380,7 +381,7 @@ export default function QuestionContainer({
         <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-md mb-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 flex-1">
-              <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+              <HugeiconsIcon icon={AlertCircleIcon} size={20} className="text-destructive mt-0.5" />
               <div className="flex-1">
                 <h4 className="text-sm font-semibold text-destructive mb-1">
                   {errorType === ErrorType.NETWORK && 'Network Error'}
@@ -405,12 +406,12 @@ export default function QuestionContainer({
             >
               {isRefreshing ? (
                 <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2 animate-spin" />
                   Retrying...
                 </>
               ) : (
                 <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2" />
                   Retry
                 </>
               )}

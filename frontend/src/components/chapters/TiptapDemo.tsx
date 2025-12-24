@@ -7,22 +7,23 @@ import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
 import { Button } from '@/components/ui/button';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
+  TextBoldIcon,
+  TextItalicIcon,
+  TextUnderlineIcon,
   Strikethrough,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  Quote,
-  Code,
-  Undo,
-  Redo,
-  Minus
-} from 'lucide-react';
+  Heading01Icon,
+  Heading02Icon,
+  Heading03Icon,
+  ListViewIcon,
+  ListSettingIcon,
+  Note01Icon,
+  CodeIcon,
+  Undo02Icon,
+  Redo02Icon,
+  MinusSignIcon
+} from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 import './editor.css';
 
@@ -88,7 +89,7 @@ export function TiptapDemo() {
               title="Bold"
               type="button"
             >
-              <Bold className="h-4 w-4" />
+              <HugeiconsIcon icon={TextBoldIcon} size={16} />
             </Button>
             
             <Button
@@ -102,7 +103,7 @@ export function TiptapDemo() {
               title="Italic"
               type="button"
             >
-              <Italic className="h-4 w-4" />
+              <HugeiconsIcon icon={TextItalicIcon} size={16} />
             </Button>
             
             <Button
@@ -116,7 +117,7 @@ export function TiptapDemo() {
               title="Underline"
               type="button"
             >
-              <UnderlineIcon className="h-4 w-4" />
+              <HugeiconsIcon icon={TextUnderlineIcon} size={16} />
             </Button>
             
             <Button
@@ -130,7 +131,7 @@ export function TiptapDemo() {
               title="Strikethrough"
               type="button"
             >
-              <Strikethrough className="h-4 w-4" />
+              <HugeiconsIcon icon={Strikethrough} size={16} />
             </Button>
             
             <div className="w-px h-6 bg-border mx-1" />
@@ -146,7 +147,7 @@ export function TiptapDemo() {
               title="Heading 1"
               type="button"
             >
-              <Heading1 className="h-4 w-4" />
+              <HugeiconsIcon icon={Heading01Icon} size={16} />
             </Button>
             
             <Button
@@ -160,7 +161,7 @@ export function TiptapDemo() {
               title="Heading 2"
               type="button"
             >
-              <Heading2 className="h-4 w-4" />
+              <HugeiconsIcon icon={Heading02Icon} size={16} />
             </Button>
             
             <Button
@@ -174,7 +175,7 @@ export function TiptapDemo() {
               title="Heading 3"
               type="button"
             >
-              <Heading3 className="h-4 w-4" />
+              <HugeiconsIcon icon={Heading03Icon} size={16} />
             </Button>
             
             <div className="w-px h-6 bg-border mx-1" />
@@ -190,7 +191,7 @@ export function TiptapDemo() {
               title="Bullet List"
               type="button"
             >
-              <List className="h-4 w-4" />
+              <HugeiconsIcon icon={ListViewIcon} size={16} />
             </Button>
             
             <Button
@@ -204,7 +205,7 @@ export function TiptapDemo() {
               title="Ordered List"
               type="button"
             >
-              <ListOrdered className="h-4 w-4" />
+              <HugeiconsIcon icon={ListSettingIcon} size={16} />
             </Button>
             
             <Button
@@ -218,7 +219,7 @@ export function TiptapDemo() {
               title="Blockquote"
               type="button"
             >
-              <Quote className="h-4 w-4" />
+              <HugeiconsIcon icon={Note01Icon} size={16} />
             </Button>
             
             <Button
@@ -232,7 +233,7 @@ export function TiptapDemo() {
               title="Code Block"
               type="button"
             >
-              <Code className="h-4 w-4" />
+              <HugeiconsIcon icon={CodeIcon} size={16} />
             </Button>
             
             <div className="w-px h-6 bg-border mx-1" />
@@ -246,7 +247,7 @@ export function TiptapDemo() {
               title="Undo"
               type="button"
             >
-              <Undo className="h-4 w-4" />
+              <HugeiconsIcon icon={Undo02Icon} size={16} />
             </Button>
             
             <Button
@@ -258,7 +259,7 @@ export function TiptapDemo() {
               title="Redo"
               type="button"
             >
-              <Redo className="h-4 w-4" />
+              <HugeiconsIcon icon={Redo02Icon} size={16} />
             </Button>
             
             <Button
@@ -269,7 +270,7 @@ export function TiptapDemo() {
               title="Horizontal Rule"
               type="button"
             >
-              <Minus className="h-4 w-4" />
+              <HugeiconsIcon icon={MinusSignIcon} size={16} />
             </Button>
           </div>
           

@@ -27,7 +27,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Loading03Icon } from '@hugeicons/core-free-icons';
 
 type BookCreationWizardProps = {
   isOpen: boolean;
@@ -102,10 +103,10 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
   };
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] bg-background border-input text-foreground dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100">
+      <DialogContent className="sm:max-w-[550px] bg-background border-input text-foreground dark:bg-gray-900 dark:border-gray-800 dark:text-gray-100">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">Create New Book</DialogTitle>
-          <DialogDescription className="text-muted-foreground dark:text-zinc-400">
+          <DialogDescription className="text-muted-foreground dark:text-gray-400">
             Fill in the details for your new book project. You can edit these later.
           </DialogDescription>
         </DialogHeader>
@@ -116,12 +117,12 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-foreground dark:text-zinc-200">Book Title *</FormLabel>
+                  <FormLabel className="text-foreground dark:text-gray-200">Book Title *</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="Enter book title" 
-                      className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100" 
-                      {...field} 
+                    <Input
+                      placeholder="Enter book title"
+                      className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                      {...field}
                       disabled={isSubmitting}
                     />
                   </FormControl>
@@ -135,12 +136,12 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
               name="subtitle"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-foreground dark:text-zinc-200">Subtitle</FormLabel>
+                  <FormLabel className="text-foreground dark:text-gray-200">Subtitle</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="Enter subtitle (optional)" 
-                      className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100" 
-                      {...field} 
+                    <Input
+                      placeholder="Enter subtitle (optional)"
+                      className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                      {...field}
                       disabled={isSubmitting}
                     />
                   </FormControl>
@@ -154,16 +155,16 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-foreground dark:text-zinc-200">Description</FormLabel>
+                  <FormLabel className="text-foreground dark:text-gray-200">Description</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Enter a brief description of your book" 
-                      className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100 resize-none min-h-[100px]" 
-                      {...field} 
+                    <Textarea
+                      placeholder="Enter a brief description of your book"
+                      className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 resize-none min-h-[100px]"
+                      {...field}
                       disabled={isSubmitting}
                     />
                   </FormControl>
-                  <FormDescription className="text-muted-foreground dark:text-zinc-500">
+                  <FormDescription className="text-muted-foreground dark:text-gray-500">
                     Provide a short summary or description of your book project.
                   </FormDescription>
                   <FormMessage className="text-destructive dark:text-red-400" />
@@ -176,16 +177,16 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
               name="cover_image_url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-foreground dark:text-zinc-200">Cover Image URL</FormLabel>
+                  <FormLabel className="text-foreground dark:text-gray-200">Cover Image URL</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="https://example.com/cover.jpg" 
-                      className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100" 
-                      {...field} 
+                    <Input
+                      placeholder="https://example.com/cover.jpg"
+                      className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                      {...field}
                       disabled={isSubmitting}
                     />
                   </FormControl>
-                  <FormDescription className="text-muted-foreground dark:text-zinc-500">
+                  <FormDescription className="text-muted-foreground dark:text-gray-500">
                     Optional: Add a URL to your book&apos;s cover image.
                   </FormDescription>
                   <FormMessage className="text-destructive dark:text-red-400" />
@@ -199,18 +200,18 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                 name="genre"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-foreground dark:text-zinc-200">Genre</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value} 
+                    <FormLabel className="text-foreground dark:text-gray-200">Genre</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
                       disabled={isSubmitting}
                     >
                       <FormControl>
-                        <SelectTrigger className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
+                        <SelectTrigger className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
                           <SelectValue placeholder="Select genre" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
+                      <SelectContent className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
                         {genreOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
@@ -228,18 +229,18 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                 name="target_audience"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-foreground dark:text-zinc-200">Target Audience</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
+                    <FormLabel className="text-foreground dark:text-gray-200">Target Audience</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
                       defaultValue={field.value}
                       disabled={isSubmitting}
                     >
                       <FormControl>
-                        <SelectTrigger className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
+                        <SelectTrigger className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
                           <SelectValue placeholder="Select target audience" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100">
+                      <SelectContent className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
                         {targetAudienceOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
@@ -254,11 +255,11 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
             </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="dark:bg-transparent dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                className="dark:bg-transparent dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100"
                 disabled={isSubmitting}
               >
                 Cancel
@@ -270,7 +271,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <HugeiconsIcon icon={Loading03Icon} size={16} className="mr-2 animate-spin" />
                     Creating...
                   </>
                 ) : (

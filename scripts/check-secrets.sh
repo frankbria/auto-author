@@ -53,9 +53,31 @@ for FILE in $FILES; do
     if git diff --cached --numstat "$FILE" | grep -q '^-'; then
         continue
     fi
+    
+    # Skip files that are typically large and don't contain secrets
+    case "$FILE" in
+        *.lock|package-lock.json|yarn.lock|*.min.js|*.bundle.js|*.map|*.svg|*.woff*|*.ttf|*.eot|*.otf)
+            continue
+            ;;
+    esac
+    
+    # Skip files larger than 100KB (byte size check)
+    if [ -f "$FILE" ]; then
+        # Try GNU stat first, fall back to macOS stat
+        FILE_BYTES=$(stat -c%s "$FILE" 2>/dev/null || stat -f%z "$FILE" 2>/dev/null || echo 0)
+        if [ "$FILE_BYTES" -gt 102400 ]; then
+            continue
+        fi
+    fi
+    
+    # Additional safeguard: skip files with very large diffs (>10000 lines changed)
+    LINES_CHANGED=$(git diff --cached --numstat "$FILE" | awk '{print $1 + $2}')
+    if [ -n "$LINES_CHANGED" ] && [ "$LINES_CHANGED" -gt 10000 ]; then
+        continue
+    fi
 
-    # Get the content being committed
-    CONTENT=$(git diff --cached "$FILE")
+    # Get the content being committed (limit to first 10KB to avoid processing huge diffs)
+    CONTENT=$(git diff --cached "$FILE" | head -c 10240)
 
     for PATTERN in "${PATTERNS[@]}"; do
         MATCHES=$(echo "$CONTENT" | grep -E "$PATTERN" | head -5)

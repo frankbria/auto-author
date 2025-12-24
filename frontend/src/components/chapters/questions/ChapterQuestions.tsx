@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { AlertCircle, BookOpen, PenTool } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { AlertCircleIcon, BookOpen01Icon, PenTool01Icon } from '@hugeicons/core-free-icons';
 import QuestionContainer from './QuestionContainer';
 import { bookClient } from '@/lib/api/bookClient';
 import { QuestionProgressResponse } from '@/types/chapter-questions';
@@ -89,12 +90,12 @@ export default function ChapterQuestions({
       <Tabs defaultValue="questions" className="w-full">
         <TabsList className="w-full border-b mb-4">
           <TabsTrigger value="questions" className="flex items-center">
-            <BookOpen className="w-4 h-4 mr-2" />
+            <HugeiconsIcon icon={BookOpen01Icon} size={16} className="mr-2" />
             Interview Questions
           </TabsTrigger>
           {onSwitchToEditor && (
             <TabsTrigger value="editor" className="flex items-center" onClick={onSwitchToEditor}>
-              <PenTool className="w-4 h-4 mr-2" />
+              <HugeiconsIcon icon={PenTool01Icon} size={16} className="mr-2" />
               Chapter Editor
             </TabsTrigger>
           )}
@@ -104,7 +105,7 @@ export default function ChapterQuestions({
           {error ? (
             <Card className="p-6">
               <div className="flex items-center text-destructive">
-                <AlertCircle className="h-5 w-5 mr-2" />
+                <HugeiconsIcon icon={AlertCircleIcon} size={20} className="mr-2" />
                 <p>{error}</p>
               </div>
               <Button 
