@@ -1,27 +1,19 @@
 """
 Comprehensive tests for core security module
 
-Tests JWT verification, password hashing, authentication, and authorization.
+Tests password hashing, session-based authentication, and authorization.
+JWT-based authentication has been removed - all auth is now cookie/session-based.
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock, MagicMock, PropertyMock
+from unittest.mock import Mock, patch, AsyncMock, PropertyMock
 from fastapi import HTTPException, Request
-from fastapi.security import HTTPAuthorizationCredentials
-from jose import jwt
-from jose.exceptions import JWTError, ExpiredSignatureError
-import time
-from datetime import datetime, timedelta
 
 from app.core.security import (
     hash_password,
     verify_password,
-    verify_jwt_token,
-    RoleChecker,
     SessionRoleChecker,
-    get_current_user,
     get_current_user_from_session,
-    optional_security,
     optional_session_security,
 )
 
@@ -71,205 +63,147 @@ class TestPasswordHashing:
 
 
 @pytest.mark.asyncio
-class TestJWTVerification:
-    """Test JWT token verification for better-auth (HS256)"""
+class TestSessionRoleChecker:
+    """Test session-based role access control"""
 
-    @patch("app.core.security.jwt.decode")
-    @patch("app.core.security.settings")
-    async def test_verify_jwt_token_success(self, mock_settings, mock_decode):
-        """Test JWT verification with valid HS256 token"""
-        mock_settings.BETTER_AUTH_SECRET = "test-secret-key-minimum-32-chars-long"
-        mock_decode.return_value = {
-            "sub": "user_123",
-            "email": "test@example.com"
-        }
-
-        token = "test_token"
-        result = await verify_jwt_token(token)
-
-        assert result["sub"] == "user_123"
-        assert result["email"] == "test@example.com"
-        mock_decode.assert_called_once()
-
-    @patch("app.core.security.jwt.decode")
-    @patch("app.core.security.settings")
-    async def test_verify_jwt_token_expired(self, mock_settings, mock_decode):
-        """Test JWT verification with expired token"""
-        mock_settings.BETTER_AUTH_SECRET = "test-secret-key-minimum-32-chars-long"
-        mock_decode.side_effect = ExpiredSignatureError("Token has expired")
-
-        token = "expired_token"
-
-        with pytest.raises(HTTPException) as exc_info:
-            await verify_jwt_token(token)
-
-        assert exc_info.value.status_code == 401
-        assert "expired" in exc_info.value.detail.lower()
-
-    @patch("app.core.security.jwt.decode")
-    @patch("app.core.security.settings")
-    async def test_verify_jwt_token_invalid(self, mock_settings, mock_decode):
-        """Test JWT verification with invalid token"""
-        mock_settings.BETTER_AUTH_SECRET = "test-secret-key-minimum-32-chars-long"
-        mock_decode.side_effect = JWTError("Invalid signature")
-
-        token = "invalid_token"
-
-        with pytest.raises(HTTPException) as exc_info:
-            await verify_jwt_token(token)
-
-        assert exc_info.value.status_code == 401
-        assert "Invalid authentication token" in exc_info.value.detail
-
-
-@pytest.mark.asyncio
-class TestRoleChecker:
-    """Test role-based access control"""
-
-    @patch("app.core.security.verify_jwt_token")
-    @patch("app.db.user.get_user_by_auth_id")
-    async def test_role_checker_allowed(self, mock_get_user, mock_verify):
-        """Test RoleChecker allows authorized role"""
-        mock_verify.return_value = {"sub": "user_123"}
+    @patch("app.core.security.get_current_user_from_session")
+    async def test_session_role_checker_allowed(self, mock_get_user):
+        """Test SessionRoleChecker allows authorized role"""
         mock_get_user.return_value = {
             "auth_id": "user_123",
             "role": "admin",
             "email": "admin@example.com"
         }
 
-        checker = RoleChecker(allowed_roles=["admin", "moderator"])
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="test_token")
+        checker = SessionRoleChecker(allowed_roles=["admin", "moderator"])
+        mock_request = Mock(spec=Request)
 
-        result = await checker(credentials)
+        result = await checker(mock_request)
 
         assert result["role"] == "admin"
 
-    @patch("app.core.security.verify_jwt_token")
-    @patch("app.db.user.get_user_by_auth_id")
-    async def test_role_checker_forbidden(self, mock_get_user, mock_verify):
-        """Test RoleChecker denies unauthorized role"""
-        mock_verify.return_value = {"sub": "user_123"}
+    @patch("app.core.security.get_current_user_from_session")
+    async def test_session_role_checker_forbidden(self, mock_get_user):
+        """Test SessionRoleChecker denies unauthorized role"""
         mock_get_user.return_value = {
             "auth_id": "user_123",
             "role": "user",
             "email": "user@example.com"
         }
 
-        checker = RoleChecker(allowed_roles=["admin", "moderator"])
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="test_token")
+        checker = SessionRoleChecker(allowed_roles=["admin", "moderator"])
+        mock_request = Mock(spec=Request)
 
         with pytest.raises(HTTPException) as exc_info:
-            await checker(credentials)
+            await checker(mock_request)
 
         assert exc_info.value.status_code == 403
         assert "Not enough permissions" in exc_info.value.detail
 
-    @patch("app.core.security.verify_jwt_token")
-    @patch("app.db.user.get_user_by_auth_id")
-    async def test_role_checker_user_not_found(self, mock_get_user, mock_verify):
-        """Test RoleChecker when user not in database"""
-        mock_verify.return_value = {"sub": "user_123"}
-        mock_get_user.return_value = None
+    @patch("app.core.config.settings")
+    async def test_session_role_checker_bypass_auth(self, mock_settings):
+        """Test SessionRoleChecker with BYPASS_AUTH enabled returns admin"""
+        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=True)
 
-        checker = RoleChecker(allowed_roles=["admin"])
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="test_token")
+        checker = SessionRoleChecker(allowed_roles=["admin"])
+        mock_request = Mock(spec=Request)
 
-        with pytest.raises(HTTPException) as exc_info:
-            await checker(credentials)
+        result = await checker(mock_request)
 
-        assert exc_info.value.status_code == 401
-        assert "User not found" in exc_info.value.detail
-
-    @patch("app.core.security.verify_jwt_token")
-    async def test_role_checker_no_user_id(self, mock_verify):
-        """Test RoleChecker when token has no user ID"""
-        mock_verify.return_value = {}  # No 'sub' field
-
-        checker = RoleChecker(allowed_roles=["admin"])
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="test_token")
-
-        with pytest.raises(HTTPException) as exc_info:
-            await checker(credentials)
-
-        assert exc_info.value.status_code == 401
-        assert "Invalid user ID" in exc_info.value.detail
+        assert result["role"] == "admin"
+        assert result["auth_id"] == "test-auth-id"
 
 
 @pytest.mark.asyncio
-class TestGetCurrentUser:
-    """Test get_current_user authentication function"""
+class TestGetCurrentUserFromSession:
+    """Test get_current_user_from_session authentication function"""
 
     @patch("app.core.config.settings")
-    async def test_get_current_user_bypass_auth(self, mock_settings):
-        """Test get_current_user with BYPASS_AUTH enabled"""
-        # Mock BYPASS_AUTH as a property
+    async def test_get_current_user_from_session_bypass_auth(self, mock_settings):
+        """Test get_current_user_from_session with BYPASS_AUTH enabled"""
         type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=True)
 
-        result = await get_current_user(credentials=None)
+        mock_request = Mock(spec=Request)
+        result = await get_current_user_from_session(mock_request)
 
         assert result["auth_id"] == "test-auth-id"
         assert result["email"] == "test@example.com"
         assert result["role"] == "user"
 
-    @patch("app.core.security.verify_jwt_token")
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_from_session_no_session(self, mock_settings, mock_validate):
+        """Test get_current_user_from_session without valid session"""
+        mock_settings.BYPASS_AUTH = False
+        mock_validate.return_value = None
+
+        mock_request = Mock(spec=Request)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user_from_session(mock_request)
+
+        assert exc_info.value.status_code == 401
+        assert "Not authenticated" in exc_info.value.detail
+
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.security.get_better_auth_user")
     @patch("app.db.user.get_user_by_auth_id")
     @patch("app.core.config.settings")
-    async def test_get_current_user_valid_token(self, mock_settings, mock_get_user, mock_verify):
-        """Test get_current_user with valid token"""
-        type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=False)
-        mock_verify.return_value = {"sub": "user_123"}
+    async def test_get_current_user_from_session_valid_session(
+        self, mock_settings, mock_get_user, mock_get_auth_user, mock_validate
+    ):
+        """Test get_current_user_from_session with valid session"""
+        mock_settings.BYPASS_AUTH = False
+        mock_validate.return_value = {"userId": "user_123"}
+        mock_get_auth_user.return_value = {"id": "user_123", "email": "test@example.com"}
         mock_get_user.return_value = {
             "auth_id": "user_123",
             "email": "test@example.com",
             "role": "user"
         }
 
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
+        mock_request = Mock(spec=Request)
 
-        result = await get_current_user(credentials)
+        result = await get_current_user_from_session(mock_request)
 
         assert result["auth_id"] == "user_123"
         assert result["email"] == "test@example.com"
 
-    @patch("app.core.security.settings")
-    async def test_get_current_user_missing_credentials(self, mock_settings):
-        """Test get_current_user without credentials"""
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_from_session_no_user_id_in_session(
+        self, mock_settings, mock_validate
+    ):
+        """Test get_current_user_from_session when session has no userId"""
         mock_settings.BYPASS_AUTH = False
+        # Return a truthy session dict but without userId
+        mock_validate.return_value = {"token": "some-token", "expiresAt": "2025-12-25"}
+
+        mock_request = Mock(spec=Request)
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(credentials=None)
+            await get_current_user_from_session(mock_request)
 
         assert exc_info.value.status_code == 401
-        assert "Missing authentication credentials" in exc_info.value.detail
+        assert "Invalid session" in exc_info.value.detail
 
-    @patch("app.core.security.verify_jwt_token")
-    @patch("app.core.security.settings")
-    async def test_get_current_user_invalid_token(self, mock_settings, mock_verify):
-        """Test get_current_user with invalid token"""
-        mock_settings.BYPASS_AUTH = False
-        mock_verify.return_value = {}  # No 'sub' field
-
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid_token")
-
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(credentials)
-
-        assert exc_info.value.status_code == 401
-        assert "Invalid user ID" in exc_info.value.detail
-
-    @patch("app.core.security.verify_jwt_token")
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.security.get_better_auth_user")
     @patch("app.db.user.get_user_by_auth_id")
-    @patch("app.core.security.settings")
     @patch("app.db.user.create_user")
-    async def test_get_current_user_not_found(self, mock_create_user, mock_settings, mock_get_user, mock_verify):
-        """Test get_current_user auto-creates user when not in database"""
+    @patch("app.core.config.settings")
+    async def test_get_current_user_from_session_auto_creates_user(
+        self, mock_settings, mock_create_user, mock_get_user, mock_get_auth_user, mock_validate
+    ):
+        """Test get_current_user_from_session auto-creates user when not in database"""
         mock_settings.BYPASS_AUTH = False
-        mock_verify.return_value = {
-            "sub": "user_123",
+        mock_validate.return_value = {"userId": "user_123"}
+        mock_get_auth_user.return_value = {
+            "id": "user_123",
             "email": "test@example.com",
             "name": "Test User"
         }
-        # First call returns None (user not found), second call returns the created user
+        mock_get_user.return_value = None  # User not in backend database
         created_user = {
             "id": "new_user_id",
             "auth_id": "user_123",
@@ -277,99 +211,55 @@ class TestGetCurrentUser:
             "first_name": "Test",
             "last_name": "User"
         }
-        mock_get_user.return_value = None
         mock_create_user.return_value = created_user
 
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
+        mock_request = Mock(spec=Request)
 
-        user = await get_current_user(credentials)
+        result = await get_current_user_from_session(mock_request)
 
-        # Verify user was auto-created
-        assert user == created_user
+        assert result == created_user
         mock_create_user.assert_called_once()
-        # Verify the user data passed to create_user
-        call_args = mock_create_user.call_args[0][0]
-        assert call_args["auth_id"] == "user_123"
-        assert call_args["email"] == "test@example.com"
-        assert call_args["first_name"] == "Test"
-        assert call_args["last_name"] == "User"
-
-    @patch("app.core.security.verify_jwt_token")
-    @patch("app.db.user.get_user_by_auth_id")
-    @patch("app.core.security.settings")
-    async def test_get_current_user_missing_email_in_jwt(self, mock_settings, mock_get_user, mock_verify):
-        """Test get_current_user when JWT is missing email claim - should return 400"""
-        mock_settings.BYPASS_AUTH = False
-        mock_verify.return_value = {"sub": "user_123"}  # No email
-        mock_get_user.return_value = None
-
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
-
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(credentials)
-
-        assert exc_info.value.status_code == 400
-        assert "missing email" in exc_info.value.detail.lower()
-
-    @patch("app.core.security.verify_jwt_token")
-    @patch("app.db.user.get_user_by_auth_id")
-    @patch("app.core.security.settings")
-    async def test_get_current_user_database_error(self, mock_settings, mock_get_user, mock_verify):
-        """Test get_current_user with database error"""
-        mock_settings.BYPASS_AUTH = False
-        mock_verify.return_value = {"sub": "user_123"}
-        mock_get_user.side_effect = Exception("Database connection error")
-
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
-
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(credentials)
-
-        assert exc_info.value.status_code == 500
-        assert "Error fetching user" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
-class TestOptionalSecurity:
-    """Test optional security dependency"""
+class TestOptionalSessionSecurity:
+    """Test optional session security dependency"""
 
-    @patch("app.core.security.settings")
-    async def test_optional_security_bypass_auth(self, mock_settings):
-        """Test optional_security with BYPASS_AUTH enabled"""
+    @patch("app.core.config.settings")
+    async def test_optional_session_security_bypass_auth(self, mock_settings):
+        """Test optional_session_security with BYPASS_AUTH enabled returns None"""
         type(mock_settings).BYPASS_AUTH = PropertyMock(return_value=True)
-        mock_request = Mock(spec=Request)
-        mock_request.headers = {}
 
-        result = await optional_security(mock_request)
+        mock_request = Mock(spec=Request)
+        result = await optional_session_security(mock_request)
 
         assert result is None
 
-    @patch("app.core.security.HTTPBearer")
-    @patch("app.core.security.settings")
-    async def test_optional_security_with_token(self, mock_settings, mock_bearer_class):
-        """Test optional_security with valid token"""
+    @patch("app.core.security.get_current_user_from_session")
+    @patch("app.core.config.settings")
+    async def test_optional_session_security_authenticated(self, mock_settings, mock_get_user):
+        """Test optional_session_security with valid session"""
         mock_settings.BYPASS_AUTH = False
+        mock_get_user.return_value = {
+            "auth_id": "user_123",
+            "email": "test@example.com",
+            "role": "user"
+        }
+
         mock_request = Mock(spec=Request)
-        mock_bearer_instance = AsyncMock()
-        mock_credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="test_token")
-        mock_bearer_instance.return_value = mock_credentials
-        mock_bearer_class.return_value = mock_bearer_instance
+        result = await optional_session_security(mock_request)
 
-        result = await optional_security(mock_request)
+        assert result["auth_id"] == "user_123"
 
-        assert result == mock_credentials
-
-    @patch("app.core.security.HTTPBearer")
-    @patch("app.core.security.settings")
-    async def test_optional_security_without_token(self, mock_settings, mock_bearer_class):
-        """Test optional_security without token (auto_error=False)"""
+    @patch("app.core.security.get_current_user_from_session")
+    @patch("app.core.config.settings")
+    async def test_optional_session_security_not_authenticated(self, mock_settings, mock_get_user):
+        """Test optional_session_security without valid session returns None"""
         mock_settings.BYPASS_AUTH = False
-        mock_request = Mock(spec=Request)
-        mock_bearer_instance = AsyncMock()
-        mock_bearer_instance.return_value = None
-        mock_bearer_class.return_value = mock_bearer_instance
+        mock_get_user.side_effect = HTTPException(status_code=401, detail="Not authenticated")
 
-        result = await optional_security(mock_request)
+        mock_request = Mock(spec=Request)
+        result = await optional_session_security(mock_request)
 
         assert result is None
 

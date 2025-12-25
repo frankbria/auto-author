@@ -150,15 +150,8 @@ async def main():
         print("Setting up test data...")
         user = create_test_user()
         book = create_test_book(user)
-        print(f"Created test user: {user['clerk_id']}")
+        print(f"Created test user: {user['auth_id']}")
         print(f"Created test book: {book['id']}")
-
-        # Set up authentication bypass
-        async def fake_verify_jwt(token: str):
-            return {"sub": user["clerk_id"]}
-
-        # Override the JWT verification
-        sec.verify_jwt_token = fake_verify_jwt
 
         # Override get_current_user_from_session to return our test user
         from app.core.security import get_current_user_from_session

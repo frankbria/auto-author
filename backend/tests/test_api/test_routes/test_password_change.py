@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 
 pytest.skip(
-    "Skipping this file for now - haven't integrated with Clerk yet.",
+    "Skipping this file - password changes are handled by better-auth, not the backend API.",
     allow_module_level=True,
 )
 
