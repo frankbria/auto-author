@@ -228,6 +228,7 @@ jobs:
 
           # Create/update .env.production with all required variables
           {
+            echo "NODE_ENV=production"
             echo "NEXT_PUBLIC_API_URL=$API_URL"
             echo "NEXT_PUBLIC_BETTER_AUTH_URL=$FRONTEND_URL"
             echo "BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}"
@@ -238,6 +239,7 @@ jobs:
           } > .env.production
 
           # Export environment variables for build process
+          export NODE_ENV=production
           export NEXT_PUBLIC_API_URL=$API_URL
           export NEXT_PUBLIC_BETTER_AUTH_URL=$FRONTEND_URL
           export BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}
