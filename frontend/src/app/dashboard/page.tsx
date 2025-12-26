@@ -29,10 +29,8 @@ export default function Dashboard() {
 
     setIsLoading(true);
     try {
-      // Set up token provider for authenticated requests
-      const tokenProvider = async () => session?.session.token || null;
-      bookClient.setTokenProvider(tokenProvider);
-
+      // Cookie-based authentication - no token provider needed
+      // Cookies are automatically sent with credentials: 'include'
       const books = await bookClient.getUserBooks();
       setProjects(books);
       setError(null);
@@ -66,23 +64,20 @@ export default function Dashboard() {
   const handleCreateNewBook = () => {
     setIsBookDialogOpen(true);
   };
-  
+
   const handleBookCreated = (bookId: string) => {
     toast.success('Your book has been created! Click "Open Project" to start writing.');
     fetchBooks();  // Refresh the list of books
-    
+
     // Redirect after a short delay to allow the user to see the success toast
     setTimeout(() => {
       router.push(`/dashboard/books/${bookId}`);
     }, 1500);
   };
-  
+
   const handleDeleteBook = async (bookId: string) => {
     try {
-      // Set up token provider for authenticated requests
-      const tokenProvider = async () => session?.session.token || null;
-      bookClient.setTokenProvider(tokenProvider);
-
+      // Cookie-based authentication - no token provider needed
       await bookClient.deleteBook(bookId);
       toast.success('Book deleted successfully');
 

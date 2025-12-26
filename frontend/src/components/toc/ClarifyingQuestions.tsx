@@ -17,12 +17,10 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
-  // Set up token provider for automatic token refresh
   useEffect(() => {
     const getToken = async () => {
       return session?.session.token ?? null;
     };
-    bookClient.setTokenProvider(getToken);
   }, [session?.session.token]);
 
   // Load existing responses when component mounts
@@ -62,10 +60,10 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
             question,
             answer: responses[index] || ''
           }));
-          
+
           // Only save non-empty responses
           const nonEmptyResponses = questionResponses.filter(r => r.answer.trim().length > 0);
-          
+
           // Note: Skipping save call due to type mismatch between TOC and chapter questions
           // This component is for TOC generation which has simpler question/answer structure
           if (nonEmptyResponses.length > 0) {
@@ -90,10 +88,10 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
       question,
       answer: responses[index] || ''
     }));
-    
+
     // Note: This component is for TOC generation, not chapter questions
     // For now, skip saving to the chapter-questions API which has different structure
-    
+
     onSubmit(questionResponses);
   };
 
@@ -115,7 +113,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
     }
   };
 
-  const allQuestionsAnswered = questions.every((_, index) => 
+  const allQuestionsAnswered = questions.every((_, index) =>
     responses[index] && responses[index].trim().length > 0
   );
 
@@ -130,7 +128,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         <p className="text-zinc-400">
           Help us create the best table of contents by answering a few questions about your book.
         </p>
-        
+
         {/* Auto-save status */}
         <div className="mt-3 flex items-center text-sm">
           {isSaving ? (
@@ -160,8 +158,8 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
           <span>{Math.round(progress)}% complete</span>
         </div>
         <div className="w-full bg-zinc-700 rounded-full h-2">
-          <div 
-            className="bg-indigo-600 h-2 rounded-full transition-all duration-300" 
+          <div
+            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           ></div>
         </div>
@@ -171,7 +169,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         <h3 className="text-zinc-100 font-medium mb-4 text-lg">
           {currentQuestion}
         </h3>
-        
+
         <textarea
           value={responses[currentQuestionIndex] || ''}
           onChange={(e) => handleResponseChange(currentQuestionIndex, e.target.value)}
@@ -179,7 +177,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
           className="w-full h-32 px-4 py-3 bg-zinc-800 border border-zinc-600 rounded-lg text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
           disabled={isLoading}
         />
-        
+
         <div className="mt-3 text-zinc-400 text-sm">
           {responses[currentQuestionIndex]?.length || 0} characters
         </div>

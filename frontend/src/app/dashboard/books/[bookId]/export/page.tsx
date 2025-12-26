@@ -59,31 +59,28 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
   useEffect(() => {
     const fetchBookDetails = async () => {
       try {
-        // Set up token provider for automatic token refresh
-        const tokenProvider = async () => session?.session.token || null;
-        bookClient.setTokenProvider(tokenProvider);
 
         // Fetch book details
         const bookData = await bookClient.getBook(bookId);
         setBook(bookData);
-        
+
         // Fetch export formats
         const exportData = await bookClient.getExportFormats(bookId);
-        
+
         // Add icons to formats (since API doesn't provide them)
         const formatsWithIcons = exportData.formats.map(format => ({
           ...format,
           icon: format.format === 'pdf' ? '📄' : format.format === 'docx' ? '📝' : '📋'
         }));
-        
+
         setFormats(formatsWithIcons);
-        
+
         // Set default format to first available one
         const firstAvailable = formatsWithIcons.find(f => f.available);
         if (firstAvailable) {
           setSelectedFormat(firstAvailable.format);
         }
-        
+
         // Fetch chapters metadata
         const chaptersData = await bookClient.getChaptersMetadata(bookId);
         const chaptersFormatted: ChapterStatus[] = chaptersData.chapters.map(ch => ({
@@ -92,9 +89,9 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
           status: ch.status,
           word_count: ch.word_count
         }));
-        
+
         setChapters(chaptersFormatted);
-        
+
       } catch (error) {
         console.error('Error fetching book details:', error);
         toast.error('Failed to load export options. Please try again.');
@@ -104,19 +101,19 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
     };
       fetchBookDetails();
   }, [bookId, session]);
-  
+
   const handleExport = async () => {
-  
+
     if (!selectedFormat) {
       toast.error('Please select an export format');
       return;
     }
-    
+
     setIsExporting(true);
-    
+
     try {
       let blob: Blob;
-      
+
       if (selectedFormat === 'pdf') {
         blob = await bookClient.exportPDF(bookId, {
           includeEmptyChapters,
@@ -131,7 +128,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
         setIsExporting(false);
         return;
       }
-      
+
       setDownloadBlob(blob);
       setExportComplete(true);
     } catch (error) {
@@ -140,10 +137,10 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
       setIsExporting(false);
     }
   };
-  
+
   const handleDownload = () => {
     if (!downloadBlob || !book) return;
-    
+
     const format = formats.find(f => f.format === selectedFormat);
     const url = window.URL.createObjectURL(downloadBlob);
     const a = document.createElement('a');
@@ -153,10 +150,10 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
-    
+
     toast.success('Download started!');
   };
-  
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft':
@@ -169,7 +166,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
         return 'bg-zinc-600';
     }
   };
-  
+
   const getStatusText = (status: string) => {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
@@ -192,7 +189,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
           <h1 className="text-3xl font-bold text-zinc-100">Export Book</h1>
           <p className="text-zinc-400 mt-1">{book?.title || ''}</p>
         </div>
-        
+
         <button
           onClick={() => router.back()}
           className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-md"
@@ -200,7 +197,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
           Back to Book
         </button>
       </div>
-      
+
       {exportComplete ? (
         // Export Complete View
         <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8 text-center">
@@ -213,9 +210,9 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
           <p className="text-zinc-400 mb-6">
             Your book has been successfully exported in {formats.find(f => f.format === selectedFormat)?.name} format.
           </p>
-          
+
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <button 
+            <button
               onClick={handleDownload}
               className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md flex items-center justify-center"
             >
@@ -224,7 +221,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
               </svg>
               Download File
             </button>
-            <button 
+            <button
               onClick={() => {
                 setExportComplete(false);
                 setIsExporting(false);
@@ -244,7 +241,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
               <h2 className="text-xl font-semibold text-zinc-100 mb-4">1. Choose Export Format</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {formats.map(format => (
-                  <div 
+                  <div
                     key={format.format}
                     className={`border rounded-lg p-4 cursor-pointer transition-colors ${
                       selectedFormat === format.format
@@ -266,7 +263,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                 ))}
               </div>
             </div>
-            
+
             {/* Export Options */}
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 mb-6">
               <h2 className="text-xl font-semibold text-zinc-100 mb-4">2. Export Options</h2>
@@ -277,8 +274,8 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                       <div className="mt-1">
                         <label className="inline-flex items-center cursor-pointer">
                           <div className="relative">
-                            <input 
-                              type="checkbox" 
+                            <input
+                              type="checkbox"
                               className="sr-only peer"
                               checked={includeEmptyChapters}
                               onChange={() => setIncludeEmptyChapters(!includeEmptyChapters)}
@@ -292,7 +289,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                         <p className="text-zinc-400 text-sm">Export chapters that don't have content yet</p>
                       </div>
                     </div>
-                    
+
                     <div>
                       <h3 className="font-medium text-zinc-200 mb-2">Page Size</h3>
                       <div className="flex gap-4">
@@ -322,14 +319,14 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                     </div>
                   </div>
                 )}
-                
+
                 {selectedFormat === 'docx' && (
                   <div className="flex items-start">
                     <div className="mt-1">
                       <label className="inline-flex items-center cursor-pointer">
                         <div className="relative">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             className="sr-only peer"
                             checked={includeEmptyChapters}
                             onChange={() => setIncludeEmptyChapters(!includeEmptyChapters)}
@@ -344,13 +341,13 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                     </div>
                   </div>
                 )}
-                
+
                 {!selectedFormat && (
                   <p className="text-zinc-400 text-center py-4">Select a format to see available options</p>
                 )}
               </div>
             </div>
-            
+
             {/* Chapter Summary */}
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6">
               <h2 className="text-xl font-semibold text-zinc-100 mb-4">3. Chapter Information</h2>
@@ -365,13 +362,13 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                   <span className="text-zinc-400">Total word count:</span> {chapters.reduce((sum, ch) => sum + ch.word_count, 0).toLocaleString()}
                 </div>
               </div>
-              
+
               {chapters.length === 0 && (
                 <div className="text-center py-6 mt-4">
                   <p className="text-zinc-400">No chapters found in this book.</p>
                 </div>
               )}
-              
+
               {chapters.length > 0 && chapters.filter(ch => ch.word_count === 0).length > 0 && !includeEmptyChapters && (
                 <div className="mt-4 p-3 bg-amber-900/20 border border-amber-700/50 rounded-md">
                   <p className="text-amber-300 text-sm">
@@ -381,25 +378,25 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
               )}
             </div>
           </div>
-          
+
           {/* Export Summary */}
           <div className="lg:col-span-1">
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 sticky top-24">
               <h2 className="text-xl font-semibold text-zinc-100 mb-4">Export Summary</h2>
-              
+
               <div className="space-y-4">
                 <div>
                   <h3 className="text-zinc-400 text-sm">Book</h3>
                   <p className="text-zinc-200">{book?.title || ''}</p>
                 </div>
-                
+
                 <div>
                   <h3 className="text-zinc-400 text-sm">Format</h3>
                   <p className="text-zinc-200">
                     {formats.find(f => f.format === selectedFormat)?.name || 'Not selected'}
                   </p>
                 </div>
-                
+
                 <div>
                   <h3 className="text-zinc-400 text-sm">Options</h3>
                   <div className="space-y-1 mt-1">
@@ -428,7 +425,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                     )}
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-zinc-400 text-sm">Export Details</h3>
                   <div className="space-y-1 mt-1">
@@ -441,7 +438,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                   </div>
                 </div>
               </div>
-              
+
               {isExporting ? (
                 <div className="mt-6">
                   <LoadingStateManager
@@ -462,7 +459,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                   >
                     Export Book
                   </button>
-                  
+
                   {chapters.length === 0 && (
                     <p className="text-amber-400 text-xs mt-2">
                       This book has no chapters to export.

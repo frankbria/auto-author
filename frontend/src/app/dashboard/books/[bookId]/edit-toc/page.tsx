@@ -22,7 +22,7 @@ type Chapter = {
 };
 
 // Helper functions to convert between API format and local format
-const convertTocDataToChapters = (tocData: { 
+const convertTocDataToChapters = (tocData: {
   chapters: Array<{
     id: string;
     title: string;
@@ -42,11 +42,11 @@ const convertTocDataToChapters = (tocData: {
   structure_notes: string;
 }): Chapter[] => {
   const chapters: Chapter[] = [];
-  
+
   if (!tocData || !tocData.chapters) {
     return chapters;
   }
-  
+
   tocData.chapters.forEach((apiChapter) => {    const chapter: Chapter = {
       id: apiChapter.id,
       title: apiChapter.title,
@@ -57,7 +57,7 @@ const convertTocDataToChapters = (tocData: {
       word_count: (apiChapter as { word_count?: number }).word_count || 0,
       estimated_reading_time: (apiChapter as { estimated_reading_time?: number }).estimated_reading_time || 0
     };
-    
+
     // Convert subchapters to children
     if (apiChapter.subchapters && apiChapter.subchapters.length > 0) {
       apiChapter.subchapters.forEach((apiSubchapter) => {        const subchapter: Chapter = {
@@ -74,10 +74,10 @@ const convertTocDataToChapters = (tocData: {
         chapter.children.push(subchapter);
       });
     }
-    
+
     chapters.push(chapter);
   });
-  
+
   return chapters;
 };
 
@@ -96,7 +96,7 @@ const convertChaptersToTocData = (chapters: Chapter[]) => {
       order: number;
     }>;
   }> = [];
-  
+
   chapters.forEach((chapter, index) => {
     if (chapter.depth === 0) { // Only process top-level chapters
       const apiChapter = {
@@ -113,7 +113,7 @@ const convertChaptersToTocData = (chapters: Chapter[]) => {
           order: number;
         }>
       };
-      
+
       // Convert children to subchapters
       chapter.children.forEach((child, childIndex) => {
         const apiSubchapter = {
@@ -125,11 +125,11 @@ const convertChaptersToTocData = (chapters: Chapter[]) => {
         };
         apiChapter.subchapters.push(apiSubchapter);
       });
-      
+
       apiChapters.push(apiChapter);
     }
   });
-  
+
   return {
     chapters: apiChapters,
     total_chapters: apiChapters.length,
@@ -150,13 +150,10 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   useEffect(() => {
     const fetchTOC = async () => {
       try {
-        // Set up token provider for automatic token refresh
-        const tokenProvider = async () => session?.session.token || null;
-        bookClient.setTokenProvider(tokenProvider);
 
         // Fetch TOC from the backend API
         const response = await bookClient.getToc(bookId);
-        
+
         if (response.toc) {
           // Convert API format (TocData) to local format (Chapter[])
           const convertedToc = convertTocDataToChapters(response.toc);
@@ -172,7 +169,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         setIsLoading(false);
       }
     };
-    
+
     fetchTOC();
   }, [bookId, session]);
 
@@ -187,13 +184,13 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       word_count: 0,
       estimated_reading_time: 0
     };
-    
+
     setToc([...toc, newChapter]);
   };
-  
+
   const addSubchapter = (parentId: string) => {
     const updatedToc = [...toc];
-    
+
     // Find the parent chapter
     const findAndAddSubchapter = (chapters: Chapter[]) => {
       for (let i = 0; i < chapters.length; i++) {
@@ -208,75 +205,75 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
             word_count: 0,
             estimated_reading_time: 0
           };
-          
+
           chapters[i].children.push(newSubchapter);
           return true;
         }
-        
+
         if (chapters[i].children.length > 0) {
           if (findAndAddSubchapter(chapters[i].children)) {
             return true;
           }
         }
       }
-      
+
       return false;
     };
-    
+
     findAndAddSubchapter(updatedToc);
     setToc(updatedToc);
   };
-  
+
   const updateChapter = (id: string, field: 'title' | 'description', value: string) => {
     const updatedToc = [...toc];
-    
+
     const findAndUpdateChapter = (chapters: Chapter[]) => {
       for (let i = 0; i < chapters.length; i++) {
         if (chapters[i].id === id) {
           chapters[i][field] = value;
           return true;
         }
-        
+
         if (chapters[i].children.length > 0) {
           if (findAndUpdateChapter(chapters[i].children)) {
             return true;
           }
         }
       }
-      
+
       return false;
     };
-    
+
     findAndUpdateChapter(updatedToc);
     setToc(updatedToc);
   };
-  
+
   const deleteChapter = (id: string) => {
     let updatedToc = [...toc];
-    
+
     // Handle top-level chapters
     updatedToc = updatedToc.filter(chapter => chapter.id !== id);
-    
+
     // Handle nested chapters
     const findAndDeleteSubchapter = (chapters: Chapter[]) => {
       for (let i = 0; i < chapters.length; i++) {
         chapters[i].children = chapters[i].children.filter(
           subchapter => subchapter.id !== id
         );
-        
+
         if (chapters[i].children.length > 0) {
           findAndDeleteSubchapter(chapters[i].children);
         }
       }
     };
-    
+
     findAndDeleteSubchapter(updatedToc);
     setToc(updatedToc);
   };
     const handleDragStart = (id: string) => {
     setDraggedItem(id);
   };
-  
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
@@ -291,7 +288,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
 
   const handleDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
-    
+
     if (!draggedItem || draggedItem === targetId) {
       setDraggedItem(null);
       setDragOverItem(null);
@@ -302,7 +299,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     const flattenedToc = flattenTocForReordering(toc);
     const draggedIndex = flattenedToc.findIndex(item => item.id === draggedItem);
     const targetIndex = flattenedToc.findIndex(item => item.id === targetId);
-    
+
     if (draggedIndex === -1 || targetIndex === -1) {
       setDraggedItem(null);
       setDragOverItem(null);
@@ -312,7 +309,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     // Reorder the chapters
     const reorderedToc = reorderChapters(toc, draggedItem, targetId);
     setToc(reorderedToc);
-    
+
     setDraggedItem(null);
     setDragOverItem(null);
   };
@@ -320,7 +317,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   // Helper function to flatten TOC for easier reordering calculations
   const flattenTocForReordering = (chapters: Chapter[]): Chapter[] => {
     const flattened: Chapter[] = [];
-    
+
     const flatten = (items: Chapter[]) => {
       items.forEach(item => {
         flattened.push(item);
@@ -329,17 +326,17 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         }
       });
     };
-    
+
     flatten(chapters);
     return flattened;
   };  // Helper function to reorder chapters in the TOC structure
   const reorderChapters = (originalToc: Chapter[], draggedId: string, targetId: string): Chapter[] => {
     // Create a deep copy
     let newToc = JSON.parse(JSON.stringify(originalToc)) as Chapter[];
-    
+
     // Find and remove the dragged item
     let draggedChapter: Chapter | null = null;
-    
+
     const removeDraggedItem = (chapters: Chapter[]): Chapter[] => {
       return chapters.filter(chapter => {
         if (chapter.id === draggedId) {
@@ -350,9 +347,9 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         return true;
       });
     };
-    
+
     newToc = removeDraggedItem(newToc);
-    
+
     if (!draggedChapter) return originalToc;
 
     // Find target and determine insertion logic
@@ -365,20 +362,20 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
           const updatedChapter = draggedChapter as Chapter;
           updatedChapter.depth = newDepth;
           updatedChapter.parent = parent?.id;
-          
+
           // Recursively update children depths
           const updateChildrenDepth = (chapter: Chapter, baseDepth: number) => {
             chapter.depth = baseDepth;
             chapter.children.forEach(child => updateChildrenDepth(child, baseDepth + 1));
           };
-          
+
           updateChildrenDepth(updatedChapter, newDepth);
-          
+
           // Insert before the target
           chapters.splice(i, 0, updatedChapter);
           return true;
         }
-        
+
         if (chapters[i].children.length > 0) {
           if (insertDraggedItem(chapters[i].children, chapters[i])) {
             return true;
@@ -392,13 +389,13 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         const updatedChapter = draggedChapter as Chapter;
         updatedChapter.depth = 0;
         delete updatedChapter.parent;
-        
+
         // Update children depths
         const updateChildrenDepth = (chapter: Chapter, baseDepth: number) => {
           chapter.depth = baseDepth;
           chapter.children.forEach(child => updateChildrenDepth(child, baseDepth + 1));
         };
-        
+
         updateChildrenDepth(updatedChapter, 0);
         newToc.push(updatedChapter);
       }
@@ -410,20 +407,17 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     setError('');
 
     try {
-      // Set up token provider for automatic token refresh
-      const tokenProvider = async () => session?.session.token || null;
-      bookClient.setTokenProvider(tokenProvider);
 
       // Convert local Chapter format to API TocData format
       const tocData = convertChaptersToTocData(toc);
       console.log('TOC to save:', tocData);
-      
+
       // Save TOC using the real API
       await bookClient.updateToc(bookId, tocData);
-      
+
       // Trigger TOC synchronization event for chapter tabs
       triggerTocUpdateEvent(bookId);
-      
+
       // Navigate to the book page with tabs
       router.push(`/dashboard/books/${bookId}`);
     } catch (err) {
@@ -436,7 +430,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     const renderChapterItem = (chapter: Chapter) => {
     const isDragging = draggedItem === chapter.id;
     const isDragOver = dragOverItem === chapter.id;
-    
+
     return (
       <div
         key={chapter.id}
@@ -531,13 +525,13 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
           Customize your book's structure by editing, adding, or rearranging chapters and subchapters.
         </p>
       </div>
-      
+
       {error && (
         <div className="p-4 mb-6 rounded-lg bg-red-900/20 border border-red-700 text-red-400">
           {error}
         </div>
       )}
-      
+
       <div className="mb-6 flex justify-end">
         <button
           onClick={addNewChapter}
@@ -549,7 +543,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
           Add Chapter
         </button>
       </div>
-      
+
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="space-y-3">
           {toc.map(chapter => (
@@ -574,7 +568,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
           </div>
         )}
       </div>
-      
+
       <div className="mt-8 flex justify-between">
         <button
           onClick={() => router.back()}

@@ -54,7 +54,7 @@ const convertTocToChapters = (tocData: TocData | null): Chapter[] => {
   }
 
   const chapters: Chapter[] = [];
-  
+
   tocData.chapters.forEach((tocChapter) => {
     // Add main chapter
     const chapter: Chapter = {
@@ -101,9 +101,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     const fetchBookData = async () => {
       setIsLoading(true);
       try {
-        // Set up token provider for automatic token refresh
-        const tokenProvider = async () => session?.session.token || null;
-        bookClient.setTokenProvider(tokenProvider);
 
         // Fetch book details
         const bookData: BookProject = await bookClient.getBook(bookId);
@@ -155,9 +152,9 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   }, [bookId, session]);
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -324,7 +321,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       </div>
     );
   }
-  
+
   // Show error state
   if (error) {
     return (
@@ -333,14 +330,14 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           <h2 className="text-red-400 text-xl font-medium mb-2">Error</h2>
           <p className="text-zinc-300 mb-4">{error}</p>
           <div className="flex space-x-4">
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md"
             >
               Try Again
             </button>
-            <Link 
-              href="/dashboard" 
+            <Link
+              href="/dashboard"
               className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-medium rounded-md"
             >
               Back to Dashboard
@@ -350,15 +347,15 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       </div>
     );
   }
-  
+
   // If book is null but not loading or error state
   if (!book) {
     return (
       <div className="container mx-auto flex-1 p-6 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-medium text-zinc-300 mb-4">Book not found</h2>
-          <Link 
-            href="/dashboard" 
+          <Link
+            href="/dashboard"
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
           >
             Back to Dashboard
@@ -374,7 +371,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
         // Get active chapter info for breadcrumb
         const activeChapter = initialChapter ? book.chapters.find(ch => ch.id === initialChapter) : null;
         const showChapterContext = !!initialChapter && !!activeChapter;
-        
+
         return (
           <ChapterBreadcrumb
             bookId={book.id}
@@ -385,7 +382,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           />
         );
       })()}
-      
+
       <div className="mb-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-zinc-100">{book.title}</h1>
@@ -532,9 +529,9 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       </div>      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-zinc-800 border border-zinc-700 p-5 rounded-lg lg:col-span-3">          {book.chapters.length > 0 ? (
             /* Chapter Tabs Interface */
-            <ChapterTabs 
-              bookId={book.id} 
-              className="h-full" 
+            <ChapterTabs
+              bookId={book.id}
+              className="h-full"
               initialActiveChapter={initialChapter || undefined}
             />
           ) : (
@@ -572,8 +569,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
               <div className="text-sm text-zinc-400 mb-1">Overall Progress</div>
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-zinc-700 rounded-full h-2">
-                  <div 
-                    className="bg-indigo-600 h-2 rounded-full" 
+                  <div
+                    className="bg-indigo-600 h-2 rounded-full"
                     style={{ width: `${book.progress}%` }}
                   ></div>
                 </div>

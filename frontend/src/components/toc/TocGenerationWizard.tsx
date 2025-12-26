@@ -31,12 +31,10 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
     isLoading: true
   });
 
-  // Set up token provider for automatic token refresh
   useEffect(() => {
     const getToken = async () => {
       return session?.session.token ?? null;
     };
-    bookClient.setTokenProvider(getToken);
   }, [session?.session.token]);
 
   const generateQuestions = useCallback(async () => {
@@ -45,7 +43,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       const { data: response } = await trackOperation('toc-questions', async () => {
         return await bookClient.generateQuestions(bookId);
       }, { bookId });
-      
+
       setWizardState(prev => ({
         ...prev,
         step: WizardStep.ASKING_QUESTIONS,
@@ -65,7 +63,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
   const checkTocReadiness = useCallback(async () => {
     try {
       setWizardState(prev => ({ ...prev, isLoading: true }));
-      
+
       // First, analyze the summary using AI to get readiness assessment
       try {
         console.log('Analyzing summary with AI...');
@@ -82,7 +80,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       const { data: readiness } = await trackOperation('toc-readiness', async () => {
         return await bookClient.checkTocReadiness(bookId);
       }, { bookId });
-      
+
       if (readiness.meets_minimum_requirements) {
         // If ready, proceed to generate questions
         await generateQuestions();
@@ -122,7 +120,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       const { data: result } = await trackOperation('toc-generation', async () => {
         return await bookClient.generateToc(bookId, responses);
       }, { bookId, responseCount: responses.length });
-      
+
       // Ensure chapters have all required TocChapter fields
       const transformedResult = {
         ...result,
@@ -163,12 +161,12 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
   const handleAcceptToc = async () => {
     try {
       if (!wizardState.generatedToc?.toc) return;
-      
+
       setWizardState(prev => ({ ...prev, isLoading: true }));
-      
+
       // Save the TOC to the backend
       await bookClient.updateToc(bookId, wizardState.generatedToc.toc);
-      
+
       // Navigate to the edit TOC page
       router.push(`/dashboard/books/${bookId}/edit-toc`);
     } catch (error) {
@@ -193,7 +191,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       const { data: result } = await trackOperation('toc-generation', async () => {
         return await bookClient.generateToc(bookId, wizardState.questionResponses);
       }, { bookId, responseCount: wizardState.questionResponses.length });
-      
+
       // Ensure chapters have all required TocChapter fields
       const transformedResult = {
         ...result,
@@ -242,46 +240,46 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
   const renderCurrentStep = () => {
     switch (wizardState.step) {      case WizardStep.CHECKING_READINESS:
         return <ReadinessChecker />;
-      
+
       case WizardStep.NOT_READY:
         return (
-          <NotReadyMessage 
-            readiness={wizardState.readiness!} 
+          <NotReadyMessage
+            readiness={wizardState.readiness!}
             onRetry={handleRetry}
             bookId={bookId}
           />
         );
         case WizardStep.ASKING_QUESTIONS:
         return (
-          <ClarifyingQuestions 
+          <ClarifyingQuestions
             questions={wizardState.questions!}
             onSubmit={handleQuestionSubmit}
             isLoading={wizardState.isLoading}
             bookId={bookId}
           />
         );
-      
+
       case WizardStep.GENERATING:
         return <TocGenerating />;
-      
+
       case WizardStep.REVIEW:
         return (
-          <TocReview 
+          <TocReview
             tocResult={wizardState.generatedToc!}
             onAccept={handleAcceptToc}
             onRegenerate={handleRegenerateToc}
             isLoading={wizardState.isLoading}
           />
         );
-      
+
       case WizardStep.ERROR:
         return (
-          <ErrorDisplay 
+          <ErrorDisplay
             error={wizardState.error!}
             onRetry={handleRetry}
           />
         );
-      
+
       default:
         return null;
     }
@@ -303,8 +301,8 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
           <span>{getStepTitle(wizardState.step)}</span>
         </div>
         <div className="w-full bg-zinc-700 rounded-full h-2">
-          <div 
-            className="bg-indigo-600 h-2 rounded-full transition-all duration-300" 
+          <div
+            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${getProgressPercentage(wizardState.step)}%` }}
           ></div>
         </div>
