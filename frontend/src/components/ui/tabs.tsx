@@ -1,176 +1,68 @@
 'use client';
 
 import * as React from 'react';
+import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { cn } from '@/lib/utils';
 
-interface TabsContextValue {
-  value: string;
-  onValueChange: (value: string) => void;
-  idPrefix: string;
-}
+const Tabs = React.forwardRef<
+  React.ComponentRef<typeof TabsPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Root
+    ref={ref}
+    className={cn('', className)}
+    {...props}
+  />
+));
+Tabs.displayName = TabsPrimitive.Root.displayName;
 
-const TabsContext = React.createContext<TabsContextValue | undefined>(undefined);
+const TabsList = React.forwardRef<
+  React.ComponentRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn(
+      'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
+      className
+    )}
+    {...props}
+  />
+));
+TabsList.displayName = TabsPrimitive.List.displayName;
 
-function useTabsContext() {
-  const context = React.useContext(TabsContext);
-  if (!context) {
-    throw new Error('Tabs components must be used within a Tabs provider');
-  }
-  return context;
-}
+const TabsTrigger = React.forwardRef<
+  React.ComponentRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+      'disabled:pointer-events-none disabled:opacity-50',
+      'data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
+      'hover:bg-accent hover:text-accent-foreground data-[state=active]:hover:bg-background',
+      className
+    )}
+    {...props}
+  />
+));
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
-// Generate a stable unique ID prefix for each Tabs instance
-let tabsIdCounter = 0;
-function useTabsId() {
-  const [id] = React.useState(() => `tabs-${++tabsIdCounter}`);
-  return id;
-}
+const TabsContent = React.forwardRef<
+  React.ComponentRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn(
+      'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+      className
+    )}
+    {...props}
+  />
+));
+TabsContent.displayName = TabsPrimitive.Content.displayName;
 
-interface TabsProps {
-  defaultValue?: string;
-  value?: string;
-  onValueChange?: (value: string) => void;
-  className?: string;
-  children: React.ReactNode;
-}
-
-export function Tabs({
-  defaultValue,
-  value: controlledValue,
-  onValueChange,
-  className,
-  children
-}: TabsProps) {
-  const [uncontrolledValue, setUncontrolledValue] = React.useState(defaultValue || '');
-  const idPrefix = useTabsId();
-
-  const isControlled = controlledValue !== undefined;
-  const value = isControlled ? controlledValue : uncontrolledValue;
-
-  const handleValueChange = React.useCallback((newValue: string) => {
-    if (!isControlled) {
-      setUncontrolledValue(newValue);
-    }
-    onValueChange?.(newValue);
-  }, [isControlled, onValueChange]);
-
-  return (
-    <TabsContext.Provider value={{ value, onValueChange: handleValueChange, idPrefix }}>
-      <div className={cn('', className)}>
-        {children}
-      </div>
-    </TabsContext.Provider>
-  );
-}
-
-interface TabsListProps {
-  className?: string;
-  children: React.ReactNode;
-}
-
-export function TabsList({ className, children }: TabsListProps) {
-  return (
-    <div
-      role="tablist"
-      className={cn(
-        'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-interface TabsTriggerProps {
-  value: string;
-  className?: string;
-  children: React.ReactNode;
-  disabled?: boolean;
-  onClick?: () => void;
-}
-
-export function TabsTrigger({
-  value,
-  className,
-  children,
-  disabled,
-  onClick
-}: TabsTriggerProps) {
-  const { value: selectedValue, onValueChange, idPrefix } = useTabsContext();
-  const isSelected = selectedValue === value;
-
-  const triggerId = `${idPrefix}-trigger-${value}`;
-  const panelId = `${idPrefix}-panel-${value}`;
-
-  const handleClick = () => {
-    if (!disabled) {
-      onValueChange(value);
-      onClick?.();
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      role="tab"
-      id={triggerId}
-      aria-selected={isSelected}
-      aria-controls={panelId}
-      disabled={disabled}
-      onClick={handleClick}
-      className={cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        'disabled:pointer-events-none disabled:opacity-50',
-        isSelected
-          ? 'bg-background text-foreground shadow-sm'
-          : 'hover:bg-accent hover:text-accent-foreground',
-        className
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-interface TabsContentProps {
-  value: string;
-  className?: string;
-  children: React.ReactNode;
-  forceMount?: boolean;
-}
-
-export function TabsContent({
-  value,
-  className,
-  children,
-  forceMount
-}: TabsContentProps) {
-  const { value: selectedValue, idPrefix } = useTabsContext();
-  const isSelected = selectedValue === value;
-
-  const triggerId = `${idPrefix}-trigger-${value}`;
-  const panelId = `${idPrefix}-panel-${value}`;
-
-  if (!isSelected && !forceMount) {
-    return null;
-  }
-
-  return (
-    <div
-      role="tabpanel"
-      id={panelId}
-      aria-labelledby={triggerId}
-      tabIndex={0}
-      hidden={!isSelected}
-      className={cn(
-        'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        !isSelected && 'hidden',
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-}
+export { Tabs, TabsList, TabsTrigger, TabsContent };
