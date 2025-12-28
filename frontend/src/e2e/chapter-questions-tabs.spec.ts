@@ -20,9 +20,19 @@ import {
  * - Backend running with MongoDB connection (MONGODB_URI or DATABASE_URL)
  * - Frontend running (localhost:3000)
  * - BYPASS_AUTH=true for test authentication
+ *
+ * These tests are skipped in CI unless E2E_ENABLED=true is set,
+ * as they require full infrastructure (MongoDB, backend, frontend).
  */
 
+// Skip these tests in CI unless explicitly enabled
+// This prevents CI failures when infrastructure isn't available
+const shouldSkip = process.env.CI === 'true' && process.env.E2E_ENABLED !== 'true';
+
 test.describe('ChapterQuestions Tabs Navigation', () => {
+  // Skip entire suite if in CI without E2E_ENABLED
+  test.skip(shouldSkip, 'Skipping E2E tests in CI - set E2E_ENABLED=true to run');
+
   let testBook: TestBook;
   let testChapters: TestChapter[];
 
