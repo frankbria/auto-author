@@ -10,7 +10,15 @@ import { test, expect } from '@playwright/test';
  * - Accessibility compliance
  */
 
-test.describe('ChapterQuestions Tabs Navigation', () => {
+/**
+ * These E2E tests are skipped by default as they require:
+ * 1. A running backend with MongoDB connection
+ * 2. Authentication setup
+ * 3. Test data (books with chapters)
+ *
+ * To run these tests, ensure the backend is running and remove the .skip
+ */
+test.describe.skip('ChapterQuestions Tabs Navigation', () => {
   // Use a mock page that renders ChapterQuestions for testing
   // In a real implementation, navigate to an actual chapter page
 
@@ -22,7 +30,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
   });
 
   test.describe('Tab Click Navigation', () => {
-    test.skip('user can click tabs to switch between questions and editor', async ({ page }) => {
+    test('user can click tabs to switch between questions and editor', async ({ page }) => {
       // Navigate to a book with chapters
       await page.click('[data-testid="book-card"]');
       await page.waitForLoadState('networkidle');
@@ -46,7 +54,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
       }
     });
 
-    test.skip('active tab has visual indicator', async ({ page }) => {
+    test('active tab has visual indicator', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
@@ -65,7 +73,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
   });
 
   test.describe('Keyboard Navigation', () => {
-    test.skip('Ctrl+1 switches to Interview Questions tab', async ({ page }) => {
+    test('Ctrl+1 switches to Interview Questions tab', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
@@ -84,7 +92,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
       }
     });
 
-    test.skip('Ctrl+2 switches to Chapter Editor tab', async ({ page }) => {
+    test('Ctrl+2 switches to Chapter Editor tab', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
@@ -102,7 +110,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
       }
     });
 
-    test.skip('Ctrl+Tab cycles through tabs', async ({ page }) => {
+    test('Ctrl+Tab cycles through tabs', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
@@ -123,7 +131,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
       }
     });
 
-    test.skip('Arrow keys navigate between tabs', async ({ page }) => {
+    test('Arrow keys navigate between tabs', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
@@ -144,7 +152,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
   });
 
   test.describe('Session Storage Persistence', () => {
-    test.skip('tab state persists during session', async ({ page }) => {
+    test('tab state persists during session', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
@@ -170,7 +178,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
       }
     });
 
-    test.skip('tab state is restored after navigation', async ({ page }) => {
+    test('tab state is restored after navigation', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
@@ -191,7 +199,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
   });
 
   test.describe('Tab Content', () => {
-    test.skip('tab switching does not lose question progress', async ({ page }) => {
+    test('tab switching does not lose question progress', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
@@ -216,7 +224,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
   });
 
   test.describe('Accessibility', () => {
-    test.skip('tabs have proper ARIA attributes', async ({ page }) => {
+    test('tabs have proper ARIA attributes', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
@@ -235,7 +243,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
       await expect(tabpanel).toHaveAttribute('aria-labelledby');
     });
 
-    test.skip('focus is visible on tabs', async ({ page }) => {
+    test('focus is visible on tabs', async ({ page }) => {
       await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
 
