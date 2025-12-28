@@ -1,4 +1,11 @@
 import { test, expect } from '@playwright/test';
+import {
+  createTestBookWithTOC,
+  deleteTestBook,
+  navigateToBookEditor,
+  type TestBook,
+  type TestChapter
+} from './helpers/testData';
 
 /**
  * E2E tests for ChapterQuestions tab navigation
@@ -8,42 +15,49 @@ import { test, expect } from '@playwright/test';
  * - Keyboard navigation (Ctrl+1, Ctrl+2, Ctrl+Tab)
  * - Session storage persistence
  * - Accessibility compliance
+ *
+ * Requirements:
+ * - Backend running with MongoDB connection (MONGODB_URI or DATABASE_URL)
+ * - Frontend running (localhost:3000)
+ * - BYPASS_AUTH=true for test authentication
  */
 
-/**
- * These E2E tests are skipped by default as they require:
- * 1. A running backend with MongoDB connection
- * 2. Authentication setup
- * 3. Test data (books with chapters)
- *
- * To run these tests, ensure the backend is running and remove the .skip
- */
-test.describe.skip('ChapterQuestions Tabs Navigation', () => {
-  // Use a mock page that renders ChapterQuestions for testing
-  // In a real implementation, navigate to an actual chapter page
+test.describe('ChapterQuestions Tabs Navigation', () => {
+  let testBook: TestBook;
+  let testChapters: TestChapter[];
 
   test.beforeEach(async ({ page }) => {
-    // Navigate to a chapter questions page
-    // This assumes the app has a route that displays ChapterQuestions
-    await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    // Create test book with chapters for each test
+    const result = await createTestBookWithTOC(page, {
+      title: `Tabs Test Book ${Date.now()}`,
+      description: 'Test book for ChapterQuestions tabs E2E tests'
+    });
+    testBook = result.book;
+    testChapters = result.chapters;
+
+    // Navigate to the book editor
+    await navigateToBookEditor(page, testBook.id);
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Cleanup: Delete test book
+    if (testBook?.id) {
+      await deleteTestBook(page, testBook.id);
+    }
   });
 
   test.describe('Tab Click Navigation', () => {
     test('user can click tabs to switch between questions and editor', async ({ page }) => {
-      // Navigate to a book with chapters
-      await page.click('[data-testid="book-card"]');
-      await page.waitForLoadState('networkidle');
-
-      // Click on a chapter to open ChapterQuestions
+      // Click on first chapter tab to open ChapterQuestions
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       // Verify Interview Questions tab is visible and active
       const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
       await expect(questionsTab).toBeVisible();
       await expect(questionsTab).toHaveAttribute('aria-selected', 'true');
 
-      // Click on Chapter Editor tab
+      // Click on Chapter Editor tab if available
       const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
       if (await editorTab.isVisible()) {
         await editorTab.click();
@@ -55,8 +69,8 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
     });
 
     test('active tab has visual indicator', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       const activeTab = page.getByRole('tab', { name: /Interview Questions/i });
 
@@ -74,10 +88,10 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
 
   test.describe('Keyboard Navigation', () => {
     test('Ctrl+1 switches to Interview Questions tab', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
-      // First switch to editor tab
+      // First switch to editor tab if available
       const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
       if (await editorTab.isVisible()) {
         await editorTab.click();
@@ -93,8 +107,8 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
     });
 
     test('Ctrl+2 switches to Chapter Editor tab', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       // Verify questions tab is active initially
       const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
@@ -111,8 +125,8 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
     });
 
     test('Ctrl+Tab cycles through tabs', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
       const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
@@ -132,8 +146,8 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
     });
 
     test('Arrow keys navigate between tabs', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
       const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
@@ -153,8 +167,8 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
 
   test.describe('Session Storage Persistence', () => {
     test('tab state persists during session', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
       if (await editorTab.isVisible()) {
@@ -179,8 +193,8 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
     });
 
     test('tab state is restored after navigation', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
       if (await editorTab.isVisible()) {
@@ -188,8 +202,9 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
         await editorTab.click();
 
         // Navigate away and back
-        await page.goBack();
+        await page.goto('/dashboard');
         await page.waitForLoadState('networkidle');
+        await navigateToBookEditor(page, testBook.id);
         await page.click('[data-testid="chapter-tab"]');
 
         // Verify editor tab is still active (restored from session storage)
@@ -200,8 +215,8 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
 
   test.describe('Tab Content', () => {
     test('tab switching does not lose question progress', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       // Find a question response textarea and enter some text
       const textarea = page.getByPlaceholder(/response/i);
@@ -225,8 +240,8 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
 
   test.describe('Accessibility', () => {
     test('tabs have proper ARIA attributes', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       // Verify tablist role
       const tablist = page.getByRole('tablist');
@@ -244,8 +259,8 @@ test.describe.skip('ChapterQuestions Tabs Navigation', () => {
     });
 
     test('focus is visible on tabs', async ({ page }) => {
-      await page.click('[data-testid="book-card"]');
       await page.click('[data-testid="chapter-tab"]');
+      await page.waitForLoadState('networkidle');
 
       const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
 
