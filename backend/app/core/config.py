@@ -5,8 +5,15 @@ import os
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "mongodb://localhost:27017"
+    # MongoDB connection - MONGODB_URI takes precedence over DATABASE_URL
+    MONGODB_URI: str = ""  # Standard env var name (e.g., for Atlas)
+    DATABASE_URL: str = "mongodb://localhost:27017"  # Fallback/legacy
     DATABASE_NAME: str = "auto_author_test"
+
+    @property
+    def mongo_connection_string(self) -> str:
+        """Get MongoDB connection string, preferring MONGODB_URI over DATABASE_URL."""
+        return self.MONGODB_URI if self.MONGODB_URI else self.DATABASE_URL
     OPENAI_AUTOAUTHOR_API_KEY: str = "test-key"  # Default for testing
 
     # Better Auth Settings
