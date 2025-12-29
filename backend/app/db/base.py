@@ -5,17 +5,31 @@ from bson.objectid import ObjectId
 from app.core.config import settings
 import certifi
 
-# Configure MongoDB client with proper SSL/TLS settings for Python 3.13+ compatibility
-# This ensures secure connections to MongoDB Atlas with proper certificate validation
-_client = AsyncIOMotorClient(
-    settings.mongo_connection_string,  # Prefers MONGODB_URI over DATABASE_URL
-    tlsCAFile=certifi.where(),  # Use certifi's CA bundle for SSL certificate verification
-    tls=True,  # Explicitly enable TLS (inferred from mongodb+srv:// but explicit is better)
-    tlsAllowInvalidCertificates=False,  # Ensure certificate validation (security requirement)
-    serverSelectionTimeoutMS=30000,  # 30-second timeout for server selection
-    connectTimeoutMS=20000,  # 20-second timeout for initial connection
-    socketTimeoutMS=20000,  # 20-second timeout for socket operations
-)
+# Determine if we're connecting to MongoDB Atlas (requires TLS) or local MongoDB (no TLS)
+is_atlas = settings.mongo_connection_string.startswith("mongodb+srv://")
+
+# Configure MongoDB client with SSL/TLS settings appropriate for the connection type
+# MongoDB Atlas (mongodb+srv://) requires TLS with certificate validation
+# Local MongoDB (mongodb://localhost) does not use TLS
+if is_atlas:
+    _client = AsyncIOMotorClient(
+        settings.mongo_connection_string,  # Prefers MONGODB_URI over DATABASE_URL
+        tlsCAFile=certifi.where(),  # Use certifi's CA bundle for SSL certificate verification
+        tls=True,  # Explicitly enable TLS for Atlas connections
+        tlsAllowInvalidCertificates=False,  # Ensure certificate validation (security requirement)
+        serverSelectionTimeoutMS=30000,  # 30-second timeout for server selection
+        connectTimeoutMS=20000,  # 20-second timeout for initial connection
+        socketTimeoutMS=20000,  # 20-second timeout for socket operations
+    )
+else:
+    # Local MongoDB - no TLS configuration needed
+    _client = AsyncIOMotorClient(
+        settings.mongo_connection_string,
+        serverSelectionTimeoutMS=30000,  # 30-second timeout for server selection
+        connectTimeoutMS=20000,  # 20-second timeout for initial connection
+        socketTimeoutMS=20000,  # 20-second timeout for socket operations
+    )
+
 _db = _client[settings.DATABASE_NAME]
 
 users_collection = _db.get_collection("users")
