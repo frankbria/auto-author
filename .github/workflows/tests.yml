@@ -152,6 +152,28 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      - name: Verify MongoDB Atlas secret is configured
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          if [ -z "$MONGODB_URI" ]; then
+            echo "ERROR: MONGODB_URI secret is not configured in GitHub repository settings."
+            echo "E2E tests require a MongoDB Atlas connection string."
+            echo ""
+            echo "To fix this:"
+            echo "1. Go to GitHub repository Settings > Secrets and variables > Actions"
+            echo "2. Add a secret named 'MONGODB_URI' with your Atlas connection string"
+            echo "   Format: mongodb+srv://user:password@cluster.mongodb.net/database"
+            exit 1
+          fi
+          echo "✓ MONGODB_URI secret is configured"
+          # Verify it looks like an Atlas connection string (starts with mongodb+srv://)
+          if [[ "$MONGODB_URI" == mongodb+srv://* ]]; then
+            echo "✓ MONGODB_URI appears to be an Atlas connection string"
+          else
+            echo "⚠ Warning: MONGODB_URI doesn't start with mongodb+srv:// - verify this is correct for your setup"
+          fi
+
       - name: Start backend server
         working-directory: backend
         env:
@@ -161,6 +183,9 @@ jobs:
           BETTER_AUTH_SECRET: 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
           BETTER_AUTH_URL: 'http://localhost:3000'
         run: |
+          echo "Starting backend with MongoDB Atlas connection..."
+          echo "DATABASE_NAME: $DATABASE_NAME"
+          echo "MONGODB_URI length: ${#MONGODB_URI} characters"
           uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 &
           echo "Waiting for backend to start..."
           BACKEND_READY=false
