@@ -163,13 +163,19 @@ jobs:
         run: |
           uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 &
           echo "Waiting for backend to start..."
+          BACKEND_READY=false
           for i in {1..30}; do
             if curl -s http://localhost:8000/ > /dev/null; then
               echo "Backend is ready!"
+              BACKEND_READY=true
               break
             fi
             sleep 1
           done
+          if [ "$BACKEND_READY" != "true" ]; then
+            echo "ERROR: Backend failed to start within 30 seconds"
+            exit 1
+          fi
 
       - name: Start frontend server
         working-directory: frontend
@@ -182,13 +188,19 @@ jobs:
           npm run build
           npm start &
           echo "Waiting for frontend to start..."
+          FRONTEND_READY=false
           for i in {1..30}; do
             if curl -s http://localhost:3000/ > /dev/null; then
               echo "Frontend is ready!"
+              FRONTEND_READY=true
               break
             fi
             sleep 1
           done
+          if [ "$FRONTEND_READY" != "true" ]; then
+            echo "ERROR: Frontend failed to start within 30 seconds"
+            exit 1
+          fi
 
       - name: Run E2E tests
         working-directory: frontend
