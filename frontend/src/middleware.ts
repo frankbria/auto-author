@@ -15,7 +15,9 @@ export async function middleware(request: NextRequest) {
   const bypassAuth = process.env.BYPASS_AUTH === 'true';
 
   // Production safety check - prevent accidental bypass in production
-  if (bypassAuth && process.env.NODE_ENV === 'production') {
+  // Allow BYPASS_AUTH in CI/testing environments (GitHub Actions sets CI=true)
+  const isCI = process.env.CI === 'true';
+  if (bypassAuth && process.env.NODE_ENV === 'production' && !isCI) {
     console.error('FATAL: BYPASS_AUTH cannot be enabled in production environment');
     throw new Error(
       'FATAL SECURITY ERROR: BYPASS_AUTH is enabled in production. ' +

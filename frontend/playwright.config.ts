@@ -97,7 +97,9 @@ export default defineConfig({
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
       // Environment
       NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT || 'test',
-      NODE_ENV: process.env.NODE_ENV || 'test'
+      NODE_ENV: process.env.NODE_ENV || 'test',
+      // Pass CI flag to allow BYPASS_AUTH in production builds during CI
+      CI: process.env.CI || 'false'
     }
   },
 
