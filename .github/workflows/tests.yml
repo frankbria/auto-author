@@ -190,30 +190,8 @@ jobs:
             exit 1
           fi
 
-      - name: Start frontend server
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: 'http://localhost:8000'
-          BYPASS_AUTH: 'true'
-          BETTER_AUTH_SECRET: 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
-          NEXT_PUBLIC_BETTER_AUTH_URL: 'http://localhost:3000'
-        run: |
-          npm run build
-          npm start &
-          echo "Waiting for frontend to start..."
-          FRONTEND_READY=false
-          for i in {1..30}; do
-            if curl -s http://localhost:3000/ > /dev/null; then
-              echo "Frontend is ready!"
-              FRONTEND_READY=true
-              break
-            fi
-            sleep 1
-          done
-          if [ "$FRONTEND_READY" != "true" ]; then
-            echo "ERROR: Frontend failed to start within 30 seconds"
-            exit 1
-          fi
+      # Frontend server is started by Playwright's webServer configuration
+      # No need to start it manually here
 
       - name: Run E2E tests
         working-directory: frontend
