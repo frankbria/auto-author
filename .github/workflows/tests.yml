@@ -130,7 +130,21 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync
+
+      - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
@@ -138,11 +152,51 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      - name: Start backend server
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          DATABASE_NAME: auto_author_e2e_test
+          BYPASS_AUTH: 'true'
+          BETTER_AUTH_SECRET: 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
+          BETTER_AUTH_URL: 'http://localhost:3000'
+        run: |
+          uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          echo "Waiting for backend to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/ > /dev/null; then
+              echo "Backend is ready!"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Start frontend server
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: 'http://localhost:8000'
+          BYPASS_AUTH: 'true'
+          BETTER_AUTH_SECRET: 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
+          NEXT_PUBLIC_BETTER_AUTH_URL: 'http://localhost:3000'
+        run: |
+          npm run build
+          npm start &
+          echo "Waiting for frontend to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3000/ > /dev/null; then
+              echo "Frontend is ready!"
+              break
+            fi
+            sleep 1
+          done
+
       - name: Run E2E tests
         working-directory: frontend
         env:
-          BYPASS_AUTH: true # Use auth bypass for CI testing
-        run: npx playwright test
+          BYPASS_AUTH: 'true'
+          BASE_URL: 'http://localhost:3000'
+          NEXT_PUBLIC_API_URL: 'http://localhost:8000'
+        run: npx playwright test --project=chromium
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
