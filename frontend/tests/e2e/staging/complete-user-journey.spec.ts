@@ -144,10 +144,8 @@ test.describe('Complete Authoring Journey', () => {
     // Wait for navigation to summary page
     await page.waitForURL(/\/summary/, { timeout: 10000 });
 
-    // Wait for summary editor
-    const summaryEditor = page.locator(
-      'textarea[name="summary"], textarea[placeholder*="summary" i], [contenteditable="true"]'
-    );
+    // Wait for summary editor (textbox role)
+    const summaryEditor = page.getByRole('textbox', { name: /book summary/i });
     await summaryEditor.waitFor({ timeout: 10000 });
 
     // Add summary content
