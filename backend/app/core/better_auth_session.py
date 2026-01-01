@@ -175,8 +175,12 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
         user = await user_collection.find_one({"id": user_id})
 
         if not user:
-            # Try with _id as fallback
-            user = await user_collection.find_one({"_id": user_id})
+            # Try with _id as fallback (convert string to ObjectId)
+            from bson import ObjectId
+            try:
+                user = await user_collection.find_one({"_id": ObjectId(user_id)})
+            except Exception:
+                logger.debug(f"Could not convert user_id to ObjectId: {user_id}")
 
         if user:
             logger.debug(f"Found better-auth user: {user.get('email')}")
