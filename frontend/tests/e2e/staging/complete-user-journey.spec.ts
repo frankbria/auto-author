@@ -135,11 +135,14 @@ test.describe('Complete Authoring Journey', () => {
     // ==========================================
     console.log('📍 Step 3: Add book summary');
 
-    // Navigate to summary page/tab if not already there
-    const summaryLink = page.getByRole('link', { name: /summary/i });
-    if (await summaryLink.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await summaryLink.click();
-    }
+    // Navigate to summary page (click "Start with Book Summary" or "Complete Book Summary" button)
+    const summaryButton = page.getByRole('button', {
+      name: /start with book summary|complete book summary|book summary/i,
+    });
+    await summaryButton.first().click();
+
+    // Wait for navigation to summary page
+    await page.waitForURL(/\/summary/, { timeout: 10000 });
 
     // Wait for summary editor
     const summaryEditor = page.locator(
