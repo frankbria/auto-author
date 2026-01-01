@@ -48,6 +48,14 @@ async def get_session_token_from_cookies(request: Request) -> Optional[str]:
         token = request.cookies.get(cookie_name)
         if token:
             logger.debug(f"Found session token in cookie: {cookie_name}")
+
+            # Better-auth uses signed cookies: "token.signature"
+            # Extract only the base token part for database lookup
+            if '.' in token:
+                base_token = token.split('.')[0]
+                logger.debug(f"Extracted base token from signed cookie (length: {len(base_token)})")
+                return base_token
+
             return token
 
     return None
@@ -82,11 +90,24 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
         # Get the session collection using the shared MongoDB client
         session_collection = await get_collection("session")
 
+        # Debug logging to track down the issue
+        logger.info(f"🔍 DEBUG: Database name: {session_collection.database.name}")
+        logger.info(f"🔍 DEBUG: Collection name: {session_collection.name}")
+        logger.info(f"🔍 DEBUG: Searching for session token: {session_token}")
+
+        # Count total sessions in collection
+        total_sessions = await session_collection.count_documents({})
+        logger.info(f"🔍 DEBUG: Total sessions in collection: {total_sessions}")
+
         # Find session by token
         session = await session_collection.find_one({"token": session_token})
 
         if not session:
             logger.warning(f"Session not found for token: {session_token[:10]}...")
+            # Log a sample session to see what's in the database
+            sample_session = await session_collection.find_one({})
+            if sample_session:
+                logger.info(f"🔍 DEBUG: Sample session from DB: {sample_session}")
             return None
 
         # Check if session has expired
