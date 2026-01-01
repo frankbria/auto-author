@@ -124,6 +124,9 @@ async def get_current_user_from_session(request: Request) -> Dict:
             detail="Invalid session. Please sign in again."
         )
 
+    # Convert ObjectId to string (better-auth stores userId as ObjectId)
+    user_id = str(user_id)
+
     # Get better-auth user to extract email/name for auto-creation
     better_auth_user = await get_better_auth_user(user_id)
 
