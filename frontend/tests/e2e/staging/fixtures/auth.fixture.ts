@@ -21,12 +21,15 @@ export type AuthFixtures = {
  * 5. Verify session cookie set
  */
 async function loginToStaging(page: Page): Promise<void> {
-  const email = process.env.STAGING_TEST_EMAIL;
-  const password = process.env.STAGING_TEST_PASSWORD;
+  // Support both local (.env.test) and CI (GitHub Secrets) variable names
+  const email = process.env.STAGING_TEST_EMAIL || process.env.TEST_USER_EMAIL;
+  const password = process.env.STAGING_TEST_PASSWORD || process.env.TEST_USER_PASSWORD;
 
   if (!email || !password) {
     throw new Error(
-      'STAGING_TEST_EMAIL and STAGING_TEST_PASSWORD must be set in environment'
+      'Test credentials not found. ' +
+      'Local: Set STAGING_TEST_EMAIL and STAGING_TEST_PASSWORD in .env.test. ' +
+      'CI: Ensure TEST_USER_EMAIL and TEST_USER_PASSWORD GitHub Secrets are set.'
     );
   }
 
