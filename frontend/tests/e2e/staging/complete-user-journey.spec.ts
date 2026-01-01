@@ -52,11 +52,11 @@ test.describe('Complete Authoring Journey', () => {
     // ==========================================
     console.log('📍 Step 2: Create new book');
 
-    // Click create book button
+    // Click create book button (use .first() since there are multiple on the page)
     const createButton = page.getByRole('button', {
       name: /create.*book|new book|add book/i,
     });
-    await createButton.click();
+    await createButton.first().click();
 
     // Wait for book creation form/modal
     await page.waitForSelector('input[name="title"], input[placeholder*="title" i]', {
