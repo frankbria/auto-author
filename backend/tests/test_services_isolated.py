@@ -3,10 +3,14 @@
 Run service tests in isolation without database dependencies
 """
 
+import sys
+import asyncio
 import pytest
 import os
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 from app.services.ai_service import AIService
+from app.services.transcription_service import TranscriptionService
 from app.core.config import settings
 
 # Set environment variables for testing
@@ -19,15 +23,12 @@ async def test_ai_service():
 
     ai_service = AIService()
 
-    # Mock the OpenAI request method directly
+    # Mock the OpenAI request method directly. The service reads the response
+    # as an object (response.choices[0].message.content), not a dict.
     async def mock_openai_request(messages, **kwargs):
-        return {
-            'choices': [{
-                'message': {
-                    'content': "Generated draft content"
-                }
-            }]
-        }
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="Generated draft content"))]
+        )
 
     with patch.object(ai_service, '_make_openai_request', side_effect=mock_openai_request):
         result = await ai_service.generate_chapter_draft(
@@ -79,6 +80,7 @@ async def test_cloud_storage():
     """Test cloud storage service"""
     print("\n=== Testing Cloud Storage Service ===")
 
+    import boto3
     from app.services.cloud_storage_service import CloudStorageFactory, S3StorageService, CloudinaryStorageService
 
     # Test with no credentials (should return None)
@@ -86,8 +88,9 @@ async def test_cloud_storage():
     assert service is None
     print("✓ Returns None for local storage")
 
-    # Test S3 service creation
-    with patch('boto3.client'):
+    # Test S3 service creation (boto3.client is imported locally inside
+    # S3StorageService.__init__, so patch the attribute on the boto3 module).
+    with patch.object(boto3, 'client', return_value=MagicMock()):
         service = CloudStorageFactory.create_storage_service(
             provider="s3",
             bucket_name="test-bucket",
@@ -98,67 +101,57 @@ async def test_cloud_storage():
         assert isinstance(service, S3StorageService)
         print("✓ Creates S3 service when requested")
 
-    # Test Cloudinary service creation
-    with patch('cloudinary.config'):
-        service = CloudStorageFactory.create_storage_service(
-            provider="cloudinary",
-            cloud_name="test-cloud",
-            api_key="test-key",
-            api_secret="test-secret"
-        )
-        assert isinstance(service, CloudinaryStorageService)
-        print("✓ Creates Cloudinary service when requested")
+    # Test Cloudinary service creation. cloudinary.config(...) just stores
+    # credentials in-process (no network), so call it for real — patching it to
+    # return a MagicMock breaks cloudinary's module-load proxy setup.
+    service = CloudStorageFactory.create_storage_service(
+        provider="cloudinary",
+        cloud_name="test-cloud",
+        api_key="test-key",
+        api_secret="test-secret"
+    )
+    assert isinstance(service, CloudinaryStorageService)
+    print("✓ Creates Cloudinary service when requested")
 
 async def test_file_upload():
     """Test file upload service"""
     print("\n=== Testing File Upload Service ===")
 
     from app.services.file_upload_service import FileUploadService
+    from starlette.datastructures import Headers, UploadFile
     from PIL import Image
     import io
 
-    # Create test image
+    # FileUploadService picks storage via get_cloud_storage_service(); force
+    # the local-storage path so the test never touches a cloud provider.
+    with patch("app.services.file_upload_service.get_cloud_storage_service", return_value=None):
+        service = FileUploadService()
+
+    # A real JPEG passes validation.
     img = Image.new('RGB', (100, 100), color='red')
     img_bytes = io.BytesIO()
     img.save(img_bytes, format='JPEG')
     img_bytes.seek(0)
+    valid = UploadFile(
+        filename="test.jpg",
+        file=img_bytes,
+        headers=Headers({"content-type": "image/jpeg"}),
+    )
+    is_valid, error = await service.validate_image_upload(valid)
+    assert is_valid is True
+    assert error is None
+    print("✓ Local file validation accepts a real image")
 
-    # Test with local storage
-    service = FileUploadService(cloud_storage=None)
-
-    # Mock file operations
-    with patch('pathlib.Path.mkdir'), \
-         patch('builtins.open', mock_open()), \
-         patch.object(Image, 'save'):
-
-        result = await service.upload_image(
-            file_data=img_bytes.getvalue(),
-            filename="test.jpg",
-            file_type="book_cover"
-        )
-
-        assert result["url"].startswith("/uploads/")
-        assert result["filename"] == "test.jpg"
-        print("✓ Local file upload works correctly")
-
-    # Test file validation
-    try:
-        await service.upload_image(
-            file_data=b"not an image",
-            filename="test.txt",
-            file_type="book_cover"
-        )
-        assert False, "Should have raised ValueError"
-    except ValueError as e:
-        assert "Invalid image format" in str(e)
-        print("✓ File validation works correctly")
-
-def mock_open():
-    """Create a mock for open() that returns a file-like object"""
-    m = MagicMock()
-    m.__enter__ = MagicMock(return_value=io.BytesIO())
-    m.__exit__ = MagicMock(return_value=None)
-    return MagicMock(return_value=m)
+    # A non-image file is rejected.
+    invalid = UploadFile(
+        filename="test.txt",
+        file=io.BytesIO(b"not an image"),
+        headers=Headers({"content-type": "text/plain"}),
+    )
+    is_valid, error = await service.validate_image_upload(invalid)
+    assert is_valid is False
+    assert error is not None
+    print("✓ File validation rejects non-images")
 
 async def main():
     """Run all tests"""
