@@ -352,7 +352,7 @@ class ChapterErrorHandler:
             if cached_state:
                 return True, cached_state
         except Exception:
-            pass
+            logger.warning("Tab state cache recovery failed", exc_info=True)
 
         return False, None
 
@@ -388,7 +388,7 @@ class ChapterErrorHandler:
             if cached_content:
                 return True, cached_content
         except Exception:
-            pass
+            logger.warning("Chapter content cache recovery failed", exc_info=True)
 
         return False, None
 

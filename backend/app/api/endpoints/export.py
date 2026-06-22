@@ -8,7 +8,12 @@ from fastapi.responses import StreamingResponse
 from app.api.dependencies import get_rate_limiter
 from app.core.security import get_current_user_from_session
 from app.db.book import get_book_by_id
-from app.services.export_service import export_service
+from app.services.export_service import (
+    export_service,
+    ExportUnavailableError,
+    PDF_AVAILABLE,
+    DOCX_AVAILABLE,
+)
 from app.services.chapter_access_service import chapter_access_service
 from datetime import datetime, timezone
 import io
@@ -94,6 +99,9 @@ async def export_book_pdf(
             }
         )
 
+    except ExportUnavailableError as e:
+        logger.warning("PDF export unavailable: %s", e)
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception:
         logger.error("Failed to generate PDF", exc_info=True)
         raise HTTPException(
@@ -168,6 +176,9 @@ async def export_book_docx(
             }
         )
 
+    except ExportUnavailableError as e:
+        logger.warning("DOCX export unavailable: %s", e)
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception:
         logger.error("Failed to generate DOCX", exc_info=True)
         raise HTTPException(
@@ -195,7 +206,8 @@ async def get_export_formats(
             detail="Not authorized to access this book"
         )
 
-    # Return available formats
+    # Return available formats, flagging which are actually functional based on
+    # whether their backing libraries are installed.
     return {
         "formats": [
             {
@@ -204,6 +216,7 @@ async def get_export_formats(
                 "description": "Portable Document Format - ideal for reading and printing",
                 "mime_type": "application/pdf",
                 "extension": ".pdf",
+                "available": PDF_AVAILABLE,
                 "options": {
                     "page_size": ["letter", "A4"],
                     "include_empty_chapters": "boolean"
@@ -215,6 +228,7 @@ async def get_export_formats(
                 "description": "Microsoft Word format - ideal for further editing",
                 "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 "extension": ".docx",
+                "available": DOCX_AVAILABLE,
                 "options": {
                     "include_empty_chapters": "boolean"
                 }

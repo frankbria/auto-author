@@ -922,6 +922,10 @@ async def get_question_responses(
     # Get question responses from book record
     question_responses = book.get("question_responses", {})
 
+    # Legitimate "no data yet" case: the user hasn't answered any clarifying
+    # questions for this book. This is real DB-backed state (an empty/absent
+    # `question_responses` field), not mock data — the shape matches the
+    # populated response below so the frontend can handle both uniformly.
     if not question_responses:
         return {"responses": [], "status": "not_provided"}
 
