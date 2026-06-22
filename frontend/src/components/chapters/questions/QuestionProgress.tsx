@@ -4,16 +4,7 @@ import { QuestionProgressResponse } from '@/types/chapter-questions';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CheckmarkCircle01Icon, CircleIcon, Loading03Icon } from '@hugeicons/core-free-icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-// Stub component for Progress since the real one isn't available
-const Progress = ({ value, className }: { value: number, className?: string }) => (
-  <div className={`w-full bg-gray-200 rounded-full ${className || ''}`}>
-    <div
-      className="bg-primary rounded-full h-full transition-all duration-300 ease-in-out"
-      style={{ width: `${value}%` }}
-    ></div>
-  </div>
-);
+import { Progress } from '@/components/ui/progress';
 
 interface QuestionProgressProps {
   progress: QuestionProgressResponse;
@@ -31,6 +22,7 @@ export default function QuestionProgress({
 }: QuestionProgressProps) {
   // Calculate progress percentage for the progress bar (progress is 0.0-1.0, convert to 0-100)
   const progressPercentage = (progress.progress || 0) * 100;
+  const safeProgress = isNaN(progressPercentage) ? 0 : Math.round(progressPercentage);
 
   // Calculate current position
   const currentPosition = currentIndex + 1;
@@ -49,17 +41,7 @@ export default function QuestionProgress({
     statusLabel = 'Not started';
     statusColor = 'text-gray-500';
   }
-  
-  // Stub components if real UI components aren't available
-  const StubTooltip = ({ children, content }: { children: React.ReactNode, content: React.ReactNode }) => (
-    <div className="relative group">
-      {children}
-      <div className="absolute z-10 invisible group-hover:visible bg-black/80 text-white text-xs rounded p-2 bottom-full mb-1 left-1/2 transform -translate-x-1/2 w-max max-w-xs">
-        {content}
-      </div>
-    </div>
-  );
-  
+
   return (
     <section aria-label="Question progress" className="space-y-2 transition-all" role="region" data-slot="question-progress">
       <div className="flex items-center justify-between">
@@ -107,17 +89,17 @@ export default function QuestionProgress({
         </div>
       </div>
       
-      {/* Progress bar */}
+      {/* Progress bar — wrapper carries progressbar semantics; the visual Radix bar is decorative */}
       <div
         role="progressbar"
         aria-label="Question progress"
-        aria-valuenow={isNaN(progressPercentage) ? 0 : Math.round(progressPercentage)}
+        aria-valuenow={safeProgress}
         aria-valuemin={0}
         aria-valuemax={100}
         className="w-full transition-all"
         data-testid="question-progressbar"
       >
-        <Progress value={progressPercentage} className="h-2 transition-all" />
+        <Progress value={safeProgress} aria-hidden="true" className="h-2 transition-all" />
       </div>
 
       {/* Question position indicator */}
@@ -151,18 +133,23 @@ export default function QuestionProgress({
             dotClasses += " ring-[3px] ring-blue-300 dark:ring-blue-700 ring-opacity-50";
           }
 
+          const dotLabel =
+            isCompleted ? "Completed" :
+            isInProgress ? "In progress" :
+            isCurrent ? "Current question" :
+            "Not started";
+
           return (
-            <StubTooltip
-              key={index}
-              content={
-                isCompleted ? "Completed" :
-                isInProgress ? "In progress" :
-                isCurrent ? "Current question" :
-                "Not started"
-              }
-            >
-              <div className={dotClasses} data-slot="progress-dot"></div>
-            </StubTooltip>
+            <TooltipProvider key={index}>
+              <Tooltip>
+                <TooltipTrigger aria-label={dotLabel}>
+                  <div className={dotClasses} data-slot="progress-dot"></div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{dotLabel}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           );
         })}
       </div>

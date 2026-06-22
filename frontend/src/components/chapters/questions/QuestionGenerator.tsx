@@ -7,49 +7,10 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { AlertCircleIcon, BookOpen01Icon, HelpCircleIcon, BrainIcon, SparklesIcon } from '@hugeicons/core-free-icons';
 import { QuestionDifficulty, QuestionType } from '@/types/chapter-questions';
 import { Label } from '@/components/ui/label';
-
-// Stub components for UI elements that will be properly implemented later
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const Checkbox = ({ id, checked, onCheckedChange, className }: { id: string, checked: boolean, onCheckedChange: (checked: boolean) => void, className?: string }) => (
-  <div className={`w-4 h-4 border rounded ${checked ? 'bg-primary' : 'bg-transparent'} ${className}`} onClick={() => onCheckedChange(!checked)} />
-);
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const RadioGroup = ({ value, onValueChange, className, children }: { value?: string, onValueChange: (value: string) => void, className?: string, children: React.ReactNode }) => (
-  <div className={className}>{children}</div>
-);
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const RadioGroupItem = ({ value, id }: { value: string, id: string }) => (
-  <div className="w-4 h-4 border rounded-full" />
-);
-
-const Tooltip = ({ children }: { children: React.ReactNode }) => <>{children}</>;
-const TooltipProvider = ({ children }: { children: React.ReactNode }) => <>{children}</>;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const TooltipTrigger = ({ asChild, children }: { asChild?: boolean, children: React.ReactNode }) => <>{children}</>;
-const TooltipContent = ({ children }: { children: React.ReactNode }) => <>{children}</>;
-
-const Slider = ({ id, min, max, step, value, onValueChange, className }: { 
-  id: string, 
-  min: number, 
-  max: number, 
-  step: number, 
-  value: number[], 
-  onValueChange: (values: number[]) => void, 
-  className?: string 
-}) => (
-  <input 
-    type="range" 
-    id={id} 
-    min={min} 
-    max={max} 
-    step={step} 
-    value={value[0]} 
-    onChange={(e) => onValueChange([parseInt(e.target.value)])}
-    className={className} 
-  />
-);
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Slider } from '@/components/ui/slider';
 
 interface QuestionGeneratorProps {
   bookId: string;
@@ -143,6 +104,7 @@ export default function QuestionGenerator({
             </div>
             <Slider
               id="question-count"
+              aria-label="Number of questions"
               min={5}
               max={20}
               step={1}
