@@ -8,8 +8,8 @@ name: E2E Staging Tests
 #   - pull_request: ONLY when the PR carries the `e2e-staging` label
 #
 # Required GitHub Secrets:
-#   - STAGING_TEST_EMAIL
-#   - STAGING_TEST_PASSWORD
+#   - TEST_USER_EMAIL
+#   - TEST_USER_PASSWORD
 
 on:
   schedule:
@@ -55,8 +55,10 @@ jobs:
       - name: Run E2E tests against staging
         working-directory: frontend
         env:
-          STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
-          STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+          # Repo secrets are TEST_USER_EMAIL / TEST_USER_PASSWORD; map them to the
+          # env names the auth fixture reads first.
+          STAGING_TEST_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          STAGING_TEST_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
         run: npm run test:e2e:staging
 
       - name: Upload Playwright report

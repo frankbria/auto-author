@@ -254,7 +254,7 @@ cp tests/e2e/staging/.env.test.example tests/e2e/staging/.env.test  # set STAGIN
 npm run test:e2e:staging
 ```
 - Specs: `tests/e2e/staging/complete-user-journey.spec.ts` (full journey) and `regressions.spec.ts` (Issue #83 regressions: session/401, ObjectId, #54 answer persistence).
-- CI: `.github/workflows/e2e-staging-tests.yml` runs on a 6h schedule, manual dispatch, and PRs labeled `e2e-staging`. Requires GitHub Secrets `STAGING_TEST_EMAIL` / `STAGING_TEST_PASSWORD`.
+- CI: `.github/workflows/e2e-staging-tests.yml` runs on a 6h schedule, manual dispatch, and PRs labeled `e2e-staging`. Requires GitHub Secrets `TEST_USER_EMAIL` / `TEST_USER_PASSWORD` (the fixture also accepts `STAGING_TEST_EMAIL` / `STAGING_TEST_PASSWORD` locally).
 - See `tests/e2e/staging/README.md` for details.
 
 ---
