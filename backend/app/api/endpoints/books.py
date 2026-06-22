@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 import re
 from fastapi import (
     APIRouter,
@@ -84,6 +85,8 @@ from app.services.chapter_status_service import chapter_status_service
 from app.services.question_generation_service import get_question_generation_service
 from bson import ObjectId
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 # Role-based access controls
@@ -136,7 +139,6 @@ async def create_new_book(
         # Convert ObjectId to str for the response
         if "_id" in new_book:
             new_book["id"] = str(new_book["_id"])
-        print("->new_book", new_book)
         # Remove the raw ObjectId for JSON serialization
         new_book.pop("_id", None)
 
@@ -148,7 +150,6 @@ async def create_new_book(
         return new_book
 
     except Exception as e:
-        print("->create_book_error", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create book: {str(e)}",
@@ -203,7 +204,6 @@ async def get_book(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid book ID format",
             )
-        print("->get_book", book_id)
 
         # Get the book from the database
         book = await get_book_by_id(book_id)
@@ -576,9 +576,7 @@ async def get_book_summary(
     """
     Retrieve the summary and its revision history for a book.
     """
-    print(">>> DEBUG summary: current_user", current_user, "book_id", book_id)
     book = await get_book_by_id(book_id)
-    print(">>> DEBUG found book:", book)
 
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -601,9 +599,7 @@ async def update_book_summary(
     Save or update the summary for a book, and store revision history.
     Validates min/max length and filters offensive content.
     """
-    print(">>> DEBUG summary: current_user", current_user, "book_id", book_id)
     book = await get_book_by_id(book_id)
-    print(">>> DEBUG found book:", book)
 
     summary = data.get("summary", "")
     if not summary or not isinstance(summary, str):
@@ -1348,8 +1344,8 @@ async def update_book_toc(
             )
         else:
             raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        print(f"Error updating TOC: {str(e)}")
+    except Exception:
+        logger.error("Failed to update TOC", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to update TOC")
 
 
@@ -1417,8 +1413,8 @@ async def create_chapter(
             raise HTTPException(status_code=400, detail="Parent chapter not found")
         else:
             raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        print(f"Error creating chapter: {str(e)}")
+    except Exception:
+        logger.error("Failed to create chapter", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create chapter")
 
 
@@ -1542,8 +1538,8 @@ async def update_chapter(
             )
         else:
             raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        print(f"Error updating chapter: {str(e)}")
+    except Exception:
+        logger.error("Failed to update chapter", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to update chapter")
 
 
@@ -1591,8 +1587,8 @@ async def delete_chapter(
             )
         else:
             raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        print(f"Error deleting chapter: {str(e)}")
+    except Exception:
+        logger.error("Failed to delete chapter", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to delete chapter")
 
 
@@ -1848,9 +1844,6 @@ async def save_tab_state(
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
-        print(
-            f"User {current_user.get('auth_id')} is not authorized to access book {book_id}"
-        )
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book"
         )
@@ -1882,9 +1875,6 @@ async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_u
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
-        print(
-            f"User {current_user.get('auth_id')} is not authorized to access book {book_id}"
-        )
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book"
         )
@@ -1969,8 +1959,9 @@ async def get_chapter_content(
                 "access_timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
-    except Exception as e:
-        print(f"Failed to log chapter content access: {e}")  # Prepare response
+    except Exception:
+        logger.error("Failed to log chapter content access", exc_info=True)
+    # Prepare response
     response = {
         "book_id": book_id,
         "chapter_id": chapter_id,
@@ -2074,8 +2065,8 @@ async def update_chapter_content(
                 "update_timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
-    except Exception as e:
-        print(f"Failed to log chapter content update: {e}")
+    except Exception:
+        logger.error("Failed to log chapter content update", exc_info=True)
 
     # Update TOC data
     updated_toc = {
@@ -2230,8 +2221,8 @@ async def batch_get_chapter_content(
                 "access_timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
-    except Exception as e:
-        print(f"Failed to log batch chapter access: {e}")
+    except Exception:
+        logger.error("Failed to log batch chapter access", exc_info=True)
 
     return {
         "book_id": book_id,

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Dict, Any, Optional
@@ -22,6 +24,8 @@ from app.api.dependencies import (
 
 router = APIRouter()
 security = HTTPBearer()
+
+logger = logging.getLogger(__name__)
 
 # Role-based access controls
 allow_admins = SessionRoleChecker(["admin"])
@@ -118,7 +122,7 @@ async def update_profile(
         )
     except Exception as e:
         msg = str(e).lower()
-        print(f"Error updating user: {msg}")
+        logger.error("Failed to update user", exc_info=True)
         if "duplicate key error" in msg:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

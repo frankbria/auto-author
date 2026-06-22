@@ -1,5 +1,7 @@
 # backend/app/db/book.py
 
+import logging
+
 from .base import books_collection, users_collection
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
@@ -7,6 +9,8 @@ from typing import Optional, List, Dict
 from .audit_log import create_audit_log
 from app.models.book import BookDB
 from app.models.user import UserDB
+
+logger = logging.getLogger(__name__)
 
 
 # Book-related database operations
@@ -18,25 +22,21 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
 
         # 2) build the Pydantic model
         book_obj = BookDB(**book_data)
-        # print(f"Creating book: {book_obj}")
 
         # 3) serialize to a Mongo-ready dict, with _id alias and timestamps
         payload = book_obj.model_dump(by_alias=True)
 
         # 4) Insert the new book
-        print(f"database of the books_collection: {books_collection.database.name}")
         result = await books_collection.insert_one(payload)
 
         # 5) patch the real ObjectId back onto the model
         book_obj.id = result.inserted_id
-        # print(f"Inserted book with ID: {book_obj.id}")
 
         # Associate the book with the user
         await users_collection.update_one(
             {"auth_id": user_auth_id}, {"$push": {"book_ids": str(book_obj.id)}}
         )
 
-        print(f"Audit log: {user_auth_id}")
         # Create audit log entry
         await create_audit_log(
             action="book_create",
@@ -46,17 +46,13 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
             details={"title": book_obj.title},
         )
         return payload
-    except Exception as e:
-        import traceback
-
-        print(f"create_book_error {e}")
-        traceback.print_exc()
+    except Exception:
+        logger.error("Failed to create book", exc_info=True)
         raise
 
 
 async def get_book_by_id(book_id: str) -> Optional[Dict]:
     """Get a book by its ID"""
-    # print(f"Getting book by ID: {book_id}")
     try:
         book = await books_collection.find_one({"_id": ObjectId(book_id)})
         return book
