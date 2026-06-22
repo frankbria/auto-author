@@ -101,7 +101,7 @@ async def export_book_pdf(
 
     except ExportUnavailableError as e:
         logger.warning("PDF export unavailable: %s", e)
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception:
         logger.error("Failed to generate PDF", exc_info=True)
         raise HTTPException(
@@ -178,7 +178,7 @@ async def export_book_docx(
 
     except ExportUnavailableError as e:
         logger.warning("DOCX export unavailable: %s", e)
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception:
         logger.error("Failed to generate DOCX", exc_info=True)
         raise HTTPException(

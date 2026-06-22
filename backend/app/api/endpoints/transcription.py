@@ -60,7 +60,8 @@ async def transcribe_audio(
                 detail=f"Transcription failed: {result.error_message}"
             )
         
-        logger.info(f"Transcription completed for user {current_user.id}: {len(result.transcript)} characters")
+        user_id = current_user.get("id") or current_user.get("auth_id", "unknown")
+        logger.info(f"Transcription completed for user {user_id}: {len(result.transcript)} characters")
         
         return result
         

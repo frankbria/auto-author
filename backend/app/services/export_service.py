@@ -3,6 +3,7 @@ Export Service for generating PDF and DOCX files from book content
 """
 import io
 import asyncio
+import html
 from typing import Dict, List, Optional, BinaryIO
 from datetime import datetime
 import re
@@ -65,8 +66,12 @@ class ExportService:
             # Convert HTML to markdown
             markdown_text = self.h2t.handle(content)
         else:
-            # ponytail: html2text not installed — fall back to a naive tag strip.
-            markdown_text = re.sub(r'<[^>]+>', '', content)
+            # ponytail: html2text not installed — fall back to a tag strip that
+            # preserves block boundaries so words/paragraphs don't merge.
+            text = re.sub(r'(?is)<(script|style).*?>.*?</\1>', '', content)
+            text = re.sub(r'(?i)</(p|div|h[1-6]|li|br|tr)>', '\n', text)
+            text = re.sub(r'(?is)<[^>]+>', '', text)
+            markdown_text = html.unescape(text)
 
         # Clean up excessive newlines
         markdown_text = re.sub(r'\n{3,}', '\n\n', markdown_text)
