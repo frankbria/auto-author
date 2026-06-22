@@ -3,45 +3,79 @@ Export Service for generating PDF and DOCX files from book content
 """
 import io
 import asyncio
+import html
 from typing import Dict, List, Optional, BinaryIO
 from datetime import datetime
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, PageBreak,
-    Table, TableStyle, KeepTogether
-)
-from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
-from docx import Document
-from docx.shared import Inches, Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.style import WD_STYLE_TYPE
-import html2text
 import re
+
+# Optional export dependencies are guarded so the service (and the rest of the
+# API) still imports if a library is missing — only the affected format fails,
+# and it fails loudly with a clear message rather than at import time.
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, PageBreak,
+        Table, TableStyle, KeepTogether
+    )
+    from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+try:
+    from docx import Document
+    from docx.shared import Inches, Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.style import WD_STYLE_TYPE
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+
+try:
+    import html2text
+    HTML2TEXT_AVAILABLE = True
+except ImportError:
+    HTML2TEXT_AVAILABLE = False
+
+
+class ExportUnavailableError(RuntimeError):
+    """Raised when an export format's required library is not installed."""
 
 
 class ExportService:
     """Service for exporting books to PDF and DOCX formats."""
     
     def __init__(self):
-        self.h2t = html2text.HTML2Text()
-        self.h2t.ignore_links = False
-        self.h2t.ignore_images = True
-        self.h2t.body_width = 0  # Don't wrap lines
-        
+        if HTML2TEXT_AVAILABLE:
+            self.h2t = html2text.HTML2Text()
+            self.h2t.ignore_links = False
+            self.h2t.ignore_images = True
+            self.h2t.body_width = 0  # Don't wrap lines
+        else:
+            self.h2t = None
+
     def _clean_html_content(self, content: str) -> str:
         """Convert HTML content to clean text, preserving basic formatting."""
         if not content:
             return ""
-        
-        # Convert HTML to markdown
-        markdown_text = self.h2t.handle(content)
-        
+
+        if self.h2t is not None:
+            # Convert HTML to markdown
+            markdown_text = self.h2t.handle(content)
+        else:
+            # ponytail: html2text not installed — fall back to a tag strip that
+            # preserves block boundaries so words/paragraphs don't merge.
+            text = re.sub(r'(?is)<(script|style).*?>.*?</\1>', '', content)
+            text = re.sub(r'(?i)</(p|div|h[1-6]|li|br|tr)>', '\n', text)
+            text = re.sub(r'(?is)<[^>]+>', '', text)
+            markdown_text = html.unescape(text)
+
         # Clean up excessive newlines
         markdown_text = re.sub(r'\n{3,}', '\n\n', markdown_text)
-        
+
         return markdown_text.strip()
     
     def _extract_text_formatting(self, content: str) -> List[Dict]:
@@ -101,6 +135,11 @@ class ExportService:
         Returns:
             PDF content as bytes
         """
+        if not PDF_AVAILABLE:
+            raise ExportUnavailableError(
+                "PDF export unavailable: reportlab is not installed"
+            )
+
         # Create output buffer if not provided
         if output_stream is None:
             output_stream = io.BytesIO()
@@ -292,6 +331,11 @@ class ExportService:
         Returns:
             DOCX content as bytes
         """
+        if not DOCX_AVAILABLE:
+            raise ExportUnavailableError(
+                "DOCX export unavailable: python-docx is not installed"
+            )
+
         # Create document
         doc = Document()
         

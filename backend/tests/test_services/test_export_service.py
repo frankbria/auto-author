@@ -226,3 +226,28 @@ class TestExportService:
         
         docx_bytes = await export_service.export_book(book_data, format="docx")
         assert isinstance(docx_bytes, bytes)
+
+class TestExportAvailabilityGuards:
+    """Issue #45: export degrades gracefully when an optional library is missing."""
+
+    @pytest.mark.asyncio
+    async def test_generate_pdf_raises_when_reportlab_unavailable(self, monkeypatch):
+        import app.services.export_service as es
+        monkeypatch.setattr(es, "PDF_AVAILABLE", False)
+        with pytest.raises(es.ExportUnavailableError, match="reportlab"):
+            await es.export_service.generate_pdf({"title": "x"}, [])
+
+    @pytest.mark.asyncio
+    async def test_generate_docx_raises_when_docx_unavailable(self, monkeypatch):
+        import app.services.export_service as es
+        monkeypatch.setattr(es, "DOCX_AVAILABLE", False)
+        with pytest.raises(es.ExportUnavailableError, match="python-docx"):
+            await es.export_service.generate_docx({"title": "x"}, [])
+
+    def test_clean_html_falls_back_without_html2text(self):
+        import app.services.export_service as es
+        svc = es.ExportService()
+        svc.h2t = None  # simulate html2text not installed
+        out = svc._clean_html_content("<p>Hello <strong>world</strong></p>")
+        assert "Hello" in out and "world" in out
+        assert "<" not in out

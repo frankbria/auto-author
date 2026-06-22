@@ -1,11 +1,10 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from typing import Optional
+from typing import Optional, Dict
 import logging
 from app.services.transcription_service import transcription_service
-from app.schemas.transcription import TranscriptionResponse, StreamingTranscriptionData
+from app.schemas.transcription import TranscriptionResponse
 from app.core.security import get_current_user_from_session
-from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ async def transcribe_audio(
     audio: UploadFile = File(...),
     language: str = "en-US",
     enable_punctuation_commands: bool = False,
-    current_user: User = Depends(get_current_user_from_session)
+    current_user: Dict = Depends(get_current_user_from_session)
 ):
     """
     Transcribe uploaded audio file to text.
@@ -61,7 +60,8 @@ async def transcribe_audio(
                 detail=f"Transcription failed: {result.error_message}"
             )
         
-        logger.info(f"Transcription completed for user {current_user.id}: {len(result.transcript)} characters")
+        user_id = current_user.get("id") or current_user.get("auth_id", "unknown")
+        logger.info(f"Transcription completed for user {user_id}: {len(result.transcript)} characters")
         
         return result
         
@@ -89,54 +89,28 @@ async def stream_transcription(
         enable_punctuation_commands: Process voice punctuation commands
     """
     await websocket.accept()
-    
+
+    # Real-time streaming transcription is not yet implemented. Rather than
+    # return fabricated transcripts, inform the client explicitly and close.
+    # A production implementation requires a streaming speech-to-text backend
+    # (e.g. AWS Transcribe Streaming); the synchronous POST /transcribe
+    # endpoint above uses real OpenAI Whisper and remains the supported path.
     try:
-        # In a real implementation, this would handle streaming audio chunks
-        # and provide real-time transcription updates
-        
-        while True:
-            # Receive audio chunk or control message
-            data = await websocket.receive()
-            
-            if data["type"] == "websocket.receive":
-                if "bytes" in data:
-                    # Process audio chunk
-                    audio_chunk = data["bytes"]
-                    
-                    # Mock streaming transcription
-                    # In production, this would use streaming speech recognition
-                    mock_partial = StreamingTranscriptionData(
-                        type="partial",
-                        transcript="Processing audio...",
-                        confidence=0.8,
-                        is_final=False
-                    )
-                    
-                    await websocket.send_json(mock_partial.dict())
-                    
-                elif "text" in data:
-                    # Handle control messages
-                    message = data["text"]
-                    if message == '{"type": "end"}':
-                        # Send final transcription
-                        final_result = StreamingTranscriptionData(
-                            type="final",
-                            transcript="Complete transcription from streaming audio.",
-                            confidence=0.95,
-                            is_final=True
-                        )
-                        await websocket.send_json(final_result.dict())
-                        break
-                        
+        await websocket.send_json({
+            "type": "error",
+            "code": "NOT_IMPLEMENTED",
+            "message": (
+                "Real-time streaming transcription is not yet available. "
+                "Use the POST /transcribe endpoint to transcribe a recorded audio file."
+            ),
+        })
+        await websocket.close(code=1011, reason="Streaming transcription not implemented")
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
-    except Exception as e:
-        logger.error(f"WebSocket transcription error: {str(e)}")
-        await websocket.close(code=1011, reason="Internal server error")
+        logger.info("WebSocket disconnected before not-implemented notice was sent")
 
 @router.get("/transcribe/status")
 async def get_transcription_status(
-    current_user: User = Depends(get_current_user_from_session)
+    current_user: Dict = Depends(get_current_user_from_session)
 ):
     """
     Get transcription service status and capabilities.
@@ -151,7 +125,7 @@ async def get_transcription_status(
         "max_file_size": "10MB",
         "features": {
             "punctuation_commands": True,
-            "streaming": True,
+            "streaming": False,  # Real-time streaming not yet implemented
             "confidence_scores": True
         }
     }
@@ -159,7 +133,7 @@ async def get_transcription_status(
 @router.post("/transcribe/validate")
 async def validate_audio_file(
     audio: UploadFile = File(...),
-    current_user: User = Depends(get_current_user_from_session)
+    current_user: Dict = Depends(get_current_user_from_session)
 ):
     """
     Validate audio file without transcribing.

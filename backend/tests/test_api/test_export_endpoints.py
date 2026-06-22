@@ -298,3 +298,34 @@ class TestExportEndpoints:
         assert "/" not in content_disposition
         assert "!" not in content_disposition
         assert ".pdf" in content_disposition
+
+class TestExportAvailability:
+    """Issue #45: format availability reporting and 503 on missing libraries."""
+
+    @pytest.mark.asyncio
+    async def test_formats_report_availability(self, auth_client_factory):
+        import app.api.endpoints.export as export_endpoint
+        client = await auth_client_factory()
+        resp = await client.post("/api/v1/books/", json={"title": "Avail Book"})
+        book_id = resp.json()["id"]
+
+        data = (await client.get(f"/api/v1/books/{book_id}/export/formats")).json()
+        expected = {
+            "pdf": export_endpoint.PDF_AVAILABLE,
+            "docx": export_endpoint.DOCX_AVAILABLE,
+        }
+        for fmt in data["formats"]:
+            assert "available" in fmt
+            assert fmt["available"] is expected[fmt["format"]]
+
+    @pytest.mark.asyncio
+    async def test_pdf_export_returns_503_when_unavailable(self, auth_client_factory, monkeypatch):
+        client = await auth_client_factory()
+        book_id = (await client.post("/api/v1/books/", json={"title": "503 Book"})).json()["id"]
+
+        import app.services.export_service as es
+        monkeypatch.setattr(es, "PDF_AVAILABLE", False)
+
+        resp = await client.get(f"/api/v1/books/{book_id}/export/pdf")
+        assert resp.status_code == 503
+        assert "unavailable" in resp.json()["detail"].lower()

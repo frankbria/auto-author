@@ -117,7 +117,7 @@ class ChapterFactory(MongoFactory):
 class QuestionFactory(MongoFactory):
     """Factory for Question documents."""
 
-    text = factory.LazyFunction(lambda: fake.sentence() + "?")
+    question_text = factory.LazyFunction(lambda: fake.sentence() + "?")
     question_type = factory.Iterator([
         "open-ended", "multiple-choice", "yes-no", "scale", "reflection"
     ])
@@ -150,7 +150,7 @@ class QuestionFactory(MongoFactory):
 class ResponseFactory(MongoFactory):
     """Factory for Response documents."""
 
-    content = factory.Faker("text", max_nb_chars=1000)
+    response_text = factory.Faker("text", max_nb_chars=1000)
     question_id = factory.LazyFunction(lambda: str(ObjectId()))  # Will be overridden in tests
     user_id = factory.LazyFunction(lambda: str(ObjectId()))  # Will be overridden in tests
     chapter_id = factory.LazyFunction(lambda: str(ObjectId()))  # Will be overridden in tests
@@ -161,7 +161,7 @@ class ResponseFactory(MongoFactory):
     @factory.lazy_attribute
     def metadata(self):
         """Generate response metadata."""
-        content_text = getattr(self, 'content', '') or ''
+        content_text = getattr(self, 'response_text', '') or ''
         return {
             "word_count": len(content_text.split()) if content_text else 0,
             "character_count": len(content_text) if content_text else 0,
@@ -251,7 +251,7 @@ def generate_interview_questions(category: str, count: int = 5) -> List[Dict[str
 
     return [
         QuestionFactory.create(
-            text=q,
+            question_text=q,
             category=category,
             question_type="open-ended",
             order=i+1

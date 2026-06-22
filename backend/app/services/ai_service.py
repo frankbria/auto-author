@@ -815,8 +815,8 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                             questions.append(q)
                     return questions
         except json.JSONDecodeError:
-            pass
-        
+            logger.debug("Question text was not valid JSON; falling back to text parsing")
+
         # Fallback: parse structured text format
         lines = questions_text.strip().split('\n')
         current_question = {}
