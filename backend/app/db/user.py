@@ -1,10 +1,14 @@
 # backend/app/db/user.py
 
+import logging
+
 from .base import users_collection, books_collection
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
 from .audit_log import create_audit_log
+
+logger = logging.getLogger(__name__)
 
 
 # User-related database operations
@@ -126,7 +130,6 @@ async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
         )
 
         return result.deleted_count > 0
-    except Exception as e:
-        # In a production app, you might want to log this error
-        print(f"Error deleting user books: {e}")
+    except Exception:
+        logger.error("Failed to delete user books", exc_info=True)
         return False

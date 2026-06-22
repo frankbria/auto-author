@@ -3,10 +3,14 @@ Enhanced book deletion with cascade delete functionality.
 This module provides a complete cascade deletion implementation for books.
 """
 
+import logging
+
 from bson.objectid import ObjectId
 from typing import Optional
 from .base import books_collection, users_collection, get_collection
 from .audit_log import create_audit_log
+
+logger = logging.getLogger(__name__)
 
 
 async def delete_book_with_cascade(book_id: str, user_auth_id: str) -> bool:
@@ -34,9 +38,9 @@ async def delete_book_with_cascade(book_id: str, user_auth_id: str) -> bool:
     if cover_image_url:
         try:
             await file_upload_service.delete_cover_image(cover_image_url, cover_thumbnail_url)
-        except Exception as e:
+        except Exception:
             # Log error but don't fail the deletion
-            print(f"Error deleting cover images for book {book_id}: {e}")
+            logger.error("Failed to delete cover images for book", exc_info=True)
 
     # Delete chapter access logs
     chapter_access_logs = get_collection("chapter_access_logs")

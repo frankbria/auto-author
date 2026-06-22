@@ -1,6 +1,7 @@
 """
 Export endpoints for generating PDF and DOCX files
 """
+import logging
 from typing import Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
@@ -16,6 +17,8 @@ router = APIRouter(
     prefix="/books/{book_id}/export",
     tags=["export"],
 )
+
+logger = logging.getLogger(__name__)
 
 
 @router.get("/pdf")
@@ -62,8 +65,8 @@ async def export_book_pdf(
                 "export_timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
-    except Exception as e:
-        print(f"Failed to log export access: {e}")
+    except Exception:
+        logger.error("Failed to log export access", exc_info=True)
 
     try:
         # Generate PDF
@@ -136,8 +139,8 @@ async def export_book_docx(
                 "export_timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
-    except Exception as e:
-        print(f"Failed to log export access: {e}")
+    except Exception:
+        logger.error("Failed to log export access", exc_info=True)
 
     try:
         # Generate DOCX
