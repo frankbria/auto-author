@@ -7,7 +7,7 @@ name: E2E Staging Tests
 #   - workflow_dispatch: manual runs
 #   - pull_request: ONLY when the PR carries the `e2e-staging` label
 #
-# Required GitHub Secrets:
+# Required GitHub Secrets (in the `staging` environment):
 #   - TEST_USER_EMAIL
 #   - TEST_USER_PASSWORD
 
@@ -28,6 +28,10 @@ jobs:
     name: E2E Staging (Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # TEST_USER_EMAIL / TEST_USER_PASSWORD live in the `staging` environment.
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
     # Skip on PRs unless explicitly labeled `e2e-staging`.
     if: >-
       github.event_name != 'pull_request' ||
