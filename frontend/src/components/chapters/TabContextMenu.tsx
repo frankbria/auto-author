@@ -12,6 +12,7 @@ interface TabContextMenuProps {
   onDelete?: (chapterId: string) => void;
   onDuplicate?: (chapterId: string) => void;
   onPreview?: (chapterId: string) => void;
+  onEdit?: (chapterId: string) => void;
 }
 
 export default function TabContextMenu({
@@ -19,7 +20,8 @@ export default function TabContextMenu({
   onStatusUpdate,
   onDelete,
   onDuplicate,
-  onPreview
+  onPreview,
+  onEdit
 }: TabContextMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -46,6 +48,9 @@ export default function TabContextMenu({
         size="sm"
         className="h-6 w-6 p-0"
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Chapter options"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
       >
         <HugeiconsIcon icon={MoreVerticalIcon} size={12} />
       </Button>
@@ -67,13 +72,15 @@ export default function TabContextMenu({
               </button>
             )}
             
-            <button
-              className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
-              onClick={() => handleAction(() => console.log('Edit chapter', chapterId))}
-            >
-              <HugeiconsIcon icon={Edit01Icon} size={16} className="mr-2" />
-              Edit
-            </button>
+            {onEdit && (
+              <button
+                className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                onClick={() => handleAction(() => onEdit(chapterId))}
+              >
+                <HugeiconsIcon icon={Edit01Icon} size={16} className="mr-2" />
+                Edit
+              </button>
+            )}
 
             {onDuplicate && (
               <button

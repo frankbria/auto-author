@@ -115,6 +115,18 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
     saveTabState(); // Persist state
   }, [setActiveChapter, saveTabState]);
 
+  // "Edit" from the tab context menu: select the chapter and move focus into its
+  // editor so the action has an observable effect even when it is already active.
+  const handleEditChapter = useCallback((chapterId: string) => {
+    setActiveChapter(chapterId);
+    requestAnimationFrame(() => {
+      const editor = document.querySelector<HTMLElement>(
+        '[data-testid="tab-content"] [contenteditable="true"]'
+      );
+      editor?.focus();
+    });
+  }, [setActiveChapter]);
+
   const handleTabReorder = useCallback((sourceIndex: number, destinationIndex: number) => {
     reorderTabs(sourceIndex, destinationIndex);
   }, [reorderTabs]);
@@ -223,8 +235,10 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
         data-testid="tab-content"
       />
       <TabContextMenu
+        chapterId={state.active_chapter_id ?? undefined}
         onStatusUpdate={updateChapterStatus}
         onDelete={handleDeleteChapter}
+        onEdit={handleEditChapter}
       />
 
       {/* For tests requiring scroll controls and overflow indicators */}

@@ -7,23 +7,89 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuthFetch } from '@/hooks/useAuthFetch';
+
+interface UserPreferences {
+  theme?: string;
+  email_notifications?: boolean;
+  marketing_emails?: boolean;
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const user = session?.user;
   const { toast } = useToast();
+  const { authFetch } = useAuthFetch({ baseUrl: API_BASE_URL });
   const [emailNotifications, setEmailNotifications] = useState(true);
+  // ponytail: auto-save is a client-only preference; backend has no field for it.
   const [autoSave, setAutoSave] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  // 'loading' | 'loaded' | 'error'. Saving is only allowed after a successful load
+  // so a failed/partial load can't overwrite persisted preferences with UI defaults.
+  const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading');
+  // Preserve preference fields the UI doesn't expose (e.g. marketing_emails) so Save doesn't reset them.
+  const [loadedPreferences, setLoadedPreferences] = useState<UserPreferences>({});
 
-  const handleSaveSettings = () => {
-    // TODO: Implement actual settings save
-    toast({
-      title: "Settings saved",
-      description: "Your preferences have been updated successfully.",
-    });
+  const loadPreferences = useCallback(() => {
+    let active = true;
+    setLoadState('loading');
+    authFetch<{ preferences?: UserPreferences }>('/users/me')
+      .then((data) => {
+        if (!active) return;
+        const prefs = data?.preferences ?? {};
+        setLoadedPreferences(prefs);
+        if (prefs.theme) {
+          setDarkMode(prefs.theme === 'dark');
+        }
+        if (typeof prefs.email_notifications === 'boolean') {
+          setEmailNotifications(prefs.email_notifications);
+        }
+        setLoadState('loaded');
+      })
+      .catch(() => {
+        // Do NOT enable saving: saving now would overwrite persisted fields with defaults.
+        if (active) setLoadState('error');
+      });
+    return () => {
+      active = false;
+    };
+  }, [authFetch]);
+
+  useEffect(() => loadPreferences(), [loadPreferences]);
+
+  const isLoaded = loadState === 'loaded';
+
+  const handleSaveSettings = async () => {
+    setIsSaving(true);
+    try {
+      await authFetch('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          preferences: {
+            ...loadedPreferences,
+            theme: darkMode ? 'dark' : 'light',
+            email_notifications: emailNotifications,
+          },
+        }),
+      });
+      toast({
+        title: 'Settings saved',
+        description: 'Your preferences have been updated successfully.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Save failed',
+        description: err instanceof Error ? err.message : 'Could not update your preferences.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -79,6 +145,7 @@ export default function SettingsPage() {
                 id="email-notifications"
                 checked={emailNotifications}
                 onCheckedChange={setEmailNotifications}
+                disabled={!isLoaded}
               />
             </div>
             <Separator />
@@ -107,6 +174,7 @@ export default function SettingsPage() {
                 id="dark-mode"
                 checked={darkMode}
                 onCheckedChange={setDarkMode}
+                disabled={!isLoaded}
               />
             </div>
           </CardContent>
@@ -145,10 +213,23 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Load error — saving stays disabled so we can't overwrite stored preferences with defaults */}
+        {loadState === 'error' && (
+          <div
+            role="alert"
+            className="flex items-center justify-between rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            <span>Couldn&apos;t load your current preferences. Saving is disabled to avoid overwriting them.</span>
+            <Button variant="outline" size="sm" onClick={loadPreferences}>
+              Retry
+            </Button>
+          </div>
+        )}
+
         {/* Save Button */}
         <div className="flex justify-end">
-          <Button onClick={handleSaveSettings} size="lg">
-            Save Settings
+          <Button onClick={handleSaveSettings} size="lg" disabled={isSaving || !isLoaded}>
+            {isSaving ? 'Saving...' : loadState === 'loading' ? 'Loading...' : 'Save Settings'}
           </Button>
         </div>
       </div>

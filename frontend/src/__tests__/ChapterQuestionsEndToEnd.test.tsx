@@ -319,11 +319,13 @@ describe('Chapter Questions End-to-End Tests', () => {
         fireEvent.change(difficultySelect, { target: { value: 'hard' } });
       }
 
-      // Find count input - might be a slider
-      const countInput = screen.queryByLabelText(/Number of [Qq]uestions/i) ||
-                        screen.queryByRole('slider', { name: /Number of questions/i });
+      // Find count input - a Radix slider (role="slider"); drive it via keyboard.
+      // Home key sets the value to the slider minimum (5).
+      const countInput = screen.queryByRole('slider', { name: /Number of questions/i }) ||
+                        screen.queryByRole('slider');
       if (countInput) {
-        fireEvent.change(countInput, { target: { value: '5' } });
+        countInput.focus();
+        fireEvent.keyDown(countInput, { key: 'Home', code: 'Home' });
       }
 
       // Find focus areas textarea if it exists
