@@ -40,6 +40,8 @@ frontend/.yarn/install-state.gz
 frontend/coverage
 frontend/playwright-report/
 frontend/test-results/
+frontend/tests/e2e/staging/playwright-report-staging/
+frontend/tests/e2e/staging/test-results/
 
 # next.js
 frontend/.next/

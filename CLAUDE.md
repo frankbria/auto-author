@@ -247,6 +247,16 @@ npx playwright test --ui    # Run with UI mode (recommended)
 BYPASS_AUTH=true npx playwright test
 ```
 
+#### Staging E2E (real auth against https://dev.autoauthor.app)
+```bash
+cd frontend
+cp tests/e2e/staging/.env.test.example tests/e2e/staging/.env.test  # set STAGING_TEST_EMAIL / STAGING_TEST_PASSWORD
+npm run test:e2e:staging
+```
+- Specs: `tests/e2e/staging/complete-user-journey.spec.ts` (full journey) and `regressions.spec.ts` (Issue #83 regressions: session/401, ObjectId, #54 answer persistence).
+- CI: `.github/workflows/e2e-staging-tests.yml` runs on a 6h schedule, manual dispatch, and PRs labeled `e2e-staging`. Requires GitHub Secrets `STAGING_TEST_EMAIL` / `STAGING_TEST_PASSWORD`.
+- See `tests/e2e/staging/README.md` for details.
+
 ---
 
 ## Key Features
