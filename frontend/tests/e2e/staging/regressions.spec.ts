@@ -161,23 +161,34 @@ async function createBookWithSummary(page: Page, title: string): Promise<void> {
 
   const editor = page.getByRole('textbox', { name: /book summary/i });
   await editor.waitFor({ timeout: 10000 });
+
+  // The summary page auto-saves on a debounce (no Save button); wait for the
+  // POST /books/{id}/summary round-trip rather than an arbitrary timeout.
+  const summarySaved = page.waitForResponse(
+    (res) =>
+      /\/books\/.+\/summary/.test(res.url()) &&
+      ['POST', 'PUT', 'PATCH'].includes(res.request().method()) &&
+      res.status() < 400,
+    { timeout: 15000 }
+  );
   await editor.fill(
     'A regression test book summary with enough content to drive table-of-contents generation on staging.'
   );
-  await page.getByRole('button', { name: /save|update/i }).first().click();
+  await summarySaved;
+
+  // Advance to the TOC wizard via the submit button.
+  await page.getByRole('button', { name: /continue to toc/i }).click();
+  await page.waitForURL(/\/generate-toc/, { timeout: 15000 });
 }
 
 async function generateToc(page: Page): Promise<void> {
-  const tocLink = page.getByRole('link', { name: /table.*content|toc|chapters/i });
-  if (await tocLink.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await tocLink.click();
-  }
+  // Already on the TOC wizard (/generate-toc). Kick off generation.
   await page
     .getByRole('button', { name: /generate.*toc|generate.*table|create.*chapters/i })
     .first()
     .click();
   await page.waitForSelector('[data-testid="chapter-item"], [role="list"] li', {
-    timeout: 35000,
+    timeout: 45000,
   });
 }
 
