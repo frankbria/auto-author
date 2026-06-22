@@ -94,10 +94,11 @@ async def export_book_pdf(
             }
         )
 
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to generate PDF", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to generate PDF: {str(e)}"
+            detail="Failed to generate PDF"
         )
 
 
@@ -167,10 +168,11 @@ async def export_book_docx(
             }
         )
 
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to generate DOCX", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to generate DOCX: {str(e)}"
+            detail="Failed to generate DOCX"
         )
 
 

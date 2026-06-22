@@ -4,6 +4,8 @@ This is a temporary file to implement the cover upload functionality.
 The content will be integrated into books.py.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from typing import Dict
 from datetime import datetime, timezone
@@ -12,6 +14,8 @@ from app.core.security import get_current_user_from_session
 from app.db.database import get_book_by_id, update_book
 from app.api.dependencies import get_rate_limiter, audit_request
 from app.services.file_upload_service import file_upload_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -87,8 +91,9 @@ async def upload_book_cover_image(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to upload cover image", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload cover image: {str(e)}"
+            detail="Failed to upload cover image"
         )

@@ -149,10 +149,11 @@ async def create_new_book(
 
         return new_book
 
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to create book", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create book: {str(e)}",
+            detail="Failed to create book",
         )
 
 
@@ -180,10 +181,11 @@ async def get_user_books(
 
         return books
 
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to retrieve books", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve books: {str(e)}",
+            detail="Failed to retrieve books",
         )
 
 
@@ -241,10 +243,11 @@ async def get_book(
     except HTTPException:
         raise
 
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to retrieve book", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve book: {str(e)}",
+            detail="Failed to retrieve book",
         )
 
 
@@ -323,19 +326,21 @@ async def update_book_details(
 
         try:
             return BookResponse.model_validate(full_book)
-        except Exception as e:
+        except Exception:
+            logger.error("BookResponse parse error", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"BookResponse parse error: {str(e)}",
+                detail="Failed to parse book response",
             )
 
     except HTTPException:
         raise
 
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to update book", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update book: {str(e)}",
+            detail="Failed to update book",
         )
 
 
@@ -410,18 +415,20 @@ async def patch_book_details(
 
         try:
             return BookResponse.model_validate(full_book)
-        except Exception as e:
+        except Exception:
+            logger.error("BookResponse parse error", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"BookResponse parse error: {str(e)}",
+                detail="Failed to parse book response",
             )
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to patch update book", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to patch update book: {str(e)}",
+            detail="Failed to patch update book",
         )
 
 
@@ -485,10 +492,11 @@ async def delete_book_endpoint(
     except HTTPException:
         raise
 
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to delete book", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete book: {str(e)}",
+            detail="Failed to delete book",
         )
 
 
@@ -561,10 +569,11 @@ async def upload_book_cover_image(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to upload cover image", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload cover image: {str(e)}"
+            detail="Failed to upload cover image"
         )
 
 
@@ -756,9 +765,10 @@ async def analyze_book_summary(
             "analyzed_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    except Exception as e:
+    except Exception:
+        logger.error("Error analyzing summary", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Error analyzing summary: {str(e)}"
+            status_code=500, detail="Error analyzing summary"
         )
 
 
@@ -883,11 +893,11 @@ async def generate_clarifying_questions(
                 "correlation_id": e.correlation_id
             }
         )
-    except Exception as e:
-        # Unexpected error
+    except Exception:
+        logger.error("Unexpected error generating questions", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unexpected error generating questions: {str(e)}"
+            detail="Unexpected error generating questions"
         )
 
 
@@ -1215,10 +1225,11 @@ async def generate_table_of_contents(
                 "correlation_id": e.correlation_id
             }
         )
-    except Exception as e:
+    except Exception:
+        logger.error("Unexpected error generating TOC", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unexpected error generating TOC: {str(e)}"
+            detail="Unexpected error generating TOC"
         )
 
 
@@ -2131,9 +2142,10 @@ async def get_chapter_analytics(
             "success": True,
         }
 
-    except Exception as e:
+    except Exception:
+        logger.error("Failed to retrieve chapter analytics", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve chapter analytics: {str(e)}"
+            status_code=500, detail="Failed to retrieve chapter analytics"
         )
 
 
@@ -3037,9 +3049,10 @@ async def generate_chapter_draft(
             "message": "Draft generated successfully"
         }
 
-    except Exception as e:
+    except Exception:
+        logger.error("Error generating draft", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Error generating draft: {str(e)}"
+            status_code=500, detail="Error generating draft"
         )
 
 @router.post(
