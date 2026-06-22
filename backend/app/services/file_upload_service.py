@@ -171,16 +171,17 @@ class FileUploadService:
             
             return image_url, thumbnail_url
             
-        except Exception as e:
+        except Exception:
             # Clean up any partially saved files
             if image_path.exists():
                 image_path.unlink()
             if thumbnail_path.exists():
                 thumbnail_path.unlink()
-            
+
+            logger.error("Failed to process image", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to process image: {str(e)}"
+                detail="Failed to process image"
             )
     
     async def delete_cover_image(self, image_url: str, thumbnail_url: Optional[str] = None):

@@ -139,7 +139,7 @@ async def get_current_user_from_session(request: Request) -> Dict:
         logger.error(f"Error fetching user {user_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching user: {e}",
+            detail="Error fetching user",
         )
 
     # Auto-create user if they have a valid session but no backend record

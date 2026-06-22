@@ -143,7 +143,7 @@ async def pydantic_validation_exception_handler(request: Request, exc: Validatio
     logger.error(f"Pydantic validation error: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": f"Validation error: {str(exc.errors())}"},
+        content={"detail": "Validation error"},
     )
 
 
@@ -154,8 +154,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "detail": f"An unexpected error occurred: {str(exc)}",
-            "type": str(type(exc).__name__),
+            "detail": "An unexpected error occurred",
         },
     )
 

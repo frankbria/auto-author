@@ -90,7 +90,7 @@ async def read_users_me(
         logger.error(f"Error in read_users_me: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving user profile: {str(e)}",
+            detail="Error retrieving user profile",
         )
 
 
@@ -136,7 +136,7 @@ async def update_profile(
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error updating user: {e}",
+                detail="Error updating user",
             )
 
     if not updated_user:
@@ -224,10 +224,11 @@ async def create_new_user(user: UserCreate):
     try:
         created_user = await create_user(user_data)
         return created_user
-    except Exception as e:
+    except Exception:
+        logger.error("Error creating user", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating user: {e}",
+            detail="Error creating user",
         )
 
 
@@ -252,12 +253,11 @@ async def update_user_data(
     # Check if user exists
     try:
         existing_user = await get_user_by_auth_id(auth_id)
-    except Exception as e:
-        msg = str(e).lower()
-
+    except Exception:
+        logger.error("Database operation timed out while fetching user", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail=f"Database operation timed out: {e}",
+            detail="Database operation timed out",
         )
     if not existing_user:
         raise HTTPException(
@@ -287,10 +287,11 @@ async def update_user_data(
             )
 
         return updated_user
-    except Exception as e:
+    except Exception:
+        logger.error("Error updating user", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating user: {e}",
+            detail="Error updating user",
         )
 
 
@@ -327,8 +328,9 @@ async def delete_user_account(
             )
 
         return None
-    except Exception as e:
+    except Exception:
+        logger.error("Error deleting user", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail=f"Error deleting user: {e}",
+            detail="Error deleting user",
         )
