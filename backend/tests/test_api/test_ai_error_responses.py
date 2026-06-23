@@ -210,6 +210,26 @@ class TestGenerateTOCErrors:
                 assert data["detail"]["error_code"] == "AI_NETWORK_ERROR"
 
     @pytest.mark.asyncio
+    async def test_toc_invalid_response_returns_500_retryable(self, client, mock_user, mock_book):
+        """An unusable/poorly-formatted AI TOC surfaces as a retryable error (issue #48),
+        not a silently-saved placeholder TOC."""
+        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+            with patch('app.services.ai_service.ai_service.generate_toc_from_summary_and_responses') as mock_generate:
+                mock_generate.side_effect = AIServiceError(
+                    message="The AI returned an unusable table of contents. Please try again.",
+                    error_code="AI_INVALID_RESPONSE",
+                    retryable=True,
+                    correlation_id="toc-invalid-1",
+                )
+
+                response = await client.post("/api/v1/books/book123/generate-toc")
+
+                assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+                data = response.json()
+                assert data["detail"]["error_code"] == "AI_INVALID_RESPONSE"
+                assert data["detail"]["retryable"] is True
+
+    @pytest.mark.asyncio
     async def test_toc_service_unavailable_returns_503(self, client, mock_user, mock_book):
         """Test that TOC generation service unavailable errors return 503."""
         with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
@@ -225,6 +245,65 @@ class TestGenerateTOCErrors:
                 data = response.json()
                 assert data["detail"]["error_code"] == "AI_SERVICE_UNAVAILABLE"
                 assert data["detail"]["retry_after"] == 45
+
+
+class TestAnalyzeSummaryErrors:
+    """Test error handling in analyze summary endpoint (issue #48).
+
+    Timeouts surface from ai_service as AINetworkError, so a graceful
+    timeout response is the same path as any network error: 503 + retry info.
+    """
+
+    @pytest.mark.asyncio
+    async def test_analyze_network_error_returns_503(self, client, mock_user, mock_book):
+        """Timeouts/network errors during summary analysis return 503, not 500."""
+        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+            with patch('app.services.ai_service.ai_service.analyze_summary_for_toc') as mock_analyze:
+                mock_analyze.side_effect = AINetworkError(
+                    correlation_id="analyze-correlation-456"
+                )
+
+                response = await client.post("/api/v1/books/book123/analyze-summary")
+
+                assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+                data = response.json()
+                assert data["detail"]["error_code"] == "AI_NETWORK_ERROR"
+                assert data["detail"]["retryable"] is True
+                assert data["detail"]["correlation_id"] == "analyze-correlation-456"
+
+    @pytest.mark.asyncio
+    async def test_analyze_rate_limit_error_returns_429(self, client, mock_user, mock_book):
+        """Rate limit errors during summary analysis return 429 with retry info."""
+        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+            with patch('app.services.ai_service.ai_service.analyze_summary_for_toc') as mock_analyze:
+                mock_analyze.side_effect = AIRateLimitError(
+                    retry_after=60,
+                    correlation_id="analyze-correlation-123"
+                )
+
+                response = await client.post("/api/v1/books/book123/analyze-summary")
+
+                assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+                data = response.json()
+                assert data["detail"]["error_code"] == "AI_RATE_LIMIT"
+                assert data["detail"]["retry_after"] == 60
+
+    @pytest.mark.asyncio
+    async def test_analyze_service_unavailable_returns_503(self, client, mock_user, mock_book):
+        """Service-unavailable errors during summary analysis return 503."""
+        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+            with patch('app.services.ai_service.ai_service.analyze_summary_for_toc') as mock_analyze:
+                mock_analyze.side_effect = AIServiceUnavailableError(
+                    retry_after=30,
+                    correlation_id="analyze-correlation-789"
+                )
+
+                response = await client.post("/api/v1/books/book123/analyze-summary")
+
+                assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+                data = response.json()
+                assert data["detail"]["error_code"] == "AI_SERVICE_UNAVAILABLE"
+                assert data["detail"]["retry_after"] == 30
 
 
 class TestErrorResponseStructure:

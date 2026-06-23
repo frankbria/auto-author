@@ -30,6 +30,14 @@
 
 ## Recent Changes
 
+### 2026-06-22
+- **TOC Generation Hardening (#48)**: Closed reliability gaps in the AI TOC flow
+  - **analyze-summary endpoint**: now uses the same structured AI-error handling as generate-questions/generate-toc (timeouts → 503 with retry info, instead of an opaque 500)
+  - **Frontend**: `bookClient` AI methods surface the backend's `detail.message`, and `TocGenerationWizard` shows it (meaningful error text + existing retry button) rather than a generic string
+  - **Malformed AI responses**: `ai_service._parse_toc_response` now rejects unusable output (empty/title-less chapters, unparseable text) with a retryable `AI_INVALID_RESPONSE` error instead of silently fabricating a generic placeholder TOC; it also unwraps the common `table_of_contents` JSON wrapper so valid-but-wrapped responses parse correctly
+  - **Tests**: backend integration tests for AI timeouts/invalid responses across all 3 TOC endpoints; `bookClient` error-surfacing unit tests; deterministic route-mocked E2E (`frontend/src/e2e/toc-generation-resilience.spec.ts`) for the error→retry recovery path
+  - **Status**: ✅ Complete
+
 ### 2025-12-24
 - **Cookie-Based Authentication Reconciliation**: Aligned backend auth with better-auth's cookie-based session management
   - **Problem**: Backend expected JWT tokens in Authorization headers, but better-auth uses httpOnly session cookies

@@ -765,6 +765,48 @@ async def analyze_book_summary(
             "analyzed_at": datetime.now(timezone.utc).isoformat(),
         }
 
+    except AIRateLimitError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retry_after": e.retry_after,
+                "cached_content_available": e.cached_content_available,
+                "correlation_id": e.correlation_id,
+            },
+        )
+    except (AIServiceUnavailableError, AINetworkError) as e:
+        # Timeouts surface from ai_service as AINetworkError after retries.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retry_after": getattr(e, "retry_after", None),
+                "retryable": getattr(e, "retryable", True),
+                "correlation_id": e.correlation_id,
+            },
+        )
+    except AIInvalidRequestError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "correlation_id": e.correlation_id,
+            },
+        )
+    except AIServiceError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retryable": e.retryable,
+                "correlation_id": e.correlation_id,
+            },
+        )
     except Exception:
         logger.error("Error analyzing summary", exc_info=True)
         raise HTTPException(

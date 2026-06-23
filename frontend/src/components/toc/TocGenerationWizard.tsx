@@ -55,7 +55,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       setWizardState(prev => ({
         ...prev,
         step: WizardStep.ERROR,
-        error: 'Failed to generate clarifying questions. Please try again.',
+        error: error instanceof Error ? error.message : 'Failed to generate clarifying questions. Please try again.',
         isLoading: false
       }));
     }
@@ -97,7 +97,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       setWizardState(prev => ({
         ...prev,
         step: WizardStep.ERROR,
-        error: 'Failed to check if your summary is ready for TOC generation. Please try again.',
+        error: error instanceof Error ? error.message : 'Failed to check if your summary is ready for TOC generation. Please try again.',
         isLoading: false
       }));
     }
@@ -152,7 +152,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       setWizardState(prev => ({
         ...prev,
         step: WizardStep.ERROR,
-        error: 'Failed to generate table of contents. Please try again.',
+        error: error instanceof Error ? error.message : 'Failed to generate table of contents. Please try again.',
         isLoading: false
       }));
     }
@@ -173,7 +173,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       console.error('Error saving TOC:', error);
       setWizardState(prev => ({
         ...prev,
-        error: 'Failed to save table of contents. Please try again.',
+        error: error instanceof Error ? error.message : 'Failed to save table of contents. Please try again.',
         isLoading: false
       }));
     }
@@ -223,7 +223,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       setWizardState(prev => ({
         ...prev,
         step: WizardStep.ERROR,
-        error: 'Failed to regenerate table of contents. Please try again.',
+        error: error instanceof Error ? error.message : 'Failed to regenerate table of contents. Please try again.',
         isLoading: false
       }));
     }

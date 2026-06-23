@@ -648,21 +648,42 @@ Format your response as JSON with this structure:
 Ensure the TOC is comprehensive, logically ordered, and matches the book's scope and audience.
 """
 
-    def _parse_toc_response(self, toc_text: str) -> Dict:
-        """Parse the AI TOC response into a structured format."""
-        try:
-            # Try to extract JSON from the response
-            import json
-            import re
+    def _is_valid_toc(self, toc_data: Dict) -> bool:
+        """A usable TOC has a non-empty chapter list where every chapter has a title.
 
-            # Look for JSON content between curly braces
+        Guards against the AI returning 200 with unusable content (empty
+        chapters, or chapters missing titles) that would otherwise be saved as a
+        bogus "successful" TOC. See issue #48.
+        """
+        chapters = toc_data.get("chapters")
+        if not isinstance(chapters, list) or not chapters:
+            return False
+        return all(
+            isinstance(ch, dict)
+            and isinstance(ch.get("title"), str)
+            and ch.get("title").strip()
+            for ch in chapters
+        )
+
+    def _parse_toc_response(self, toc_text: str) -> Dict:
+        """Parse the AI TOC response into a structured format.
+
+        Raises AIServiceError (retryable) when the response can't be turned into
+        a usable TOC, so the caller surfaces a clear error + retry instead of
+        silently fabricating placeholder chapters.
+        """
+        import json
+        import re
+
+        try:
             json_match = re.search(r"\{.*\}", toc_text, re.DOTALL)
             if json_match:
-                json_str = json_match.group(0)
-                toc_data = json.loads(json_str)
-
-                # Validate required fields
-                if "chapters" in toc_data and isinstance(toc_data["chapters"], list):
+                toc_data = json.loads(json_match.group(0))
+                # The model sometimes wraps the structure under a
+                # "table_of_contents" key — unwrap it before validating.
+                if isinstance(toc_data.get("table_of_contents"), dict):
+                    toc_data = toc_data["table_of_contents"]
+                if self._is_valid_toc(toc_data):
                     return {
                         "toc": toc_data,
                         "success": True,
@@ -672,13 +693,12 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                             for chapter in toc_data["chapters"]
                         ),
                     }
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            logger.warning(f"Error parsing TOC JSON: {str(e)}")
 
-            # Fallback: Create a simple structure from text
-            return self._create_fallback_toc(toc_text)
-
-        except Exception as e:
-            logger.warning(f"Error parsing TOC response: {str(e)}")
-            return self._create_fallback_toc(toc_text)
+        # No usable JSON — fall back to extracting chapters from plain text. This
+        # raises if nothing usable can be recovered.
+        return self._create_fallback_toc(toc_text)
 
     def _create_fallback_toc(self, toc_text: str) -> Dict:
         """Create a fallback TOC structure when parsing fails."""
@@ -705,34 +725,22 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     }
                 )
 
-        # If no chapters found, create default structure
+        # No chapters could be recovered from the AI response. Fabricating a
+        # generic placeholder TOC here would be a silent failure (issue #48):
+        # the user would get boilerplate content labelled as a success. Surface
+        # a retryable error instead so the UI can show it and offer regeneration.
         if not chapters:
-            chapters = [
-                {
-                    "id": "ch1",
-                    "title": "Introduction",
-                    "description": "Introduction to the topic",
-                    "level": 1,
-                    "order": 1,
-                    "subchapters": [],
-                },
-                {
-                    "id": "ch2",
-                    "title": "Main Content",
-                    "description": "Core content of the book",
-                    "level": 1,
-                    "order": 2,
-                    "subchapters": [],
-                },
-                {
-                    "id": "ch3",
-                    "title": "Conclusion",
-                    "description": "Summary and next steps",
-                    "level": 1,
-                    "order": 3,
-                    "subchapters": [],
-                },
-            ]
+            correlation_id = str(uuid.uuid4())
+            logger.warning(
+                f"AI returned an unusable TOC; no chapters recoverable "
+                f"[correlation_id={correlation_id}]"
+            )
+            raise AIServiceError(
+                message="The AI returned an unusable table of contents. Please try again.",
+                error_code="AI_INVALID_RESPONSE",
+                retryable=True,
+                correlation_id=correlation_id,
+            )
 
         return {
             "toc": {
