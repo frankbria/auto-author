@@ -15,7 +15,7 @@ from app.core.config import settings
 
 # Set environment variables for testing
 os.environ['OPENAI_AUTOAUTHOR_API_KEY'] = 'test-key'
-os.environ['BETTER_AUTH_SECRET'] = 'test-secret-key-for-better-auth'
+os.environ['BETTER_AUTH_SECRET'] = 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
 
 async def test_ai_service():
     """Test AI service draft generation"""
