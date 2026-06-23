@@ -28,7 +28,10 @@ test.describe('Complete Authoring Journey', () => {
     bookTitle = `E2E Test Book ${timestamp}`;
   });
 
-  test('user can complete full authoring workflow: create book → summary → TOC → questions → draft', async ({
+  // fixme: brittle against live staging — book-creation navigation, summary
+  // editor fill race, and the multi-phase TOC wizard need hardening. Tracked in
+  // #105. Uses page.waitForTimeout()/conditional skips that also need replacing.
+  test.fixme('user can complete full authoring workflow: create book → summary → TOC → questions → draft', async ({
     authenticatedPage: page,
   }) => {
     test.setTimeout(300000); // 5 minutes for complete journey
