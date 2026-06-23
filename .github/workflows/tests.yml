@@ -198,7 +198,12 @@ jobs:
         env:
           BYPASS_AUTH: 'true'
           BASE_URL: 'http://localhost:3000'
-          NEXT_PUBLIC_API_URL: 'http://localhost:8000'
+          # Must include the /api/v1 prefix the backend mounts (settings.API_V1_PREFIX);
+          # the frontend app and the E2E test helpers both read this for API calls.
+          NEXT_PUBLIC_API_URL: 'http://localhost:8000/api/v1'
+          # Better-auth init throws without a secret; reuse the canonical CI test secret.
+          BETTER_AUTH_SECRET: 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
+          BETTER_AUTH_URL: 'http://localhost:3000'
         run: npx playwright test --project=chromium
 
       - name: Upload Playwright report

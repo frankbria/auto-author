@@ -90,9 +90,9 @@ export default defineConfig({
       // E2E test environment variables (loaded from .env.test)
       BYPASS_AUTH: process.env.BYPASS_AUTH || 'true',
       NEXT_PUBLIC_BYPASS_AUTH: process.env.NEXT_PUBLIC_BYPASS_AUTH || 'true',
-      // Clerk configuration (with fallback defaults for E2E tests)
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_ZGVsaWNhdGUtbGFkeWJpcmQtNDcuY2xlcmsuYWNjb3VudHMuZGV2JA',
-      CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY || 'sk_test_yxycVoEwI4EzhsYAJ8g0Re8VBKClBrfoQC5OTnS6zE',
+      // Better-auth configuration (init throws without a secret)
+      BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing',
+      BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
       // API configuration
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
       // Environment

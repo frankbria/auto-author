@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from app.db.database import get_collection
 from app.db.database import create_audit_log
+from app.core.config import settings
 
 # Simple in-memory cache for rate limiting
 # In production, this should be replaced with Redis or similar
@@ -71,6 +72,12 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
 
     async def rate_limiter(request: Request):
         """Rate limiting dependency function"""
+        # Skip rate limiting in auth-bypass mode (E2E/test only; BYPASS_AUTH is
+        # rejected in production by Settings validation), so test suites can
+        # create many resources from a single IP without tripping the limiter.
+        if settings.BYPASS_AUTH:
+            return {"limit": limit, "remaining": limit, "reset": 0}
+
         # Default: use client IP
         client_ip = request.client.host
         endpoint = request.url.path
