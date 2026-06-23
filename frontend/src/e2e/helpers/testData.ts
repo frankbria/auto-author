@@ -73,13 +73,16 @@ export async function createTestBookWithTOC(
   // Create book
   const book = await createTestBook(page, bookData);
 
-  // Create TOC with chapters
-  const tocResponse = await page.request.post(`${API_BASE_URL}/books/${book.id}/toc`, {
+  // Save TOC with chapters. The backend exposes PUT /books/{id}/toc (there is no
+  // POST /toc; POST /generate-toc is the AI path). Body shape is { toc: { chapters } }.
+  const tocResponse = await page.request.put(`${API_BASE_URL}/books/${book.id}/toc`, {
     data: {
-      chapters: chapterTitles.map((title, index) => ({
-        title,
-        order_index: index
-      }))
+      toc: {
+        chapters: chapterTitles.map((title, index) => ({
+          title,
+          order_index: index
+        }))
+      }
     },
     headers: {
       'Content-Type': 'application/json'
@@ -91,7 +94,7 @@ export async function createTestBookWithTOC(
   }
 
   const tocData = await tocResponse.json();
-  const chapters: TestChapter[] = tocData.chapters || [];
+  const chapters: TestChapter[] = tocData.toc?.chapters || [];
 
   return { book, chapters };
 }
