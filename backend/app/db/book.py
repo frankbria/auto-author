@@ -2,13 +2,13 @@
 
 import logging
 
-from .base import books_collection, users_collection
+from .base import books_collection, users_collection, _client, get_collection
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, List, Dict
+from motor.motor_asyncio import AsyncIOMotorClientSession
 from .audit_log import create_audit_log
 from app.models.book import BookDB
-from app.models.user import UserDB
 
 logger = logging.getLogger(__name__)
 
@@ -97,13 +97,17 @@ async def update_book(
 
 
 async def delete_book(book_id: str, user_auth_id: str) -> bool:
-    """Delete a book and remove its association from the user.
+    """Delete a book and cascade-delete all of its related data.
 
-    This performs a cascade deletion, removing:
-    - The book document
-    - All questions for the book
-    - All question responses for the book
-    - Book association from the user
+    Removes (atomically when MongoDB supports transactions via a replica set,
+    and with a safe children-first ordering otherwise):
+    - chapter access logs, questions, question responses, question ratings
+    - the book document
+    - the book association on the user
+
+    Mirrors the conditional-transaction pattern in ``toc_transactions``. On a
+    non-transactional deployment a mid-cascade failure leaves the book document
+    (deleted last) intact, so it stays discoverable rather than orphaned.
     """
     # First check if user owns the book
     book = await books_collection.find_one(
@@ -112,28 +116,101 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
     if not book:
         return False
 
-    # Cascade delete: Remove all questions and responses for this book
-    from app.db.questions import delete_questions_for_book
-    await delete_questions_for_book(book_id=book_id, user_id=user_auth_id)
+    # Detect replica-set support; multi-document transactions require one.
+    use_transaction = True
+    try:
+        async with await _client.start_session():
+            info = await _client.admin.command("isMaster")
+            use_transaction = info.get("setName") is not None
+    except Exception:
+        use_transaction = False
 
-    # Delete the book
-    result = await books_collection.delete_one({"_id": ObjectId(book_id)})
+    try:
+        if use_transaction:
+            async with await _client.start_session() as session:
+                async with session.start_transaction():
+                    counts = await _delete_book_internal(book_id, user_auth_id, session)
+        else:
+            counts = await _delete_book_internal(book_id, user_auth_id, None)
+    except Exception:
+        # Transactional path rolls back; non-transactional path is contained by
+        # children-first ordering (the book document is deleted last).
+        logger.error("Cascade delete failed for book %s", book_id, exc_info=True)
+        raise
 
-    # Remove book association from user
-    if result.deleted_count > 0:
-        await users_collection.update_one(
-            {"auth_id": user_auth_id}, {"$pull": {"book_ids": book_id}}
-        )
+    # The book vanished between the ownership check and the delete.
+    if counts is None:
+        return False
 
-        # Create audit log entry
-        await create_audit_log(
-            action="book_delete",
-            actor_id=user_auth_id,
-            target_id=book_id,
-            resource_type="book",
-            details={"title": book.get("title", "Untitled")},
-        )
+    # Create audit log entry
+    await create_audit_log(
+        action="book_delete",
+        actor_id=user_auth_id,
+        target_id=book_id,
+        resource_type="book",
+        details={"title": book.get("title", "Untitled"), "cascade_deleted": counts},
+    )
+    return True
 
-        return True
 
-    return False
+async def _delete_book_internal(
+    book_id: str,
+    user_auth_id: str,
+    session: Optional[AsyncIOMotorClientSession],
+) -> Optional[Dict[str, int]]:
+    """Run the cascade deletes, optionally inside a transaction ``session``.
+
+    Children are deleted first and the book document + user association last, so
+    a non-transactional partial failure leaves the book discoverable. Returns
+    per-collection delete counts, or ``None`` if the book document was already
+    gone (deleted between the ownership check and here).
+    """
+    chapter_access_logs = await get_collection("chapter_access_logs")
+    questions_collection = await get_collection("questions")
+    responses_collection = await get_collection("question_responses")
+    ratings_collection = await get_collection("question_ratings")
+
+    access_logs_result = await chapter_access_logs.delete_many(
+        {"book_id": book_id}, session=session
+    )
+
+    questions = await questions_collection.find(
+        {"book_id": book_id, "user_id": user_auth_id}, session=session
+    ).to_list(length=None)
+    question_ids = [str(q["_id"]) for q in questions]
+
+    responses_deleted = 0
+    ratings_deleted = 0
+    if question_ids:
+        responses_deleted = (
+            await responses_collection.delete_many(
+                {"question_id": {"$in": question_ids}}, session=session
+            )
+        ).deleted_count
+        ratings_deleted = (
+            await ratings_collection.delete_many(
+                {"question_id": {"$in": question_ids}}, session=session
+            )
+        ).deleted_count
+
+    questions_result = await questions_collection.delete_many(
+        {"book_id": book_id, "user_id": user_auth_id}, session=session
+    )
+
+    # Parent last: book document, then the user's book_ids association.
+    result = await books_collection.delete_one(
+        {"_id": ObjectId(book_id)}, session=session
+    )
+    if result.deleted_count == 0:
+        return None
+
+    await users_collection.update_one(
+        {"auth_id": user_auth_id}, {"$pull": {"book_ids": book_id}}, session=session
+    )
+
+    return {
+        "chapter_access_logs": access_logs_result.deleted_count,
+        "questions": questions_result.deleted_count,
+        "question_responses": responses_deleted,
+        "question_ratings": ratings_deleted,
+    }
