@@ -217,7 +217,8 @@ SUGGESTIONS: Consider adding more specific examples. Include target audience det
     async def test_generate_toc_from_summary_and_responses_invalid_json(
         self, ai_service_with_mock_client, mock_invalid_toc_response
     ):
-        """Test TOC generation with invalid JSON response falls back to default structure."""
+        """Unusable AI output raises a retryable error instead of silently
+        fabricating a placeholder TOC (issue #48)."""
         ai_service_with_mock_client.client.chat.completions.create.return_value = (
             mock_invalid_toc_response
         )
@@ -229,18 +230,15 @@ SUGGESTIONS: Consider adding more specific examples. Include target audience det
             {"question": "What is the focus?", "answer": "Practical projects"},
         ]
 
-        result = (
+        from app.services.ai_errors import AIServiceError
+
+        with pytest.raises(AIServiceError) as exc_info:
             await ai_service_with_mock_client.generate_toc_from_summary_and_responses(
                 summary, question_responses, book_metadata
             )
-        )
 
-        # Should return fallback TOC
-        assert result is not None
-        assert result["success"] == True
-        assert "toc" in result
-        assert result["toc"]["total_chapters"] == 3  # Default fallback has 3 chapters
-        assert result["toc"]["chapters"][0]["title"] == "Introduction"
+        assert exc_info.value.error_code == "AI_INVALID_RESPONSE"
+        assert exc_info.value.retryable is True
 
     @pytest.mark.asyncio
     async def test_generate_toc_from_summary_and_responses_api_error(
@@ -418,27 +416,65 @@ SUGGESTIONS: Add more concrete examples. Define target audience clearly. Include
         assert len(result["toc"]["chapters"][0]["subchapters"]) == 2
 
     def test_parse_toc_response_invalid_json(self):
-        """Test parsing invalid JSON falls back to default structure."""
+        """Unparseable AI text with no recoverable chapters raises (issue #48)."""
+        from app.services.ai_errors import AIServiceError
+
         service = AIService()
         invalid_response = "This is not valid JSON at all"
 
-        result = service._parse_toc_response(invalid_response)
-
-        assert result["success"] == True
-        assert "toc" in result
-        assert result["toc"]["total_chapters"] == 3
-        assert result["toc"]["chapters"][0]["title"] == "Introduction"
+        with pytest.raises(AIServiceError) as exc_info:
+            service._parse_toc_response(invalid_response)
+        assert exc_info.value.error_code == "AI_INVALID_RESPONSE"
 
     def test_parse_toc_response_missing_required_fields(self):
-        """Test parsing JSON with missing required fields falls back."""
+        """JSON without a chapters list is unusable and raises (issue #48)."""
+        from app.services.ai_errors import AIServiceError
+
         service = AIService()
         incomplete_json = '{"title": "Test"}'  # Missing chapters
 
-        result = service._parse_toc_response(incomplete_json)
+        with pytest.raises(AIServiceError) as exc_info:
+            service._parse_toc_response(incomplete_json)
+        assert exc_info.value.error_code == "AI_INVALID_RESPONSE"
 
-        assert result["success"] == True
-        assert "toc" in result
-        assert result["toc"]["total_chapters"] == 3
+    def test_parse_toc_response_unwraps_table_of_contents(self):
+        """A response wrapped in a 'table_of_contents' key is parsed, not discarded
+        as boilerplate (issue #48)."""
+        service = AIService()
+        wrapped = """
+{
+  "table_of_contents": {
+    "chapters": [
+      {"id": "ch1", "title": "Real Chapter", "description": "d", "level": 1, "order": 1, "subchapters": []}
+    ],
+    "total_chapters": 1
+  }
+}
+"""
+        result = service._parse_toc_response(wrapped)
+
+        assert result["success"] is True
+        assert result["toc"]["chapters"][0]["title"] == "Real Chapter"
+
+    def test_parse_toc_response_empty_chapters(self):
+        """An empty chapters list must not pass as a successful TOC (issue #48)."""
+        from app.services.ai_errors import AIServiceError
+
+        service = AIService()
+
+        with pytest.raises(AIServiceError) as exc_info:
+            service._parse_toc_response('{"chapters": []}')
+        assert exc_info.value.error_code == "AI_INVALID_RESPONSE"
+
+    def test_parse_toc_response_chapters_missing_titles(self):
+        """Chapters without titles are unusable and raise (issue #48)."""
+        from app.services.ai_errors import AIServiceError
+
+        service = AIService()
+
+        with pytest.raises(AIServiceError) as exc_info:
+            service._parse_toc_response('{"chapters": [{"description": "x"}]}')
+        assert exc_info.value.error_code == "AI_INVALID_RESPONSE"
 
     def test_create_fallback_toc(self):
         """Test creation of fallback TOC structure."""

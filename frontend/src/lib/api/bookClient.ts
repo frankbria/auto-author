@@ -137,6 +137,23 @@ export class BookClient {
   }
 
   /**
+   * Build an Error from a failed AI-endpoint response, surfacing the backend's
+   * structured `detail.message` (e.g. timeout / rate-limit text from issue #48)
+   * so the wizard can show a meaningful message instead of a generic one.
+   */
+  private async aiError(response: Response, fallback: string): Promise<Error> {
+    try {
+      const body = await response.json();
+      const detail = body?.detail;
+      if (typeof detail === 'string' && detail) return new Error(detail);
+      if (detail?.message) return new Error(detail.message);
+    } catch {
+      // Non-JSON body — fall through to the generic fallback message.
+    }
+    return new Error(fallback);
+  }
+
+  /**
    * Fetch all books for the current authenticated user
    *
    * Retrieves a list of all books owned by or shared with the current user.
@@ -475,8 +492,7 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to check TOC readiness: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to check if your summary is ready for TOC generation. Please try again.');
     }
     return response.json();
   }
@@ -553,8 +569,7 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to analyze summary: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to analyze summary. Please try again.');
     }
     return response.json();
   }
@@ -592,8 +607,7 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to generate questions: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to generate clarifying questions. Please try again.');
     }
     return response.json();
   }
@@ -664,8 +678,7 @@ export class BookClient {
       body: JSON.stringify({ question_responses: questionResponses }),
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to generate TOC: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to generate table of contents. Please try again.');
     }
     return response.json();
   }
@@ -798,8 +811,7 @@ export class BookClient {
       body: JSON.stringify({ toc }),
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to update TOC: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to save table of contents. Please try again.');
     }
     return response.json();
   }

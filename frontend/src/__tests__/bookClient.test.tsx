@@ -630,14 +630,14 @@ describe('BookClient', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: async () => 'Generation failed',
+        json: async () => ({ detail: { message: 'Generation failed' } }),
       });
 
       await expect(
         bookClient.generateToc('book123', [
           { question: 'Test?', answer: 'Test answer' },
         ])
-      ).rejects.toThrow('Failed to generate TOC: 500 Generation failed');
+      ).rejects.toThrow('Generation failed');
     });
   });
 
@@ -846,11 +846,11 @@ describe('BookClient', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 404,
-        text: async () => 'Book not found',
+        json: async () => ({ detail: { message: 'Book not found' } }),
       });
 
       await expect(bookClient.checkTocReadiness('book123')).rejects.toThrow(
-        'Failed to check TOC readiness: 404 Book not found'
+        'Book not found'
       );
     });
 
@@ -858,11 +858,11 @@ describe('BookClient', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: async () => 'Analysis failed',
+        json: async () => ({ detail: { message: 'Analysis failed' } }),
       });
 
       await expect(bookClient.analyzeSummary('book123')).rejects.toThrow(
-        'Failed to analyze summary: 500 Analysis failed'
+        'Analysis failed'
       );
     });
   });
@@ -987,11 +987,11 @@ describe('BookClient', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: async () => 'Generation failed',
+        json: async () => ({ detail: { message: 'Generation failed' } }),
       });
 
       await expect(bookClient.generateQuestions('book123')).rejects.toThrow(
-        'Failed to generate questions: 500 Generation failed'
+        'Generation failed'
       );
     });
   });
@@ -1553,6 +1553,41 @@ describe('BookClient', () => {
       await expect(
         bookClient.saveQuestionResponse('book123', 'ch1', 'q1', responseData as any)
       ).rejects.toThrow('Failed to save question response: 422 Validation error');
+    });
+  });
+
+  describe('TOC AI error surfacing (issue #48)', () => {
+    it('surfaces the backend detail.message on a structured AI error', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({
+          detail: {
+            message: 'AI service temporarily unavailable',
+            error_code: 'AI_NETWORK_ERROR',
+            retry_after: 30,
+            correlation_id: 'abc-123',
+          },
+        }),
+      });
+
+      await expect(
+        bookClient.generateToc('book123', [{ question: 'q', answer: 'a' }])
+      ).rejects.toThrow('AI service temporarily unavailable');
+    });
+
+    it('falls back to a generic message when the body is not structured JSON', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => {
+          throw new Error('not json');
+        },
+      });
+
+      await expect(
+        bookClient.generateToc('book123', [{ question: 'q', answer: 'a' }])
+      ).rejects.toThrow('Failed to generate table of contents. Please try again.');
     });
   });
 });
