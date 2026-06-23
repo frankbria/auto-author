@@ -56,6 +56,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             {...props}
             role="button"
             tabIndex={0}
+            data-testid="chapter-tab"
             aria-label={`Open chapter ${chapter.title}`}
             aria-selected={isActive}
             className={cn(
