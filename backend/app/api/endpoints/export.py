@@ -11,10 +11,13 @@ from app.db.book import get_book_by_id
 from app.services.export_service import (
     export_service,
     ExportUnavailableError,
+    ExportValidationError,
+    ExportTimeoutError,
     PDF_AVAILABLE,
     DOCX_AVAILABLE,
 )
 from app.services.chapter_access_service import chapter_access_service
+from app.core.config import settings
 from datetime import datetime, timezone
 import io
 
@@ -79,7 +82,8 @@ async def export_book_pdf(
             book_data=book,
             format="pdf",
             include_empty_chapters=include_empty_chapters,
-            page_size=page_size
+            page_size=page_size,
+            timeout_seconds=settings.EXPORT_TIMEOUT_SECONDS,
         )
 
         # Create filename
@@ -99,6 +103,11 @@ async def export_book_pdf(
             }
         )
 
+    except ExportValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ExportTimeoutError as e:
+        logger.warning("PDF export timed out for book %s", book_id)
+        raise HTTPException(status_code=504, detail=str(e)) from e
     except ExportUnavailableError as e:
         logger.warning("PDF export unavailable: %s", e)
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -156,7 +165,8 @@ async def export_book_docx(
         docx_content = await export_service.export_book(
             book_data=book,
             format="docx",
-            include_empty_chapters=include_empty_chapters
+            include_empty_chapters=include_empty_chapters,
+            timeout_seconds=settings.EXPORT_TIMEOUT_SECONDS,
         )
 
         # Create filename
@@ -176,6 +186,11 @@ async def export_book_docx(
             }
         )
 
+    except ExportValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ExportTimeoutError as e:
+        logger.warning("DOCX export timed out for book %s", book_id)
+        raise HTTPException(status_code=504, detail=str(e)) from e
     except ExportUnavailableError as e:
         logger.warning("DOCX export unavailable: %s", e)
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -234,11 +249,5 @@ async def get_export_formats(
                 }
             }
         ],
-        "book_stats": {
-            "total_chapters": len(book.get("table_of_contents", {}).get("chapters", [])),
-            "chapters_with_content": sum(
-                1 for ch in book.get("table_of_contents", {}).get("chapters", [])
-                if ch.get("content", "").strip()
-            )
-        }
+        "book_stats": export_service.book_stats(book),
     }

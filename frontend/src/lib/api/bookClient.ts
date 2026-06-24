@@ -154,6 +154,30 @@ export class BookClient {
   }
 
   /**
+   * Build an Error from a failed export response, attaching `statusCode` and
+   * `userMessage` (the backend's `detail`) so the unified error handler can
+   * classify it correctly — retry transient 5xx, surface clear 4xx/504 text
+   * for the export progress modal instead of a generic "something went wrong".
+   */
+  private async exportError(response: Response): Promise<Error> {
+    let message: string | undefined;
+    try {
+      const body = await response.json();
+      const detail = body?.detail;
+      if (typeof detail === 'string' && detail) message = detail;
+      else if (detail?.message) message = detail.message;
+    } catch {
+      // Non-JSON body — leave message undefined; classifier picks a default.
+    }
+    const err = new Error(
+      message || `Export failed: ${response.status}`
+    ) as Error & { statusCode: number; userMessage?: string };
+    err.statusCode = response.status;
+    err.userMessage = message;
+    return err;
+  }
+
+  /**
    * Fetch all books for the current authenticated user
    *
    * Retrieves a list of all books owned by or shared with the current user.
@@ -1475,8 +1499,7 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to export PDF: ${response.status} ${error}`);
+      throw await this.exportError(response);
     }
 
     return response.blob();
@@ -1505,8 +1528,7 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to export DOCX: ${response.status} ${error}`);
+      throw await this.exportError(response);
     }
 
     return response.blob();

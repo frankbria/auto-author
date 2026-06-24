@@ -758,7 +758,7 @@ describe('BookClient', () => {
 
     it('should work without auth token', async () => {
       const newClient = new (bookClient.constructor as any)();
-      
+
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => [],
@@ -1588,6 +1588,53 @@ describe('BookClient', () => {
       await expect(
         bookClient.generateToc('book123', [{ question: 'q', answer: 'a' }])
       ).rejects.toThrow('Failed to generate table of contents. Please try again.');
+    });
+  });
+
+  describe('Export error surfacing (issue #49)', () => {
+    it('attaches statusCode and the backend detail message on a failed PDF export', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          detail:
+            'This book has no chapter content yet. Add content to at least one chapter.',
+        }),
+      });
+
+      await expect(bookClient.exportPDF('book123')).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining('no chapter content'),
+        userMessage: expect.stringContaining('no chapter content'),
+      });
+    });
+
+    it('surfaces a timeout detail with a 504 status for DOCX export', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 504,
+        json: async () => ({ detail: 'Export took too long and was stopped.' }),
+      });
+
+      await expect(bookClient.exportDOCX('book123')).rejects.toMatchObject({
+        statusCode: 504,
+        userMessage: 'Export took too long and was stopped.',
+      });
+    });
+
+    it('falls back to a status-based message when the body is not JSON', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => {
+          throw new Error('not json');
+        },
+      });
+
+      await expect(bookClient.exportPDF('book123')).rejects.toMatchObject({
+        statusCode: 500,
+        message: 'Export failed: 500',
+      });
     });
   });
 });
