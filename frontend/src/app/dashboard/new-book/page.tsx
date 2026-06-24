@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import bookClient from '@/lib/api/bookClient';
+import { classifyError } from '@/lib/errors';
+import { showErrorNotification } from '@/components/errors';
+import { toast } from '@/lib/toast';
 
 export default function NewBook() {
   const [bookData, setBookData] = useState({
@@ -32,10 +35,16 @@ export default function NewBook() {
         description: bookData.description
       });
 
+      toast.success({
+        title: 'Book created',
+        description: `"${bookData.title}" is ready to edit.`,
+      });
+
       // Redirect to the newly created book's detail page
       router.push(`/dashboard/books/${newBook.id}`);
     } catch (error) {
-      console.error('Error creating book:', error);
+      const classified = classifyError(error, 'Creating book');
+      showErrorNotification(classified, { onRetry: () => handleSubmit(e) });
     } finally {
       setIsSubmitting(false);
     }

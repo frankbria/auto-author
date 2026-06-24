@@ -11,7 +11,7 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { bookCreationSchema, BookFormData } from '@/lib/schemas/bookSchema';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import Image from 'next/image';
 import { BookMetadataForm } from '@/components/BookMetadataForm';
 import { ChapterTabs } from '@/components/chapters/ChapterTabs';
@@ -239,7 +239,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
         context: `Export ${options.format.toUpperCase()}`,
         onRetry: (attempt, error) => {
           setExportProgress(0);
-          toast.info(`Retrying export (attempt ${attempt})...`);
+          toast.info({ title: `Retrying export (attempt ${attempt})...` });
         },
         onSuccess: (attempts) => {
           if (attempts > 1) {
@@ -262,7 +262,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
 
       // Update status to completed
       setExportStatus('completed');
-      toast.success(`${options.format.toUpperCase()} exported successfully!`);
+      toast.success({ title: `${options.format.toUpperCase()} exported successfully!` });
     } else if (result.error) {
       // Error occurred
       setExportStatus('failed');
@@ -300,9 +300,9 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           target_audience: values.target_audience,
           cover_image_url: values.cover_image_url,
         });
-        toast.success('Book info saved');
+        toast.success({ title: 'Book info saved' });
       } catch {
-        toast.error('Failed to save book info');
+        toast.error({ title: 'Failed to save book info' });
       } finally {
         setIsSaving(false);
       }
@@ -507,10 +507,10 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
                 setIsSaving(true);
                 try {
                   await bookClient.updateBook(book.id, values);
-                  toast.success('Book info saved');
+                  toast.success({ title: 'Book info saved' });
                   setBook({ ...book, ...values });
                 } catch {
-                  toast.error('Failed to save book info');
+                  toast.error({ title: 'Failed to save book info' });
                 } finally {
                   setIsSaving(false);
                 }

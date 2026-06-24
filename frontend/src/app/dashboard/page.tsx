@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { useSession } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -66,7 +66,7 @@ export default function Dashboard() {
   };
 
   const handleBookCreated = (bookId: string) => {
-    toast.success('Your book has been created! Click "Open Project" to start writing.');
+    toast.success({ title: 'Your book has been created! Click "Open Project" to start writing.' });
     fetchBooks();  // Refresh the list of books
 
     // Redirect after a short delay to allow the user to see the success toast
@@ -79,13 +79,13 @@ export default function Dashboard() {
     try {
       // Cookie-based authentication - no token provider needed
       await bookClient.deleteBook(bookId);
-      toast.success('Book deleted successfully');
+      toast.success({ title: 'Book deleted successfully' });
 
       // Update the local state to remove the deleted book
       setProjects(prevProjects => prevProjects.filter(book => book.id !== bookId));
     } catch (err) {
       console.error('Error deleting book:', err);
-      toast.error('Failed to delete book. Please try again.');
+      toast.error({ title: 'Failed to delete book. Please try again.' });
     }
   };
 

@@ -13,18 +13,23 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { bookClient } from '@/lib/api/bookClient';
 import QuestionDisplay from '@/components/chapters/questions/QuestionDisplay';
+import { toast } from '@/lib/toast';
 import { Question, QuestionType, QuestionDifficulty, ResponseStatus } from '@/types/chapter-questions';
 
 // Mock the bookClient
 jest.mock('@/lib/api/bookClient');
 
-// Mock toast
-const mockToast = jest.fn();
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({
-    toast: mockToast,
+// Mock toast. The component calls the base toast({...}) imported from
+// '@/lib/toast', so mock that module with a callable toast.
+jest.mock('@/lib/toast', () => ({
+  toast: Object.assign(jest.fn(), {
+    success: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
   }),
 }));
+const mockToast = toast as unknown as jest.Mock;
 
 // Sample question data
 const sampleQuestion: Question = {

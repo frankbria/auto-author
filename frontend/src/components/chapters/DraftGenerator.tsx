@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { SparklesIcon, Loading03Icon, AlertCircleIcon, File01Icon } from '@hugeicons/core-free-icons';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import bookClient from '@/lib/api/bookClient';
 import { cn } from '@/lib/utils';
@@ -93,7 +93,6 @@ export function DraftGenerator({
       ALLOWED_ATTR: ['class']
     });
   }, [generatedDraft]);
-  const { toast } = useToast();
 
   const handleResponseChange = (index: number, value: string) => {
     const newResponses = [...questionResponses];

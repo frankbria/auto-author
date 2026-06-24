@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { bookCreationSchema, BookFormData } from '@/lib/schemas/bookSchema';
 import bookClient from '@/lib/api/bookClient';
 import { Button } from '@/components/ui/button';
@@ -86,7 +86,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
         target_audience: data.target_audience, // pass as targetAudience for API compatibility
         cover_image_url: data.cover_image_url,
       });
-      toast.success('Book created successfully!');
+      toast.success({ title: 'Book created successfully!' });
       form.reset();
       onOpenChange(false);
       if (onSuccess) {
@@ -96,7 +96,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
       }
     } catch (error) {
       console.error('Error creating book:', error);
-      toast.error('Failed to create book. Please try again.');
+      toast.error({ title: 'Failed to create book. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
