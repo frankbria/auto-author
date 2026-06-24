@@ -1,16 +1,22 @@
 """
 Test Export Service functionality
 """
+import asyncio
 import pytest
 from io import BytesIO
-from app.services.export_service import export_service
+from unittest.mock import patch
+from app.services.export_service import (
+    export_service,
+    ExportValidationError,
+    ExportTimeoutError,
+)
 from reportlab.pdfgen import canvas
 from docx import Document
 
 
 class TestExportService:
     """Test the export service functionality."""
-    
+
     @pytest.fixture
     def sample_book_data(self):
         """Sample book data for testing."""
@@ -33,7 +39,7 @@ class TestExportService:
                         "word_count": 100
                     },
                     {
-                        "id": "ch2", 
+                        "id": "ch2",
                         "title": "Chapter Two",
                         "description": "The plot thickens",
                         "content": "<h2>Chapter 2</h2><p>This chapter has a <em>different</em> heading level.</p><ul><li>Item 1</li><li>Item 2</li></ul>",
@@ -63,20 +69,20 @@ class TestExportService:
                 ]
             }
         }
-    
+
     def test_clean_html_content(self):
         """Test HTML to text conversion."""
         html = "<h1>Title</h1><p>This is a <strong>bold</strong> paragraph.</p>"
         result = export_service._clean_html_content(html)
-        
+
         assert "# Title" in result
         assert "This is a **bold** paragraph." in result
-    
+
     def test_extract_text_formatting(self):
         """Test text formatting extraction."""
         content = "<h1>Main Title</h1><p>Normal paragraph.</p><h2>Subtitle</h2>"
         formatted = export_service._extract_text_formatting(content)
-        
+
         assert len(formatted) == 3
         assert formatted[0]['text'] == "Main Title"
         assert formatted[0]['style'] == 'heading1'
@@ -84,7 +90,7 @@ class TestExportService:
         assert formatted[1]['style'] == 'normal'
         assert formatted[2]['text'] == "Subtitle"
         assert formatted[2]['style'] == 'heading2'
-    
+
     def test_flatten_chapters(self):
         """Test chapter flattening for nested structures."""
         chapters = [
@@ -98,45 +104,45 @@ class TestExportService:
             },
             {"id": "2", "title": "Chapter 2"}
         ]
-        
+
         flattened = export_service._flatten_chapters(chapters)
-        
+
         assert len(flattened) == 4
         assert flattened[0]['level'] == 1
         assert flattened[1]['level'] == 2
         assert flattened[2]['level'] == 2
         assert flattened[3]['level'] == 1
-    
+
     @pytest.mark.asyncio
     async def test_generate_pdf(self, sample_book_data):
         """Test PDF generation."""
         chapters = sample_book_data['table_of_contents']['chapters'][:2]  # Use first 2 chapters
-        
+
         pdf_bytes = await export_service.generate_pdf(
             sample_book_data,
             chapters,
             page_size="letter"
         )
-        
+
         assert isinstance(pdf_bytes, bytes)
         assert len(pdf_bytes) > 1000  # Should have substantial content
         assert pdf_bytes.startswith(b'%PDF')  # PDF magic number
-    
+
     @pytest.mark.asyncio
     async def test_generate_docx(self, sample_book_data):
         """Test DOCX generation."""
         chapters = sample_book_data['table_of_contents']['chapters'][:2]  # Use first 2 chapters
-        
+
         docx_bytes = await export_service.generate_docx(
             sample_book_data,
             chapters
         )
-        
+
         assert isinstance(docx_bytes, bytes)
         assert len(docx_bytes) > 1000  # Should have substantial content
         # DOCX files start with PK (ZIP format)
         assert docx_bytes.startswith(b'PK')
-    
+
     @pytest.mark.asyncio
     async def test_export_book_pdf(self, sample_book_data):
         """Test complete book export to PDF."""
@@ -145,11 +151,11 @@ class TestExportService:
             format="pdf",
             include_empty_chapters=False
         )
-        
+
         assert isinstance(pdf_bytes, bytes)
         assert len(pdf_bytes) > 1000
         assert pdf_bytes.startswith(b'%PDF')
-    
+
     @pytest.mark.asyncio
     async def test_export_book_docx(self, sample_book_data):
         """Test complete book export to DOCX."""
@@ -158,11 +164,11 @@ class TestExportService:
             format="docx",
             include_empty_chapters=True
         )
-        
+
         assert isinstance(docx_bytes, bytes)
         assert len(docx_bytes) > 1000
         assert docx_bytes.startswith(b'PK')
-    
+
     @pytest.mark.asyncio
     async def test_export_exclude_empty_chapters(self, sample_book_data):
         """Test that empty chapters are excluded when requested."""
@@ -172,12 +178,12 @@ class TestExportService:
             format="pdf",
             include_empty_chapters=False
         )
-        
+
         # The PDF should not contain "Empty Chapter" text
         # This is a basic check - in reality you'd parse the PDF
         assert b"Empty Chapter" not in pdf_bytes
-    
-    @pytest.mark.asyncio 
+
+    @pytest.mark.asyncio
     async def test_export_invalid_format(self, sample_book_data):
         """Test that invalid format raises error."""
         with pytest.raises(ValueError, match="Unsupported export format"):
@@ -185,25 +191,104 @@ class TestExportService:
                 sample_book_data,
                 format="invalid"
             )
-    
+
     @pytest.mark.asyncio
     async def test_export_with_no_content(self):
-        """Test export with minimal book data."""
+        """A book with no chapters is rejected with a clear validation error."""
         minimal_book = {
             "title": "Empty Book",
             "table_of_contents": {
                 "chapters": []
             }
         }
-        
+
+        with pytest.raises(ExportValidationError) as exc:
+            await export_service.export_book(minimal_book, format="pdf")
+        assert "no chapters" in str(exc.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_export_empty_chapters_rejected_unless_included(self):
+        """Chapters that exist but have no content are rejected by default,
+        but exportable when include_empty_chapters is set."""
+        book = {
+            "title": "Outline Only",
+            "table_of_contents": {
+                "chapters": [
+                    {"id": "1", "title": "Ch One", "content": "", "order": 1}
+                ]
+            },
+        }
+
+        with pytest.raises(ExportValidationError) as exc:
+            await export_service.export_book(book, format="pdf")
+        assert "no chapter content" in str(exc.value).lower()
+
         pdf_bytes = await export_service.export_book(
-            minimal_book,
-            format="pdf"
+            book, format="pdf", include_empty_chapters=True
         )
-        
-        assert isinstance(pdf_bytes, bytes)
-        assert pdf_bytes.startswith(b'%PDF')
-    
+        assert pdf_bytes.startswith(b"%PDF")
+
+    @pytest.mark.asyncio
+    async def test_book_stats_counts_words_and_pages(self):
+        """book_stats reports chapter counts, word count, and estimated pages."""
+        book = {
+            "title": "Stats Book",
+            "table_of_contents": {
+                "chapters": [
+                    {"id": "1", "title": "A",
+                     "content": "<p>one two three four five</p>", "order": 1},
+                    {"id": "2", "title": "B", "content": "", "order": 2},
+                ]
+            },
+        }
+        stats = export_service.book_stats(book)
+        assert stats["total_chapters"] == 2
+        assert stats["chapters_with_content"] == 1
+        assert stats["total_word_count"] == 5
+        assert stats["estimated_pages"] >= 1
+
+    @pytest.mark.asyncio
+    async def test_export_times_out_for_slow_generation(self):
+        """A generation that exceeds the timeout raises ExportTimeoutError."""
+        book = {
+            "title": "Slow Book",
+            "table_of_contents": {
+                "chapters": [
+                    {"id": "1", "title": "A", "content": "<p>hi</p>", "order": 1}
+                ]
+            },
+        }
+
+        async def slow_pdf(*args, **kwargs):
+            await asyncio.sleep(0.2)
+            return b"%PDF-never"
+
+        with patch.object(export_service, "generate_pdf", side_effect=slow_pdf):
+            with pytest.raises(ExportTimeoutError):
+                await export_service.export_book(
+                    book, format="pdf", timeout_seconds=0.01
+                )
+
+    @pytest.mark.asyncio
+    async def test_export_large_book_succeeds(self):
+        """A large book (100+ chapters) exports successfully within budget."""
+        chapters = [
+            {
+                "id": str(i),
+                "title": f"Chapter {i}",
+                "content": f"<p>Content for chapter {i} with several words.</p>",
+                "order": i,
+            }
+            for i in range(1, 121)
+        ]
+        book = {"title": "Big Book", "table_of_contents": {"chapters": chapters}}
+
+        pdf_bytes = await export_service.export_book(
+            book, format="pdf", timeout_seconds=60
+        )
+        assert pdf_bytes.startswith(b"%PDF")
+        assert len(pdf_bytes) > 1000
+
     @pytest.mark.asyncio
     async def test_export_special_characters(self):
         """Test export with special characters in content."""
@@ -219,11 +304,11 @@ class TestExportService:
                 }]
             }
         }
-        
+
         # Should not raise any errors
         pdf_bytes = await export_service.export_book(book_data, format="pdf")
         assert isinstance(pdf_bytes, bytes)
-        
+
         docx_bytes = await export_service.export_book(book_data, format="docx")
         assert isinstance(docx_bytes, bytes)
 

@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     AI_CACHE_ENABLED: bool = True
     AI_MAX_RETRIES: int = 3
 
+    # Export Settings
+    EXPORT_TIMEOUT_SECONDS: int = 120  # Hard cap on a single export's generation
+
     # AWS Settings (Optional - for transcription and storage)
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
