@@ -6,7 +6,7 @@ JWT-based authentication has been removed - all auth is now cookie/session-based
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock, PropertyMock
+from unittest.mock import Mock, patch, PropertyMock
 from fastapi import HTTPException, Request
 
 from app.core.security import (
@@ -219,6 +219,88 @@ class TestGetCurrentUserFromSession:
 
         assert result == created_user
         mock_create_user.assert_called_once()
+
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.security.get_better_auth_user")
+    @patch("app.db.user.get_user_by_auth_id")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_from_session_db_error(
+        self, mock_settings, mock_get_user, mock_get_auth_user, mock_validate
+    ):
+        """DB error while fetching the application user surfaces as a 500."""
+        mock_settings.BYPASS_AUTH = False
+        mock_validate.return_value = {"userId": "user_123"}
+        mock_get_auth_user.return_value = {"id": "user_123", "email": "test@example.com"}
+        mock_get_user.side_effect = Exception("connection lost")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user_from_session(Mock(spec=Request))
+
+        assert exc_info.value.status_code == 500
+        assert "Error fetching user" in exc_info.value.detail
+
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.security.get_better_auth_user")
+    @patch("app.db.user.get_user_by_auth_id")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_from_session_unknown_user(
+        self, mock_settings, mock_get_user, mock_get_auth_user, mock_validate
+    ):
+        """Valid session but user missing from both backend and better-auth -> 401."""
+        mock_settings.BYPASS_AUTH = False
+        mock_validate.return_value = {"userId": "user_123"}
+        mock_get_user.return_value = None
+        mock_get_auth_user.return_value = None
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user_from_session(Mock(spec=Request))
+
+        assert exc_info.value.status_code == 401
+        assert "User not found" in exc_info.value.detail
+
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.security.get_better_auth_user")
+    @patch("app.db.user.get_user_by_auth_id")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_from_session_auto_create_missing_email(
+        self, mock_settings, mock_get_user, mock_get_auth_user, mock_validate
+    ):
+        """Auto-create aborts with 400 when better-auth user has no email."""
+        mock_settings.BYPASS_AUTH = False
+        mock_validate.return_value = {"userId": "user_123"}
+        mock_get_user.return_value = None
+        mock_get_auth_user.return_value = {"id": "user_123", "name": "No Email"}
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user_from_session(Mock(spec=Request))
+
+        assert exc_info.value.status_code == 400
+        assert "missing email" in exc_info.value.detail
+
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.security.get_better_auth_user")
+    @patch("app.db.user.get_user_by_auth_id")
+    @patch("app.db.user.create_user")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_from_session_auto_create_failure(
+        self, mock_settings, mock_create_user, mock_get_user, mock_get_auth_user, mock_validate
+    ):
+        """A failure during auto-create surfaces as a 500."""
+        mock_settings.BYPASS_AUTH = False
+        mock_validate.return_value = {"userId": "user_123"}
+        mock_get_user.return_value = None
+        mock_get_auth_user.return_value = {
+            "id": "user_123",
+            "email": "test@example.com",
+            "name": "Test User",
+        }
+        mock_create_user.side_effect = Exception("insert failed")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user_from_session(Mock(spec=Request))
+
+        assert exc_info.value.status_code == 500
+        assert "Failed to create user account" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
