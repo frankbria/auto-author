@@ -4,7 +4,7 @@ import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/auth-client';
 import bookClient from '@/lib/api/bookClient';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { BookProject } from '@/components/BookCard';
 import { LoadingStateManager } from '@/components/loading';
 import { createProgressTracker } from '@/lib/loading';
@@ -94,7 +94,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
 
       } catch (error) {
         console.error('Error fetching book details:', error);
-        toast.error('Failed to load export options. Please try again.');
+        toast.error({ title: 'Failed to load export options. Please try again.' });
       } finally {
         setIsLoading(false);
       }
@@ -105,7 +105,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
   const handleExport = async () => {
 
     if (!selectedFormat) {
-      toast.error('Please select an export format');
+      toast.error({ title: 'Please select an export format' });
       return;
     }
 
@@ -124,7 +124,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
           includeEmptyChapters
         });
       } else {
-        toast.error('This export format is not yet implemented');
+        toast.error({ title: 'This export format is not yet implemented' });
         setIsExporting(false);
         return;
       }
@@ -133,7 +133,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
       setExportComplete(true);
     } catch (error) {
       console.error('Error exporting book:', error);
-      toast.error('Failed to export book. Please try again.');
+      toast.error({ title: 'Failed to export book. Please try again.' });
       setIsExporting(false);
     }
   };
@@ -151,7 +151,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
 
-    toast.success('Download started!');
+    toast.success({ title: 'Download started!' });
   };
 
   const getStatusColor = (status: string) => {

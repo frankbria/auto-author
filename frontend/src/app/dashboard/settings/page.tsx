@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useCallback, useEffect, useState } from 'react';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { useAuthFetch } from '@/hooks/useAuthFetch';
 
 interface UserPreferences {
@@ -22,7 +22,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/a
 export default function SettingsPage() {
   const { data: session } = useSession();
   const user = session?.user;
-  const { toast } = useToast();
   const { authFetch } = useAuthFetch({ baseUrl: API_BASE_URL });
   const [emailNotifications, setEmailNotifications] = useState(true);
   // ponytail: auto-save is a client-only preference; backend has no field for it.

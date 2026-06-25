@@ -9,16 +9,18 @@ import userEvent from '@testing-library/user-event';
 import { BookCreationWizard } from '@/components/BookCreationWizard';
 import bookClient from '@/lib/api/bookClient';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 // Mock dependencies
 jest.mock('@/lib/api/bookClient');
 jest.mock('next/navigation');
-jest.mock('sonner', () => ({
-  toast: {
+jest.mock('@/lib/toast', () => ({
+  toast: Object.assign(jest.fn(), {
     success: jest.fn(),
     error: jest.fn(),
-  },
+    warning: jest.fn(),
+    info: jest.fn(),
+  }),
 }));
 
 const mockBookClient = bookClient as jest.Mocked<typeof bookClient>;
@@ -135,7 +137,7 @@ describe('BookCreationWizard', () => {
       await user.click(screen.getByRole('button', { name: /Create Book/i }));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Failed to create book. Please try again.');
+        expect(toast.error).toHaveBeenCalledWith({ title: 'Failed to create book. Please try again.' });
       });
     });
   });
@@ -365,7 +367,7 @@ describe('BookCreationWizard', () => {
       await user.click(screen.getByRole('button', { name: /Create Book/i }));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Failed to create book. Please try again.');
+        expect(toast.error).toHaveBeenCalledWith({ title: 'Failed to create book. Please try again.' });
       });
     });
 
@@ -598,7 +600,7 @@ describe('BookCreationWizard', () => {
       await user.click(screen.getByRole('button', { name: /Create Book/i }));
 
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith('Book created successfully!');
+        expect(toast.success).toHaveBeenCalledWith({ title: 'Book created successfully!' });
       });
     });
 

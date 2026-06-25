@@ -4,12 +4,19 @@ import { useSession } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import Dashboard from '@/app/dashboard/page';
 import bookClient from '@/lib/api/bookClient';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 // Mock dependencies
 jest.mock('@/lib/auth-client');
 jest.mock('@/lib/api/bookClient');
-jest.mock('sonner');
+jest.mock('@/lib/toast', () => ({
+  toast: Object.assign(jest.fn(), {
+    success: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  }),
+}));
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
@@ -255,7 +262,7 @@ describe('Dashboard - Book Deletion', () => {
     
     await waitFor(() => {
       expect(bookClient.deleteBook).toHaveBeenCalledWith('book-1');
-      expect(toast.success).toHaveBeenCalledWith('Book deleted successfully');
+      expect(toast.success).toHaveBeenCalledWith({ title: 'Book deleted successfully' });
     });
     
     // Book should be removed from the list
@@ -305,7 +312,7 @@ describe('Dashboard - Book Deletion', () => {
     fireEvent.click(confirmButton);
     
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to delete book. Please try again.');
+      expect(toast.error).toHaveBeenCalledWith({ title: 'Failed to delete book. Please try again.' });
       expect(consoleError).toHaveBeenCalledWith('Error deleting book:', expect.any(Error));
     });
     
@@ -427,9 +434,9 @@ describe('Dashboard - Book Deletion', () => {
     fireEvent.click(createBookButton);
     
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith(
-        'Your book has been created! Click "Open Project" to start writing.'
-      );
+      expect(toast.success).toHaveBeenCalledWith({
+        title: 'Your book has been created! Click "Open Project" to start writing.',
+      });
     });
   });
 
@@ -451,7 +458,7 @@ describe('Dashboard - Book Deletion', () => {
     fireEvent.click(confirmButton);
     
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to delete book. Please try again.');
+      expect(toast.error).toHaveBeenCalledWith({ title: 'Failed to delete book. Please try again.' });
     });
     
     // Dialog should close but book should remain

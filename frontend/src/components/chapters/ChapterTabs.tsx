@@ -4,7 +4,7 @@ import { useEffect, useCallback } from 'react';
 import { useChapterTabs } from '@/hooks/useChapterTabs';
 import { useTocSync } from '@/hooks/useTocSync';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import bookClient from '@/lib/api/bookClient';
 import { TabBar } from './TabBar';
 import { TabContent } from './TabContent';
@@ -21,8 +21,7 @@ interface ChapterTabsProps {
 export function ChapterTabs({ bookId, initialActiveChapter, className, orientation = 'vertical' }: ChapterTabsProps) {
   // Check if we're on a mobile device - must be called at the top level
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const { toast } = useToast();
-  
+
   const {
     state,
     actions: {
@@ -165,7 +164,7 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
         <h3 className="font-bold mb-1">Error loading chapters</h3>
         <p>{error}</p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => refreshChapters()}
           className="mt-3 px-3 py-1 bg-red-800/40 hover:bg-red-800/70 text-red-200 text-sm rounded"
         >
           Retry

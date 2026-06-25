@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ChapterTabs } from '@/components/chapters/ChapterTabs';
+import { useChapterTabs } from '@/hooks/useChapterTabs';
 
 // Mock the useChapterTabs hook
 jest.mock('@/hooks/useChapterTabs', () => ({
@@ -60,7 +61,29 @@ describe('ChapterTabs', () => {
     const { container } = render(
       <ChapterTabs bookId="test-book-id" className="custom-class" />
     );
-    
+
     expect(container.firstChild).toHaveClass('custom-class');
+  });
+
+  it('retry on load error refreshes chapters instead of reloading the page', () => {
+    const refreshChapters = jest.fn();
+    (useChapterTabs as jest.Mock).mockReturnValueOnce({
+      state: { chapters: [], active_chapter_id: null, tab_order: [], unsaved_changes: {} },
+      actions: {
+        setActiveChapter: jest.fn(),
+        reorderTabs: jest.fn(),
+        closeTab: jest.fn(),
+        updateChapterStatus: jest.fn(),
+        saveTabState: jest.fn(),
+        refreshChapters,
+      },
+      loading: false,
+      error: 'Failed to load chapters',
+    });
+
+    render(<ChapterTabs bookId="test-book-id" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(refreshChapters).toHaveBeenCalledTimes(1);
   });
 });

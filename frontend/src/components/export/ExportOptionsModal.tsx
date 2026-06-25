@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Download01Icon, File01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   Dialog,
   DialogContent,
@@ -87,7 +87,7 @@ export function ExportOptionsModal({
       setStats(response.book_stats);
     } catch (error) {
       console.error('Failed to load book statistics:', error);
-      toast.error('Failed to load book information');
+      toast.error({ title: 'Failed to load book information' });
     } finally {
       setLoadingStats(false);
     }

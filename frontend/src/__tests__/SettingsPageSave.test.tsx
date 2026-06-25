@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SettingsPage from '@/app/dashboard/settings/page';
+import { toast } from '@/lib/toast';
 
 // Mock auth session
 jest.mock('@/lib/auth-client', () => ({
@@ -8,11 +9,17 @@ jest.mock('@/lib/auth-client', () => ({
   })),
 }));
 
-// Capture toast calls
-const mockToast = jest.fn();
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({ toast: mockToast }),
+// Capture toast calls. The component calls the base toast({ title, variant })
+// imported from '@/lib/toast', so mock that module with a callable toast.
+jest.mock('@/lib/toast', () => ({
+  toast: Object.assign(jest.fn(), {
+    success: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  }),
 }));
+const mockToast = toast as unknown as jest.Mock;
 
 // Mock the authenticated fetch hook
 const mockAuthFetch = jest.fn();

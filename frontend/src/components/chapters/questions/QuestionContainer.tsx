@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { bookClient } from '@/lib/api/bookClient';
 import {
   Question,
@@ -38,8 +38,6 @@ export default function QuestionContainer({
   onDraftGenerated,
   onSwitchToEditor
 }: QuestionContainerProps) {
-  const { toast } = useToast();
-
   // State
   const [questions, setQuestions] = useState<Question[]>([]);
   const [cachedQuestions, setCachedQuestions] = useState<Question[]>([]);

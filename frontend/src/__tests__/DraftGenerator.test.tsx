@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DraftGenerator } from '@/components/chapters/DraftGenerator';
 import bookClient from '@/lib/api/bookClient';
+import { toast } from '@/lib/toast';
 // Mock the bookClient
 jest.mock('@/lib/api/bookClient', () => ({
   __esModule: true,
@@ -11,13 +12,17 @@ jest.mock('@/lib/api/bookClient', () => ({
   },
 }));
 
-// Mock the toast hook
-const mockToast = jest.fn();
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({
-    toast: mockToast,
+// Mock the toast wrapper. The component calls the base toast({...}) imported
+// from '@/lib/toast', so mock that module with a callable toast.
+jest.mock('@/lib/toast', () => ({
+  toast: Object.assign(jest.fn(), {
+    success: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
   }),
 }));
+const mockToast = toast as unknown as jest.Mock;
 
 describe('DraftGenerator', () => {
   const defaultProps = {

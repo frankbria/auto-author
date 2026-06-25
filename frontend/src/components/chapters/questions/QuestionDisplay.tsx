@@ -28,7 +28,7 @@ import { VoiceTextInput } from '@/components/chapters/VoiceTextInput';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { retryQueue } from '@/lib/utils/retryQueue';
 import { ErrorHandler, classifyError, ErrorType } from '@/lib/errors/errorHandler';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 
 interface QuestionDisplayProps {
   bookId: string;
@@ -49,9 +49,6 @@ export default function QuestionDisplay({
   onResponseSaved,
   onRegenerateQuestion
 }: QuestionDisplayProps) {
-  // Toast for notifications
-  const { toast } = useToast();
-
   // State for response text
   const [responseText, setResponseText] = useState('');
   // State for auto-saving

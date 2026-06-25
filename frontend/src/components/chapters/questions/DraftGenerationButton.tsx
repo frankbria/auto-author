@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { SparklesIcon, AlertCircleIcon, CheckmarkCircle01Icon, PencilEdit01Icon } from '@hugeicons/core-free-icons';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { bookClient } from '@/lib/api/bookClient';
 import { LoadingStateManager } from '@/components/loading';
 import { createProgressTracker } from '@/lib/loading';
@@ -67,8 +67,6 @@ export function DraftGenerationButton({
   className,
   minimumResponses = 3
 }: DraftGenerationButtonProps) {
-  const { toast } = useToast();
-
   // Dialog state
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<'options' | 'generating' | 'preview'>('options');

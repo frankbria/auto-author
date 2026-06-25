@@ -1,34 +1,19 @@
-# Issue #44 — Wire up broken/stubbed UI elements
+# Issue #46 — Comprehensive error feedback to UI
 
-Adapted from Traycer + CodeRabbit plans to the **actual** current code state
-(tabs/tooltip/radio-group/progress UI primitives already exist from PRs #78/#79).
+## Ground truth (verified in codebase, not the stale issue body)
+- Error infra exists & is solid: `@/lib/errors` (`classifyError`, `handleApiCall`, `ClassifiedError`), `@/components/errors` (`ErrorNotification`, `showErrorNotification`), `@/components/loading/LoadingStateManager`.
+- `@/lib/toast` wrapper exists but is imported **nowhere**. Code uses `sonner` direct + `useToast()` hook. **All three render through the same sonner `<Toaster>`** → notifications already look identical to users.
+- Issue body paths are stale (`src/utils/...`, `new-book/page.tsx`). Real paths verified below.
 
-## Scope (4 genuinely-broken items)
+## Real user-facing gaps (CORE — recommended)
+1. **Duplicate Toaster** — `src/app/layout.tsx` mounts both `<Toaster/>` (ui/toaster) and `<SonnerToaster/>` (ui/sonner). Two sonner Toasters = duplicate toasts. → remove one (keep `SonnerToaster`, theme-aware).
+2. **new-book silent failure** — `src/app/dashboard/new-book/page.tsx` catch only `console.error`s. Loading state already exists. → add error feedback (`showErrorNotification` + `classifyError`) and success toast.
+3. **ChapterTabs heavy retry** — `src/components/chapters/ChapterTabs.tsx` error state uses `window.location.reload()`. `refreshChapters()` already destructured. → swap reload→refreshChapters; reuse `ErrorNotification` for the error block.
 
-### 1. Settings page save (`frontend/src/app/dashboard/settings/page.tsx`)
-- `handleSaveSettings` is a TODO that only toasts. Wire to `PATCH /api/v1/users/me`.
-- Use `useAuthFetch` hook (cookie auth, `credentials: 'include'`).
-- Map: `darkMode` → `preferences.theme` ('dark'|'light'), `emailNotifications` → `preferences.email_notifications`.
-- Loading state + error toast. autoSave/font-size/interval stay client-only (no backend fields).
+## Optional (STANDARDIZATION — churn, low user value)
+- Migrate `sonner`/`useToast` imports → `@/lib/toast` across dashboard/page, book-detail, export, settings, Draft*/Question* components. Pure import churn, no visual change, breaks ~10 test files that mock `sonner`/`useToast`. Acceptance "consistent UI" already met visually.
 
-### 2. QuestionGenerator (`.../questions/QuestionGenerator.tsx`)
-- Delete inline stubs (lines 11-52).
-- Import real `RadioGroup`/`RadioGroupItem` + `Tooltip*` (exist).
-- Create `ui/checkbox.tsx` + `ui/slider.tsx` (shadcn pattern, lucide-react icon like radio-group); add deps `@radix-ui/react-checkbox`, `@radix-ui/react-slider`.
-
-### 3. QuestionProgress (`.../questions/QuestionProgress.tsx`)
-- Delete stub `Progress` → import `@/components/ui/progress`.
-- Delete `StubTooltip` → use real `Tooltip` (already imported).
-
-### 4. Chapter tab Edit action
-- `TabContextMenu.tsx`: add `onEdit?`, Edit button calls `onEdit(chapterId)` (not console.log), gate on prop.
-- `ChapterTabs.tsx` (line 225): pass `chapterId={state.active_chapter_id}` + `onEdit={setActiveChapter}`.
-
-## Process
-- TDD where it adds value (settings save, context menu edit, checkbox/slider).
-- Branch: `fix/issue-44-broken-ui-elements`.
-- Gates: lint, typecheck, unit tests, lockfile sync, cross-family review, demo, CI.
-
-## Out of scope
-- Backend (PATCH /users/me already works).
-- autoSave/font-size persistence (no backend support — kept client-side).
+## Tests
+- new-book: add test asserting error feedback on createBook rejection + success path.
+- ChapterTabs: retry calls refreshChapters (not reload).
+- layout: single Toaster mounted.

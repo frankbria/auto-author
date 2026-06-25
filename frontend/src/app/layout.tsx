@@ -2,7 +2,6 @@
 
 import { Nunito_Sans } from 'next/font/google';
 import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { WebVitalsInit } from '@/components/performance/WebVitalsInit';
@@ -41,7 +40,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main className="flex flex-col min-h-screen">
               {/* Placeholder for future header/sidebar */}
               <div className="flex-1 flex flex-col">{children}</div>
-              <Toaster />
               <SonnerToaster />
             </main>
           </ErrorBoundary>
