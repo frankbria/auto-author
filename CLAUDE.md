@@ -30,6 +30,15 @@
 
 ## Recent Changes
 
+### 2026-06-24
+- **Error/Success Feedback Unification (#46)**: Closed user-facing feedback gaps and standardized the notification path
+  - **Duplicate Toaster**: `layout.tsx` mounted two sonner Toasters → duplicate toasts; removed the redundant one, kept theme-aware `SonnerToaster`
+  - **new-book silent failure**: create errors only `console.error`'d; now classified and shown via `showErrorNotification` with a retry action, plus a success toast on create
+  - **ChapterTabs retry**: load-error "Retry" did a full `window.location.reload()`; now calls `refreshChapters()` (data refresh, no page reload)
+  - **Standardization**: all toasts route through the single `@/lib/toast` wrapper (added a `variant` compat shim); migrated 5 direct-`sonner` + 6 `useToast` call sites by import swap
+  - **Tests**: `NewBookPage.test.tsx` (success toast + redirect / error notification + no redirect), `ChapterTabs.test.tsx` (retry refreshes, no reload); migration mocks updated
+  - **Status**: ✅ Complete (PR #115)
+
 ### 2026-06-22
 - **TOC Generation Hardening (#48)**: Closed reliability gaps in the AI TOC flow
   - **analyze-summary endpoint**: now uses the same structured AI-error handling as generate-questions/generate-toc (timeouts → 503 with retry info, instead of an opaque 500)
