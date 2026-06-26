@@ -14,7 +14,16 @@ class Settings(BaseSettings):
     def mongo_connection_string(self) -> str:
         """Get MongoDB connection string, preferring MONGODB_URI over DATABASE_URL."""
         return self.MONGODB_URI if self.MONGODB_URI else self.DATABASE_URL
+    # OpenAI key. OPENAI_API_KEY is the canonical/standard name (matches the
+    # GitHub env secret); OPENAI_AUTOAUTHOR_API_KEY is the legacy app-specific
+    # name kept for backward compatibility. Use `settings.openai_api_key`.
+    OPENAI_API_KEY: str = ""
     OPENAI_AUTOAUTHOR_API_KEY: str = "test-key"  # Default for testing
+
+    @property
+    def openai_api_key(self) -> str:
+        """Resolve the OpenAI key, preferring the standard OPENAI_API_KEY."""
+        return self.OPENAI_API_KEY or self.OPENAI_AUTOAUTHOR_API_KEY
 
     # Better Auth Settings
     # CRITICAL: BETTER_AUTH_SECRET must be set in .env file

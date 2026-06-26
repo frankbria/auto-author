@@ -1,39 +1,46 @@
-# Issue #65 — Migrate UI to shadcn nova template (residual cleanup)
+# Issue #105 — Harden full staging E2E journey
 
-## Context
-Core migration **already merged in PR #73** (Dec 24): `components.json` is nova/gray/hugeicons,
-Nunito Sans font applied, 37 files already use hugeicons. Issue is still OPEN because the
-literal acceptance criteria ("no lucide-react imports", "no zinc colors") aren't fully met.
+## Root-cause finding (drives scope)
+The interview-questions Q&A loop (#54: generate → answer → persist) is **not mounted** in
+any navigable route. `QuestionContainer`/`ChapterQuestions` exist with real persistence
+(`PUT /books/{id}/chapters/{cid}/questions/{qid}/response`) but the live `ChapterEditor`
+only surfaces draft + style-transform; the only `/chapters` page is hardcoded mock data.
+**User chose: wire the Q&A UI into the editor (make #54 real), then harden + un-fixme.**
 
-## Remaining drift (the actual work)
-### A. zinc-* → gray-* (20 files) — mechanical className swap, safe
-dashboard pages (export/page, [bookId]/page, summary/page, new-book), app/page, ChapterTab,
-ai-error-handling-example, LoadingStateManager, ProgressIndicator, ChapterBreadcrumb,
-toc/{ClarifyingQuestions,ErrorDisplay,NotReadyMessage,ReadinessChecker,TocGenerating,
-TocGenerationWizard,TocReview,TocSidebar}, ui/{avatar,toaster}
+## Plan
 
-### B. lucide-react → hugeicons (14 source files) — per-usage refactor + icon mapping
-Feature code: auth/{sign-in,sign-up,reset-password,forgot-password}, PasswordRequirements,
-SessionWarning.
-Stock shadcn ui/* primitives: sheet, checkbox, sonner, breadcrumb, dialog, radio-group,
-dropdown-menu, select.  <- scope decision (see question)
-Icon map (lucide -> @hugeicons/core-free-icons): Eye->ViewIcon, EyeOff->ViewOffIcon,
-AlertCircle->Alert02Icon, CheckCircle->CheckmarkCircle01Icon, ArrowLeft->ArrowLeft01Icon,
-Mail->Mail01Icon, Check/CheckIcon->Tick02Icon, X/XIcon->Cancel01Icon, Circle->CircleIcon,
-ChevronRight->ArrowRight01Icon, ChevronDown->ArrowDown01Icon, ChevronUp->ArrowUp01Icon,
-MoreHorizontal->MoreHorizontalIcon, Clock->Clock01Icon, Shield->ShieldIcon
-(verify each name exists in v3 before use)
+### 1. Feature: mount Q&A panel in ChapterEditor
+- [ ] Add `view: 'write' | 'questions'` state + a Write / Interview Questions toggle
+- [ ] Render `<QuestionContainer bookId chapterId chapterTitle onDraftGenerated onSwitchToEditor>` in questions view
+- [ ] Keep existing toolbar/editor/footer in write view
+- [ ] Unit test: toggling renders QuestionContainer / back to editor (mock QuestionContainer)
 
-### C. Remove `lucide-react` from package.json once imports hit zero; clean test/e2e/md refs
-### D. Tests stay green + >=85% coverage; typecheck + lint + build pass
-### E. Docs: short CLAUDE.md note; verify grep shows 0 lucide / 0 zinc
+### 2. Shared, correct E2E helpers (single source of selectors)
+- [ ] `tests/e2e/staging/fixtures/journey.helpers.ts`: createBook (modal, 1500ms delayed nav),
+      addSummary (wait GET settle → fill+verify → wait save), completeTocWizard (auto readiness →
+      ClarifyingQuestions → "Generate Table of Contents" → TocReview "Accept & Continue" → /edit-toc),
+      openChapterEditor, openQuestionsPanel, generate+answer questions (wait PUT .../response)
 
-## Approach
-Mechanical/visual swaps. Rely on existing component tests + build + typecheck as the
-regression net; add/adjust tests only where a swap touches asserted markup.
+### 3. Harden specs (real selectors, web-first, network waits; no waitForTimeout / silent isVisible)
+- [ ] `regressions.spec.ts` #54: un-fixme, rewrite via helpers
+- [ ] `complete-user-journey.spec.ts`: un-fixme, rewrite full happy path incl. draft
 
-## DONE
-- 0 lucide / 0 zinc remaining; lucide-react removed from package.json + lockfile.
-- Removed obsolete frontend/backup-pre-nova/ migration backup.
-- typecheck clean, lint 0 errors, build green, 89/89 suites + 1853 tests pass,
-  coverage stmt 92 / lines 93 / func 90 / branch 83.
+### 4. Verify
+- [x] Jest unit (272 chapters tests pass) + typecheck + lint (0 errors)
+- [x] Live staging: session/401 ✓, ObjectId create ✓ (new dialog selectors), summary fill-race fix ✓
+- [ ] BLOCKED — TOC/questions/draft legs: staging OpenAI key is INVALID (401 invalid_api_key
+      on every AI call). Confirmed via authenticated analyze-summary response. **User must
+      rotate `OPENAI_AUTOAUTHOR_API_KEY` on staging.** Then deploy this branch + re-run.
+
+### 5. Backend robustness bug fixed (found while iterating)
+- [x] `analyze_book_summary` persisted FAILED analyses → permanently poisoned the readiness
+      check (has_analysis=true, meets_minimum=false). Now returns retryable 503 and does NOT
+      persist, so readiness falls back to the deterministic word/char check. +1 test.
+
+## Forbidden-pattern checklist (CLAUDE.md)
+- [x] No `page.waitForTimeout()` (only mentioned in comments)
+- [x] No silent `if (await x.isVisible())` skips
+
+## Blocker for the user
+Staging `OPENAI_AUTOAUTHOR_API_KEY` returns 401 invalid_api_key. Rotate it, then I deploy
+this branch (frontend Q&A wiring + backend fix) and re-run the full journey for the >95% gate.
