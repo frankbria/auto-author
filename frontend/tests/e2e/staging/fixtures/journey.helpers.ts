@@ -19,6 +19,24 @@ const BOOK_DETAIL_RE = /\/dashboard\/books\/[a-f0-9]+(?:[/?#]|$)/;
 const AI_TIMEOUT = 90_000;
 
 /**
+ * A detailed, well-structured summary that the AI readiness analyzer reliably
+ * judges ready (meets_minimum_requirements=true): clear topic + scope, explicit
+ * part/chapter structure, named audience, and a basic→advanced progression.
+ * A thin summary gets a (successful) "not ready" verdict and stalls the wizard.
+ */
+export const READY_SUMMARY =
+  'This is a practical, hands-on guide to machine learning for working software engineers who ' +
+  'already know how to code but have no formal ML background. The book progresses from ' +
+  'fundamentals to production. Part 1 introduces core concepts: what machine learning is, ' +
+  'supervised versus unsupervised learning, and the typical model lifecycle. Part 2 covers data ' +
+  'preparation, feature engineering, and how to split and validate datasets. Part 3 walks through ' +
+  'building and evaluating models — linear models, decision trees, and neural networks — with ' +
+  'worked Python examples in each chapter. Part 4 focuses on getting models into production: ' +
+  'packaging, serving them behind an API, monitoring for drift, and retraining. Each chapter ends ' +
+  'with exercises and a runnable example so readers can apply the material immediately. By the end, ' +
+  'an engineer can take a business problem, build a model, evaluate it honestly, and ship it.';
+
+/**
  * Create a book through the dashboard modal and return its id.
  *
  * The dashboard closes the modal and navigates to the book detail page after a

@@ -6,6 +6,7 @@ import {
   openChapterEditor,
   answerFirstChapterQuestion,
   readFirstChapterAnswer,
+  READY_SUMMARY,
 } from './fixtures/journey.helpers';
 
 /**
@@ -115,13 +116,7 @@ test.describe('Issue #83 regressions', () => {
 
     const answer = `Persistence check ${Date.now()}`;
     const bookId = await createBook(page, `E2E #54 Book ${Date.now()}`);
-    await addSummary(
-      page,
-      bookId,
-      'A regression test book about practical machine learning for working software engineers. ' +
-        'It covers supervised and unsupervised learning, model evaluation, and shipping models to production, ' +
-        'with hands-on examples in Python so readers can follow along chapter by chapter.'
-    );
+    await addSummary(page, bookId, READY_SUMMARY);
     await completeTocWizard(page);
     await openChapterEditor(page, bookId);
     await answerFirstChapterQuestion(page, answer);
