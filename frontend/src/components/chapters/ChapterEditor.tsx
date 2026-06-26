@@ -305,8 +305,18 @@ export function ChapterEditor({
   const handleRevertStyleTransform = () => {
     if (editor && preTransformContent !== null) {
       editor.commands.setContent(preTransformContent);
+      // Only mark a pending save if the restored content differs from what's
+      // saved. If the transform was reverted before its autosave fired, the
+      // chapter already matches storage — clear the dirty flags so the user
+      // isn't warned about unsaved changes for content that was never saved.
+      if (preTransformContent !== lastAutoSavedContent) {
+        setAutoSavePending(true);
+        setHasUnsavedChanges(true);
+      } else {
+        setAutoSavePending(false);
+        setHasUnsavedChanges(false);
+      }
       setPreTransformContent(null);
-      setAutoSavePending(true);
     }
   };
 

@@ -1002,10 +1002,24 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             ]
 
             response = await self._make_openai_request(
-                messages, temperature=0.7, max_tokens=2000
+                messages, temperature=0.7, max_tokens=4000
             )
 
-            transformed = response.choices[0].message.content
+            choice = response.choices[0]
+            # Refuse to return a truncated rewrite: the caller would overwrite the
+            # whole chapter with shortened text, silently losing content (#58).
+            if getattr(choice, "finish_reason", None) == "length":
+                return {
+                    "success": False,
+                    "error": (
+                        "This chapter is too long to transform in one pass. "
+                        "Try transforming a shorter section."
+                    ),
+                    "transformed": "",
+                    "metadata": {},
+                }
+
+            transformed = choice.message.content
             original_words = len(content.split())
             transformed_words = len(transformed.split())
 

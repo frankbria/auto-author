@@ -11,7 +11,10 @@ class TestAIServiceStyleTransformation:
         mock_client = Mock(spec=OpenAI)
         mock_completion = Mock()
         mock_completion.choices = [
-            Mock(message=Mock(content="The rewritten text in the requested style."))
+            Mock(
+                message=Mock(content="The rewritten text in the requested style."),
+                finish_reason="stop",
+            )
         ]
         mock_client.chat.completions.create.return_value = mock_completion
         return mock_client
@@ -59,6 +62,17 @@ class TestAIServiceStyleTransformation:
         result = await ai_service.transform_text_style(content="Hello.", target_style="creative")
         assert result["success"] is False
         assert "OpenAI down" in result["error"]
+        assert result["transformed"] == ""
+
+    @pytest.mark.asyncio
+    async def test_truncated_output_is_rejected_not_saved(self, ai_service):
+        """A length-truncated rewrite must fail, not silently overwrite the chapter."""
+        ai_service.client.chat.completions.create.return_value.choices[0].finish_reason = "length"
+        result = await ai_service.transform_text_style(
+            content="A very long chapter...", target_style="professional"
+        )
+        assert result["success"] is False
+        assert "too long" in result["error"].lower()
         assert result["transformed"] == ""
 
     @pytest.mark.asyncio
