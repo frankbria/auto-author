@@ -16,7 +16,7 @@
 * 🔁 Regeneration of TOC, prompts, and content at any stage
 
 ### User Experience
-* 🔐 Secure **user authentication** with Clerk and profile management
+* 🔐 Secure **user authentication** (better-auth) and profile management
 * 📚 Full **CRUD functionality** for books, chapters, and metadata
 * 🎤 **Voice input** support via Web Speech API (production ready)
 * 💾 **Auto-save** with 3-second debounce and localStorage backup on network failure
@@ -43,48 +43,37 @@
 | Frontend       | Next.js (TypeScript), TailwindCSS |
 | Backend API    | FastAPI                           |
 | Database       | MongoDB (Atlas or self-hosted)    |
-| Auth           | Clerk Authentication               |
+| Auth           | better-auth (cookie sessions)      |
 | AI Integration | OpenAI (or local LLM)             |
 | Voice Input    | Web Speech API / Whisper API      |
 
 ---
 
-## 🔐 Authentication with Clerk
+## 🔐 Authentication (better-auth)
 
-Auto Author uses Clerk for authentication, providing:
+Auto Author uses [better-auth](https://www.better-auth.com/) for authentication with cookie-based sessions:
 
-- Secure user registration and login
-- Social login options (Google, GitHub, etc.)
-- Multi-factor authentication
-- Email verification
-- Session management across devices
-- Password reset functionality
+- Email/password registration and login, email verification, password reset
+- httpOnly session cookies (no JWT is sent to the backend)
+- Sessions stored in MongoDB; the backend validates the session cookie on each request (see `backend/app/core/better_auth_session.py`)
 
-While Clerk manages authentication, we maintain a local user table in our MongoDB database that maps Clerk user IDs to our application's user entities. This approach allows us to:
+We keep a local user record in MongoDB keyed by the better-auth user id (`auth_id`) so books, chapters, and preferences can be associated with a user. This separates authentication concerns from application data management:
 
 1. Associate user-generated content (books, chapters, etc.) with specific users
 2. Store application-specific user preferences and metadata
 3. Implement role-based permissions within our application
 4. Maintain data relationships without exposing authentication details
 
-The architecture separates authentication concerns (handled by Clerk) from application data management (handled by our backend), creating a more secure and maintainable system.
+### Configuration
 
-### Authentication Implementation Details
+- Backend: `BETTER_AUTH_SECRET` (≥32 chars; ≥64 in production), `BETTER_AUTH_URL` — see `backend/.env.example`.
+- Frontend: `BETTER_AUTH_SECRET` (must match the backend) and `NEXT_PUBLIC_BETTER_AUTH_URL` — see `frontend/.env.example`.
+- `BYPASS_AUTH=true` enables auth bypass for local development and E2E tests only. It is rejected at startup in production.
 
-**Production Environment:**
-- JWT verification using Clerk's JWKS endpoint (`https://clerk.{domain}/.well-known/jwks.json`)
-- Secure token validation with automatic key rotation support
-- Session management with configurable timeout policies
+> Migration note: this project previously used Clerk. See `CLAUDE.md` (2025-12-17 and 2025-12-24) for migration details.
 
-**Development & Testing:**
-- Auth bypass mode available via `BYPASS_AUTH=true` environment variable
-- Enables E2E testing without real authentication credentials
-- **Security Note:** Auth bypass must NEVER be enabled in production
-
-For detailed documentation about our Clerk integration:
-- [Clerk Integration Guide](docs/clerk-integration-guide.md)
+For detailed documentation:
 - [Authentication User Guide](docs/user-guide-auth.md)
-- [Clerk Deployment Checklist](docs/clerk-deployment-checklist.md)
 - [Profile Management Guide](docs/profile-management-guide.md)
 - [API Profile Endpoints](docs/api-profile-endpoints.md)
 
@@ -151,8 +140,9 @@ Create `.env` files for both frontend and backend:
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_*****
-CLERK_SECRET_KEY=sk_*****
+# Must match the backend BETTER_AUTH_SECRET exactly
+BETTER_AUTH_SECRET=your-secure-secret-key-here-replace-with-generated-value
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 # Development only - NEVER use in production
 # BYPASS_AUTH=true
 ```
@@ -161,8 +151,8 @@ CLERK_SECRET_KEY=sk_*****
 
 ```
 MONGODB_URI=mongodb://localhost:27017/auto_author
-CLERK_SECRET_KEY=sk_*****
-CLERK_WEBHOOK_SECRET=whsec_*****
+BETTER_AUTH_SECRET=your-secure-secret-key-here-replace-with-generated-value
+BETTER_AUTH_URL=http://localhost:3000
 OPENAI_API_KEY=sk-...
 # Redis for AI caching (recommended for production)
 REDIS_URL=redis://localhost:6379/0
@@ -393,7 +383,6 @@ Auto Author comes with comprehensive documentation to help you understand and us
 - [Profile Documentation Index](docs/profile-documentation-index.md) - Complete index of profile-related docs
 
 ### Authentication & Profile Management
-- [Clerk Integration Guide](docs/clerk-integration-guide.md) - How Clerk authentication is integrated
 - [Authentication User Guide](docs/user-guide-auth.md) - User-facing authentication guide
 - [Profile Management Guide](docs/profile-management-guide.md) - Features and usage of profile management
 - [Frontend Profile Components](docs/frontend-profile-components.md) - Technical docs for profile UI components
@@ -405,7 +394,6 @@ Auto Author comes with comprehensive documentation to help you understand and us
 - [API Profile Endpoints](docs/api-profile-endpoints.md) - Profile management API documentation
 
 ### Technical Guides
-- [Clerk Deployment Checklist](docs/clerk-deployment-checklist.md) - Deployment considerations
 - [Session Management](docs/session-management.md) - How user sessions are managed
 - [Login/Logout Flows](docs/login-logout-flows.md) - Detailed authentication flows
 
@@ -446,7 +434,7 @@ auto-author/
 ## 🌟 User Workflows Supported
 
 ### Book Creation & Management
-* User authentication and profile management with Clerk
+* User authentication and profile management with better-auth
 * Create/update/delete books with metadata
 * Book dashboard with progress tracking
 * Type-to-confirm deletion with data loss warnings
@@ -506,7 +494,7 @@ auto-author/
 ## 🔧 What's New (Updated: 2025-10-29)
 
 ### Security & Authentication
-- **JWT Verification Enhancement**: Migrated from hardcoded public key to Clerk's JWKS endpoint for improved security and automatic key rotation
+- **JWT Verification Enhancement**: Migrated from hardcoded public key to Clerk's JWKS endpoint for improved security and automatic key rotation (later replaced by better-auth — see CLAUDE.md 2025-12-17)
 - **E2E Testing Support**: Added `BYPASS_AUTH=true` environment variable for authentication bypass during testing (development only)
 - **Security Audit**: Completed comprehensive authentication middleware review
 
