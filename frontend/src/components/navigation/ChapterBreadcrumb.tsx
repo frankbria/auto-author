@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
+import {
   Breadcrumb,
   BreadcrumbList,
   BreadcrumbItem,
@@ -21,12 +21,12 @@ interface ChapterBreadcrumbProps {
   showChapterContext?: boolean;
 }
 
-export function ChapterBreadcrumb({ 
-  bookId, 
+export function ChapterBreadcrumb({
+  bookId,
   bookTitle = 'Untitled Book',
   chapterId,
   chapterTitle,
-  showChapterContext = false 
+  showChapterContext = false
 }: ChapterBreadcrumbProps) {
   const pathname = usePathname();
 
@@ -44,15 +44,15 @@ export function ChapterBreadcrumb({
         {/* Dashboard */}
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link href="/dashboard" className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200">
+            <Link href="/dashboard" className="flex items-center gap-1.5 text-gray-400 hover:text-gray-200">
               <HugeiconsIcon icon={Home01Icon} size={16} />
               Dashboard
             </Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
-        
+
         <BreadcrumbSeparator />
-        
+
         {/* Book */}
         {bookId && (
           <>
@@ -60,14 +60,14 @@ export function ChapterBreadcrumb({
               <BreadcrumbLink asChild>
                 <Link
                   href={`/dashboard/books/${bookId}`}
-                  className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200"
+                  className="flex items-center gap-1.5 text-gray-400 hover:text-gray-200"
                 >
                   <HugeiconsIcon icon={Book02Icon} size={16} />
                   {bookTitle}
                 </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
-            
+
             <BreadcrumbSeparator />
           </>
         )}
@@ -75,25 +75,25 @@ export function ChapterBreadcrumb({
         {/* Current Page */}
         {isSummaryPage && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-zinc-100">Book Summary</BreadcrumbPage>
+            <BreadcrumbPage className="text-gray-100">Book Summary</BreadcrumbPage>
           </BreadcrumbItem>
         )}
-        
+
         {isGenerateTocPage && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-zinc-100">Generate TOC</BreadcrumbPage>
+            <BreadcrumbPage className="text-gray-100">Generate TOC</BreadcrumbPage>
           </BreadcrumbItem>
         )}
-        
+
         {isEditTocPage && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-zinc-100">Edit TOC</BreadcrumbPage>
+            <BreadcrumbPage className="text-gray-100">Edit TOC</BreadcrumbPage>
           </BreadcrumbItem>
         )}
-        
+
         {isExportPage && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-zinc-100">Export Book</BreadcrumbPage>
+            <BreadcrumbPage className="text-gray-100">Export Book</BreadcrumbPage>
           </BreadcrumbItem>
         )}
 
@@ -101,13 +101,13 @@ export function ChapterBreadcrumb({
         {isBookPage && showChapterContext && chapterId && chapterTitle && (
           <>
             <BreadcrumbItem>
-              <BreadcrumbPage className="text-zinc-100">Writing</BreadcrumbPage>
+              <BreadcrumbPage className="text-gray-100">Writing</BreadcrumbPage>
             </BreadcrumbItem>
-            
+
             <BreadcrumbSeparator />
-            
+
             <BreadcrumbItem>
-              <BreadcrumbPage className="text-zinc-100 flex items-center gap-1.5">
+              <BreadcrumbPage className="text-gray-100 flex items-center gap-1.5">
                 <HugeiconsIcon icon={File01Icon} size={16} />
                 {chapterTitle}
               </BreadcrumbPage>
@@ -120,30 +120,30 @@ export function ChapterBreadcrumb({
           <>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link 
+                <Link
                   href={`/dashboard/books/${bookId}?chapter=${chapterId}`}
-                  className="text-zinc-400 hover:text-zinc-200"
+                  className="text-gray-400 hover:text-gray-200"
                 >
                   Writing (Tabbed)
                 </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
-            
+
             <BreadcrumbSeparator />
-            
+
             <BreadcrumbItem>
-              <BreadcrumbPage className="text-zinc-100 flex items-center gap-1.5">
+              <BreadcrumbPage className="text-gray-100 flex items-center gap-1.5">
                 <HugeiconsIcon icon={File01Icon} size={16} />
                 {chapterTitle} (Legacy)
               </BreadcrumbPage>
             </BreadcrumbItem>
           </>
         )}
-        
+
         {/* Default book page when no specific context */}
         {isBookPage && !showChapterContext && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-zinc-100">Book Overview</BreadcrumbPage>
+            <BreadcrumbPage className="text-gray-100">Book Overview</BreadcrumbPage>
           </BreadcrumbItem>
         )}
       </BreadcrumbList>

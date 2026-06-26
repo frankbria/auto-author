@@ -30,6 +30,15 @@
 
 ## Recent Changes
 
+### 2026-06-26
+- **Nova migration residual cleanup (#65)**: finished the lucide→hugeicons + zinc→gray drift left after PR #73
+  - **Context**: PR #73 (Dec 24) already did the bulk nova migration (style/baseColor/iconLibrary in `components.json`, Nunito Sans). #65 stayed open because the literal AC ("no lucide-react imports", "no zinc colors") weren't fully met.
+  - **Icons**: converted the remaining 14 source files off `lucide-react` to `<HugeiconsIcon icon={…}/>` from `@hugeicons/core-free-icons` — 6 feature files (auth sign-in/up, reset/forgot-password, `PasswordRequirements`, `SessionWarning`) + 8 stock shadcn `ui/*` primitives (dialog, select, checkbox, dropdown-menu, sheet, radio-group, breadcrumb, sonner). Removed `lucide-react` from `package.json`/lockfile and two dead `jest.mock('lucide-react')` blocks. **Zero lucide refs remain.**
+  - **Colors**: `zinc-* → gray-*` across 20 files (mechanical className swap). **Zero zinc refs remain.**
+  - **Cleanup**: removed the now-obsolete `frontend/backup-pre-nova/` migration-backup dir (git preserves history).
+  - **Verify**: typecheck clean, lint 0 errors, prod build green (compiles every converted route), 89/89 suites + 1853 tests pass, coverage stmt 92 / lines 93 / func 90 / branch 83.
+  - **Status**: ✅ Complete
+
 ### 2026-06-25
 - **Flaky test fix + frontend coverage to 85% (#68)**: tests-mostly
   - **Flaky `TabStatePersistence`**: the "saves tab state…" case raced the 1s debounced auto-save under real timers. Now uses `jest.useFakeTimers()` + `advanceTimersByTime(1000)` and an `afterEach(jest.useRealTimers())` so it's deterministic and can't leak timer state into the full run.

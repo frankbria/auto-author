@@ -12,19 +12,19 @@ export function Toaster({ ...props }: ToasterProps) {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-zinc-900 group-[.toaster]:text-zinc-200 group-[.toaster]:border-zinc-700 group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-zinc-400",
+            "group toast group-[.toaster]:bg-gray-900 group-[.toaster]:text-gray-200 group-[.toaster]:border-gray-700 group-[.toaster]:shadow-lg",
+          description: "group-[.toast]:text-gray-400",
           actionButton:
             "group-[.toast]:bg-indigo-600 group-[.toast]:text-primary-foreground",
           cancelButton:
-            "group-[.toast]:bg-zinc-700 group-[.toast]:text-zinc-200",
+            "group-[.toast]:bg-gray-700 group-[.toast]:text-gray-200",
           success:
             "group-[.toast]:bg-green-900/20 group-[.toast]:border-green-700",
-          error: 
+          error:
             "group-[.toast]:bg-red-900/20 group-[.toast]:border-red-700",
-          info: 
+          info:
             "group-[.toast]:bg-blue-900/20 group-[.toast]:border-blue-700",
-          warning: 
+          warning:
             "group-[.toast]:bg-yellow-900/20 group-[.toast]:border-yellow-700",
         },
       }}

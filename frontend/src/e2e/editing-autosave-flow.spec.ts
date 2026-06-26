@@ -522,7 +522,7 @@ test.describe.skip('Editing & Auto-save Flow (NEEDS TEST IDS)', () => {
       );
 
       // Verify checkmark icon is present
-      // Note: lucide-react Check icon may not have text, so we verify the "Saved ✓" text contains the checkmark
+      // Note: the checkmark icon may not have text, so we verify the "Saved ✓" text contains the checkmark
 
       const savedText = await page.locator('text=/saved.*✓/i').textContent();
       expect(savedText).toContain('Saved');

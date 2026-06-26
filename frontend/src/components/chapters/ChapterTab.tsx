@@ -44,8 +44,8 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
   ({ chapter, isActive, isDragging, onSelect, onClose, orientation = 'vertical', ...props }, ref) => {
     const config = statusConfig[chapter.status];
     const statusIcon = config.icon;
-    const truncatedTitle = orientation === 'horizontal' && chapter.title.length > 20 
-      ? `${chapter.title.substring(0, 20)}...` 
+    const truncatedTitle = orientation === 'horizontal' && chapter.title.length > 20
+      ? `${chapter.title.substring(0, 20)}...`
       : chapter.title;
 
     return (
@@ -82,11 +82,11 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             }}
           >
             {/* Status Indicator */}
-            <div className={cn("w-2 h-2 rounded-full flex-shrink-0 border border-zinc-400 bg-white", config.color)} />            
+            <div className={cn("w-2 h-2 rounded-full flex-shrink-0 border border-gray-400 bg-white", config.color)} />
             {/* Chapter Title */}
             <span className={cn(
               "text-sm font-semibold truncate flex-1",
-              isActive ? "text-primary" : "text-zinc-700 hover:text-primary"
+              isActive ? "text-primary" : "text-gray-700 hover:text-primary"
             )}>
               {truncatedTitle}
             </span>
@@ -96,7 +96,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
               {chapter.has_unsaved_changes && (
                 <div className="w-1.5 h-1.5 bg-orange-500 rounded-full border border-orange-700" />
               )}
-              
+
               {chapter.is_loading && (
                 <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin bg-white" />
               )}
@@ -110,7 +110,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             <Button
               variant="ghost"
               size="sm"
-              className="h-11 w-11 p-0 border border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-destructive hover:text-destructive-foreground focus:bg-zinc-200 focus:text-zinc-900 shadow-sm"
+              className="h-11 w-11 p-0 border border-gray-300 bg-gray-100 text-gray-700 hover:bg-destructive hover:text-destructive-foreground focus:bg-gray-200 focus:text-gray-900 shadow-sm"
               style={{ opacity: 1 }}
               onClick={(e) => {
                 e.stopPropagation();

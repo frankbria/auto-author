@@ -4,7 +4,7 @@
 
 1. **BookCard Component Test** (`components/BookCard.test.tsx`)
    - ✅ Properly mocked all UI components (Card, Button, AlertDialog)
-   - ✅ Mocked lucide-react icons
+   - ✅ Mocked icon components
    - ✅ Uses data-testid for reliable element selection
    - ✅ Tests all delete functionality scenarios
 

@@ -111,11 +111,11 @@ export function ProgressIndicator({
     >
       {/* Progress text */}
       <div className={cn('flex justify-between items-center', textClasses[size])}>
-        <span className="text-zinc-300 font-medium">
+        <span className="text-gray-300 font-medium">
           {displayMessage}
         </span>
         {showPercentage && (
-          <span className="text-zinc-400">
+          <span className="text-gray-400">
             {roundedPercentage}%
           </span>
         )}
@@ -124,7 +124,7 @@ export function ProgressIndicator({
       {/* Progress bar */}
       <div
         className={cn(
-          'w-full bg-zinc-700 rounded-full overflow-hidden',
+          'w-full bg-gray-700 rounded-full overflow-hidden',
           heightClasses[size]
         )}
       >
@@ -143,7 +143,7 @@ export function ProgressIndicator({
       </div>
 
       {/* Numeric indicator */}
-      <div className={cn('text-center text-zinc-500', textClasses[size])}>
+      <div className={cn('text-center text-gray-500', textClasses[size])}>
         <span>
           {current} / {total}
         </span>
@@ -175,7 +175,7 @@ ProgressIndicator.Compact = function ProgressIndicatorCompact({
 
   return (
     <div className={cn('flex items-center gap-3', className)} role="status">
-      <div className="flex-1 bg-zinc-700 rounded-full h-1.5 overflow-hidden">
+      <div className="flex-1 bg-gray-700 rounded-full h-1.5 overflow-hidden">
         <div
           className="bg-indigo-600 h-full rounded-full transition-all duration-500 ease-out"
           style={{ width: `${percentage}%` }}
@@ -186,7 +186,7 @@ ProgressIndicator.Compact = function ProgressIndicatorCompact({
           aria-label={`Processing ${current} of ${total} ${unit} - ${roundedPercentage}% complete`}
         />
       </div>
-      <span className="text-xs text-zinc-400 whitespace-nowrap">
+      <span className="text-xs text-gray-400 whitespace-nowrap">
         {current}/{total}
       </span>
     </div>

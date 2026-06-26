@@ -19,7 +19,14 @@ import {
   PasswordRequirements,
   isPasswordValid,
 } from "@/components/auth/PasswordRequirements";
-import { CheckCircle, Eye, EyeOff, ArrowLeft, AlertCircle } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  CheckmarkCircle01Icon,
+  ViewIcon,
+  ViewOffIcon,
+  ArrowLeft01Icon,
+  Alert02Icon,
+} from "@hugeicons/core-free-icons";
 import Link from "next/link";
 
 function ResetPasswordForm() {
@@ -123,7 +130,7 @@ function ResetPasswordForm() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <HugeiconsIcon icon={CheckmarkCircle01Icon} size={24} className="text-green-600 dark:text-green-400" />
             </div>
             <CardTitle className="text-2xl">Password Reset</CardTitle>
             <CardDescription className="mt-2">
@@ -154,7 +161,7 @@ function ResetPasswordForm() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
-              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+              <HugeiconsIcon icon={Alert02Icon} size={24} className="text-red-600 dark:text-red-400" />
             </div>
             <CardTitle className="text-2xl">Invalid Reset Link</CardTitle>
             <CardDescription className="mt-2">
@@ -169,7 +176,7 @@ function ResetPasswordForm() {
               href="/auth/sign-in"
               className="flex items-center justify-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
               Back to sign in
             </Link>
           </CardFooter>
@@ -215,9 +222,9 @@ function ResetPasswordForm() {
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
+                    <HugeiconsIcon icon={ViewOffIcon} size={16} />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <HugeiconsIcon icon={ViewIcon} size={16} />
                   )}
                 </button>
               </div>
@@ -249,9 +256,9 @@ function ResetPasswordForm() {
                   }
                 >
                   {showConfirmPassword ? (
-                    <EyeOff className="h-4 w-4" />
+                    <HugeiconsIcon icon={ViewOffIcon} size={16} />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <HugeiconsIcon icon={ViewIcon} size={16} />
                   )}
                 </button>
               </div>
@@ -272,7 +279,7 @@ function ResetPasswordForm() {
               href="/auth/sign-in"
               className="flex items-center justify-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
               Back to sign in
             </Link>
           </CardFooter>

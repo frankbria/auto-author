@@ -44,12 +44,6 @@ jest.mock('@/components/EmptyBookState', () => ({
   ),
 }));
 
-// Mock lucide-react icons
-jest.mock('lucide-react', () => ({
-  PlusIcon: () => <span>Plus</span>,
-  BookIcon: () => <span>Book</span>,
-  Trash2: ({ className }: any) => <span data-testid="trash-icon" className={className}>Trash</span>,
-}));
 
 // Mock BookCard component
 jest.mock('@/components/BookCard', () => ({
@@ -57,18 +51,18 @@ jest.mock('@/components/BookCard', () => ({
   default: ({ book, onDelete }: any) => {
     const [showDialog, setShowDialog] = React.useState(false);
     const [isDeleting, setIsDeleting] = React.useState(false);
-    
+
     // Access mocked router
     const mockRouter = require('next/navigation').useRouter();
-    
+
     const handleDeleteClick = () => {
       setShowDialog(true);
     };
-    
+
     const handleOpenProject = () => {
       mockRouter.push(`/dashboard/books/${book.id}`);
     };
-    
+
     const handleConfirmDelete = async () => {
       if (!onDelete) return;
       setIsDeleting(true);
@@ -81,7 +75,7 @@ jest.mock('@/components/BookCard', () => ({
         setIsDeleting(false);
       }
     };
-    
+
     return (
       <div data-testid={`book-card-${book.id}`}>
         <h3>{book.title}</h3>
@@ -90,7 +84,7 @@ jest.mock('@/components/BookCard', () => ({
         <p>{book.progress}% progress</p>
         <button onClick={handleOpenProject}>Open Project</button>
         {onDelete && (
-          <button 
+          <button
             onClick={handleDeleteClick}
             data-testid={`delete-book-${book.id}`}
           >
@@ -102,13 +96,13 @@ jest.mock('@/components/BookCard', () => ({
             <h2>Delete Book</h2>
             <p>Are you sure you want to delete "{book.title}"? This action cannot be undone.</p>
             <p>All chapters and content will be permanently deleted.</p>
-            <button 
+            <button
               onClick={() => setShowDialog(false)}
               data-testid="cancel-delete"
             >
               Cancel
             </button>
-            <button 
+            <button
               onClick={handleConfirmDelete}
               disabled={isDeleting}
               data-testid="confirm-delete"
@@ -192,12 +186,12 @@ describe('Dashboard - Book Deletion', () => {
 
   it('should render books with delete buttons', async () => {
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
       expect(screen.getByText('Second Book')).toBeInTheDocument();
       expect(screen.getByText('Third Book')).toBeInTheDocument();
-      
+
       // Each book should have a delete button (trash icon)
       const deleteButtons = screen.getAllByTestId('trash-icon');
       expect(deleteButtons).toHaveLength(3);
@@ -206,16 +200,16 @@ describe('Dashboard - Book Deletion', () => {
 
   it('should show confirmation dialog when delete button is clicked', async () => {
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     // Find and click the first delete button
     const deleteButtons = screen.getAllByTestId('trash-icon');
     const firstDeleteButton = deleteButtons[0].closest('button')!;
     fireEvent.click(firstDeleteButton);
-    
+
     // Check confirmation dialog
     expect(screen.getByText('Delete Book')).toBeInTheDocument();
     expect(screen.getByText(/Are you sure you want to delete "First Book"\?/)).toBeInTheDocument();
@@ -224,21 +218,21 @@ describe('Dashboard - Book Deletion', () => {
 
   it('should close dialog when cancel is clicked', async () => {
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     const deleteButtons = screen.getAllByTestId('trash-icon');
     fireEvent.click(deleteButtons[0].closest('button')!);
-    
+
     const cancelButton = screen.getByTestId('cancel-delete');
     fireEvent.click(cancelButton);
-    
+
     await waitFor(() => {
       expect(screen.queryByText('Delete Book')).not.toBeInTheDocument();
     });
-    
+
     // Books should still be there
     expect(screen.getByText('First Book')).toBeInTheDocument();
     expect(screen.getByText('Second Book')).toBeInTheDocument();
@@ -247,24 +241,24 @@ describe('Dashboard - Book Deletion', () => {
 
   it('should delete book when confirmed', async () => {
     (bookClient.deleteBook as jest.Mock).mockResolvedValue(undefined);
-    
+
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     const deleteButtons = screen.getAllByTestId('trash-icon');
     fireEvent.click(deleteButtons[0].closest('button')!);
-    
+
     const confirmButton = screen.getByTestId('confirm-delete');
     fireEvent.click(confirmButton);
-    
+
     await waitFor(() => {
       expect(bookClient.deleteBook).toHaveBeenCalledWith('book-1');
       expect(toast.success).toHaveBeenCalledWith({ title: 'Book deleted successfully' });
     });
-    
+
     // Book should be removed from the list
     expect(screen.queryByText('First Book')).not.toBeInTheDocument();
     expect(screen.getByText('Second Book')).toBeInTheDocument();
@@ -275,21 +269,21 @@ describe('Dashboard - Book Deletion', () => {
     (bookClient.deleteBook as jest.Mock).mockImplementation(
       () => new Promise(resolve => setTimeout(resolve, 100))
     );
-    
+
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     const deleteButtons = screen.getAllByTestId('trash-icon');
     fireEvent.click(deleteButtons[0].closest('button')!);
-    
+
     const confirmButton = screen.getByTestId('confirm-delete');
     fireEvent.click(confirmButton);
-    
+
     expect(screen.getByText('Deleting...')).toBeInTheDocument();
-    
+
     await waitFor(() => {
       expect(screen.queryByText('Deleting...')).not.toBeInTheDocument();
     });
@@ -298,57 +292,57 @@ describe('Dashboard - Book Deletion', () => {
   it('should handle deletion errors', async () => {
     (bookClient.deleteBook as jest.Mock).mockRejectedValue(new Error('Delete failed'));
     const consoleError = jest.spyOn(console, 'error').mockImplementation();
-    
+
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     const deleteButtons = screen.getAllByTestId('trash-icon');
     fireEvent.click(deleteButtons[0].closest('button')!);
-    
+
     const confirmButton = screen.getByTestId('confirm-delete');
     fireEvent.click(confirmButton);
-    
+
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith({ title: 'Failed to delete book. Please try again.' });
       expect(consoleError).toHaveBeenCalledWith('Error deleting book:', expect.any(Error));
     });
-    
+
     // Book should still be in the list
     expect(screen.getByText('First Book')).toBeInTheDocument();
-    
+
     consoleError.mockRestore();
   });
 
   it('should delete multiple books sequentially', async () => {
     (bookClient.deleteBook as jest.Mock).mockResolvedValue(undefined);
-    
+
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     // Delete first book
     let deleteButtons = screen.getAllByTestId('trash-icon');
     fireEvent.click(deleteButtons[0].closest('button')!);
     fireEvent.click(screen.getByTestId('confirm-delete'));
-    
+
     await waitFor(() => {
       expect(screen.queryByText('First Book')).not.toBeInTheDocument();
     });
-    
+
     // Delete second book
     deleteButtons = screen.getAllByTestId('trash-icon');
     fireEvent.click(deleteButtons[0].closest('button')!); // Now this is the second book
     fireEvent.click(screen.getByTestId('confirm-delete'));
-    
+
     await waitFor(() => {
       expect(screen.queryByText('Second Book')).not.toBeInTheDocument();
     });
-    
+
     // Only third book should remain
     expect(screen.getByText('Third Book')).toBeInTheDocument();
     expect(bookClient.deleteBook).toHaveBeenCalledTimes(2);
@@ -379,15 +373,15 @@ describe('Dashboard - Book Deletion', () => {
 
   it('should not interfere with book navigation', async () => {
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     // Click on Open Project button (not delete)
     const openButtons = screen.getAllByText('Open Project');
     fireEvent.click(openButtons[0]);
-    
+
     expect(mockPush).toHaveBeenCalledWith('/dashboard/books/book-1');
     expect(screen.queryByText('Delete Book')).not.toBeInTheDocument();
   });
@@ -395,44 +389,44 @@ describe('Dashboard - Book Deletion', () => {
   it('should handle deletion when only one book exists', async () => {
     (bookClient.getUserBooks as jest.Mock).mockResolvedValue([mockBooks[0]]);
     (bookClient.deleteBook as jest.Mock).mockResolvedValue(undefined);
-    
+
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     const deleteButton = screen.getByTestId('trash-icon').closest('button')!;
     fireEvent.click(deleteButton);
-    
+
     const confirmButton = screen.getByTestId('confirm-delete');
     fireEvent.click(confirmButton);
-    
+
     await waitFor(() => {
       expect(screen.queryByText('First Book')).not.toBeInTheDocument();
     });
-    
+
     // Should show empty state after deleting the only book
     expect(screen.getByText("You haven't created any books yet")).toBeInTheDocument();
   });
 
   it('should not affect book creation functionality', async () => {
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     // Click create new book
     const createButton = screen.getByText('Create New Book');
     fireEvent.click(createButton);
-    
+
     expect(screen.getByTestId('book-creation-wizard')).toBeInTheDocument();
-    
+
     // Create a new book
     const createBookButton = screen.getByText('Create Book');
     fireEvent.click(createBookButton);
-    
+
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith({
         title: 'Your book has been created! Click "Open Project" to start writing.',
@@ -444,23 +438,23 @@ describe('Dashboard - Book Deletion', () => {
     (bookClient.deleteBook as jest.Mock).mockRejectedValue(
       new Error('Network request failed')
     );
-    
+
     render(<Dashboard />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('First Book')).toBeInTheDocument();
     });
-    
+
     const deleteButtons = screen.getAllByTestId('trash-icon');
     fireEvent.click(deleteButtons[0].closest('button')!);
-    
+
     const confirmButton = screen.getByTestId('confirm-delete');
     fireEvent.click(confirmButton);
-    
+
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith({ title: 'Failed to delete book. Please try again.' });
     });
-    
+
     // Dialog should close but book should remain
     await waitFor(() => {
       expect(screen.queryByTestId('confirmation-dialog')).not.toBeInTheDocument();

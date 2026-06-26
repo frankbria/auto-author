@@ -163,7 +163,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
       case 'final':
         return 'bg-green-600';
       default:
-        return 'bg-zinc-600';
+        return 'bg-gray-600';
     }
   };
 
@@ -176,7 +176,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
       <div className="container mx-auto flex-1 p-6 flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-          <p className="text-zinc-400">Loading export options...</p>
+          <p className="text-gray-400">Loading export options...</p>
         </div>
       </div>
     );
@@ -186,13 +186,13 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-100">Export Book</h1>
-          <p className="text-zinc-400 mt-1">{book?.title || ''}</p>
+          <h1 className="text-3xl font-bold text-gray-100">Export Book</h1>
+          <p className="text-gray-400 mt-1">{book?.title || ''}</p>
         </div>
 
         <button
           onClick={() => router.back()}
-          className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-md"
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md"
         >
           Back to Book
         </button>
@@ -200,14 +200,14 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
 
       {exportComplete ? (
         // Export Complete View
-        <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8 text-center">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
           <div className="w-16 h-16 mx-auto bg-green-900/30 rounded-full flex items-center justify-center mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-zinc-100 mb-2">Export Complete!</h2>
-          <p className="text-zinc-400 mb-6">
+          <h2 className="text-2xl font-bold text-gray-100 mb-2">Export Complete!</h2>
+          <p className="text-gray-400 mb-6">
             Your book has been successfully exported in {formats.find(f => f.format === selectedFormat)?.name} format.
           </p>
 
@@ -227,7 +227,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                 setIsExporting(false);
                 setDownloadBlob(null);
               }}
-              className="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-md"
+              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md"
             >
               Export Another Format
             </button>
@@ -237,8 +237,8 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Export Format Selection */}
           <div className="lg:col-span-2">
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold text-zinc-100 mb-4">1. Choose Export Format</h2>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold text-gray-100 mb-4">1. Choose Export Format</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {formats.map(format => (
                   <div
@@ -246,27 +246,27 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                     className={`border rounded-lg p-4 cursor-pointer transition-colors ${
                       selectedFormat === format.format
                         ? 'border-indigo-500 bg-indigo-900/20'
-                        : 'border-zinc-700 hover:bg-zinc-700/50'
+                        : 'border-gray-700 hover:bg-gray-700/50'
                     } ${!format.available ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={() => format.available && setSelectedFormat(format.format)}
                   >
                     <div className="flex items-center mb-2">
                       <span className="text-2xl mr-3">{format.icon}</span>
                       <div className="flex-1">
-                        <h3 className="font-medium text-zinc-200">{format.name}</h3>
-                        <p className="text-zinc-400 text-xs">{format.extension}</p>
+                        <h3 className="font-medium text-gray-200">{format.name}</h3>
+                        <p className="text-gray-400 text-xs">{format.extension}</p>
                       </div>
-                      <div className={`w-4 h-4 rounded-full ${selectedFormat === format.format ? 'bg-indigo-500' : 'bg-zinc-700'}`}></div>
+                      <div className={`w-4 h-4 rounded-full ${selectedFormat === format.format ? 'bg-indigo-500' : 'bg-gray-700'}`}></div>
                     </div>
-                    <p className="text-zinc-400 text-sm">{format.description}</p>
+                    <p className="text-gray-400 text-sm">{format.description}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Export Options */}
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold text-zinc-100 mb-4">2. Export Options</h2>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold text-gray-100 mb-4">2. Export Options</h2>
               <div className="space-y-4">
                 {selectedFormat === 'pdf' && (
                   <div className="space-y-4">
@@ -280,18 +280,18 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                               checked={includeEmptyChapters}
                               onChange={() => setIncludeEmptyChapters(!includeEmptyChapters)}
                             />
-                            <div className="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
+                            <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
                           </div>
                         </label>
                       </div>
                       <div className="ml-3">
-                        <h3 className="font-medium text-zinc-200">Include Empty Chapters</h3>
-                        <p className="text-zinc-400 text-sm">Export chapters that don't have content yet</p>
+                        <h3 className="font-medium text-gray-200">Include Empty Chapters</h3>
+                        <p className="text-gray-400 text-sm">Export chapters that don't have content yet</p>
                       </div>
                     </div>
 
                     <div>
-                      <h3 className="font-medium text-zinc-200 mb-2">Page Size</h3>
+                      <h3 className="font-medium text-gray-200 mb-2">Page Size</h3>
                       <div className="flex gap-4">
                         <label className="flex items-center">
                           <input
@@ -302,7 +302,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                             onChange={() => setPageSize('letter')}
                             className="mr-2"
                           />
-                          <span className="text-zinc-300">Letter (8.5" × 11")</span>
+                          <span className="text-gray-300">Letter (8.5" × 11")</span>
                         </label>
                         <label className="flex items-center">
                           <input
@@ -313,7 +313,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                             onChange={() => setPageSize('A4')}
                             className="mr-2"
                           />
-                          <span className="text-zinc-300">A4 (210mm × 297mm)</span>
+                          <span className="text-gray-300">A4 (210mm × 297mm)</span>
                         </label>
                       </div>
                     </div>
@@ -331,41 +331,41 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                             checked={includeEmptyChapters}
                             onChange={() => setIncludeEmptyChapters(!includeEmptyChapters)}
                           />
-                          <div className="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
+                          <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
                         </div>
                       </label>
                     </div>
                     <div className="ml-3">
-                      <h3 className="font-medium text-zinc-200">Include Empty Chapters</h3>
-                      <p className="text-zinc-400 text-sm">Export chapters that don't have content yet</p>
+                      <h3 className="font-medium text-gray-200">Include Empty Chapters</h3>
+                      <p className="text-gray-400 text-sm">Export chapters that don't have content yet</p>
                     </div>
                   </div>
                 )}
 
                 {!selectedFormat && (
-                  <p className="text-zinc-400 text-center py-4">Select a format to see available options</p>
+                  <p className="text-gray-400 text-center py-4">Select a format to see available options</p>
                 )}
               </div>
             </div>
 
             {/* Chapter Summary */}
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-zinc-100 mb-4">3. Chapter Information</h2>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-100 mb-4">3. Chapter Information</h2>
               <div className="space-y-3">
-                <div className="text-zinc-300">
-                  <span className="text-zinc-400">Total chapters:</span> {chapters.length}
+                <div className="text-gray-300">
+                  <span className="text-gray-400">Total chapters:</span> {chapters.length}
                 </div>
-                <div className="text-zinc-300">
-                  <span className="text-zinc-400">Chapters with content:</span> {chapters.filter(ch => ch.word_count > 0).length}
+                <div className="text-gray-300">
+                  <span className="text-gray-400">Chapters with content:</span> {chapters.filter(ch => ch.word_count > 0).length}
                 </div>
-                <div className="text-zinc-300">
-                  <span className="text-zinc-400">Total word count:</span> {chapters.reduce((sum, ch) => sum + ch.word_count, 0).toLocaleString()}
+                <div className="text-gray-300">
+                  <span className="text-gray-400">Total word count:</span> {chapters.reduce((sum, ch) => sum + ch.word_count, 0).toLocaleString()}
                 </div>
               </div>
 
               {chapters.length === 0 && (
                 <div className="text-center py-6 mt-4">
-                  <p className="text-zinc-400">No chapters found in this book.</p>
+                  <p className="text-gray-400">No chapters found in this book.</p>
                 </div>
               )}
 
@@ -381,33 +381,33 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
 
           {/* Export Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 sticky top-24">
-              <h2 className="text-xl font-semibold text-zinc-100 mb-4">Export Summary</h2>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 sticky top-24">
+              <h2 className="text-xl font-semibold text-gray-100 mb-4">Export Summary</h2>
 
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-zinc-400 text-sm">Book</h3>
-                  <p className="text-zinc-200">{book?.title || ''}</p>
+                  <h3 className="text-gray-400 text-sm">Book</h3>
+                  <p className="text-gray-200">{book?.title || ''}</p>
                 </div>
 
                 <div>
-                  <h3 className="text-zinc-400 text-sm">Format</h3>
-                  <p className="text-zinc-200">
+                  <h3 className="text-gray-400 text-sm">Format</h3>
+                  <p className="text-gray-200">
                     {formats.find(f => f.format === selectedFormat)?.name || 'Not selected'}
                   </p>
                 </div>
 
                 <div>
-                  <h3 className="text-zinc-400 text-sm">Options</h3>
+                  <h3 className="text-gray-400 text-sm">Options</h3>
                   <div className="space-y-1 mt-1">
                     {selectedFormat === 'pdf' && (
                       <>
-                        <div className="text-zinc-300 text-sm flex items-center">
+                        <div className="text-gray-300 text-sm flex items-center">
                           <div className="w-1 h-1 rounded-full bg-indigo-500 mr-2"></div>
                           Page size: {pageSize === 'letter' ? 'Letter' : 'A4'}
                         </div>
                         {includeEmptyChapters && (
-                          <div className="text-zinc-300 text-sm flex items-center">
+                          <div className="text-gray-300 text-sm flex items-center">
                             <div className="w-1 h-1 rounded-full bg-indigo-500 mr-2"></div>
                             Include empty chapters
                           </div>
@@ -415,24 +415,24 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                       </>
                     )}
                     {selectedFormat === 'docx' && includeEmptyChapters && (
-                      <div className="text-zinc-300 text-sm flex items-center">
+                      <div className="text-gray-300 text-sm flex items-center">
                         <div className="w-1 h-1 rounded-full bg-indigo-500 mr-2"></div>
                         Include empty chapters
                       </div>
                     )}
                     {!selectedFormat && (
-                      <p className="text-zinc-500 text-sm">No format selected</p>
+                      <p className="text-gray-500 text-sm">No format selected</p>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-zinc-400 text-sm">Export Details</h3>
+                  <h3 className="text-gray-400 text-sm">Export Details</h3>
                   <div className="space-y-1 mt-1">
-                    <p className="text-zinc-300 text-sm">
+                    <p className="text-gray-300 text-sm">
                       {includeEmptyChapters ? chapters.length : chapters.filter(ch => ch.word_count > 0).length} chapters
                     </p>
-                    <p className="text-zinc-300 text-sm">
+                    <p className="text-gray-300 text-sm">
                       {chapters.reduce((sum, ch) => sum + ch.word_count, 0).toLocaleString()} words
                     </p>
                   </div>
