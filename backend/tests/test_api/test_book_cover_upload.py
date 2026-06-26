@@ -121,6 +121,24 @@ class TestBookCoverUpload:
             assert call_args[0] == "https://old.example.com/old_cover.jpg"
     
     @pytest.mark.asyncio
+    async def test_upload_book_cover_wrong_owner(self, auth_client_factory, test_image):
+        """User cannot upload a cover to a book they don't own (ownership branch)."""
+        owner = await auth_client_factory(overrides={"auth_id": "owner-auth-id"})
+        owner_book = await owner.post("/api/v1/books/", json={"title": "Owned Book"})
+        assert owner_book.status_code == 201
+        book_id = owner_book.json()["id"]
+
+        intruder = await auth_client_factory(overrides={"auth_id": "intruder-auth-id"})
+        response = await intruder.post(
+            f"/api/v1/books/{book_id}/cover-image",
+            files={"file": ("cover.jpg", test_image, "image/jpeg")},
+        )
+
+        # The live endpoint merges not-found and not-owner into a single 404.
+        assert response.status_code == 404
+        assert "Book not found" in response.json()["detail"]
+
+    @pytest.mark.asyncio
     async def test_upload_book_cover_book_not_found(self, auth_client_factory, test_image):
         """Test upload fails when book doesn't exist."""
         client = await auth_client_factory()
