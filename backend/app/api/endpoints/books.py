@@ -1196,9 +1196,15 @@ async def generate_table_of_contents(
             status_code=400, detail="Book summary is required for TOC generation"
         )
 
-    # Check if question responses exist
-    question_responses = book.get("question_responses", {})
-    responses = question_responses.get("responses", [])
+    # Question responses come from the clarifying-questions wizard, which sends
+    # them in the request body ({"question_responses": [{question, answer}, ...]}).
+    # Fall back to any responses persisted on the book. Previously this only read
+    # the persisted field, but the wizard never persists them, so TOC generation
+    # always failed with "Question responses are required".
+    responses = data.get("question_responses") or []
+    if not responses:
+        persisted = book.get("question_responses", {})
+        responses = persisted.get("responses", [])
     if not responses:
         raise HTTPException(
             status_code=400, detail="Question responses are required for TOC generation"

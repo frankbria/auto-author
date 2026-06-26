@@ -87,6 +87,54 @@ async def test_generate_toc_endpoint(mock_generate_toc, async_client_factory):
 
 @pytest.mark.asyncio
 @patch("app.services.ai_service.AIService.generate_toc_from_summary_and_responses")
+async def test_generate_toc_accepts_responses_from_request_body(
+    mock_generate_toc, async_client_factory
+):
+    """The clarifying-questions wizard sends responses in the request body and
+    never persists them. generate-toc must read the body payload, not only the
+    persisted book field (regression: it always 400'd 'responses required')."""
+    mock_generate_toc.return_value = MOCK_TOC_RESPONSE
+
+    client = await async_client_factory()
+    create_resp = await client.post(
+        "/api/v1/books/",
+        json={
+            "title": "Body Responses Book",
+            "description": "Testing body-supplied question responses.",
+            "genre": "Test",
+            "target_audience": "Developers",
+        },
+    )
+    assert create_resp.status_code == 201
+    book_id = create_resp.json()["id"]
+
+    summary_resp = await client.patch(
+        f"/api/v1/books/{book_id}/summary",
+        json={"summary": "A sufficiently long summary for TOC generation testing."},
+    )
+    assert summary_resp.status_code == 200
+
+    # No PUT /question-responses — responses are provided in the body only,
+    # exactly as the ClarifyingQuestions wizard does.
+    toc_resp = await client.post(
+        f"/api/v1/books/{book_id}/generate-toc",
+        json={
+            "question_responses": [
+                {"question": "Q1", "answer": "Answer 1"},
+                {"question": "Q2", "answer": "Answer 2"},
+            ]
+        },
+    )
+    assert toc_resp.status_code == 200, toc_resp.text
+    assert toc_resp.json()["success"] is True
+    assert mock_generate_toc.called
+    assert len(mock_generate_toc.call_args[0][1]) == 2  # body responses used
+
+    await client.delete(f"/api/v1/books/{book_id}")
+
+
+@pytest.mark.asyncio
+@patch("app.services.ai_service.AIService.generate_toc_from_summary_and_responses")
 async def test_toc_generation_workflow_e2e(mock_generate_toc, async_client_factory):
     # Configure the mock to return our test TOC
     mock_generate_toc.return_value = MOCK_TOC_RESPONSE

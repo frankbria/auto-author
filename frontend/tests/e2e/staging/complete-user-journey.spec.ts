@@ -6,6 +6,7 @@ import {
   openChapterEditor,
   answerFirstChapterQuestion,
   readFirstChapterAnswer,
+  READY_SUMMARY,
 } from './fixtures/journey.helpers';
 
 /**
@@ -35,13 +36,7 @@ test.describe('Complete Authoring Journey', () => {
     expect(bookId).toMatch(/^[a-f0-9]+$/);
 
     // 2. Add a summary and advance to the TOC wizard.
-    await addSummary(
-      page,
-      bookId,
-      'A complete-journey test book about building reliable web applications. It walks readers ' +
-        'from project setup through testing, deployment, and observability, with concrete examples ' +
-        'in each chapter so the table of contents has plenty of structure to generate from.'
-    );
+    await addSummary(page, bookId, READY_SUMMARY);
 
     // 3. Generate and accept a table of contents.
     await completeTocWizard(page);
