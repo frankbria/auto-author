@@ -161,6 +161,17 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
 - Creative
 - Technical
 
+#### Transform Writing Style
+**What it does**: Rewrite existing chapter text into any of the writing styles above, preserving your facts and meaning.
+
+**How to use it**:
+1. Open a chapter that already has content in the editor
+2. Click the "Transform Style" button
+3. Choose a target style and click "Transform"
+4. Review the before/after comparison
+5. Click "Apply to Chapter" to replace the content
+6. Changed your mind? Click "Revert style" to restore the previous version
+
 #### Voice Input
 **What it does**: Write your book using your voice instead of typing.
 
