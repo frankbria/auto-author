@@ -53,6 +53,11 @@ describe('Tab State Persistence', () => {
     },
   ];
 
+  afterEach(() => {
+    // Prevent fake-timer state from leaking into other suites in the full run
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     setupTestEnvironment();
     jest.clearAllMocks();
@@ -112,9 +117,13 @@ describe('Tab State Persistence', () => {
   });
 
   test('saves tab state to localStorage and backend on state changes', async () => {
+    // Use fake timers so the 1s debounce fires deterministically. With real
+    // timers this test races other suites under load and intermittently fails.
+    jest.useFakeTimers();
+
     const { result } = renderHook(() => useChapterTabs(bookId));
 
-    // Wait for initial load
+    // Wait for initial load (waitFor advances fake timers internally)
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -124,7 +133,11 @@ describe('Tab State Persistence', () => {
       result.current.actions.setActiveChapter('ch3');
     });
 
-    // Wait for debounced save (1000ms delay) plus processing time
+    // Fire the debounced save explicitly instead of waiting on wall-clock time
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+
     await waitFor(() => {
       // Verify localStorage was updated
       expect(mockLocalStorage.setItem).toHaveBeenCalled();
@@ -136,7 +149,7 @@ describe('Tab State Persistence', () => {
           active_chapter_id: 'ch3',
         })
       );
-    }, { timeout: 3000 }); // Increase timeout to allow for 1s debounce delay
+    });
   });
 
   test('prefers backend state over localStorage when backend is newer', async () => {

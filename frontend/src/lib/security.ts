@@ -112,7 +112,7 @@ export function sanitizeFileName(fileName: string): string {
   }
   
   return fileName
-    .replace(/[^a-zA-Z0-9.-_]/g, '_') // Replace invalid characters with underscore
+    .replace(/[^a-zA-Z0-9.\-_]/g, '_') // Replace invalid characters with underscore (escape hyphen so it's a literal, not a range)
     .replace(/^\.+/, '') // Remove leading dots
     .replace(/\.+$/, '') // Remove trailing dots
     .substring(0, 255); // Limit length
