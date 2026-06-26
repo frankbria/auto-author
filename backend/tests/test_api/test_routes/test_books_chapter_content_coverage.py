@@ -477,6 +477,33 @@ async def test_get_chapter_analytics_happy_path(auth_client_factory):
     assert body["chapter_id"] == "ch1"
     assert body["analytics_period_days"] == 14
     assert isinstance(body["analytics"], list)
+    # Every returned entry belongs to the requested chapter.
+    assert all(
+        e.get("_id", {}).get("chapter_id") == "ch1" for e in body["analytics"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_chapter_analytics_filters_to_requested_chapter(auth_client_factory):
+    """The service aggregates the whole book; the route must return only ch1."""
+    api = await auth_client_factory()
+    book_id = await _create_book(api)
+    await _seed_toc(
+        api,
+        book_id,
+        [_chapter("ch1", content="text one"), _chapter("ch2", content="text two")],
+    )
+
+    # Generate read_content access logs for BOTH chapters.
+    await api.get(f"{API}/{book_id}/chapters/ch1/content")
+    await api.get(f"{API}/{book_id}/chapters/ch2/content")
+
+    r = await api.get(f"{API}/{book_id}/chapters/ch1/analytics", params={"days": 7})
+    assert r.status_code == 200, r.text
+    entries = r.json()["analytics"]
+    assert entries  # ch1 was accessed, so there is at least one entry
+    # ch2's logs must NOT leak into ch1's analytics.
+    assert all(e["_id"]["chapter_id"] == "ch1" for e in entries)
 
 
 @pytest.mark.asyncio

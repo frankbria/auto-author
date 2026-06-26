@@ -2202,10 +2202,17 @@ async def get_chapter_analytics(
 
     try:
         # Get chapter analytics
-        analytics = await chapter_access_service.get_chapter_analytics(
+        # The service aggregates analytics for the whole book; this route is
+        # chapter-specific, so keep only entries for the requested chapter.
+        book_analytics = await chapter_access_service.get_chapter_analytics(
             book_id=book_id,
             days=days,
         )
+        analytics = [
+            entry
+            for entry in book_analytics
+            if entry.get("_id", {}).get("chapter_id") == chapter_id
+        ]
 
         return {
             "book_id": book_id,
