@@ -30,6 +30,14 @@
 
 ## Recent Changes
 
+### 2026-06-25
+- **AI Draft Generation alignment (#55)**: Feature was already ~95% built; closed the real gaps the stale issue/bot plans missed
+  - **Writing styles**: both `DraftGenerator.tsx` and `DraftGenerationButton.tsx` now ship the 5 documented styles (Professional, Conversational, Academic, Creative, Technical) matching the user manual + AC, replacing the prior mismatched 6. Backend is style-agnostic (free-text into the prompt) → no backend change
+  - **Bug fix**: `DraftGenerator.tsx` loading state was unreachable (ternary checked `!generatedDraft` before `isGenerating`, so the form always rendered during generation); reordered so the loading view shows. `DraftGenerationButton.tsx` already had a correct step machine
+  - **A11y**: associated the style/length selects and the per-question input with labels in `DraftGenerator.tsx`
+  - **Tests**: added a regression test asserting the loading state renders during generation; new deterministic route-mocked E2E `frontend/src/e2e/draft-generation.spec.ts` (open → pick style → generate → preview → insert into editor)
+  - **Status**: ✅ Complete
+
 ### 2026-06-24
 - **Error/Success Feedback Unification (#46)**: Closed user-facing feedback gaps and standardized the notification path
   - **Duplicate Toaster**: `layout.tsx` mounted two sonner Toasters → duplicate toasts; removed the redundant one, kept theme-aware `SonnerToaster`
