@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { DraftGenerator } from './DraftGenerator';
 import { StyleTransformer } from './StyleTransformer';
+import QuestionContainer from './questions/QuestionContainer';
 import { useRouter } from 'next/navigation';
 import {
   validateChapterBackup,
@@ -86,6 +87,8 @@ export function ChapterEditor({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Snapshot of content before a style transform, for single-level revert (#58).
   const [preTransformContent, setPreTransformContent] = useState<string | null>(null);
+  // Toggle between writing the chapter and answering its interview questions (#105/#54).
+  const [view, setView] = useState<'write' | 'questions'>('write');
 
   const router = useRouter();
 
@@ -384,7 +387,43 @@ export function ChapterEditor({
           {error}
         </div>
       )}
-      
+
+      {/* Write / Interview Questions view toggle (#105/#54) */}
+      <div className="border-b border-border px-2 py-1 bg-muted/20 flex gap-1 items-center" role="tablist" aria-label="Chapter editor view">
+        <Button
+          size="sm"
+          variant={view === 'write' ? 'default' : 'ghost'}
+          onClick={() => setView('write')}
+          role="tab"
+          aria-selected={view === 'write'}
+          className="text-xs"
+        >
+          Write
+        </Button>
+        <Button
+          size="sm"
+          variant={view === 'questions' ? 'default' : 'ghost'}
+          onClick={() => setView('questions')}
+          role="tab"
+          aria-selected={view === 'questions'}
+          className="text-xs"
+        >
+          Interview Questions
+        </Button>
+      </div>
+
+      {view === 'questions' ? (
+        <div className="flex-1 overflow-auto">
+          <QuestionContainer
+            bookId={bookId}
+            chapterId={chapterId}
+            chapterTitle={chapterTitle}
+            onDraftGenerated={handleDraftGenerated}
+            onSwitchToEditor={() => setView('write')}
+          />
+        </div>
+      ) : (
+      <>
       {/* Editor Toolbar */}
       <div className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center justify-between">
         <div className="flex flex-wrap gap-1 items-center">
@@ -654,6 +693,8 @@ export function ChapterEditor({
           {isSaving ? 'Saving...' : 'Save'}
         </Button>
       </div>
+      </>
+      )}
     </div>
   );
 }

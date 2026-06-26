@@ -750,6 +750,22 @@ async def analyze_book_summary(
         # Analyze summary using AI service
         analysis = await ai_service.analyze_summary_for_toc(summary, book_metadata)
 
+        # A failed analysis must NOT be persisted. ai_service swallows AI errors
+        # into an error dict; storing it sets summary_analysis with
+        # meets_minimum_requirements=false, which permanently blocks the readiness
+        # check (has_analysis=true) for an otherwise-valid summary. Surface it as a
+        # retryable error and let the readiness endpoint fall back to its basic
+        # word/character-count check instead.
+        if analysis.get("error"):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "message": "Summary analysis is temporarily unavailable. Please try again.",
+                    "error_code": "AI_ANALYSIS_FAILED",
+                    "retryable": True,
+                },
+            )
+
         # Store analysis results in book record for future reference
         update_data = {
             "summary_analysis": {
@@ -766,6 +782,9 @@ async def analyze_book_summary(
             "analyzed_at": datetime.now(timezone.utc).isoformat(),
         }
 
+    except HTTPException:
+        # Don't let the generic handler below turn our 4xx/5xx into an opaque 500.
+        raise
     except AIRateLimitError as e:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

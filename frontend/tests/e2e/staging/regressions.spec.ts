@@ -1,5 +1,12 @@
 import { test, expect } from './fixtures/auth.fixture';
-import type { Page } from '@playwright/test';
+import {
+  createBook,
+  addSummary,
+  completeTocWizard,
+  openChapterEditor,
+  answerFirstChapterQuestion,
+  readFirstChapterAnswer,
+} from './fixtures/journey.helpers';
 
 /**
  * Dedicated regression tests for the bugs that motivated Issue #83.
@@ -70,20 +77,17 @@ test.describe('Issue #83 regressions', () => {
       .first()
       .click();
 
-    await page.waitForSelector('input[name="title"], input[placeholder*="title" i]', {
-      timeout: 10000,
-    });
-    await page.fill('input[name="title"], input[placeholder*="title" i]', bookTitle);
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByPlaceholder(/enter book title/i)).toBeVisible();
+    await dialog.getByPlaceholder(/enter book title/i).fill(bookTitle);
 
     // Capture the create response so we assert on the actual status, not the UI.
     const createResponse = page.waitForResponse(
-      (res) =>
-        res.url().includes('/books') &&
-        res.request().method() === 'POST',
+      (res) => res.url().includes('/books') && res.request().method() === 'POST',
       { timeout: 20000 }
     );
 
-    await page.getByRole('button', { name: /create|submit|save/i }).first().click();
+    await dialog.getByRole('button', { name: /^create book$/i }).click();
 
     const res = await createResponse;
     expect(
@@ -100,113 +104,30 @@ test.describe('Issue #83 regressions', () => {
    * Regression (Issue #54): chapter question answers were lost on page refresh.
    * Full chain: create book -> summary -> TOC -> chapter -> answer -> reload.
    *
-   * fixme: the full pipeline (book-nav, summary editor fill race, TOC wizard) is
-   * brittle against live staging. Tracked in #105. The cheap regressions above
-   * (session/401, ObjectId) pass reliably and cover 2 of the 4 #83 regressions.
+   * Reachable now that the interview-questions panel is mounted in the chapter
+   * editor (Write / Interview Questions tabs). Every step uses web-first
+   * assertions and real save round-trips — see journey.helpers.ts.
    */
-  test.fixme('Issue #54: chapter question answers persist after refresh', async ({
+  test('Issue #54: chapter question answers persist after refresh', async ({
     authenticatedPage: page,
   }) => {
-    test.setTimeout(300000);
+    test.setTimeout(300_000);
 
     const answer = `Persistence check ${Date.now()}`;
-    await createBookWithSummary(page, `E2E #54 Book ${Date.now()}`);
-    await generateToc(page);
-    await openFirstChapter(page);
-    await generateQuestions(page);
-
-    const answerField = page
-      .locator('textarea[placeholder*="answer" i], input[placeholder*="answer" i], [contenteditable="true"][data-question]')
-      .first();
-    await answerField.waitFor({ timeout: 15000 });
-
-    // Wait for the save round-trip instead of a fixed debounce timeout.
-    const saved = page.waitForResponse(
-      (res) =>
-        /\/questions\/.*\/response|\/questions\/responses\/batch/.test(res.url()) &&
-        ['POST', 'PUT', 'PATCH'].includes(res.request().method()) &&
-        res.status() < 400,
-      { timeout: 20000 }
+    const bookId = await createBook(page, `E2E #54 Book ${Date.now()}`);
+    await addSummary(
+      page,
+      bookId,
+      'A regression test book about practical machine learning for working software engineers. ' +
+        'It covers supervised and unsupervised learning, model evaluation, and shipping models to production, ' +
+        'with hands-on examples in Python so readers can follow along chapter by chapter.'
     );
-    await answerField.fill(answer);
-    await answerField.blur();
-    await saved;
+    await completeTocWizard(page);
+    await openChapterEditor(page, bookId);
+    await answerFirstChapterQuestion(page, answer);
 
     await page.reload();
-    const reloaded = page
-      .locator('textarea[placeholder*="answer" i], input[placeholder*="answer" i], [contenteditable="true"][data-question]')
-      .first();
-    await reloaded.waitFor({ timeout: 15000 });
-    const value = (await reloaded.inputValue().catch(() => reloaded.textContent())) ?? '';
-    expect(value, 'Answer was lost after refresh (Issue #54 regression)').toContain(answer);
+    const reloaded = await readFirstChapterAnswer(page);
+    expect(reloaded, 'Answer was lost after refresh (Issue #54 regression)').toContain(answer);
   });
 });
-
-// --- shared helpers (kept local; the journey spec has its own copies) ---
-
-async function createBookWithSummary(page: Page, title: string): Promise<void> {
-  await page.goto('/dashboard');
-  await page
-    .getByRole('button', { name: /create.*book|new book|add book/i })
-    .first()
-    .click();
-  await page.waitForSelector('input[name="title"], input[placeholder*="title" i]', {
-    timeout: 10000,
-  });
-  await page.fill('input[name="title"], input[placeholder*="title" i]', title);
-  await page.getByRole('button', { name: /create|submit|save/i }).first().click();
-  await page.waitForURL(/\/books\/[a-f0-9]+/, { timeout: 15000 });
-
-  await page
-    .getByRole('button', { name: /start with book summary|complete book summary|book summary/i })
-    .first()
-    .click();
-  await page.waitForURL(/\/summary/, { timeout: 10000 });
-
-  const editor = page.getByRole('textbox', { name: /book summary/i });
-  await editor.waitFor({ timeout: 10000 });
-
-  // The summary page auto-saves on a debounce (no Save button); wait for the
-  // POST /books/{id}/summary round-trip rather than an arbitrary timeout.
-  const summarySaved = page.waitForResponse(
-    (res) =>
-      /\/books\/.+\/summary/.test(res.url()) &&
-      ['POST', 'PUT', 'PATCH'].includes(res.request().method()) &&
-      res.status() < 400,
-    { timeout: 15000 }
-  );
-  await editor.fill(
-    'A regression test book summary with enough content to drive table-of-contents generation on staging.'
-  );
-  await summarySaved;
-
-  // Advance to the TOC wizard via the submit button.
-  await page.getByRole('button', { name: /continue to toc/i }).click();
-  await page.waitForURL(/\/generate-toc/, { timeout: 15000 });
-}
-
-async function generateToc(page: Page): Promise<void> {
-  // Already on the TOC wizard (/generate-toc). Kick off generation.
-  await page
-    .getByRole('button', { name: /generate.*toc|generate.*table|create.*chapters/i })
-    .first()
-    .click();
-  await page.waitForSelector('[data-testid="chapter-item"], [role="list"] li', {
-    timeout: 45000,
-  });
-}
-
-async function openFirstChapter(page: Page): Promise<void> {
-  await page.locator('[data-testid="chapter-item"], [role="list"] li').first().click();
-}
-
-async function generateQuestions(page: Page): Promise<void> {
-  const btn = page.getByRole('button', { name: /generate.*question/i });
-  if (await btn.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await btn.click();
-  }
-  await page.waitForSelector(
-    'textarea[placeholder*="answer" i], input[placeholder*="answer" i], [contenteditable="true"][data-question]',
-    { timeout: 35000 }
-  );
-}

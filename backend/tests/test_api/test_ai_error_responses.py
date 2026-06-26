@@ -305,6 +305,40 @@ class TestAnalyzeSummaryErrors:
                 assert data["detail"]["error_code"] == "AI_SERVICE_UNAVAILABLE"
                 assert data["detail"]["retry_after"] == 30
 
+    @pytest.mark.asyncio
+    async def test_analyze_error_dict_returns_503_and_is_not_persisted(
+        self, client, mock_user, mock_book
+    ):
+        """A swallowed AI error (e.g. invalid OpenAI key) returns an error dict, not
+        an exception. The endpoint must surface it as a retryable 503 and must NOT
+        persist it — a stored failed analysis permanently poisons the readiness
+        check (has_analysis=true, meets_minimum_requirements=false)."""
+        error_analysis = {
+            "is_ready_for_toc": False,
+            "confidence_score": 0.0,
+            "analysis": "Error occurred during analysis",
+            "suggestions": ["Please try again later or contact support"],
+            "error": "AI_UNEXPECTED_ERROR: 401 invalid_api_key",
+        }
+        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+            with patch(
+                'app.services.ai_service.ai_service.analyze_summary_for_toc',
+                new=AsyncMock(return_value=error_analysis),
+            ):
+                with patch(
+                    'app.api.endpoints.books.update_book', new=AsyncMock()
+                ) as mock_update:
+                    response = await client.post(
+                        "/api/v1/books/book123/analyze-summary"
+                    )
+
+                    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+                    data = response.json()
+                    assert data["detail"]["error_code"] == "AI_ANALYSIS_FAILED"
+                    assert data["detail"]["retryable"] is True
+                    # The poisoned analysis must never be written to the book.
+                    mock_update.assert_not_called()
+
 
 class TestErrorResponseStructure:
     """Test the structure of error responses."""
