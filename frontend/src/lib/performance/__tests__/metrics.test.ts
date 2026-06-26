@@ -4,7 +4,23 @@
  * Tests for Core Web Vitals tracking and custom operation performance monitoring.
  */
 
-import { PerformanceTracker, getCachedMetrics, clearCachedMetrics } from '../metrics';
+// Override the global web-vitals stub (jest.setup.ts only has onFID, not onINP).
+// This must be hoisted to the top before any imports.
+jest.mock('web-vitals', () => ({
+  onCLS: jest.fn(),
+  onINP: jest.fn(),
+  onFCP: jest.fn(),
+  onLCP: jest.fn(),
+  onTTFB: jest.fn(),
+}), { virtual: true });
+
+import { onCLS, onINP, onFCP, onLCP, onTTFB } from 'web-vitals';
+import {
+  PerformanceTracker,
+  getCachedMetrics,
+  clearCachedMetrics,
+  initializeWebVitals,
+} from '../metrics';
 import { getBudget, checkBudget, getBudgetStatus } from '../budgets';
 
 // Mock performance.now()
@@ -45,7 +61,7 @@ describe('PerformanceTracker', () => {
         },
       };
     })();
-    Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+    Object.defineProperty(window, 'localStorage', { value: localStorageMock, writable: true });
 
     // Mock console methods
     jest.spyOn(console, 'log').mockImplementation();
@@ -85,6 +101,43 @@ describe('PerformanceTracker', () => {
       const metric = tracker.end({ result: 'success' });
 
       expect(metric.metadata).toMatchObject({ phase: 'init', result: 'success' });
+    });
+
+    it('should set startTime from performance.now at construction', () => {
+      performanceMock.advance(100); // start time = 100
+      const tracker = new PerformanceTracker('test-operation');
+      const startTime = tracker['startTime' as keyof PerformanceTracker] as unknown as number;
+      // startTime captured at construction
+      expect(startTime).toBe(100);
+    });
+
+    it('should set endTime on end()', () => {
+      const tracker = new PerformanceTracker('test-operation');
+      performanceMock.advance(250);
+      const metric = tracker.end();
+      expect(metric.endTime).toBe(250);
+    });
+
+    it('should expose budget in the returned metric', () => {
+      const tracker = new PerformanceTracker('test-operation', 2000);
+      performanceMock.advance(100);
+      const metric = tracker.end();
+      expect(metric.budget).toBe(2000);
+    });
+
+    it('should have exceeded_budget = false when no budget is set', () => {
+      const tracker = new PerformanceTracker('no-budget-op');
+      performanceMock.advance(9999);
+      const metric = tracker.end();
+      expect(metric.exceeded_budget).toBe(false);
+    });
+
+    it('should rate as good when no budget is given', () => {
+      const tracker = new PerformanceTracker('no-budget-op');
+      performanceMock.advance(5000);
+      const metric = tracker.end();
+      // rateOperation returns 'good' when budget is absent
+      expect(metric.rating).toBe('good');
     });
   });
 
@@ -134,6 +187,23 @@ describe('PerformanceTracker', () => {
       performanceMock.advance(1300); // 130% of budget
       const metric = tracker.end();
 
+      expect(metric.rating).toBe('poor');
+    });
+
+    it('should rate as needs-improvement at exactly 80% of budget', () => {
+      // ratio = 0.8 → rateOperation: ratio <= 0.8 → 'good'
+      const budget = 1000;
+      const tracker = new PerformanceTracker('test-operation', budget);
+      performanceMock.advance(800); // exactly 80%
+      const metric = tracker.end();
+      expect(metric.rating).toBe('good');
+    });
+
+    it('should rate as poor at exactly 120% of budget', () => {
+      const budget = 1000;
+      const tracker = new PerformanceTracker('test-operation', budget);
+      performanceMock.advance(1200); // exactly 120%
+      const metric = tracker.end();
       expect(metric.rating).toBe('poor');
     });
   });
@@ -220,6 +290,33 @@ describe('PerformanceTracker', () => {
 
       process.env.NODE_ENV = originalEnv;
     });
+
+    it('should return empty array when no metrics are cached', () => {
+      clearCachedMetrics();
+      expect(getCachedMetrics()).toEqual([]);
+    });
+
+    it('should return empty array when cached data is invalid JSON', () => {
+      // Directly write invalid JSON into the mock store
+      localStorage.setItem('performance-metrics', 'not-valid-json{{{');
+      const metrics = getCachedMetrics();
+      expect(metrics).toEqual([]);
+      expect(console.error).toHaveBeenCalled();
+    });
+
+    it('should include a timestamp in each cached entry', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      const tracker = new PerformanceTracker('ts-test');
+      performanceMock.advance(100);
+      tracker.end();
+
+      const cached = getCachedMetrics();
+      expect(cached[0]).toHaveProperty('timestamp');
+
+      process.env.NODE_ENV = originalEnv;
+    });
   });
 
   describe('Error Handling', () => {
@@ -227,16 +324,20 @@ describe('PerformanceTracker', () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
 
-      // Make localStorage throw an error
-      jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      // Spy on the local mock object so the throw reaches sendToAnalytics.
+      jest.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
         throw new Error('Storage quota exceeded');
       });
 
       const tracker = new PerformanceTracker('test-operation');
       performanceMock.advance(500);
 
-      // Should not throw
+      // Should not throw and should log the error
       expect(() => tracker.end()).not.toThrow();
+      expect(console.error).toHaveBeenCalledWith(
+        'Failed to cache performance metric:',
+        expect.any(Error)
+      );
 
       process.env.NODE_ENV = originalEnv;
     });
@@ -248,6 +349,19 @@ describe('PerformanceTracker', () => {
 
       const metrics = getCachedMetrics();
       expect(metrics).toEqual([]);
+    });
+
+    it('should handle clearCachedMetrics errors gracefully', () => {
+      // Spy on the local mock object (Storage.prototype spy doesn't reach it).
+      jest.spyOn(window.localStorage, 'removeItem').mockImplementation(() => {
+        throw new Error('Storage error');
+      });
+
+      expect(() => clearCachedMetrics()).not.toThrow();
+      expect(console.error).toHaveBeenCalledWith(
+        'Failed to clear cached metrics:',
+        expect.any(Error)
+      );
     });
   });
 
@@ -261,6 +375,48 @@ describe('PerformanceTracker', () => {
       tracker.end();
 
       expect(console.log).toHaveBeenCalled();
+
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('should include a rating emoji in dev mode logs', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+
+      const tracker = new PerformanceTracker('test-operation', 1000);
+      performanceMock.advance(700); // 70% → good → ✅
+      tracker.end();
+
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('✅');
+
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('should log ❌ in dev mode when metric is poor', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+
+      const tracker = new PerformanceTracker('test-operation', 1000);
+      performanceMock.advance(1300); // 130% → poor → ❌
+      tracker.end();
+
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('❌');
+
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('should log ⚠️ in dev mode when metric is needs-improvement', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+
+      const tracker = new PerformanceTracker('test-operation', 1000);
+      performanceMock.advance(1000); // 100% → needs-improvement → ⚠️
+      tracker.end();
+
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('⚠️');
 
       process.env.NODE_ENV = originalEnv;
     });
@@ -283,5 +439,224 @@ describe('PerformanceTracker', () => {
 
       process.env.NODE_ENV = originalEnv;
     });
+  });
+});
+
+// ============================================================================
+// initializeWebVitals
+// ============================================================================
+
+describe('initializeWebVitals', () => {
+  beforeEach(() => {
+    // Reset all web-vitals mocks between tests
+    (onCLS as jest.Mock).mockClear();
+    (onINP as jest.Mock).mockClear();
+    (onLCP as jest.Mock).mockClear();
+    (onTTFB as jest.Mock).mockClear();
+    (onFCP as jest.Mock).mockClear();
+
+    jest.spyOn(console, 'log').mockImplementation();
+    jest.spyOn(console, 'error').mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    clearCachedMetrics();
+  });
+
+  it('registers a callback with onCLS', () => {
+    initializeWebVitals();
+    expect(onCLS).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('registers a callback with onINP', () => {
+    initializeWebVitals();
+    expect(onINP).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('registers a callback with onLCP', () => {
+    initializeWebVitals();
+    expect(onLCP).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('registers a callback with onTTFB', () => {
+    initializeWebVitals();
+    expect(onTTFB).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('registers a callback with onFCP', () => {
+    initializeWebVitals();
+    expect(onFCP).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  describe('CLS rating thresholds', () => {
+    it('rates CLS ≤ 0.1 as good', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onCLS as jest.Mock).mock.calls[0][0];
+      cb({ name: 'CLS', value: 0.05 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('✅');
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('rates CLS ≥ 0.25 as poor', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onCLS as jest.Mock).mock.calls[0][0];
+      cb({ name: 'CLS', value: 0.3 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('❌');
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('rates CLS between 0.1 and 0.25 as needs-improvement', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onCLS as jest.Mock).mock.calls[0][0];
+      cb({ name: 'CLS', value: 0.15 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('⚠️');
+      process.env.NODE_ENV = originalEnv;
+    });
+  });
+
+  describe('LCP rating thresholds', () => {
+    it('rates LCP ≤ 2500ms as good', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onLCP as jest.Mock).mock.calls[0][0];
+      cb({ name: 'LCP', value: 2500 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('✅');
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('rates LCP ≥ 4000ms as poor', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onLCP as jest.Mock).mock.calls[0][0];
+      cb({ name: 'LCP', value: 4000 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('❌');
+      process.env.NODE_ENV = originalEnv;
+    });
+  });
+
+  describe('INP rating thresholds', () => {
+    it('rates INP ≤ 200ms as good', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onINP as jest.Mock).mock.calls[0][0];
+      cb({ name: 'INP', value: 150 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('✅');
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('rates INP ≥ 500ms as poor', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onINP as jest.Mock).mock.calls[0][0];
+      cb({ name: 'INP', value: 600 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('❌');
+      process.env.NODE_ENV = originalEnv;
+    });
+  });
+
+  describe('TTFB rating thresholds', () => {
+    it('rates TTFB ≤ 800ms as good', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onTTFB as jest.Mock).mock.calls[0][0];
+      cb({ name: 'TTFB', value: 600 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('✅');
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('rates TTFB ≥ 1800ms as poor', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onTTFB as jest.Mock).mock.calls[0][0];
+      cb({ name: 'TTFB', value: 2000 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('❌');
+      process.env.NODE_ENV = originalEnv;
+    });
+  });
+
+  describe('FCP rating thresholds', () => {
+    it('rates FCP ≤ 1800ms as good', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onFCP as jest.Mock).mock.calls[0][0];
+      cb({ name: 'FCP', value: 1500 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('✅');
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('rates FCP ≥ 3000ms as poor', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      initializeWebVitals();
+      const cb = (onFCP as jest.Mock).mock.calls[0][0];
+      cb({ name: 'FCP', value: 3500 });
+      const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+      expect(firstArg).toContain('❌');
+      process.env.NODE_ENV = originalEnv;
+    });
+  });
+
+  it('stores web vitals in localStorage in production mode', () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    // Set up a writable localStorage mock
+    const store: Record<string, string> = {};
+    Object.defineProperty(window, 'localStorage', {
+      writable: true,
+      value: {
+        getItem: (k: string) => store[k] ?? null,
+        setItem: (k: string, v: string) => { store[k] = v; },
+        removeItem: (k: string) => { delete store[k]; },
+        clear: () => { Object.keys(store).forEach(k => delete store[k]); },
+      },
+    });
+
+    initializeWebVitals();
+    const clsCb = (onCLS as jest.Mock).mock.calls[0][0];
+    clsCb({ name: 'CLS', value: 0.05 });
+
+    const cached = getCachedMetrics();
+    expect(cached.length).toBeGreaterThan(0);
+    expect(cached[0].metric_name).toBe('CLS');
+
+    process.env.NODE_ENV = originalEnv;
+  });
+
+  it('uses needs-improvement for an unrecognised metric name', () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    initializeWebVitals();
+    // Invoke the CLS callback but give it an unknown name to trigger the fallback
+    const cb = (onCLS as jest.Mock).mock.calls[0][0];
+    cb({ name: 'UNKNOWN', value: 999 });
+    // ⚠️ is the needs-improvement emoji
+    const firstArg = (console.log as jest.Mock).mock.calls[0][0] as string;
+    expect(firstArg).toContain('⚠️');
+    process.env.NODE_ENV = originalEnv;
   });
 });

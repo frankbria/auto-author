@@ -31,6 +31,12 @@
 ## Recent Changes
 
 ### 2026-06-25
+- **Flaky test fix + frontend coverage to 85% (#68)**: tests-mostly
+  - **Flaky `TabStatePersistence`**: the "saves tab state…" case raced the 1s debounced auto-save under real timers. Now uses `jest.useFakeTimers()` + `advanceTimersByTime(1000)` and an `afterEach(jest.useRealTimers())` so it's deterministic and can't leak timer state into the full run.
+  - **Coverage**: global was stmt 74 / lines 75 / func 67 / branch 62 → now **stmt 92 / lines 93 / func 90 / branch 83**, clearing the pre-commit gate (85/85/75) without `--no-verify`. ~700 unit tests added across `lib/errors/*`, `lib/api/bookClient.ts`, `lib/security.ts`, `lib/performance/*`, `lib/loading/timeEstimator.ts`, `lib/utils/toc-to-tabs-converter.ts`, `lib/toast.ts`, hooks (`useTocSync`, `usePerformanceTracking`), and components (`ErrorNotification`, `QuestionDisplay/Container/Navigation/Generator`, `ClarifyingQuestions`, `ChapterTabs`/`MobileChapterTabs`/`TabBar`/`TabContextMenu`/`TabOverflowMenu`, `ui/dropdown-menu`, `ui/sheet`).
+  - **Real bugs fixed while testing**: `sanitizeFileName` regex `[^a-zA-Z0-9.-_]` was a char *range* (46–95) so `/ : \ @` slipped through while `-` was stripped — hyphen now escaped (path-traversal hardening); `showRecoveryNotification` printed "2 attempt" (singular) — fixed to plural; removed a dead empty `useEffect`/`getToken` + orphaned `useSession` in `ClarifyingQuestions.tsx`.
+  - **Status**: ✅ Complete
+
 - **Transcription test coverage + dead-code removal (#93)**: tests-only plan 009
   - **transcription.py**: 40% → 85% via new `backend/tests/test_api/test_transcription.py` (POST /transcribe auth/413/400/happy/service-error; GET /status; POST /validate). Router isn't mounted on the app, so tests mount it on a bare FastAPI app + override auth; transcription service patched (no AWS/audio)
   - **Drift**: `app/api/endpoints/book_cover_upload.py` was dead code (never imported) — an unmounted duplicate of the live cover endpoint in `books.py`. Removed it (same pattern as #92's `book_cascade_delete.py`); added a wrong-owner (404) case to the existing `test_book_cover_upload.py` which already exercises the live `books.py` path

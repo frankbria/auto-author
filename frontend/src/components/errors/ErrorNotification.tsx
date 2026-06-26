@@ -169,7 +169,7 @@ export function showErrorNotification(
 export function showRecoveryNotification(message: string, attempts: number) {
   if (attempts > 1) {
     toast.success(message, {
-      description: `Succeeded after ${attempts} ${attempts === 2 ? 'attempt' : 'attempts'}`,
+      description: `Succeeded after ${attempts} attempts`,
       duration: 3000,
     });
   } else {

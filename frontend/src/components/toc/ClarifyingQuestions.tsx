@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useSession } from '@/lib/auth-client';
 import { QuestionResponse } from '@/types/toc';
 import { bookClient } from '@/lib/api/bookClient';
 
@@ -11,17 +10,10 @@ interface ClarifyingQuestionsProps {
 }
 
 export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bookId }: ClarifyingQuestionsProps) {
-  const { data: session } = useSession();
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
-
-  useEffect(() => {
-    const getToken = async () => {
-      return session?.session.token ?? null;
-    };
-  }, [session?.session.token]);
 
   // Load existing responses when component mounts
   useEffect(() => {

@@ -1,19 +1,31 @@
-# Issue #46 — Comprehensive error feedback to UI
+# Issue #68 — Fix flaky TabStatePersistence test + raise frontend coverage to 85%
 
-## Ground truth (verified in codebase, not the stale issue body)
-- Error infra exists & is solid: `@/lib/errors` (`classifyError`, `handleApiCall`, `ClassifiedError`), `@/components/errors` (`ErrorNotification`, `showErrorNotification`), `@/components/loading/LoadingStateManager`.
-- `@/lib/toast` wrapper exists but is imported **nowhere**. Code uses `sonner` direct + `useToast()` hook. **All three render through the same sonner `<Toaster>`** → notifications already look identical to users.
-- Issue body paths are stale (`src/utils/...`, `new-book/page.tsx`). Real paths verified below.
+## Reality check (2026-06-25)
+- All 65 suites / 896 tests pass; TabStatePersistence currently passes but is flaky (real-timer race on 1s debounce).
+- Global coverage: stmt 74.26 / lines 75.33 / func 67.32 / branch 62.26. Targets: stmt 85 / lines 85 / func 85 / branch 75.
+- Plan from issue is stale (errorHandler.test.ts & metrics.test.ts already exist; numbers shifted). Reconciled below.
 
-## Real user-facing gaps (CORE — recommended)
-1. **Duplicate Toaster** — `src/app/layout.tsx` mounts both `<Toaster/>` (ui/toaster) and `<SonnerToaster/>` (ui/sonner). Two sonner Toasters = duplicate toasts. → remove one (keep `SonnerToaster`, theme-aware).
-2. **new-book silent failure** — `src/app/dashboard/new-book/page.tsx` catch only `console.error`s. Loading state already exists. → add error feedback (`showErrorNotification` + `classifyError`) and success toast.
-3. **ChapterTabs heavy retry** — `src/components/chapters/ChapterTabs.tsx` error state uses `window.location.reload()`. `refreshChapters()` already destructured. → swap reload→refreshChapters; reuse `ErrorNotification` for the error block.
+## Task 1 — Flaky test (small)
+- Make `saves tab state...` deterministic: fake timers + advanceTimersByTime(1000); restore real timers in afterEach.
 
-## Optional (STANDARDIZATION — churn, low user value)
-- Migrate `sonner`/`useToast` imports → `@/lib/toast` across dashboard/page, book-detail, export, settings, Draft*/Question* components. Pure import churn, no visual change, breaks ~10 test files that mock `sonner`/`useToast`. Acceptance "consistent UI" already met visually.
+## Task 2 — Coverage to 85% global (write tests, by ROI = uncovered lines)
+Pure-logic / lib & hooks (best ROI for functions+branches):
+- [ ] lib/api/bookClient.ts            (105 uncov, 61%) — biggest win
+- [ ] lib/errors/classifier.ts         (49 uncov, 28%)
+- [ ] hooks/useTocSync.ts              (42 uncov, 34%)
+- [ ] lib/errors/handler.ts            (32 uncov, 8.5%)
+- [ ] hooks/usePerformanceTracking.ts  (30 uncov, 42%)
+- [ ] lib/security.ts                  (28 uncov, 39%)
+- [ ] lib/performance/metrics.ts       (26 uncov, 59%) — expand existing
+- [ ] lib/errors/utils.ts              (21 uncov, 16%)
+- [ ] lib/loading/timeEstimator.ts     (19 uncov, 59%)
+- [ ] lib/errors/index.ts              (18 uncov, 28%)
+- [ ] lib/utils/toc-to-tabs-converter.ts (17 uncov, 35%)
+- [ ] lib/performance/budgets.ts       (13 uncov, 58%) — expand
+Components if still short after libs:
+- [ ] components/errors/ErrorNotification.tsx (34 uncov, 15%) — small, easy
+- [ ] components/chapters/questions/QuestionDisplay.tsx (56 uncov)
 
-## Tests
-- new-book: add test asserting error feedback on createBook rejection + success path.
-- ChapterTabs: retry calls refreshChapters (not reload).
-- layout: single Toaster mounted.
+## Task 3 — Verify
+- [ ] Full suite green; coverage gate passes with pre-commit thresholds.
+- [ ] Flaky test passes repeatedly (determinism confirmed).
