@@ -29,12 +29,13 @@ interface QuestionResponse {
   answer: string;
 }
 
+// Styles documented in AUTO_AUTHOR_USER_MANUAL.md and issue #55 acceptance criteria.
+// Backend is style-agnostic (free-text into the prompt), so this list is the source of truth.
 const WRITING_STYLES = [
+  { value: 'professional', label: 'Professional' },
   { value: 'conversational', label: 'Conversational' },
-  { value: 'formal', label: 'Formal' },
-  { value: 'narrative', label: 'Narrative' },
-  { value: 'educational', label: 'Educational' },
-  { value: 'inspirational', label: 'Inspirational' },
+  { value: 'academic', label: 'Academic' },
+  { value: 'creative', label: 'Creative' },
   { value: 'technical', label: 'Technical' },
 ];
 
@@ -193,13 +194,24 @@ export function DraftGenerator({
             </DialogDescription>
           </DialogHeader>
 
-          {!generatedDraft ? (
+          {isGenerating ? (
+            <div className="py-8">
+              <LoadingStateManager
+                isLoading={true}
+                operation="Generating Chapter Draft"
+                progress={draftProgress.progress}
+                estimatedTime={draftProgress.estimatedTimeRemaining}
+                message="Analyzing your responses and creating narrative content..."
+                inline
+              />
+            </div>
+          ) : !generatedDraft ? (
             <div className="space-y-6">
               {/* Writing Style Selection */}
               <div className="space-y-2">
-                <Label>Writing Style</Label>
+                <Label htmlFor="draft-writing-style">Writing Style</Label>
                 <Select value={writingStyle} onValueChange={setWritingStyle}>
-                  <SelectTrigger>
+                  <SelectTrigger id="draft-writing-style">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -214,9 +226,9 @@ export function DraftGenerator({
 
               {/* Target Length */}
               <div className="space-y-2">
-                <Label>Target Word Count</Label>
+                <Label htmlFor="draft-target-length">Target Word Count</Label>
                 <Select value={targetLength.toString()} onValueChange={(v) => setTargetLength(parseInt(v))}>
-                  <SelectTrigger>
+                  <SelectTrigger id="draft-target-length">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -249,6 +261,7 @@ export function DraftGenerator({
                       <div className="flex-1 space-y-2">
                         <input
                           type="text"
+                          aria-label={`Question ${index + 1}`}
                           placeholder="Enter your question..."
                           value={qr.question}
                           onChange={(e) => {
@@ -308,17 +321,6 @@ export function DraftGenerator({
                 </Button>
               </div>
             </div>
-          ) : isGenerating ? (
-            <div className="py-8">
-              <LoadingStateManager
-                isLoading={true}
-                operation="Generating Chapter Draft"
-                progress={draftProgress.progress}
-                estimatedTime={draftProgress.estimatedTimeRemaining}
-                message="Analyzing your responses and creating narrative content..."
-                inline
-              />
-            </div>
           ) : (
             <div className="space-y-6">
               {/* Generated Draft Display */}
@@ -326,12 +328,12 @@ export function DraftGenerator({
                 <div className="flex justify-between items-center">
                   <Label>Generated Draft</Label>
                   <div className="text-sm text-muted-foreground">
-                    {draftMetadata?.word_count || 0} words • 
+                    {draftMetadata?.word_count || 0} words •
                     {' '}{draftMetadata?.estimated_reading_time || 0} min read
                   </div>
                 </div>
                 <div className="border rounded-lg p-4 max-h-96 overflow-y-auto bg-muted/30">
-                  <div 
+                  <div
                     className="text-sm leading-relaxed whitespace-pre-wrap"
                     dangerouslySetInnerHTML={{ __html: sanitizedDraft || '' }}
                   />

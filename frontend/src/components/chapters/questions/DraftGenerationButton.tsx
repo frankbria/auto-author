@@ -26,12 +26,13 @@ interface DraftGenerationButtonProps {
   minimumResponses?: number;
 }
 
+// Styles documented in AUTO_AUTHOR_USER_MANUAL.md and issue #55 acceptance criteria.
+// Backend is style-agnostic (free-text into the prompt), so this list is the source of truth.
 const WRITING_STYLES = [
+  { value: 'professional', label: 'Professional' },
   { value: 'conversational', label: 'Conversational' },
-  { value: 'formal', label: 'Formal' },
-  { value: 'narrative', label: 'Narrative' },
-  { value: 'educational', label: 'Educational' },
-  { value: 'inspirational', label: 'Inspirational' },
+  { value: 'academic', label: 'Academic' },
+  { value: 'creative', label: 'Creative' },
   { value: 'technical', label: 'Technical' },
 ];
 
