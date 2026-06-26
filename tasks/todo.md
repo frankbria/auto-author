@@ -1,31 +1,39 @@
-# Issue #68 — Fix flaky TabStatePersistence test + raise frontend coverage to 85%
+# Issue #65 — Migrate UI to shadcn nova template (residual cleanup)
 
-## Reality check (2026-06-25)
-- All 65 suites / 896 tests pass; TabStatePersistence currently passes but is flaky (real-timer race on 1s debounce).
-- Global coverage: stmt 74.26 / lines 75.33 / func 67.32 / branch 62.26. Targets: stmt 85 / lines 85 / func 85 / branch 75.
-- Plan from issue is stale (errorHandler.test.ts & metrics.test.ts already exist; numbers shifted). Reconciled below.
+## Context
+Core migration **already merged in PR #73** (Dec 24): `components.json` is nova/gray/hugeicons,
+Nunito Sans font applied, 37 files already use hugeicons. Issue is still OPEN because the
+literal acceptance criteria ("no lucide-react imports", "no zinc colors") aren't fully met.
 
-## Task 1 — Flaky test (small)
-- Make `saves tab state...` deterministic: fake timers + advanceTimersByTime(1000); restore real timers in afterEach.
+## Remaining drift (the actual work)
+### A. zinc-* → gray-* (20 files) — mechanical className swap, safe
+dashboard pages (export/page, [bookId]/page, summary/page, new-book), app/page, ChapterTab,
+ai-error-handling-example, LoadingStateManager, ProgressIndicator, ChapterBreadcrumb,
+toc/{ClarifyingQuestions,ErrorDisplay,NotReadyMessage,ReadinessChecker,TocGenerating,
+TocGenerationWizard,TocReview,TocSidebar}, ui/{avatar,toaster}
 
-## Task 2 — Coverage to 85% global (write tests, by ROI = uncovered lines)
-Pure-logic / lib & hooks (best ROI for functions+branches):
-- [ ] lib/api/bookClient.ts            (105 uncov, 61%) — biggest win
-- [ ] lib/errors/classifier.ts         (49 uncov, 28%)
-- [ ] hooks/useTocSync.ts              (42 uncov, 34%)
-- [ ] lib/errors/handler.ts            (32 uncov, 8.5%)
-- [ ] hooks/usePerformanceTracking.ts  (30 uncov, 42%)
-- [ ] lib/security.ts                  (28 uncov, 39%)
-- [ ] lib/performance/metrics.ts       (26 uncov, 59%) — expand existing
-- [ ] lib/errors/utils.ts              (21 uncov, 16%)
-- [ ] lib/loading/timeEstimator.ts     (19 uncov, 59%)
-- [ ] lib/errors/index.ts              (18 uncov, 28%)
-- [ ] lib/utils/toc-to-tabs-converter.ts (17 uncov, 35%)
-- [ ] lib/performance/budgets.ts       (13 uncov, 58%) — expand
-Components if still short after libs:
-- [ ] components/errors/ErrorNotification.tsx (34 uncov, 15%) — small, easy
-- [ ] components/chapters/questions/QuestionDisplay.tsx (56 uncov)
+### B. lucide-react → hugeicons (14 source files) — per-usage refactor + icon mapping
+Feature code: auth/{sign-in,sign-up,reset-password,forgot-password}, PasswordRequirements,
+SessionWarning.
+Stock shadcn ui/* primitives: sheet, checkbox, sonner, breadcrumb, dialog, radio-group,
+dropdown-menu, select.  <- scope decision (see question)
+Icon map (lucide -> @hugeicons/core-free-icons): Eye->ViewIcon, EyeOff->ViewOffIcon,
+AlertCircle->Alert02Icon, CheckCircle->CheckmarkCircle01Icon, ArrowLeft->ArrowLeft01Icon,
+Mail->Mail01Icon, Check/CheckIcon->Tick02Icon, X/XIcon->Cancel01Icon, Circle->CircleIcon,
+ChevronRight->ArrowRight01Icon, ChevronDown->ArrowDown01Icon, ChevronUp->ArrowUp01Icon,
+MoreHorizontal->MoreHorizontalIcon, Clock->Clock01Icon, Shield->ShieldIcon
+(verify each name exists in v3 before use)
 
-## Task 3 — Verify
-- [ ] Full suite green; coverage gate passes with pre-commit thresholds.
-- [ ] Flaky test passes repeatedly (determinism confirmed).
+### C. Remove `lucide-react` from package.json once imports hit zero; clean test/e2e/md refs
+### D. Tests stay green + >=85% coverage; typecheck + lint + build pass
+### E. Docs: short CLAUDE.md note; verify grep shows 0 lucide / 0 zinc
+
+## Approach
+Mechanical/visual swaps. Rely on existing component tests + build + typecheck as the
+regression net; add/adjust tests only where a swap touches asserted markup.
+
+## DONE
+- 0 lucide / 0 zinc remaining; lucide-react removed from package.json + lockfile.
+- Removed obsolete frontend/backup-pre-nova/ migration backup.
+- typecheck clean, lint 0 errors, build green, 89/89 suites + 1853 tests pass,
+  coverage stmt 92 / lines 93 / func 90 / branch 83.

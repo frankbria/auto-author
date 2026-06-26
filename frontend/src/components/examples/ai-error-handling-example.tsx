@@ -114,9 +114,9 @@ export function TOCQuestionsExample({ bookId }: AIErrorHandlingExampleProps) {
           {questions.map((question, index) => (
             <div
               key={index}
-              className="p-3 bg-zinc-800 rounded-lg border border-zinc-700"
+              className="p-3 bg-gray-800 rounded-lg border border-gray-700"
             >
-              <p className="text-sm text-zinc-300">{question}</p>
+              <p className="text-sm text-gray-300">{question}</p>
             </div>
           ))}
         </div>
@@ -207,7 +207,7 @@ export function ChapterDraftExample({ bookId, chapterId }: AIErrorHandlingExampl
       )}
 
       {draft && (
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+        <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
           <div className="prose prose-invert max-w-none">
             <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(draft) }} />
           </div>
@@ -297,7 +297,7 @@ export function SummaryAnalysisExample({ bookId }: AIErrorHandlingExampleProps) 
 
       {analysis && (
         <div className="space-y-3">
-          <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+          <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">
                 Ready for TOC:
@@ -316,14 +316,14 @@ export function SummaryAnalysisExample({ bookId }: AIErrorHandlingExampleProps) 
                 {(analysis.confidence_score * 100).toFixed(0)}%
               </span>
             </div>
-            <p className="text-sm text-zinc-300 mb-3">{analysis.analysis}</p>
+            <p className="text-sm text-gray-300 mb-3">{analysis.analysis}</p>
 
             {analysis.suggestions.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Suggestions:</p>
                 <ul className="list-disc list-inside space-y-1">
                   {analysis.suggestions.map((suggestion, index) => (
-                    <li key={index} className="text-sm text-zinc-400">
+                    <li key={index} className="text-sm text-gray-400">
                       {suggestion}
                     </li>
                   ))}

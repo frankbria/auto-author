@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AlertCircle, Clock, Shield } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Alert02Icon, Clock01Icon, ShieldIcon } from "@hugeicons/core-free-icons";
 import useSession from "@/hooks/useSession";
 
 export interface SessionWarningProps {
@@ -90,7 +91,7 @@ export function SessionWarning({
       {showExpiryWarning && sessionStatus?.time_until_expiry_seconds !== null && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 shadow-lg max-w-md">
           <div className="flex items-start gap-3">
-            <Clock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <HugeiconsIcon icon={Clock01Icon} size={20} className="text-amber-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="font-semibold text-amber-900 mb-1">
                 Session Expiring Soon
@@ -132,7 +133,7 @@ export function SessionWarning({
       {showIdleWarning && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-lg max-w-md">
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <HugeiconsIcon icon={Alert02Icon} size={20} className="text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="font-semibold text-blue-900 mb-1">
                 Session Idle
@@ -163,7 +164,7 @@ export function SessionWarning({
       {showSuspiciousWarning && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 shadow-lg max-w-md">
           <div className="flex items-start gap-3">
-            <Shield className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <HugeiconsIcon icon={ShieldIcon} size={20} className="text-red-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="font-semibold text-red-900 mb-1">
                 Suspicious Activity Detected

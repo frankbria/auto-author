@@ -14,7 +14,7 @@ export default function NewBook() {
     genre: '',
     targetAudience: '',
   });
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -53,12 +53,12 @@ export default function NewBook() {
   return (
     <div className="container mx-auto p-6">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold text-zinc-100 mb-6">Create New Book</h1>
+        <h1 className="text-3xl font-bold text-gray-100 mb-6">Create New Book</h1>
 
-        <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 shadow-xl">
+        <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 shadow-xl">
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
-              <label htmlFor="title" className="block text-sm font-medium text-zinc-300 mb-1">
+              <label htmlFor="title" className="block text-sm font-medium text-gray-300 mb-1">
                 Book Title <span className="text-red-500">*</span>
               </label>
               <input
@@ -68,12 +68,12 @@ export default function NewBook() {
                 value={bookData.title}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-md text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Enter the title of your book"
               />
             </div>
               <div className="mb-4">
-              <label htmlFor="description" className="block text-sm font-medium text-zinc-300 mb-1">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
                 Description
               </label>
               <textarea
@@ -81,14 +81,14 @@ export default function NewBook() {
                 name="description"
                 value={bookData.description}
                 onChange={handleChange}
-                className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-md text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Enter a description of your book (optional)"
                 rows={4}
               />
             </div>
-            
+
             <div className="mb-4">
-              <label htmlFor="genre" className="block text-sm font-medium text-zinc-300 mb-1">
+              <label htmlFor="genre" className="block text-sm font-medium text-gray-300 mb-1">
                 Genre <span className="text-red-500">*</span>
               </label>
               <select
@@ -97,7 +97,7 @@ export default function NewBook() {
                 value={bookData.genre}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-md text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">Select a genre</option>
                 <option value="business">Business & Economics</option>
@@ -110,9 +110,9 @@ export default function NewBook() {
                 <option value="other">Other Non-Fiction</option>
               </select>
             </div>
-            
+
             <div className="mb-6">
-              <label htmlFor="targetAudience" className="block text-sm font-medium text-zinc-300 mb-1">
+              <label htmlFor="targetAudience" className="block text-sm font-medium text-gray-300 mb-1">
                 Target Audience <span className="text-red-500">*</span>
               </label>
               <input
@@ -122,16 +122,16 @@ export default function NewBook() {
                 value={bookData.targetAudience}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-md text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Who is this book for?"
               />
             </div>
-            
+
             <div className="flex justify-end mt-6 space-x-4">
               <button
                 type="button"
                 onClick={() => router.push('/dashboard')}
-                className="px-4 py-2 bg-transparent border border-zinc-600 text-zinc-300 hover:bg-zinc-700 rounded-md transition"
+                className="px-4 py-2 bg-transparent border border-gray-600 text-gray-300 hover:bg-gray-700 rounded-md transition"
                 disabled={isSubmitting}
               >
                 Cancel

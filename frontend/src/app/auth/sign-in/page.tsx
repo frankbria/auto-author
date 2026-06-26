@@ -15,7 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ViewIcon, ViewOffIcon, Alert02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 
 /**
@@ -133,7 +134,7 @@ function SignInForm() {
           <CardContent className="space-y-4">
             {error && (
               <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
+                <HugeiconsIcon icon={Alert02Icon} size={16} />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -179,9 +180,9 @@ function SignInForm() {
                   tabIndex={-1}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
+                    <HugeiconsIcon icon={ViewOffIcon} size={16} />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <HugeiconsIcon icon={ViewIcon} size={16} />
                   )}
                 </button>
               </div>

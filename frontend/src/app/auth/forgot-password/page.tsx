@@ -14,7 +14,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, ArrowLeft, Mail } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { CheckmarkCircle01Icon, ArrowLeft01Icon, Mail01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 
 export default function ForgotPasswordPage() {
@@ -76,7 +77,7 @@ export default function ForgotPasswordPage() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <HugeiconsIcon icon={CheckmarkCircle01Icon} size={24} className="text-green-600 dark:text-green-400" />
             </div>
             <CardTitle className="text-2xl">Check Your Email</CardTitle>
             <CardDescription className="mt-2">
@@ -85,7 +86,7 @@ export default function ForgotPasswordPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert>
-              <Mail className="h-4 w-4" />
+              <HugeiconsIcon icon={Mail01Icon} size={16} />
               <AlertDescription>
                 The link will expire in 1 hour. If you don't see the email,
                 check your spam folder.
@@ -107,7 +108,7 @@ export default function ForgotPasswordPage() {
               href="/auth/sign-in"
               className="flex items-center justify-center gap-2 text-sm text-blue-600 hover:underline dark:text-blue-400"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
               Back to sign in
             </Link>
           </CardFooter>
@@ -155,7 +156,7 @@ export default function ForgotPasswordPage() {
               href="/auth/sign-in"
               className="flex items-center justify-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
               Back to sign in
             </Link>
           </CardFooter>

@@ -20,9 +20,9 @@ jest.mock('@/components/ui/card', () => ({
 
 jest.mock('@/components/ui/button', () => ({
   Button: ({ children, onClick, className, disabled, size }: any) => (
-    <button 
-      onClick={onClick} 
-      className={className} 
+    <button
+      onClick={onClick}
+      className={className}
       disabled={disabled}
       data-size={size}
     >
@@ -58,10 +58,6 @@ jest.mock('@/components/ui/alert-dialog', () => ({
   ),
 }));
 
-jest.mock('lucide-react', () => ({
-  Trash2: ({ className }: any) => <span className={className} data-testid="trash-icon">Trash</span>,
-}));
-
 // Mock DeleteBookModal
 jest.mock('@/components/books', () => ({
   DeleteBookModal: ({ isOpen, bookTitle, onConfirm, isDeleting, onOpenChange }: any) => (
@@ -81,7 +77,7 @@ jest.mock('@/components/books', () => ({
 
 describe('BookCard', () => {
   const mockPush = jest.fn();
-  
+
   const mockBook: BookProject = {
     id: 'book-123',
     title: 'Test Book Title',
@@ -108,7 +104,7 @@ describe('BookCard', () => {
 
   it('should render book information correctly', () => {
     render(<BookCard book={mockBook} />);
-    
+
     expect(screen.getByText('Test Book Title')).toBeInTheDocument();
     expect(screen.getByText('This is a test book description')).toBeInTheDocument();
     expect(screen.getByText('5 chapters')).toBeInTheDocument();
@@ -127,36 +123,36 @@ describe('BookCard', () => {
   it('should show "New" badge when book has no chapters', () => {
     const newBook = { ...mockBook, chapters: 0 };
     render(<BookCard book={newBook} />);
-    
+
     expect(screen.getByText('New')).toBeInTheDocument();
     expect(screen.getByText('Ready to start writing! Click below to begin creating your book content.')).toBeInTheDocument();
   });
 
   it('should navigate to book page when card is clicked', () => {
     render(<BookCard book={mockBook} />);
-    
+
     const card = screen.getByRole('article');
     fireEvent.click(card);
-    
+
     expect(mockPush).toHaveBeenCalledWith('/dashboard/books/book-123');
   });
 
   it('should navigate to book page when Open Project button is clicked', () => {
     render(<BookCard book={mockBook} />);
-    
+
     const openButton = screen.getByText('Open Project');
     fireEvent.click(openButton);
-    
+
     expect(mockPush).toHaveBeenCalledWith('/dashboard/books/book-123');
   });
 
   it('should call custom onClick handler when provided', () => {
     const mockOnClick = jest.fn();
     render(<BookCard book={mockBook} onClick={mockOnClick} />);
-    
+
     const card = screen.getByRole('article');
     fireEvent.click(card);
-    
+
     expect(mockOnClick).toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -166,24 +162,24 @@ describe('BookCard', () => {
 
     it('should show delete button when onDelete prop is provided', () => {
       render(<BookCard book={mockBook} onDelete={mockOnDelete} />);
-      
+
       const deleteButton = screen.getByTestId('trash-icon');
       expect(deleteButton).toBeInTheDocument();
     });
 
     it('should not show delete button when onDelete prop is not provided', () => {
       render(<BookCard book={mockBook} />);
-      
+
       const deleteButton = screen.queryByTestId('trash-icon');
       expect(deleteButton).not.toBeInTheDocument();
     });
 
     it('should show confirmation dialog when delete button is clicked', () => {
       render(<BookCard book={mockBook} onDelete={mockOnDelete} />);
-      
+
       const deleteButton = screen.getByTestId('trash-icon').closest('button')!;
       fireEvent.click(deleteButton);
-      
+
       expect(screen.getByText('Delete Book')).toBeInTheDocument();
       expect(screen.getByText(/Are you sure you want to delete "Test Book Title"\?/)).toBeInTheDocument();
       expect(screen.getByText(/All chapters and content will be permanently deleted/)).toBeInTheDocument();
@@ -261,10 +257,10 @@ describe('BookCard', () => {
 
     it('should prevent card navigation when delete button is clicked', () => {
       render(<BookCard book={mockBook} onDelete={mockOnDelete} />);
-      
+
       const deleteButton = screen.getByTestId('trash-icon').closest('button')!;
       fireEvent.click(deleteButton);
-      
+
       expect(mockPush).not.toHaveBeenCalled();
     });
   });
@@ -275,12 +271,12 @@ describe('BookCard', () => {
       title: 'This is a very long book title that should be truncated in the UI',
       description: 'This is an extremely long description that goes on and on and should definitely be truncated in the card view to maintain a clean layout',
     };
-    
+
     render(<BookCard book={longBook} />);
-    
+
     const title = screen.getByText(longBook.title);
     const description = screen.getByText(longBook.description);
-    
+
     expect(title).toHaveClass('truncate');
     expect(description).toHaveClass('line-clamp-2');
   });
@@ -292,9 +288,9 @@ describe('BookCard', () => {
       chapters: 0,
       progress: 0,
     };
-    
+
     render(<BookCard book={minimalBook} />);
-    
+
     expect(screen.getByText('Minimal Book')).toBeInTheDocument();
     expect(screen.queryByText(/Last edited/)).toBeInTheDocument();
   });

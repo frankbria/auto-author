@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 
 export interface PasswordValidation {
   minLength: boolean;
@@ -74,9 +75,9 @@ function RequirementItem({ met, text }: RequirementItemProps) {
   return (
     <li className={`flex items-center gap-2 text-sm ${met ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
       {met ? (
-        <Check className="h-4 w-4" aria-hidden="true" />
+        <HugeiconsIcon icon={Tick02Icon} size={16} aria-hidden="true" />
       ) : (
-        <X className="h-4 w-4 text-red-500" aria-hidden="true" />
+        <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-red-500" aria-hidden="true" />
       )}
       <span>{text}</span>
     </li>

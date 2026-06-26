@@ -20,7 +20,7 @@ export default function TocGenerating() {
   const currentStep = Math.floor((progress / 100) * steps.length);
 
   return (
-    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8">
+    <div className="bg-gray-800 border border-gray-700 rounded-lg p-8">
       {/* New LoadingStateManager with progress and time estimate */}
       <LoadingStateManager
         isLoading={true}
@@ -32,15 +32,15 @@ export default function TocGenerating() {
 
       <div className="flex flex-col items-center mt-8">
         {/* Current step */}
-        <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 w-full max-w-md mb-6">
-          <p className="text-zinc-300 text-center font-medium">
+        <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 w-full max-w-md mb-6">
+          <p className="text-gray-300 text-center font-medium">
             {steps[currentStep] || steps[steps.length - 1]}
           </p>
         </div>
 
         {/* Process steps */}
-        <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 w-full max-w-lg">
-          <h3 className="text-zinc-300 font-medium mb-4 text-center">AI Processing Steps</h3>
+        <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-lg">
+          <h3 className="text-gray-300 font-medium mb-4 text-center">AI Processing Steps</h3>
           <div className="space-y-3">
             {steps.map((step, index) => (
               <div key={index} className="flex items-center">
@@ -49,7 +49,7 @@ export default function TocGenerating() {
                     ? 'bg-green-600'
                     : index === currentStep
                     ? 'bg-indigo-600'
-                    : 'bg-zinc-700'
+                    : 'bg-gray-700'
                 }`}>
                   {index < currentStep ? (
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
@@ -58,11 +58,11 @@ export default function TocGenerating() {
                   ) : index === currentStep ? (
                     <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                   ) : (
-                    <span className="text-zinc-400 text-xs">{index + 1}</span>
+                    <span className="text-gray-400 text-xs">{index + 1}</span>
                   )}
                 </div>
                 <span className={`text-sm ${
-                  index <= currentStep ? 'text-zinc-300' : 'text-zinc-500'
+                  index <= currentStep ? 'text-gray-300' : 'text-gray-500'
                 }`}>
                   {step}
                 </span>
@@ -71,9 +71,9 @@ export default function TocGenerating() {
           </div>
         </div>
 
-        <div className="mt-8 bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 w-full max-w-lg">
-          <h4 className="text-zinc-300 font-medium mb-2 text-center">🤖 What&apos;s happening:</h4>
-          <ul className="text-zinc-400 text-sm space-y-1">
+        <div className="mt-8 bg-gray-800/50 border border-gray-700 rounded-lg p-4 w-full max-w-lg">
+          <h4 className="text-gray-300 font-medium mb-2 text-center">🤖 What&apos;s happening:</h4>
+          <ul className="text-gray-400 text-sm space-y-1">
             <li>• Analyzing thematic patterns in your responses</li>
             <li>• Creating logical chapter progressions</li>
             <li>• Ensuring balanced content distribution</li>
