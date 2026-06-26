@@ -1,4 +1,9 @@
-# Issue #105 — Harden full staging E2E journey
+# Issue #105 — Harden full staging E2E journey ✅ COMPLETE
+
+**Done (PRs #134 + #135, merged + deployed):** staging suite 4/4 pass, 3 consecutive
+runs against live dev.autoauthor.app. Wired Q&A into editor; fixed generate-toc
+body-responses, analyze-summary readiness poisoning, and the OpenAI key name.
+
 
 ## Root-cause finding (drives scope)
 The interview-questions Q&A loop (#54: generate → answer → persist) is **not mounted** in
