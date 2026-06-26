@@ -31,6 +31,17 @@
 ## Recent Changes
 
 ### 2026-06-26
+- **Harden full staging E2E journey + wire chapter Q&A (#105)**: PRs #134 + #135
+  - **Root finding**: the #54 interview-questions Q&A loop (`QuestionContainer`, with real `PUT .../questions/{id}/response` persistence) existed but was **never mounted** in any navigable route — only a hardcoded-mock `/chapters` page used it. So #54 was untestable. `ChapterEditor` now has a **Write / Interview Questions** tab toggle that mounts `QuestionContainer`, making generate→answer→persist real. +3 unit tests.
+  - **Real backend bugs fixed (both blocked the live wizard)**:
+    1. `generate-toc` only read the *persisted* `book.question_responses`, but the `ClarifyingQuestions` wizard sends responses in the request **body** and never persists them → every wizard TOC generation 400'd "Question responses are required". Now reads body first, falls back to persisted. +1 test.
+    2. `analyze-summary` **persisted failed AI analyses**, which permanently poisoned readiness (`has_analysis=true`, `meets_minimum=false`) and blocked TOC forever after one transient error. Now returns a retryable 503 and doesn't persist, so readiness falls back to the deterministic word/char check. +1 test.
+    3. OpenAI key: service only read `OPENAI_AUTOAUTHOR_API_KEY`; staging's was stale/invalid. Now reads canonical `OPENAI_API_KEY` (legacy fallback); deploy writes it. +2 tests. **NB: the running staging key only refreshes on redeploy.**
+  - **Test hardening**: new shared `tests/e2e/staging/fixtures/journey.helpers.ts` (real selectors + network waits + a `READY_SUMMARY` the AI judges ready); `complete-user-journey.spec.ts` and the #54 regression **un-`fixme`'d**; removed **every** `page.waitForTimeout()` and silent `if(isVisible)` skip (CLAUDE.md forbidden). Fixes all four issue items: delayed book-create nav, summary fill-race (re-fill-until-submit-enables), the auto-running TOC wizard, and the forbidden patterns.
+  - **Verify**: full staging suite **4/4 pass, 3 consecutive runs** (12/12) against live `dev.autoauthor.app` with real Better-auth + real AI — meets the issue's >95% bar.
+  - **Status**: ✅ Complete
+
+### 2026-06-26
 - **Nova migration residual cleanup (#65)**: finished the lucide→hugeicons + zinc→gray drift left after PR #73
   - **Context**: PR #73 (Dec 24) already did the bulk nova migration (style/baseColor/iconLibrary in `components.json`, Nunito Sans). #65 stayed open because the literal AC ("no lucide-react imports", "no zinc colors") weren't fully met.
   - **Icons**: converted the remaining 14 source files off `lucide-react` to `<HugeiconsIcon icon={…}/>` from `@hugeicons/core-free-icons` — 6 feature files (auth sign-in/up, reset/forgot-password, `PasswordRequirements`, `SessionWarning`) + 8 stock shadcn `ui/*` primitives (dialog, select, checkbox, dropdown-menu, sheet, radio-group, breadcrumb, sonner). Removed `lucide-react` from `package.json`/lockfile and two dead `jest.mock('lucide-react')` blocks. **Zero lucide refs remain.**
