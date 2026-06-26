@@ -31,6 +31,14 @@
 ## Recent Changes
 
 ### 2026-06-26
+- **Remove dead service code + omit seed script from coverage (#120)**: backend cleanup, no behavior change
+  - **Deleted 9 dead service modules (4,983 LOC)**: `content_analysis_service`, `historical_data_service`, `question_feedback_service`, `chapter_error_handler`, `chapter_cache_service`, `user_level_adaptation`, `question_quality_service`, `genre_question_templates`, `chapter_soft_delete_service`. Each verified unreferenced in `app/` (no importers, no `services/__init__.py` re-exports, no dynamic/class-name refs). `chapter_error_handler` ↔ `chapter_cache_service` were mutually-dead (only imported each other).
+  - **Deleted 5 ghost validation scripts** that referenced the chapter cache/error modules and were run by nothing (pytest collected 0 tests; not in CI): `tests/test_chapter_tabs_api.py`, `archived_tests/test_chapter_tabs_api.py`, root `validate_chapter_tabs.py` / `quick_validate.py` / `simple_validate.py`.
+  - **Coverage**: added `*/populate_db_test_data.py` (seed script) to `.coveragerc` omit. Backend coverage **~50% → 71%** with zero new tests (the dead modules were the drag). Suite green: **466 passed, 17 skipped**.
+  - **Docs**: scrubbed deleted-module refs from `docs/ai-caching-and-error-handling.md` (tree + links); added a removal note to `docs/developer-guide-question-system.md` (4 of its documented modules were dead). Historical analysis snapshots (`docs/analysis/*`, `TEST_COVERAGE_REPORT.md`) left as-is — they identify this dead code.
+  - **Status**: ✅ Complete
+
+### 2026-06-26
 - **Harden full staging E2E journey + wire chapter Q&A (#105)**: PRs #134 + #135
   - **Root finding**: the #54 interview-questions Q&A loop (`QuestionContainer`, with real `PUT .../questions/{id}/response` persistence) existed but was **never mounted** in any navigable route — only a hardcoded-mock `/chapters` page used it. So #54 was untestable. `ChapterEditor` now has a **Write / Interview Questions** tab toggle that mounts `QuestionContainer`, making generate→answer→persist real. +3 unit tests.
   - **Real backend bugs fixed (both blocked the live wizard)**:

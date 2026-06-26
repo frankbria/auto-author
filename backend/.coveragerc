@@ -5,6 +5,7 @@ omit =
     */migrations/*
     */venv/*
     */env/*
+    */populate_db_test_data.py
 
 [report]
 exclude_lines =
