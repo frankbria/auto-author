@@ -8,8 +8,8 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi import HTTPException, Request
 import time
-from datetime import datetime
 
+import app.api.dependencies as deps
 from app.api.dependencies import (
     sanitize_input,
     get_rate_limiter,
@@ -17,7 +17,29 @@ from app.api.dependencies import (
     get_api_key,
     audit_request,
     rate_limit_cache,
+    get_database_collection,
+    SanitizedModel,
 )
+
+
+@pytest.mark.asyncio
+async def test_get_database_collection_delegates():
+    """get_database_collection forwards to the db layer's get_collection."""
+    with patch("app.api.dependencies.get_collection", AsyncMock(return_value="coll")) as mock_get:
+        result = await get_database_collection("books")
+    assert result == "coll"
+    mock_get.assert_awaited_once_with("books")
+
+
+class TestSanitizedModel:
+    def test_string_fields_are_sanitized_on_init(self):
+        class Demo(SanitizedModel):
+            name: str
+            count: int
+
+        demo = Demo(name="<b>Bob</b>  Smith", count=3)
+        assert demo.name == "Bob Smith"  # HTML stripped, whitespace collapsed
+        assert demo.count == 3  # non-string untouched
 
 
 class TestInputSanitization:
@@ -110,11 +132,13 @@ class TestRateLimiting:
             result = await limiter(mock_request)
             assert result["remaining"] >= 0
 
-    @pytest.mark.skip(reason="Rate limiter test has mock/closure interaction issue - functionality tested by other passing tests")
     @pytest.mark.asyncio
-    async def test_rate_limiter_blocks_over_limit(self):
-        """Test that requests over limit are blocked"""
-        # Clear cache and use unique identifiers
+    async def test_rate_limiter_blocks_over_limit(self, real_rate_limiter):
+        """Test that requests over limit are blocked.
+
+        The limiter short-circuits when BYPASS_AUTH is on (test default), so
+        patch it off to exercise the real counting path.
+        """
         rate_limit_cache.clear()
 
         mock_request = Mock(spec=Request)
@@ -123,31 +147,27 @@ class TestRateLimiting:
         mock_request.url = Mock()
         mock_request.url.path = "/api/test_blocks_over_limit"  # Unique path
 
-        limiter = get_rate_limiter(limit=3, window=60)
+        limiter = real_rate_limiter(limit=3, window=60)
 
-        # Make 3 requests (at limit) - should succeed
-        results = []
-        for i in range(3):
-            result = await limiter(mock_request)
-            results.append(result)
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            # Make 3 requests (at limit) - should succeed
+            results = [await limiter(mock_request) for _ in range(3)]
 
-        # Verify requests were allowed
-        assert results[0]["remaining"] == 2
-        assert results[1]["remaining"] == 1
-        assert results[2]["remaining"] == 0
+            # Verify requests were allowed
+            assert results[0]["remaining"] == 2
+            assert results[1]["remaining"] == 1
+            assert results[2]["remaining"] == 0
 
-        # 4th request should be blocked
-        with pytest.raises(HTTPException) as exc_info:
-            await limiter(mock_request)
+            # 4th request should be blocked
+            with pytest.raises(HTTPException) as exc_info:
+                await limiter(mock_request)
 
         assert exc_info.value.status_code == 429
         assert "Rate limit exceeded" in exc_info.value.detail
 
-    @pytest.mark.skip(reason="Rate limiter test has mock/closure interaction issue - functionality tested by other passing tests")
     @pytest.mark.asyncio
-    async def test_rate_limiter_includes_headers(self):
+    async def test_rate_limiter_includes_headers(self, real_rate_limiter):
         """Test that rate limit response includes proper headers"""
-        # Clear cache and use unique identifiers
         rate_limit_cache.clear()
 
         mock_request = Mock(spec=Request)
@@ -156,22 +176,36 @@ class TestRateLimiting:
         mock_request.url = Mock()
         mock_request.url.path = "/api/test_headers_check"  # Unique path
 
-        limiter = get_rate_limiter(limit=2, window=60)
+        limiter = real_rate_limiter(limit=2, window=60)
 
-        # Make 2 requests (at limit) - should succeed
-        await limiter(mock_request)
-        result2 = await limiter(mock_request)
-        assert result2["remaining"] == 0
-
-        # 3rd request should be blocked with headers
-        with pytest.raises(HTTPException) as exc_info:
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            # Make 2 requests (at limit) - should succeed
             await limiter(mock_request)
+            result2 = await limiter(mock_request)
+            assert result2["remaining"] == 0
+
+            # 3rd request should be blocked with headers
+            with pytest.raises(HTTPException) as exc_info:
+                await limiter(mock_request)
 
         headers = exc_info.value.headers
         assert "X-RateLimit-Limit" in headers
         assert "X-RateLimit-Remaining" in headers
         assert "X-RateLimit-Reset" in headers
         assert "Retry-After" in headers
+
+    @pytest.mark.asyncio
+    async def test_rate_limiter_bypass_auth_short_circuits(self, real_rate_limiter):
+        """With BYPASS_AUTH on, the limiter returns full quota without counting."""
+        rate_limit_cache.clear()
+        mock_request = Mock(spec=Request)
+        limiter = real_rate_limiter(limit=2, window=60)
+
+        with patch.object(deps.settings, "BYPASS_AUTH", True):
+            for _ in range(5):
+                result = await limiter(mock_request)
+                assert result["remaining"] == 2
+        assert rate_limit_cache == {}
 
     @pytest.mark.asyncio
     async def test_rate_limiter_per_endpoint(self):
@@ -267,6 +301,21 @@ class TestRateLimiting:
         assert result is not None
         # Verify custom key was used in cache
         assert any("custom_key" in key for key in rate_limit_cache.keys())
+
+    @pytest.mark.asyncio
+    async def test_deprecated_rate_limit_blocks_over_limit(self):
+        """Deprecated rate_limit raises 429 with headers once the limit is passed."""
+        rate_limit_cache.clear()
+        mock_request = Mock(spec=Request)
+        mock_request.client.host = "10.50.50.1"
+        mock_request.url.path = "/api/deprecated_block"
+
+        await rate_limit(mock_request, limit=1, window=60)
+        with pytest.raises(HTTPException) as exc_info:
+            await rate_limit(mock_request, limit=1, window=60)
+
+        assert exc_info.value.status_code == 429
+        assert "Retry-After" in exc_info.value.headers
 
 
 @pytest.mark.asyncio
@@ -393,3 +442,22 @@ class TestAuditRequest:
         assert call_kwargs["actor_id"] == "admin_user"
         assert call_kwargs["resource_type"] == "book"
         assert call_kwargs["target_id"] == "123"
+
+    @patch("app.api.dependencies.create_audit_log")
+    async def test_audit_request_with_no_request_object(self, mock_create_audit):
+        """audit_request tolerates request=None (used in non-HTTP contexts)."""
+        current_user = {"clerk_id": "legacy_user", "email": "legacy@example.com"}
+
+        result = await audit_request(
+            request=None,
+            current_user=current_user,
+            action="cleanup",
+            resource_type="session",
+        )
+
+        # Falls back to clerk_id and defaults target_id to "unknown"
+        assert result["sub"] == "legacy_user"
+        call_kwargs = mock_create_audit.call_args.kwargs
+        assert call_kwargs["actor_id"] == "legacy_user"
+        assert call_kwargs["target_id"] == "unknown"
+        assert call_kwargs["details"]["method"] is None
