@@ -454,9 +454,7 @@ def _create_default_toc(self, summary: str) -> Dict:
 backend/
 ├── app/
 │   ├── services/
-│   │   ├── ai_service.py                    # Main AI service
-│   │   ├── chapter_cache_service.py         # Chapter-specific caching
-│   │   └── chapter_error_handler.py         # Error recovery
+│   │   └── ai_service.py                    # Main AI service
 │   ├── api/
 │   │   └── v1/
 │   │       └── endpoints/
@@ -1031,8 +1029,6 @@ class AIService:
 ### Related Documentation
 
 - [AI Service Implementation](../backend/app/services/ai_service.py)
-- [Chapter Cache Service](../backend/app/services/chapter_cache_service.py)
-- [Error Handler Service](../backend/app/services/chapter_error_handler.py)
 - [Configuration Guide](../backend/app/core/config.py)
 
 ### External Resources

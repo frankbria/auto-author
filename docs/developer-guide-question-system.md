@@ -1,5 +1,10 @@
 # Developer Guide: Extending Question Functionality
 
+> **⚠️ Partially outdated (#120):** `QuestionQualityService`, `QuestionFeedbackService`,
+> `GenreQuestionTemplates`, and `UserLevelAdaptation` were removed as dead code (never wired
+> into `app/`). Code examples below that reference those modules are historical. The live
+> question subsystem is `services/question_generation_service.py` + `app/db/questions.py`.
+
 ## Overview
 This guide provides comprehensive information for developers working on the question generation and management system, including architecture, extension points, and implementation patterns.
 
