@@ -31,6 +31,13 @@
 ## Recent Changes
 
 ### 2026-06-25
+- **Writing style transformation (#58)**: New feature — rewrite existing chapter text into a chosen style (distinct from draft-from-Q&A)
+  - **Backend**: `app/services/style_templates.py` (5 documented styles with distinct tone/vocab/structure guidance + `get_style_transformation_prompt`); `ai_service.transform_text_style(content, target_style)` (temp 0.7, preserves facts); new endpoint `POST /books/{id}/chapters/{cid}/transform-style` (auth + ownership + rate limit, **preview-only, no persistence**)
+  - **Frontend**: `StyleTransformer.tsx` dialog (pick style → before/after preview → apply); wired into `ChapterEditor` toolbar with a **client-side snapshot revert** ("Revert style" button) — single-level undo, no backend version storage; `bookClient.transformChapterStyle`
+  - **Tests**: backend `test_style_templates` + `test_ai_service_style_transformation` + `test_style_transformation` (15 tests: distinct prompts per style, validation, auth, AI-failure→503); frontend `StyleTransformer.test.tsx`; deterministic route-mocked E2E `frontend/src/e2e/style-transformation.spec.ts` (transform → preview → apply → revert)
+  - **Note**: the stale deployment spec `tests/e2e/deployment/06-draft-writing-styles.spec.ts` still references the old 6 draft styles (real-auth suite) — not rewritten here
+  - **Status**: ✅ Complete
+
 - **AI Draft Generation alignment (#55)**: Feature was already ~95% built; closed the real gaps the stale issue/bot plans missed
   - **Writing styles**: both `DraftGenerator.tsx` and `DraftGenerationButton.tsx` now ship the 5 documented styles (Professional, Conversational, Academic, Creative, Technical) matching the user manual + AC, replacing the prior mismatched 6. Backend is style-agnostic (free-text into the prompt) → no backend change
   - **Bug fix**: `DraftGenerator.tsx` loading state was unreachable (ternary checked `!generatedDraft` before `isGenerating`, so the form always rendered during generation); reordered so the loading view shows. `DraftGenerationButton.tsx` already had a correct step machine

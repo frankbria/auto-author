@@ -73,6 +73,7 @@ from app.api.dependencies import (
     rate_limit, audit_request, sanitize_input, get_rate_limiter
 )
 from app.services.ai_service import ai_service
+from app.services.style_templates import available_styles, is_valid_style
 from app.services.ai_errors import (
     AIServiceError,
     AIRateLimitError,
@@ -3100,6 +3101,71 @@ async def generate_chapter_draft(
         raise HTTPException(
             status_code=500, detail="Error generating draft"
         )
+
+
+@router.post("/{book_id}/chapters/{chapter_id}/transform-style", response_model=dict)
+async def transform_chapter_style(
+    book_id: str,
+    chapter_id: str,
+    data: dict = Body(default={}),
+    current_user: Dict = Depends(get_current_user_from_session),
+    rate_limit_info: Dict = Depends(
+        get_rate_limiter(limit=10, window=3600)
+    ),  # 10 per hour
+):
+    """
+    Transform existing chapter text into a target writing style (issue #58).
+
+    Preview-only: returns the rewritten text without persisting. The caller
+    applies it via the chapter-content PATCH endpoint and can revert by
+    restoring the snapshot it held before applying.
+    """
+    # Verify book ownership.
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to transform content for this book",
+        )
+
+    content = data.get("content", "")
+    target_style = data.get("target_style", "")
+
+    if not content or not content.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Content is required for style transformation.",
+        )
+    if not is_valid_style(target_style):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported writing style: {target_style!r}. "
+                f"Valid styles: {', '.join(available_styles())}."
+            ),
+        )
+
+    result = await ai_service.transform_text_style(
+        content=content, target_style=target_style
+    )
+
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=503,
+            detail=f"Failed to transform style: {result.get('error', 'Unknown error')}",
+        )
+
+    return {
+        "success": True,
+        "book_id": book_id,
+        "chapter_id": chapter_id,
+        "transformed": result["transformed"],
+        "metadata": result["metadata"],
+        "message": "Style transformed successfully",
+    }
+
 
 @router.post(
     "/{book_id}/chapters/{chapter_id}/questions/responses/batch",

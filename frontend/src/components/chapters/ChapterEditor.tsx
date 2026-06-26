@@ -49,6 +49,7 @@ import {
 import { cn } from '@/lib/utils';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { DraftGenerator } from './DraftGenerator';
+import { StyleTransformer } from './StyleTransformer';
 import { useRouter } from 'next/navigation';
 import {
   validateChapterBackup,
@@ -83,6 +84,8 @@ export function ChapterEditor({
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
   const [hasBackup, setHasBackup] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Snapshot of content before a style transform, for single-level revert (#58).
+  const [preTransformContent, setPreTransformContent] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -285,6 +288,24 @@ export function ChapterEditor({
       // Insert the draft at the current cursor position
       editor.chain().focus().insertContent(draft).run();
       // Trigger auto-save
+      setAutoSavePending(true);
+    }
+  };
+
+  // Apply a style transform: snapshot the current content, then replace it (#58).
+  const handleApplyStyleTransform = (transformed: string) => {
+    if (editor) {
+      setPreTransformContent(editor.getHTML());
+      editor.commands.setContent(transformed);
+      setAutoSavePending(true);
+    }
+  };
+
+  // Revert the last style transform (single-level undo).
+  const handleRevertStyleTransform = () => {
+    if (editor && preTransformContent !== null) {
+      editor.commands.setContent(preTransformContent);
+      setPreTransformContent(null);
       setAutoSavePending(true);
     }
   };
@@ -560,6 +581,26 @@ export function ChapterEditor({
           chapterTitle={chapterTitle}
           onDraftGenerated={handleDraftGenerated}
         />
+
+        {/* AI Style Transformer (#58) */}
+        <StyleTransformer
+          bookId={bookId}
+          chapterId={chapterId}
+          getCurrentContent={() => editor?.getHTML() ?? ''}
+          onApply={handleApplyStyleTransform}
+        />
+
+        {preTransformContent !== null && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRevertStyleTransform}
+            title="Revert the last style transformation"
+            type="button"
+          >
+            Revert style
+          </Button>
+        )}
       </div>
       
       {/* Editor Content */}

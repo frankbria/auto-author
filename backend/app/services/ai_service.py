@@ -16,6 +16,10 @@ from app.services.ai_errors import (
     AIInvalidRequestError,
     AIResponseParsingError
 )
+from app.services.style_templates import (
+    STYLE_LABELS,
+    get_style_transformation_prompt,
+)
 from app.services.ai_cache_service import (
     AICacheService,
     get_toc_generation_cache,
@@ -950,7 +954,83 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 "draft": "",
                 "metadata": {}
             }
-    
+
+    async def transform_text_style(
+        self, content: str, target_style: str
+    ) -> Dict[str, Any]:
+        """
+        Rewrite existing chapter text into a target writing style (issue #58).
+
+        Preview-only: returns the transformed text and metadata without
+        persisting. Facts and meaning are preserved; only tone/phrasing change.
+
+        Args:
+            content: The existing text to transform.
+            target_style: One of the supported style values (see style_templates).
+
+        Returns:
+            Dict with success flag, transformed text, and metadata.
+        """
+        if not content or not content.strip():
+            return {
+                "success": False,
+                "error": "Content is required for style transformation.",
+                "transformed": "",
+                "metadata": {},
+            }
+
+        try:
+            prompt = get_style_transformation_prompt(content, target_style)
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "transformed": "",
+                "metadata": {},
+            }
+
+        try:
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert editor. Rewrite text into a requested "
+                        "style while preserving all facts and meaning exactly."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ]
+
+            response = await self._make_openai_request(
+                messages, temperature=0.7, max_tokens=2000
+            )
+
+            transformed = response.choices[0].message.content
+            original_words = len(content.split())
+            transformed_words = len(transformed.split())
+
+            return {
+                "success": True,
+                "transformed": transformed,
+                "metadata": {
+                    "target_style": target_style,
+                    "style_label": STYLE_LABELS.get(target_style, target_style),
+                    "original_word_count": original_words,
+                    "transformed_word_count": transformed_words,
+                    "model_used": self.model,
+                    "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to transform text style: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "transformed": "",
+                "metadata": {},
+            }
+
     def _build_draft_generation_prompt(
         self,
         chapter_title: str,
