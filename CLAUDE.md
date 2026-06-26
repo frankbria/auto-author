@@ -31,6 +31,11 @@
 ## Recent Changes
 
 ### 2026-06-25
+- **Transcription test coverage + dead-code removal (#93)**: tests-only plan 009
+  - **transcription.py**: 40% → 85% via new `backend/tests/test_api/test_transcription.py` (POST /transcribe auth/413/400/happy/service-error; GET /status; POST /validate). Router isn't mounted on the app, so tests mount it on a bare FastAPI app + override auth; transcription service patched (no AWS/audio)
+  - **Drift**: `app/api/endpoints/book_cover_upload.py` was dead code (never imported) — an unmounted duplicate of the live cover endpoint in `books.py`. Removed it (same pattern as #92's `book_cascade_delete.py`); added a wrong-owner (404) case to the existing `test_book_cover_upload.py` which already exercises the live `books.py` path
+  - **Status**: ✅ Complete (PR #131)
+
 - **Writing style transformation (#58)**: New feature — rewrite existing chapter text into a chosen style (distinct from draft-from-Q&A)
   - **Backend**: `app/services/style_templates.py` (5 documented styles with distinct tone/vocab/structure guidance + `get_style_transformation_prompt`); `ai_service.transform_text_style(content, target_style)` (temp 0.7, preserves facts); new endpoint `POST /books/{id}/chapters/{cid}/transform-style` (auth + ownership + rate limit, **preview-only, no persistence**)
   - **Frontend**: `StyleTransformer.tsx` dialog (pick style → before/after preview → apply); wired into `ChapterEditor` toolbar with a **client-side snapshot revert** ("Revert style" button) — single-level undo, no backend version storage; `bookClient.transformChapterStyle`
@@ -179,7 +184,7 @@
 
 ### Known Issues
 - **Backend Coverage**: 41% vs 85% target
-  - Critical gaps: `security.py` (18%), `book_cover_upload.py` (0%), `transcription.py` (0%)
+  - Critical gaps: `security.py` (18%). (`transcription.py` now 85% via #93; the dead `book_cover_upload.py` duplicate was removed — live cover endpoint lives in `books.py`.)
   - Path to 85%: 4-5 weeks, 207-252 new tests
 - **Backend Asyncio**: 2 test failures related to event loop lifecycle
 - **Backend Module Structure**: Missing `__init__.py` in `app/api/middleware/` causing import errors
