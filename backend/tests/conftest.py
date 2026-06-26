@@ -1,4 +1,5 @@
 import sys
+import os
 import asyncio
 
 if sys.platform == "win32":
@@ -14,12 +15,18 @@ import motor.motor_asyncio
 import app.db.user as users_dao
 import app.db.book as books_dao
 import app.db.audit_log as audit_log_dao
+import app.db.toc_transactions as toc_transactions
 from app.db import base
 from app import db
 
 
 # Patch the DB connection for tests to use a real MongoDB instance
-TEST_MONGO_URI = "mongodb://localhost:27017/auto-author-test"
+# DB name is env-overridable so parallel runs (e.g. CI shards, multi-agent test
+# authoring) can each use an isolated database. Default preserves prior behavior.
+TEST_MONGO_URI = os.environ.get(
+    "TEST_MONGO_URI", "mongodb://localhost:27017/auto-author-test"
+)
+_TEST_DB_NAME = TEST_MONGO_URI.rsplit("/", 1)[-1].split("?")[0]
 _sync_client = pymongo.MongoClient(TEST_MONGO_URI)
 _sync_db = _sync_client.get_default_database()
 _sync_users = _sync_db.get_collection("users")
@@ -79,7 +86,7 @@ def motor_reinit_db():
     with sync tests causes pytest-asyncio to hang.
     """
     # Drop database before test using sync client
-    _sync_client.drop_database("auto-author-test")
+    _sync_client.drop_database(_TEST_DB_NAME)
 
     # Create async Motor client for test use
     base._client = motor.motor_asyncio.AsyncIOMotorClient(TEST_MONGO_URI)
@@ -96,10 +103,17 @@ def motor_reinit_db():
     users_dao.users_collection = base.users_collection
     audit_log_dao.audit_logs_collection = base.audit_logs_collection
 
+    # toc_transactions binds _client/_db/books_collection at import time via
+    # `from .base import ...`; rebind them to the fresh per-test client so the
+    # transactional chapter endpoints don't run against a closed event loop.
+    toc_transactions._client = base._client
+    toc_transactions._db = base._db
+    toc_transactions.books_collection = base.books_collection
+
     yield
 
     # Drop database after test using sync client
-    _sync_client.drop_database("auto-author-test")
+    _sync_client.drop_database(_TEST_DB_NAME)
     base._client.close()
 
 

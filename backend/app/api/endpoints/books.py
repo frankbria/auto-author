@@ -628,7 +628,7 @@ async def update_book_summary(
         )
     # Offensive content filter (simple word blacklist)
     pattern = re.compile(
-        r"\\b(" + "|".join(map(re.escape, OFFENSIVE_WORDS)) + r")\\b", re.IGNORECASE
+        r"\b(" + "|".join(map(re.escape, OFFENSIVE_WORDS)) + r")\b", re.IGNORECASE
     )
     if pattern.search(summary):
         raise HTTPException(
@@ -1465,7 +1465,7 @@ async def create_chapter(
         new_chapter = await add_chapter_with_transaction(
             book_id=book_id,
             chapter_data=chapter_dict,
-            parent_id=chapter_data.parent_id if chapter_data.level > 1 else None,
+            parent_chapter_id=chapter_data.parent_id if chapter_data.level > 1 else None,
             user_auth_id=current_user.get("auth_id")
         )
 
@@ -1499,6 +1499,125 @@ async def create_chapter(
     except Exception:
         logger.error("Failed to create chapter", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create chapter")
+
+
+# NOTE: literal sub-paths (/chapters/metadata, /chapters/tab-state) must be
+# registered BEFORE the parameterized /chapters/{chapter_id} route, otherwise
+# FastAPI matches them as chapter_id="metadata"/"tab-state" and they 404.
+@router.get("/{book_id}/chapters/metadata", response_model=ChapterMetadataResponse)
+async def get_chapters_metadata(
+    book_id: str,
+    current_user: Dict = Depends(get_current_user_from_session),
+    include_content_stats: bool = Query(
+        False, description="Include word count and reading time"
+    ),
+):
+    """
+    Get comprehensive metadata for all chapters in a book.
+    Optimized for tab interface rendering.
+    """
+    # Get the book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to access this book's chapters"
+        )
+
+    # Get current TOC
+    current_toc = book.get("table_of_contents", {})
+    chapters = current_toc.get("chapters", [])
+
+    # Convert chapters to metadata format
+    chapter_metadata_list = []
+
+    def process_chapters(chapter_list, level=1):
+        for chapter in chapter_list:
+            # Calculate reading time if word count exists
+            word_count = chapter.get("word_count", 0)
+            estimated_reading_time = chapter_status_service.calculate_reading_time(
+                word_count
+            )
+
+            metadata = ChapterMetadata(
+                id=chapter.get("id"),
+                title=chapter.get("title"),
+                status=chapter.get("status", ChapterStatus.DRAFT.value),
+                word_count=word_count,
+                last_modified=chapter.get("last_modified"),
+                estimated_reading_time=estimated_reading_time,
+                order=chapter.get("order", 0),
+                level=chapter.get("level", level),
+                has_content=word_count > 0,
+                description=chapter.get("description"),
+                parent_id=chapter.get("parent_id"),
+            )
+            chapter_metadata_list.append(metadata)
+
+            # Process subchapters
+            if chapter.get("subchapters"):
+                process_chapters(chapter["subchapters"], level + 1)
+
+    process_chapters(chapters)
+
+    # Calculate completion stats
+    completion_stats = chapter_status_service.get_completion_stats(
+        [chapter.dict() for chapter in chapter_metadata_list]
+    )
+
+    # Get last active chapter from recent access logs
+    recent_chapters = await chapter_access_service.get_user_recent_chapters(
+        current_user.get("auth_id"), book_id, limit=1
+    )
+    last_active_chapter = recent_chapters[0]["_id"] if recent_chapters else None
+
+    return ChapterMetadataResponse(
+        book_id=book_id,
+        chapters=chapter_metadata_list,
+        total_chapters=len(chapter_metadata_list),
+        completion_stats=completion_stats,
+        last_active_chapter=last_active_chapter,
+    )
+
+
+@router.get("/{book_id}/chapters/tab-state", response_model=dict)
+async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_user_from_session)):
+    """
+    Retrieve saved tab state for restoration.
+    """
+    # Verify book ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise HTTPException(
+            status_code=403, detail="Not authorized to access this book"
+        )
+
+    # Get latest tab state
+    tab_state = await chapter_access_service.get_user_tab_state(
+        current_user.get("auth_id"), book_id
+    )
+
+    if not tab_state:
+        return {
+            "book_id": book_id,
+            "tab_state": None,
+            "message": "No saved tab state found",
+        }
+
+    metadata = tab_state.get("metadata", {})
+    return {
+        "book_id": book_id,
+        "tab_state": {
+            "active_chapter_id": metadata.get("active_chapter_id"),
+            "open_tab_ids": metadata.get("open_tab_ids", []),
+            "tab_order": metadata.get("tab_order", []),
+            "last_updated": tab_state.get("timestamp"),
+        },
+        "success": True,
+    }
 
 
 @router.get("/{book_id}/chapters/{chapter_id}", response_model=dict)
@@ -1577,7 +1696,7 @@ async def update_chapter(
         updated_chapter = await update_chapter_with_transaction(
             book_id=book_id,
             chapter_id=chapter_id,
-            updates=updates,
+            chapter_updates=updates,
             user_auth_id=current_user.get("auth_id")
         )
 
@@ -1742,83 +1861,6 @@ async def list_chapters(
 # Enhanced Chapter Metadata and Tab Management Endpoints
 
 
-@router.get("/{book_id}/chapters/metadata", response_model=ChapterMetadataResponse)
-async def get_chapters_metadata(
-    book_id: str,
-    current_user: Dict = Depends(get_current_user_from_session),
-    include_content_stats: bool = Query(
-        False, description="Include word count and reading time"
-    ),
-):
-    """
-    Get comprehensive metadata for all chapters in a book.
-    Optimized for tab interface rendering.
-    """
-    # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book's chapters"
-        )
-
-    # Get current TOC
-    current_toc = book.get("table_of_contents", {})
-    chapters = current_toc.get("chapters", [])
-
-    # Convert chapters to metadata format
-    chapter_metadata_list = []
-
-    def process_chapters(chapter_list, level=1):
-        for chapter in chapter_list:
-            # Calculate reading time if word count exists
-            word_count = chapter.get("word_count", 0)
-            estimated_reading_time = chapter_status_service.calculate_reading_time(
-                word_count
-            )
-
-            metadata = ChapterMetadata(
-                id=chapter.get("id"),
-                title=chapter.get("title"),
-                status=chapter.get("status", ChapterStatus.DRAFT.value),
-                word_count=word_count,
-                last_modified=chapter.get("last_modified"),
-                estimated_reading_time=estimated_reading_time,
-                order=chapter.get("order", 0),
-                level=chapter.get("level", level),
-                has_content=word_count > 0,
-                description=chapter.get("description"),
-                parent_id=chapter.get("parent_id"),
-            )
-            chapter_metadata_list.append(metadata)
-
-            # Process subchapters
-            if chapter.get("subchapters"):
-                process_chapters(chapter["subchapters"], level + 1)
-
-    process_chapters(chapters)
-
-    # Calculate completion stats
-    completion_stats = chapter_status_service.get_completion_stats(
-        [chapter.dict() for chapter in chapter_metadata_list]
-    )
-
-    # Get last active chapter from recent access logs
-    recent_chapters = await chapter_access_service.get_user_recent_chapters(
-        current_user.get("auth_id"), book_id, limit=1
-    )
-    last_active_chapter = recent_chapters[0]["_id"] if recent_chapters else None
-
-    return ChapterMetadataResponse(
-        book_id=book_id,
-        chapters=chapter_metadata_list,
-        total_chapters=len(chapter_metadata_list),
-        completion_stats=completion_stats,
-        last_active_chapter=last_active_chapter,
-    )
-
-
 @router.patch("/{book_id}/chapters/bulk-status", response_model=dict)
 async def update_chapter_status_bulk(
     book_id: str,
@@ -1945,45 +1987,6 @@ async def save_tab_state(
         "tab_state_id": log_id,
         "success": True,
         "message": "Tab state saved successfully",
-    }
-
-
-@router.get("/{book_id}/chapters/tab-state", response_model=dict)
-async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_user_from_session)):
-    """
-    Retrieve saved tab state for restoration.
-    """
-    # Verify book ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book"
-        )
-
-    # Get latest tab state
-    tab_state = await chapter_access_service.get_user_tab_state(
-        current_user.get("auth_id"), book_id
-    )
-
-    if not tab_state:
-        return {
-            "book_id": book_id,
-            "tab_state": None,
-            "message": "No saved tab state found",
-        }
-
-    metadata = tab_state.get("metadata", {})
-    return {
-        "book_id": book_id,
-        "tab_state": {
-            "active_chapter_id": metadata.get("active_chapter_id"),
-            "open_tab_ids": metadata.get("open_tab_ids", []),
-            "tab_order": metadata.get("tab_order", []),
-            "last_updated": tab_state.get("timestamp"),
-        },
-        "success": True,
     }
 
 
@@ -2200,9 +2203,7 @@ async def get_chapter_analytics(
     try:
         # Get chapter analytics
         analytics = await chapter_access_service.get_chapter_analytics(
-            user_id=current_user.get("auth_id"),
             book_id=book_id,
-            chapter_id=chapter_id,
             days=days,
         )
 
@@ -2276,9 +2277,13 @@ async def batch_get_chapter_content(
             }
 
             if include_metadata:
-                # Calculate reading time
-                reading_time = await chapter_status_service.calculate_reading_time(
-                    chapter.get("content", "")
+                # Calculate reading time from word count (fall back to content)
+                word_count = chapter.get("word_count", 0)
+                if not word_count:
+                    content = chapter.get("content", "")
+                    word_count = len(content.split()) if content else 0
+                reading_time = chapter_status_service.calculate_reading_time(
+                    word_count
                 )
 
                 chapter_info["metadata"] = {
