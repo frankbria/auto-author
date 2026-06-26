@@ -193,6 +193,7 @@ jobs:
             echo "BACKEND_CORS_ORIGINS=[\"$FRONTEND_URL\",\"$API_URL\"]"
             echo ""
             echo "# OpenAI"
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}"
             echo "OPENAI_AUTOAUTHOR_API_KEY=${{ secrets.OPENAI_API_KEY }}"
             echo ""
             echo "# Better Auth Authentication"
