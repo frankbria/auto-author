@@ -44,19 +44,30 @@ def mw():
 @pytest.mark.asyncio
 class TestSessionMiddleware:
     async def test_skip_path_bypasses_session_logic(self, mw):
-        req = _request(path="/docs")
+        # Cookie + user are present, which would normally trigger session work;
+        # the skip-path must short-circuit before any of it runs.
+        req = _request(path="/docs", cookies={"session_id": "sess_1"}, user={"auth_id": "u1"})
         call_next = _call_next_returning()
-        with patch.object(sm.settings, "BYPASS_AUTH", False):
+        with patch.object(sm.settings, "BYPASS_AUTH", False), \
+             patch.object(sm, "validate_session", AsyncMock()) as mock_validate, \
+             patch.object(sm, "get_active_session_by_user", AsyncMock()) as mock_get:
             resp = await mw.dispatch(req, call_next)
         call_next.assert_awaited_once()
+        mock_validate.assert_not_awaited()
+        mock_get.assert_not_awaited()
         assert "X-Session-ID" not in resp.headers
 
     async def test_bypass_auth_skips(self, mw):
-        req = _request()
+        # Same: a present cookie/user must not drive any session lookups when bypassed.
+        req = _request(cookies={"session_id": "sess_1"}, user={"auth_id": "u1"})
         call_next = _call_next_returning()
-        with patch.object(sm.settings, "BYPASS_AUTH", True):
+        with patch.object(sm.settings, "BYPASS_AUTH", True), \
+             patch.object(sm, "validate_session", AsyncMock()) as mock_validate, \
+             patch.object(sm, "get_active_session_by_user", AsyncMock()) as mock_get:
             resp = await mw.dispatch(req, call_next)
         call_next.assert_awaited_once()
+        mock_validate.assert_not_awaited()
+        mock_get.assert_not_awaited()
         assert "X-Session-ID" not in resp.headers
 
     async def test_valid_cookie_session_sets_cookie_and_header(self, mw):

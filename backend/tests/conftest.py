@@ -54,6 +54,15 @@ real_get_rate_limiter = getattr(deps, "_real_get_rate_limiter", deps.get_rate_li
 deps._real_get_rate_limiter = real_get_rate_limiter
 deps.get_rate_limiter = fake_get_rate_limiter
 import pytest, pytest_asyncio
+
+
+@pytest.fixture
+def real_rate_limiter():
+    """The genuine get_rate_limiter, for tests that exercise real rate limiting
+    (the module-level override above replaces it with a no-op everywhere else)."""
+    return real_get_rate_limiter
+
+
 from httpx import AsyncClient, ASGITransport
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

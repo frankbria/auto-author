@@ -10,7 +10,6 @@ from fastapi import HTTPException, Request
 import time
 
 import app.api.dependencies as deps
-from tests.conftest import real_get_rate_limiter
 from app.api.dependencies import (
     sanitize_input,
     get_rate_limiter,
@@ -134,7 +133,7 @@ class TestRateLimiting:
             assert result["remaining"] >= 0
 
     @pytest.mark.asyncio
-    async def test_rate_limiter_blocks_over_limit(self):
+    async def test_rate_limiter_blocks_over_limit(self, real_rate_limiter):
         """Test that requests over limit are blocked.
 
         The limiter short-circuits when BYPASS_AUTH is on (test default), so
@@ -148,7 +147,7 @@ class TestRateLimiting:
         mock_request.url = Mock()
         mock_request.url.path = "/api/test_blocks_over_limit"  # Unique path
 
-        limiter = real_get_rate_limiter(limit=3, window=60)
+        limiter = real_rate_limiter(limit=3, window=60)
 
         with patch.object(deps.settings, "BYPASS_AUTH", False):
             # Make 3 requests (at limit) - should succeed
@@ -167,7 +166,7 @@ class TestRateLimiting:
         assert "Rate limit exceeded" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_rate_limiter_includes_headers(self):
+    async def test_rate_limiter_includes_headers(self, real_rate_limiter):
         """Test that rate limit response includes proper headers"""
         rate_limit_cache.clear()
 
@@ -177,7 +176,7 @@ class TestRateLimiting:
         mock_request.url = Mock()
         mock_request.url.path = "/api/test_headers_check"  # Unique path
 
-        limiter = real_get_rate_limiter(limit=2, window=60)
+        limiter = real_rate_limiter(limit=2, window=60)
 
         with patch.object(deps.settings, "BYPASS_AUTH", False):
             # Make 2 requests (at limit) - should succeed
@@ -196,11 +195,11 @@ class TestRateLimiting:
         assert "Retry-After" in headers
 
     @pytest.mark.asyncio
-    async def test_rate_limiter_bypass_auth_short_circuits(self):
+    async def test_rate_limiter_bypass_auth_short_circuits(self, real_rate_limiter):
         """With BYPASS_AUTH on, the limiter returns full quota without counting."""
         rate_limit_cache.clear()
         mock_request = Mock(spec=Request)
-        limiter = real_get_rate_limiter(limit=2, window=60)
+        limiter = real_rate_limiter(limit=2, window=60)
 
         with patch.object(deps.settings, "BYPASS_AUTH", True):
             for _ in range(5):
