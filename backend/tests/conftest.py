@@ -46,6 +46,12 @@ def fake_get_rate_limiter(limit: int = 10, window: int = 60):
     return _always_allow
 
 
+# Preserve the real limiter so tests that need to exercise the actual
+# rate-limiting logic can reach it (the override below hides it everywhere else).
+# Idempotent: conftest can be imported more than once, so stash the genuine
+# function on the module and never let a re-import capture the fake.
+real_get_rate_limiter = getattr(deps, "_real_get_rate_limiter", deps.get_rate_limiter)
+deps._real_get_rate_limiter = real_get_rate_limiter
 deps.get_rate_limiter = fake_get_rate_limiter
 import pytest, pytest_asyncio
 from httpx import AsyncClient, ASGITransport
