@@ -1,12 +1,12 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import List, Dict, Any, Optional
+from fastapi.security import HTTPBearer
+from typing import List, Dict
 from datetime import datetime, timezone
 
 from app.core.security import get_current_user_from_session, SessionRoleChecker
-from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserPreferences
+from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.db.database import (
     get_user_by_auth_id,
     get_user_by_email,
@@ -16,7 +16,6 @@ from app.db.database import (
     get_collection,  # Added missing import
 )
 from app.api.dependencies import (
-    rate_limit,
     audit_request,
     sanitize_input,
     get_rate_limiter,
@@ -287,6 +286,8 @@ async def update_user_data(
             )
 
         return updated_user
+    except HTTPException:
+        raise
     except Exception:
         logger.error("Error updating user", exc_info=True)
         raise HTTPException(
@@ -328,6 +329,8 @@ async def delete_user_account(
             )
 
         return None
+    except HTTPException:
+        raise
     except Exception:
         logger.error("Error deleting user", exc_info=True)
         raise HTTPException(
