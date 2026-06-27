@@ -373,5 +373,6 @@ class QuestionProgressResponse(BaseModel):
 
     total: int
     completed: int
+    in_progress: int = 0  # questions with a draft (started but not completed) response
     progress: float  # 0.0 to 1.0
     status: str  # "not-started", "in-progress", "completed"
