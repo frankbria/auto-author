@@ -13,7 +13,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+
   // Navigation items with active state detection
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', active: pathname === '/dashboard' },
@@ -67,10 +67,10 @@ export default function DashboardLayout({
                 className="text-gray-400 hover:text-gray-100 transition-colors p-2"
                 aria-label="Toggle mobile menu"
               >
-                <svg 
-                  className="w-6 h-6" 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
                   {isMobileMenuOpen ? (
@@ -87,11 +87,11 @@ export default function DashboardLayout({
           {isMobileMenuOpen && (
             <>
               {/* Backdrop */}
-              <div 
+              <div
                 className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
                 onClick={closeMobileMenu}
               />
-              
+
               {/* Menu Panel */}
               <div className="fixed top-0 right-0 h-full w-64 bg-gray-900 border-l border-gray-800 z-50 md:hidden transform transition-transform duration-300 ease-in-out">
                 <div className="p-6">

@@ -41,8 +41,8 @@ class DraftClient {
    * Generate a chapter draft from question responses
    */
   async generateChapterDraft(
-    bookId: string, 
-    chapterId: string, 
+    bookId: string,
+    chapterId: string,
     request: DraftGenerationRequest
   ): Promise<DraftGenerationResponse> {
     try {
@@ -77,8 +77,8 @@ class DraftClient {
    * Save draft content for a chapter
    */
   async saveDraftContent(
-    bookId: string, 
-    chapterId: string, 
+    bookId: string,
+    chapterId: string,
     content: string,
     autoSave: boolean = false
   ): Promise<void> {

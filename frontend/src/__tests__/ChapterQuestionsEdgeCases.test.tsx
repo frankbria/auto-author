@@ -1,6 +1,6 @@
 /**
  * Edge Cases Test Suite for User Story 4.2 (Interview-Style Prompts)
- * 
+ *
  * This test suite covers edge cases, error scenarios, and boundary conditions
  * for the chapter questions functionality to ensure robust error handling
  * and graceful degradation.
@@ -21,19 +21,19 @@ const ChapterQuestions = ({ bookId, chapterId, chapterTitle }: any) => {
   );
 };
 
-// Mock QuestionDisplay component  
+// Mock QuestionDisplay component
 const QuestionDisplay = ({ bookId, chapterId, question, onResponseSaved, onRegenerateQuestion, response, onResponseChange, onNext, onPrevious }: any) => {
   return (
     <div>
       <div>Question</div>
       <div>{question?.questionText || question?.question_text}</div>
-      <textarea 
-        role="textbox" 
+      <textarea
+        role="textbox"
         aria-label="Response text"
         onChange={(e) => {
           onResponseSaved?.();
           onResponseChange?.(e.target.value);
-        }} 
+        }}
       />
       {onNext && <button onClick={onNext}>Next</button>}
       {onPrevious && <button onClick={onPrevious}>Previous</button>}
@@ -122,9 +122,9 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionGenerator 
-            bookId="book-1" 
-            chapterId="chapter-1" 
+          <QuestionGenerator
+            bookId="book-1"
+            chapterId="chapter-1"
             onGenerate={mockOnGenerate}
             isGenerating={false}
             error="Failed to generate questions: Network timeout"
@@ -144,9 +144,9 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionGenerator 
-            bookId="book-1" 
-            chapterId="chapter-1" 
+          <QuestionGenerator
+            bookId="book-1"
+            chapterId="chapter-1"
             onGenerate={mockOnGenerate}
             isGenerating={false}
             error="Rate limit exceeded. Please try again later."
@@ -166,9 +166,9 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionGenerator 
-            bookId="book-1" 
-            chapterId="chapter-1" 
+          <QuestionGenerator
+            bookId="book-1"
+            chapterId="chapter-1"
             onGenerate={mockOnGenerate}
             isGenerating={false}
             error="Unexpected response format from server"
@@ -198,7 +198,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionDisplay 
+          <QuestionDisplay
             bookId="book-1"
             chapterId="chapter-1"
             question={longQuestion}
@@ -226,7 +226,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionDisplay 
+          <QuestionDisplay
             bookId="book-1"
             chapterId="chapter-1"
             question={questionWithoutMetadata as any}
@@ -244,8 +244,8 @@ describe('ChapterQuestions Edge Cases', () => {
       // Simply test that ChapterQuestions renders without crashing
       const { container } = render(
         <TestWrapper>
-          <ChapterQuestions 
-            bookId="book-1" 
+          <ChapterQuestions
+            bookId="book-1"
             chapterId="chapter-1"
             chapterTitle="Test Chapter"
           />
@@ -264,7 +264,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionDisplay 
+          <QuestionDisplay
             bookId="book-1"
             chapterId="chapter-1"
             question={{
@@ -297,7 +297,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionDisplay 
+          <QuestionDisplay
             bookId="book-1"
             chapterId="chapter-1"
             question={{
@@ -330,7 +330,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionDisplay 
+          <QuestionDisplay
             bookId="book-1"
             chapterId="chapter-1"
             question={{
@@ -353,7 +353,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       // Test component renders without navigation buttons
       expect(screen.getByText('Question')).toBeInTheDocument();
-      
+
       // Navigation functionality would be handled by parent component
       expect(mockOnNext).toHaveBeenCalledTimes(0);
       expect(mockOnPrevious).toHaveBeenCalledTimes(0);
@@ -372,7 +372,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionProgress 
+          <QuestionProgress
             progress={inconsistentProgress}
             currentIndex={0}
             totalQuestions={10}
@@ -398,7 +398,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionProgress 
+          <QuestionProgress
             progress={negativeProgress}
             currentIndex={0}
             totalQuestions={10}
@@ -422,9 +422,9 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionGenerator 
-            bookId="book-1" 
-            chapterId="chapter-1" 
+          <QuestionGenerator
+            bookId="book-1"
+            chapterId="chapter-1"
             onQuestionsGenerated={jest.fn()}
             existingQuestions={[{
               id: 'q1',
@@ -441,11 +441,11 @@ describe('ChapterQuestions Edge Cases', () => {
       );
 
       const regenerateButton = screen.getByRole('button', { name: /regenerate.*questions/i });
-      
+
       // Since our mock doesn't actually call the API, we need to test differently
       expect(regenerateButton).toBeInTheDocument();
       expect(screen.getByText('Existing question')).toBeInTheDocument();
-      
+
       // Click would trigger onQuestionsGenerated in our mock
       fireEvent.click(regenerateButton);
     });
@@ -468,9 +468,9 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionGenerator 
-            bookId="book-1" 
-            chapterId="chapter-1" 
+          <QuestionGenerator
+            bookId="book-1"
+            chapterId="chapter-1"
             onQuestionsGenerated={jest.fn()}
             existingQuestions={[]}
           />
@@ -499,8 +499,8 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <ChapterQuestions 
-            bookId="book-1" 
+          <ChapterQuestions
+            bookId="book-1"
             chapterId="chapter-1"
             chapterTitle="Test Chapter"
           />
@@ -522,7 +522,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionDisplay 
+          <QuestionDisplay
             bookId="book-1"
             chapterId="chapter-1"
             question={{
@@ -542,7 +542,7 @@ describe('ChapterQuestions Edge Cases', () => {
       );
 
       const textarea = screen.getByRole('textbox');
-      
+
       // Try to focus disabled textarea
       await user.click(textarea);
 
@@ -570,8 +570,8 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <ChapterQuestions 
-            bookId="book-1" 
+          <ChapterQuestions
+            bookId="book-1"
             chapterId="chapter-1"
             chapterTitle="Test Chapter"
           />
@@ -590,7 +590,7 @@ describe('ChapterQuestions Edge Cases', () => {
       let callCount = 0;
       mockApi.saveQuestionResponse.mockImplementation(() => {
         callCount++;
-        return new Promise(resolve => 
+        return new Promise(resolve =>
           setTimeout(() => resolve({ data: { id: `response-${callCount}` } }), 100)
         );
       });
@@ -599,7 +599,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <QuestionDisplay 
+          <QuestionDisplay
             bookId="book-1"
             chapterId="chapter-1"
             question={{
@@ -621,7 +621,7 @@ describe('ChapterQuestions Edge Cases', () => {
       );
 
       const textarea = screen.getByRole('textbox');
-      
+
       // Simulate rapid typing that triggers multiple API calls
       await userEvent.type(textarea, 'Quick response');
 
@@ -634,7 +634,7 @@ describe('ChapterQuestions Edge Cases', () => {
     it('should handle screen reader navigation with complex question structures', async () => {
       render(
         <TestWrapper>
-          <QuestionDisplay 
+          <QuestionDisplay
             bookId="book-1"
             chapterId="chapter-1"
             question={{
@@ -645,7 +645,7 @@ describe('ChapterQuestions Edge Cases', () => {
               category: 'development',
               generatedAt: new Date().toISOString(),
               order: 1,
-              metadata: { 
+              metadata: {
                 suggestedResponseLength: 'long',
                 helpText: 'Think about both internal and external motivations',
                 examples: ['Fear of abandonment', 'Desire for recognition']
@@ -667,8 +667,8 @@ describe('ChapterQuestions Edge Cases', () => {
 
       render(
         <TestWrapper>
-          <ChapterQuestions 
-            bookId="book-1" 
+          <ChapterQuestions
+            bookId="book-1"
             chapterId="chapter-1"
             chapterTitle="Test Chapter"
           />
@@ -677,7 +677,7 @@ describe('ChapterQuestions Edge Cases', () => {
 
       // Test tab navigation
       await user.tab();
-      
+
       // Should handle dynamic content gracefully
       expect(document.activeElement).toBeInTheDocument();
     });

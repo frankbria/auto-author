@@ -116,7 +116,7 @@ describe('ChapterTabs TOC Integration', () => {
     });
 
     render(<ChapterTabs bookId="test-book-id" />);
-    
+
     // Verify loading state is shown
     expect(screen.getByText('Loading chapters...')).toBeInTheDocument();
   });
@@ -145,7 +145,7 @@ describe('ChapterTabs TOC Integration', () => {
     });
 
     render(<ChapterTabs bookId="test-book-id" />);
-    
+
     // Verify error state is shown
     expect(screen.getByText('Error loading chapters')).toBeInTheDocument();
     expect(screen.getByText('Failed to load TOC data')).toBeInTheDocument();

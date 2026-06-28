@@ -12,7 +12,7 @@ async def test_create_audit_log():
     # Mock the audit_logs_collection
     mock_collection = AsyncMock()
     mock_collection.insert_one = AsyncMock()
-    
+
     with patch('app.db.audit_log.audit_logs_collection', mock_collection):
         # Test basic audit log
         log = await create_audit_log(
@@ -21,7 +21,7 @@ async def test_create_audit_log():
             target_id="resource456",
             resource_type="test_resource"
         )
-        
+
         assert log["action"] == "test_action"
         assert log["actor_id"] == "user123"
         assert log["target_id"] == "resource456"
@@ -29,10 +29,10 @@ async def test_create_audit_log():
         assert "timestamp" in log
         assert isinstance(log["timestamp"], datetime)
         assert log["details"] == {}
-        
+
         # Verify insert_one was called
         mock_collection.insert_one.assert_called()
-        
+
         # Test with details
         log_with_details = await create_audit_log(
             action="update_book",
@@ -45,9 +45,9 @@ async def test_create_audit_log():
                 "new_title": "New Title"
             }
         )
-        
+
         assert log_with_details["details"]["fields_updated"] == ["title", "description"]
         assert log_with_details["details"]["new_title"] == "New Title"
-        
+
         # Verify insert_one was called twice
         assert mock_collection.insert_one.call_count == 2

@@ -51,7 +51,7 @@ jest.mock('@/components/chapters/TabContextMenu', () => ({
 describe('ChapterTabs', () => {
   it('should render without crashing', () => {
     render(<ChapterTabs bookId="test-book-id" />);
-    
+
     expect(screen.getByTestId('tab-bar')).toBeInTheDocument();
     expect(screen.getByTestId('tab-content')).toBeInTheDocument();
     expect(screen.getByTestId('tab-context-menu')).toBeInTheDocument();

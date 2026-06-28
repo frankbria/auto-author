@@ -94,7 +94,7 @@ export default function SettingsPage() {
   return (
     <div className="container mx-auto py-8 max-w-2xl">
       <h1 className="text-3xl font-bold mb-8">Settings</h1>
-      
+
       <div className="space-y-6">
         {/* Profile Settings */}
         <Card>
@@ -188,17 +188,17 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="auto-save-interval">Auto-save Interval (seconds)</Label>
-              <Input 
-                id="auto-save-interval" 
-                type="number" 
-                min="1" 
-                max="300" 
-                defaultValue="3" 
+              <Input
+                id="auto-save-interval"
+                type="number"
+                min="1"
+                max="300"
+                defaultValue="3"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="default-font-size">Editor Font Size</Label>
-              <select 
+              <select
                 id="default-font-size"
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 defaultValue="16"

@@ -13,14 +13,14 @@ interface TabContentProps {
   'data-testid'?: string;
 }
 
-export function TabContent({ 
-  bookId, 
+export function TabContent({
+  bookId,
   activeChapterId,
   chapters,
   onContentChange,
   onChapterSave,
   'data-testid': testId
-}: TabContentProps) {  
+}: TabContentProps) {
   if (!activeChapterId) {
     return (
       <div className="flex-1 flex items-center justify-center">

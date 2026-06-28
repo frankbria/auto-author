@@ -61,19 +61,19 @@ describe('Book Metadata Editing', () => {
         onUpdate={() => {}} // Empty function
       />
     );
-    
+
     // Get the title input field
     const titleInput = await screen.findByLabelText(/Book Title/i);
     expect(titleInput).toHaveValue('Test Book');
-    
+
     // Check initial validation passes
     expect(screen.queryByText(/Title is required/i)).not.toBeInTheDocument();
-    
+
     // Change the title
     await act(async () => {
       fireEvent.change(titleInput, { target: { value: 'New Title' } });
     });
-    
+
     // Check that the input value was updated
     expect(titleInput).toHaveValue('New Title');
   });

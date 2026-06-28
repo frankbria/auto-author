@@ -19,7 +19,7 @@ export function ChapterPreview({ chapter, content }: ChapterPreviewProps) {
             <span className="capitalize">{chapter.status}</span>
           </div>
         </header>
-        
+
         <div className="prose prose-lg max-w-none">
           {content ? (
             <div className="whitespace-pre-wrap">{content}</div>

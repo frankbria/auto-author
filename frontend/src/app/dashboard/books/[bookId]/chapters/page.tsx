@@ -29,17 +29,17 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
-  
+
   // Fetch chapters and their prompts when component mounts
   useEffect(() => {
     const fetchChapters = async () => {
       try {
         // In a real app, this would call your API
         // const response = await bookClient.getBookChapters(bookId);
-        
+
         // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         // Sample chapter data with questions
         const chapterData: ChapterPrompt[] = [
           {
@@ -109,7 +109,7 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
             ]
           }
         ];
-        
+
         setChapters(chapterData);
         setActiveChapter(chapterData[0].chapterId);
       } catch (err) {
@@ -119,22 +119,22 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
         setIsLoading(false);
       }
     };
-    
+
     fetchChapters();
   }, []);
 
   const activeChapterData = chapters.find(chapter => chapter.chapterId === activeChapter);
-  
+
   const regenerateQuestions = async (chapterId: string) => {
     setIsGenerating(true);
-    
+
     try {
       // In a real app, this would call your API to regenerate questions
       // const response = await bookClient.regenerateChapterQuestions(bookId, chapterId);
-      
+
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Generate new questions (this would come from the API)
       const newQuestions: Question[] = [
         {
@@ -158,10 +158,10 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
           text: 'What visual elements or diagrams would enhance understanding of these concepts?'
         }
       ];
-      
+
       // Update the chapters with new questions
-      setChapters(prevChapters => 
-        prevChapters.map(chapter => 
+      setChapters(prevChapters =>
+        prevChapters.map(chapter =>
           chapter.chapterId === chapterId
             ? { ...chapter, questions: newQuestions }
             : chapter
@@ -174,10 +174,10 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
       setIsGenerating(false);
     }
   };
-  
+
   const markQuestionRelevance = (chapterId: string, questionId: string, isRelevant: boolean) => {
-    setChapters(prevChapters => 
-      prevChapters.map(chapter => 
+    setChapters(prevChapters =>
+      prevChapters.map(chapter =>
         chapter.chapterId === chapterId
           ? {
               ...chapter,
@@ -214,13 +214,13 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
           Answer these interview-style questions to generate content for each chapter.
         </p>
       </div>
-      
+
       {error && (
         <div className="p-4 mb-6 rounded-lg bg-red-900/20 border border-red-700 text-red-400">
           {error}
         </div>
       )}
-      
+
       <div className="flex gap-6 flex-col md:flex-row">
         {/* Chapter navigation sidebar */}        <div className="w-full md:w-64 shrink-0">
           <div className="bg-card border border-border rounded-lg p-4">
@@ -245,14 +245,14 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
             </nav>
           </div>
         </div>
-        
+
         {/* Questions for active chapter */}        <div className="flex-1">
           <div className="bg-card border border-border rounded-lg p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-foreground">
                 {activeChapterData?.chapterTitle || 'Chapter Questions'}
               </h2>
-              
+
               <button
                 onClick={() => regenerateQuestions(activeChapter)}
                 disabled={isGenerating}
@@ -284,8 +284,8 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                     <button
                       onClick={() => markQuestionRelevance(activeChapter, question.id, true)}
                       className={`p-1 rounded-md ${
-                        question.isRelevant === true 
-                          ? 'bg-green-900/30 text-green-400' 
+                        question.isRelevant === true
+                          ? 'bg-green-900/30 text-green-400'
                           : 'text-muted-foreground hover:text-green-400'
                       }`}
                       title="Mark as relevant"
@@ -297,8 +297,8 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                     <button
                       onClick={() => markQuestionRelevance(activeChapter, question.id, false)}
                       className={`p-1 rounded-md ${
-                        question.isRelevant === false 
-                          ? 'bg-red-900/30 text-red-400' 
+                        question.isRelevant === false
+                          ? 'bg-red-900/30 text-red-400'
                           : 'text-muted-foreground hover:text-red-400'
                       }`}
                       title="Mark as irrelevant"
@@ -309,7 +309,7 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
                     </button>
                   </div>
                 </div>
-                
+
                 <textarea
                   placeholder="Type your answer here..."
                   className="w-full mt-2 bg-background border border-border rounded-md py-2 px-3 text-foreground focus:border-ring"
@@ -336,7 +336,7 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
             >
               Back
             </button>
-            
+
             <div className="flex space-x-3">
               <button
                 onClick={() => {
@@ -350,7 +350,7 @@ export default function ChapterPromptsPage({ params }: ChapterPromptsPageProps) 
               >
                 Previous Chapter
               </button>
-              
+
               <button
                 onClick={() => {
                   const currentIndex = chapters.findIndex(c => c.chapterId === activeChapter);

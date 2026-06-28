@@ -59,26 +59,26 @@ CHAPTER_QUESTION_ANSWERS = {
 
 class SystemE2ETest:
     """System E2E Test Runner"""
-    
+
     def __init__(self, client: httpx.AsyncClient, cleanup: bool = True):
         self.client = client
         self.cleanup = cleanup
         self.book_id: str = None
         self.chapter_id: str = None
         self.chapter_qa_pairs: List[Dict[str, str]] = []
-        
+
     def log_step(self, message: str):
         """Log a test step"""
         print(f"\n🔸 {message}")
-        
+
     def log_success(self, message: str):
         """Log a success message"""
         print(f"✅ {message}")
-        
+
     def log_error(self, message: str):
         """Log an error message"""
         print(f"❌ {message}")
-        
+
     def log_info(self, message: str):
         """Log an info message"""
         print(f"ℹ️  {message}")
@@ -86,14 +86,14 @@ class SystemE2ETest:
     async def create_book(self) -> Dict[str, Any]:
         """Step 1: Create a book"""
         self.log_step("Creating book...")
-        
+
         response = await self.client.post("/api/v1/books/", json=TEST_BOOK)
         response.raise_for_status()
-        
+
         book = response.json()
         self.book_id = book["id"]
         self.log_success(f"Book created: {book['title']} (ID: {self.book_id})")
-        
+
         # Save book summary
         self.log_step("Saving book summary...")
         summary_response = await self.client.put(
@@ -102,16 +102,16 @@ class SystemE2ETest:
         )
         summary_response.raise_for_status()
         self.log_success("Book summary saved")
-        
+
         return book
 
     async def generate_book_questions(self) -> List[Dict[str, Any]]:
         """Step 2: Generate book summary questions"""
         self.log_step("Generating book summary questions...")
-        
+
         response = await self.client.post(f"/api/v1/books/{self.book_id}/generate-questions")
         response.raise_for_status()
-        
+
         data = response.json()
         questions = data["questions"]
         self.log_success(f"Generated {len(questions)} summary questions")
@@ -127,7 +127,7 @@ class SystemE2ETest:
     async def answer_book_questions(self, questions: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Step 3: Answer book summary questions"""
         self.log_step("Answering book summary questions...")
-        
+
         answers = []
         for i, question in enumerate(questions):
             answer_text = list(BOOK_QUESTION_ANSWERS.values())[i % len(BOOK_QUESTION_ANSWERS)]
@@ -136,25 +136,25 @@ class SystemE2ETest:
                 question_text = question
             else:
                 question_text = question.get("question", question.get("question_text", ""))
-            
+
             answers.append({
                 "question": question_text,
                 "answer": answer_text
             })
-        
+
         response = await self.client.put(
             f"/api/v1/books/{self.book_id}/question-responses",
             json={"responses": answers}
         )
         response.raise_for_status()
-        
+
         self.log_success("Summary answers submitted")
         return response.json()
 
     async def generate_toc(self) -> Dict[str, Any]:
         """Step 4: Generate Table of Contents"""
         self.log_step("Generating Table of Contents...")
-        
+
         response = await self.client.post(
             f"/api/v1/books/{self.book_id}/generate-toc",
             json={
@@ -164,7 +164,7 @@ class SystemE2ETest:
             }
         )
         response.raise_for_status()
-        
+
         toc = response.json()
         # The response contains toc.toc.chapters structure
         chapters_count = len(toc.get("toc", {}).get("chapters", []))
@@ -174,16 +174,16 @@ class SystemE2ETest:
     async def get_chapters(self) -> List[Dict[str, Any]]:
         """Step 5: Get chapters from the book (created with TOC)"""
         self.log_step("Getting chapters from book...")
-        
+
         response = await self.client.get(f"/api/v1/books/{self.book_id}/chapters?flat=true")
         response.raise_for_status()
-        
+
         data = response.json()
         chapters = data.get("chapters", [])
-        
+
         # Debug: print chapter structure
         self.log_info(f"Chapters structure: {[{'id': ch.get('id'), 'title': ch.get('title')} for ch in chapters[:3]]}")
-        
+
         if chapters:
             # Find the first content chapter (not introduction)
             for ch in chapters:
@@ -192,27 +192,27 @@ class SystemE2ETest:
                 if ch_id and ("Chapter 1" in ch_title or (ch.get("level") == 1 and ch.get("order", 0) == 2)):
                     self.chapter_id = ch_id
                     break
-            
+
             # If no specific chapter found, use the first one with an ID
             if not self.chapter_id:
                 for ch in chapters:
                     if ch.get("id"):
                         self.chapter_id = ch.get("id")
                         break
-                        
+
         self.log_success(f"Found {len(chapters)} chapters, selected chapter ID: {self.chapter_id}")
         return chapters
 
     async def generate_chapter_questions(self) -> List[Dict[str, Any]]:
         """Step 6: Generate chapter questions"""
         self.log_step("Generating questions for Chapter 1...")
-        
+
         response = await self.client.post(
             f"/api/v1/books/{self.book_id}/chapters/{self.chapter_id}/generate-questions",
             json={"count": 3, "difficulty": "medium"}
         )
         response.raise_for_status()
-        
+
         data = response.json()
         questions = data["questions"]
         self.log_success(f"Generated {len(questions)} chapter questions")
@@ -221,15 +221,15 @@ class SystemE2ETest:
     async def answer_chapter_questions(self, questions: List[Dict[str, Any]]):
         """Step 7: Answer chapter questions"""
         self.log_step("Answering chapter questions...")
-        
+
         # Clear previous Q&A pairs
         self.chapter_qa_pairs = []
-        
+
         for question in questions:
             # Determine answer based on question content
             question_text = question["question_text"]
             question_lower = question_text.lower()
-            
+
             if "main points" in question_lower or "cover" in question_lower:
                 answer = CHAPTER_QUESTION_ANSWERS["main_points"]
             elif "open" in question_lower or "hook" in question_lower:
@@ -238,13 +238,13 @@ class SystemE2ETest:
                 answer = CHAPTER_QUESTION_ANSWERS["examples"]
             else:
                 answer = "This chapter establishes the foundation for understanding habit formation"
-            
+
             # Store Q&A pair for draft generation
             self.chapter_qa_pairs.append({
                 "question": question_text,
                 "answer": answer
             })
-            
+
             response = await self.client.put(
                 f"/api/v1/books/{self.book_id}/chapters/{self.chapter_id}/questions/{question['id']}/response",
                 json={
@@ -254,13 +254,13 @@ class SystemE2ETest:
                 }
             )
             response.raise_for_status()
-        
+
         self.log_success("All chapter questions answered")
 
     async def generate_chapter_draft(self) -> str:
         """Step 8: Generate chapter draft"""
         self.log_step("Generating chapter draft from answers...")
-        
+
         response = await self.client.post(
             f"/api/v1/books/{self.book_id}/chapters/{self.chapter_id}/generate-draft",
             json={
@@ -269,13 +269,13 @@ class SystemE2ETest:
                 "target_word_count": 2000
             }
         )
-        
+
         if response.status_code != 200:
             self.log_error(f"Generate draft failed with status {response.status_code}")
             self.log_error(f"Response: {response.text}")
-            
+
         response.raise_for_status()
-        
+
         data = response.json()
         draft = data["draft"]
         self.log_success(f"Generated draft with {len(draft)} characters")
@@ -284,43 +284,43 @@ class SystemE2ETest:
     async def save_chapter_content(self, content: str):
         """Step 9: Save draft to chapter"""
         self.log_step("Saving draft to chapter...")
-        
+
         response = await self.client.patch(
             f"/api/v1/books/{self.book_id}/chapters/{self.chapter_id}/content",
             json={"content": content, "auto_update_metadata": True}
         )
         response.raise_for_status()
-        
+
         self.log_success("Draft saved successfully")
 
     async def verify_system(self) -> bool:
         """Step 10: Verify complete workflow"""
         self.log_step("Verifying complete workflow...")
-        
+
         # Verify book
         book_response = await self.client.get(f"/api/v1/books/{self.book_id}")
         book_response.raise_for_status()
         book = book_response.json()
-        
+
         # Verify chapters
         chapters_response = await self.client.get(f"/api/v1/books/{self.book_id}/chapters")
         chapters_response.raise_for_status()
         chapters = chapters_response.json()
-        
+
         # Verify content - use the dedicated content endpoint
         content_response = await self.client.get(f"/api/v1/books/{self.book_id}/chapters/{self.chapter_id}/content")
         content_response.raise_for_status()
         content_data = content_response.json()
-        
+
         self.log_info(f"Book: {book['title']}")
         self.log_info(f"Chapters: {len(chapters)}")
         self.log_info(f"Draft Length: {len(content_data.get('content', ''))} characters")
-        
+
         # Verify draft contains expected content
         content = content_data.get("content", "")
         assert len(content) > 100, f"Chapter content too short: {len(content)} characters"
         assert "habit" in content.lower(), "Draft doesn't contain expected topic"
-        
+
         self.log_success("System verification passed!")
         return True
 
@@ -339,28 +339,28 @@ class SystemE2ETest:
         """Run the complete system test"""
         print("\n🚀 Auto Author System E2E Test Starting...\n")
         start_time = time.time()
-        
+
         try:
             # Execute test workflow
             await self.create_book()
-            
+
             book_questions = await self.generate_book_questions()
             await self.answer_book_questions(book_questions)
-            
+
             toc = await self.generate_toc()
             chapters = await self.get_chapters()
-            
+
             chapter_questions = await self.generate_chapter_questions()
             await self.answer_chapter_questions(chapter_questions)
-            
+
             draft = await self.generate_chapter_draft()
             await self.save_chapter_content(draft)
-            
+
             await self.verify_system()
-            
+
             duration = time.time() - start_time
             print(f"\n✅ SYSTEM TEST PASSED in {duration:.2f} seconds!\n")
-            
+
         except Exception as e:
             print(f"\n❌ SYSTEM TEST FAILED!\n")
             print(f"Error: {e}")
@@ -378,7 +378,7 @@ def mock_ai_service(monkeypatch):
     """Mock the AI service to return predictable responses"""
     from app.services.ai_service import AIService
     from app.api.endpoints import books as books_endpoint
-    
+
     # Mock question generation
     async def mock_generate_clarifying_questions(self, *args, **kwargs):
         return [
@@ -386,7 +386,7 @@ def mock_ai_service(monkeypatch):
             {"question": "What are the key takeaways?", "category": "content"},
             {"question": "What makes this unique?", "category": "uniqueness"},
         ]
-    
+
     # Mock TOC generation
     async def mock_generate_toc_from_summary_and_responses(self, *args, **kwargs):
         return {
@@ -435,7 +435,7 @@ def mock_ai_service(monkeypatch):
             "has_subchapters": False,
             "success": True
         }
-    
+
     # Mock chapter questions
     async def mock_generate_chapter_questions(self, *args, **kwargs):
         return [
@@ -455,7 +455,7 @@ def mock_ai_service(monkeypatch):
                 "guidance": "Provide 2-3 concrete examples"
             }
         ]
-    
+
     # Mock draft generation
     async def mock_generate_chapter_draft(self, *args, **kwargs):
         draft_text = """# Understanding Habit Formation
@@ -473,7 +473,7 @@ Consider your morning routine. Do you reach for your phone immediately upon waki
 ## The Power of Small Changes
 
 The key to habit change isn't massive transformation but small, consistent adjustments."""
-        
+
         return {
             "success": True,
             "draft": draft_text,
@@ -487,7 +487,7 @@ The key to habit change isn't massive transformation but small, consistent adjus
                 "Include specific research citations for credibility"
             ]
         }
-    
+
     # Mock question generation service to avoid the Request.scope bug
     async def mock_generate_questions_for_chapter(*args, **kwargs):
         return {
@@ -528,17 +528,17 @@ The key to habit change isn't massive transformation but small, consistent adjus
             ],
             "total": 3
         }
-    
+
     # Apply mocks to the AIService class methods
     monkeypatch.setattr(AIService, "generate_clarifying_questions", mock_generate_clarifying_questions)
     monkeypatch.setattr(AIService, "generate_toc_from_summary_and_responses", mock_generate_toc_from_summary_and_responses)
     monkeypatch.setattr(AIService, "generate_chapter_questions", mock_generate_chapter_questions)
     monkeypatch.setattr(AIService, "generate_chapter_draft", mock_generate_chapter_draft)
-    
+
     # Mock the entire generate_chapter_questions endpoint to avoid the Request.scope bug
     async def mock_generate_chapter_questions_endpoint(
-        book_id: str, 
-        chapter_id: str, 
+        book_id: str,
+        chapter_id: str,
         request_data = None,
         current_user = None,
         **kwargs
@@ -582,7 +582,7 @@ The key to habit change isn't massive transformation but small, consistent adjus
             "total": 3,
             "generated_at": datetime.now(timezone.utc).isoformat()
         }
-    
+
     # Mock the endpoint
     monkeypatch.setattr(books_endpoint, "generate_chapter_questions", mock_generate_chapter_questions_endpoint)
 
@@ -605,7 +605,7 @@ async def test_complete_system_workflow(auth_client_factory, mock_ai_service):
 async def test_ai_service_connectivity(auth_client_factory):
     """Quick test to ensure AI services are responsive"""
     client = await auth_client_factory()
-    
+
     try:
         response = await client.get("/api/v1/health")
         assert response.status_code == 200

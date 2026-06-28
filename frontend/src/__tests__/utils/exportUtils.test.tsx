@@ -31,13 +31,13 @@ const loadExportData = async (
 ) => {
   const token = await getToken();
   bookClient.setAuthToken(token);
-  
+
   const [book, exportFormats, chaptersMetadata] = await Promise.all([
     bookClient.getBook(bookId),
     bookClient.getExportFormats(bookId),
     bookClient.getChaptersMetadata(bookId),
   ]);
-  
+
   return { book, exportFormats, chaptersMetadata };
 };
 
@@ -50,11 +50,11 @@ const exportBook = async (
   setIsExporting: (value: boolean) => void
 ) => {
   setIsExporting(true);
-  
+
   try {
     const token = await getToken();
     bookClient.setAuthToken(token);
-    
+
     let blob;
     if (format === 'pdf') {
       blob = await bookClient.exportPDF(bookId, options);
@@ -63,7 +63,7 @@ const exportBook = async (
     } else {
       throw new Error(`Unsupported format: ${format}`);
     }
-    
+
     // Create download link
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -73,7 +73,7 @@ const exportBook = async (
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     toast.success(`${format.toUpperCase()} exported successfully!`);
     return true;
   } catch (error) {
@@ -92,7 +92,7 @@ const exportBook = async (
 describe('Export Utils', () => {
   const mockGetToken = jest.fn();
   const mockSetIsExporting = jest.fn();
-  
+
   const mockBookData = {
     id: 'test-book-id',
     title: 'Test Book for Export',
@@ -155,11 +155,11 @@ describe('Export Utils', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Mock URL methods
     global.URL.createObjectURL = jest.fn(() => 'blob:mock-url');
     global.URL.revokeObjectURL = jest.fn();
-    
+
     // Mock document methods
     const originalCreateElement = document.createElement;
     document.createElement = jest.fn((tagName) => {
@@ -173,10 +173,10 @@ describe('Export Utils', () => {
       }
       return originalCreateElement.call(document, tagName);
     });
-    
+
     document.body.appendChild = jest.fn();
     document.body.removeChild = jest.fn();
-    
+
     // Setup default mocks
     mockGetToken.mockResolvedValue('test-token');
     (bookClient.getBook as jest.Mock).mockResolvedValue(mockBookData);
@@ -187,12 +187,12 @@ describe('Export Utils', () => {
   describe('loadExportData', () => {
     it('should load all export data successfully', async () => {
       const result = await loadExportData('test-book-id', mockGetToken);
-      
+
       expect(bookClient.setAuthToken).toHaveBeenCalledWith('test-token');
       expect(bookClient.getBook).toHaveBeenCalledWith('test-book-id');
       expect(bookClient.getExportFormats).toHaveBeenCalledWith('test-book-id');
       expect(bookClient.getChaptersMetadata).toHaveBeenCalledWith('test-book-id');
-      
+
       expect(result.book).toEqual(mockBookData);
       expect(result.exportFormats).toEqual(mockExportFormats);
       expect(result.chaptersMetadata).toEqual(mockChaptersMetadata);
@@ -200,15 +200,15 @@ describe('Export Utils', () => {
 
     it('should handle API errors when loading data', async () => {
       (bookClient.getBook as jest.Mock).mockRejectedValue(new Error('API Error'));
-      
+
       await expect(loadExportData('test-book-id', mockGetToken)).rejects.toThrow('API Error');
-      
+
       expect(bookClient.setAuthToken).toHaveBeenCalledWith('test-token');
     });
 
     it('should handle authentication errors', async () => {
       mockGetToken.mockRejectedValue(new Error('Auth failed'));
-      
+
       await expect(loadExportData('test-book-id', mockGetToken)).rejects.toThrow('Auth failed');
     });
   });
@@ -217,7 +217,7 @@ describe('Export Utils', () => {
     it('should export PDF successfully', async () => {
       const mockBlob = new Blob(['PDF content'], { type: 'application/pdf' });
       (bookClient.exportPDF as jest.Mock).mockResolvedValue(mockBlob);
-      
+
       const result = await exportBook(
         'test-book-id',
         'Test Book',
@@ -226,7 +226,7 @@ describe('Export Utils', () => {
         mockGetToken,
         mockSetIsExporting
       );
-      
+
       expect(result).toBe(true);
       expect(mockSetIsExporting).toHaveBeenCalledWith(true);
       expect(bookClient.setAuthToken).toHaveBeenCalledWith('test-token');
@@ -238,11 +238,11 @@ describe('Export Utils', () => {
     });
 
     it('should export DOCX successfully', async () => {
-      const mockBlob = new Blob(['DOCX content'], { 
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      const mockBlob = new Blob(['DOCX content'], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       });
       (bookClient.exportDOCX as jest.Mock).mockResolvedValue(mockBlob);
-      
+
       const result = await exportBook(
         'test-book-id',
         'Test Book',
@@ -251,7 +251,7 @@ describe('Export Utils', () => {
         mockGetToken,
         mockSetIsExporting
       );
-      
+
       expect(result).toBe(true);
       expect(bookClient.exportDOCX).toHaveBeenCalledWith('test-book-id', {
         includeEmptyChapters: true,
@@ -262,16 +262,16 @@ describe('Export Utils', () => {
     it('should create correct download filename for different formats', async () => {
       const mockBlob = new Blob(['content']);
       (bookClient.exportPDF as jest.Mock).mockResolvedValue(mockBlob);
-      
+
       const mockAnchor = {
         click: jest.fn(),
         href: '',
         download: '',
         style: {},
       };
-      
+
       document.createElement = jest.fn(() => mockAnchor as any);
-      
+
       await exportBook(
         'test-book-id',
         'My Complex Book: Title! (2024)',
@@ -280,7 +280,7 @@ describe('Export Utils', () => {
         mockGetToken,
         mockSetIsExporting
       );
-      
+
       expect(mockAnchor.download).toBe('My_Complex_Book__Title___2024_.pdf');
     });
 
@@ -293,7 +293,7 @@ describe('Export Utils', () => {
         mockGetToken,
         mockSetIsExporting
       );
-      
+
       expect(result).toBe(false);
       expect(toast.error).toHaveBeenCalledWith('EPUB format is not supported.');
       expect(mockSetIsExporting).toHaveBeenCalledWith(false);
@@ -302,7 +302,7 @@ describe('Export Utils', () => {
     it('should handle export API errors', async () => {
       (bookClient.exportPDF as jest.Mock).mockRejectedValue(new Error('Export failed'));
       const consoleError = jest.spyOn(console, 'error').mockImplementation();
-      
+
       const result = await exportBook(
         'test-book-id',
         'Test Book',
@@ -311,19 +311,19 @@ describe('Export Utils', () => {
         mockGetToken,
         mockSetIsExporting
       );
-      
+
       expect(result).toBe(false);
       expect(consoleError).toHaveBeenCalledWith('Export failed:', expect.any(Error));
       expect(toast.error).toHaveBeenCalledWith('Export failed. Please try again.');
       expect(mockSetIsExporting).toHaveBeenCalledWith(false);
-      
+
       consoleError.mockRestore();
     });
 
     it('should handle authentication errors during export', async () => {
       mockGetToken.mockRejectedValue(new Error('Auth failed'));
       const consoleError = jest.spyOn(console, 'error').mockImplementation();
-      
+
       const result = await exportBook(
         'test-book-id',
         'Test Book',
@@ -332,27 +332,27 @@ describe('Export Utils', () => {
         mockGetToken,
         mockSetIsExporting
       );
-      
+
       expect(result).toBe(false);
       expect(consoleError).toHaveBeenCalledWith('Export failed:', expect.any(Error));
       expect(mockSetIsExporting).toHaveBeenCalledWith(false);
-      
+
       consoleError.mockRestore();
     });
 
     it('should properly clean up download link after successful export', async () => {
       const mockBlob = new Blob(['PDF content'], { type: 'application/pdf' });
       (bookClient.exportPDF as jest.Mock).mockResolvedValue(mockBlob);
-      
+
       const mockAnchor = {
         click: jest.fn(),
         href: '',
         download: '',
         style: {},
       };
-      
+
       document.createElement = jest.fn(() => mockAnchor as any);
-      
+
       await exportBook(
         'test-book-id',
         'Test Book',
@@ -361,7 +361,7 @@ describe('Export Utils', () => {
         mockGetToken,
         mockSetIsExporting
       );
-      
+
       expect(global.URL.createObjectURL).toHaveBeenCalledWith(mockBlob);
       expect(mockAnchor.click).toHaveBeenCalled();
       expect(document.body.appendChild).toHaveBeenCalledWith(mockAnchor);

@@ -30,7 +30,7 @@ class TestEnvironmentValidator {
     };
     const reset = '\x1b[0m';
     console.log(`${colorMap[type]}[${timestamp}] ${type}: ${message}${reset}`);
-    
+
     if (type === 'ERROR') this.errors.push(message);
     if (type === 'WARNING') this.warnings.push(message);
     if (type === 'SUCCESS') this.successes.push(message);
@@ -61,7 +61,7 @@ class TestEnvironmentValidator {
       const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
       const hasInDeps = packageJson.dependencies && packageJson.dependencies[dependency];
       const hasInDevDeps = packageJson.devDependencies && packageJson.devDependencies[dependency];
-      
+
       if (hasInDeps || hasInDevDeps) {
         this.log('SUCCESS', `✓ ${description} dependency found: ${dependency}`);
         return true;
@@ -93,27 +93,27 @@ class TestEnvironmentValidator {
 
   validateFrontendInfrastructure() {
     this.log('INFO', '=== Validating Frontend Test Infrastructure ===');
-    
+
     // Check package.json exists and has test dependencies
     const frontendPackageJson = path.join(FRONTEND_DIR, 'package.json');
     this.checkFileExists(frontendPackageJson, 'Frontend package.json');
-    
+
     // Check Playwright dependencies
     this.checkPackageJsonDependency(frontendPackageJson, '@playwright/test', 'Playwright test framework');
     this.checkPackageJsonDependency(frontendPackageJson, 'axe-playwright', 'Accessibility testing');
-    
+
     // Check Jest dependencies
     this.checkPackageJsonDependency(frontendPackageJson, 'jest', 'Jest testing framework');
     this.checkPackageJsonDependency(frontendPackageJson, '@testing-library/react', 'React Testing Library');
-    
+
     // Check configuration files
     this.checkFileExists(path.join(FRONTEND_DIR, 'playwright.config.ts'), 'Playwright configuration');
     this.checkFileExists(path.join(FRONTEND_DIR, 'jest.config.js'), 'Jest configuration');
-    
+
     // Check test directories
     this.checkDirectoryExists(path.join(FRONTEND_DIR, 'src', '__tests__'), 'Unit tests directory');
     this.checkDirectoryExists(path.join(FRONTEND_DIR, 'src', 'e2e'), 'E2E tests directory');
-    
+
     // Check specific test files
     this.checkFileExists(
       path.join(FRONTEND_DIR, 'src', 'e2e', 'interview-prompts.spec.ts'),
@@ -123,22 +123,22 @@ class TestEnvironmentValidator {
 
   validateBackendInfrastructure() {
     this.log('INFO', '=== Validating Backend Test Infrastructure ===');
-    
+
     // Check requirements.txt
     const requirementsPath = path.join(BACKEND_DIR, 'requirements.txt');
     this.checkFileExists(requirementsPath, 'Backend requirements.txt');
-    
+
     // Check Python test dependencies
     this.checkPythonRequirement(requirementsPath, 'pytest', 'PyTest framework');
     this.checkPythonRequirement(requirementsPath, 'locust', 'Load testing framework');
     this.checkPythonRequirement(requirementsPath, 'faker', 'Test data generation');
-    
+
     // Check test directories
     this.checkDirectoryExists(path.join(BACKEND_DIR, 'tests'), 'Backend tests directory');
     this.checkDirectoryExists(path.join(BACKEND_DIR, 'tests', 'factories'), 'Test factories directory');
     this.checkDirectoryExists(path.join(BACKEND_DIR, 'tests', 'load'), 'Load tests directory');
     this.checkDirectoryExists(path.join(BACKEND_DIR, 'tests', 'performance'), 'Performance tests directory');
-    
+
     // Check specific test files
     this.checkFileExists(
       path.join(BACKEND_DIR, 'tests', 'factories', 'models.py'),
@@ -156,10 +156,10 @@ class TestEnvironmentValidator {
 
   validateCIConfiguration() {
     this.log('INFO', '=== Validating CI/CD Configuration ===');
-    
+
     const githubDir = path.join(ROOT_DIR, '.github', 'workflows');
     this.checkDirectoryExists(githubDir, 'GitHub workflows directory');
-    
+
     // Check workflow files
     this.checkFileExists(
       path.join(githubDir, 'test-suite.yml'),
@@ -177,10 +177,10 @@ class TestEnvironmentValidator {
 
   validateDocumentation() {
     this.log('INFO', '=== Validating Test Documentation ===');
-    
+
     const docsDir = path.join(ROOT_DIR, 'docs', 'testing');
     this.checkDirectoryExists(docsDir, 'Testing documentation directory');
-    
+
     // Check documentation files
     this.checkFileExists(path.join(docsDir, 'README.md'), 'Main testing README');
     this.checkFileExists(path.join(docsDir, 'setup-guide.md'), 'Setup guide');
@@ -191,16 +191,16 @@ class TestEnvironmentValidator {
 
   async validateNodeModules() {
     this.log('INFO', '=== Validating Node Dependencies ===');
-    
+
     try {
       process.chdir(FRONTEND_DIR);
       const nodeModulesExists = fs.existsSync(path.join(FRONTEND_DIR, 'node_modules'));
-      
+
       if (!nodeModulesExists) {
         this.log('WARNING', 'node_modules not found, dependencies may need to be installed');
         return;
       }
-      
+
       // Check if Playwright is installed
       const playwrightPath = path.join(FRONTEND_DIR, 'node_modules', '@playwright', 'test');
       if (fs.existsSync(playwrightPath)) {
@@ -208,7 +208,7 @@ class TestEnvironmentValidator {
       } else {
         this.log('WARNING', 'Playwright may need to be installed (run: npm install)');
       }
-      
+
     } catch (error) {
       this.log('WARNING', `Could not validate Node dependencies: ${error.message}`);
     } finally {
@@ -218,26 +218,26 @@ class TestEnvironmentValidator {
 
   generateReport() {
     this.log('INFO', '=== Test Environment Validation Report ===');
-    
+
     console.log(`\n📊 Summary:`);
     console.log(`✓ Successes: ${this.successes.length}`);
     console.log(`⚠️  Warnings: ${this.warnings.length}`);
     console.log(`❌ Errors: ${this.errors.length}`);
-    
+
     if (this.errors.length > 0) {
       console.log(`\n❌ Critical Issues to Fix:`);
       this.errors.forEach((error, index) => {
         console.log(`${index + 1}. ${error}`);
       });
     }
-    
+
     if (this.warnings.length > 0) {
       console.log(`\n⚠️  Warnings to Address:`);
       this.warnings.forEach((warning, index) => {
         console.log(`${index + 1}. ${warning}`);
       });
     }
-    
+
     if (this.errors.length === 0) {
       this.log('SUCCESS', '🎉 Test environment validation completed successfully!');
       console.log(`\n✅ Next Steps:`);
@@ -254,13 +254,13 @@ class TestEnvironmentValidator {
 
   async run() {
     console.log('🔍 Starting test environment validation...\n');
-    
+
     this.validateFrontendInfrastructure();
     this.validateBackendInfrastructure();
     this.validateCIConfiguration();
     this.validateDocumentation();
     await this.validateNodeModules();
-    
+
     return this.generateReport();
   }
 }

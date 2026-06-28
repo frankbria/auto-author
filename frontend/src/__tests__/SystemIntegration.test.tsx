@@ -1,9 +1,9 @@
 /**
  * System Integration Test for Auto Author
- * 
+ *
  * This test validates the complete authoring workflow from book creation
  * through chapter draft generation, using real API calls.
- * 
+ *
  * This is the gold standard test - if this passes, the core system is working.
  */
 
@@ -100,7 +100,7 @@ describe('Auto Author System Integration Test', () => {
     // Step 2: Generate book summary questions
     console.log('❓ Step 2: Generating book summary questions...');
     const summaryQuestions = await aiClient.generateBookSummaryQuestions(bookId);
-    
+
     expect(summaryQuestions).toBeDefined();
     expect(summaryQuestions.questions).toBeInstanceOf(Array);
     expect(summaryQuestions.questions.length).toBeGreaterThan(0);
@@ -111,7 +111,7 @@ describe('Auto Author System Integration Test', () => {
     const summaryAnswers = summaryQuestions.questions.map((q: any, index: number) => ({
       question_id: q.id,
       question_text: q.question_text,
-      answer: index === 0 
+      answer: index === 0
         ? 'Adults aged 25-55 interested in personal development and understanding behavior change'
         : index === 1
         ? 'Readers will understand the neurological basis of habits and gain practical tools for change'
@@ -138,7 +138,7 @@ describe('Auto Author System Integration Test', () => {
     // Step 5: Create chapters from TOC
     console.log('📖 Step 5: Creating chapters from TOC...');
     const createdChapters = await bookClient.createChaptersFromTOC(bookId, tocResponse.chapters);
-    
+
     expect(createdChapters).toBeInstanceOf(Array);
     expect(createdChapters.length).toBeGreaterThan(0);
     chapterId = createdChapters[0].id;
@@ -160,7 +160,7 @@ describe('Auto Author System Integration Test', () => {
     console.log('✍️ Step 7: Answering chapter questions...');
     for (const question of chapterQuestions.questions) {
       let answer = '';
-      
+
       if (question.question_text.toLowerCase().includes('main points')) {
         answer = 'Introduce habits concept, explain neuroscience basis, preview book framework';
       } else if (question.question_text.toLowerCase().includes('open') || question.question_text.toLowerCase().includes('hook')) {
@@ -205,20 +205,20 @@ describe('Auto Author System Integration Test', () => {
 
     // Step 10: Verify complete workflow
     console.log('🔍 Step 10: Verifying complete workflow...');
-    
+
     // Verify book exists
     const book = await bookClient.getBook(bookId);
     expect(book.title).toBe(TEST_BOOK.title);
-    
+
     // Verify chapters exist
     const chapters = await bookClient.getChapters(bookId);
     expect(chapters.length).toBeGreaterThan(0);
-    
+
     // Verify chapter has content
     const chapter = await bookClient.getChapter(chapterId);
     expect(chapter.content).toBeTruthy();
     expect(chapter.content.length).toBeGreaterThan(500);
-    
+
     console.log('✅ System Integration Test PASSED!');
     console.log(`📊 Summary:`);
     console.log(`   - Book: ${book.title}`);
@@ -230,7 +230,7 @@ describe('Auto Author System Integration Test', () => {
   test('Verify AI services are responsive', async () => {
     // Quick smoke test to ensure AI services are available
     console.log('🔌 Testing AI service connectivity...');
-    
+
     try {
       // Test a simple AI call
       const testResponse = await aiClient.testConnection();
@@ -246,13 +246,13 @@ describe('Auto Author System Integration Test', () => {
 
 /**
  * Instructions for running this test:
- * 
+ *
  * 1. Ensure backend is running with real AI credentials
  * 2. Set environment variables:
  *    - OPENAI_API_KEY
  *    - Any other required API keys
  * 3. Run: npm test SystemIntegration.test.tsx
- * 
+ *
  * This test will:
  * - Create real data in the database
  * - Make real API calls to AI services

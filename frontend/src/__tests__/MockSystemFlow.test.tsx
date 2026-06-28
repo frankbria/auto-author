@@ -1,6 +1,6 @@
 /**
  * Mock System Flow Test
- * 
+ *
  * This test validates the complete authoring workflow using mocked API responses.
  * It simulates the entire flow without requiring real backend or AI services.
  */
@@ -169,7 +169,7 @@ Remember: habits are not destiny. With understanding and deliberate practice, we
 
     // Verification: Check all mocks were set up correctly
     console.log('\n🔍 Verifying mock setup...');
-    
+
     // Test creating a book
     const createdBook = await bookClient.createBook({
       title: 'The Psychology of Habit Formation',
@@ -180,7 +180,7 @@ Remember: habits are not destiny. With understanding and deliberate practice, we
       language: 'English',
       estimated_word_count: 50000,
     });
-    
+
     expect(createdBook).toEqual(mockBook);
     expect(bookClient.createBook).toHaveBeenCalledTimes(1);
     console.log('✅ Book creation verified');
@@ -219,11 +219,11 @@ Remember: habits are not destiny. With understanding and deliberate practice, we
   test('Verify error handling in workflow', async () => {
     // Test API error handling
     (bookClient.createBook as jest.Mock).mockRejectedValue(new Error('API Error'));
-    
+
     await expect(
       bookClient.createBook({ title: 'Test', author_name: 'Test' } as any)
     ).rejects.toThrow('API Error');
-    
+
     console.log('✅ Error handling verified');
   });
 });

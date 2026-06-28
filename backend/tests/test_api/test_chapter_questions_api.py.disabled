@@ -109,7 +109,7 @@ class TestChapterQuestionsAPI:
             mock_database.books.find_one.return_value = sample_book_data
             mock_database.chapters.find_one.return_value = sample_chapter_data
             mock_database.questions.insert_many.return_value = MagicMock(inserted_ids=[f"q{i}" for i in range(3)])
-            
+
             mock_ai_service.generate_chapter_questions.return_value = ai_question_response
 
             with patch('app.routers.questions.get_ai_service', return_value=mock_ai_service):
@@ -125,12 +125,12 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert "questions" in data
             assert len(data["questions"]) == 3
             assert "generation_metadata" in data
             assert data["generation_metadata"]["ai_model"] == "gpt-4"
-            
+
             # Verify AI service was called correctly
             mock_ai_service.generate_chapter_questions.assert_called_once()
 
@@ -184,7 +184,7 @@ class TestChapterQuestionsAPI:
             mock_database.questions.find.return_value = sample_questions
             mock_database.questions.delete_many.return_value = MagicMock(deleted_count=3)
             mock_database.questions.insert_many.return_value = MagicMock(inserted_ids=[f"q{i}" for i in range(3)])
-            
+
             mock_ai_service.generate_chapter_questions.return_value = ai_question_response
 
             with patch('app.routers.questions.get_ai_service', return_value=mock_ai_service):
@@ -198,7 +198,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert "questions" in data
             assert data["regeneration_metadata"]["previous_count"] == 3
             assert data["regeneration_metadata"]["kept_responses"] == True
@@ -218,7 +218,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert "questions" in data
             assert len(data["questions"]) == len(sample_questions)
             assert data["questions"][0]["question_text"] == sample_questions[0]["question_text"]
@@ -239,7 +239,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert len(data["questions"]) == len(filtered_questions)
             for question in data["questions"]:
                 assert question["question_type"] == QuestionType.CONTENT.value
@@ -255,7 +255,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert data["id"] == question_data["id"]
             assert data["question_text"] == question_data["question_text"]
 
@@ -291,7 +291,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert data["success"] == True
             assert "response_id" in data
 
@@ -331,7 +331,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert data["has_response"] == True
             assert data["response"]["response_text"] == response_data["response_text"]
             assert data["response"]["status"] == response_data["status"]
@@ -346,7 +346,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert data["has_response"] == False
             assert data["response"] is None
 
@@ -385,7 +385,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert data["success"] == True
             assert "rating_id" in data
 
@@ -426,7 +426,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert "ratings" in data
             assert len(data["ratings"]) == 1
             assert data["ratings"][0]["rating"] == 4
@@ -447,7 +447,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert data["total_questions"] == 5
             assert data["answered_questions"] == 3
             assert data["completion_percentage"] == 60
@@ -455,7 +455,7 @@ class TestChapterQuestionsAPI:
         async def test_get_detailed_progress(self, async_client, mock_database, sample_chapter_data):
             """Test retrieving detailed progress breakdown."""
             mock_database.chapters.find_one.return_value = sample_chapter_data
-            
+
             # Mock aggregation pipeline results
             progress_data = [
                 {"_id": ResponseStatus.COMPLETE, "count": 3},
@@ -470,7 +470,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert data["by_status"][ResponseStatus.COMPLETE.value] == 3
             assert data["by_status"][ResponseStatus.DRAFT.value] == 1
             assert data["by_status"][ResponseStatus.SKIPPED.value] == 1
@@ -524,7 +524,7 @@ class TestChapterQuestionsAPI:
                 tasks.append(task)
 
             responses = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             # Some requests should be rate limited
             rate_limited_count = sum(1 for r in responses if not isinstance(r, Exception) and r.status_code == 429)
             assert rate_limited_count > 0
@@ -543,7 +543,7 @@ class TestChapterQuestionsAPI:
             """Test handling of concurrent modifications to questions."""
             question_data = sample_questions[0]
             mock_database.questions.find_one.return_value = question_data
-            
+
             # Simulate optimistic locking failure
             mock_database.question_responses.replace_one.side_effect = Exception("Document was modified")
 
@@ -565,17 +565,17 @@ class TestChapterQuestionsAPI:
         async def test_bulk_operations_performance(self, async_client, mock_database, sample_chapter_data):
             """Test performance of bulk question operations."""
             mock_database.chapters.find_one.return_value = sample_chapter_data
-            
+
             # Generate large number of questions
             large_question_set = [sample_questions[0].copy() for _ in range(100)]
             mock_database.questions.find.return_value = large_question_set
 
             start_time = asyncio.get_event_loop().time()
-            
+
             response = await async_client.get(
                 "/api/books/test-book-id/chapters/test-chapter-id/questions"
             )
-            
+
             end_time = asyncio.get_event_loop().time()
             request_time = end_time - start_time
 
@@ -586,7 +586,7 @@ class TestChapterQuestionsAPI:
         async def test_pagination_performance(self, async_client, mock_database, sample_chapter_data):
             """Test pagination performance for large question sets."""
             mock_database.chapters.find_one.return_value = sample_chapter_data
-            
+
             # Mock paginated results
             paginated_questions = sample_questions[:2]  # First page
             mock_database.questions.find.return_value.skip.return_value.limit.return_value = paginated_questions
@@ -599,7 +599,7 @@ class TestChapterQuestionsAPI:
 
             assert response.status_code == 200
             data = response.json()
-            
+
             assert len(data["questions"]) == 2
             assert data["pagination"]["total"] == 100
             assert data["pagination"]["pages"] == 50
@@ -614,11 +614,11 @@ class TestChapterQuestionsAPI:
             )
 
             assert response.status_code == 200
-            
+
             # Should include appropriate cache headers
             assert "Cache-Control" in response.headers
             assert "ETag" in response.headers
-            
+
             # Questions data should be cached for a short period
             cache_control = response.headers["Cache-Control"]
             assert "max-age" in cache_control

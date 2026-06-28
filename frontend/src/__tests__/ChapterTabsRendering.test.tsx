@@ -15,7 +15,7 @@ describe('ChapterTabs Rendering Tests', () => {
     setupTestEnvironment();
     jest.clearAllMocks();
   });
-  
+
   test.each([
     [1, 'single chapter'],
     [5, 'few chapters'],
@@ -45,18 +45,18 @@ describe('ChapterTabs Rendering Tests', () => {
       loading: false,
       error: null
     });
-    
+
     // Act
     render(<ChapterTabs bookId="test-book" />);
-    
+
     // Assert
     await waitFor(() => {
       expect(screen.getByTestId('chapter-tabs-container')).toBeInTheDocument();
     });
-    
+
     // Verify tab bar is rendered
     expect(screen.getByTestId('tab-bar')).toBeInTheDocument();
-    
+
     // Verify all chapters are accessible
     if (chapterCount <= 20) {
       // For smaller sets, verify all tabs are rendered
@@ -68,14 +68,14 @@ describe('ChapterTabs Rendering Tests', () => {
       expect(screen.getByTestId('tab-overflow-indicator')).toBeInTheDocument();
       expect(screen.getByTestId('scroll-controls')).toBeInTheDocument();
     }
-    
+
     // Verify tab content is rendered
     expect(screen.getByTestId('tab-content')).toBeInTheDocument();
-    
+
     // Performance assertion removed as it's unreliable in CI environments
     // and can cause false failures
   });
-  
+
   test('handles empty chapter list gracefully', () => {
     mockUseChapterTabs.mockReturnValue({
       state: {
@@ -98,9 +98,9 @@ describe('ChapterTabs Rendering Tests', () => {
       loading: false,
       error: null
     });
-    
+
     render(<ChapterTabs bookId="test-book" />);
-    
+
     expect(screen.getByTestId('empty-chapters-state')).toBeInTheDocument();
     expect(screen.getByText(/no chapters available/i)).toBeInTheDocument();
   });

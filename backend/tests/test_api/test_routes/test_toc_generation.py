@@ -36,7 +36,7 @@ MOCK_TOC_RESPONSE = {
 async def test_generate_toc_endpoint(mock_generate_toc, async_client_factory):
     # Configure the mock to return our test TOC
     mock_generate_toc.return_value = MOCK_TOC_RESPONSE
-    
+
     client = await async_client_factory()
     # Create a test book first (assuming endpoint exists and returns book_id)
     book_data = {
@@ -74,7 +74,7 @@ async def test_generate_toc_endpoint(mock_generate_toc, async_client_factory):
     assert "toc" in toc_json
     assert toc_json["success"] is True
     assert toc_json["toc"]["chapters"]
-    
+
     # Verify the mock was called with correct parameters
     assert mock_generate_toc.called
     call_args = mock_generate_toc.call_args
@@ -138,7 +138,7 @@ async def test_generate_toc_accepts_responses_from_request_body(
 async def test_toc_generation_workflow_e2e(mock_generate_toc, async_client_factory):
     # Configure the mock to return our test TOC
     mock_generate_toc.return_value = MOCK_TOC_RESPONSE
-    
+
     client = await async_client_factory()
     # 1. Create a book
     book_data = {
@@ -194,7 +194,7 @@ async def test_toc_generation_workflow_e2e(mock_generate_toc, async_client_facto
     if get_book_resp.status_code != 200:
         print(f"Book GET failed with status: {get_book_resp.status_code}")
         print(f"Response: {get_book_resp.json()}")
-    
+
     summary_resp2 = await client.patch(
         f"/api/v1/books/{book_id}/summary", json={"summary": ""}
     )

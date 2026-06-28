@@ -48,7 +48,7 @@ const sizeConfig = {
   },
   md: {
     dot: 'w-3 h-3',
-    icon: 'w-4 h-4', 
+    icon: 'w-4 h-4',
     text: 'text-sm'
   },
   lg: {

@@ -37,7 +37,7 @@ class TestSuiteRunner {
   async execCommand(command, options = {}) {
     return new Promise((resolve, reject) => {
       this.log('INFO', `Executing: ${command}`);
-      
+
       const child = spawn(command, [], {
         shell: true,
         stdio: 'inherit',
@@ -60,11 +60,11 @@ class TestSuiteRunner {
 
   async runFrontendTests() {
     this.log('INFO', '=== Running Frontend Tests ===');
-    
+
     try {
       // Change to frontend directory
       process.chdir(FRONTEND_DIR);
-      
+
       // Check if dependencies are installed
       if (!fs.existsSync(path.join(FRONTEND_DIR, 'node_modules'))) {
         this.log('WARNING', 'node_modules not found. Installing dependencies...');
@@ -108,21 +108,21 @@ class TestSuiteRunner {
 
   async runBackendTests() {
     this.log('INFO', '=== Running Backend Tests ===');
-    
+
     try {
       // Change to backend directory
       process.chdir(BACKEND_DIR);
-      
+
       // Check if virtual environment should be used
-      const hasVenv = fs.existsSync(path.join(BACKEND_DIR, 'venv')) || 
+      const hasVenv = fs.existsSync(path.join(BACKEND_DIR, 'venv')) ||
                      fs.existsSync(path.join(BACKEND_DIR, '.venv'));
-      
-      const pythonCmd = hasVenv ? 
-        (process.platform === 'win32' ? '.venv\\Scripts\\python' : './venv/bin/python') : 
+
+      const pythonCmd = hasVenv ?
+        (process.platform === 'win32' ? '.venv\\Scripts\\python' : './venv/bin/python') :
         'python';
-      
-      const pipCmd = hasVenv ? 
-        (process.platform === 'win32' ? '.venv\\Scripts\\pip' : './venv/bin/pip') : 
+
+      const pipCmd = hasVenv ?
+        (process.platform === 'win32' ? '.venv\\Scripts\\pip' : './venv/bin/pip') :
         'pip';
 
       // Install dependencies if requirements.txt exists
@@ -168,7 +168,7 @@ class TestSuiteRunner {
 
   async validateTestInfrastructure() {
     this.log('INFO', '=== Validating Test Infrastructure ===');
-    
+
     try {
       const ValidatorClass = require('./validate-test-environment.js');
       const validator = new ValidatorClass();
@@ -182,7 +182,7 @@ class TestSuiteRunner {
 
   generateTestReport() {
     this.log('INFO', '=== Test Suite Results ===');
-    
+
     const formatResult = (result) => {
       if (result === true) return '✅ PASSED';
       if (result === false) return '❌ FAILED';
@@ -223,15 +223,15 @@ class TestSuiteRunner {
     const hasFailures = this.results.overall.failed > 0;
     const statusIcon = hasFailures ? '❌' : '✅';
     const statusText = hasFailures ? 'FAILED' : 'PASSED';
-    
+
     console.log(`\n${statusIcon} Test Suite ${statusText}`);
-    
+
     return !hasFailures;
   }
 
   async runFullTestSuite() {
     console.log('🚀 Starting comprehensive test suite...\n');
-    
+
     // Validate infrastructure first
     const isInfraValid = await this.validateTestInfrastructure();
     if (!isInfraValid) {
@@ -242,33 +242,33 @@ class TestSuiteRunner {
     // Run all test suites
     await this.runFrontendTests();
     await this.runBackendTests();
-    
+
     // Generate final report
     return this.generateTestReport();
   }
 
   async runQuickTests() {
     console.log('⚡ Running quick test suite (unit tests only)...\n');
-    
+
     try {
       // Frontend unit tests
       process.chdir(FRONTEND_DIR);
       this.log('INFO', 'Running frontend unit tests...');
       const frontendResult = await this.execCommand('npm test -- --passWithNoTests --watchAll=false');
       this.results.frontend.unit = frontendResult.success;
-      
+
       // Backend unit tests
       process.chdir(BACKEND_DIR);
       this.log('INFO', 'Running backend unit tests...');
       const backendResult = await this.execCommand('python -m pytest tests/ -x --tb=short -q');
       this.results.backend.unit = backendResult.success;
-      
+
     } catch (error) {
       this.log('ERROR', `Quick tests failed: ${error.message}`);
     } finally {
       process.chdir(ROOT_DIR);
     }
-    
+
     return this.generateTestReport();
   }
 }
@@ -277,7 +277,7 @@ class TestSuiteRunner {
 if (require.main === module) {
   const runner = new TestSuiteRunner();
   const mode = process.argv[2] || 'full';
-  
+
   let testPromise;
   switch (mode) {
     case 'quick':
@@ -297,7 +297,7 @@ if (require.main === module) {
       testPromise = runner.runFullTestSuite();
       break;
   }
-  
+
   testPromise
     .then(success => {
       console.log(`\n🏁 Test suite completed. Exit code: ${success ? 0 : 1}`);

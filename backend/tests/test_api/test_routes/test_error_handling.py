@@ -20,7 +20,7 @@ async def test_error_handling_database_connection(auth_client_factory, monkeypat
     """
     # Get the API client first
     api_client = await auth_client_factory()
-    
+
     # Define the function that will raise an exception with the correct signature
     # Create a function that raises an exception (simulating database error)
     async def explode(request=None):
@@ -32,7 +32,7 @@ async def test_error_handling_database_connection(auth_client_factory, monkeypat
     # Make request that will trigger database error
     try:
         response = await api_client.get("/api/v1/users/me")
-        
+
         # If we get here, check for 500 status code
         assert response.status_code == 500
         data = response.json()

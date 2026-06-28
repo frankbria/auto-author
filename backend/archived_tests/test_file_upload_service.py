@@ -21,12 +21,12 @@ async def create_test_image(filename: str, size: tuple = (800, 600), format: str
     """Create a test image file for upload testing."""
     # Create a test image
     image = Image.new('RGB', size, color='red')
-    
+
     # Save to bytes
     img_bytes = io.BytesIO()
     image.save(img_bytes, format=format)
     img_bytes.seek(0)
-    
+
     # Create UploadFile object
     content_type = f"image/{format.lower()}"
     return UploadFile(
@@ -40,7 +40,7 @@ async def test_file_upload_service():
     """Test the file upload service functionality."""
     print("Testing File Upload Service...")
     print("-" * 50)
-    
+
     # Test 1: Valid image upload
     print("\n1. Testing valid image upload:")
     try:
@@ -52,7 +52,7 @@ async def test_file_upload_service():
         print("   ✅ Valid image test passed")
     except Exception as e:
         print(f"   ❌ Valid image test failed: {e}")
-    
+
     # Test 2: Invalid file type
     print("\n2. Testing invalid file type:")
     try:
@@ -69,7 +69,7 @@ async def test_file_upload_service():
         print("   ✅ Invalid file type test passed")
     except Exception as e:
         print(f"   ❌ Invalid file type test failed: {e}")
-    
+
     # Test 3: File too large
     print("\n3. Testing file size validation:")
     try:
@@ -87,7 +87,7 @@ async def test_file_upload_service():
         print("   ✅ File size test passed")
     except Exception as e:
         print(f"   ❌ File size test failed: {e}")
-    
+
     # Test 4: Process and save image
     print("\n4. Testing image processing and saving:")
     try:
@@ -98,31 +98,31 @@ async def test_file_upload_service():
         )
         print(f"   Image URL: {image_url}")
         print(f"   Thumbnail URL: {thumb_url}")
-        
+
         # Check if files were created
         upload_dir = Path("uploads/cover_images")
         image_filename = image_url.split("/")[-1]
         thumb_filename = thumb_url.split("/")[-1]
-        
+
         image_path = upload_dir / image_filename
         thumb_path = upload_dir / thumb_filename
-        
+
         assert image_path.exists(), "Main image file not created"
         assert thumb_path.exists(), "Thumbnail file not created"
-        
+
         # Check thumbnail size
         with Image.open(thumb_path) as img:
             print(f"   Thumbnail size: {img.size}")
             assert img.width <= 300 and img.height <= 450
-        
+
         # Clean up test files
         image_path.unlink()
         thumb_path.unlink()
-        
+
         print("   ✅ Image processing test passed")
     except Exception as e:
         print(f"   ❌ Image processing test failed: {e}")
-    
+
     # Test 5: Get upload statistics
     print("\n5. Testing upload statistics:")
     try:
@@ -133,7 +133,7 @@ async def test_file_upload_service():
         print("   ✅ Statistics test passed")
     except Exception as e:
         print(f"   ❌ Statistics test failed: {e}")
-    
+
     print("\n" + "-" * 50)
     print("File Upload Service Testing Complete!")
 

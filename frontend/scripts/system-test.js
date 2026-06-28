@@ -2,12 +2,12 @@
 
 /**
  * Auto Author System Test Script
- * 
+ *
  * This script tests the complete authoring workflow from book creation
  * through chapter draft generation, using real API services.
- * 
+ *
  * Usage: node scripts/system-test.js [--cleanup]
- * 
+ *
  * Options:
  *   --cleanup    Delete test data after completion
  */
@@ -75,7 +75,7 @@ async function answerBookQuestions(bookId, questions) {
     question_text: q.question_text,
     answer: getBookAnswer(q.question_text, index),
   }));
-  
+
   const response = await api.post(`/books/${bookId}/summary-answers`, { answers });
   log.success('Summary answers submitted');
   return response.data;
@@ -114,7 +114,7 @@ async function generateChapterQuestions(bookId, chapterId) {
 
 async function answerChapterQuestions(bookId, chapterId, questions) {
   log.step('Answering chapter questions...');
-  
+
   for (const question of questions) {
     const answer = getChapterAnswer(question.question_text);
     await api.post(`/books/${bookId}/chapters/${chapterId}/questions/${question.id}/response`, {
@@ -122,7 +122,7 @@ async function answerChapterQuestions(bookId, chapterId, questions) {
       status: 'completed',
     });
   }
-  
+
   log.success('All chapter questions answered');
 }
 
@@ -148,23 +148,23 @@ async function saveChapterContent(chapterId, content) {
 
 async function verifySystem(bookId, chapterId) {
   log.step('Verifying complete workflow...');
-  
+
   // Verify book
   const bookResponse = await api.get(`/books/${bookId}`);
   const book = bookResponse.data;
-  
+
   // Verify chapters
   const chaptersResponse = await api.get(`/books/${bookId}/chapters`);
   const chapters = chaptersResponse.data;
-  
+
   // Verify content
   const chapterResponse = await api.get(`/chapters/${chapterId}`);
   const chapter = chapterResponse.data;
-  
+
   log.info(`Book: ${book.title}`);
   log.info(`Chapters: ${chapters.length}`);
   log.info(`Draft Length: ${chapter.content?.length || 0} characters`);
-  
+
   if (chapter.content && chapter.content.length > 500) {
     log.success('System verification passed!');
     return true;
@@ -197,7 +197,7 @@ function getBookAnswer(questionText, index) {
 
 function getChapterAnswer(questionText) {
   const lowerText = questionText.toLowerCase();
-  
+
   if (lowerText.includes('main points') || lowerText.includes('cover')) {
     return 'Introduce habits concept, explain neuroscience basis, preview book framework';
   } else if (lowerText.includes('open') || lowerText.includes('hook')) {
@@ -212,33 +212,33 @@ function getChapterAnswer(questionText) {
 // Main test execution
 async function runSystemTest() {
   console.log(colors.cyan('\n🚀 Auto Author System Test Starting...\n'));
-  
+
   let bookId, chapterId;
   const startTime = Date.now();
-  
+
   try {
     // Execute test workflow
     const book = await createBook();
     bookId = book.id;
-    
+
     const bookQuestions = await generateBookQuestions(bookId);
     await answerBookQuestions(bookId, bookQuestions);
-    
+
     const toc = await generateTOC(bookId);
     const chapters = await createChapters(bookId, toc.chapters);
     chapterId = chapters[0].id;
-    
+
     const chapterQuestions = await generateChapterQuestions(bookId, chapterId);
     await answerChapterQuestions(bookId, chapterId, chapterQuestions);
-    
+
     const draft = await generateChapterDraft(bookId, chapterId);
     await saveChapterContent(chapterId, draft);
-    
+
     await verifySystem(bookId, chapterId);
-    
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(colors.green(`\n✅ SYSTEM TEST PASSED in ${duration} seconds!\n`));
-    
+
   } catch (error) {
     console.error(colors.red('\n❌ SYSTEM TEST FAILED!\n'));
     console.error(colors.red(error.message));

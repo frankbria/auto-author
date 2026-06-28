@@ -16,11 +16,11 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
     const loadChapterTabs = async () => {
       try {
         setState(prev => ({ ...prev, is_loading: true, error: null }));
-        
+
         // First try to load chapters from the TOC structure
         let chapterTabsMetadata: ChapterTabMetadata[] = [];
         let lastActiveChapter: string | undefined;
-        
+
         try {          // Get TOC data which contains the hierarchical structure
           const tocResponse = await bookClient.getToc(bookId);
           if (tocResponse.toc) {
@@ -36,10 +36,10 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
                 last_modified: (ch as { last_modified?: string }).last_modified || new Date().toISOString(),
               }))
             };
-            
+
             // Convert TOC data to chapter tab metadata format
             chapterTabsMetadata = convertTocToChapterTabs(processedTocData);
-            
+
             console.log('Successfully loaded TOC structure and converted to chapter tabs');
           }
         } catch (tocError) {
@@ -52,7 +52,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
               has_content: false // We'll need to check this separately if needed
             }));
             lastActiveChapter = metadata.last_active_chapter;
-            
+
             console.log('Loaded chapter data from chapter-tabs API');
           } catch (apiError) {
             console.error('Failed to load chapter metadata:', apiError);
@@ -75,20 +75,20 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
         // Try to load tab state from backend
         let backendTabState = null;
         let tabState = null;
-        
+
         try {
           backendTabState = await bookClient.getTabState(bookId);
           console.log('Loaded tab state from backend:', backendTabState);
-          
+
           // Get the actual state object (the API might return different formats)
           // @ts-expect-error - Handle different response formats for backwards compatibility
           const backendStateData = backendTabState?.tab_state || backendTabState;
-          
+
           // Compare timestamps if both local and backend states exist
           if (localTabState && backendStateData) {
             const localDate = new Date(localTabState.last_updated);
             const backendDate = new Date(backendStateData.last_updated || new Date(0));
-            
+
             // Use the newer state
             if (backendDate > localDate) {
               console.log('Backend state is newer, using backend state');
@@ -134,13 +134,13 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
   const setActiveChapter = useCallback((chapterId: string) => {
     setState(prevState => {
       const newState = { ...prevState, active_chapter_id: chapterId };
-      
+
       // Add to open tabs if not already open
       if (!newState.open_tab_ids.includes(chapterId)) {
         newState.open_tab_ids = [...newState.open_tab_ids, chapterId];
         newState.tab_order = [...newState.tab_order.filter(id => id !== chapterId), chapterId];
       }
-      
+
       return newState;
     });
   }, []);
@@ -150,7 +150,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
       const updatedOrder = Array.from(prevState.tab_order);
       const [movedTab] = updatedOrder.splice(sourceIndex, 1);
       updatedOrder.splice(destinationIndex, 0, movedTab);
-      
+
       return { ...prevState, tab_order: updatedOrder };
     });
   }, []);
@@ -159,9 +159,9 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
     setState(prevState => {
       const newOpenTabs = prevState.open_tab_ids.filter(id => id !== chapterId);
       const newTabOrder = prevState.tab_order.filter(id => id !== chapterId);
-      
+
       let newActiveChapter = prevState.active_chapter_id;
-      
+
       // If closing the active tab, switch to another open tab
       if (chapterId === prevState.active_chapter_id && newOpenTabs.length > 0) {
         // Find the next tab in the order
@@ -171,7 +171,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
       } else if (newOpenTabs.length === 0) {
         newActiveChapter = null;
       }
-      
+
       return {
         ...prevState,
         open_tab_ids: newOpenTabs,
@@ -224,7 +224,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
         last_updated: new Date().toISOString()
       };
       localStorage.setItem(`tabState_${bookId}`, JSON.stringify(tabState));
-      
+
       // Also save to backend
       await bookClient.saveTabState(bookId, {
         active_chapter_id: state.active_chapter_id,
@@ -251,10 +251,10 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
   const refreshChapters = useCallback(async () => {
     try {
       setState(prev => ({ ...prev, is_loading: true, error: null }));
-      
+
       // Reload chapters from the TOC structure
       let chapterTabsMetadata: ChapterTabMetadata[] = [];
-      
+
       try {
         const tocResponse = await bookClient.getToc(bookId);
         if (tocResponse.toc) {
@@ -268,7 +268,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
               last_modified: (ch as { last_modified?: string }).last_modified || new Date().toISOString(),
             }))
           };
-          
+
           chapterTabsMetadata = convertTocToChapterTabs(processedTocData);
           console.log('Successfully refreshed TOC structure and converted to chapter tabs');
         }
@@ -292,24 +292,24 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
       const currentActiveId = state.active_chapter_id;
       const currentOpenTabs = state.open_tab_ids;
       const currentTabOrder = state.tab_order;
-      
+
       const existingChapterIds = chapterTabsMetadata.map(ch => ch.id);
       const validOpenTabs = currentOpenTabs.filter(id => existingChapterIds.includes(id));
       const validTabOrder = currentTabOrder.filter(id => existingChapterIds.includes(id));
-      
+
       // Add any new chapters to tab order
       const newChapterIds = existingChapterIds.filter(id => !validTabOrder.includes(id));
       const updatedTabOrder = [...validTabOrder, ...newChapterIds];
-      
+
       let newActiveChapter = currentActiveId;
       if (!currentActiveId || !existingChapterIds.includes(currentActiveId)) {
         // Active chapter was deleted or doesn't exist, select first available
-        newActiveChapter = validOpenTabs.length > 0 ? validOpenTabs[0] : 
+        newActiveChapter = validOpenTabs.length > 0 ? validOpenTabs[0] :
                           (chapterTabsMetadata.length > 0 ? chapterTabsMetadata[0].id : null);
       }
-      
+
       // If no tabs are open, open the active chapter
-      const finalOpenTabs = validOpenTabs.length > 0 ? validOpenTabs : 
+      const finalOpenTabs = validOpenTabs.length > 0 ? validOpenTabs :
                            (newActiveChapter ? [newActiveChapter] : []);
 
       setState(prev => ({
@@ -320,7 +320,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
         tab_order: updatedTabOrder,
         is_loading: false,
       }));
-      
+
       console.log('Successfully refreshed chapter tabs state');
     } catch (error) {
       setState(prev => ({

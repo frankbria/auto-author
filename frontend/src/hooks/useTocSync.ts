@@ -19,7 +19,7 @@ export function useTocSync({ bookId, onTocChanged, pollInterval = 0 }: UseTocSyn
       // Use bookClient instead of direct fetch to avoid URL duplication
       const tocResponse = await bookClient.getToc(bookId);
       if (!tocResponse.toc) return null;
-      
+
       // Create a simple hash based on chapter structure
       const hashSource = JSON.stringify({
         chapters: tocResponse.toc.chapters.map((ch) => ({
@@ -33,7 +33,7 @@ export function useTocSync({ bookId, onTocChanged, pollInterval = 0 }: UseTocSyn
           })) || []
         }))
       });
-      
+
       // Simple hash function
       let hash = 0;
       for (let i = 0; i < hashSource.length; i++) {
@@ -51,12 +51,12 @@ export function useTocSync({ bookId, onTocChanged, pollInterval = 0 }: UseTocSyn
   // Function to check for TOC changes
   const checkForTocChanges = useCallback(async () => {
     const currentHash = await generateTocHash();
-    
+
     if (currentHash && lastTocHashRef.current && currentHash !== lastTocHashRef.current) {
       console.log('TOC change detected, triggering sync');
       onTocChanged();
     }
-    
+
     lastTocHashRef.current = currentHash;
   }, [generateTocHash, onTocChanged]);
 
@@ -70,7 +70,7 @@ export function useTocSync({ bookId, onTocChanged, pollInterval = 0 }: UseTocSyn
     };
 
     window.addEventListener('tocUpdated', handleTocUpdate as EventListener);
-    
+
     return () => {
       window.removeEventListener('tocUpdated', handleTocUpdate as EventListener);
     };
@@ -88,7 +88,7 @@ export function useTocSync({ bookId, onTocChanged, pollInterval = 0 }: UseTocSyn
     };
 
     window.addEventListener('storage', handleStorageChange);
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
@@ -99,12 +99,12 @@ export function useTocSync({ bookId, onTocChanged, pollInterval = 0 }: UseTocSyn
       const startPolling = async () => {
         // Initialize the hash
         lastTocHashRef.current = await generateTocHash();
-        
+
         const poll = async () => {
           await checkForTocChanges();
           pollTimeoutRef.current = setTimeout(poll, pollInterval);
         };
-        
+
         pollTimeoutRef.current = setTimeout(poll, pollInterval);
       };
 
@@ -138,9 +138,9 @@ export function triggerTocUpdateEvent(bookId: string) {
     detail: { bookId, timestamp: Date.now() }
   });
   window.dispatchEvent(event);
-  
+
   // Set localStorage flag for cross-tab communication
   localStorage.setItem(`toc-updated-${bookId}`, Date.now().toString());
-  
+
   console.log('TOC update event triggered for book:', bookId);
 }

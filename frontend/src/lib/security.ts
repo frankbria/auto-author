@@ -13,7 +13,7 @@ export function sanitizeHtml(html: string, options?: {
 }): string {
   const defaultOptions = {
     ALLOWED_TAGS: [
-      'p', 'br', 'strong', 'em', 'u', 'i', 'b', 
+      'p', 'br', 'strong', 'em', 'u', 'i', 'b',
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'ul', 'ol', 'li', 'blockquote', 'code', 'pre'
     ],
@@ -39,10 +39,10 @@ export function sanitizeText(text: string): string {
   if (typeof text !== 'string') {
     return '';
   }
-  
+
   // Remove any HTML tags
   const withoutHtml = text.replace(/<[^>]*>/g, '');
-  
+
   // Remove potentially dangerous characters
   const sanitized = withoutHtml
     .replace(/[<>\"']/g, '') // Remove HTML-sensitive characters
@@ -50,7 +50,7 @@ export function sanitizeText(text: string): string {
     .replace(/data:/gi, '') // Remove data: protocols
     .replace(/vbscript:/gi, '') // Remove vbscript: protocols
     .trim();
-    
+
   return sanitized;
 }
 
@@ -61,13 +61,13 @@ export function sanitizeEmail(email: string): string {
   if (typeof email !== 'string') {
     return '';
   }
-  
+
   // Basic email validation and sanitization
   const sanitized = email
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9.@_+-]/g, ''); // Only allow valid email characters
-    
+
   // Simple email regex validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(sanitized) ? sanitized : '';
@@ -80,9 +80,9 @@ export function sanitizeUrl(url: string): string {
   if (typeof url !== 'string') {
     return '';
   }
-  
+
   const trimmed = url.trim();
-  
+
   // Block dangerous protocols
   const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:'];
   for (const protocol of dangerousProtocols) {
@@ -90,16 +90,16 @@ export function sanitizeUrl(url: string): string {
       return '';
     }
   }
-  
+
   // Only allow http, https, and relative URLs
-  if (trimmed.startsWith('//') || 
-      trimmed.startsWith('http://') || 
+  if (trimmed.startsWith('//') ||
+      trimmed.startsWith('http://') ||
       trimmed.startsWith('https://') ||
       trimmed.startsWith('/') ||
       !trimmed.includes(':')) {
     return trimmed;
   }
-  
+
   return '';
 }
 
@@ -110,7 +110,7 @@ export function sanitizeFileName(fileName: string): string {
   if (typeof fileName !== 'string') {
     return '';
   }
-  
+
   return fileName
     .replace(/[^a-zA-Z0-9.\-_]/g, '_') // Replace invalid characters with underscore (escape hyphen so it's a literal, not a range)
     .replace(/^\.+/, '') // Remove leading dots
@@ -123,26 +123,26 @@ export function sanitizeFileName(fileName: string): string {
  */
 class RateLimiter {
   private attempts: Map<string, { count: number; resetTime: number }> = new Map();
-  
+
   constructor(private maxAttempts: number = 5, private windowMs: number = 15 * 60 * 1000) {}
-  
+
   isAllowed(identifier: string): boolean {
     const now = Date.now();
     const attempt = this.attempts.get(identifier);
-    
+
     if (!attempt || now > attempt.resetTime) {
       this.attempts.set(identifier, { count: 1, resetTime: now + this.windowMs });
       return true;
     }
-    
+
     if (attempt.count >= this.maxAttempts) {
       return false;
     }
-    
+
     attempt.count++;
     return true;
   }
-  
+
   reset(identifier: string): void {
     this.attempts.delete(identifier);
   }

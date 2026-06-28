@@ -29,11 +29,11 @@ export function convertTocToChapterTabs(tocData: ConvertibleToc | null): Chapter
   }
 
   const chapterTabs: ChapterTabMetadata[] = [];
-  
+
   // Process main chapters
   tocData.chapters.forEach((chapter) => {
     chapterTabs.push(convertChapterToTab(chapter));
-    
+
     // Process subchapters if they exist
     if (chapter.subchapters && chapter.subchapters.length > 0) {
       chapter.subchapters.forEach((subchapter) => {
@@ -52,7 +52,7 @@ export function convertTocToChapterTabs(tocData: ConvertibleToc | null): Chapter
       });
     }
   });
-  
+
   return chapterTabs;
 }
 

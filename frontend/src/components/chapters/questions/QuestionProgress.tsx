@@ -88,7 +88,7 @@ export default function QuestionProgress({
           )}
         </div>
       </div>
-      
+
       {/* Progress bar — wrapper carries progressbar semantics; the visual Radix bar is decorative */}
       <div
         role="progressbar"
@@ -107,7 +107,7 @@ export default function QuestionProgress({
         <span>Question {currentPosition} of {totalQuestions}</span>
         <span>{isNaN(progressPercentage) ? 0 : Math.round(progressPercentage)}% complete</span>
       </div>
-      
+
       {/* Question dots - visual representation of each question's status */}
       <div className="flex items-center justify-center space-x-1 mt-2 transition-all">
         {Array.from({ length: totalQuestions }).map((_, index) => {

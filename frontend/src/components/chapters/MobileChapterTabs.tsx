@@ -16,13 +16,13 @@ interface MobileChapterTabsProps {
   onChapterSelect: (chapterId: string) => void;
 }
 
-export function MobileChapterTabs({ 
-  chapters, 
-  activeChapterId, 
-  onChapterSelect 
+export function MobileChapterTabs({
+  chapters,
+  activeChapterId,
+  onChapterSelect
 }: MobileChapterTabsProps) {
   const [isOpen, setIsOpen] = useState(false);
-  
+
   const activeChapter = chapters.find(ch => ch.id === activeChapterId);
 
   return (
@@ -71,8 +71,8 @@ export function MobileChapterTabs({
                   key={chapter.id}
                   className={cn(
                     "p-3 rounded-lg border cursor-pointer transition-colors",
-                    chapter.id === activeChapterId 
-                      ? "bg-primary/10 border-primary" 
+                    chapter.id === activeChapterId
+                      ? "bg-primary/10 border-primary"
                       : "hover:bg-muted"
                   )}
                   onClick={() => {

@@ -49,16 +49,16 @@ describe('Book Metadata Edge Cases', () => {
     });
   });  it('persists metadata changes between reloads', async () => {
     // Set up mocked implementation to modify the book data
-    const updatedBook = { 
+    const updatedBook = {
       ...mockBook,
-      title: 'Persistence Title' 
+      title: 'Persistence Title'
     };
-    
+
     // Reset the mock implementation
     (bookClient.updateBook as jest.Mock).mockImplementation((_id, data) => {
       return Promise.resolve({ ...mockBook, ...data });
     });
-    
+
     // First render with original book
     const { rerender } = render(
       <BookMetadataForm
@@ -68,23 +68,23 @@ describe('Book Metadata Edge Cases', () => {
         }}
       />
     );
-    
+
     // Get the title input
     const titleInput = await screen.findByLabelText(/Book Title/i);
-    
+
     // Change the title and check the input value
     await act(async () => {
       fireEvent.change(titleInput, { target: { value: 'Persistence Title' } });
       fireEvent.blur(titleInput);
     });
-    
+
     expect(titleInput).toHaveValue('Persistence Title');
-    
+
     // Run all timers to ensure debounce is complete
     await act(async () => {
       jest.runAllTimers();
     });
-    
+
     // Simulate reload by rerendering with updated book
     rerender(
       <BookMetadataForm
@@ -94,7 +94,7 @@ describe('Book Metadata Edge Cases', () => {
         }}
       />
     );
-    
+
     // Check that the title persisted after reload
     const titleInputAfterRerender = await screen.findByLabelText(/Book Title/i);
     expect(titleInputAfterRerender).toHaveValue('Persistence Title');

@@ -25,7 +25,7 @@ describe('Responsive Tab Layout', () => {
   beforeEach(() => {
     setupTestEnvironment();
     jest.clearAllMocks();
-    
+
     // Default mock for tab state
     const { chapters, tabOrder } = generateChaptersFixture(5);
     mockUseChapterTabs.mockReturnValue({
@@ -50,44 +50,44 @@ describe('Responsive Tab Layout', () => {
       error: null
     });
   });
-  
+
   test('renders desktop layout on large screens', () => {
     // Mock desktop viewport
     mockUseMediaQuery.mockReturnValue(false); // Not mobile
-    
+
     render(<ChapterTabs bookId="test-book" />);
-    
+
     // Verify desktop components are rendered
     expect(screen.queryByTestId('mobile-tabs')).not.toBeInTheDocument();
     expect(screen.getByTestId('tab-bar')).toBeInTheDocument();
   });
-  
+
   test('renders mobile layout on small screens', () => {
     // Mock mobile viewport
     mockUseMediaQuery.mockReturnValue(true); // Is mobile
-    
+
     render(<ChapterTabs bookId="test-book" />);
-    
+
     // Verify mobile components are rendered
     expect(screen.getByTestId('mobile-tabs')).toBeInTheDocument();
     expect(screen.queryByTestId('tab-bar')).not.toBeInTheDocument();
   });
-  
+
   test('passes correct props to mobile and desktop components', () => {
     // Test desktop first
     mockUseMediaQuery.mockReturnValue(false);
-    
+
     const { unmount } = render(<ChapterTabs bookId="test-book" />);
-    
+
     // Verify desktop component receives correct props
     expect(screen.getByTestId('tab-bar')).toBeInTheDocument();
-    
+
     // Unmount and test mobile
     unmount();
     mockUseMediaQuery.mockReturnValue(true);
-    
+
     render(<ChapterTabs bookId="test-book" />);
-    
+
     // Verify mobile component receives correct props
     expect(screen.getByTestId('mobile-tabs')).toHaveTextContent('Mobile View (5 chapters)');
   });

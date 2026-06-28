@@ -35,46 +35,46 @@ export function TabBar({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [canScrollDown, setCanScrollDown] = useState(false);
-  
+
   // Handle scrolling
   const handleScroll = () => {
     if (!scrollAreaRef.current) return;
-    
+
     const element = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
     if (!element) return;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = element as HTMLElement;
     setCanScrollUp(scrollTop > 0);
     setCanScrollDown(scrollTop < scrollHeight - clientHeight);
   };
-  
+
   // Scroll functions
   const scrollUp = () => {
     if (!scrollAreaRef.current) return;
     const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
     if (!viewport) return;
-    
+
     (viewport as HTMLElement).scrollBy({
       top: -100,
       behavior: 'smooth'
     });
   };
-  
+
   const scrollDown = () => {
     if (!scrollAreaRef.current) return;
     const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
     if (!viewport) return;
-    
+
     (viewport as HTMLElement).scrollBy({
       top: 100,
       behavior: 'smooth'
     });
   };
-  
+
   // Scroll active tab into view
   useEffect(() => {
     if (!activeChapterId || !scrollAreaRef.current) return;
-    
+
     const activeTab = scrollAreaRef.current.querySelector(`[data-rfd-draggable-id="${activeChapterId}"]`);
     if (activeTab && typeof HTMLElement !== 'undefined' && activeTab instanceof HTMLElement) {
       try {
@@ -95,11 +95,11 @@ export function TabBar({
       }
     }
   }, [activeChapterId]);
-  
+
   // Check for overflow on mount and resize
   useEffect(() => {
     handleScroll();
-    
+
     // Set up scroll event listener
     const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
     if (viewport) {
@@ -107,7 +107,7 @@ export function TabBar({
       return () => viewport.removeEventListener('scroll', handleScroll);
     }
   }, []);
-  
+
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     onTabReorder(result.source.index, result.destination.index);
@@ -116,12 +116,12 @@ export function TabBar({
   const orderedChapters = tabOrder
     .map(id => chapters.find(ch => ch.id === id))
     .filter(Boolean) as ChapterTabMetadata[];
-    
+
   return (
-    <div 
+    <div
       data-testid={testId}
-      className={orientation === 'vertical' 
-        ? "flex flex-col w-64 border-r border-border bg-background h-full relative" 
+      className={orientation === 'vertical'
+        ? "flex flex-col w-64 border-r border-border bg-background h-full relative"
         : "flex border-b border-border bg-background"
       }
     >
@@ -137,7 +137,7 @@ export function TabBar({
           >
             <HugeiconsIcon icon={ArrowUp01Icon} size={16} />
           </Button>
-          
+
           <Button
             data-testid="scroll-down-button"
             className="absolute bottom-0 left-0 right-0 z-10 py-1 rounded-none border-t"
@@ -150,14 +150,14 @@ export function TabBar({
           </Button>
         </>
       )}
-      <ScrollArea 
-        className={orientation === 'vertical' ? "flex-1 h-full" : "flex-1"} 
+      <ScrollArea
+        className={orientation === 'vertical' ? "flex-1 h-full" : "flex-1"}
         ref={scrollAreaRef}
         data-testid="tabs-scroll-container"
       >
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable 
-            droppableId="chapter-tabs" 
+          <Droppable
+            droppableId="chapter-tabs"
             direction={orientation === 'vertical' ? "vertical" : "horizontal"}
           >
             {(provided) => (

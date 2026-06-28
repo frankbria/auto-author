@@ -7,7 +7,7 @@
 export function useOptimizedClerkImage() {
   /**
    * Get an optimized image URL from a Clerk image URL
-   * 
+   *
    * @param imageUrl - The original Clerk image URL
    * @param width - Desired width in pixels
    * @param height - Desired height in pixels (defaults to same as width)
@@ -15,10 +15,10 @@ export function useOptimizedClerkImage() {
    */
   const getOptimizedImageUrl = (imageUrl: string, width: number, height: number = width): string => {
     if (!imageUrl) return '';
-    
+
     // Check if the URL already has query parameters
     const hasQueryParams = imageUrl.includes('?');
-    
+
     // Add width and height parameters appropriately
     return hasQueryParams
       ? `${imageUrl}&width=${width}&height=${height}`

@@ -253,7 +253,7 @@ def generate_test_questions(chapter_id, count=5):
     for i in range(count):
         question_type = ["character", "plot", "setting", "theme", "research"][i % 5]
         difficulty = ["easy", "medium", "hard"][i % 3]
-        
+
         question = {
             "id": str(uuid.uuid4()),
             "chapter_id": chapter_id,
@@ -271,14 +271,14 @@ def generate_test_questions(chapter_id, count=5):
             "response_status": "not_started"
         }
         questions.append(question)
-    
+
     return questions
 
 # Helper function to generate a response
 def generate_test_response(question_id, user_id, status="completed"):
     """Generate a test response for a specific question."""
     response_text = "This is a test response for question " + question_id
-    
+
     return {
         "id": str(uuid.uuid4()),
         "question_id": question_id,

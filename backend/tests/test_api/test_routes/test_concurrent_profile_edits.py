@@ -44,7 +44,7 @@ def test_concurrent_profile_edits(auth_client_factory, test_user):
     """
     # Create a client with test user data
     client = auth_client_factory()
-    
+
     # Update data for the first concurrent request
     update_data1 = {"first_name": "NewFirstName1", "bio": "New bio from update 1"}
 
@@ -106,7 +106,7 @@ def test_concurrent_conflicting_edits(auth_client_factory, test_user):
     """
     # Create a client with test user data
     client = auth_client_factory()
-    
+
     # Set up a counter for update sequence
     update_counter = 0
 
@@ -159,7 +159,7 @@ def test_concurrent_edits_different_fields(auth_client_factory, test_user):
     """
     # Create a client with test user data
     client = auth_client_factory()
-    
+
     # Update data for different fields
     update_data1 = {"first_name": "NewFirstName"}
     update_data2 = {"last_name": "NewLastName"}
