@@ -12,7 +12,7 @@ def test_question_create_schema():
         help_text="Test help",
         examples=["Example 1", "Example 2"]
     )
-    
+
     question_create = QuestionCreate(
         book_id="test_book",
         chapter_id="test_chapter",
@@ -23,7 +23,7 @@ def test_question_create_schema():
         order=1,
         metadata=metadata
     )
-    
+
     assert question_create.book_id == "test_book"
     assert question_create.chapter_id == "test_chapter"
     assert question_create.question_type == QuestionType.THEME
@@ -37,7 +37,7 @@ def test_question_schema():
         help_text="Test help",
         examples=["Example 1", "Example 2"]
     )
-    
+
     question = Question(
         id="test_id",
         book_id="test_book",
@@ -50,7 +50,7 @@ def test_question_schema():
         metadata=metadata,
         generated_at=datetime.now(timezone.utc)
     )
-    
+
     assert question.id == "test_id"
     assert question.book_id == "test_book"
     assert question.chapter_id == "test_chapter"
@@ -75,9 +75,9 @@ def test_question_from_dict():
         },
         "generated_at": datetime.now(timezone.utc).isoformat()
     }
-    
+
     question_from_dict = Question(**question_dict)
-    
+
     assert question_from_dict.id == "test_id"
     assert question_from_dict.book_id == "test_book"
     assert question_from_dict.chapter_id == "test_chapter"

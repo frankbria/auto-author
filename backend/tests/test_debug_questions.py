@@ -12,7 +12,7 @@ from app.db import base  # Use fixture-managed collections
 async def create_test_book():
     """Create a test book with TOC"""
     books_collection = base.books_collection  # Use fixture-managed collection
-    
+
     book = {
         "_id": ObjectId(),
         "title": "Test Book for Questions",
@@ -33,7 +33,7 @@ async def create_test_book():
             ]
         }
     }
-    
+
     await books_collection.insert_one(book)
     return str(book["_id"])
 
@@ -41,12 +41,12 @@ async def create_test_book():
 @pytest.mark.asyncio
 async def test_question_generation_direct(motor_reinit_db):  # Use correct fixture name
     """Test question generation directly without HTTP layer"""
-    
+
     # Create test book
     book_id = await create_test_book()
-    
+
     service = get_question_generation_service()
-    
+
     try:
         result = await service.generate_questions_for_chapter(
             book_id=book_id,
@@ -57,16 +57,16 @@ async def test_question_generation_direct(motor_reinit_db):  # Use correct fixtu
             user_id="test_user",
             current_user={"clerk_id": "test_user"}
         )
-        
+
         print(f"Success! Generated {len(result.questions)} questions")
         print(f"Generation ID: {result.generation_id}")
         print(f"Questions: {[q.question_text for q in result.questions]}")
-        
+
         # Verify questions were saved
         assert len(result.questions) == 3
         assert all(q.book_id == book_id for q in result.questions)
         assert all(q.chapter_id == "test_chapter_id" for q in result.questions)
-        
+
     except Exception as e:
         print(f"Error: {type(e).__name__}: {str(e)}")
         import traceback
@@ -76,7 +76,7 @@ async def test_question_generation_direct(motor_reinit_db):  # Use correct fixtu
         # Cleanup
         books_collection = base.books_collection  # Use fixture-managed collection
         await books_collection.delete_one({"_id": ObjectId(book_id)})
-        
+
         # Also cleanup questions
         questions_collection = base._db.get_collection("questions")  # Use db from fixture
         await questions_collection.delete_many({"book_id": book_id})

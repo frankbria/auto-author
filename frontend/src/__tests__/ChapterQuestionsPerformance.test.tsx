@@ -1,6 +1,6 @@
 /**
  * Performance Test Suite for User Story 4.2 (Interview-Style Prompts)
- * 
+ *
  * This test suite focuses on performance testing for the chapter questions
  * functionality, including large question sets, memory management, API
  * performance, and optimization scenarios.
@@ -134,7 +134,7 @@ describe('Chapter Questions Performance Tests', () => {
   describe('Large Question Set Performance', () => {
     test('renders 100 questions within acceptable time limits', async () => {
       const largeQuestionSet = generateLargeQuestionSet(100);
-      
+
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
         questions: largeQuestionSet
       });
@@ -149,10 +149,10 @@ describe('Chapter Questions Performance Tests', () => {
       await act(async () => {
         render(
           <TestWrapper>
-            <QuestionContainer 
-              bookId="test-book" 
-              chapterId="test-chapter" 
-              chapterTitle="Performance Test Chapter" 
+            <QuestionContainer
+              bookId="test-book"
+              chapterId="test-chapter"
+              chapterTitle="Performance Test Chapter"
             />
           </TestWrapper>
         );
@@ -171,7 +171,7 @@ describe('Chapter Questions Performance Tests', () => {
 
     test('handles 500 questions with virtualization', async () => {
       const veryLargeQuestionSet = generateLargeQuestionSet(500);
-      
+
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
         questions: veryLargeQuestionSet
       });
@@ -181,10 +181,10 @@ describe('Chapter Questions Performance Tests', () => {
       await act(async () => {
         render(
           <TestWrapper>
-            <QuestionContainer 
-              bookId="test-book" 
-              chapterId="test-chapter" 
-              chapterTitle="Large Performance Test" 
+            <QuestionContainer
+              bookId="test-book"
+              chapterId="test-chapter"
+              chapterTitle="Large Performance Test"
             />
           </TestWrapper>
         );
@@ -203,20 +203,20 @@ describe('Chapter Questions Performance Tests', () => {
 
     test('memory usage remains stable with large question sets', async () => {
       const initialMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
-      
+
       for (let i = 0; i < 5; i++) {
         const questionSet = generateLargeQuestionSet(100);
-        
+
         (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
           questions: questionSet
         });
 
         const { unmount } = render(
           <TestWrapper>
-            <QuestionContainer 
-              bookId={`test-book-${i}`} 
-              chapterId={`test-chapter-${i}`} 
-              chapterTitle={`Test Chapter ${i}`} 
+            <QuestionContainer
+              bookId={`test-book-${i}`}
+              chapterId={`test-chapter-${i}`}
+              chapterTitle={`Test Chapter ${i}`}
             />
           </TestWrapper>
         );
@@ -226,7 +226,7 @@ describe('Chapter Questions Performance Tests', () => {
         });
 
         unmount();
-        
+
         // Force garbage collection if available
         if (global.gc) {
           global.gc();
@@ -282,12 +282,12 @@ describe('Chapter Questions Performance Tests', () => {
 
       // Check that the component rendered - there are multiple elements with this text
       expect(screen.getAllByText('Generate Interview Questions').length).toBeGreaterThan(0);
-      
+
       // Try to find and click the generate button
       try {
         const generateButton = screen.getByRole('button', { name: /generate.*questions/i });
         fireEvent.click(generateButton);
-        
+
         // If click succeeds, check callback was called
         await waitFor(() => {
           expect(generateCalled).toBe(true);
@@ -347,10 +347,10 @@ describe('Chapter Questions Performance Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Error Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Error Test Chapter"
           />
         </TestWrapper>
       );
@@ -373,7 +373,7 @@ describe('Chapter Questions Performance Tests', () => {
   describe('User Interaction Performance', () => {
     test('question navigation is responsive', async () => {
       const questionSet = generateLargeQuestionSet(50);
-      
+
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
         questions: questionSet
       });
@@ -384,10 +384,10 @@ describe('Chapter Questions Performance Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Navigation Test" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Navigation Test"
           />
         </TestWrapper>
       );
@@ -398,17 +398,17 @@ describe('Chapter Questions Performance Tests', () => {
 
       // Test rapid navigation
       const times: number[] = [];
-      
+
       for (let i = 0; i < 10; i++) {
         const startTime = performance.now();
-        
+
         const nextButton = screen.getByText('Next');
         fireEvent.click(nextButton);
-        
+
         await waitFor(() => {
           expect(screen.getByText(new RegExp(`Performance test question ${i + 2}`))).toBeInTheDocument();
         });
-        
+
         const endTime = performance.now();
         times.push(endTime - startTime);
       }
@@ -453,14 +453,14 @@ describe('Chapter Questions Performance Tests', () => {
       );
 
       const textarea = screen.getByRole('textbox');
-      
+
       // Simulate rapid typing
       const longText = 'This is a performance test for auto-save functionality. '.repeat(10);
-      
+
       performanceMonitor.start();
-      
+
       await userEvent.type(textarea, longText);
-      
+
       // Wait for auto-save debounce
       await waitFor(() => {
         expect(bookClient.saveQuestionResponse).toHaveBeenCalled();
@@ -485,21 +485,21 @@ describe('Chapter Questions Performance Tests', () => {
       for (let i = 0; i < 20; i++) {
         const { unmount } = render(
           <TestWrapper>
-            <QuestionContainer 
-              bookId={`book-${i}`} 
-              chapterId={`chapter-${i}`} 
-              chapterTitle={`Chapter ${i}`} 
+            <QuestionContainer
+              bookId={`book-${i}`}
+              chapterId={`chapter-${i}`}
+              chapterTitle={`Chapter ${i}`}
             />
           </TestWrapper>
         );
-        
+
         components.push(unmount);
-        
+
         if (i % 5 === 0) {
           // Cleanup every 5 components
           components.forEach(unmount => unmount());
           components.length = 0;
-          
+
           if (global.gc) {
             global.gc();
           }
@@ -508,7 +508,7 @@ describe('Chapter Questions Performance Tests', () => {
 
       // Final cleanup
       components.forEach(unmount => unmount());
-      
+
       if (global.gc) {
         global.gc();
       }
@@ -526,16 +526,16 @@ describe('Chapter Questions Performance Tests', () => {
 
       const { unmount } = render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Event Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Event Test Chapter"
           />
         </TestWrapper>
       );
 
       const initialListeners = addEventListenerSpy.mock.calls.length;
-      
+
       unmount();
 
       // Should remove all event listeners
@@ -567,10 +567,10 @@ describe('Chapter Questions Performance Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Media Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Media Test Chapter"
           />
         </TestWrapper>
       );
@@ -590,11 +590,11 @@ describe('Chapter Questions Performance Tests', () => {
 
     test('debounced search performs efficiently', async () => {
       const searchQuestions = generateLargeQuestionSet(200);
-      
+
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
         questions: searchQuestions
       });
-      
+
       (bookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
         total: 200,
         completed: 100,
@@ -605,10 +605,10 @@ describe('Chapter Questions Performance Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Search Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Search Test Chapter"
           />
         </TestWrapper>
       );
@@ -616,7 +616,7 @@ describe('Chapter Questions Performance Tests', () => {
       await waitFor(() => {
         expect(screen.getByTestId('question-container')).toBeInTheDocument();
       });
-      
+
       // Wait for questions to load
       await waitFor(() => {
         expect(screen.getByText(/Performance test question 1/)).toBeInTheDocument();
@@ -628,7 +628,7 @@ describe('Chapter Questions Performance Tests', () => {
         // Skip test if search functionality is not implemented
         return;
       }
-      
+
       performanceMonitor.start();
 
       // Rapid typing should be debounced
@@ -646,7 +646,7 @@ describe('Chapter Questions Performance Tests', () => {
 
     test('virtual scrolling handles large lists efficiently', async () => {
       const hugeQuestionSet = generateLargeQuestionSet(1000);
-      
+
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
         questions: hugeQuestionSet
       });
@@ -655,10 +655,10 @@ describe('Chapter Questions Performance Tests', () => {
 
       const { container } = render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Virtual Scroll Test" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Virtual Scroll Test"
           />
         </TestWrapper>
       );
@@ -672,7 +672,7 @@ describe('Chapter Questions Performance Tests', () => {
 
       // Virtual scrolling should handle large lists efficiently
       expect(performance.duration).toBeLessThan(3000);
-      
+
       // Only visible items should be rendered in DOM
       // Since we're using virtualization, check that not all questions are rendered
       const questionElements = container.querySelectorAll('[role="textbox"], .question-text, textarea');

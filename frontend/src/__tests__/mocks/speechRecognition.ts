@@ -12,12 +12,12 @@ export class MockSpeechRecognition {
   public continuous = false;
   public interimResults = false;
   public lang = 'en-US';
-  
+
   // Configurable for different test scenarios
   private delay: number;
   private transcript: string;
   private shouldError: boolean;
-  
+
   constructor(config: {
     delay?: number;
     transcript?: string;
@@ -27,10 +27,10 @@ export class MockSpeechRecognition {
     this.transcript = config.transcript || 'Default test transcription.';
     this.shouldError = config.shouldError || false;
   }
-  
+
   start = jest.fn(() => {
     if (this.onstart) this.onstart();
-    
+
     setTimeout(() => {
       if (this.shouldError) {
         if (this.onerror) {
@@ -42,7 +42,7 @@ export class MockSpeechRecognition {
         if (this.onresult) {
           this.onresult({
             resultIndex: 0,
-            results: [[{ 
+            results: [[{
               transcript: this.transcript,
               confidence: 0.95,
               isFinal: true
@@ -53,12 +53,12 @@ export class MockSpeechRecognition {
       if (this.onend) this.onend();
     }, this.delay);
   });
-  
+
   stop = jest.fn(() => {
     if (this.onspeechend) this.onspeechend();
     if (this.onend) this.onend();
   });
-  
+
   abort = jest.fn(() => {
     if (this.onend) this.onend();
   });

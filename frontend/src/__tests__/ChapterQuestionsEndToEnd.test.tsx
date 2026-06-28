@@ -1,6 +1,6 @@
 /**
  * End-to-End Test Suite for User Story 4.2 (Interview-Style Prompts)
- * 
+ *
  * This test suite covers complete user workflows from question generation
  * through answering to draft creation integration, ensuring the entire
  * interview-style prompts feature works cohesively.
@@ -603,7 +603,7 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <ChapterTabs 
+          <ChapterTabs
             bookId="test-book-id"
             chapterId="test-chapter-id"
             activeTab="questions"
@@ -653,10 +653,10 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
@@ -708,10 +708,10 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
@@ -763,10 +763,10 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
@@ -776,15 +776,15 @@ describe('Chapter Questions End-to-End Tests', () => {
         const errorMessage = screen.queryByText(/Error loading questions/i);
         const networkError = screen.queryByText(/Network error/i);
         const retryButton = screen.queryByRole('button', { name: /Retry/i });
-        
+
         // At least one error indicator should be present
         expect(errorMessage || networkError || retryButton).toBeTruthy();
       });
 
       // Should provide retry option
-      const retryButton = screen.getByRole('button', { name: /Retry/i }) || 
+      const retryButton = screen.getByRole('button', { name: /Retry/i }) ||
                          screen.getByText('Retry');
-      
+
       // Mock successful retry
       (mockBookClient.getChapterQuestions as jest.Mock).mockResolvedValueOnce({
         questions: mockGeneratedQuestions
@@ -869,10 +869,10 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
@@ -942,10 +942,10 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
@@ -959,10 +959,10 @@ describe('Chapter Questions End-to-End Tests', () => {
       if (main) {
         expect(main).toHaveAttribute('aria-label');
       }
-      
+
       const textbox = screen.getByRole('textbox');
       expect(textbox).toHaveAttribute('aria-label');
-      
+
       const progressbar = screen.queryByRole('progressbar');
       if (progressbar) {
         expect(progressbar).toHaveAttribute('aria-valuenow');
@@ -981,10 +981,10 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book-id" 
-            chapterId="test-chapter-id" 
-            chapterTitle="Chapter 1: Getting Started" 
+          <QuestionContainer
+            bookId="test-book-id"
+            chapterId="test-chapter-id"
+            chapterTitle="Chapter 1: Getting Started"
           />
         </TestWrapper>
       );
@@ -994,7 +994,7 @@ describe('Chapter Questions End-to-End Tests', () => {
       });
 
       // Should have mobile-optimized layout
-      const container = screen.queryByTestId('question-container') || 
+      const container = screen.queryByTestId('question-container') ||
                        screen.getByText('What is the main character\'s motivation?').closest('div');
       expect(container).toBeInTheDocument();
 

@@ -9,7 +9,7 @@ async def test_generate_chapter_draft_success(auth_client_factory):
     """Test successful draft generation"""
     # Create client with a specific test user
     client = await auth_client_factory()
-    
+
     # Create a book with TOC
     book_data = {
         "title": "Test Book for Draft Generation",
@@ -21,13 +21,13 @@ async def test_generate_chapter_draft_success(auth_client_factory):
     assert book_resp.status_code == 201, f"Failed to create book: {book_resp.json()}"
     book_json = book_resp.json()
     book_id = book_json["id"]
-    
+
     # Debug: Check if book is retrievable
     get_resp = await client.get(f"/api/v1/books/{book_id}")
     print(f"DEBUG: Get book status: {get_resp.status_code}")
     if get_resp.status_code == 200:
         print(f"DEBUG: Book owner_id: {get_resp.json().get('owner_id')}")
-    
+
     # Add TOC with a chapter
     toc_data = {
         "toc": {
@@ -48,7 +48,7 @@ async def test_generate_chapter_draft_success(auth_client_factory):
     }
     toc_resp = await client.put(f"/api/v1/books/{book_id}/toc", json=toc_data)
     assert toc_resp.status_code == 200, f"Failed to update TOC: {toc_resp.json()}"
-    
+
     # Mock the AI service
     mock_result = {
         "success": True,
@@ -64,8 +64,8 @@ async def test_generate_chapter_draft_success(auth_client_factory):
         },
         "suggestions": ["Add more examples", "Consider breaking into sections"]
     }
-    
-    with patch('app.api.endpoints.books.ai_service.generate_chapter_draft', 
+
+    with patch('app.api.endpoints.books.ai_service.generate_chapter_draft',
                AsyncMock(return_value=mock_result)):
         # Generate draft
         draft_data = {
@@ -82,15 +82,15 @@ async def test_generate_chapter_draft_success(auth_client_factory):
             "writing_style": "educational",
             "target_length": 2000
         }
-        
+
         response = await client.post(
             f"/api/v1/books/{book_id}/chapters/ch1/generate-draft",
             json=draft_data
         )
-        
+
         assert response.status_code == 200
         result = response.json()
-        
+
         assert result["success"] is True
         assert result["book_id"] == book_id
         assert result["chapter_id"] == "ch1"
@@ -103,7 +103,7 @@ async def test_generate_chapter_draft_success(auth_client_factory):
 async def test_generate_chapter_draft_missing_responses(auth_client_factory):
     """Test draft generation fails without question responses"""
     client = await auth_client_factory()
-    
+
     # Create a book with TOC
     book_data = {
         "title": "Test Book",
@@ -113,7 +113,7 @@ async def test_generate_chapter_draft_missing_responses(auth_client_factory):
     }
     book_resp = await client.post("/api/v1/books/", json=book_data)
     book_id = book_resp.json()["id"]
-    
+
     # Add TOC
     toc_data = {
         "toc": {
@@ -124,27 +124,27 @@ async def test_generate_chapter_draft_missing_responses(auth_client_factory):
         }
     }
     await client.put(f"/api/v1/books/{book_id}/toc", json=toc_data)
-    
+
     # Try to generate without responses
     response = await client.post(
         f"/api/v1/books/{book_id}/chapters/ch1/generate-draft",
         json={"question_responses": []}
     )
-    
+
     assert response.status_code == 400
     assert "Question responses are required" in response.json()["detail"]
 
 
-@pytest.mark.asyncio  
+@pytest.mark.asyncio
 async def test_generate_chapter_draft_invalid_chapter(auth_client_factory):
     """Test draft generation fails for non-existent chapter"""
     client = await auth_client_factory()
-    
+
     # Create a book
     book_data = {"title": "Test Book", "description": "Test", "genre": "Fiction", "target_audience": "General"}
     book_resp = await client.post("/api/v1/books/", json=book_data)
     book_id = book_resp.json()["id"]
-    
+
     # Try to generate for non-existent chapter
     response = await client.post(
         f"/api/v1/books/{book_id}/chapters/invalid-chapter/generate-draft",
@@ -154,6 +154,6 @@ async def test_generate_chapter_draft_invalid_chapter(auth_client_factory):
             ]
         }
     )
-    
+
     assert response.status_code == 404
     assert "Chapter not found" in response.json()["detail"]

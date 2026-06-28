@@ -30,6 +30,15 @@
 
 ## Recent Changes
 
+### 2026-06-27
+- **Restore pre-commit/CI gate enforcement — stop merging with `--no-verify`/`--admin` (#118, capstone)**: process/enforcement, no app behavior change
+  - **Gates verified green at baseline**: backend coverage **92.4%** (`pytest --cov=app --cov-fail-under=85`, 888 passed/15 skipped); frontend coverage clears **85/85/75/85** (1856 passed/8 skipped, 90 suites). `pre-commit run --all-files` passes with no bypass. All four blocking coverage issues (#68, #93, #116, #117) closed; no coverage gate remains red.
+  - **CI now actually enforces coverage**: removed `continue-on-error: true` from both "Check coverage threshold" steps in `.github/workflows/tests.yml` (the old "don't fail CI until we reach 85%" escape) — a coverage regression now fails `Frontend Tests` / `Backend Tests`.
+  - **Branch protection on `main`** (was unprotected): required status checks (strict/up-to-date) = `Frontend Tests` + `Backend Tests`; merges route through a PR. `--admin` override stays for true emergencies but is no longer the norm. (E2E intentionally out of scope per the issue.)
+  - **Docs**: neutralized the stale `--no-verify`/"baseline gates red" boilerplate in this file; the Pre-Commit section now states gates are green and enforced. (No PR template file exists, so nothing to scrub there.)
+  - **Demonstrated**: this issue's own PR merged through required checks **without** `--admin`.
+  - **Status**: ✅ Complete
+
 ### 2026-06-26
 - **Test coverage for books.py endpoints 41% → 89% + 6 real bug fixes (#121)**: PR #138 (reliability-labeled)
   - **244 new integration tests** across 7 files in `tests/test_api/test_routes/` (one per endpoint group: book CRUD/summary, pre-TOC AI, TOC, chapter CRUD, chapter content/tab-state, chapter questions, draft/style). Each endpoint covers happy-path + 404 + 403 (wrong owner) + validation/AI-error branches. Real local MongoDB + mocked session auth (`auth_client_factory`); AI endpoints patch `ai_service`. Full backend suite green: **714 passed, 17 skipped**.
@@ -41,7 +50,7 @@
     5. `GET /chapters/metadata` and `GET /chapters/tab-state` were registered **after** `/chapters/{chapter_id}` → permanently route-shadowed (404). Moved both before the parameterized route.
     6. Offensive-summary filter regex used `"\\b"` (literal backslash-b) not `"\b"` → never matched real input.
   - **Test infra (`conftest.py`)**: test DB name now env-overridable via `TEST_MONGO_URI` (default unchanged, enables parallel/sharded runs); `motor_reinit_db` now rebinds `app.db.toc_transactions` to the per-test client (it captured `_client`/`books_collection` at import), so transactional chapter endpoints run for real instead of against a closed loop.
-  - **NB**: committed with `--no-verify` — overall backend coverage is still <85% (this PR targets `books.py`), so the local pre-commit gate false-blocks; CI is the authority (Backend Tests green). Coordinates with #94 (covers the monolith as-is; tests grouped by area to move cleanly when split).
+  - **NB (historical)**: this PR predated the coverage work and was committed with `--no-verify` while overall backend coverage was still <85%. As of #118 the backend gate is green (92%) and enforcement is restored — `--no-verify`/`--admin` are no longer used as the norm. Coordinates with #94 (covers the monolith as-is; tests grouped by area to move cleanly when split).
   - **Status**: ✅ Complete
 
 ### 2026-06-26
@@ -231,9 +240,7 @@
 - `frontend/docs/TEST_FAILURE_ANALYSIS.md`: Categorized frontend failures with fix priorities
 
 ### Known Issues
-- **Backend Coverage**: 41% vs 85% target
-  - Critical gaps: `security.py` (18%). (`transcription.py` now 85% via #93; the dead `book_cover_upload.py` duplicate was removed — live cover endpoint lives in `books.py`.)
-  - Path to 85%: 4-5 weeks, 207-252 new tests
+- **Backend Coverage**: ✅ resolved — now **~92%** (≥85% gate enforced as of #118; was 41%). Historical gaps (`security.py`, `transcription.py`, `book_cover_upload.py` duplicate) closed via #93/#116/#117.
 - **Backend Asyncio**: 2 test failures related to event loop lifecycle
 - **Backend Module Structure**: Missing `__init__.py` in `app/api/middleware/` causing import errors
 
@@ -369,9 +376,7 @@ See `CURRENT_SPRINT.md` for active tasks or run `bd ready` for unblocked work.
 - **Frontend**: 88.7% pass rate (613/691 tests passing)
   - 75 failures are environmental (missing mocks, not code bugs)
   - Fix plan: 3.5-5.5 hours across 4 phases
-- **Backend**: 98.9% pass rate (187/189 tests passing)
-  - 41% coverage vs 85% target
-  - Improvement plan: 4-5 weeks, 207-252 new tests
+- **Backend**: 888 passed / 15 skipped; **~92% coverage** (≥85% gate enforced as of #118)
 - **E2E**: Comprehensive Playwright suite with auth bypass support
 
 ---
@@ -489,6 +494,8 @@ test('user can generate TOC from book summary', async ({ page }) => {
 ### Pre-Commit Hook Setup
 
 **✅ PRE-COMMIT HOOKS ARE CONFIGURED AND ENFORCED**
+
+**Gates are green at baseline and enforced (#118).** Backend coverage is ~92% and frontend coverage clears 85/85/75/85, so `pre-commit run --all-files` passes cleanly. Commit and merge **without** `--no-verify` / `gh pr merge --admin` — `main` branch protection requires the `Frontend Tests` and `Backend Tests` checks (coverage included) to pass before merge. The `--no-verify` escape hatch below is for genuine emergencies only, not routine use.
 
 This project uses automated pre-commit hooks that run before every commit. These hooks enforce TDD and quality standards.
 

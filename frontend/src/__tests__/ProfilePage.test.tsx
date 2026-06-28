@@ -35,8 +35,8 @@ jest.mock('@hookform/resolvers/zod', () => ({
 // Mock form components
 jest.mock('../components/ui/form', () => ({
   Form: ({ children, onSubmit, form }: { children: React.ReactNode; onSubmit: (...args: unknown[]) => void; form: any }) => (
-    <form onSubmit={(e) => { 
-      e.preventDefault(); 
+    <form onSubmit={(e) => {
+      e.preventDefault();
       // Call onSubmit with form values when form is submitted
       if (onSubmit && form?.getValues) {
         onSubmit(form.getValues());
@@ -50,12 +50,12 @@ jest.mock('../components/ui/form', () => ({
 
 // Mock UI components
 jest.mock('../components/ui/input', () => ({
-  Input: ({ value, ...props }: { value?: string; [key: string]: unknown }) => 
+  Input: ({ value, ...props }: { value?: string; [key: string]: unknown }) =>
     <input data-testid="input" value={value} {...props} />,
 }));
 
 jest.mock('../components/ui/button', () => ({
-  Button: ({ children, onClick, ...props }: { children: React.ReactNode; onClick?: () => void; [key: string]: unknown }) => 
+  Button: ({ children, onClick, ...props }: { children: React.ReactNode; onClick?: () => void; [key: string]: unknown }) =>
     <button onClick={onClick} {...props} data-testid="button">{children}</button>,
 }));
 
@@ -66,11 +66,11 @@ jest.mock('../components/ui/switch', () => ({
         props.onCheckedChange(e.target.checked);
       }
     };
-    
+
     return (
-      <input 
-        type="checkbox" 
-        data-testid="switch" 
+      <input
+        type="checkbox"
+        data-testid="switch"
         checked={props.checked || false}
         onChange={handleChange}
         readOnly={!props.onCheckedChange}
@@ -84,7 +84,7 @@ jest.mock('../components/ui/label', () => ({
 }));
 
 jest.mock('../components/ui/dialog', () => ({
-  Dialog: ({ children, open }: { children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void; [key: string]: unknown }) => 
+  Dialog: ({ children, open }: { children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void; [key: string]: unknown }) =>
     <div data-testid="dialog" data-open={open}>{children}</div>,
   DialogContent: ({ children }: { children: React.ReactNode }) => <div data-testid="dialog-content">{children}</div>,
   DialogHeader: ({ children }: { children: React.ReactNode }) => <div data-testid="dialog-header">{children}</div>,
@@ -212,7 +212,7 @@ describe('UserProfile page', () => {
     marketingEmails: boolean;
     [key: string]: string | boolean;
   }
-  
+
   const mockFormValuesTemplate: MockFormValues = {
     firstName: 'Jane',
     lastName: 'Doe',
@@ -232,9 +232,9 @@ describe('UserProfile page', () => {
       // Actually call the callback with the form values
       return callback(mockFormTemplate.getValues());
     }),
-    control: { 
+    control: {
       register: jest.fn(),
-      _formState: {} 
+      _formState: {}
     },
     watch: jest.fn().mockImplementation((fieldName?: string) => {
       if (fieldName) return mockFormValuesTemplate[fieldName];
@@ -245,7 +245,7 @@ describe('UserProfile page', () => {
       mockFormValuesTemplate[name] = value;
     }),
   };
-  
+
   it('renders user profile data from Clerk', async () => {
     render(<UserProfile />);
     // Wait for the form reset to be called (with act)
@@ -263,8 +263,8 @@ describe('UserProfile page', () => {
 
     // Verify user data was passed to form.reset
     expect(mockForm.reset).toHaveBeenCalled();
-  });  
-  
+  });
+
   // Test all editable fields update correctly
   it('updates all editable fields correctly', async () => {
     const updateProfileSpy = jest.fn().mockResolvedValue({ success: true });
@@ -320,7 +320,7 @@ describe('UserProfile page', () => {
     // Set up react-hook-form mock
     const rhfModule = jest.requireMock('react-hook-form');
     rhfModule.useForm.mockReturnValue(formWithErrors);
-    
+
     render(<UserProfile />);
     // In a real component, we'd test for error messages in the DOM
     // With our mocked components, we'll just verify the form is using the control with errors

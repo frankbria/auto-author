@@ -1,29 +1,27 @@
-# Issue #120 — Remove ~1,909 stmts of dead service code + omit seed script
+# Issue #118 — Restore pre-commit/CI gate enforcement (P1.15, capstone)
 
-## Verified findings (Phase 2)
-All 9 service modules are genuinely dead in `app/` — no importers, no re-exports in
-`services/__init__.py`, no dynamic/class-name references. Total **4,983 LOC**.
+## Verified preconditions (all blockers closed)
+- #68, #93, #116, #117 all CLOSED. No open coverage child issues remain.
+- Backend coverage gate: **92.44%** ✅ (was ~41%) — `pytest --cov=app --cov-fail-under=85` passes, 888 passed/15 skipped.
+- Frontend coverage gate: ✅ passes 85/85/75/85 thresholds, 1856 passed/8 skipped, 90 suites.
 
-Non-`app/` references (only 2 of the 9 modules):
-- `tests/test_chapter_tabs_api.py` — **collects 0 pytest tests** (manual harness), imports
-  `ChapterMetadataCache` + `ChapterErrorHandler` alongside live modules.
-- `validate_chapter_tabs.py`, `quick_validate.py`, `simple_validate.py` (backend root) —
-  manual dev scripts, **not referenced by any CI/config**.
+## Findings
+- `main` has **no branch protection** (404). Item 3 is greenfield.
+- CI `tests.yml` has `continue-on-error: true` on BOTH coverage-threshold steps (lines 50, 106) — coverage regressions don't fail the job today. Must remove to truly enforce.
+- No PR template file exists (`.github/` has only workflows + DEPLOYMENT.md) → scope item 4 "PR template" is N/A.
+- Bypass boilerplate lives in CLAUDE.md (line 44 NB; pre-commit section).
+- CI check contexts: `Frontend Tests`, `Backend Tests`, `E2E Tests (Playwright)`, `Quality Summary`, `Build and Deploy to Staging`. E2E explicitly out of scope per issue.
 
 ## Plan
-1. Delete 9 dead service modules:
-   content_analysis_service, historical_data_service, question_feedback_service,
-   chapter_error_handler, chapter_cache_service, user_level_adaptation,
-   question_quality_service, genre_question_templates, chapter_soft_delete_service.
-2. Add `*/populate_db_test_data.py` to `.coveragerc` `omit`.
-3. Handle the 4 manual scripts referencing chapter cache/error modules (decision pending user):
-   delete as ghost code, OR surgically drop the dead imports.
-4. Re-run backend suite — must stay green (no module-named test files exist).
-5. Re-measure coverage; record before/after in PR + CLAUDE.md.
+1. `.github/workflows/tests.yml`: remove `continue-on-error: true` from the frontend + backend coverage-threshold steps so coverage is enforced in CI.
+2. `CLAUDE.md`: neutralize the line-44 `--no-verify`/baseline-gates-red NB; update the pre-commit/TDD section to state gates are green & enforced; add a Recent Changes entry.
+3. Branch protection on `main` via `gh api`: required status checks (strict) = Frontend Tests + Backend Tests; route merges through PR. (Strictness = user decision — see Phase 4.)
+4. Demonstrate: `pre-commit run --all-files` green; open PR; merge through required checks **without** `--admin`.
+5. Update stale auto-memory note (coverage gate now green/enforced).
 
-## Acceptance criteria
-- [ ] Dead modules removed
-- [ ] `populate_db_test_data.py` omitted from coverage
-- [ ] Coverage re-measured and recorded (~70% expected)
-- [ ] Test suite green
-- [ ] Coordinates with #90 (dead-code/bloat cleanup)
+## Acceptance criteria mapping
+- [ ] `pre-commit run --all-files` zero failures → demo evidence (Phase 11)
+- [ ] PR merged through required checks without `--admin` → Phase 13
+- [ ] Branch protection requires coverage/test checks → step 3
+- [ ] CLAUDE.md / PR template no longer instruct bypassing → step 2 (no PR template exists)
+- [ ] No open coverage gate red → verified above

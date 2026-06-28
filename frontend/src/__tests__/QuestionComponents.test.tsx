@@ -74,12 +74,12 @@ describe('Question Components', () => {
 
     test('renders empty state when no questions', async () => {
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({ questions: [] });
-      
+
       render(
-        <QuestionContainer 
-          bookId="book1" 
-          chapterId="chapter1" 
-          chapterTitle="Chapter 1: Introduction" 
+        <QuestionContainer
+          bookId="book1"
+          chapterId="chapter1"
+          chapterTitle="Chapter 1: Introduction"
         />
       );
 
@@ -92,16 +92,16 @@ describe('Question Components', () => {
     test('renders questions when available', async () => {
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({ questions: mockQuestions });
       (bookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue(mockProgress);
-      (bookClient.getQuestionResponse as jest.Mock).mockResolvedValue({ 
-        has_response: false, 
-        response: null 
+      (bookClient.getQuestionResponse as jest.Mock).mockResolvedValue({
+        has_response: false,
+        response: null
       });
-      
+
       render(
-        <QuestionContainer 
-          bookId="book1" 
-          chapterId="chapter1" 
-          chapterTitle="Chapter 1: Introduction" 
+        <QuestionContainer
+          bookId="book1"
+          chapterId="chapter1"
+          chapterTitle="Chapter 1: Introduction"
         />
       );
 
@@ -112,18 +112,18 @@ describe('Question Components', () => {
 
     test('handles question generation', async () => {
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({ questions: [] });
-      (bookClient.generateChapterQuestions as jest.Mock).mockResolvedValue({ 
+      (bookClient.generateChapterQuestions as jest.Mock).mockResolvedValue({
         questions: mockQuestions,
         total: 2,
         generation_id: 'gen1'
       });
       (bookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue(mockProgress);
-      
+
       render(
-        <QuestionContainer 
-          bookId="book1" 
-          chapterId="chapter1" 
-          chapterTitle="Chapter 1: Introduction" 
+        <QuestionContainer
+          bookId="book1"
+          chapterId="chapter1"
+          chapterTitle="Chapter 1: Introduction"
         />
       );
 
@@ -137,8 +137,8 @@ describe('Question Components', () => {
 
       await waitFor(() => {
         expect(bookClient.generateChapterQuestions).toHaveBeenCalledWith(
-          'book1', 
-          'chapter1', 
+          'book1',
+          'chapter1',
           expect.anything()
         );
       });
@@ -147,9 +147,9 @@ describe('Question Components', () => {
     test('handles saving responses', async () => {
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({ questions: mockQuestions });
       (bookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue(mockProgress);
-      (bookClient.getQuestionResponse as jest.Mock).mockResolvedValue({ 
-        has_response: false, 
-        response: null 
+      (bookClient.getQuestionResponse as jest.Mock).mockResolvedValue({
+        has_response: false,
+        response: null
       });
       (bookClient.saveQuestionResponse as jest.Mock).mockResolvedValue({
         response: {
@@ -168,12 +168,12 @@ describe('Question Components', () => {
         success: true,
         message: 'Response saved'
       });
-      
+
       render(
-        <QuestionContainer 
-          bookId="book1" 
-          chapterId="chapter1" 
-          chapterTitle="Chapter 1: Introduction" 
+        <QuestionContainer
+          bookId="book1"
+          chapterId="chapter1"
+          chapterTitle="Chapter 1: Introduction"
         />
       );
 
@@ -216,16 +216,16 @@ describe('Question Components', () => {
     test('handles navigation between questions', async () => {
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({ questions: mockQuestions });
       (bookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue(mockProgress);
-      (bookClient.getQuestionResponse as jest.Mock).mockResolvedValue({ 
-        has_response: false, 
-        response: null 
+      (bookClient.getQuestionResponse as jest.Mock).mockResolvedValue({
+        has_response: false,
+        response: null
       });
-      
+
       render(
-        <QuestionContainer 
-          bookId="book1" 
-          chapterId="chapter1" 
-          chapterTitle="Chapter 1: Introduction" 
+        <QuestionContainer
+          bookId="book1"
+          chapterId="chapter1"
+          chapterTitle="Chapter 1: Introduction"
         />
       );
 

@@ -65,8 +65,8 @@ class ChapterTabsAPI {
     return response.content || '';
   }
   async saveChapterContent(
-    bookId: string, 
-    chapterId: string, 
+    bookId: string,
+    chapterId: string,
     content: string,
     autoUpdateMetadata: boolean = true
   ): Promise<void> {

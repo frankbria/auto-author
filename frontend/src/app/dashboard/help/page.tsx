@@ -2,7 +2,7 @@ export default function HelpPage() {
   return (
     <div className="container max-w-4xl py-8">
       <h1 className="text-3xl font-bold mb-6">Help & Support</h1>
-      
+
       <div className="space-y-6">
         <section>
           <h2 className="text-2xl font-semibold mb-3">Getting Started</h2>
@@ -11,7 +11,7 @@ export default function HelpPage() {
             compelling content through guided interviews and intelligent draft generation.
           </p>
         </section>
-        
+
         <section>
           <h2 className="text-2xl font-semibold mb-3">Key Features</h2>
           <ul className="list-disc list-inside space-y-2 text-muted-foreground">
@@ -22,7 +22,7 @@ export default function HelpPage() {
             <li>Track your writing progress</li>
           </ul>
         </section>
-        
+
         <section>
           <h2 className="text-2xl font-semibold mb-3">How to Use AI Draft Generation</h2>
           <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
@@ -34,7 +34,7 @@ export default function HelpPage() {
             <li>Review and edit the generated draft before using it</li>
           </ol>
         </section>
-        
+
         <section>
           <h2 className="text-2xl font-semibold mb-3">Need More Help?</h2>
           <p className="text-muted-foreground">

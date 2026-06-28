@@ -32,20 +32,20 @@ TEST_BOOK = {
 
 class SimplifiedSystemTest:
     """Simplified System E2E Test Runner"""
-    
+
     def __init__(self, client: httpx.AsyncClient, cleanup: bool = True):
         self.client = client
         self.cleanup = cleanup
         self.book_id: str = None
-        
+
     def log_step(self, message: str):
         """Log a test step"""
         print(f"\n🔸 {message}")
-        
+
     def log_success(self, message: str):
         """Log a success message"""
         print(f"✅ {message}")
-        
+
     def log_error(self, message: str):
         """Log an error message"""
         print(f"❌ {message}")
@@ -53,14 +53,14 @@ class SimplifiedSystemTest:
     async def create_book(self) -> Dict[str, Any]:
         """Step 1: Create a book"""
         self.log_step("Creating book...")
-        
+
         response = await self.client.post("/api/v1/books/", json=TEST_BOOK)
         response.raise_for_status()
-        
+
         book = response.json()
         self.book_id = book["id"]
         self.log_success(f"Book created: {book['title']} (ID: {self.book_id})")
-        
+
         # Save book summary
         self.log_step("Saving book summary...")
         summary_response = await self.client.put(
@@ -69,16 +69,16 @@ class SimplifiedSystemTest:
         )
         summary_response.raise_for_status()
         self.log_success("Book summary saved")
-        
+
         return book
 
     async def generate_book_questions(self) -> List[Dict[str, Any]]:
         """Step 2: Generate book summary questions"""
         self.log_step("Generating book summary questions...")
-        
+
         response = await self.client.post(f"/api/v1/books/{self.book_id}/generate-questions")
         response.raise_for_status()
-        
+
         data = response.json()
         questions = data["questions"]
         self.log_success(f"Generated {len(questions)} summary questions")
@@ -87,27 +87,27 @@ class SimplifiedSystemTest:
     async def answer_book_questions(self, questions: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Step 3: Answer book summary questions"""
         self.log_step("Answering book summary questions...")
-        
+
         answers = []
         for i, question in enumerate(questions):
             answers.append({
                 "question": question.get("question", question.get("question_text", "")),
                 "answer": f"This is a test answer for question {i+1}"
             })
-        
+
         response = await self.client.put(
             f"/api/v1/books/{self.book_id}/question-responses",
             json={"responses": answers}
         )
         response.raise_for_status()
-        
+
         self.log_success("Summary answers submitted")
         return response.json()
 
     async def generate_toc(self) -> Dict[str, Any]:
         """Step 4: Generate Table of Contents"""
         self.log_step("Generating Table of Contents...")
-        
+
         response = await self.client.post(
             f"/api/v1/books/{self.book_id}/generate-toc",
             json={
@@ -117,7 +117,7 @@ class SimplifiedSystemTest:
             }
         )
         response.raise_for_status()
-        
+
         toc = response.json()
         chapters_count = len(toc.get("toc", {}).get("chapters", []))
         self.log_success(f"Generated TOC with {chapters_count} chapters")
@@ -126,18 +126,18 @@ class SimplifiedSystemTest:
     async def verify_system(self) -> bool:
         """Step 5: Verify workflow completed"""
         self.log_step("Verifying system state...")
-        
+
         # Verify book exists
         book_response = await self.client.get(f"/api/v1/books/{self.book_id}")
         book_response.raise_for_status()
         book = book_response.json()
-        
+
         # Verify TOC exists
         has_toc = bool(book.get("table_of_contents", {}).get("chapters"))
-        
+
         self.log_success(f"Book: {book['title']}")
         self.log_success(f"Has TOC: {has_toc}")
-        
+
         return has_toc
 
     async def cleanup_test_data(self):
@@ -155,7 +155,7 @@ class SimplifiedSystemTest:
         """Run the simplified system test"""
         print("\n🚀 Auto Author Simplified System Test Starting...\n")
         start_time = time.time()
-        
+
         try:
             # Execute test workflow
             await self.create_book()
@@ -163,10 +163,10 @@ class SimplifiedSystemTest:
             await self.answer_book_questions(book_questions)
             toc = await self.generate_toc()
             await self.verify_system()
-            
+
             duration = time.time() - start_time
             print(f"\n✅ SIMPLIFIED SYSTEM TEST PASSED in {duration:.2f} seconds!\n")
-            
+
         except Exception as e:
             print(f"\n❌ SIMPLIFIED SYSTEM TEST FAILED!\n")
             print(f"Error: {e}")
@@ -182,7 +182,7 @@ class SimplifiedSystemTest:
 def mock_ai_service(monkeypatch):
     """Mock the AI service to return predictable responses"""
     from app.services.ai_service import AIService
-    
+
     # Mock question generation
     async def mock_generate_clarifying_questions(self, *args, **kwargs):
         return [
@@ -190,7 +190,7 @@ def mock_ai_service(monkeypatch):
             {"question": "What are the key takeaways?", "category": "content"},
             {"question": "What makes this unique?", "category": "uniqueness"},
         ]
-    
+
     # Mock TOC generation
     async def mock_generate_toc_from_summary_and_responses(self, *args, **kwargs):
         return {
@@ -217,7 +217,7 @@ def mock_ai_service(monkeypatch):
             "has_subchapters": False,
             "success": True
         }
-    
+
     # Apply mocks
     monkeypatch.setattr(AIService, "generate_clarifying_questions", mock_generate_clarifying_questions)
     monkeypatch.setattr(AIService, "generate_toc_from_summary_and_responses", mock_generate_toc_from_summary_and_responses)

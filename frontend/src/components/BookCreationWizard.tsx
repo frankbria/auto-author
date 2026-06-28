@@ -62,7 +62,7 @@ const targetAudienceOptions = [
 export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCreationWizardProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const form = useForm<BookFormData>({
     resolver: zodResolver(bookCreationSchema),
     defaultValues: {
@@ -264,8 +264,8 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-white"
                 disabled={isSubmitting}
               >

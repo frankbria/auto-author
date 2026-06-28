@@ -440,7 +440,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={TextBoldIcon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -454,7 +454,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={TextItalicIcon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -468,7 +468,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={TextUnderlineIcon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -482,9 +482,9 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={Strikethrough} size={16} />
         </Button>
-        
+
         <div className="w-px h-6 bg-border mx-1" />
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -498,7 +498,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={Heading01Icon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -512,7 +512,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={Heading02Icon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -526,9 +526,9 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={Heading03Icon} size={16} />
         </Button>
-        
+
         <div className="w-px h-6 bg-border mx-1" />
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -542,7 +542,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={ListViewIcon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -556,7 +556,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={MenuSquareIcon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -570,7 +570,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={QuoteUpIcon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -584,9 +584,9 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={CodeIcon} size={16} />
         </Button>
-        
+
         <div className="w-px h-6 bg-border mx-1" />
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -598,7 +598,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={Undo02Icon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -610,7 +610,7 @@ export function ChapterEditor({
         >
           <HugeiconsIcon icon={Redo02Icon} size={16} />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -622,7 +622,7 @@ export function ChapterEditor({
           <HugeiconsIcon icon={MinusSignIcon} size={16} />
         </Button>
         </div>
-        
+
         {/* AI Draft Generator */}
         <DraftGenerator
           bookId={bookId}
@@ -651,15 +651,15 @@ export function ChapterEditor({
           </Button>
         )}
       </div>
-      
+
       {/* Editor Content */}
       <div className="flex-1 p-4 bg-white overflow-auto">
-        <EditorContent 
-          editor={editor} 
-          className="w-full h-full min-h-[500px] tiptap-editor text-black" 
+        <EditorContent
+          editor={editor}
+          className="w-full h-full min-h-[500px] tiptap-editor text-black"
         />
       </div>
-      
+
       {/* Editor Footer */}
       <div className="border-t border-border p-4 flex justify-between items-center bg-muted/20">
         <div className="flex items-center gap-4">

@@ -54,11 +54,11 @@ export default function TabContextMenu({
       >
         <HugeiconsIcon icon={MoreVerticalIcon} size={12} />
       </Button>
-      
+
       {isOpen && (
         <>
-          <div 
-            className="fixed inset-0 z-10" 
+          <div
+            className="fixed inset-0 z-10"
             onClick={() => setIsOpen(false)}
           />
           <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-md border border-border bg-popover text-popover-foreground p-1 shadow-md">
@@ -71,7 +71,7 @@ export default function TabContextMenu({
                 Preview
               </button>
             )}
-            
+
             {onEdit && (
               <button
                 className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
@@ -93,7 +93,7 @@ export default function TabContextMenu({
             )}
 
             <div className="my-1 h-px bg-border" />
-            
+
             <button
               className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleStatusUpdate(ChapterStatus.DRAFT)}
@@ -120,7 +120,7 @@ export default function TabContextMenu({
             </button>
 
             <div className="my-1 h-px bg-border" />
-            
+
             {onDelete && (
               <button
                 className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground"

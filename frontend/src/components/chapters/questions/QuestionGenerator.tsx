@@ -39,7 +39,7 @@ export default function QuestionGenerator({
   const [difficulty, setDifficulty] = useState<QuestionDifficulty | undefined>(undefined);
   const [focusTypes, setFocusTypes] = useState<QuestionType[]>([]);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
-  
+
   // Toggle question type in focus array
   const toggleQuestionType = (type: QuestionType) => {
     if (focusTypes.includes(type)) {
@@ -48,12 +48,12 @@ export default function QuestionGenerator({
       setFocusTypes([...focusTypes, type]);
     }
   };
-  
+
   // Handle generate button click
   const handleGenerate = async () => {
     // Use focus types only if some are selected
     const focus = focusTypes.length > 0 ? focusTypes : undefined;
-    
+
     await onGenerate(questionCount, difficulty, focus);
   };
 
@@ -94,7 +94,7 @@ export default function QuestionGenerator({
           a guided interview process. Answer these questions to explore key aspects of your chapter.
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent className="space-y-6">
         {/* Basic options */}
         <div className="space-y-4">
@@ -118,7 +118,7 @@ export default function QuestionGenerator({
               <span>20 (Comprehensive)</span>
             </div>
           </div>
-          
+
           <div>
             <Button
               variant="outline"
@@ -199,7 +199,7 @@ export default function QuestionGenerator({
             </div>
           </div>
         )}
-        
+
         {/* Error message */}
         {error && (
           <div className="bg-destructive/10 p-3 rounded-md text-destructive text-sm flex items-center">
@@ -208,7 +208,7 @@ export default function QuestionGenerator({
           </div>
         )}
       </CardContent>
-      
+
       <CardFooter>
         <Button
           onClick={handleGenerate}

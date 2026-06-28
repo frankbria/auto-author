@@ -765,11 +765,11 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
     ) -> List[Dict[str, Any]]:
         """
         Generate interview-style questions for a chapter using AI.
-        
+
         Args:
             prompt: The prompt containing chapter context and requirements
             count: Number of questions to generate
-            
+
         Returns:
             List of question dictionaries
         """
@@ -781,46 +781,46 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 },
                 {"role": "user", "content": prompt}
             ]
-            
+
             response = await self._make_openai_request(
-                messages=messages, 
+                messages=messages,
                 temperature=0.7,  # Higher creativity for question generation
                 max_tokens=2000
             )
-            
+
             questions_text = response.choices[0].message.content
             questions = self._parse_chapter_questions_response(questions_text)
-            
+
             logger.info(f"Generated {len(questions)} questions for chapter")
             return questions
-            
+
         except Exception as e:
             logger.error(f"Error generating chapter questions: {str(e)}")
             # Return empty list, fallback questions will be handled by the service
             return []
-    
+
     def _parse_chapter_questions_response(self, questions_text: str) -> List[Dict[str, Any]]:
         """
         Parse the AI response containing chapter questions.
-        
+
         Args:
             questions_text: Raw text response from AI
-            
+
         Returns:
             List of question dictionaries
         """
         import json
         import re
-        
+
         questions = []
-        
+
         try:
             # Try to parse as JSON first
             json_match = re.search(r'\[.*\]', questions_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group(0)
                 parsed_questions = json.loads(json_str)
-                
+
                 if isinstance(parsed_questions, list):
                     for q in parsed_questions:
                         if isinstance(q, dict) and 'question_text' in q:
@@ -832,12 +832,12 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
         # Fallback: parse structured text format
         lines = questions_text.strip().split('\n')
         current_question = {}
-        
+
         for line in lines:
             line = line.strip()
             if not line:
                 continue
-                
+
             # Look for question text
             if line.startswith('"question_text"') or 'question_text' in line:
                 match = re.search(r'"question_text"\s*:\s*"([^"]+)"', line)
@@ -858,7 +858,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             elif line.startswith('}') and current_question.get('question_text'):
                 questions.append(current_question.copy())
                 current_question = {}
-        
+
         # If still no questions, try simple question extraction
         if not questions:
             question_lines = []
@@ -869,7 +869,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     # Remove numbering, bullets, etc.
                     question_text = re.sub(r'^[\d\.\-\*\•]\s*', '', question_text)
                     question_text = question_text.strip('"\'')
-                    
+
                     if question_text:
                         questions.append({
                             'question_text': question_text,
@@ -877,7 +877,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                             'difficulty': 'medium',   # Default difficulty
                             'help_text': 'Consider the key elements that would engage readers in this chapter.'
                         })
-        
+
         return questions[:20]  # Limit to reasonable number
 
     async def generate_chapter_draft(
@@ -891,7 +891,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
     ) -> Dict[str, Any]:
         """
         Generate a draft chapter based on Q&A responses using AI.
-        
+
         Args:
             chapter_title: Title of the chapter
             chapter_description: Brief description of chapter content
@@ -899,7 +899,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             book_metadata: Optional book metadata (title, genre, audience)
             writing_style: Optional writing style preference
             target_length: Target word count for the chapter
-            
+
         Returns:
             Dict containing the generated draft and metadata
         """
@@ -912,7 +912,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 writing_style,
                 target_length
             )
-            
+
             messages = [
                 {
                     "role": "system",
@@ -920,17 +920,17 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 },
                 {"role": "user", "content": prompt}
             ]
-            
+
             response = await self._make_openai_request(
                 messages, temperature=0.8
             )
-            
+
             draft_content = response.choices[0].message.content
-            
+
             # Calculate metadata
             word_count = len(draft_content.split())
             estimated_reading_time = max(1, word_count // 200)  # ~200 words per minute
-            
+
             return {
                 "success": True,
                 "draft": draft_content,
@@ -945,7 +945,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 },
                 "suggestions": self._generate_improvement_suggestions(draft_content)
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to generate chapter draft: {str(e)}")
             return {
@@ -1066,16 +1066,16 @@ Book Context:
 - Genre: {genre}
 - Target Audience: {audience}
 """
-        
+
         style_instruction = ""
         if writing_style:
             style_instruction = f"\nWriting Style: {writing_style}"
-        
+
         responses_text = "\n\n".join([
             f"Question: {resp['question']}\nAuthor's Response: {resp['answer']}"
             for resp in question_responses
         ])
-        
+
         return f"""
 Generate a compelling chapter draft based on the following information:
 
@@ -1100,32 +1100,32 @@ Write in a style that is {writing_style or 'engaging, clear, and appropriate for
 
 Format the output as clean, ready-to-edit prose with proper paragraph breaks.
 """
-    
+
     def _generate_improvement_suggestions(self, draft_content: str) -> List[str]:
         """Generate suggestions for improving the draft."""
         suggestions = []
-        
+
         # Basic analysis
         word_count = len(draft_content.split())
         sentence_count = len([s for s in draft_content.split('.') if s.strip()])
         avg_sentence_length = word_count / max(sentence_count, 1)
-        
+
         if word_count < 500:
             suggestions.append("Consider expanding the content with more examples and details")
         elif word_count > 3000:
             suggestions.append("Consider breaking this into multiple chapters or sections")
-            
+
         if avg_sentence_length > 25:
             suggestions.append("Some sentences may be too long - consider breaking them up for clarity")
         elif avg_sentence_length < 10:
             suggestions.append("Sentences seem short - consider combining some for better flow")
-            
+
         if draft_content.count('\n\n') < 3:
             suggestions.append("Add more paragraph breaks to improve readability")
-            
+
         if not any(word in draft_content.lower() for word in ['example', 'for instance', 'such as']):
             suggestions.append("Consider adding specific examples to illustrate key points")
-            
+
         return suggestions
 
 

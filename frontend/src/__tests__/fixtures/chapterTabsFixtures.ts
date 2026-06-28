@@ -16,13 +16,13 @@ export const createMockChapter = (id: string, title: string, overrides = {}): Ch
 export const generateChaptersFixture = (count: number) => {
   const chapters = [];
   const tabOrder = [];
-  
+
   for (let i = 1; i <= count; i++) {
     const id = `ch-${i}`;
-    const status = i <= 2 ? ChapterStatus.DRAFT : 
-                   i <= 4 ? ChapterStatus.IN_PROGRESS : 
+    const status = i <= 2 ? ChapterStatus.DRAFT :
+                   i <= 4 ? ChapterStatus.IN_PROGRESS :
                    ChapterStatus.COMPLETED;
-    
+
     chapters.push(createMockChapter(id, `Chapter ${i}`, {
       status,
       word_count: i * 150,
@@ -31,7 +31,7 @@ export const generateChaptersFixture = (count: number) => {
     }));
     tabOrder.push(id);
   }
-  
+
   return { chapters, tabOrder };
 };
 
@@ -80,14 +80,14 @@ export const setupTestEnvironment = () => {
   Object.defineProperty(window, 'localStorage', {
     value: mockLocalStorage,
   });
-  
+
   // Mock IntersectionObserver
   window.IntersectionObserver = jest.fn().mockImplementation(() => ({
     observe: jest.fn(),
     unobserve: jest.fn(),
     disconnect: jest.fn(),
   }));
-  
+
   // Mock ResizeObserver
   window.ResizeObserver = jest.fn().mockImplementation(() => ({
     observe: jest.fn(),

@@ -1,6 +1,6 @@
 /**
  * Mobile and Accessibility Test Suite for User Story 4.2 (Interview-Style Prompts)
- * 
+ *
  * This test suite focuses on responsive design, mobile usability, and accessibility
  * compliance for the chapter questions functionality, ensuring inclusive user
  * experience across all devices and assistive technologies.
@@ -163,10 +163,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
 
         render(
           <TestWrapper>
-            <QuestionContainer 
-              bookId="test-book" 
-              chapterId="test-chapter" 
-              chapterTitle="Test Chapter" 
+            <QuestionContainer
+              bookId="test-book"
+              chapterId="test-chapter"
+              chapterTitle="Test Chapter"
             />
           </TestWrapper>
         );
@@ -176,17 +176,17 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
         });
 
         const container = screen.getByTestId('question-container');
-        
+
         if (width < 768) {
           // Mobile layout - verify the component renders without errors
           expect(container).toBeInTheDocument();
           expect(container).toHaveClass('space-y-6'); // Verify actual classes
-          
+
           // Verify essential mobile elements are present
           // Check for question text or progress indicator
           const questionText = screen.queryByText('What are the main learning objectives for this chapter?');
           expect(questionText).toBeInTheDocument();
-          
+
           // Progress should be visible - look for any progress indicator
           const progressBar = screen.queryByRole('progressbar') || screen.queryByText(/Progress/);
           expect(progressBar).toBeTruthy();
@@ -231,10 +231,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );
@@ -269,10 +269,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );
@@ -353,10 +353,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
     test('handles virtual keyboard appearance correctly', async () => {
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );
@@ -366,7 +366,7 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
       });
 
       const textarea = screen.getByRole('textbox');
-      
+
       // Focus should trigger virtual keyboard simulation
       textarea.focus();
 
@@ -383,10 +383,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
     test('passes automated accessibility audit', async () => {
       const { container } = render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );
@@ -402,10 +402,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
     test('provides proper semantic structure', async () => {
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );
@@ -417,12 +417,12 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
       // Check for proper semantic elements
       expect(screen.getByRole('main')).toBeInTheDocument();
       expect(screen.getByRole('textbox')).toBeInTheDocument();
-      
+
       // Progress bar might be rendered differently
       const progressBar = screen.queryByRole('progressbar');
       const progressText = screen.queryByText(/3 of 5/);
       expect(progressBar || progressText).toBeInTheDocument();
-      
+
       // Check for buttons (may have more than just Next/Previous)
       const buttons = screen.getAllByRole('button');
       expect(buttons.length).toBeGreaterThan(0);
@@ -431,10 +431,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
     test('supports screen readers with proper ARIA labels', async () => {
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );
@@ -446,10 +446,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
       // Check that key elements have ARIA attributes
       const main = screen.getByRole('main');
       expect(main).toBeInTheDocument();
-      
+
       const textbox = screen.getByRole('textbox');
       expect(textbox).toBeInTheDocument();
-      
+
       // Check for help text if it exists
       const helpText = screen.queryByText('Consider what readers should achieve after reading this chapter.');
       if (helpText) {
@@ -460,10 +460,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
     test('maintains focus management correctly', async () => {
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );
@@ -561,10 +561,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );
@@ -595,10 +595,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );
@@ -663,10 +663,10 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
 
       render(
         <TestWrapper>
-          <QuestionContainer 
-            bookId="test-book" 
-            chapterId="test-chapter" 
-            chapterTitle="Test Chapter" 
+          <QuestionContainer
+            bookId="test-book"
+            chapterId="test-chapter"
+            chapterTitle="Test Chapter"
           />
         </TestWrapper>
       );

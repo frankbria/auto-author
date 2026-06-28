@@ -53,14 +53,14 @@ for FILE in $FILES; do
     if git diff --cached --numstat "$FILE" | grep -q '^-'; then
         continue
     fi
-    
+
     # Skip files that are typically large and don't contain secrets
     case "$FILE" in
         *.lock|package-lock.json|yarn.lock|*.min.js|*.bundle.js|*.map|*.svg|*.woff*|*.ttf|*.eot|*.otf)
             continue
             ;;
     esac
-    
+
     # Skip files larger than 100KB (byte size check)
     if [ -f "$FILE" ]; then
         # Try GNU stat first, fall back to macOS stat
@@ -69,15 +69,18 @@ for FILE in $FILES; do
             continue
         fi
     fi
-    
+
     # Additional safeguard: skip files with very large diffs (>10000 lines changed)
     LINES_CHANGED=$(git diff --cached --numstat "$FILE" | awk '{print $1 + $2}')
     if [ -n "$LINES_CHANGED" ] && [ "$LINES_CHANGED" -gt 10000 ]; then
         continue
     fi
 
-    # Get the content being committed (limit to first 10KB to avoid processing huge diffs)
-    CONTENT=$(git diff --cached "$FILE" | head -c 10240)
+    # Get the content being ADDED (only '+' lines, excluding the '+++' file header).
+    # Scanning added lines only — not removed/context lines — so that deleting a
+    # hardcoded secret or editing nearby code doesn't falsely block the commit.
+    # (limit to first 10KB to avoid processing huge diffs)
+    CONTENT=$(git diff --cached "$FILE" | grep '^+' | grep -v '^+++' | head -c 10240)
 
     for PATTERN in "${PATTERNS[@]}"; do
         MATCHES=$(echo "$CONTENT" | grep -E "$PATTERN" | head -5)

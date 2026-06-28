@@ -13,7 +13,7 @@ export const createMockMediaStream = (): MediaStream => {
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
   };
-  
+
   return {
     getAudioTracks: () => [audioTrack],
     getTracks: () => [audioTrack],

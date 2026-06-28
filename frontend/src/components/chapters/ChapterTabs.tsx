@@ -42,16 +42,16 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
       // Find the chapter to get its title
       const chapter = state.chapters.find(ch => ch.id === chapterId);
       const chapterTitle = chapter?.title || 'Chapter';
-      
+
       // Call the API to delete the chapter
       await bookClient.deleteChapter(bookId, chapterId);
-      
+
       // Close the tab if it's open
       closeTab(chapterId);
-      
+
       // Refresh the chapters list
       await refreshChapters();
-      
+
       toast({
         title: "Chapter deleted",
         description: `"${chapterTitle}" has been deleted successfully.`,
@@ -71,23 +71,23 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
   const handleCreateChapter = useCallback(async () => {
     try {
       // Calculate the next chapter order
-      const nextOrder = state.chapters.length > 0 
-        ? Math.max(...state.chapters.map(ch => ch.order || 0)) + 1 
+      const nextOrder = state.chapters.length > 0
+        ? Math.max(...state.chapters.map(ch => ch.order || 0)) + 1
         : 1;
-      
+
       // Create the new chapter
       const newChapter = await bookClient.createChapter(bookId, {
         title: `Chapter ${nextOrder}`,
         content: '',
         order: nextOrder
       });
-      
+
       // Refresh the chapters list to include the new chapter
       await refreshChapters();
-      
+
       // Set the new chapter as active
       setActiveChapter(newChapter.id);
-      
+
       toast({
         title: "Chapter created",
         description: `"${newChapter.title}" has been created successfully.`,
@@ -103,8 +103,8 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
     }
   }, [bookId, state.chapters, refreshChapters, setActiveChapter, toast]);
   // Set up TOC synchronization
-  useTocSync({ 
-    bookId, 
+  useTocSync({
+    bookId,
     onTocChanged: refreshChapters
     // Removed pollInterval - polling disabled by default
   });
@@ -145,7 +145,7 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [state.tab_order, handleTabSelect]);  
+  }, [state.tab_order, handleTabSelect]);
 
   if (loading) {
     return (
@@ -176,15 +176,15 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
   // Handle empty chapters state
   if (state.chapters.length === 0) {
     return (
-      <div 
-        data-testid="empty-chapters-state" 
+      <div
+        data-testid="empty-chapters-state"
         className="flex flex-col items-center justify-center h-64 p-8 text-center"
       >
         <h3 className="text-xl font-semibold mb-2">No chapters available</h3>
         <p className="text-muted-foreground mb-4">
           Create your first chapter to get started with your book.
         </p>
-        <button 
+        <button
           className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
           onClick={handleCreateChapter}
         >
@@ -195,12 +195,12 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
   }
 
   return (
-    <div 
+    <div
       data-testid="chapter-tabs-container"
       className={orientation === 'vertical' ? `flex h-full ${className}` : className}
     >
       {isMobile ? (
-        <MobileChapterTabs 
+        <MobileChapterTabs
           chapters={state.chapters}
           activeChapterId={state.active_chapter_id}
           onChapterSelect={handleTabSelect}

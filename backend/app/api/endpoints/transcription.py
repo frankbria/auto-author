@@ -19,13 +19,13 @@ async def transcribe_audio(
 ):
     """
     Transcribe uploaded audio file to text.
-    
+
     Args:
         audio: Audio file to transcribe
         language: Language code for transcription (default: en-US)
         enable_punctuation_commands: Process voice punctuation commands
         current_user: Authenticated user
-        
+
     Returns:
         TranscriptionResponse with transcript and metadata
     """
@@ -36,35 +36,35 @@ async def transcribe_audio(
                 status_code=413,
                 detail="File too large. Maximum size is 10MB."
             )
-        
+
         # Read audio data
         audio_data = await audio.read()
-        
+
         # Validate audio format
         if not transcription_service.validate_audio_format(audio_data, audio.content_type or ""):
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported audio format: {audio.content_type}"
             )
-        
+
         # Perform transcription
         result = await transcription_service.transcribe_audio(
             audio_data=audio_data,
             language=language,
             enable_punctuation_commands=enable_punctuation_commands
         )
-        
+
         if result.status == "error":
             raise HTTPException(
                 status_code=500,
                 detail=f"Transcription failed: {result.error_message}"
             )
-        
+
         user_id = current_user.get("id") or current_user.get("auth_id", "unknown")
         logger.info(f"Transcription completed for user {user_id}: {len(result.transcript)} characters")
-        
+
         return result
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -82,7 +82,7 @@ async def stream_transcription(
 ):
     """
     WebSocket endpoint for real-time audio transcription.
-    
+
     Args:
         websocket: WebSocket connection
         language: Language code for transcription
@@ -114,7 +114,7 @@ async def get_transcription_status(
 ):
     """
     Get transcription service status and capabilities.
-    
+
     Returns:
         Service status information
     """
@@ -137,11 +137,11 @@ async def validate_audio_file(
 ):
     """
     Validate audio file without transcribing.
-    
+
     Args:
         audio: Audio file to validate
         current_user: Authenticated user
-        
+
     Returns:
         Validation result
     """
@@ -152,25 +152,25 @@ async def validate_audio_file(
                 "valid": False,
                 "error": "File too large. Maximum size is 10MB."
             }
-        
+
         # Read a small sample to validate format
         audio_sample = await audio.read(1024)
-        
+
         # Validate format
         is_valid = transcription_service.validate_audio_format(
-            audio_sample, 
+            audio_sample,
             audio.content_type or ""
         )
-        
+
         if not is_valid:
             return {
                 "valid": False,
                 "error": f"Unsupported audio format: {audio.content_type}"
             }
-        
+
         # Estimate duration
         duration = transcription_service.estimate_duration(audio_sample)
-        
+
         return {
             "valid": True,
             "file_size": audio.size,
@@ -178,7 +178,7 @@ async def validate_audio_file(
             "estimated_duration": duration,
             "filename": audio.filename
         }
-        
+
     except Exception as e:
         logger.error(f"Audio validation error: {str(e)}")
         return {

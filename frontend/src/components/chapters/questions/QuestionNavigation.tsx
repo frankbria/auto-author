@@ -28,33 +28,33 @@ export default function QuestionNavigation({
   questions
 }: QuestionNavigationProps) {
   const [showQuestionList, setShowQuestionList] = useState(false);
-  
+
   // Determine if we're at the first or last question
   const isFirstQuestion = currentIndex === 0;
   const isLastQuestion = currentIndex === totalQuestions - 1;
-  
+
   // Format question list for dropdown
   const getQuestionTitle = (index: number): string => {
     const question = questions[index];
-    
+
     // Truncate long question text
     const questionText = question.question_text || '';
-    const truncatedText = questionText.length > 50 
-      ? questionText.substring(0, 50) + '...' 
+    const truncatedText = questionText.length > 50
+      ? questionText.substring(0, 50) + '...'
       : questionText;
-    
+
     // Get question status indicator
     let statusIndicator = '';
-    
+
     if (question.response_status === 'completed') {
       statusIndicator = '✓ ';
     } else if (question.response_status === 'draft') {
       statusIndicator = '⚙️ ';
     }
-    
+
     return `${statusIndicator}${index + 1}. ${truncatedText}`;
   };
-  
+
   return (
     <div className="flex flex-col space-y-2 transition-all" data-slot="question-navigation">
       {/* Main navigation controls */}

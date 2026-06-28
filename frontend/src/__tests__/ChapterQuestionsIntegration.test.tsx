@@ -102,7 +102,7 @@ describe('Chapter Questions Integration Tests', () => {
   describe('QuestionGenerator Component', () => {
     test('displays generation options and handles question generation', async () => {
       const onGenerate = jest.fn();
-      
+
       render(
         <QuestionGenerator
           bookId={mockBookId}
@@ -142,7 +142,7 @@ describe('Chapter Questions Integration Tests', () => {
 
     test('handles regeneration with existing questions', async () => {
       const onGenerate = jest.fn();
-      
+
       render(
         <QuestionGenerator
           bookId={mockBookId}
@@ -166,12 +166,12 @@ describe('Chapter Questions Integration Tests', () => {
   describe('QuestionDisplay Component', () => {
     test('displays question with metadata and help text', async () => {
       const question = mockQuestions[0];
-      
+
       // Mock the API call for getting existing response
       (bookClient.getQuestionResponse as jest.Mock).mockResolvedValue({
         response: null
       });
-      
+
       await act(async () => {
         render(
           <QuestionDisplay
@@ -190,13 +190,13 @@ describe('Chapter Questions Integration Tests', () => {
 
     test('handles question rating interactions', async () => {
       const question = mockQuestions[0];
-      
+
       // Mock the API calls
       (bookClient.getQuestionResponse as jest.Mock).mockResolvedValue({
         response: null
       });
       (bookClient.rateQuestion as jest.Mock).mockResolvedValue({});
-      
+
       await act(async () => {
         render(
           <QuestionDisplay
@@ -217,7 +217,7 @@ describe('Chapter Questions Integration Tests', () => {
 
     test('shows examples when available', () => {
       const question = mockQuestions[0];
-      
+
       render(
         <QuestionDisplay
           question={question}
@@ -546,7 +546,7 @@ describe('Chapter Questions Integration Tests', () => {
       // Find and click the next button directly
       const nextButton = screen.getByRole('button', { name: /next/i });
       await user.click(nextButton);
-      
+
       await waitFor(() => {
         expect(screen.getByText(mockQuestions[1].question_text)).toBeInTheDocument();
       });
@@ -615,12 +615,12 @@ describe('Chapter Questions Integration Tests', () => {
         // Either the container or the heading should be present
         expect(container || heading).toBeTruthy();
       });
-      
+
       // Verify the component rendered successfully on mobile
       const loadingText = screen.queryByText(/Loading questions/i);
       const interviewText = screen.queryByText('Interview Questions');
       const questionContainer = screen.queryByTestId('question-container');
-      
+
       // At least one of these should be present
       expect(loadingText || interviewText || questionContainer).toBeTruthy();
     });

@@ -11,7 +11,7 @@ jest.mock('next/navigation', () => ({
 // Mock the EditTocPage component to test navigation
 const EditTocPage = () => {
   const router = useRouter();
-  
+
   const handleSaveToc = async () => {
     // This is the fix we implemented - navigate to book page instead of /chapters
     router.push(`/dashboard/books/bookId123`);
@@ -59,14 +59,14 @@ describe('Navigation Fix', () => {
     // Test that individual chapter pages redirect to book page with chapter query param
     const ChapterPage = ({ chapterId }: { chapterId: string }) => {
       const router = useRouter();
-      
+
       React.useEffect(() => {
         // Set active chapter in localStorage
         localStorage.setItem(`chapter-tabs-bookId123`, JSON.stringify({
           active_chapter_id: chapterId,
           timestamp: Date.now()
         }));
-        
+
         // Redirect to book page with chapter query param
         router.replace(`/dashboard/books/bookId123?chapter=${chapterId}`);
       }, [chapterId, router]);
@@ -91,7 +91,7 @@ describe('Navigation Fix', () => {
   it('should preserve chapter context in breadcrumb navigation', () => {
     const BookPage = ({ chapterId }: { chapterId?: string }) => {
       const showChapterContext = !!chapterId;
-      
+
       return (
         <div>
           {showChapterContext && (

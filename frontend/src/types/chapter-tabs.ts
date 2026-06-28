@@ -36,7 +36,7 @@ export interface TabContextMenuAction {
 
 export enum ChapterStatus {
   DRAFT = 'draft',
-  IN_PROGRESS = 'in_progress', 
+  IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
   PUBLISHED = 'published'
 }

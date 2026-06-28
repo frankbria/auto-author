@@ -114,7 +114,7 @@ describe('Test Infrastructure Integration', () => {
       );
 
       render(<TestComponent />);
-      
+
       expect(screen.getByTestId('test-component')).toBeInTheDocument();
       expect(screen.getByText('Test Component')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Click me' })).toBeInTheDocument();
@@ -130,10 +130,10 @@ describe('Test Infrastructure Integration', () => {
 
       const user = userEvent.setup();
       render(<TestComponent />);
-      
+
       const button = screen.getByTestId('test-button');
       await user.click(button);
-      
+
       expect(handleClick).toHaveBeenCalledTimes(1);
     });
   });
@@ -172,14 +172,14 @@ describe('Test Infrastructure Integration', () => {
 
       const user = userEvent.setup();
       render(<TestComponent />);
-      
+
       const button = screen.getByRole('button');
       await user.click(button);
-      
+
       await waitFor(() => {
         expect(screen.getByTestId('result')).toHaveTextContent('Success');
       });
-      
+
       expect(global.fetch).toHaveBeenCalledWith('/api/test');
     });
   });
@@ -200,7 +200,7 @@ describe('Test Infrastructure Integration', () => {
 
       // Suppress console.error for this test
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       expect(() => {
         render(
           <ErrorBoundary>
@@ -208,7 +208,7 @@ describe('Test Infrastructure Integration', () => {
           </ErrorBoundary>
         );
       }).toThrow('Test error');
-      
+
       consoleSpy.mockRestore();
     });
   });
@@ -216,7 +216,7 @@ describe('Test Infrastructure Integration', () => {
   describe('Performance Testing Capabilities', () => {
     it('should measure component rendering performance', () => {
       const start = performance.now();
-      
+
       const TestComponent = () => (
         <div>
           {Array.from({ length: 100 }, (_, i) => (
@@ -226,10 +226,10 @@ describe('Test Infrastructure Integration', () => {
       );
 
       render(<TestComponent />);
-      
+
       const end = performance.now();
       const renderTime = end - start;
-      
+
       // Expect rendering to complete within reasonable time
       expect(renderTime).toBeLessThan(100); // 100ms threshold
     });
@@ -246,7 +246,7 @@ describe('Test Infrastructure Integration', () => {
       );
 
       render(<TestComponent />);
-      
+
       // Test accessibility through roles and labels
       expect(screen.getByLabelText('Test Input')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Submit form' })).toBeInTheDocument();

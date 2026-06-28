@@ -47,7 +47,7 @@ declare module '@tiptap/react' {
 
 export function TiptapDemo() {
   const [content, setContent] = useState<string>('<h2>Welcome to the Tiptap Editor Demo</h2><p>This is a rich text editor with a modest toolbar for formatting.</p><p>Try out the various formatting options:</p><ul><li>Use the <strong>Bold</strong>, <em>Italic</em>, and <u>Underline</u> buttons</li><li>Create headings and lists</li><li>Insert blockquotes and code blocks</li></ul><p>The editor has been integrated to replace the plain textarea component, while maintaining all the existing functionality like auto-save.</p>');
-  
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -74,7 +74,7 @@ export function TiptapDemo() {
     <div className="w-full max-w-4xl mx-auto my-8 border border-gray-300 rounded-md shadow-sm overflow-hidden">
       <div className="bg-white p-6">
         <h1 className="text-2xl font-bold mb-6 text-center">Tiptap Editor Integration Demo</h1>
-        
+
         <div className="border border-gray-200 rounded-md overflow-hidden">
           {/* Editor Toolbar */}
           <div className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center">
@@ -91,7 +91,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={TextBoldIcon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -105,7 +105,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={TextItalicIcon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -119,7 +119,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={TextUnderlineIcon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -133,9 +133,9 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={Strikethrough} size={16} />
             </Button>
-            
+
             <div className="w-px h-6 bg-border mx-1" />
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -149,7 +149,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={Heading01Icon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -163,7 +163,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={Heading02Icon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -177,9 +177,9 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={Heading03Icon} size={16} />
             </Button>
-            
+
             <div className="w-px h-6 bg-border mx-1" />
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -193,7 +193,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={ListViewIcon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -207,7 +207,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={ListSettingIcon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -221,7 +221,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={Note01Icon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -235,9 +235,9 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={CodeIcon} size={16} />
             </Button>
-            
+
             <div className="w-px h-6 bg-border mx-1" />
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -249,7 +249,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={Undo02Icon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -261,7 +261,7 @@ export function TiptapDemo() {
             >
               <HugeiconsIcon icon={Redo02Icon} size={16} />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -273,15 +273,15 @@ export function TiptapDemo() {
               <HugeiconsIcon icon={MinusSignIcon} size={16} />
             </Button>
           </div>
-          
+
           {/* Editor Content */}
           <div className="p-4 bg-white">
-            <EditorContent 
-              editor={editor} 
-              className="w-full min-h-[400px] tiptap-editor text-black" 
+            <EditorContent
+              editor={editor}
+              className="w-full min-h-[400px] tiptap-editor text-black"
             />
           </div>
-          
+
           {/* Editor Footer */}
           <div className="border-t border-border p-4 flex justify-between items-center bg-muted/20">
             <div className="flex items-center gap-4">
@@ -296,7 +296,7 @@ export function TiptapDemo() {
             </Button>
           </div>
         </div>
-        
+
         <div className="mt-8 border-t border-gray-200 pt-4">
           <h2 className="text-xl font-semibold mb-3">HTML Output</h2>
           <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto text-sm">

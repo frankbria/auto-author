@@ -16,10 +16,10 @@ export interface Toast extends ToastOptions {
 export function useToast() {
   const toast = (options: ToastOptions) => {
     const { title, description, variant = 'default', duration } = options;
-    
+
     const message = title || description || '';
     const descriptionText = title && description ? description : undefined;
-    
+
     switch (variant) {
       case 'destructive':
         return sonnerToast.error(message, {

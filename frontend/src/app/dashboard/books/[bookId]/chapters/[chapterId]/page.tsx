@@ -24,7 +24,7 @@ export default function ChapterContentPage({ params }: ChapterContentPageProps) 
         active_chapter_id: chapterId,
         timestamp: Date.now()
       }));
-      
+
       // Redirect to book page with tabs
       router.replace(`/dashboard/books/${bookId}?chapter=${chapterId}`);
     }, 2000); // 2 second delay to show the redirect message
@@ -43,7 +43,7 @@ export default function ChapterContentPage({ params }: ChapterContentPageProps) 
                   You&apos;re being redirected to the improved tabbed chapter interface for a better writing experience.
                 </p>
               </div>
-            <Button 
+            <Button
               onClick={() => {
                 localStorage.setItem(`chapter-tabs-${bookId}`, JSON.stringify({
                   active_chapter_id: chapterId,
@@ -59,7 +59,7 @@ export default function ChapterContentPage({ params }: ChapterContentPageProps) 
           </div>
         </div>
       </div>
-      
+
       <div className="mb-4 px-4 py-2 border-b flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Chapter Editor (Legacy)</h1>
@@ -82,7 +82,7 @@ export default function ChapterContentPage({ params }: ChapterContentPageProps) 
           </Link>
         </div>
       </div>
-      
+
       <div className="flex-1 px-4">
         <ChapterEditor
           bookId={bookId}

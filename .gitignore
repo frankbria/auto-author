@@ -107,3 +107,6 @@ repomix-output.xml
 
 # PM2 ecosystem config (generated from template during deployment)
 ecosystem.config.js
+
+# Playwright generated test artifacts (regenerated each run)
+frontend/tests/e2e/artifacts/

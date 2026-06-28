@@ -31,7 +31,7 @@ type ProfileUpdateData = {
  */
 export const useProfileApi = () => {
   const { authFetch } = useAuthFetch();
-  
+
   /**
    * Get the current user's profile data
    */
@@ -39,7 +39,7 @@ export const useProfileApi = () => {
     // This function is deprecated - authFetch no longer works
     throw new Error('Profile API is deprecated. Use Clerk user management instead.');
   };
-  
+
   /**
    * Update the current user's profile data
    */
@@ -47,7 +47,7 @@ export const useProfileApi = () => {
     // This function is deprecated - authFetch no longer works
     throw new Error('Profile API is deprecated. Use Clerk user management instead.');
   };
-  
+
   /**
    * Delete the current user's account
    */
@@ -55,7 +55,7 @@ export const useProfileApi = () => {
     // This function is deprecated - authFetch no longer works
     throw new Error('Profile API is deprecated. Use Clerk user management instead.');
   };
-  
+
   return {
     getUserProfile,
     updateUserProfile,

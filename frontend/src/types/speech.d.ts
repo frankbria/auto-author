@@ -21,38 +21,38 @@ interface SpeechRecognition extends EventTarget {
     start(): void;
     stop(): void;
   }
-  
+
   declare const SpeechRecognition: {
     prototype: SpeechRecognition;
     new (): SpeechRecognition;
   };
-  
+
   declare const webkitSpeechRecognition: {
     prototype: SpeechRecognition;
     new (): SpeechRecognition;
   };
-  
+
   interface SpeechRecognitionEvent extends Event {
     readonly resultIndex: number;
     readonly results: SpeechRecognitionResultList;
   }
-  
+
   interface SpeechRecognitionResultList {
     [index: number]: SpeechRecognitionResult;
     length: number;
   }
-  
+
   interface SpeechRecognitionResult {
     [index: number]: SpeechRecognitionAlternative;
     length: number;
     isFinal: boolean;
   }
-  
+
   interface SpeechRecognitionAlternative {
     transcript: string;
     confidence: number;
   }
-  
+
   interface SpeechRecognitionErrorEvent extends Event {
     error: string;
     message: string;

@@ -92,7 +92,7 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
 
   test('can type in the VoiceTextInput component', async () => {
     const user = userEvent.setup();
-    
+
     render(
       <QuestionDisplay
         bookId="book1"
@@ -171,7 +171,7 @@ describe('VoiceTextInput Integration in QuestionDisplay', () => {
 
     // Initially in text mode
     expect(screen.getByText('Switch to Voice')).toBeInTheDocument();
-    
+
     // Click to switch to voice mode
     const toggleButton = screen.getByText('Switch to Voice');
     fireEvent.click(toggleButton);
