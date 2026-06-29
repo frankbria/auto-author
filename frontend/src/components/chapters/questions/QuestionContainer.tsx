@@ -249,7 +249,10 @@ export default function QuestionContainer({
 
   // Response saved handler
   const handleResponseSaved = async () => {
-    await fetchProgress();
+    // Refresh the questions array (not just aggregate progress) so per-question
+    // response_status stays current in the navigation dropdown and progress dots.
+    // fetchQuestions also refreshes progress internally.
+    await fetchQuestions(true);
     // Call parent callback if provided
     if (parentResponseSaved) {
       parentResponseSaved();
@@ -424,6 +427,7 @@ export default function QuestionContainer({
           progress={progress}
           currentIndex={currentQuestionIndex}
           totalQuestions={questions.length}
+          questions={questions}
         />
       )}
 

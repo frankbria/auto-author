@@ -539,6 +539,25 @@ describe('QuestionContainer - handleResponseSaved', () => {
     });
   });
 
+  it('re-fetches the questions array when a response is saved (keeps statuses fresh)', async () => {
+    setupTwoQuestions();
+
+    render(<QuestionContainer {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('question-display')).toBeInTheDocument();
+    });
+
+    // Clear count so we only measure the post-save refresh
+    mockedBookClient.getChapterQuestions.mockClear();
+
+    fireEvent.click(screen.getByTestId('response-saved-btn'));
+
+    await waitFor(() => {
+      expect(mockedBookClient.getChapterQuestions).toHaveBeenCalledWith('book-1', 'ch-1');
+    });
+  });
+
   it('calls the parent onResponseSaved callback when response is saved', async () => {
     setupTwoQuestions();
     const onResponseSaved = jest.fn();

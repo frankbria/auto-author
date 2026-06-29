@@ -1,6 +1,6 @@
 'use client';
 
-import { QuestionProgressResponse } from '@/types/chapter-questions';
+import { Question, QuestionProgressResponse } from '@/types/chapter-questions';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CheckmarkCircle01Icon, CircleIcon, Loading03Icon } from '@hugeicons/core-free-icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -10,6 +10,9 @@ interface QuestionProgressProps {
   progress: QuestionProgressResponse;
   currentIndex: number;
   totalQuestions: number;
+  // Per-question statuses, so dots reflect actual completion (handles out-of-order
+  // answers). Falls back to positional progress when not provided.
+  questions?: Question[];
 }
 
 /**
@@ -18,7 +21,8 @@ interface QuestionProgressProps {
 export default function QuestionProgress({
   progress,
   currentIndex,
-  totalQuestions
+  totalQuestions,
+  questions
 }: QuestionProgressProps) {
   // Calculate progress percentage for the progress bar (progress is 0.0-1.0, convert to 0-100)
   const progressPercentage = (progress.progress || 0) * 100;
@@ -111,10 +115,16 @@ export default function QuestionProgress({
       {/* Question dots - visual representation of each question's status */}
       <div className="flex items-center justify-center space-x-1 mt-2 transition-all">
         {Array.from({ length: totalQuestions }).map((_, index) => {
-          // For each question, show its status
-          const isCompleted = index < progress.completed;
-          const isInProgress = index === progress.completed && progress.in_progress > 0;
+          // Prefer per-question status (correct for out-of-order answers); fall back
+          // to positional progress when the questions array isn't supplied.
+          const status = questions?.[index]?.response_status;
           const isCurrent = index === currentIndex;
+          const isCompleted = questions
+            ? status === 'completed'
+            : index < progress.completed;
+          const isInProgress = questions
+            ? status === 'draft'
+            : index === progress.completed && progress.in_progress > 0;
 
           let dotClasses = "w-2 h-2 rounded-full transition-all ";
 

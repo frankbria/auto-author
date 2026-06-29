@@ -8,7 +8,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import QuestionNavigation from '../QuestionNavigation';
+import QuestionNavigation, { findNextUnanswered } from '../QuestionNavigation';
 import { Question, QuestionType, QuestionDifficulty } from '@/types/chapter-questions';
 
 // ---------------------------------------------------------------------------
@@ -168,8 +168,8 @@ describe('QuestionNavigation - dropdown and getQuestionTitle', () => {
     );
     fireEvent.click(screen.getByText('Question 1 of 2').closest('button')!);
 
-    // The truncated form should end with '...'
-    expect(screen.getByText(/^1\. .{50}\.\.\./)).toBeInTheDocument();
+    // The truncated form should end with '...' (unanswered items carry a ○ prefix)
+    expect(screen.getByText(/^○ 1\. .{50}\.\.\./)).toBeInTheDocument();
   });
 
   it('getQuestionTitle adds ✓ prefix for completed questions', () => {
@@ -188,6 +188,27 @@ describe('QuestionNavigation - dropdown and getQuestionTitle', () => {
 
     const items = screen.getAllByRole('listitem');
     expect(items[0].textContent).toMatch(/^✓ /);
+  });
+
+  it('getQuestionTitle adds ○ prefix and muted text for unanswered questions', () => {
+    const questions = [
+      makeQuestion(), // no response_status -> unanswered
+      makeQuestion({ id: 'q-2', response_status: 'completed' as any, order: 2 }),
+    ];
+    render(
+      <QuestionNavigation
+        {...defaultProps}
+        questions={questions}
+        totalQuestions={2}
+      />
+    );
+    fireEvent.click(screen.getByText('Question 1 of 2').closest('button')!);
+
+    const items = screen.getAllByRole('listitem');
+    expect(items[0].textContent).toMatch(/^○ /);
+    expect(items[0].className).toContain('text-muted-foreground');
+    // Answered item is not muted
+    expect(items[1].className).not.toContain('text-muted-foreground');
   });
 
   it('getQuestionTitle adds ⚙️ prefix for draft questions', () => {
@@ -281,5 +302,78 @@ describe('QuestionNavigation - secondary action button', () => {
     );
     fireEvent.click(screen.getByText('Finish and restart').closest('button')!);
     expect(onGoToQuestion).toHaveBeenCalledWith(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findNextUnanswered helper
+// ---------------------------------------------------------------------------
+
+describe('findNextUnanswered', () => {
+  const q = (status?: string) =>
+    makeQuestion({ response_status: status as any });
+
+  it('returns the next non-completed index after currentIndex', () => {
+    const questions = [q('completed'), q('completed'), q(), q()];
+    expect(findNextUnanswered(questions, 0)).toBe(2);
+  });
+
+  it('treats draft as not-yet-answered', () => {
+    const questions = [q('completed'), q('draft'), q('completed')];
+    expect(findNextUnanswered(questions, 0)).toBe(1);
+  });
+
+  it('wraps around to the start', () => {
+    const questions = [q(), q('completed'), q('completed')];
+    expect(findNextUnanswered(questions, 2)).toBe(0);
+  });
+
+  it('returns -1 when every question is completed', () => {
+    const questions = [q('completed'), q('completed')];
+    expect(findNextUnanswered(questions, 0)).toBe(-1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Next Unanswered" navigation button
+// ---------------------------------------------------------------------------
+
+describe('QuestionNavigation - Next Unanswered button', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('navigates to the next unanswered question', () => {
+    const onGoToQuestion = jest.fn();
+    const questions = [
+      makeQuestion({ id: 'q-1', response_status: 'completed' as any }),
+      makeQuestion({ id: 'q-2', order: 2 }), // unanswered
+      makeQuestion({ id: 'q-3', order: 3 }),
+    ];
+    render(
+      <QuestionNavigation
+        {...defaultProps}
+        onGoToQuestion={onGoToQuestion}
+        currentIndex={0}
+        totalQuestions={3}
+        questions={questions}
+      />
+    );
+    fireEvent.click(screen.getByText('Next Unanswered').closest('button')!);
+    expect(onGoToQuestion).toHaveBeenCalledWith(1);
+  });
+
+  it('is disabled when all questions are completed', () => {
+    const questions = [
+      makeQuestion({ id: 'q-1', response_status: 'completed' as any }),
+      makeQuestion({ id: 'q-2', response_status: 'completed' as any, order: 2 }),
+    ];
+    render(
+      <QuestionNavigation
+        {...defaultProps}
+        currentIndex={0}
+        totalQuestions={2}
+        questions={questions}
+      />
+    );
+    expect(screen.getByText('Next Unanswered').closest('button')).toBeDisabled();
   });
 });

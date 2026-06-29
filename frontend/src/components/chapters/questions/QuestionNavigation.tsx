@@ -3,7 +3,7 @@
 import { Question } from '@/types/chapter-questions';
 import { Button } from '@/components/ui/button';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowLeft01Icon, ArrowRight01Icon, Tick02Icon, Forward01Icon, Menu01Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, ArrowRight01Icon, Tick02Icon, Forward01Icon, Menu01Icon, ArrowRightDoubleIcon } from '@hugeicons/core-free-icons';
 import { useState } from 'react';
 
 interface QuestionNavigationProps {
@@ -13,6 +13,21 @@ interface QuestionNavigationProps {
   onPrevious: () => void;
   onGoToQuestion: (index: number) => void;
   questions: Question[];
+}
+
+/**
+ * Find the next question without a completed response, searching forward from
+ * currentIndex and wrapping to the start. Returns -1 when all are completed.
+ */
+export function findNextUnanswered(questions: Question[], currentIndex: number): number {
+  const total = questions.length;
+  for (let offset = 1; offset <= total; offset++) {
+    const index = (currentIndex + offset) % total;
+    if (questions[index]?.response_status !== 'completed') {
+      return index;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -50,10 +65,16 @@ export default function QuestionNavigation({
       statusIndicator = '✓ ';
     } else if (question.response_status === 'draft') {
       statusIndicator = '⚙️ ';
+    } else {
+      // Unanswered — distinct marker so it stands out from answered items
+      statusIndicator = '○ ';
     }
 
     return `${statusIndicator}${index + 1}. ${truncatedText}`;
   };
+
+  const nextUnansweredIndex = findNextUnanswered(questions, currentIndex);
+  const allAnswered = nextUnansweredIndex === -1;
 
   return (
     <div className="flex flex-col space-y-2 transition-all" data-slot="question-navigation">
@@ -85,20 +106,24 @@ export default function QuestionNavigation({
           {showQuestionList && (
             <div className="absolute z-10 mt-1 w-64 max-h-80 overflow-y-auto bg-background border border-border rounded-md shadow-lg transition-all">
               <ul className="py-1">
-                {questions.map((_, index) => (
-                  <li
-                    key={index}
-                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-accent transition-all ${
-                      index === currentIndex ? 'bg-accent' : ''
-                    }`}
-                    onClick={() => {
-                      onGoToQuestion(index);
-                      setShowQuestionList(false);
-                    }}
-                  >
-                    {getQuestionTitle(index)}
-                  </li>
-                ))}
+                {questions.map((question, index) => {
+                  const isUnanswered = question.response_status !== 'completed'
+                    && question.response_status !== 'draft';
+                  return (
+                    <li
+                      key={index}
+                      className={`px-4 py-2 text-sm cursor-pointer hover:bg-accent transition-all ${
+                        index === currentIndex ? 'bg-accent' : ''
+                      } ${isUnanswered ? 'text-muted-foreground' : ''}`}
+                      onClick={() => {
+                        onGoToQuestion(index);
+                        setShowQuestionList(false);
+                      }}
+                    >
+                      {getQuestionTitle(index)}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -118,6 +143,18 @@ export default function QuestionNavigation({
 
       {/* Secondary actions */}
       <div className="flex justify-center space-x-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs min-h-[44px] min-w-[44px] transition-all focus-visible:ring-[3px]"
+          onClick={() => onGoToQuestion(nextUnansweredIndex)}
+          disabled={allAnswered}
+          title={allAnswered ? 'All questions answered' : 'Jump to the next unanswered question'}
+        >
+          <HugeiconsIcon icon={ArrowRightDoubleIcon} size={12} className="mr-1" />
+          <span>Next Unanswered</span>
+        </Button>
+
         <Button
           variant="ghost"
           size="sm"
