@@ -325,8 +325,11 @@ This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Co
 - `npm run typecheck` - Type checking
 
 ### Backend Testing
+Test/load tooling is in optional extras (`[project.optional-dependencies]`), so
+production installs stay lean. Install the `test` extra once before running:
 ```bash
 cd backend
+uv sync --extra test    # one-time: installs pytest, faker, httpx, coverage…
 uv run pytest --cov=app tests/ --cov-report=term-missing
 ```
 

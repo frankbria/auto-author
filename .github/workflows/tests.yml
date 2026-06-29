@@ -90,7 +90,7 @@ jobs:
       - name: Install dependencies
         working-directory: backend
         run: |
-          uv sync
+          uv sync --extra test
 
       - name: Run tests with coverage
         working-directory: backend

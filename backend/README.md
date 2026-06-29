@@ -68,6 +68,11 @@ This will start the server at `http://127.0.0.1:8000`. You can access the intera
 ## Development
 
 ### Running Tests
+Test/load tooling lives in optional extras, so production installs stay lean.
+Install them once before running tests:
+```bash
+uv sync --extra test                   # installs pytest, faker, httpx, coverage…
+```
 ```bash
 uv run pytest                          # Run all tests
 uv run pytest -v                       # Verbose output

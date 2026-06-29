@@ -90,7 +90,7 @@ repos:
 
       - id: backend-unit-tests
         name: Backend Unit Tests
-        entry: bash -c 'cd backend && uv run pytest tests/'
+        entry: bash -c 'cd backend && uv run --extra test pytest tests/'
         language: system
         files: ^backend/
         pass_filenames: false
@@ -98,7 +98,7 @@ repos:
 
       - id: backend-coverage
         name: Backend Coverage Check (≥85%)
-        entry: bash -c 'cd backend && uv run pytest tests/ --cov=app --cov-fail-under=85'
+        entry: bash -c 'cd backend && uv run --extra test pytest tests/ --cov=app --cov-fail-under=85'
         language: system
         files: ^backend/
         pass_filenames: false
