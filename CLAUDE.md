@@ -30,6 +30,15 @@
 
 ## Recent Changes
 
+### 2026-06-28
+- **EPUB export format (#60, P2.3)**: PR #147 — third export format alongside PDF/DOCX
+  - **Backend**: `ExportService.generate_epub()` via `ebooklib==0.20` (async worker thread, same pattern as PDF/DOCX). Title page + per-chapter `EpubHtml`, `EpubNcx` (EPUB2 nav) **and** `EpubNav` (EPUB3 nav) for max ereader compat, ordered spine. Reuses the shared HTML→formatted-text pipeline (`_extract_text_formatting`) so chapter content renders as **well-formed XHTML** — raw TipTap HTML isn't always XML-valid and would break ereaders/lxml. **Gotcha fixed**: no `<?xml … encoding …?>` prolog on `EpubHtml.content` — ebooklib parses it as a `str` during nav generation and lxml rejects a unicode string carrying an encoding decl (silently empties the body → `ParserError: Document is empty`). ebooklib writes its own prolog.
+  - `export_book()` gains `'epub'` dispatch (no page_size/template — EPUB is reflowable); guarded import → `EPUB_AVAILABLE`. New `GET /books/{id}/export/epub` endpoint (auth, ownership, `log_access("export_epub")`, 10/h rate limit, 503 when ebooklib missing). EPUB listed in `/export/formats`.
+  - **Frontend**: `ExportFormat` union gains `'epub'`; EPUB radio option in `ExportOptionsModal` (page-size stays PDF-only); `bookClient.exportEPUB()`; `handleExport` routing. `generateFilename` already keys off `format` → `.epub` automatic. `TemplateSelector.format` prop widened to `ExportFormat`.
+  - **Tests**: backend service (valid EPUB zip: `mimetype` first+STORED, nav+ncx+chapter XHTML, chapter text survives), `export_book('epub')`, availability guard; endpoint happy/404/403 + `/formats` lists epub; frontend modal option + `bookClient.exportEPUB` URL. Backend suite **923 passed, 92.32% cov** (export_service 95%); frontend gates green.
+  - **Known limits**: flat TOC (each chapter top-level — navigable; nest by `level` later); no ISBN (book model has no field); device testing (Kindle/Kobo/Apple Books) is manual, covered here by spec-conformant structure assertions.
+  - **Status**: ✅ Complete
+
 ### 2026-06-27
 - **Restore pre-commit/CI gate enforcement — stop merging with `--no-verify`/`--admin` (#118, capstone)**: process/enforcement, no app behavior change
   - **Gates verified green at baseline**: backend coverage **92.4%** (`pytest --cov=app --cov-fail-under=85`, 888 passed/15 skipped); frontend coverage clears **85/85/75/85** (1856 passed/8 skipped, 90 suites). `pre-commit run --all-files` passes with no bypass. All four blocking coverage issues (#68, #93, #116, #117) closed; no coverage gate remains red.
