@@ -105,7 +105,8 @@ export function ExportOptionsModal({
     const options: ExportOptions = {
       format,
       includeEmptyChapters,
-      pageSize: format === 'pdf' ? pageSize : undefined,
+      // A template defines its own page size, so don't also send pageSize.
+      pageSize: format === 'pdf' && !templateId ? pageSize : undefined,
       // Only attach template fields when a template is actually selected, so the
       // default export payload stays unchanged (legacy behaviour preserved).
       ...(templateId
@@ -180,6 +181,7 @@ export function ExportOptionsModal({
               onSelect={setTemplateId}
               customization={customization}
               onCustomizationChange={setCustomization}
+              format={format}
             />
           )}
 

@@ -21,6 +21,8 @@ interface TemplateSelectorProps {
   customization?: TemplateCustomization;
   /** Called when customization changes */
   onCustomizationChange?: (customization: TemplateCustomization) => void;
+  /** Active export format — the preview shows the font that format will use */
+  format?: 'pdf' | 'docx';
 }
 
 /**
@@ -38,13 +40,29 @@ export function TemplateSelector({
   onSelect,
   customization,
   onCustomizationChange,
+  format = 'docx',
 }: TemplateSelectorProps) {
   const [showCustomize, setShowCustomize] = useState(false);
 
   const selected = templates.find((t) => t.id === selectedTemplateId);
 
+  // PDF uses the built-in print font; DOCX uses the named (Word) font.
+  const previewFont = selected
+    ? (format === 'pdf'
+        ? selected.font.pdf_font ?? selected.font.docx_font
+        : selected.font.docx_font)
+    : '';
+
   const updateCustomization = (patch: TemplateCustomization) => {
     onCustomizationChange?.({ ...customization, ...patch });
+  };
+
+  // Clearing a numeric field removes the override (reverts to the template
+  // default) instead of coercing an empty string to 0.
+  const removeKeys = (...keys: (keyof TemplateCustomization)[]) => {
+    const next = { ...customization };
+    for (const key of keys) delete next[key];
+    onCustomizationChange?.(next);
   };
 
   return (
@@ -126,7 +144,7 @@ export function TemplateSelector({
           <div className="flex justify-between">
             <span className="text-muted-foreground">Font</span>
             <span className="font-medium">
-              {selected.font.docx_font},{' '}
+              {previewFont},{' '}
               {customization?.font_size ?? selected.font.size}pt
             </span>
           </div>
@@ -161,9 +179,11 @@ export function TemplateSelector({
                   min={8}
                   max={18}
                   value={customization?.font_size ?? selected.font.size}
-                  onChange={(e) =>
-                    updateCustomization({ font_size: Number(e.target.value) })
-                  }
+                  onChange={(e) => {
+                    if (e.target.value === '') return removeKeys('font_size');
+                    const n = Number(e.target.value);
+                    if (!Number.isNaN(n)) updateCustomization({ font_size: n });
+                  }}
                 />
               </div>
               <div className="space-y-1">
@@ -177,14 +197,20 @@ export function TemplateSelector({
                   max={2}
                   step={0.05}
                   value={customization?.margins?.inside ?? selected.margins.inside}
-                  onChange={(e) =>
-                    updateCustomization({
-                      margins: {
-                        ...customization?.margins,
-                        inside: Number(e.target.value),
-                      },
-                    })
-                  }
+                  onChange={(e) => {
+                    if (e.target.value === '') {
+                      const margins = { ...customization?.margins };
+                      delete margins.inside;
+                      onCustomizationChange?.({ ...customization, margins });
+                      return;
+                    }
+                    const n = Number(e.target.value);
+                    if (!Number.isNaN(n)) {
+                      updateCustomization({
+                        margins: { ...customization?.margins, inside: n },
+                      });
+                    }
+                  }}
                 />
               </div>
             </div>

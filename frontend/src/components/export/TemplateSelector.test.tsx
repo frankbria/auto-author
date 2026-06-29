@@ -107,6 +107,33 @@ describe('TemplateSelector', () => {
     );
   });
 
+  it('removes the font-size override (no 0 coercion) when the field is cleared', () => {
+    render(
+      <TemplateSelector
+        templates={TEMPLATES}
+        selectedTemplateId="classic_fiction"
+        onSelect={onSelect}
+        customization={{ font_size: 14 }}
+        onCustomizationChange={onCustomizationChange}
+      />
+    );
+    fireEvent.click(screen.getByTestId('customize-toggle'));
+    fireEvent.change(screen.getByLabelText(/Font size/i), { target: { value: '' } });
+    expect(onCustomizationChange).toHaveBeenCalledWith({}); // override removed, not 0
+  });
+
+  it('shows the PDF base font when format is pdf', () => {
+    render(
+      <TemplateSelector
+        templates={TEMPLATES}
+        selectedTemplateId="classic_fiction"
+        onSelect={onSelect}
+        format="pdf"
+      />
+    );
+    expect(screen.getByTestId('template-preview')).toHaveTextContent('Times-Roman');
+  });
+
   it('preview reflects an active font-size customization', () => {
     render(
       <TemplateSelector

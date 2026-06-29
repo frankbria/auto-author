@@ -126,14 +126,18 @@ def resolve_template(
         template["first_line_indent"] = _clamp(
             float(custom_options["first_line_indent"]), 0.0, 1.0
         )
-    if "margins" in custom_options and isinstance(custom_options["margins"], dict):
+    if "margins" in custom_options:
+        if not isinstance(custom_options["margins"], dict):
+            raise ValueError("custom_options.margins must be an object")
         for side in ("top", "bottom", "inside", "outside"):
             if side in custom_options["margins"]:
                 template["margins"][side] = _clamp(
                     float(custom_options["margins"][side]), MIN_MARGIN_INCHES, 2.0
                 )
     for hf, keys in (("header", ("left", "right")), ("footer", ("center",))):
-        if hf in custom_options and isinstance(custom_options[hf], dict):
+        if hf in custom_options:
+            if not isinstance(custom_options[hf], dict):
+                raise ValueError(f"custom_options.{hf} must be an object")
             for key in keys:
                 if key in custom_options[hf]:
                     template[hf][key] = str(custom_options[hf][key])

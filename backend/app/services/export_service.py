@@ -30,7 +30,7 @@ except ImportError:
 try:
     from docx import Document
     from docx.shared import Inches, Pt, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
     from docx.enum.style import WD_STYLE_TYPE
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
@@ -459,19 +459,33 @@ class ExportService:
         section.left_margin = Inches(m["inside"])
         section.right_margin = Inches(m["outside"])
 
-        # Body font + line spacing on the Normal style.
+        # Body font + line spacing on the Normal style, and the template font on
+        # the heading styles so titles/TOC/chapter headings inherit it too.
+        font_name = template["font"]["docx_font"]
         normal = doc.styles["Normal"]
-        normal.font.name = template["font"]["docx_font"]
+        normal.font.name = font_name
         normal.font.size = Pt(template["font"]["size"])
         normal.paragraph_format.line_spacing = template["line_height"]
+        for style_name in ("Title", "Heading 1", "Heading 2", "Heading 3"):
+            try:
+                doc.styles[style_name].font.name = font_name
+            except KeyError:
+                pass  # style not present in this document's base template
 
-        # Running header (book/author) — page number lives in the footer.
+        # Running header (book/author) — page number lives in the footer. A right
+        # tab stop at the content width pins the right-hand value to the margin.
         left = self._resolve_tokens(template.get("header", {}).get("left", ""), book_data)
         right = self._resolve_tokens(template.get("header", {}).get("right", ""), book_data)
         if left or right:
             hp = section.header.paragraphs[0]
-            # Tab-separated left/right keeps it simple and prints cleanly.
-            hp.text = f"{left}\t{right}" if right else left
+            if right:
+                content_width = Inches(w_in - m["inside"] - m["outside"])
+                hp.paragraph_format.tab_stops.add_tab_stop(
+                    content_width, WD_TAB_ALIGNMENT.RIGHT
+                )
+                hp.text = f"{left}\t{right}"
+            else:
+                hp.text = left
         if template.get("footer", {}).get("center"):
             fp = section.footer.paragraphs[0]
             fp.alignment = WD_ALIGN_PARAGRAPH.CENTER

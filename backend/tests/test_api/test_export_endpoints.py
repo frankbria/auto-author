@@ -441,11 +441,17 @@ class TestExportTemplateEndpoints:
         assert len(resp.json()["templates"]) >= 3
 
     @pytest.mark.asyncio
-    async def test_templates_endpoint_requires_auth(self, book):
-        client, book_id = book
-        # Missing book → 404 (auth dependency runs, then ownership/exists check).
+    async def test_templates_endpoint_missing_book_404(self, book):
+        client, _ = book
         resp = await client.get("/api/v1/books/000000000000000000000000/export/templates")
-        assert resp.status_code in (403, 404)
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_templates_endpoint_wrong_owner_403(self, book, auth_client_factory):
+        _, book_id = book
+        other = await auth_client_factory(overrides={"auth_id": "different_auth_id"})
+        resp = await other.get(f"/api/v1/books/{book_id}/export/templates")
+        assert resp.status_code == 403
 
     @pytest.mark.asyncio
     async def test_pdf_export_with_template(self, book):

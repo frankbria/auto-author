@@ -81,3 +81,10 @@ def test_resolve_unknown_id_raises():
 def test_resolve_bad_custom_options_type_raises():
     with pytest.raises(ValueError):
         resolve_template("academic", "not-a-dict")  # type: ignore[arg-type]
+
+
+def test_resolve_rejects_malformed_margins_and_header():
+    with pytest.raises(ValueError):
+        resolve_template("academic", {"margins": "wide"})
+    with pytest.raises(ValueError):
+        resolve_template("academic", {"header": "top"})
