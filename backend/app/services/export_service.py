@@ -8,6 +8,8 @@ from typing import Dict, List, Optional, BinaryIO
 from datetime import datetime
 import re
 
+from app.services.export_templates import PAGE_SIZES_INCHES, resolve_template
+
 # Optional export dependencies are guarded so the service (and the rest of the
 # API) still imports if a library is missing — only the affected format fails,
 # and it fails loudly with a clear message rather than at import time.
@@ -28,11 +30,28 @@ except ImportError:
 try:
     from docx import Document
     from docx.shared import Inches, Pt, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
     from docx.enum.style import WD_STYLE_TYPE
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
     DOCX_AVAILABLE = True
 except ImportError:
     DOCX_AVAILABLE = False
+
+
+def _add_page_number_field(paragraph) -> None:
+    """Append a Word PAGE field to a paragraph (live page number in footer)."""
+    run = paragraph.add_run()
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = "PAGE"
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    run._r.append(begin)
+    run._r.append(instr)
+    run._r.append(end)
 
 try:
     import html2text
@@ -124,12 +143,56 @@ class ExportService:
 
         return formatted_content
 
+    @staticmethod
+    def _resolve_tokens(text: str, book_data: Dict) -> str:
+        """Fill running-header/footer tokens from book-level data.
+
+        ponytail: running heads are book-level (title/author), not per-chapter —
+        {page} is handled at draw time since only the canvas knows the number.
+        """
+        if not text:
+            return ""
+        title = book_data.get("title", "Untitled")
+        author = book_data.get("author_name") or book_data.get("owner_name") or ""
+        return (
+            text.replace("{book_title}", title)
+            .replace("{running_head}", title)
+            .replace("{author}", author)
+            .replace("{chapter_title}", title)
+        )
+
+    def _make_header_footer(self, template: Dict, book_data: Dict, page):
+        """Return an onPage(canvas, doc) callback drawing the running header/footer."""
+        page_w, page_h = page
+        margins = template["margins"]
+        left = self._resolve_tokens(template.get("header", {}).get("left", ""), book_data)
+        right = self._resolve_tokens(template.get("header", {}).get("right", ""), book_data)
+        center = template.get("footer", {}).get("center", "")
+
+        def _draw(canvas, doc):
+            canvas.saveState()
+            canvas.setFont("Helvetica", 9)
+            canvas.setFillGray(0.4)
+            y_header = page_h - margins["top"] * inch + 0.25 * inch
+            y_footer = margins["bottom"] * inch - 0.35 * inch
+            if left:
+                canvas.drawString(margins["inside"] * inch, y_header, left)
+            if right:
+                canvas.drawRightString(page_w - margins["outside"] * inch, y_header, right)
+            if center:
+                text = center.replace("{page}", str(canvas.getPageNumber()))
+                canvas.drawCentredString(page_w / 2.0, y_footer, text)
+            canvas.restoreState()
+
+        return _draw
+
     async def generate_pdf(
         self,
         book_data: Dict,
         chapters: List[Dict],
         output_stream: Optional[BinaryIO] = None,
-        page_size: str = "letter"
+        page_size: str = "letter",
+        template: Optional[Dict] = None,
     ) -> bytes:
         """
         Generate a PDF from book data and chapters.
@@ -137,9 +200,12 @@ class ExportService:
         ReportLab is synchronous and CPU-bound, so the build runs in a worker
         thread to keep the event loop responsive for large books and to let an
         outer asyncio timeout actually cancel a runaway export.
+
+        ``template`` (optional) is a resolved export-template dict; when omitted
+        the legacy hardcoded styling is used unchanged.
         """
         return await asyncio.to_thread(
-            self._build_pdf, book_data, chapters, output_stream, page_size
+            self._build_pdf, book_data, chapters, output_stream, page_size, template
         )
 
     def _build_pdf(
@@ -147,7 +213,8 @@ class ExportService:
         book_data: Dict,
         chapters: List[Dict],
         output_stream: Optional[BinaryIO] = None,
-        page_size: str = "letter"
+        page_size: str = "letter",
+        template: Optional[Dict] = None,
     ) -> bytes:
         if not PDF_AVAILABLE:
             raise ExportUnavailableError(
@@ -158,26 +225,48 @@ class ExportService:
         if output_stream is None:
             output_stream = io.BytesIO()
 
-        # Set page size
-        page = letter if page_size == "letter" else A4
+        # Page size + margins: template wins, else legacy 1" margins on letter/A4.
+        if template:
+            w_in, h_in = PAGE_SIZES_INCHES[template["page_size"]]
+            page = (w_in * inch, h_in * inch)
+            m = template["margins"]
+            margin_left, margin_right = m["inside"] * inch, m["outside"] * inch
+            margin_top, margin_bottom = m["top"] * inch, m["bottom"] * inch
+        else:
+            page = letter if page_size == "letter" else A4
+            margin_left = margin_right = margin_top = margin_bottom = 72
 
         # Create document
         doc = SimpleDocTemplate(
             output_stream,
             pagesize=page,
-            rightMargin=72,
-            leftMargin=72,
-            topMargin=72,
-            bottomMargin=72
+            rightMargin=margin_right,
+            leftMargin=margin_left,
+            topMargin=margin_top,
+            bottomMargin=margin_bottom,
         )
 
         # Create styles
         styles = getSampleStyleSheet()
 
+        # Body font/size/leading/indent from the template, else legacy defaults.
+        if template:
+            body_font = template["font"]["pdf_font"]
+            body_size = template["font"]["size"]
+            body_leading = body_size * template["line_height"]
+            body_indent = template["first_line_indent"] * inch
+            heading_font = (
+                "Helvetica-Bold" if template["font"]["family"] == "sans" else "Times-Bold"
+            )
+        else:
+            body_font, body_size, body_leading, body_indent = "Helvetica", 11, 16, 0
+            heading_font = "Helvetica-Bold"
+
         # Custom styles
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Title'],
+            fontName=heading_font,
             fontSize=24,
             textColor=colors.HexColor('#1a1a1a'),
             spaceAfter=30,
@@ -196,6 +285,7 @@ class ExportService:
         chapter_title_style = ParagraphStyle(
             'ChapterTitle',
             parent=styles['Heading1'],
+            fontName=heading_font,
             fontSize=20,
             textColor=colors.HexColor('#2c3e50'),
             spaceAfter=20,
@@ -205,6 +295,7 @@ class ExportService:
         heading2_style = ParagraphStyle(
             'Heading2',
             parent=styles['Heading2'],
+            fontName=heading_font,
             fontSize=16,
             textColor=colors.HexColor('#34495e'),
             spaceAfter=12,
@@ -214,6 +305,7 @@ class ExportService:
         heading3_style = ParagraphStyle(
             'Heading3',
             parent=styles['Heading3'],
+            fontName=heading_font,
             fontSize=14,
             textColor=colors.HexColor('#34495e'),
             spaceAfter=10,
@@ -223,10 +315,12 @@ class ExportService:
         body_style = ParagraphStyle(
             'CustomBody',
             parent=styles['Normal'],
-            fontSize=11,
+            fontName=body_font,
+            fontSize=body_size,
             alignment=TA_JUSTIFY,
             spaceAfter=12,
-            leading=16
+            leading=body_leading,
+            firstLineIndent=body_indent,
         )
 
         # Build story
@@ -318,8 +412,13 @@ class ExportService:
             if i < len(chapters):
                 story.append(PageBreak())
 
-        # Build PDF
-        doc.build(story)
+        # Build PDF. With a template, draw a running header/footer on every page
+        # except the title page (clean first page is the professional convention).
+        if template:
+            draw = self._make_header_footer(template, book_data, page)
+            doc.build(story, onLaterPages=draw)
+        else:
+            doc.build(story)
 
         # Get bytes if using BytesIO
         if isinstance(output_stream, io.BytesIO):
@@ -332,23 +431,72 @@ class ExportService:
         self,
         book_data: Dict,
         chapters: List[Dict],
-        output_stream: Optional[BinaryIO] = None
+        output_stream: Optional[BinaryIO] = None,
+        template: Optional[Dict] = None,
     ) -> bytes:
         """
         Generate a DOCX file from book data and chapters.
 
         python-docx is synchronous and CPU-bound; the build runs in a worker
         thread so large books don't block the event loop and timeouts can fire.
+
+        ``template`` (optional) is a resolved export-template dict; when omitted
+        the legacy Word styling is used unchanged.
         """
         return await asyncio.to_thread(
-            self._build_docx, book_data, chapters, output_stream
+            self._build_docx, book_data, chapters, output_stream, template
         )
+
+    def _apply_docx_template(self, doc, template: Dict, book_data: Dict) -> None:
+        """Apply page size, margins, body font/spacing, and running header/footer."""
+        section = doc.sections[0]
+        w_in, h_in = PAGE_SIZES_INCHES[template["page_size"]]
+        section.page_width = Inches(w_in)
+        section.page_height = Inches(h_in)
+        m = template["margins"]
+        section.top_margin = Inches(m["top"])
+        section.bottom_margin = Inches(m["bottom"])
+        section.left_margin = Inches(m["inside"])
+        section.right_margin = Inches(m["outside"])
+
+        # Body font + line spacing on the Normal style, and the template font on
+        # the heading styles so titles/TOC/chapter headings inherit it too.
+        font_name = template["font"]["docx_font"]
+        normal = doc.styles["Normal"]
+        normal.font.name = font_name
+        normal.font.size = Pt(template["font"]["size"])
+        normal.paragraph_format.line_spacing = template["line_height"]
+        for style_name in ("Title", "Heading 1", "Heading 2", "Heading 3"):
+            try:
+                doc.styles[style_name].font.name = font_name
+            except KeyError:
+                pass  # style not present in this document's base template
+
+        # Running header (book/author) — page number lives in the footer. A right
+        # tab stop at the content width pins the right-hand value to the margin.
+        left = self._resolve_tokens(template.get("header", {}).get("left", ""), book_data)
+        right = self._resolve_tokens(template.get("header", {}).get("right", ""), book_data)
+        if left or right:
+            hp = section.header.paragraphs[0]
+            if right:
+                content_width = Inches(w_in - m["inside"] - m["outside"])
+                hp.paragraph_format.tab_stops.add_tab_stop(
+                    content_width, WD_TAB_ALIGNMENT.RIGHT
+                )
+                hp.text = f"{left}\t{right}"
+            else:
+                hp.text = left
+        if template.get("footer", {}).get("center"):
+            fp = section.footer.paragraphs[0]
+            fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            _add_page_number_field(fp)
 
     def _build_docx(
         self,
         book_data: Dict,
         chapters: List[Dict],
-        output_stream: Optional[BinaryIO] = None
+        output_stream: Optional[BinaryIO] = None,
+        template: Optional[Dict] = None,
     ) -> bytes:
         if not DOCX_AVAILABLE:
             raise ExportUnavailableError(
@@ -357,6 +505,9 @@ class ExportService:
 
         # Create document
         doc = Document()
+
+        if template:
+            self._apply_docx_template(doc, template, book_data)
 
         # Set up styles
         styles = doc.styles
@@ -536,13 +687,17 @@ class ExportService:
         include_empty_chapters: bool = False,
         page_size: str = "letter",
         timeout_seconds: Optional[float] = None,
+        template_id: Optional[str] = None,
+        custom_options: Optional[Dict] = None,
     ) -> bytes:
         """
         Export a book in the specified format.
 
-        Validates content first, then generates within a time budget. Raises
-        ExportValidationError (no content), ExportTimeoutError (too slow), or
-        ValueError (bad format).
+        Validates content first, then generates within a time budget. When a
+        ``template_id`` is given, professional template styling is applied (with
+        optional ``custom_options`` overrides). Raises ExportValidationError (no
+        content), ExportTimeoutError (too slow), ValueError (bad format/options),
+        or KeyError (unknown template).
         """
         self.validate_book_for_export(book_data, include_empty_chapters)
 
@@ -552,13 +707,17 @@ class ExportService:
         if 'author_name' not in book_data and book_data.get('owner_name'):
             book_data['author_name'] = book_data['owner_name']
 
+        template = resolve_template(template_id, custom_options)
+
         fmt = format.lower()
         if fmt == 'pdf':
             generator = self.generate_pdf(
-                book_data, flattened_chapters, page_size=page_size
+                book_data, flattened_chapters, page_size=page_size, template=template
             )
         elif fmt == 'docx':
-            generator = self.generate_docx(book_data, flattened_chapters)
+            generator = self.generate_docx(
+                book_data, flattened_chapters, template=template
+            )
         else:
             raise ValueError(f"Unsupported export format: {format}")
 

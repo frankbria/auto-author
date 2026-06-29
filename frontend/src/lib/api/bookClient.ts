@@ -16,6 +16,7 @@ import {
   QuestionType
 } from '@/types/chapter-questions';
 import { handleAIServiceError, AIServiceResult } from '@/lib/api/aiErrorHandler';
+import { ExportTemplate, TemplateCustomization } from '@/types/export';
 
 /**
  * API client for book operations
@@ -1521,6 +1522,8 @@ export class BookClient {
     options?: {
       includeEmptyChapters?: boolean;
       pageSize?: 'letter' | 'A4';
+      templateId?: string;
+      customization?: TemplateCustomization;
     }
   ): Promise<Blob> {
     const params = new URLSearchParams();
@@ -1529,6 +1532,12 @@ export class BookClient {
     }
     if (options?.pageSize) {
       params.append('page_size', options.pageSize);
+    }
+    if (options?.templateId) {
+      params.append('template_id', options.templateId);
+    }
+    if (options?.customization && Object.keys(options.customization).length > 0) {
+      params.append('custom_options', JSON.stringify(options.customization));
     }
 
     const response = await fetch(
@@ -1553,11 +1562,19 @@ export class BookClient {
     bookId: string,
     options?: {
       includeEmptyChapters?: boolean;
+      templateId?: string;
+      customization?: TemplateCustomization;
     }
   ): Promise<Blob> {
     const params = new URLSearchParams();
     if (options?.includeEmptyChapters !== undefined) {
       params.append('include_empty_chapters', options.includeEmptyChapters.toString());
+    }
+    if (options?.templateId) {
+      params.append('template_id', options.templateId);
+    }
+    if (options?.customization && Object.keys(options.customization).length > 0) {
+      params.append('custom_options', JSON.stringify(options.customization));
     }
 
     const response = await fetch(
@@ -1594,6 +1611,7 @@ export class BookClient {
       total_word_count: number;
       estimated_pages: number;
     };
+    templates?: ExportTemplate[];
   }> {
     const response = await fetch(
       `${this.baseUrl}/books/${bookId}/export/formats`,
@@ -1609,6 +1627,27 @@ export class BookClient {
     }
 
     return response.json();
+  }
+
+  /**
+   * Get the available professional export templates (issue #59)
+   */
+  public async getExportTemplates(bookId: string): Promise<ExportTemplate[]> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/export/templates`,
+      {
+        headers: await this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get export templates: ${response.status} ${error}`);
+    }
+
+    const data = await response.json();
+    return data.templates ?? [];
   }
 
 

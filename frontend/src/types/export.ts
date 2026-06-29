@@ -14,6 +14,44 @@ export type ExportFormat = 'pdf' | 'docx';
 export type PageSize = 'letter' | 'A4';
 
 /**
+ * Per-side page margins, in inches
+ */
+export interface TemplateMargins {
+  top: number;
+  bottom: number;
+  inside: number;
+  outside: number;
+}
+
+/**
+ * A professional export template (issue #59).
+ * Mirrors the backend spec returned by GET /export/templates.
+ */
+export interface ExportTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category?: string;
+  best_for?: string;
+  page_size: string;
+  margins: TemplateMargins;
+  font: { family?: string; pdf_font?: string; docx_font: string; size: number };
+  line_height: number;
+  first_line_indent: number;
+  header: { left: string; right: string };
+  footer: { center: string };
+}
+
+/**
+ * User overrides applied on top of a chosen template.
+ */
+export interface TemplateCustomization {
+  font_size?: number;
+  line_height?: number;
+  margins?: Partial<TemplateMargins>;
+}
+
+/**
  * Export options provided by user
  */
 export interface ExportOptions {
@@ -25,6 +63,10 @@ export interface ExportOptions {
   pageSize?: PageSize;
   /** Optional: specific chapter IDs to export (if not provided, exports all) */
   chapters?: string[];
+  /** Professional template id (issue #59); omitted means legacy styling */
+  templateId?: string;
+  /** Template customization overrides (only meaningful with templateId) */
+  customization?: TemplateCustomization;
 }
 
 /**
@@ -114,4 +156,6 @@ export interface BookExportStats {
 export interface ExportFormatsResponse {
   formats: ExportFormatInfo[];
   book_stats: BookExportStats;
+  /** Professional export templates (issue #59) */
+  templates?: ExportTemplate[];
 }
