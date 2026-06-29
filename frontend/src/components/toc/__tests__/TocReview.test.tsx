@@ -49,5 +49,8 @@ describe('TocReview Accept button loading state', () => {
     expect(screen.queryByText(/accept & continue/i)).not.toBeInTheDocument();
     // Regenerate also reflects loading
     expect(screen.getByText('Regenerating...')).toBeInTheDocument();
+    // Both action buttons are disabled while saving
+    expect(screen.getByText('Saving...').closest('button')).toBeDisabled();
+    expect(screen.getByText('Regenerating...').closest('button')).toBeDisabled();
   });
 });

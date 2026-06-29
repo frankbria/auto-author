@@ -151,17 +151,17 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
   if (loading) {
     return (
       <div
-        className="flex gap-4 h-64"
+        className={orientation === 'vertical' ? 'flex gap-4 h-64' : 'flex flex-col gap-4 h-64'}
         role="status"
         aria-live="polite"
         aria-busy="true"
         data-testid="chapter-tabs-skeleton"
       >
         <span className="sr-only">Loading chapters...</span>
-        {/* Tab list placeholders */}
-        <div className="flex flex-col gap-2 w-40 shrink-0">
+        {/* Tab list placeholders — match the real TabBar orientation */}
+        <div className={orientation === 'vertical' ? 'flex flex-col gap-2 w-40 shrink-0' : 'flex flex-row gap-2 shrink-0'}>
           {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-9 w-full" />
+            <Skeleton key={i} className={orientation === 'vertical' ? 'h-9 w-full' : 'h-9 w-24'} />
           ))}
         </div>
         {/* Active tab content placeholder */}

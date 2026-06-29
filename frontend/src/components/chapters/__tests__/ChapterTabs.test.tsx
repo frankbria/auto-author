@@ -201,6 +201,22 @@ describe('ChapterTabs', () => {
       expect(skeleton).toHaveAttribute('aria-busy', 'true');
       // sr-only text keeps the loading announcement for screen readers
       expect(screen.getByText('Loading chapters...')).toBeInTheDocument();
+      // Default vertical orientation → side-by-side split
+      expect(skeleton).toHaveClass('flex', 'gap-4');
+      expect(skeleton).not.toHaveClass('flex-col');
+    });
+
+    it('renders the loading skeleton in horizontal orientation when requested', () => {
+      mockUseChapterTabs.mockReturnValue({
+        state: makeState(),
+        actions: mockActions,
+        loading: true,
+        error: null,
+      } as any);
+      render(<ChapterTabs bookId="book-1" orientation="horizontal" />);
+      const skeleton = screen.getByTestId('chapter-tabs-skeleton');
+      // Horizontal → stacked (tab row on top, content below)
+      expect(skeleton).toHaveClass('flex-col');
     });
 
     it('shows error message and retry button when error is present', () => {
