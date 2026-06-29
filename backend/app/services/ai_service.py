@@ -20,6 +20,10 @@ from app.services.style_templates import (
     STYLE_LABELS,
     get_style_transformation_prompt,
 )
+from app.services.content_enhancement import (
+    ENHANCEMENT_LABELS,
+    get_enhancement_prompt,
+)
 from app.services.ai_cache_service import (
     AICacheService,
     get_toc_generation_cache,
@@ -1042,6 +1046,101 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 "success": False,
                 "error": str(e),
                 "transformed": "",
+                "metadata": {},
+            }
+
+    async def enhance_text(
+        self, content: str, enhancement_type: str
+    ) -> Dict[str, Any]:
+        """
+        Improve existing chapter text along one dimension (issue #57).
+
+        Preview-only: returns the enhanced text and metadata without persisting.
+        Facts and meaning are preserved; only quality (clarity / grammar / tone /
+        vocabulary) improves. Mirrors transform_text_style (#58).
+
+        Args:
+            content: The existing text to enhance.
+            enhancement_type: One of the supported values (see content_enhancement).
+
+        Returns:
+            Dict with success flag, enhanced text, and metadata.
+        """
+        if not content or not content.strip():
+            return {
+                "success": False,
+                "error": "Content is required for enhancement.",
+                "enhanced": "",
+                "metadata": {},
+            }
+
+        try:
+            prompt = get_enhancement_prompt(content, enhancement_type)
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "enhanced": "",
+                "metadata": {},
+            }
+
+        try:
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert editor. Improve the quality of text "
+                        "while preserving all facts and meaning exactly."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ]
+
+            # Lower temperature than style transform: enhancement should be a
+            # consistent, conservative improvement rather than a creative rewrite.
+            response = await self._make_openai_request(
+                messages, temperature=0.3, max_tokens=4000
+            )
+
+            choice = response.choices[0]
+            # Refuse to return a truncated result: the caller would overwrite the
+            # whole chapter with shortened text, silently losing content (#57).
+            if getattr(choice, "finish_reason", None) == "length":
+                return {
+                    "success": False,
+                    "error": (
+                        "This chapter is too long to enhance in one pass. "
+                        "Try enhancing a shorter section."
+                    ),
+                    "enhanced": "",
+                    "metadata": {},
+                }
+
+            enhanced = choice.message.content
+            original_words = len(content.split())
+            enhanced_words = len(enhanced.split())
+
+            return {
+                "success": True,
+                "enhanced": enhanced,
+                "metadata": {
+                    "enhancement_type": enhancement_type,
+                    "enhancement_label": ENHANCEMENT_LABELS.get(
+                        enhancement_type, enhancement_type
+                    ),
+                    "original_word_count": original_words,
+                    "enhanced_word_count": enhanced_words,
+                    "model_used": self.model,
+                    "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to enhance text: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "enhanced": "",
                 "metadata": {},
             }
 

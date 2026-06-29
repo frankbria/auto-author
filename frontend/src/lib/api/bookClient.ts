@@ -1240,6 +1240,47 @@ export class BookClient {
   }
 
   /**
+   * Enhance existing chapter text along one dimension (issue #57).
+   * Preview-only: returns the improved text; the caller decides whether to apply.
+   */
+  public async enhanceChapterText(
+    bookId: string,
+    chapterId: string,
+    data: { content: string; enhancement_type: string }
+  ): Promise<{
+    success: boolean;
+    book_id: string;
+    chapter_id: string;
+    enhanced: string;
+    metadata: {
+      enhancement_type: string;
+      enhancement_label: string;
+      original_word_count: number;
+      enhanced_word_count: number;
+      model_used: string;
+      generated_at: string;
+    };
+    message: string;
+  }> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/enhance-text`,
+      {
+        method: 'POST',
+        headers: await this.getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to enhance text: ${response.status} ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
    * Generate interview-style questions for a specific chapter
    */
   public async generateChapterQuestions(
