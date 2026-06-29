@@ -31,6 +31,15 @@
 ## Recent Changes
 
 ### 2026-06-29
+- **Comprehensive loading indicators & skeleton screens (#52, P2.8)**: PR #152 — frontend-only; adapted the CodeRabbit issue plan, reusing existing `Skeleton`/`LoadingStateManager`/inline-spinner (no new abstraction, no new deps)
+  - **Page-level skeletons** (replace centered spinners → mirror real layout, prevent layout shift, `role="status"`/`aria-live`/`aria-busy` + sr-only text): `dashboard/page.tsx` + `dashboard/loading.tsx` (book-card grid), `dashboard/books/[bookId]/page.tsx` (breadcrumb/title/stepper/two-column/tabs), `ChapterTabs.tsx` (**orientation-aware** tab-list + content — vertical split or horizontal stack).
+  - **Component loading-state gaps**: `TocReview` "Accept & Continue" spinner + "Saving…"; `ClarifyingQuestions` skeleton + disabled inputs during initial response load (new `isLoadingResponses`); `BookMetadataForm` spinner + `disabled` inputs while auto-saving; `ChapterQuestions` explicit "Loading progress…" indicator (was a blank gap).
+  - **Already-satisfied tasks dropped** (verified in code, not re-done): DraftGenerator dead `LoadingStateManager` (fixed in #55 — `isGenerating` checked first; only the now-dead inline button spinner removed here) and DraftGenerationButton fetch-gap (`step='generating'` is set *before* the fetch, so `LoadingStateManager` already shows). Plan's `LoadingSpinner` doesn't exist → used inline spinner/`Loading03Icon`. The big-ticket ACs (>2s progress %, >5s est. time) were already met by `LoadingStateManager` on the AI ops.
+  - **Tests**: new `TocReview.test.tsx`, `BookMetadataForm.test.tsx`, `pages/LoadingSkeletons.test.tsx`; extended `ClarifyingQuestions`/`ChapterTabs`/`ChapterQuestionsTabs` tests (skeleton role/aria, disabled state, skeleton→content transition, orientation). The new initial-load skeleton made 12 `ClarifyingQuestions` tests query before the mocked load resolved → switched those to `await findBy*`. Frontend **1898 passed**, coverage 91/83/89/92 (gates green); backend untouched.
+  - **Process note**: an initial `git add -A` swept pre-existing untracked working files (`plans/`, `tasks/lessons.md`, a **staging-only** E2E spec, helper scripts) into the commit; the staging spec needs live auth and **failed the normal E2E job** (looked like the feature broke E2E — it hadn't). Fixed with `git rm --cached` (kept on disk), no force-push. Lesson logged. **Stage explicitly when untracked files are outside the change.**
+  - **Status**: ✅ Complete
+
+### 2026-06-29
 - **Chapter-question progress tracking (#53, P2.7)**: PR #151 — frontend-only; backend already supplied progress + per-question `response_status`
   - The CodeRabbit/Traycer "replace stub progress bar with shadcn `Progress`" task was **already done** in the codebase, so it was omitted. Closed the real gaps:
     - `QuestionContainer.handleResponseSaved` now re-fetches the **questions array** (via `fetchQuestions(true)`, which also refreshes progress), not just the aggregate summary — so dropdown/dot statuses update in real time instead of going stale until reload.
