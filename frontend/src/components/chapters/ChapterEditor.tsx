@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { DraftGenerator } from './DraftGenerator';
 import { StyleTransformer } from './StyleTransformer';
+import { ContentEnhancer } from './ContentEnhancer';
 import QuestionContainer from './questions/QuestionContainer';
 import { useRouter } from 'next/navigation';
 import {
@@ -87,6 +88,9 @@ export function ChapterEditor({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Snapshot of content before a style transform, for single-level revert (#58).
   const [preTransformContent, setPreTransformContent] = useState<string | null>(null);
+  // Snapshot + target range before a content enhancement, for single-level revert (#57).
+  const [preEnhanceContent, setPreEnhanceContent] = useState<string | null>(null);
+  const enhanceRangeRef = useRef<{ from: number; to: number } | null>(null);
   // Toggle between writing the chapter and answering its interview questions (#105/#54).
   const [view, setView] = useState<'write' | 'questions'>('write');
 
@@ -320,6 +324,46 @@ export function ChapterEditor({
         setHasUnsavedChanges(false);
       }
       setPreTransformContent(null);
+    }
+  };
+
+  // Content enhancement (#57): enhance the selection if there is one, else the
+  // whole chapter. Capture the target range so apply can replace exactly that.
+  const getEnhanceContent = () => {
+    if (!editor) return '';
+    const { from, to, empty } = editor.state.selection;
+    if (!empty) {
+      enhanceRangeRef.current = { from, to };
+      return editor.state.doc.textBetween(from, to, '\n');
+    }
+    enhanceRangeRef.current = null;
+    return editor.getHTML();
+  };
+
+  const handleApplyEnhancement = (enhanced: string) => {
+    if (!editor) return;
+    setPreEnhanceContent(editor.getHTML());
+    const range = enhanceRangeRef.current;
+    if (range) {
+      editor.chain().focus().insertContentAt(range, enhanced).run();
+    } else {
+      editor.commands.setContent(enhanced);
+    }
+    setAutoSavePending(true);
+  };
+
+  // Revert the last enhancement (single-level undo), mirroring style revert.
+  const handleRevertEnhancement = () => {
+    if (editor && preEnhanceContent !== null) {
+      editor.commands.setContent(preEnhanceContent);
+      if (preEnhanceContent !== lastAutoSavedContent) {
+        setAutoSavePending(true);
+        setHasUnsavedChanges(true);
+      } else {
+        setAutoSavePending(false);
+        setHasUnsavedChanges(false);
+      }
+      setPreEnhanceContent(null);
     }
   };
 
@@ -648,6 +692,26 @@ export function ChapterEditor({
             type="button"
           >
             Revert style
+          </Button>
+        )}
+
+        {/* AI Content Enhancer (#57) */}
+        <ContentEnhancer
+          bookId={bookId}
+          chapterId={chapterId}
+          getCurrentContent={getEnhanceContent}
+          onApply={handleApplyEnhancement}
+        />
+
+        {preEnhanceContent !== null && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRevertEnhancement}
+            title="Revert the last enhancement"
+            type="button"
+          >
+            Revert enhancement
           </Button>
         )}
       </div>

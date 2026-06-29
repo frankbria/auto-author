@@ -74,6 +74,10 @@ from app.api.dependencies import (
 )
 from app.services.ai_service import ai_service
 from app.services.style_templates import available_styles, is_valid_style
+from app.services.content_enhancement import (
+    available_enhancements,
+    is_valid_enhancement,
+)
 from app.services.ai_errors import (
     AIServiceError,
     AIRateLimitError,
@@ -3201,6 +3205,87 @@ async def transform_chapter_style(
         "transformed": result["transformed"],
         "metadata": result["metadata"],
         "message": "Style transformed successfully",
+    }
+
+
+@router.post("/{book_id}/chapters/{chapter_id}/enhance-text", response_model=dict)
+async def enhance_chapter_text(
+    book_id: str,
+    chapter_id: str,
+    data: dict = Body(default={}),
+    current_user: Dict = Depends(get_current_user_from_session),
+    rate_limit_info: Dict = Depends(
+        get_rate_limiter(limit=10, window=3600)
+    ),  # 10 per hour
+):
+    """
+    Enhance existing chapter text along one dimension (issue #57).
+
+    Preview-only: returns the improved text without persisting. The caller
+    applies it and can revert by restoring the snapshot it held before applying.
+    Dimensions: clarity, grammar, tone, vocabulary.
+    """
+    # Verify book ownership.
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to enhance content for this book",
+        )
+
+    # Verify the chapter exists (matches the other chapter content endpoints),
+    # so a stale/mistyped id can't consume the enhancement quota.
+    chapters = book.get("table_of_contents", {}).get("chapters", [])
+
+    def find_chapter(chapter_list):
+        for chapter in chapter_list:
+            if chapter.get("id") == chapter_id:
+                return chapter
+            if chapter.get("subchapters"):
+                found = find_chapter(chapter["subchapters"])
+                if found:
+                    return found
+        return None
+
+    if not find_chapter(chapters):
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    content = data.get("content", "")
+    enhancement_type = data.get("enhancement_type", "")
+
+    if not content or not content.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Content is required for enhancement.",
+        )
+    if not is_valid_enhancement(enhancement_type):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported enhancement type: {enhancement_type!r}. "
+                f"Valid types: {', '.join(available_enhancements())}."
+            ),
+        )
+
+    result = await ai_service.enhance_text(
+        content=content, enhancement_type=enhancement_type
+    )
+
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=503,
+            detail=f"Failed to enhance text: {result.get('error', 'Unknown error')}",
+        )
+
+    return {
+        "success": True,
+        "book_id": book_id,
+        "chapter_id": chapter_id,
+        "enhanced": result["enhanced"],
+        "metadata": result["metadata"],
+        "message": "Text enhanced successfully",
     }
 
 
