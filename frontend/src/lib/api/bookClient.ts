@@ -1593,6 +1593,35 @@ export class BookClient {
   }
 
   /**
+   * Export book as EPUB
+   */
+  public async exportEPUB(
+    bookId: string,
+    options?: {
+      includeEmptyChapters?: boolean;
+    }
+  ): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (options?.includeEmptyChapters !== undefined) {
+      params.append('include_empty_chapters', options.includeEmptyChapters.toString());
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/export/epub?${params.toString()}`,
+      {
+        headers: await this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      throw await this.exportError(response);
+    }
+
+    return response.blob();
+  }
+
+  /**
    * Get available export formats and book statistics
    */
   public async getExportFormats(bookId: string): Promise<{

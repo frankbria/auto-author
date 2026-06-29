@@ -220,6 +220,22 @@ export function ExportOptionsModal({
                 </div>
                 <HugeiconsIcon icon={File01Icon} size={20} className="text-blue-500" />
               </div>
+
+              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent">
+                <RadioGroupItem value="epub" id="format-epub" />
+                <div className="flex-1">
+                  <Label
+                    htmlFor="format-epub"
+                    className="font-medium cursor-pointer"
+                  >
+                    EPUB Ebook
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    EPUB format - optimized for ereaders like Kindle, Kobo, and Apple Books.
+                  </p>
+                </div>
+                <HugeiconsIcon icon={File01Icon} size={20} className="text-green-500" />
+              </div>
             </RadioGroup>
           </div>
 

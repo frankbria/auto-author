@@ -161,6 +161,41 @@ class TestExportEndpoints:
         assert len(content) > 1000
 
     @pytest.mark.asyncio
+    async def test_export_epub_success(self, test_book_with_content):
+        """Test successful EPUB export."""
+        client, book_id = test_book_with_content
+
+        response = await client.get(f"/api/v1/books/{book_id}/export/epub")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/epub+zip"
+        assert "attachment" in response.headers.get("content-disposition", "")
+        assert ".epub" in response.headers.get("content-disposition", "")
+
+        # EPUB is a ZIP archive (starts with PK)
+        content = response.content
+        assert content.startswith(b'PK')
+        assert len(content) > 1000
+
+    @pytest.mark.asyncio
+    async def test_export_epub_not_owner(self, auth_client_factory):
+        """A non-owner gets 403 on EPUB export (ownership enforced)."""
+        client1 = await auth_client_factory()
+        response = await client1.post("/api/v1/books/", json={"title": "Private EPUB"})
+        book_id = response.json()["id"]
+
+        client2 = await auth_client_factory(overrides={"auth_id": "different_auth_id"})
+        response = await client2.get(f"/api/v1/books/{book_id}/export/epub")
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_export_epub_book_not_found(self, auth_client_factory):
+        """EPUB export of a missing book returns 404."""
+        client = await auth_client_factory()
+        response = await client.get("/api/v1/books/nonexistent_id/export/epub")
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
     async def test_export_formats_endpoint(self, test_book_with_content):
         """Test the export formats information endpoint."""
         client, book_id = test_book_with_content
@@ -171,7 +206,7 @@ class TestExportEndpoints:
         data = response.json()
 
         assert "formats" in data
-        assert len(data["formats"]) == 2
+        assert len(data["formats"]) == 3
 
         # Check PDF format
         pdf_format = next(f for f in data["formats"] if f["format"] == "pdf")
@@ -183,6 +218,12 @@ class TestExportEndpoints:
         docx_format = next(f for f in data["formats"] if f["format"] == "docx")
         assert docx_format["name"] == "Word Document"
         assert docx_format["extension"] == ".docx"
+
+        # Check EPUB format
+        epub_format = next(f for f in data["formats"] if f["format"] == "epub")
+        assert epub_format["name"] == "EPUB Ebook"
+        assert epub_format["extension"] == ".epub"
+        assert epub_format["mime_type"] == "application/epub+zip"
 
         # Check book stats
         assert "book_stats" in data
@@ -362,6 +403,7 @@ class TestExportAvailability:
         expected = {
             "pdf": export_endpoint.PDF_AVAILABLE,
             "docx": export_endpoint.DOCX_AVAILABLE,
+            "epub": export_endpoint.EPUB_AVAILABLE,
         }
         for fmt in data["formats"]:
             assert "available" in fmt

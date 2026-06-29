@@ -694,6 +694,43 @@ describe('BookClient.exportDOCX', () => {
 });
 
 // ---------------------------------------------------------------------------
+// exportEPUB – success with and without options
+// ---------------------------------------------------------------------------
+
+describe('BookClient.exportEPUB', () => {
+  it('GETs the EPUB blob without options', async () => {
+    const blob = new Blob(['PK...'], { type: 'application/epub+zip' });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: async () => blob,
+    });
+
+    const result = await bookClient.exportEPUB('book123');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/api/v1/books/book123/export/epub?',
+      expect.objectContaining({ credentials: 'include' })
+    );
+    expect(result).toBeInstanceOf(Blob);
+  });
+
+  it('appends includeEmptyChapters when specified', async () => {
+    const blob = new Blob(['PK...']);
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: async () => blob,
+    });
+
+    await bookClient.exportEPUB('book123', { includeEmptyChapters: true });
+
+    const calledUrl = (global.fetch as jest.Mock).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('include_empty_chapters=true');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // exportError – structured detail.message branch
 // ---------------------------------------------------------------------------
 

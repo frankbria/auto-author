@@ -64,6 +64,42 @@ describe('ExportOptionsModal', () => {
     // Wait for radio inputs to appear
     expect(await screen.findByLabelText(/PDF Document/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Word Document/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/EPUB Ebook/i)).toBeInTheDocument();
+  });
+
+  it('should call onExport with EPUB format (no pageSize)', async () => {
+    render(
+      <ExportOptionsModal
+        bookId={mockBookId}
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        onExport={mockOnExport}
+      />
+    );
+
+    fireEvent.click(await screen.findByLabelText(/EPUB Ebook/i));
+    fireEvent.click(screen.getByRole('button', { name: /export epub/i }));
+
+    expect(mockOnExport).toHaveBeenCalledWith({
+      format: 'epub',
+      includeEmptyChapters: false
+    });
+  });
+
+  it('should hide page size options for EPUB', async () => {
+    render(
+      <ExportOptionsModal
+        bookId={mockBookId}
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        onExport={mockOnExport}
+      />
+    );
+
+    fireEvent.click(await screen.findByLabelText(/EPUB Ebook/i));
+
+    expect(screen.queryByLabelText(/Letter.*US Standard/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/A4.*International Standard/i)).not.toBeInTheDocument();
   });
 
   it('should call onExport with selected PDF format and default options', async () => {

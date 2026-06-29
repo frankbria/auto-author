@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { ExportTemplate, TemplateCustomization } from '@/types/export';
+import { ExportTemplate, TemplateCustomization, ExportFormat } from '@/types/export';
 
 const DEFAULT_OPTION = '__default__';
 
@@ -21,8 +21,9 @@ interface TemplateSelectorProps {
   customization?: TemplateCustomization;
   /** Called when customization changes */
   onCustomizationChange?: (customization: TemplateCustomization) => void;
-  /** Active export format — the preview shows the font that format will use */
-  format?: 'pdf' | 'docx';
+  /** Active export format — the preview shows the font that format will use.
+   *  EPUB ignores templates (reflowable), so it falls through to the docx-style preview. */
+  format?: ExportFormat;
 }
 
 /**

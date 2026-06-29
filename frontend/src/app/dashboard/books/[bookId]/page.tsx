@@ -231,6 +231,10 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
             templateId: options.templateId,
             customization: options.customization,
           });
+        } else if (options.format === 'epub') {
+          return await bookClient.exportEPUB(bookId, {
+            includeEmptyChapters: options.includeEmptyChapters,
+          });
         } else {
           return await bookClient.exportDOCX(bookId, {
             includeEmptyChapters: options.includeEmptyChapters,

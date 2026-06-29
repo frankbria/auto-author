@@ -23,6 +23,7 @@ Pillow>=10.0.1
 reportlab>=4.0.0
 python-docx>=0.8.11
 html2text>=2020.1.16
+ebooklib>=0.18
 
 # Testing dependencies
 pytest>=7.3.1
