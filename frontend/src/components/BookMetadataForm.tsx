@@ -95,7 +95,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
             <FormItem>
               <FormLabel>Book Title *</FormLabel>
               <FormControl>
-                <Input {...field} maxLength={100} className="text-gray-100 placeholder:text-gray-300" />
+                <Input {...field} maxLength={100} disabled={isSaving} className="text-gray-100 placeholder:text-gray-300" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -108,7 +108,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
             <FormItem>
               <FormLabel>Subtitle</FormLabel>
               <FormControl>
-                <Input {...field} maxLength={200} className="text-gray-100 placeholder:text-gray-300" />
+                <Input {...field} maxLength={200} disabled={isSaving} className="text-gray-100 placeholder:text-gray-300" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -121,7 +121,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
-                <Textarea {...field} maxLength={1000} className="text-gray-100 placeholder:text-gray-300" />
+                <Textarea {...field} maxLength={1000} disabled={isSaving} className="text-gray-100 placeholder:text-gray-300" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -134,7 +134,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Genre</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
                   <FormControl>
                     <SelectTrigger className="text-gray-100 placeholder:text-gray-300 bg-gray-800 border-gray-700 min-w-[12rem]">
                       <SelectValue placeholder="Select genre" className="text-gray-300" />
@@ -158,7 +158,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Target Audience</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
                   <FormControl>
                     <SelectTrigger className="text-gray-100 placeholder:text-gray-300 bg-gray-800 border-gray-700 min-w-[12rem]">
                       <SelectValue placeholder="Select target audience" className="text-gray-300" />
@@ -184,13 +184,18 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
             <FormItem>
               <FormLabel>Cover Image URL</FormLabel>
               <FormControl>
-                <Input {...field} maxLength={300} className="text-gray-100 placeholder:text-gray-300" />
+                <Input {...field} maxLength={300} disabled={isSaving} className="text-gray-100 placeholder:text-gray-300" />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        {isSaving && <div className="text-gray-400">Saving...</div>}
+        {isSaving && (
+          <div className="flex items-center text-gray-400" role="status" aria-live="polite">
+            <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400 mr-2"></div>
+            Saving...
+          </div>
+        )}
       </form>
     </FormProvider>
   );

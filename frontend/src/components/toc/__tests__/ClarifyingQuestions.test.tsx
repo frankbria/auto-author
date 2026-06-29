@@ -68,7 +68,30 @@ describe('ClarifyingQuestions - rendering', () => {
 
   it('renders the first question on mount', async () => {
     setup();
-    expect(screen.getByText(TWO_QUESTIONS[0])).toBeInTheDocument();
+    expect(await screen.findByText(TWO_QUESTIONS[0])).toBeInTheDocument();
+  });
+
+  it('shows an accessible skeleton while loading saved responses, then the question (#52)', async () => {
+    // Hold the responses fetch open so the initial-load skeleton is observable
+    let resolveLoad: (v: unknown) => void = () => {};
+    mockedBookClient.getQuestionResponses.mockReturnValue(
+      new Promise((resolve) => { resolveLoad = resolve; }) as any
+    );
+
+    setup();
+    const skeleton = screen.getByTestId('clarifying-questions-skeleton');
+    expect(skeleton).toHaveAttribute('role', 'status');
+    expect(skeleton).toHaveAttribute('aria-busy', 'true');
+    // Question card / textarea are not shown yet
+    expect(screen.queryByPlaceholderText('Type your answer here...')).not.toBeInTheDocument();
+    // Navigation is disabled during the initial load
+    expect(screen.getByText('Previous')).toBeDisabled();
+
+    await act(async () => {
+      resolveLoad({ responses: [], status: 'not_provided' });
+    });
+    expect(await screen.findByPlaceholderText('Type your answer here...')).toBeInTheDocument();
+    expect(screen.queryByTestId('clarifying-questions-skeleton')).not.toBeInTheDocument();
   });
 
   it('shows progress indicator', async () => {
@@ -111,21 +134,21 @@ describe('ClarifyingQuestions - handleResponseChange', () => {
 
   it('updates the textarea value when user types', async () => {
     setup();
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'My answer' } });
     expect((textarea as HTMLTextAreaElement).value).toBe('My answer');
   });
 
   it('shows character count after typing', async () => {
     setup();
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'Hello' } });
     expect(screen.getByText('5 characters')).toBeInTheDocument();
   });
 
   it('enables the Next button after typing an answer', async () => {
     setup();
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     const nextBtn = screen.getByText('Next');
     expect(nextBtn).toBeDisabled();
     fireEvent.change(textarea, { target: { value: 'Some answer' } });
@@ -145,7 +168,7 @@ describe('ClarifyingQuestions - navigation', () => {
 
   it('handleNext advances to the second question', async () => {
     setup();
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'Answer to Q1' } });
 
     const nextBtn = screen.getByText('Next');
@@ -158,7 +181,7 @@ describe('ClarifyingQuestions - navigation', () => {
   it('handleNext does not advance past the last question', async () => {
     setup();
     // Answer Q1 and advance to Q2
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'A1' } });
     fireEvent.click(screen.getByText('Next'));
 
@@ -170,7 +193,7 @@ describe('ClarifyingQuestions - navigation', () => {
   it('handlePrevious goes back to the first question from second', async () => {
     setup();
     // Advance to Q2
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'A1' } });
     fireEvent.click(screen.getByText('Next'));
 
@@ -185,6 +208,8 @@ describe('ClarifyingQuestions - navigation', () => {
 
   it('handlePrevious does not go below index 0', async () => {
     setup();
+    // Wait for the question to load (initial-load skeleton clears)
+    expect(await screen.findByText(TWO_QUESTIONS[0])).toBeInTheDocument();
     const prevBtn = screen.getByText('Previous');
     fireEvent.click(prevBtn); // disabled but let's confirm
     // Still on Q1
@@ -219,7 +244,7 @@ describe('ClarifyingQuestions - jump to question', () => {
     setup({ ...defaultProps, questions: THREE_QUESTIONS });
 
     // Advance to Q2 via textarea answer + Next
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'A1' } });
     fireEvent.click(screen.getByText('Next'));
 
@@ -247,7 +272,7 @@ describe('ClarifyingQuestions - submit', () => {
   it('Generate TOC button is disabled when last question not answered', async () => {
     setup();
     // Answer Q1 and navigate to Q2
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'A1' } });
     fireEvent.click(screen.getByText('Next'));
 
@@ -260,7 +285,7 @@ describe('ClarifyingQuestions - submit', () => {
     setup({ ...defaultProps, onSubmit });
 
     // Answer Q1
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'A1' } });
 
     // Navigate to Q2
@@ -278,7 +303,7 @@ describe('ClarifyingQuestions - submit', () => {
     setup({ ...defaultProps, onSubmit });
 
     // Answer Q1
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'Answer 1' } });
     fireEvent.click(screen.getByText('Next'));
 
@@ -385,7 +410,7 @@ describe('ClarifyingQuestions - auto-save', () => {
       await Promise.resolve(); // flush the mount effects
     });
 
-    const textarea = screen.getByPlaceholderText('Type your answer here...');
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'Some answer text' } });
 
     // Advance past the 2-second debounce

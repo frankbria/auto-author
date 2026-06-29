@@ -187,7 +187,7 @@ describe('ChapterTabs', () => {
   // -------------------------------------------------------------------------
 
   describe('Rendering states', () => {
-    it('shows loading spinner when loading is true', () => {
+    it('shows an accessible skeleton when loading is true', () => {
       mockUseChapterTabs.mockReturnValue({
         state: makeState(),
         actions: mockActions,
@@ -195,6 +195,11 @@ describe('ChapterTabs', () => {
         error: null,
       } as any);
       render(<ChapterTabs bookId="book-1" />);
+      const skeleton = screen.getByTestId('chapter-tabs-skeleton');
+      expect(skeleton).toBeInTheDocument();
+      expect(skeleton).toHaveAttribute('role', 'status');
+      expect(skeleton).toHaveAttribute('aria-busy', 'true');
+      // sr-only text keeps the loading announcement for screen readers
       expect(screen.getByText('Loading chapters...')).toBeInTheDocument();
     });
 

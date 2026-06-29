@@ -14,11 +14,13 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [isLoadingResponses, setIsLoadingResponses] = useState(true);
 
   // Load existing responses when component mounts
   useEffect(() => {
     const loadExistingResponses = async () => {
       try {
+        setIsLoadingResponses(true);
         const existingResponses = await bookClient.getQuestionResponses(bookId);
         if (existingResponses.responses && existingResponses.responses.length > 0) {
           const responseMap: Record<string, string> = {};
@@ -35,11 +37,15 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
       } catch (error) {
         console.error('Failed to load existing responses:', error);
         // Don't throw error, just continue with empty responses
+      } finally {
+        setIsLoadingResponses(false);
       }
     };
 
     if (bookId && questions.length > 0) {
       loadExistingResponses();
+    } else {
+      setIsLoadingResponses(false);
     }
   }, [bookId, questions]);
   // Auto-save responses with debouncing
@@ -157,29 +163,43 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         </div>
       </div>
 
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6">
-        <h3 className="text-gray-100 font-medium mb-4 text-lg">
-          {currentQuestion}
-        </h3>
-
-        <textarea
-          value={responses[currentQuestionIndex] || ''}
-          onChange={(e) => handleResponseChange(currentQuestionIndex, e.target.value)}
-          placeholder="Type your answer here..."
-          className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-          disabled={isLoading}
-        />
-
-        <div className="mt-3 text-gray-400 text-sm">
-          {responses[currentQuestionIndex]?.length || 0} characters
+      {isLoadingResponses ? (
+        <div
+          className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6 animate-pulse"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          data-testid="clarifying-questions-skeleton"
+        >
+          <span className="sr-only">Loading your saved answers...</span>
+          <div className="h-6 w-2/3 bg-gray-700 rounded mb-4"></div>
+          <div className="h-32 w-full bg-gray-800 rounded-lg"></div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6">
+          <h3 className="text-gray-100 font-medium mb-4 text-lg">
+            {currentQuestion}
+          </h3>
+
+          <textarea
+            value={responses[currentQuestionIndex] || ''}
+            onChange={(e) => handleResponseChange(currentQuestionIndex, e.target.value)}
+            placeholder="Type your answer here..."
+            className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+            disabled={isLoading}
+          />
+
+          <div className="mt-3 text-gray-400 text-sm">
+            {responses[currentQuestionIndex]?.length || 0} characters
+          </div>
+        </div>
+      )}
 
       {/* Navigation buttons */}
       <div className="flex justify-between items-center mb-6">
         <button
           onClick={handlePrevious}
-          disabled={currentQuestionIndex === 0 || isLoading}
+          disabled={currentQuestionIndex === 0 || isLoading || isLoadingResponses}
           className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-gray-100 rounded-md transition-colors flex items-center"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -191,7 +211,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         {currentQuestionIndex < questions.length - 1 ? (
           <button
             onClick={handleNext}
-            disabled={!responses[currentQuestionIndex]?.trim() || isLoading}
+            disabled={!responses[currentQuestionIndex]?.trim() || isLoading || isLoadingResponses}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 disabled:text-indigo-400 text-white rounded-md transition-colors flex items-center"
           >
             Next
@@ -202,7 +222,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={!allQuestionsAnswered || isLoading}
+            disabled={!allQuestionsAnswered || isLoading || isLoadingResponses}
             className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:text-green-400 text-white font-medium rounded-md transition-colors flex items-center"
           >
             {isLoading ? (
