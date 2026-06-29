@@ -24,6 +24,10 @@ from app.services.content_enhancement import (
     ENHANCEMENT_LABELS,
     get_enhancement_prompt,
 )
+from app.services.transcription_enhancement import (
+    TRANSCRIPTION_ENHANCEMENT_LABEL,
+    get_transcription_enhancement_prompt,
+)
 from app.services.ai_cache_service import (
     AICacheService,
     get_toc_generation_cache,
@@ -1137,6 +1141,85 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
 
         except Exception as e:
             logger.error(f"Failed to enhance text: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "enhanced": "",
+                "metadata": {},
+            }
+
+    async def enhance_transcription(self, content: str) -> Dict[str, Any]:
+        """
+        Clean up a raw voice transcription into readable prose (issue #56).
+
+        Preview-only: returns the cleaned-up text and metadata without
+        persisting. A single conservative pass removes filler words, breaks
+        paragraphs at natural pauses, and fixes grammar/punctuation while
+        preserving what was said. Mirrors enhance_text (#57) with temp 0.3.
+
+        Args:
+            content: The raw voice transcription to clean up.
+
+        Returns:
+            Dict with success flag, enhanced text, and metadata.
+        """
+        if not content or not content.strip():
+            return {
+                "success": False,
+                "error": "Transcription is required for cleanup.",
+                "enhanced": "",
+                "metadata": {},
+            }
+
+        try:
+            prompt = get_transcription_enhancement_prompt(content)
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert editor cleaning up dictated speech. "
+                        "Turn raw transcriptions into readable prose while "
+                        "preserving the speaker's words and meaning exactly."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ]
+
+            # Conservative, like enhance_text: cleanup must not invent content.
+            response = await self._make_openai_request(
+                messages, temperature=0.3, max_tokens=4000
+            )
+
+            choice = response.choices[0]
+            # Refuse a truncated result: the caller would overwrite the chapter
+            # with shortened text, silently losing content (mirrors #57).
+            if getattr(choice, "finish_reason", None) == "length":
+                return {
+                    "success": False,
+                    "error": (
+                        "This transcription is too long to clean up in one pass. "
+                        "Try cleaning up a shorter section."
+                    ),
+                    "enhanced": "",
+                    "metadata": {},
+                }
+
+            enhanced = choice.message.content
+            return {
+                "success": True,
+                "enhanced": enhanced,
+                "metadata": {
+                    "enhancement_type": "transcription",
+                    "enhancement_label": TRANSCRIPTION_ENHANCEMENT_LABEL,
+                    "original_word_count": len(content.split()),
+                    "enhanced_word_count": len(enhanced.split()),
+                    "model_used": self.model,
+                    "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to enhance transcription: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),

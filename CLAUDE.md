@@ -30,6 +30,15 @@
 
 ## Recent Changes
 
+### 2026-06-29
+- **AI voice-input enhancement / dictation cleanup (#56, P2.6)**: built by **mirroring the #57 enhance-text pattern** end to end (no new deps, no transcription-router changes)
+  - **Backend**: `app/services/transcription_enhancement.py` (single `TRANSCRIPTION_CLEANUP_GUIDANCE` + `get_transcription_enhancement_prompt(content)` — fact-preserving). `ai_service.enhance_transcription(content)` (temp **0.3**, conservative; rejects length-truncated output so a long dictation can't be silently shortened; structured `{success, enhanced, metadata}`). New `POST /books/{id}/chapters/{cid}/enhance-transcription` (session auth, ownership 403, **chapter-existence 404**, 10/h rate limit, 400 empty-content, 503 on AI failure). **Preview-only, no persistence.**
+  - **Single "cleanup" mode** (one pass: filler removal + paragraph breaks at natural pauses + grammar/punctuation) rather than the Traycer plan's 3 boolean toggles — the AC lists all three as expected *outcomes*, not user options; "toggle raw vs enhanced" = the side-by-side preview + revert.
+  - **Frontend**: `VoiceEnhancer.tsx` dialog (intro→enhancing→preview; DOMPurify-sanitized raw-vs-cleaned side-by-side; mirrors `ContentEnhancer`); `bookClient.enhanceVoiceTranscription()`. `ChapterEditor` toolbar **Clean up dictation** button — **reuses** the existing `getEnhanceContent` + `handleApplyEnhancement` + **"Revert enhancement"** snapshot/revert (no new editor state).
+  - **Tests**: backend `test_transcription_enhancement` + `test_ai_service_transcription` + `test_transcription_enhancement_endpoint` (success/400/404-book/404-chapter/403/503); frontend `VoiceEnhancer.test.tsx`; route-mocked E2E `voice-enhancement.spec.ts` (raw dictation→clean up→preview→apply→revert). Backend **957 passed, 92.36% cov** (`transcription_enhancement.py` 100%); frontend **1878 passed**, gates green (85/85/75/85).
+  - **NB**: the unmounted `/transcribe` router and the Traycer plan's references to the deleted `chapter_error_handler`/`chapter_cache_service` (gone in #120) are intentionally untouched. E2E route-mocks the endpoint — browser SpeechRecognition is native/non-deterministic and unavailable headless (webkit/Mobile-Safari editor-load fails pre-existingly in this env; same as the #57 spec).
+  - **Status**: ✅ Complete
+
 ### 2026-06-28
 - **EPUB export format (#60, P2.3)**: PR #147 — third export format alongside PDF/DOCX
   - **Backend**: `ExportService.generate_epub()` via `ebooklib==0.20` (async worker thread, same pattern as PDF/DOCX). Title page + per-chapter `EpubHtml`, `EpubNcx` (EPUB2 nav) **and** `EpubNav` (EPUB3 nav) for max ereader compat, ordered spine. Reuses the shared HTML→formatted-text pipeline (`_extract_text_formatting`) so chapter content renders as **well-formed XHTML** — raw TipTap HTML isn't always XML-valid and would break ereaders/lxml. **Gotcha fixed**: no `<?xml … encoding …?>` prolog on `EpubHtml.content` — ebooklib parses it as a `str` during nav generation and lxml rejects a unicode string carrying an encoding decl (silently empties the body → `ParserError: Document is empty`). ebooklib writes its own prolog.

@@ -3290,6 +3290,80 @@ async def enhance_chapter_text(
 
 
 @router.post(
+    "/{book_id}/chapters/{chapter_id}/enhance-transcription", response_model=dict
+)
+async def enhance_chapter_transcription(
+    book_id: str,
+    chapter_id: str,
+    data: dict = Body(default={}),
+    current_user: Dict = Depends(get_current_user_from_session),
+    rate_limit_info: Dict = Depends(
+        get_rate_limiter(limit=10, window=3600)
+    ),  # 10 per hour
+):
+    """
+    Clean up raw voice-dictated text into readable prose (issue #56).
+
+    Preview-only: returns the cleaned-up text (filler removal, paragraph breaks,
+    grammar/punctuation) without persisting. The caller applies it and can revert
+    by restoring the snapshot it held before applying. Single cleanup mode.
+    """
+    # Verify book ownership.
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to enhance content for this book",
+        )
+
+    # Verify the chapter exists (matches the other chapter content endpoints),
+    # so a stale/mistyped id can't consume the cleanup quota.
+    chapters = book.get("table_of_contents", {}).get("chapters", [])
+
+    def find_chapter(chapter_list):
+        for chapter in chapter_list:
+            if chapter.get("id") == chapter_id:
+                return chapter
+            if chapter.get("subchapters"):
+                found = find_chapter(chapter["subchapters"])
+                if found:
+                    return found
+        return None
+
+    if not find_chapter(chapters):
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    content = data.get("content", "")
+    if not content or not content.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Transcription is required for cleanup.",
+        )
+
+    result = await ai_service.enhance_transcription(content=content)
+
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Failed to clean up transcription: "
+                f"{result.get('error', 'Unknown error')}"
+            ),
+        )
+
+    return {
+        "success": True,
+        "book_id": book_id,
+        "chapter_id": chapter_id,
+        "enhanced": result["enhanced"],
+        "metadata": result["metadata"],
+        "message": "Transcription cleaned up successfully",
+    }
+
+
+@router.post(
     "/{book_id}/chapters/{chapter_id}/questions/responses/batch",
     response_model=Dict[str, Any]
 )

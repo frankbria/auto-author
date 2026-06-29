@@ -1,53 +1,42 @@
-# Issue #57 — [P2.5] Content enhancement for existing chapter text
+# Issue #56 — [P2.6] Enhance voice input with AI analysis and formatting
 
-**Approach (lazy / mirror #58):** Reuse the proven, already-shipped *style transformation* (#58)
-pattern end-to-end. Build the SAME shape — prompt builder → `AIService` async method →
-ownership/rate-limited endpoint → `bookClient` method → dialog component with before/after
-preview → apply-with-snapshot/revert in `ChapterEditor`. No new dependencies, no floating
-selection button, no diff library.
+Branch: `feature/56-voice-input-ai-enhancement`
 
-## Deviations from the traycer plan (decided autonomously, safe defaults)
-- **No `EnhanceButton` floating component, no selection-coordinate math.** A toolbar "Enhance"
-  button mirroring the StyleTransformer button covers the AC; floating-button + `coordsAtPos`
-  is extra surface for no requirement.
-- **No `react-diff-viewer` / `diff-match-patch` dependency.** Side-by-side before/after preview
-  (exactly like StyleTransformer) satisfies "diff view shows original vs enhanced". Adding a
-  diffing dep for color highlighting is over-engineering.
-- **Operate on selected text if a selection exists, else full chapter HTML** (via the editor's
-  content getter). Satisfies "users can select text" without a new UI.
-- **"Blocked by #41" is already satisfied** — structured AI-failure → 503 handling exists.
-- Single new module `content_enhancement.py` mirrors `style_templates.py`.
+## Approach (adapted from Traycer plan)
+Mirror the #57 `enhance-text` / #58 `transform-style` house pattern: a dedicated
+service module + `ai_service` method + chapter-scoped **preview-only** endpoint +
+frontend dialog + client method + tests. Raw dictated text → AI cleanup → side-by-side
+preview → apply/revert (reusing ChapterEditor's existing snapshot/revert infra).
 
-## Enhancement types
-clarity · grammar · tone · vocabulary (per issue AC)
+### Autonomous design decisions (no architectural fork → no approval needed)
+- **Single "cleanup" mode** (one AI pass: filler removal + paragraph breaks at natural
+  pauses + grammar/punctuation), NOT the Traycer 3 boolean toggles. The AC lists all
+  three as expected *outcomes*, not user options; "toggle raw vs enhanced" = the
+  side-by-side preview + revert. Fewer moving parts. (Deviation from original plan.)
+- Temperature **0.3** (conservative, like `enhance_text`) — voice cleanup must not invent content.
+- **Reuse** ChapterEditor `getEnhanceContent` + `handleApplyEnhancement` + `preEnhanceContent`
+  revert button — no new editor state needed.
+- Ignore the unmounted `/transcribe` router and the deleted `chapter_error_handler` /
+  `chapter_cache_service` that the Traycer plan referenced (gone in #120).
+- E2E **route-mocks** the enhance endpoint — browser SpeechRecognition is native and
+  non-deterministic/unavailable headless (same approach as content-enhancement.spec.ts).
 
-## Steps (TDD: tests first where practical)
-1. **Backend prompts** — `backend/app/services/content_enhancement.py`: `ENHANCEMENT_LABELS`,
-   `ENHANCEMENT_GUIDANCE` (4 types), `available_enhancements()`, `is_valid_enhancement()`,
-   `get_enhancement_prompt(content, enhancement_type)`. Mirror `style_templates.py`.
-2. **Backend AIService** — `ai_service.enhance_text(content, enhancement_type)` mirroring
-   `transform_text_style` (temp 0.3, reject truncated output, structured return
-   `{success, enhanced, metadata}`).
-3. **Backend endpoint** — `POST /books/{book_id}/chapters/{chapter_id}/enhance-text` in
-   `books.py` mirroring `transform-style` (auth, ownership 403/404, rate limit 10/h, validate
-   `content` + `enhancement_type`, 503 on AI failure, `log_access`).
-4. **Frontend bookClient** — `enhanceChapterText(bookId, chapterId, {content, enhancement_type})`.
-5. **Frontend component** — `ContentEnhancer.tsx` mirroring `StyleTransformer.tsx`
-   (options → enhancing → preview; DOMPurify; content getter / onApply props).
-6. **ChapterEditor wiring** — mount `ContentEnhancer` in toolbar; snapshot + "Revert enhancement"
-   button (mirror the existing pre-transform snapshot pattern).
-7. **Tests**:
-   - backend `test_content_enhancement.py`, `test_ai_service_enhancement.py`,
-     `test_enhancement_endpoint.py` (happy + 400 + 404 + 403 + 503, all 4 types)
-   - frontend `ContentEnhancer.test.tsx`
-   - e2e `content-enhancement.spec.ts` (route-mocked: open → pick type → preview → apply → revert)
+## Steps (TDD: tests first)
+- [ ] 1. Backend service `app/services/transcription_enhancement.py` + test
+- [ ] 2. `ai_service.enhance_transcription(content)` + test
+- [ ] 3. Endpoint `POST /books/{id}/chapters/{cid}/enhance-transcription` in books.py + test
+- [ ] 4. `bookClient.enhanceVoiceTranscription(bookId, chapterId, {content})`
+- [ ] 5. `VoiceEnhancer.tsx` dialog (intro→enhancing→preview, DOMPurify side-by-side) + test
+- [ ] 6. Wire VoiceEnhancer into ChapterEditor toolbar (reuse revert)
+- [ ] 7. E2E `frontend/src/e2e/voice-enhancement.spec.ts`
+- [ ] 8. Docs (CLAUDE.md Recent Changes) + close #56
 
-## Acceptance Criteria (from #57)
-- [ ] Users can select text in editor (selection used if present, else full content)
-- [ ] "Enhance" button available (toolbar)
-- [ ] AI provides enhancement suggestions
-- [ ] Diff/preview shows original vs. enhanced (side-by-side)
-- [ ] Users can accept or reject changes (apply / revert)
-- [ ] Enhancement preserves original meaning (prompt-enforced)
-- [ ] Multiple enhancement types available (clarity/grammar/tone/vocabulary)
-- [ ] E2E test verifies enhancement workflow
+## Acceptance Criteria (from issue)
+- [ ] Voice transcription works reliably (existing VoiceTextInput — unchanged)
+- [ ] AI enhancement removes filler words
+- [ ] Paragraphs break at natural pauses
+- [ ] Grammar and punctuation improved
+- [ ] Users can toggle raw vs. enhanced (preview + revert)
+- [ ] Enhancement processing shows loading indicator
+- [ ] Side-by-side preview before accepting
+- [ ] E2E test verifies voice-to-enhanced workflow
