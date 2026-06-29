@@ -51,6 +51,7 @@ import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { DraftGenerator } from './DraftGenerator';
 import { StyleTransformer } from './StyleTransformer';
 import { ContentEnhancer } from './ContentEnhancer';
+import { VoiceEnhancer } from './VoiceEnhancer';
 import QuestionContainer from './questions/QuestionContainer';
 import { useRouter } from 'next/navigation';
 import {
@@ -697,6 +698,14 @@ export function ChapterEditor({
 
         {/* AI Content Enhancer (#57) */}
         <ContentEnhancer
+          bookId={bookId}
+          chapterId={chapterId}
+          getCurrentContent={getEnhanceContent}
+          onApply={handleApplyEnhancement}
+        />
+
+        {/* AI Voice/Dictation cleanup (#56) — shares the enhancement snapshot/revert. */}
+        <VoiceEnhancer
           bookId={bookId}
           chapterId={chapterId}
           getCurrentContent={getEnhanceContent}
