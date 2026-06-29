@@ -31,6 +31,15 @@
 ## Recent Changes
 
 ### 2026-06-29
+- **Chapter-question progress tracking (#53, P2.7)**: PR #151 — frontend-only; backend already supplied progress + per-question `response_status`
+  - The CodeRabbit/Traycer "replace stub progress bar with shadcn `Progress`" task was **already done** in the codebase, so it was omitted. Closed the real gaps:
+    - `QuestionContainer.handleResponseSaved` now re-fetches the **questions array** (via `fetchQuestions(true)`, which also refreshes progress), not just the aggregate summary — so dropdown/dot statuses update in real time instead of going stale until reload.
+    - `QuestionProgress` dots colour from each question's `response_status` (green/amber/blue-current/gray) instead of positional `index < completed` logic (wrong for out-of-order answers); falls back to positional when no `questions` prop.
+    - `QuestionNavigation` gains a **"Next Unanswered"** button (`findNextUnanswered`, wraps, disabled when all completed) and marks unanswered dropdown items distinctly (`○` + `text-muted-foreground`; completed `✓`/draft `⚙️` unchanged).
+  - **Tests**: `QuestionProgress.test.tsx` (per-question dots + positional fallback), `QuestionNavigation.test.tsx` (`findNextUnanswered`, Next-Unanswered button, `○` marker), `QuestionContainer.test.tsx` (refresh-on-save); route-mocked E2E `chapter-questions-progress.spec.ts` reaches `QuestionContainer` via the ChapterEditor "Interview Questions" tab (#105). Two pre-existing `getByRole('button',{name:/next/i})` queries tightened to `/^next$/i` to disambiguate the new button. Frontend **1890 passed**, coverage 90.98/82.99/88.62/91.97 (gates green); backend unchanged. `ResponseStatus` enum has only DRAFT/COMPLETED — unanswered = `undefined` (the plan's `'not_answered'` string isn't in the frontend type).
+  - **Status**: ✅ Complete
+
+### 2026-06-29
 - **AI voice-input enhancement / dictation cleanup (#56, P2.6)**: built by **mirroring the #57 enhance-text pattern** end to end (no new deps, no transcription-router changes)
   - **Backend**: `app/services/transcription_enhancement.py` (single `TRANSCRIPTION_CLEANUP_GUIDANCE` + `get_transcription_enhancement_prompt(content)` — fact-preserving). `ai_service.enhance_transcription(content)` (temp **0.3**, conservative; rejects length-truncated output so a long dictation can't be silently shortened; structured `{success, enhanced, metadata}`). New `POST /books/{id}/chapters/{cid}/enhance-transcription` (session auth, ownership 403, **chapter-existence 404**, 10/h rate limit, 400 empty-content, 503 on AI failure). **Preview-only, no persistence.**
   - **Single "cleanup" mode** (one pass: filler removal + paragraph breaks at natural pauses + grammar/punctuation) rather than the Traycer plan's 3 boolean toggles — the AC lists all three as expected *outcomes*, not user options; "toggle raw vs enhanced" = the side-by-side preview + revert.
