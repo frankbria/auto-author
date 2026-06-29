@@ -16,6 +16,7 @@ from app.services.export_service import (
     ExportTimeoutError,
     PDF_AVAILABLE,
     DOCX_AVAILABLE,
+    EPUB_AVAILABLE,
 )
 from app.services.export_templates import list_templates
 from app.services.chapter_access_service import chapter_access_service
@@ -255,6 +256,91 @@ async def export_book_docx(
         )
 
 
+@router.get("/epub")
+async def export_book_epub(
+    book_id: str,
+    current_user: Dict = Depends(get_current_user_from_session),
+    include_empty_chapters: bool = Query(
+        False,
+        description="Include chapters without content"
+    ),
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 exports per hour
+):
+    """
+    Export a book as an EPUB file.
+
+    Returns an EPUB 3.0 file optimized for ereaders (Kindle, Kobo, Apple Books).
+    """
+    # Get book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to export this book"
+        )
+
+    # Log the export request
+    try:
+        await chapter_access_service.log_access(
+            user_id=current_user.get("auth_id"),
+            book_id=book_id,
+            chapter_id=None,  # Book-level access
+            access_type="export_epub",
+            metadata={
+                "include_empty_chapters": include_empty_chapters,
+                "export_timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    except Exception:
+        logger.error("Failed to log export access", exc_info=True)
+
+    try:
+        # Generate EPUB
+        epub_content = await export_service.export_book(
+            book_data=book,
+            format="epub",
+            include_empty_chapters=include_empty_chapters,
+            timeout_seconds=settings.EXPORT_TIMEOUT_SECONDS,
+        )
+
+        # Create filename
+        safe_title = "".join(
+            c for c in book.get("title", "untitled")
+            if c.isalnum() or c in (' ', '-', '_')
+        ).rstrip()
+        filename = f"{safe_title}.epub"
+
+        # Return as streaming response
+        return StreamingResponse(
+            io.BytesIO(epub_content),
+            media_type="application/epub+zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(epub_content)),
+            }
+        )
+
+    except ExportValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ExportTimeoutError as e:
+        logger.warning("EPUB export timed out for book %s", book_id)
+        raise HTTPException(status_code=504, detail=str(e)) from e
+    except ExportUnavailableError as e:
+        logger.warning("EPUB export unavailable: %s", e)
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception:
+        logger.error("Failed to generate EPUB", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate EPUB"
+        )
+
+
 @router.get("/formats")
 async def get_export_formats(
     book_id: str,
@@ -297,6 +383,17 @@ async def get_export_formats(
                 "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 "extension": ".docx",
                 "available": DOCX_AVAILABLE,
+                "options": {
+                    "include_empty_chapters": "boolean"
+                }
+            },
+            {
+                "format": "epub",
+                "name": "EPUB Ebook",
+                "description": "EPUB format - optimized for ereaders and ebook platforms",
+                "mime_type": "application/epub+zip",
+                "extension": ".epub",
+                "available": EPUB_AVAILABLE,
                 "options": {
                     "include_empty_chapters": "boolean"
                 }

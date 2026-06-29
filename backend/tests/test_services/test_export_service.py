@@ -170,6 +170,49 @@ class TestExportService:
         assert docx_bytes.startswith(b'PK')
 
     @pytest.mark.asyncio
+    async def test_generate_epub(self, sample_book_data):
+        """EPUB generation produces a valid EPUB zip with chapter content."""
+        import zipfile
+        from io import BytesIO
+
+        chapters = sample_book_data['table_of_contents']['chapters'][:2]
+
+        epub_bytes = await export_service.generate_epub(sample_book_data, chapters)
+
+        assert isinstance(epub_bytes, bytes)
+        assert len(epub_bytes) > 1000
+        # EPUB is a ZIP whose first entry is an uncompressed "mimetype" file.
+        assert epub_bytes.startswith(b'PK')
+        with zipfile.ZipFile(BytesIO(epub_bytes)) as zf:
+            assert zf.read("mimetype") == b"application/epub+zip"
+            names = zf.namelist()
+            # Title page + both chapters are present as XHTML documents.
+            assert any(n.endswith("title.xhtml") for n in names)
+            assert any(n.endswith("chap_1.xhtml") for n in names)
+            assert any(n.endswith("chap_2.xhtml") for n in names)
+            # Navigation documents exist (TOC works in ereaders).
+            assert any("nav" in n.lower() for n in names)
+            assert any(n.endswith(".ncx") for n in names)
+            # Chapter title text survives into the rendered XHTML.
+            all_text = b"".join(zf.read(n) for n in names if n.endswith(".xhtml"))
+            assert b"Introduction" in all_text
+
+    @pytest.mark.asyncio
+    async def test_export_book_epub(self, sample_book_data):
+        """Complete book export to EPUB via the dispatcher."""
+        epub_bytes = await export_service.export_book(
+            sample_book_data,
+            format="epub",
+            include_empty_chapters=False,
+        )
+
+        assert isinstance(epub_bytes, bytes)
+        assert len(epub_bytes) > 1000
+        assert epub_bytes.startswith(b'PK')
+        # Empty chapters excluded by default — the empty chapter has no content.
+        assert b"Empty Chapter" not in epub_bytes
+
+    @pytest.mark.asyncio
     async def test_export_exclude_empty_chapters(self, sample_book_data):
         """Test that empty chapters are excluded when requested."""
         # Export without empty chapters
@@ -328,6 +371,13 @@ class TestExportAvailabilityGuards:
         monkeypatch.setattr(es, "DOCX_AVAILABLE", False)
         with pytest.raises(es.ExportUnavailableError, match="python-docx"):
             await es.export_service.generate_docx({"title": "x"}, [])
+
+    @pytest.mark.asyncio
+    async def test_generate_epub_raises_when_ebooklib_unavailable(self, monkeypatch):
+        import app.services.export_service as es
+        monkeypatch.setattr(es, "EPUB_AVAILABLE", False)
+        with pytest.raises(es.ExportUnavailableError, match="ebooklib"):
+            await es.export_service.generate_epub({"title": "x"}, [])
 
     def test_clean_html_falls_back_without_html2text(self):
         import app.services.export_service as es

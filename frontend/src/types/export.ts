@@ -6,7 +6,7 @@
 /**
  * Available export formats
  */
-export type ExportFormat = 'pdf' | 'docx';
+export type ExportFormat = 'pdf' | 'docx' | 'epub';
 
 /**
  * Page size options for PDF export

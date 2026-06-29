@@ -54,6 +54,12 @@ def _add_page_number_field(paragraph) -> None:
     run._r.append(end)
 
 try:
+    from ebooklib import epub
+    EPUB_AVAILABLE = True
+except ImportError:
+    EPUB_AVAILABLE = False
+
+try:
     import html2text
     HTML2TEXT_AVAILABLE = True
 except ImportError:
@@ -608,6 +614,121 @@ class ExportService:
 
         return b''
 
+    async def generate_epub(
+        self,
+        book_data: Dict,
+        chapters: List[Dict],
+    ) -> bytes:
+        """
+        Generate an EPUB (3.0) file from book data and chapters.
+
+        ebooklib is synchronous, so the build runs in a worker thread to keep the
+        event loop responsive and let an outer asyncio timeout cancel a runaway
+        export — same pattern as PDF/DOCX.
+        """
+        return await asyncio.to_thread(self._build_epub, book_data, chapters)
+
+    def _chapter_to_xhtml(self, chapter: Dict, index: int) -> str:
+        """Render a chapter to a complete, well-formed XHTML document.
+
+        Reuses the shared HTML→formatted-text pipeline (same as PDF/DOCX) so the
+        output is guaranteed valid XHTML — raw TipTap HTML isn't always XML-valid
+        and would break ereaders.
+        """
+        title = chapter.get("title", f"Chapter {index}")
+        parts = [f"<h1>Chapter {index}: {html.escape(title)}</h1>"]
+
+        if chapter.get("description"):
+            parts.append(f"<p><em>{html.escape(chapter['description'])}</em></p>")
+
+        content = chapter.get("content", "")
+        if content:
+            heading_tag = {"heading1": "h2", "heading2": "h3", "heading3": "h4"}
+            for para in self._extract_text_formatting(content):
+                text = html.escape(para["text"])
+                tag = heading_tag.get(para["style"], "p")
+                parts.append(f"<{tag}>{text}</{tag}>")
+        else:
+            parts.append("<p><em>(No content yet)</em></p>")
+
+        # No <?xml?> prolog: ebooklib parses content as a str during nav
+        # generation, and lxml rejects a unicode string carrying an encoding
+        # declaration. ebooklib writes its own prolog to the EPUB file.
+        return (
+            "<html xmlns='http://www.w3.org/1999/xhtml'><head>"
+            f"<title>{html.escape(title)}</title></head><body>"
+            + "".join(parts)
+            + "</body></html>"
+        )
+
+    def _build_epub(self, book_data: Dict, chapters: List[Dict]) -> bytes:
+        if not EPUB_AVAILABLE:
+            raise ExportUnavailableError(
+                "EPUB export unavailable: ebooklib is not installed"
+            )
+
+        book = epub.EpubBook()
+        book.set_identifier(
+            str(book_data.get("id") or book_data.get("_id") or "auto-author-book")
+        )
+        book.set_title(book_data.get("title", "Untitled"))
+        book.set_language("en")
+
+        author = book_data.get("author_name") or book_data.get("owner_name")
+        if author:
+            book.add_author(author)
+        if book_data.get("description"):
+            book.add_metadata("DC", "description", book_data["description"])
+        if book_data.get("genre"):
+            book.add_metadata("DC", "subject", book_data["genre"])
+
+        # Title page
+        meta_lines = []
+        if book_data.get("subtitle"):
+            meta_lines.append(f"<h2>{html.escape(book_data['subtitle'])}</h2>")
+        if author:
+            meta_lines.append(f"<p>by {html.escape(author)}</p>")
+        for label, key in (("Genre", "genre"), ("Target Audience", "target_audience")):
+            if book_data.get(key):
+                meta_lines.append(f"<p>{label}: {html.escape(book_data[key])}</p>")
+        if book_data.get("description"):
+            meta_lines.append(f"<p>{html.escape(book_data['description'])}</p>")
+        title_page = epub.EpubHtml(
+            title="Title Page", file_name="title.xhtml", lang="en"
+        )
+        title_page.content = (
+            "<html xmlns='http://www.w3.org/1999/xhtml'><head>"
+            f"<title>{html.escape(book_data.get('title', 'Untitled'))}</title></head>"
+            f"<body><h1>{html.escape(book_data.get('title', 'Untitled'))}</h1>"
+            + "".join(meta_lines)
+            + "</body></html>"
+        )
+        book.add_item(title_page)
+
+        # Chapters
+        epub_chapters = []
+        for i, chapter in enumerate(chapters, 1):
+            item = epub.EpubHtml(
+                title=chapter.get("title", f"Chapter {i}"),
+                file_name=f"chap_{i}.xhtml",
+                lang="en",
+            )
+            item.content = self._chapter_to_xhtml(chapter, i)
+            book.add_item(item)
+            epub_chapters.append(item)
+
+        # ponytail: flat nav — every chapter is a top-level nav point. EpubNcx +
+        # EpubNav give working ereader navigation; nest by `level` if needed later.
+        book.toc = [title_page, *epub_chapters]
+        book.add_item(epub.EpubNcx())
+        book.add_item(epub.EpubNav())
+        book.spine = [title_page, "nav", *epub_chapters]
+
+        output = io.BytesIO()
+        epub.write_epub(output, book)
+        output.seek(0)
+        return output.getvalue()
+
     def _flatten_chapters(self, chapters: List[Dict], level: int = 1) -> List[Dict]:
         """Flatten nested chapter structure for export."""
         flattened = []
@@ -718,6 +839,9 @@ class ExportService:
             generator = self.generate_docx(
                 book_data, flattened_chapters, template=template
             )
+        elif fmt == 'epub':
+            # EPUB has its own reflowable layout — no page_size/template styling.
+            generator = self.generate_epub(book_data, flattened_chapters)
         else:
             raise ValueError(f"Unsupported export format: {format}")
 
