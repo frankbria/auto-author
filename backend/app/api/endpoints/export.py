@@ -1,6 +1,7 @@
 """
 Export endpoints for generating PDF and DOCX files
 """
+import json
 import logging
 from typing import Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -16,6 +17,7 @@ from app.services.export_service import (
     PDF_AVAILABLE,
     DOCX_AVAILABLE,
 )
+from app.services.export_templates import list_templates
 from app.services.chapter_access_service import chapter_access_service
 from app.core.config import settings
 from datetime import datetime, timezone
@@ -27,6 +29,23 @@ router = APIRouter(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_custom_options(raw: Optional[str]) -> Optional[Dict]:
+    """Parse the optional custom_options JSON string, 400 on malformed input."""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise HTTPException(
+            status_code=400, detail="custom_options must be valid JSON"
+        ) from e
+    if not isinstance(parsed, dict):
+        raise HTTPException(
+            status_code=400, detail="custom_options must be a JSON object"
+        )
+    return parsed
 
 
 @router.get("/pdf")
@@ -41,6 +60,12 @@ async def export_book_pdf(
         "letter",
         description="Page size (letter or A4)",
         pattern="^(letter|A4)$"
+    ),
+    template_id: Optional[str] = Query(
+        None, description="Professional export template id (see /export/templates)"
+    ),
+    custom_options: Optional[str] = Query(
+        None, description="JSON object of template overrides (font_size, margins, ...)"
     ),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 exports per hour
 ):
@@ -60,6 +85,8 @@ async def export_book_pdf(
             detail="Not authorized to export this book"
         )
 
+    parsed_custom_options = _parse_custom_options(custom_options)
+
     # Log the export request
     try:
         await chapter_access_service.log_access(
@@ -70,6 +97,7 @@ async def export_book_pdf(
             metadata={
                 "include_empty_chapters": include_empty_chapters,
                 "page_size": page_size,
+                "template_id": template_id,
                 "export_timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
@@ -84,6 +112,8 @@ async def export_book_pdf(
             include_empty_chapters=include_empty_chapters,
             page_size=page_size,
             timeout_seconds=settings.EXPORT_TIMEOUT_SECONDS,
+            template_id=template_id,
+            custom_options=parsed_custom_options,
         )
 
         # Create filename
@@ -104,6 +134,12 @@ async def export_book_pdf(
         )
 
     except ExportValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except KeyError as e:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown export template: {template_id}"
+        ) from e
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ExportTimeoutError as e:
         logger.warning("PDF export timed out for book %s", book_id)
@@ -127,6 +163,12 @@ async def export_book_docx(
         False,
         description="Include chapters without content"
     ),
+    template_id: Optional[str] = Query(
+        None, description="Professional export template id (see /export/templates)"
+    ),
+    custom_options: Optional[str] = Query(
+        None, description="JSON object of template overrides (font_size, margins, ...)"
+    ),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 exports per hour
 ):
     """
@@ -145,6 +187,8 @@ async def export_book_docx(
             detail="Not authorized to export this book"
         )
 
+    parsed_custom_options = _parse_custom_options(custom_options)
+
     # Log the export request
     try:
         await chapter_access_service.log_access(
@@ -154,6 +198,7 @@ async def export_book_docx(
             access_type="export_docx",
             metadata={
                 "include_empty_chapters": include_empty_chapters,
+                "template_id": template_id,
                 "export_timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
@@ -167,6 +212,8 @@ async def export_book_docx(
             format="docx",
             include_empty_chapters=include_empty_chapters,
             timeout_seconds=settings.EXPORT_TIMEOUT_SECONDS,
+            template_id=template_id,
+            custom_options=parsed_custom_options,
         )
 
         # Create filename
@@ -187,6 +234,12 @@ async def export_book_docx(
         )
 
     except ExportValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except KeyError as e:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown export template: {template_id}"
+        ) from e
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ExportTimeoutError as e:
         logger.warning("DOCX export timed out for book %s", book_id)
@@ -250,4 +303,28 @@ async def get_export_formats(
             }
         ],
         "book_stats": export_service.book_stats(book),
+        "templates": list_templates(),
     }
+
+
+@router.get("/templates")
+async def get_export_templates(
+    book_id: str,
+    current_user: Dict = Depends(get_current_user_from_session),
+):
+    """
+    List the available professional export templates (full spec).
+
+    The frontend renders these directly as the template preview before export.
+    """
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to access this book"
+        )
+
+    return {"templates": list_templates()}

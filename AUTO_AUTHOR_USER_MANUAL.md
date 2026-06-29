@@ -218,6 +218,31 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
 
 ### 📤 Export Your Book
 
+#### Professional Templates
+**What it does**: Apply a publishing-grade layout (page size, margins, fonts,
+running headers, and page numbers) to your PDF or DOCX export.
+
+**How to use it**:
+1. Open the **Export Book** dialog.
+2. Under **Template**, pick one of the built-in templates:
+   - **Classic Fiction** — 6×9 trade-paperback trim, serif type, tight line
+     spacing. Best for novels and narrative non-fiction.
+   - **Modern Non-Fiction** — Letter size, sans-serif type, roomy spacing. Best
+     for business, self-help, and how-to books.
+   - **Academic** — A4, double-spaced, wide margins. Best for theses and papers.
+   (Choose **Default formatting** to skip templates and use the standard layout.)
+3. A **preview** of the template's page size, margins, font, and spacing appears
+   below the list.
+4. Optional: click **Customize** to override the font size or inside margin.
+5. Choose your format and click **Export Book**.
+
+Template margins are kept within print-on-demand safe limits (KDP / IngramSpark).
+
+> Note: PDFs use the built-in print fonts (serif/sans); DOCX files reference the
+> named fonts (Garamond, Calibri, Times New Roman), which Word substitutes from
+> what's installed on your machine. Running headers show the book title/author
+> (not per-chapter names).
+
 #### Export to PDF
 **What it does**: Generate a professional PDF version of your book ready for printing or digital distribution.
 

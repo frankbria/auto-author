@@ -6,6 +6,7 @@
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ExportOptionsModal } from './ExportOptionsModal';
+import bookClient from '@/lib/api/bookClient';
 
 // Mock the performance tracking hook
 jest.mock('@/hooks/usePerformanceTracking', () => ({
@@ -161,6 +162,78 @@ describe('ExportOptionsModal', () => {
 
     expect(mockOnOpenChange).toHaveBeenCalledWith(false);
     expect(mockOnExport).not.toHaveBeenCalled();
+  });
+
+  // --- Template support (issue #59) ---
+
+  const FORMATS_WITH_TEMPLATES = {
+    data: {
+      book_stats: {
+        total_chapters: 10,
+        chapters_with_content: 8,
+        total_word_count: 50000,
+        estimated_pages: 200,
+      },
+      templates: [
+        {
+          id: 'classic_fiction',
+          name: 'Classic Fiction',
+          description: '6x9 trade paperback.',
+          category: 'fiction',
+          best_for: 'Novels',
+          page_size: '6x9',
+          margins: { top: 0.75, bottom: 0.75, inside: 0.65, outside: 0.6 },
+          font: { docx_font: 'Garamond', size: 11 },
+          line_height: 1.3,
+          first_line_indent: 0.2,
+          header: { left: '{book_title}', right: '{author}' },
+          footer: { center: '{page}' },
+        },
+      ],
+    },
+  };
+
+  it('should render the template selector when templates are available', async () => {
+    (bookClient.getExportFormats as jest.Mock).mockResolvedValueOnce(
+      FORMATS_WITH_TEMPLATES
+    );
+
+    render(
+      <ExportOptionsModal
+        bookId={mockBookId}
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        onExport={mockOnExport}
+      />
+    );
+
+    expect(await screen.findByTestId('template-selector')).toBeInTheDocument();
+    expect(screen.getByLabelText('Classic Fiction')).toBeInTheDocument();
+  });
+
+  it('should include templateId in the export payload when a template is chosen', async () => {
+    (bookClient.getExportFormats as jest.Mock).mockResolvedValueOnce(
+      FORMATS_WITH_TEMPLATES
+    );
+
+    render(
+      <ExportOptionsModal
+        bookId={mockBookId}
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        onExport={mockOnExport}
+      />
+    );
+
+    fireEvent.click(await screen.findByLabelText('Classic Fiction'));
+    fireEvent.click(screen.getByRole('button', { name: /export pdf/i }));
+
+    expect(mockOnExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        format: 'pdf',
+        templateId: 'classic_fiction',
+      })
+    );
   });
 
   it('should not render when isOpen is false', () => {

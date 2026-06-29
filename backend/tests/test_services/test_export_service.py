@@ -336,3 +336,89 @@ class TestExportAvailabilityGuards:
         out = svc._clean_html_content("<p>Hello <strong>world</strong></p>")
         assert "Hello" in out and "world" in out
         assert "<" not in out
+
+
+class TestTemplatedExport:
+    """Export with professional templates (issue #59)."""
+
+    @pytest.fixture
+    def book_data(self):
+        return {
+            "title": "Templated Book",
+            "subtitle": "A Test",
+            "author_name": "Jane Doe",
+            "description": "Desc.",
+            "table_of_contents": {
+                "chapters": [
+                    {
+                        "id": "c1",
+                        "title": "One",
+                        "content": "<p>Some real content for the first chapter.</p>",
+                        "order": 1,
+                        "status": "completed",
+                        "word_count": 8,
+                    }
+                ]
+            },
+        }
+
+    @pytest.mark.parametrize(
+        "template_id", ["classic_fiction", "modern_nonfiction", "academic"]
+    )
+    @pytest.mark.asyncio
+    async def test_pdf_export_with_each_template(self, book_data, template_id):
+        out = await export_service.export_book(
+            book_data, format="pdf", template_id=template_id
+        )
+        assert out[:4] == b"%PDF"
+        assert len(out) > 500
+
+    @pytest.mark.asyncio
+    async def test_pdf_templates_differ_from_default(self, book_data):
+        default = await export_service.export_book(book_data, format="pdf")
+        templated = await export_service.export_book(
+            book_data, format="pdf", template_id="academic"
+        )
+        assert default != templated  # different page size/margins/font
+
+    @pytest.mark.asyncio
+    async def test_docx_template_applies_section_and_font(self, book_data):
+        out = await export_service.export_book(
+            book_data, format="docx", template_id="academic"
+        )
+        doc = Document(BytesIO(out))
+        section = doc.sections[0]
+        # Academic = A4, 1.25" inside/outside, 1.0" top/bottom.
+        assert round(section.left_margin.inches, 2) == 1.25
+        assert round(section.right_margin.inches, 2) == 1.25
+        assert round(section.top_margin.inches, 2) == 1.0
+        normal = doc.styles["Normal"]
+        assert normal.font.name == "Times New Roman"
+        assert normal.font.size.pt == 12
+        # Running header carries book/author text.
+        assert "Templated Book" in section.header.paragraphs[0].text
+
+    @pytest.mark.asyncio
+    async def test_custom_options_override_font_size(self, book_data):
+        out = await export_service.export_book(
+            book_data,
+            format="docx",
+            template_id="classic_fiction",
+            custom_options={"font_size": 14},
+        )
+        doc = Document(BytesIO(out))
+        assert doc.styles["Normal"].font.size.pt == 14
+
+    @pytest.mark.asyncio
+    async def test_unknown_template_raises(self, book_data):
+        with pytest.raises(KeyError):
+            await export_service.export_book(
+                book_data, format="pdf", template_id="not_a_template"
+            )
+
+    @pytest.mark.asyncio
+    async def test_no_template_id_is_backward_compatible(self, book_data):
+        out = await export_service.export_book(book_data, format="docx")
+        doc = Document(BytesIO(out))
+        # Default python-docx letter section, untouched header.
+        assert doc.sections[0].header.paragraphs[0].text == ""

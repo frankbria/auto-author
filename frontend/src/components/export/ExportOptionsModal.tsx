@@ -16,9 +16,10 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { ExportOptions, ExportFormat, PageSize, BookExportStats } from '@/types/export';
+import { ExportOptions, ExportFormat, PageSize, BookExportStats, ExportTemplate, TemplateCustomization } from '@/types/export';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import bookClient from '@/lib/api/bookClient';
+import { TemplateSelector } from './TemplateSelector';
 
 interface ExportOptionsModalProps {
   /** Book ID to export */
@@ -67,6 +68,11 @@ export function ExportOptionsModal({
   const [pageSize, setPageSize] = useState<PageSize>('letter');
   const [includeEmptyChapters, setIncludeEmptyChapters] = useState(false);
 
+  // Template state (issue #59)
+  const [templates, setTemplates] = useState<ExportTemplate[]>([]);
+  const [templateId, setTemplateId] = useState<string | undefined>(undefined);
+  const [customization, setCustomization] = useState<TemplateCustomization>({});
+
   // Book statistics
   const [stats, setStats] = useState<BookExportStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
@@ -85,6 +91,7 @@ export function ExportOptionsModal({
         return await bookClient.getExportFormats(bookId);
       }, { bookId });
       setStats(response.book_stats);
+      setTemplates(response.templates ?? []);
     } catch (error) {
       console.error('Failed to load book statistics:', error);
       toast.error({ title: 'Failed to load book information' });
@@ -94,10 +101,16 @@ export function ExportOptionsModal({
   };
 
   const handleExport = () => {
+    const hasCustomization = Object.keys(customization).length > 0;
     const options: ExportOptions = {
       format,
       includeEmptyChapters,
       pageSize: format === 'pdf' ? pageSize : undefined,
+      // Only attach template fields when a template is actually selected, so the
+      // default export payload stays unchanged (legacy behaviour preserved).
+      ...(templateId
+        ? { templateId, ...(hasCustomization ? { customization } : {}) }
+        : {}),
     };
 
     onExport(options);
@@ -157,6 +170,17 @@ export function ExportOptionsModal({
                 <span className="font-medium">{stats.estimated_pages}</span>
               </div>
             </div>
+          )}
+
+          {/* Template Selection (issue #59) */}
+          {templates.length > 0 && (
+            <TemplateSelector
+              templates={templates}
+              selectedTemplateId={templateId}
+              onSelect={setTemplateId}
+              customization={customization}
+              onCustomizationChange={setCustomization}
+            />
           )}
 
           {/* Format Selection */}

@@ -387,3 +387,109 @@ class TestExportAvailability:
         resp = await client.get(f"/api/v1/books/{book_id}/export/pdf")
         assert resp.status_code == 503
         assert "unavailable" in resp.json()["detail"].lower()
+
+
+class TestExportTemplateEndpoints:
+    """Template-aware export endpoints (issue #59)."""
+
+    @pytest.fixture
+    async def book(self, auth_client_factory):
+        client = await auth_client_factory()
+        resp = await client.post(
+            "/api/v1/books/", json={"title": "Template Export Book"}
+        )
+        assert resp.status_code == 201
+        book_id = resp.json()["id"]
+        await _seed_toc(
+            book_id,
+            {
+                "chapters": [
+                    {
+                        "id": "ch1",
+                        "title": "Intro",
+                        "content": "<p>Real content here for export.</p>",
+                        "order": 1,
+                        "level": 1,
+                        "parent_id": None,
+                        "status": "completed",
+                        "word_count": 6,
+                        "subchapters": [],
+                    }
+                ],
+                "total_chapters": 1,
+                "status": "edited",
+            },
+        )
+        return client, book_id
+
+    @pytest.mark.asyncio
+    async def test_list_templates_endpoint(self, book):
+        client, book_id = book
+        resp = await client.get(f"/api/v1/books/{book_id}/export/templates")
+        assert resp.status_code == 200
+        templates = resp.json()["templates"]
+        ids = {t["id"] for t in templates}
+        assert {"classic_fiction", "modern_nonfiction", "academic"} <= ids
+        # Full spec is present so the frontend can render a preview.
+        assert all("margins" in t and "font" in t for t in templates)
+
+    @pytest.mark.asyncio
+    async def test_formats_endpoint_includes_templates(self, book):
+        client, book_id = book
+        resp = await client.get(f"/api/v1/books/{book_id}/export/formats")
+        assert resp.status_code == 200
+        assert len(resp.json()["templates"]) >= 3
+
+    @pytest.mark.asyncio
+    async def test_templates_endpoint_requires_auth(self, book):
+        client, book_id = book
+        # Missing book → 404 (auth dependency runs, then ownership/exists check).
+        resp = await client.get("/api/v1/books/000000000000000000000000/export/templates")
+        assert resp.status_code in (403, 404)
+
+    @pytest.mark.asyncio
+    async def test_pdf_export_with_template(self, book):
+        client, book_id = book
+        resp = await client.get(
+            f"/api/v1/books/{book_id}/export/pdf?template_id=classic_fiction"
+        )
+        assert resp.status_code == 200
+        assert resp.content.startswith(b"%PDF")
+
+    @pytest.mark.asyncio
+    async def test_docx_export_with_template(self, book):
+        client, book_id = book
+        resp = await client.get(
+            f"/api/v1/books/{book_id}/export/docx?template_id=academic"
+        )
+        assert resp.status_code == 200
+        assert resp.content.startswith(b"PK")
+
+    @pytest.mark.asyncio
+    async def test_pdf_export_with_custom_options(self, book):
+        client, book_id = book
+        resp = await client.get(
+            f"/api/v1/books/{book_id}/export/pdf"
+            "?template_id=classic_fiction&custom_options=%7B%22font_size%22%3A14%7D"
+        )
+        assert resp.status_code == 200
+        assert resp.content.startswith(b"%PDF")
+
+    @pytest.mark.asyncio
+    async def test_unknown_template_returns_400(self, book):
+        client, book_id = book
+        resp = await client.get(
+            f"/api/v1/books/{book_id}/export/pdf?template_id=bogus"
+        )
+        assert resp.status_code == 400
+        assert "template" in resp.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_malformed_custom_options_returns_400(self, book):
+        client, book_id = book
+        resp = await client.get(
+            f"/api/v1/books/{book_id}/export/pdf"
+            "?template_id=classic_fiction&custom_options=not-json"
+        )
+        assert resp.status_code == 400
+        assert "json" in resp.json()["detail"].lower()

@@ -228,10 +228,14 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           return await bookClient.exportPDF(bookId, {
             includeEmptyChapters: options.includeEmptyChapters,
             pageSize: options.pageSize,
+            templateId: options.templateId,
+            customization: options.customization,
           });
         } else {
           return await bookClient.exportDOCX(bookId, {
             includeEmptyChapters: options.includeEmptyChapters,
+            templateId: options.templateId,
+            customization: options.customization,
           });
         }
       },
