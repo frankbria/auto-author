@@ -1,42 +1,32 @@
-# Issue #56 — [P2.6] Enhance voice input with AI analysis and formatting
+# Issue #53 [P2.7] — Fix incomplete progress tracking for chapter question workflows
 
-Branch: `feature/56-voice-input-ai-enhancement`
+Branch: `feature/53-question-progress-tracking`
 
-## Approach (adapted from Traycer plan)
-Mirror the #57 `enhance-text` / #58 `transform-style` house pattern: a dedicated
-service module + `ai_service` method + chapter-scoped **preview-only** endpoint +
-frontend dialog + client method + tests. Raw dictated text → AI cleanup → side-by-side
-preview → apply/revert (reusing ChapterEditor's existing snapshot/revert infra).
+## Findings (plan adapted to actual code)
+Backend already supplies progress + per-question `response_status` (DRAFT/COMPLETED;
+unanswered = undefined). The CodeRabbit/Traycer "replace stub Progress bar" task is
+**already done** — `QuestionProgress.tsx` already imports the real shadcn `Progress`.
+Remaining genuine gaps, frontend only:
 
-### Autonomous design decisions (no architectural fork → no approval needed)
-- **Single "cleanup" mode** (one AI pass: filler removal + paragraph breaks at natural
-  pauses + grammar/punctuation), NOT the Traycer 3 boolean toggles. The AC lists all
-  three as expected *outcomes*, not user options; "toggle raw vs enhanced" = the
-  side-by-side preview + revert. Fewer moving parts. (Deviation from original plan.)
-- Temperature **0.3** (conservative, like `enhance_text`) — voice cleanup must not invent content.
-- **Reuse** ChapterEditor `getEnhanceContent` + `handleApplyEnhancement` + `preEnhanceContent`
-  revert button — no new editor state needed.
-- Ignore the unmounted `/transcribe` router and the deleted `chapter_error_handler` /
-  `chapter_cache_service` that the Traycer plan referenced (gone in #120).
-- E2E **route-mocks** the enhance endpoint — browser SpeechRecognition is native and
-  non-deterministic/unavailable headless (same approach as content-enhancement.spec.ts).
+## Tasks
+- [ ] **A** `QuestionContainer.handleResponseSaved` refreshes only progress, not the
+  questions array → dropdown/dots show stale status. Refresh both (call `fetchQuestions`
+  which already re-fetches progress). Pass `questions` to `QuestionProgress`.
+- [ ] **B** `QuestionProgress` dots use positional logic (`index < progress.completed`),
+  wrong for out-of-order answers. Use per-question `response_status`.
+- [ ] **C** `QuestionNavigation`: add `findNextUnanswered` + "Next Unanswered" button
+  (disabled when all completed).
+- [ ] **D** `QuestionNavigation` dropdown: mark unanswered questions distinctly (○ + muted).
+- [ ] **E** Tests: QuestionProgress (per-question dots), QuestionNavigation (next-unanswered
+  + dropdown marker), QuestionContainer (refresh-on-save), E2E progress spec.
 
-## Steps (TDD: tests first)
-- [ ] 1. Backend service `app/services/transcription_enhancement.py` + test
-- [ ] 2. `ai_service.enhance_transcription(content)` + test
-- [ ] 3. Endpoint `POST /books/{id}/chapters/{cid}/enhance-transcription` in books.py + test
-- [ ] 4. `bookClient.enhanceVoiceTranscription(bookId, chapterId, {content})`
-- [ ] 5. `VoiceEnhancer.tsx` dialog (intro→enhancing→preview, DOMPurify side-by-side) + test
-- [ ] 6. Wire VoiceEnhancer into ChapterEditor toolbar (reuse revert)
-- [ ] 7. E2E `frontend/src/e2e/voice-enhancement.spec.ts`
-- [ ] 8. Docs (CLAUDE.md Recent Changes) + close #56
+## Acceptance criteria mapping
+- "X of Y answered" / progress bar % — already present (QuestionProgress). Verify.
+- Unanswered distinct — D.
+- "Next Unanswered" navigates — C.
+- Progress persists across sessions — backend persists; load on mount. Verify.
+- Real-time updates — A.
+- Integration + E2E tests — E.
 
-## Acceptance Criteria (from issue)
-- [ ] Voice transcription works reliably (existing VoiceTextInput — unchanged)
-- [ ] AI enhancement removes filler words
-- [ ] Paragraphs break at natural pauses
-- [ ] Grammar and punctuation improved
-- [ ] Users can toggle raw vs. enhanced (preview + revert)
-- [ ] Enhancement processing shows loading indicator
-- [ ] Side-by-side preview before accepting
-- [ ] E2E test verifies voice-to-enhanced workflow
+## Out of scope
+No backend changes. No new keyboard shortcut (YAGNI). Minimal diff.

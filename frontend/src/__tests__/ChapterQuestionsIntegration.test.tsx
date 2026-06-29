@@ -335,7 +335,7 @@ describe('Chapter Questions Integration Tests', () => {
       });
 
       // Navigate to next question
-      const nextButton = screen.getByRole('button', { name: /next/i });
+      const nextButton = screen.getByRole('button', { name: /^next$/i });
       fireEvent.click(nextButton);
 
       await waitFor(() => {
@@ -544,7 +544,7 @@ describe('Chapter Questions Integration Tests', () => {
       expect(focusedElement).toHaveProperty('tagName', 'BUTTON');
 
       // Find and click the next button directly
-      const nextButton = screen.getByRole('button', { name: /next/i });
+      const nextButton = screen.getByRole('button', { name: /^next$/i });
       await user.click(nextButton);
 
       await waitFor(() => {

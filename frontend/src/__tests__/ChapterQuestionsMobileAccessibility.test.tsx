@@ -284,7 +284,7 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
       const questionContainer = screen.getByTestId('question-container');
 
       // Find and click the next button instead of simulating swipe
-      const nextButton = screen.getByRole('button', { name: /next/i });
+      const nextButton = screen.getByRole('button', { name: /^next$/i });
       fireEvent.click(nextButton);
 
       await waitFor(() => {
