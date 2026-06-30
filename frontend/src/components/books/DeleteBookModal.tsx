@@ -114,7 +114,11 @@ export function DeleteBookModal({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (isConfirmed && !isDeleting) handleConfirm();
+            if (isConfirmed && !isDeleting) {
+              // Parent's onConfirm owns user-facing error display; guard the async
+              // call so a rejection can't surface as an unhandled promise rejection.
+              handleConfirm().catch((err) => console.error('Delete confirmation failed:', err));
+            }
           }}
         >
         <div className="space-y-4 py-4 transition-all">

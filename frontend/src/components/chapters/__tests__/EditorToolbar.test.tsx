@@ -45,6 +45,19 @@ describe('EditorToolbar accessibility', () => {
     expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
   });
 
+  it('reflects active state via aria-pressed on toggle buttons', () => {
+    // Editor where "bold" is active; the Bold button must report aria-pressed=true
+    // and an inactive control (Italic) aria-pressed=false.
+    const activeEditor = {
+      chain: () => makeChain(),
+      can: () => ({ chain: () => makeChain() }),
+      isActive: (name: string) => name === 'bold',
+    } as never;
+    render(<EditorToolbar editor={activeEditor} />);
+    expect(screen.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Italic' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('has no axe violations', async () => {
     const { container } = render(<EditorToolbar editor={mockEditor} />);
     expect(await axe(container)).toHaveNoViolations();
