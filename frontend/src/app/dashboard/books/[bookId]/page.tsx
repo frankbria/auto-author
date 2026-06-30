@@ -14,6 +14,7 @@ import { bookCreationSchema, BookFormData } from '@/lib/schemas/bookSchema';
 import { toast } from '@/lib/toast';
 import Image from 'next/image';
 import { BookMetadataForm } from '@/components/BookMetadataForm';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChapterTabs } from '@/components/chapters/ChapterTabs';
 import { ChapterBreadcrumb } from '@/components/navigation/ChapterBreadcrumb';
 import { ExportOptionsModal } from '@/components/export/ExportOptionsModal';
@@ -318,14 +319,37 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     return () => subscription.unsubscribe();
   }, [book, form]);
 
-  // Show loading state
+  // Show loading state — skeleton mirroring the book-details layout to prevent layout shift
   if (isLoading) {
     return (
-      <div className="container mx-auto flex-1 p-6 flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-          <p className="text-gray-400">Loading book details...</p>
+      <div
+        className="container mx-auto flex-1 p-6 space-y-6"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        data-testid="book-details-skeleton"
+      >
+        <span className="sr-only">Loading book details...</span>
+        {/* Breadcrumb */}
+        <Skeleton className="h-4 w-64" />
+        {/* Title */}
+        <Skeleton className="h-9 w-1/2" />
+        {/* Stepper / wizard progress */}
+        <Skeleton className="h-10 w-full" />
+        {/* Two-column: metadata form + stats sidebar */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+          </div>
         </div>
+        {/* Chapter tabs area */}
+        <Skeleton className="h-64 w-full rounded-lg" />
       </div>
     );
   }

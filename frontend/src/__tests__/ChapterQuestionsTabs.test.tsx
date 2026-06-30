@@ -512,5 +512,34 @@ describe('ChapterQuestions Tabs', () => {
         expect(screen.getByText(/3 of 10 questions answered/i)).toBeInTheDocument();
       });
     });
+
+    test('shows an accessible loading indicator while progress is being fetched (#52)', async () => {
+      // Hold the progress fetch open so the loading state is observable
+      let resolveProgress: (v: unknown) => void = () => {};
+      (bookClient.getChapterQuestionProgress as jest.Mock).mockReturnValue(
+        new Promise((resolve) => { resolveProgress = resolve; })
+      );
+
+      render(
+        <ChapterQuestions
+          bookId={mockBookId}
+          chapterId={mockChapterId}
+          chapterTitle={mockChapterTitle}
+          onSwitchToEditor={jest.fn()}
+        />
+      );
+
+      const loading = await screen.findByTestId('chapter-questions-progress-loading');
+      expect(loading).toHaveAttribute('role', 'status');
+      expect(screen.getByText('Loading progress...')).toBeInTheDocument();
+
+      // Resolve so the loading indicator is replaced by the summary
+      await act(async () => {
+        resolveProgress(mockProgress);
+      });
+      await waitFor(() => {
+        expect(screen.queryByTestId('chapter-questions-progress-loading')).not.toBeInTheDocument();
+      });
+    });
   });
 });

@@ -152,6 +152,18 @@ export default function ChapterQuestions({
         <h2 className="text-2xl font-bold">{chapterTitle}</h2>
 
         {/* Progress summary */}
+        {loading && (
+          <div
+            className="flex items-center space-x-2 text-sm text-muted-foreground"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            data-testid="chapter-questions-progress-loading"
+          >
+            <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-muted-foreground"></div>
+            <span>Loading progress...</span>
+          </div>
+        )}
         {!loading && progress && (
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
             <span>

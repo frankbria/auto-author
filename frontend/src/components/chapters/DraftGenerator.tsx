@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { SparklesIcon, Loading03Icon, AlertCircleIcon, File01Icon } from '@hugeicons/core-free-icons';
+import { SparklesIcon, AlertCircleIcon, File01Icon } from '@hugeicons/core-free-icons';
 import { toast } from '@/lib/toast';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import bookClient from '@/lib/api/bookClient';
@@ -307,17 +307,10 @@ export function DraftGenerator({
                   onClick={handleGenerateDraft}
                   disabled={isGenerating || !isReadyToGenerate()}
                 >
-                  {isGenerating ? (
-                    <>
-                      <HugeiconsIcon icon={Loading03Icon} size={16} className="mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" />
-                      Generate Draft
-                    </>
-                  )}
+                  {/* This branch only renders when !isGenerating; LoadingStateManager
+                      (above) handles the generating state. */}
+                  <HugeiconsIcon icon={SparklesIcon} size={16} className="mr-2" />
+                  Generate Draft
                 </Button>
               </div>
             </div>

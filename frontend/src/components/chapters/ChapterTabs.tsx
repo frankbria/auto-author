@@ -10,6 +10,7 @@ import { TabBar } from './TabBar';
 import { TabContent } from './TabContent';
 import TabContextMenu from './TabContextMenu';
 import { MobileChapterTabs } from './MobileChapterTabs';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChapterTabsProps {
   bookId: string;
@@ -149,11 +150,22 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary mb-2"></div>
-          <p className="text-foreground">Loading chapters...</p>
+      <div
+        className={orientation === 'vertical' ? 'flex gap-4 h-64' : 'flex flex-col gap-4 h-64'}
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        data-testid="chapter-tabs-skeleton"
+      >
+        <span className="sr-only">Loading chapters...</span>
+        {/* Tab list placeholders — match the real TabBar orientation */}
+        <div className={orientation === 'vertical' ? 'flex flex-col gap-2 w-40 shrink-0' : 'flex flex-row gap-2 shrink-0'}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className={orientation === 'vertical' ? 'h-9 w-full' : 'h-9 w-24'} />
+          ))}
         </div>
+        {/* Active tab content placeholder */}
+        <Skeleton className="flex-1 h-full rounded-lg" />
       </div>
     );
   }

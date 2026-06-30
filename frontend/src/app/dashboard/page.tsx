@@ -10,6 +10,7 @@ import { Add01Icon, Book02Icon } from '@hugeicons/core-free-icons';
 import BookCard, { BookProject } from '@/components/BookCard';
 import { BookCreationWizard } from '@/components/BookCreationWizard';
 import { EmptyBookState } from '@/components/EmptyBookState';
+import { Skeleton } from '@/components/ui/skeleton';
 import bookClient from '@/lib/api/bookClient';
 
 export default function Dashboard() {
@@ -89,13 +90,25 @@ export default function Dashboard() {
     }
   };
 
-  // Show loading state
+  // Show loading state — skeleton mirroring the book-card grid to prevent layout shift
   if (isLoading) {
     return (
-      <div className="container mx-auto flex-1 p-6 flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-          <p className="text-gray-400">Loading your books...</p>
+      <div
+        className="container mx-auto flex-1 p-6"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        data-testid="dashboard-skeleton"
+      >
+        <span className="sr-only">Loading your books...</span>
+        <div className="flex justify-between items-center mb-8">
+          <Skeleton className="h-9 w-48" />
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-48 w-full rounded-lg" />
+          ))}
         </div>
       </div>
     );
