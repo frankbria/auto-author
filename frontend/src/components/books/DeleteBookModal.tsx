@@ -110,6 +110,13 @@ export function DeleteBookModal({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Form wrapper so Enter submits when the confirmation matches. */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (isConfirmed && !isDeleting) handleConfirm();
+          }}
+        >
         <div className="space-y-4 py-4 transition-all">
           {/* Book Information */}
           <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 space-y-2 transition-all">
@@ -154,9 +161,11 @@ export function DeleteBookModal({
               className="font-mono transition-all focus-visible:ring-[3px]"
               autoComplete="off"
               autoFocus
+              aria-invalid={confirmationText !== '' && !isConfirmed ? true : undefined}
+              aria-describedby={confirmationText !== '' && !isConfirmed ? 'confirm-delete-error' : undefined}
             />
             {confirmationText && !isConfirmed && (
-              <p className="text-xs text-destructive transition-all">
+              <p id="confirm-delete-error" role="alert" className="text-xs text-destructive transition-all">
                 Title must match exactly (case-sensitive)
               </p>
             )}
@@ -165,6 +174,7 @@ export function DeleteBookModal({
 
         <DialogFooter className="transition-all">
           <Button
+            type="button"
             variant="outline"
             onClick={handleCancel}
             disabled={isDeleting}
@@ -173,8 +183,8 @@ export function DeleteBookModal({
             Cancel
           </Button>
           <Button
+            type="submit"
             variant="destructive"
-            onClick={handleConfirm}
             disabled={!isConfirmed || isDeleting}
             className="transition-all focus-visible:ring-[3px]"
           >
@@ -188,6 +198,7 @@ export function DeleteBookModal({
             )}
           </Button>
         </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -414,8 +414,8 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
       });
 
-      // Check for proper semantic elements
-      expect(screen.getByRole('main')).toBeInTheDocument();
+      // Check for proper semantic elements (labeled region — the page layout owns <main>)
+      expect(screen.getByRole('region', { name: /chapter questions interface/i })).toBeInTheDocument();
       expect(screen.getByRole('textbox')).toBeInTheDocument();
 
       // Progress bar might be rendered differently
@@ -443,8 +443,8 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
       });
 
-      // Check that key elements have ARIA attributes
-      const main = screen.getByRole('main');
+      // Check that key elements have ARIA attributes (labeled region, not <main>)
+      const main = screen.getByRole('region', { name: /chapter questions interface/i });
       expect(main).toBeInTheDocument();
 
       const textbox = screen.getByRole('textbox');

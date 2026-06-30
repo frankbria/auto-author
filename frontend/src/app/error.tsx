@@ -19,7 +19,8 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-4">
+    // Provide the skip-link target / main landmark in the route error state too.
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md bg-gray-900 border-gray-800">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -64,6 +65,6 @@ export default function Error({
           </div>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

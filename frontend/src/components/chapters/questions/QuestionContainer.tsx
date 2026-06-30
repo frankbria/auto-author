@@ -365,9 +365,10 @@ export default function QuestionContainer({
         className="sr-only"
       />
 
-      <main
+      {/* Labeled region (not <main>) — the page layout already provides the single
+          <main id="main-content"> landmark; a nested main would be invalid. */}
+      <section
         className={containerClasses}
-        role="main"
         aria-label="Chapter questions interface"
         data-testid="question-container"
         style={{
@@ -465,7 +466,7 @@ export default function QuestionContainer({
         onGoToQuestion={handleGoToQuestion}
         questions={questions}
       />
-    </main>
+    </section>
     </>
   );
 }

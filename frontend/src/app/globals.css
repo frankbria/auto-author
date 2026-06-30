@@ -123,4 +123,13 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+  /* Visible keyboard-focus fallback (WCAG 2.4.7) for any interactive element
+     that doesn't define its own focus-visible ring. Components with their own
+     ring (buttons, inputs) keep it; this just guarantees nothing is unindicated. */
+  a:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }

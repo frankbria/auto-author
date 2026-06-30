@@ -101,7 +101,7 @@ export const SummaryInput: React.FC<{
       </div>
       <div id="summary-help" className="text-xs text-muted-foreground mt-2 transition-all">
         <div>Guidelines: Aim for 1-3 paragraphs. Include the main idea, genre, and any key themes or characters. Minimum 30 words recommended.</div>
-        <div className="italic text-gray-500 dark:text-gray-600 mt-1 transition-all">
+        <div className="italic text-gray-600 dark:text-gray-400 mt-1 transition-all">
           &quot;A young orphan discovers a hidden world of magic and must stop a dark sorcerer from conquering both realms. The story explores friendship, courage, and the power of believing in oneself.&quot;
         </div>
       </div>
