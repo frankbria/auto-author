@@ -64,7 +64,7 @@ export default function DashboardLayout({
               <UserButton />
               <button
                 onClick={toggleMobileMenu}
-                className="text-gray-400 hover:text-gray-100 transition-colors p-2"
+                className="flex items-center justify-center min-h-11 min-w-11 text-gray-400 hover:text-gray-100 transition-colors"
                 aria-label="Toggle mobile menu"
               >
                 <svg
@@ -99,7 +99,7 @@ export default function DashboardLayout({
                     <h2 className="text-lg font-semibold text-gray-100">Menu</h2>
                     <button
                       onClick={closeMobileMenu}
-                      className="text-gray-400 hover:text-gray-100 transition-colors p-1"
+                      className="flex items-center justify-center min-h-11 min-w-11 text-gray-400 hover:text-gray-100 transition-colors"
                       aria-label="Close menu"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

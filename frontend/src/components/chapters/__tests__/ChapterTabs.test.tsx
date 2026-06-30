@@ -541,4 +541,54 @@ describe('ChapterTabs', () => {
       expect(mockActions.closeTab).toHaveBeenCalledWith('ch-1');
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Mobile swipe navigation (issue #51)
+  // -------------------------------------------------------------------------
+
+  describe('mobile swipe navigation', () => {
+    const dispatchSwipe = (el: HTMLElement, startX: number, endX: number) => {
+      const start = new Event('touchstart', { bubbles: true }) as unknown as TouchEvent;
+      Object.defineProperty(start, 'touches', { value: [{ clientX: startX, clientY: 0 }] });
+      const end = new Event('touchend', { bubbles: true }) as unknown as TouchEvent;
+      Object.defineProperty(end, 'changedTouches', { value: [{ clientX: endX, clientY: 0 }] });
+      act(() => {
+        el.dispatchEvent(start);
+        el.dispatchEvent(end);
+      });
+    };
+
+    beforeEach(() => {
+      mockUseMediaQuery.mockReturnValue(true); // mobile
+    });
+
+    it('wraps content in a swipe area only on mobile', () => {
+      render(<ChapterTabs bookId="book-1" />);
+      expect(screen.getByTestId('chapter-swipe-area')).toBeInTheDocument();
+    });
+
+    it('swiping left advances to the next chapter', () => {
+      render(<ChapterTabs bookId="book-1" />); // active ch-1, order [ch-1, ch-2]
+      dispatchSwipe(screen.getByTestId('chapter-swipe-area'), 250, 100); // left
+      expect(mockActions.setActiveChapter).toHaveBeenCalledWith('ch-2');
+    });
+
+    it('swiping right at the first chapter is a no-op (clamped)', () => {
+      render(<ChapterTabs bookId="book-1" />); // active ch-1 is first
+      dispatchSwipe(screen.getByTestId('chapter-swipe-area'), 100, 250); // right
+      expect(mockActions.setActiveChapter).not.toHaveBeenCalled();
+    });
+
+    it('swiping right from a later chapter goes to the previous one', () => {
+      mockUseChapterTabs.mockReturnValue({
+        state: makeState({ active_chapter_id: 'ch-2' }),
+        actions: mockActions,
+        loading: false,
+        error: null,
+      } as unknown as ReturnType<typeof useChapterTabs>);
+      render(<ChapterTabs bookId="book-1" />);
+      dispatchSwipe(screen.getByTestId('chapter-swipe-area'), 100, 250); // right
+      expect(mockActions.setActiveChapter).toHaveBeenCalledWith('ch-1');
+    });
+  });
 });

@@ -225,10 +225,12 @@ test.describe('Responsive Design - Layout Adaptation', () => {
       test('should have all critical UI elements visible', async ({ page }) => {
         await navigateToPage(page, '/dashboard');
 
-        // Check for critical elements
+        // Check for critical elements. Use :visible for button — the mobile-menu
+        // toggle is present in the DOM but hidden on desktop, so a bare .first()
+        // would resolve to a hidden element.
         const criticalElements = [
           'main', // Main content area
-          'button', // At least one button
+          'button:visible', // At least one visible button
         ];
 
         for (const selector of criticalElements) {
@@ -286,16 +288,12 @@ test.describe('Responsive Design - Breakpoint Transitions', () => {
 
     // Start at mobile
     await page.setViewportSize(VIEWPORTS.mobile);
-    await page.waitForTimeout(500); // Allow transition
-
     // Verify mobile layout
     const isMobileBefore = await page.evaluate(() => window.innerWidth < 768);
     expect(isMobileBefore).toBe(true);
 
     // Transition to desktop
     await page.setViewportSize(VIEWPORTS.desktop);
-    await page.waitForTimeout(500); // Allow transition
-
     // Verify desktop layout
     const isDesktopAfter = await page.evaluate(() => window.innerWidth >= 1024);
     expect(isDesktopAfter).toBe(true);
@@ -374,11 +372,7 @@ test.describe('Responsive Design - Performance', () => {
 
     // Measure CLS (Cumulative Layout Shift)
     await page.setViewportSize(VIEWPORTS.mobile);
-    await page.waitForTimeout(1000);
-
     await page.setViewportSize(VIEWPORTS.desktop);
-    await page.waitForTimeout(1000);
-
     // Get layout shift score
     const cls = await page.evaluate(() => {
       return new Promise<number>((resolve) => {
@@ -414,8 +408,6 @@ test.describe('Responsive Design - Accessibility Integration', () => {
 
     // Tab through interactive elements
     await page.keyboard.press('Tab');
-    await page.waitForTimeout(100);
-
     const firstFocused = await page.evaluate(() => {
       return document.activeElement?.tagName;
     });
@@ -424,8 +416,6 @@ test.describe('Responsive Design - Accessibility Integration', () => {
 
     // Tab again
     await page.keyboard.press('Tab');
-    await page.waitForTimeout(100);
-
     const secondFocused = await page.evaluate(() => {
       return document.activeElement?.tagName;
     });

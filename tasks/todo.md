@@ -1,47 +1,46 @@
-# Issue #52 [P2.8] — Comprehensive loading indicators & progress tracking
+# Issue #51 — P2.9 Optimize mobile responsiveness
 
-**Source**: CodeRabbit plan in issue comments, adapted to current codebase.
-**Branch**: `feature/52-loading-indicators`
-**Scope**: frontend-only. Reuses existing `Skeleton`, `LoadingStateManager`, `Loading03Icon`.
+Branch: `feature/51-mobile-responsiveness`
 
-## Adapted steps
+## Adapted plan (verified against codebase + the real E2E spec)
 
-### Already done (verified in code — skipped)
-- ~~DraftGenerator dead `LoadingStateManager`~~ — fixed in #55 (`isGenerating` checked first).
-- ~~DraftGenerationButton fetch-gap loading~~ — `handleGenerateDraft` sets `step='generating'` *before* the fetch; `LoadingStateManager` already shows during it. No gap.
+The orphaned `frontend/e2e/responsive.spec.ts` is the acceptance spec. Key divergence from the
+CodeRabbit plan: it proposed **opt-in** `mobile`/`icon-mobile` button variants. The test
+`responsive.spec.ts:99` asserts *every visible button* is ≥44×44px — an opt-in variant nobody
+wires up passes nothing. So instead: **auto-apply 44px sizing at mobile widths in the primitive
+base classes** (one edit each, desktop unchanged). Less churn, actually passes.
 
-### Step 1 — Page-level skeleton loaders (replace centered spinners)
-1a. `app/dashboard/page.tsx` (l.93-102) → skeleton: header + 3-col BookCard-shaped grid + button placeholder. `role="status"` `aria-live="polite"`.
-1b. `app/dashboard/loading.tsx` → matching dashboard skeleton (lightweight).
-1c. `app/dashboard/books/[bookId]/page.tsx` (l.322-331) → skeleton: breadcrumb, title, stepper, two-column form/sidebar, tabs.
-1d. `components/chapters/ChapterTabs.tsx` (l.150-159) → skeleton: vertical tab list + content area.
+### Phase 1 — Touch targets (44px) on mobile via responsive base classes
+- [ ] `ui/button.tsx` — add `max-md:min-h-11 max-md:min-w-11` to the CVA base → all buttons ≥44px on mobile, desktop keeps h-9. (No new variants; drop plan's `mobile`/`icon-mobile`.)
+- [ ] `ui/input.tsx` — add `max-md:min-h-11` (36→44 on mobile).
+- [ ] `ui/select.tsx` — SelectTrigger `max-md:min-h-11`.
+- [ ] `ui/textarea.tsx` — already `min-h-16` (64px) → **no change**.
+- [ ] `ui/radio-group.tsx` — wrap 16px indicator in a 44px tappable area on mobile (`max-md:` padding) without shifting desktop.
+- [ ] `ui/switch.tsx` — increase mobile tappable height to 44px (`max-md:min-h-11`, keep visual track).
+- [ ] auth `sign-in`/`sign-up` password toggles (raw `<button>`) — add `flex items-center justify-center min-h-11 min-w-11` (mobile-safe; they're absolutely positioned).
+- [ ] `QuestionNavigation.tsx` — already 44px → **no change**.
 
-### Step 2 — Component loading-state gaps
-2a. `components/toc/TocReview.tsx` — "Accept & Continue" button: spinner + "Saving..." when `isLoading` (mirror Regenerate button).
-2b. `components/toc/ClarifyingQuestions.tsx` — add `isLoadingResponses`; skeleton/disabled question+textarea area during initial `loadExistingResponses`.
-2c. `components/BookMetadataForm.tsx` — `isSaving` indicator gets a spinner; `disabled={isSaving}` on inputs.
-2d. `components/chapters/questions/ChapterQuestions.tsx` — small spinner in progress-summary area while `loading` (instead of hiding it).
+### Phase 2 — Swipe gesture hook + chapter navigation
+- [ ] New `hooks/useSwipeGesture.ts` — native touch events, configurable threshold (~50px), horizontal-vs-vertical discrimination, returns a ref. Matches `use-media-query.ts` SSR-safe pattern. **+ unit test.**
+- [ ] `ChapterTabs.tsx` — on mobile, attach swipe ref to the content container; swipe left→next chapter, right→prev (compute from `state.tab_order` + `active_chapter_id`, reuse `handleTabSelect`). No interference with vertical scroll/text selection.
+- [ ] Skip decorative swipe-direction indicators / bottom prev-next buttons (plan's soft "consider" items — YAGNI; AC only requires swipe works).
 
-### Step 3 — DraftGenerator cleanup (trivial)
-3a. Remove the now-dead inline `isGenerating` spinner branch in the Generate button (unreachable since the form only renders when `!isGenerating`).
+### Phase 3 — Viewport, layout, E2E activation
+- [ ] `app/layout.tsx` — add Next.js `export const viewport` (`width=device-width`, `initial-scale=1`, `viewport-fit=cover`). **No `maximum-scale=1`** (blocks zoom — a11y anti-pattern; plan hedged on it).
+- [ ] Horizontal scroll: verify `/dashboard` at 320px via E2E; add `overflow-x-hidden` only where a real overflow is found. Don't pre-emptively rewrite `BookCard`/header unless the test fails.
+- [ ] Move `frontend/e2e/responsive.spec.ts` → `frontend/src/e2e/responsive.spec.ts` (into the configured `testDir`). Make the viewport/touch-target/horizontal-scroll tests pass against the served app (mirror sibling specs' auth/route handling if redirect blocks them). Leave the 6 chapter-page-fixture-dependent skips documented if they can't be made deterministic.
 
-## Tests (TDD)
-- Skeleton renders (role=status, no spinner text) for 1a/1c/1d; loading.tsx render (1b).
-- TocReview: Accept button shows "Saving..."/disabled when isLoading (2a).
-- ClarifyingQuestions: loading skeleton + disabled inputs during load (2b).
-- BookMetadataForm: spinner + inputs disabled when isSaving (2c).
-- ChapterQuestions: progress spinner while loading (2d).
+## Acceptance criteria (issue #51)
+- [ ] All touch targets ≥44×44px (mobile)
+- [ ] No horizontal scroll at any mobile width (320px+)
+- [ ] Content readable without zooming
+- [ ] Forms work with mobile keyboards
+- [ ] Swipe gestures navigate chapters
+- [ ] Mobile Lighthouse perf >85 (manual/verify)
+- [ ] E2E tests pass on mobile viewports
 
-## Acceptance criteria (issue #52)
-- [ ] All async operations show loading state
-- [ ] Operations >2s show progress percentage — (LoadingStateManager, pre-existing for AI ops)
-- [ ] Operations >5s show estimated time — (LoadingStateManager, pre-existing)
-- [ ] Skeleton screens for page loads — Step 1
-- [ ] Consistent loading UI pattern throughout
-- [ ] Loading states accessible (ARIA live regions)
-- [ ] No operation leaves user without feedback
-
-## Deviations
-- Two plan tasks dropped as already-satisfied (see above) — no value in re-doing.
-- `LoadingSpinner` (named in plan) does not exist; use inline spinner / `Loading03Icon`.
-- Skeletons inline per-page (plan Design Choice 2, option 2) — no new abstraction.
+## Quality gates
+- [ ] `npm run lint` + `npm run typecheck` clean
+- [ ] Unit tests pass, coverage ≥85/85/75/85
+- [ ] New: useSwipeGesture test, button/input/etc. variant tests as needed
+- [ ] Frontend-only — backend untouched
