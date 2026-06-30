@@ -4,6 +4,7 @@ import { useEffect, useCallback } from 'react';
 import { useChapterTabs } from '@/hooks/useChapterTabs';
 import { useTocSync } from '@/hooks/useTocSync';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { toast } from '@/lib/toast';
 import bookClient from '@/lib/api/bookClient';
 import { TabBar } from './TabBar';
@@ -114,6 +115,22 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
     setActiveChapter(chapterId);
     saveTabState(); // Persist state
   }, [setActiveChapter, saveTabState]);
+
+  // Mobile swipe navigation: left → next chapter, right → previous (clamped at ends).
+  // Walk the full chapter list (what the mobile selector shows), not tab_order —
+  // tab_order can omit closed tabs, which would skip or stall on swipe.
+  const goToAdjacentChapter = useCallback((direction: 1 | -1) => {
+    const order = state.chapters.map(ch => ch.id);
+    const currentIndex = order.indexOf(state.active_chapter_id ?? '');
+    if (currentIndex === -1) return;
+    const target = order[currentIndex + direction];
+    if (target) handleTabSelect(target);
+  }, [state.chapters, state.active_chapter_id, handleTabSelect]);
+
+  const swipeRef = useSwipeGesture<HTMLDivElement>({
+    onSwipeLeft: () => goToAdjacentChapter(1),
+    onSwipeRight: () => goToAdjacentChapter(-1),
+  });
 
   // "Edit" from the tab context menu: select the chapter and move focus into its
   // editor so the action has an observable effect even when it is already active.
@@ -230,21 +247,37 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
           data-testid="tab-bar"
         />
       )}
-      <TabContent
-        bookId={bookId}
-        activeChapterId={state.active_chapter_id}
-        chapters={state.chapters}
-        onContentChange={(chapterId, content) => {
-          // Handle real-time content changes for auto-save
-          console.log(`Content changed for chapter ${chapterId}: ${content.length} characters`);
-        }}
-        onChapterSave={(chapterId) => {
-          // Handle chapter save completion
-          console.log(`Chapter ${chapterId} saved successfully`);
-          saveTabState(); // Update tab state when content is saved
-        }}
-        data-testid="tab-content"
-      />
+      {(() => {
+        const content = (
+          <TabContent
+            bookId={bookId}
+            activeChapterId={state.active_chapter_id}
+            chapters={state.chapters}
+            onContentChange={(chapterId, contentValue) => {
+              // Handle real-time content changes for auto-save
+              console.log(`Content changed for chapter ${chapterId}: ${contentValue.length} characters`);
+            }}
+            onChapterSave={(chapterId) => {
+              // Handle chapter save completion
+              console.log(`Chapter ${chapterId} saved successfully`);
+              saveTabState(); // Update tab state when content is saved
+            }}
+            data-testid="tab-content"
+          />
+        );
+        // On mobile, wrap in a swipe container (touch-action: pan-y keeps vertical
+        // scroll/selection working while we capture horizontal swipes for navigation).
+        return isMobile ? (
+          <div
+            ref={swipeRef}
+            className="flex-1 min-w-0 flex flex-col"
+            style={{ touchAction: 'pan-y' }}
+            data-testid="chapter-swipe-area"
+          >
+            {content}
+          </div>
+        ) : content;
+      })()}
       <TabContextMenu
         chapterId={state.active_chapter_id ?? undefined}
         onStatusUpdate={updateChapterStatus}

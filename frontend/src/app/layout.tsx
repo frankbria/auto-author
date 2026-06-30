@@ -15,6 +15,14 @@ export const metadata = {
   description: 'AI-powered nonfiction book writing assistant',
 };
 
+// ponytail: no maximum-scale — clamping zoom is a WCAG 1.4.4 anti-pattern. viewport-fit=cover
+// lets content use the full screen on notched devices.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover' as const,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
