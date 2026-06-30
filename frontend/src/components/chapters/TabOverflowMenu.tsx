@@ -28,7 +28,7 @@ export function TabOverflowMenu({
   return (
     <DropdownMenu open={visible} onOpenChange={onVisibilityChange}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="px-2">
+        <Button variant="ghost" size="sm" className="px-2" aria-label="Show more tabs">
           <HugeiconsIcon icon={MoreHorizontalIcon} size={16} />
         </Button>
       </DropdownMenuTrigger>

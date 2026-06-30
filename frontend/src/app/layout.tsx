@@ -35,21 +35,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <ErrorBoundary
             fallback={
-              <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-4">
+              // Keep the skip-link target / main landmark even in the error state.
+              <main id="main-content" tabIndex={-1} className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-4">
                 <div className="text-center">
                   <h1 className="text-2xl font-bold text-red-400 mb-4">Something went wrong</h1>
                   <p className="text-gray-400 mb-4">An unexpected error occurred. Please refresh the page.</p>
                   <RefreshButton />
                 </div>
-              </div>
+              </main>
             }
           >
             <WebVitalsInit />
-            <main className="flex flex-col min-h-screen">
-              {/* Placeholder for future header/sidebar */}
+            {/* Skip link: first focusable element, visually hidden until focused.
+                Targets the per-page <main id="main-content"> landmark. */}
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"
+            >
+              Skip to main content
+            </a>
+            {/* Layout wrapper only — the semantic <main> landmark lives in each
+                page/layout so banner/contentinfo can be top-level siblings. */}
+            <div className="flex flex-col min-h-screen">
               <div className="flex-1 flex flex-col">{children}</div>
               <SonnerToaster />
-            </main>
+            </div>
           </ErrorBoundary>
         </ThemeProvider>
       </body>

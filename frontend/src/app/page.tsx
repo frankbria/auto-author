@@ -19,20 +19,20 @@ export default function Home() {
   // Show loading state while Clerk is initializing
   if (!isAuthReady) {
     return (
-      <div className="flex flex-col items-center justify-center text-center p-6 min-h-screen">
+      <main id="main-content" tabIndex={-1} className="flex flex-col items-center justify-center text-center p-6 min-h-screen">
         <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500" aria-hidden="true"></div>
           <p className="text-gray-400">Loading...</p>
         </div>
-      </div>
+      </main>
     );
   }
 
   // Show any authentication errors
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center text-center p-6 min-h-screen">
-        <div className="bg-red-900/20 border border-red-700 text-red-400 p-4 rounded-lg mb-6 max-w-md">
+      <main id="main-content" tabIndex={-1} className="flex flex-col items-center justify-center text-center p-6 min-h-screen">
+        <div className="bg-red-900/20 border border-red-700 text-red-400 p-4 rounded-lg mb-6 max-w-md" role="alert">
           <p>Authentication Error: {error}</p>
         </div>
         <button
@@ -41,12 +41,12 @@ export default function Home() {
         >
           Dismiss
         </button>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center text-center p-6 min-h-screen">
+    <main id="main-content" tabIndex={-1} className="flex flex-col items-center justify-center text-center p-6 min-h-screen">
       {!session ? (
         <div className="space-y-6">
           <h1 className="text-4xl font-extrabold text-white tracking-tight sm:text-5xl">
@@ -89,6 +89,6 @@ export default function Home() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

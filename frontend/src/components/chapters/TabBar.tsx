@@ -129,6 +129,7 @@ export function TabBar({
         <>
           <Button
             data-testid="scroll-up-button"
+            aria-label="Scroll tabs up"
             className="absolute top-0 left-0 right-0 z-10 py-1 rounded-none border-b"
             disabled={!canScrollUp}
             onClick={scrollUp}
@@ -140,6 +141,7 @@ export function TabBar({
 
           <Button
             data-testid="scroll-down-button"
+            aria-label="Scroll tabs down"
             className="absolute bottom-0 left-0 right-0 z-10 py-1 rounded-none border-t"
             disabled={!canScrollDown}
             onClick={scrollDown}

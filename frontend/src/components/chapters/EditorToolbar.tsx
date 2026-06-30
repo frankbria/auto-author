@@ -49,7 +49,13 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   }
 
   return (
-    <div className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center">
+    // role="toolbar" + aria-label groups these controls; each icon-only button needs
+    // its own aria-label (title alone is an unreliable accessible name for screen readers).
+    <div
+      role="toolbar"
+      aria-label="Text formatting"
+      className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center"
+    >
       <Button
         variant="ghost"
         size="sm"
@@ -59,6 +65,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('bold') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Bold"
+        aria-label="Bold"
+        aria-pressed={editor.isActive('bold')}
         type="button"
       >
         <HugeiconsIcon icon={TextBoldIcon} size={16} />
@@ -73,6 +81,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('italic') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Italic"
+        aria-label="Italic"
+        aria-pressed={editor.isActive('italic')}
         type="button"
       >
         <HugeiconsIcon icon={TextItalicIcon} size={16} />
@@ -87,6 +97,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('underline') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Underline"
+        aria-label="Underline"
+        aria-pressed={editor.isActive('underline')}
         type="button"
       >
         <HugeiconsIcon icon={TextUnderlineIcon} size={16} />
@@ -101,6 +113,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('strike') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Strikethrough"
+        aria-label="Strikethrough"
+        aria-pressed={editor.isActive('strike')}
         type="button"
       >
         <HugeiconsIcon icon={Strikethrough} size={16} />
@@ -117,6 +131,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('heading', { level: 1 }) ? 'bg-muted' : 'bg-transparent'
         )}
         title="Heading 1"
+        aria-label="Heading 1"
+        aria-pressed={editor.isActive('heading', { level: 1 })}
         type="button"
       >
         <HugeiconsIcon icon={Heading01Icon} size={16} />
@@ -131,6 +147,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('heading', { level: 2 }) ? 'bg-muted' : 'bg-transparent'
         )}
         title="Heading 2"
+        aria-label="Heading 2"
+        aria-pressed={editor.isActive('heading', { level: 2 })}
         type="button"
       >
         <HugeiconsIcon icon={Heading02Icon} size={16} />
@@ -145,6 +163,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('heading', { level: 3 }) ? 'bg-muted' : 'bg-transparent'
         )}
         title="Heading 3"
+        aria-label="Heading 3"
+        aria-pressed={editor.isActive('heading', { level: 3 })}
         type="button"
       >
         <HugeiconsIcon icon={Heading03Icon} size={16} />
@@ -161,6 +181,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('bulletList') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Bullet List"
+        aria-label="Bullet List"
+        aria-pressed={editor.isActive('bulletList')}
         type="button"
       >
         <HugeiconsIcon icon={ListViewIcon} size={16} />
@@ -175,6 +197,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('orderedList') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Ordered List"
+        aria-label="Ordered List"
+        aria-pressed={editor.isActive('orderedList')}
         type="button"
       >
         <HugeiconsIcon icon={MenuSquareIcon} size={16} />
@@ -189,6 +213,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('blockquote') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Blockquote"
+        aria-label="Blockquote"
+        aria-pressed={editor.isActive('blockquote')}
         type="button"
       >
         <HugeiconsIcon icon={QuoteUpIcon} size={16} />
@@ -203,6 +229,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           editor.isActive('codeBlock') ? 'bg-muted' : 'bg-transparent'
         )}
         title="Code Block"
+        aria-label="Code Block"
+        aria-pressed={editor.isActive('codeBlock')}
         type="button"
       >
         <HugeiconsIcon icon={CodeIcon} size={16} />
@@ -217,6 +245,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         disabled={!editor.can().chain().focus().undo().run()}
         className="h-11 w-11 p-0 bg-transparent"
         title="Undo"
+        aria-label="Undo"
         type="button"
       >
         <HugeiconsIcon icon={Undo02Icon} size={16} />
@@ -229,6 +258,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         disabled={!editor.can().chain().focus().redo().run()}
         className="h-11 w-11 p-0 bg-transparent"
         title="Redo"
+        aria-label="Redo"
         type="button"
       >
         <HugeiconsIcon icon={Redo02Icon} size={16} />
@@ -240,6 +270,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         onClick={() => editor.chain().focus().setHorizontalRule().run()}
         className="h-11 w-11 p-0 bg-transparent"
         title="Horizontal Rule"
+        aria-label="Horizontal Rule"
         type="button"
       >
         <HugeiconsIcon icon={MinusSignIcon} size={16} />

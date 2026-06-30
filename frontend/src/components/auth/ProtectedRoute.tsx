@@ -39,12 +39,23 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <>{children}</>;
   }
 
-  // Show nothing while loading or if not authenticated
+  // While loading/redirecting, still render the <main id="main-content"> landmark
+  // so the global skip link always has a target (and the page has a main landmark).
   if (isPending || !session) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex items-center justify-center min-h-screen"
+      >
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Loading…</span>
+          <div
+            className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"
+            aria-hidden="true"
+          ></div>
+        </div>
+      </main>
     );
   }
 

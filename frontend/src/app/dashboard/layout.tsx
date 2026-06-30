@@ -38,7 +38,7 @@ export default function DashboardLayout({
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-4">
-              <nav>
+              <nav aria-label="Main navigation">
                 <ul className="flex items-center gap-6">
                   {navItems.map((item) => (
                     <li key={item.name}>
@@ -108,7 +108,7 @@ export default function DashboardLayout({
                     </button>
                   </div>
 
-                  <nav>
+                  <nav aria-label="Mobile navigation">
                     <ul className="space-y-4">
                       {navItems.map((item) => (
                         <li key={item.name}>
@@ -134,9 +134,9 @@ export default function DashboardLayout({
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 bg-gray-950">
+        <main id="main-content" tabIndex={-1} className="flex-1 bg-gray-950">
           {children}
-        </div>
+        </main>
 
         {/* Footer */}
         <footer className="bg-gray-900 border-t border-gray-800 py-4 px-6">

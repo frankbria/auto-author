@@ -401,4 +401,41 @@ describe('DeleteBookModal', () => {
       });
     });
   });
+
+  describe('Accessibility (#50)', () => {
+    it('submits via Enter key when the confirmation matches', async () => {
+      const user = userEvent.setup();
+      render(<DeleteBookModal {...defaultProps} />);
+
+      const input = screen.getByLabelText(/to confirm/i);
+      await user.type(input, 'My Test Book{Enter}');
+
+      await waitFor(() => {
+        expect(mockOnConfirm).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('does NOT submit via Enter when the confirmation does not match', async () => {
+      const user = userEvent.setup();
+      render(<DeleteBookModal {...defaultProps} />);
+
+      const input = screen.getByLabelText(/to confirm/i);
+      await user.type(input, 'wrong title{Enter}');
+
+      expect(mockOnConfirm).not.toHaveBeenCalled();
+    });
+
+    it('marks the input invalid and announces the mismatch error', async () => {
+      const user = userEvent.setup();
+      render(<DeleteBookModal {...defaultProps} />);
+
+      const input = screen.getByLabelText(/to confirm/i);
+      await user.type(input, 'wrong');
+
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      const error = screen.getByRole('alert');
+      expect(error).toHaveTextContent(/must match exactly/i);
+      expect(input).toHaveAttribute('aria-describedby', error.id);
+    });
+  });
 });
