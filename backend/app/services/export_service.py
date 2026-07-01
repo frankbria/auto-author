@@ -772,6 +772,15 @@ class ExportService:
         else:
             # ponytail: no html2text — reuse the block-preserving tag strip.
             md = self._clean_html_content(content)
+        # Push the chapter's own headings below its '##' chapter heading so an
+        # embedded <h1> can't outrank the book title / chapter heading (issue
+        # #61: proper heading hierarchy). Offset every ATX heading by 2, cap 6.
+        md = re.sub(
+            r'^(#{1,6})(?= )',
+            lambda m: '#' * min(6, len(m.group(1)) + 2),
+            md,
+            flags=re.MULTILINE,
+        )
         return re.sub(r'\n{3,}', '\n\n', md).strip()
 
     def _chapter_markdown(self, chapter: Dict, index: int) -> str:

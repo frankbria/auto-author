@@ -227,6 +227,10 @@ class TestExportService:
         # HTML content is converted to Markdown (bold, list survive).
         assert "**first chapter**" in text
         assert "Item 1" in text
+        # A chapter's own <h1>Welcome</h1> must not become a top-level '#'
+        # heading that outranks the book title (proper hierarchy, issue #61).
+        assert "\n# Welcome" not in text
+        assert "### Welcome" in text
 
     @pytest.mark.asyncio
     async def test_generate_markdown_preserves_images(self):

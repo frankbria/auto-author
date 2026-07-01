@@ -432,12 +432,12 @@ async def export_book_markdown(
     except ExportUnavailableError as e:
         logger.warning("Markdown export unavailable: %s", e)
         raise HTTPException(status_code=503, detail=str(e)) from e
-    except Exception:
+    except Exception as e:
         logger.error("Failed to generate Markdown", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Failed to generate Markdown"
-        )
+        ) from e
 
 
 @router.get("/formats")
