@@ -6,7 +6,7 @@
 /**
  * Available export formats
  */
-export type ExportFormat = 'pdf' | 'docx' | 'epub';
+export type ExportFormat = 'pdf' | 'docx' | 'epub' | 'markdown';
 
 /**
  * Page size options for PDF export
@@ -67,6 +67,8 @@ export interface ExportOptions {
   templateId?: string;
   /** Template customization overrides (only meaningful with templateId) */
   customization?: TemplateCustomization;
+  /** Markdown only: export one file per chapter as a ZIP (issue #61) */
+  markdownMultiFile?: boolean;
 }
 
 /**

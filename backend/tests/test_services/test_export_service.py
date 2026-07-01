@@ -213,6 +213,66 @@ class TestExportService:
         assert b"Empty Chapter" not in epub_bytes
 
     @pytest.mark.asyncio
+    async def test_generate_markdown_single_file(self, sample_book_data):
+        """Single-file Markdown has a title H1, chapter headings, and content."""
+        chapters = export_service._select_chapters(sample_book_data, False)
+        md_bytes = await export_service.generate_markdown(sample_book_data, chapters)
+
+        assert isinstance(md_bytes, bytes)
+        text = md_bytes.decode('utf-8')
+        # Book title is the top-level heading.
+        assert text.startswith("# Test Book")
+        # Chapters render with their own heading level below the book title.
+        assert "## Chapter 1: Introduction" in text
+        # HTML content is converted to Markdown (bold, list survive).
+        assert "**first chapter**" in text
+        assert "Item 1" in text
+
+    @pytest.mark.asyncio
+    async def test_generate_markdown_preserves_images(self):
+        """<img> tags convert to Markdown image syntax with correct paths."""
+        book = {
+            "title": "Img Book",
+            "table_of_contents": {"chapters": [{
+                "id": "c1", "title": "Pics",
+                "content": '<p><img src="https://ex.com/a.png" alt="Alt"></p>',
+            }]},
+        }
+        chapters = export_service._select_chapters(book, False)
+        text = (await export_service.generate_markdown(book, chapters)).decode('utf-8')
+        assert "![Alt](https://ex.com/a.png)" in text
+
+    @pytest.mark.asyncio
+    async def test_generate_markdown_multi_file(self, sample_book_data):
+        """Multi-file mode returns a ZIP with one .md per chapter."""
+        import zipfile
+        from io import BytesIO
+
+        chapters = export_service._select_chapters(sample_book_data, False)
+        zip_bytes = await export_service.generate_markdown(
+            sample_book_data, chapters, multi_file=True
+        )
+
+        assert zip_bytes.startswith(b'PK')
+        with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
+            names = zf.namelist()
+            assert all(n.endswith('.md') for n in names)
+            assert len(names) == len(chapters)
+            assert any('introduction' in n for n in names)
+            assert b"**first chapter**" in zf.read(names[0])
+
+    @pytest.mark.asyncio
+    async def test_export_book_markdown(self, sample_book_data):
+        """Complete book export to Markdown via the dispatcher."""
+        md_bytes = await export_service.export_book(
+            sample_book_data, format="markdown", include_empty_chapters=False
+        )
+        text = md_bytes.decode('utf-8')
+        assert "# Test Book" in text
+        # Empty chapter excluded by default.
+        assert "Empty Chapter" not in text
+
+    @pytest.mark.asyncio
     async def test_export_exclude_empty_chapters(self, sample_book_data):
         """Test that empty chapters are excluded when requested."""
         # Export without empty chapters
@@ -378,6 +438,13 @@ class TestExportAvailabilityGuards:
         monkeypatch.setattr(es, "EPUB_AVAILABLE", False)
         with pytest.raises(es.ExportUnavailableError, match="ebooklib"):
             await es.export_service.generate_epub({"title": "x"}, [])
+
+    @pytest.mark.asyncio
+    async def test_generate_markdown_raises_when_html2text_unavailable(self, monkeypatch):
+        import app.services.export_service as es
+        monkeypatch.setattr(es, "HTML2TEXT_AVAILABLE", False)
+        with pytest.raises(es.ExportUnavailableError, match="html2text"):
+            await es.export_service.generate_markdown({"title": "x"}, [])
 
     def test_clean_html_falls_back_without_html2text(self):
         import app.services.export_service as es

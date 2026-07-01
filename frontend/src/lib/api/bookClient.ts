@@ -1705,6 +1705,39 @@ export class BookClient {
   }
 
   /**
+   * Export book as Markdown (single .md file, or a .zip of per-chapter files)
+   */
+  public async exportMarkdown(
+    bookId: string,
+    options?: {
+      includeEmptyChapters?: boolean;
+      multiFile?: boolean;
+    }
+  ): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (options?.includeEmptyChapters !== undefined) {
+      params.append('include_empty_chapters', options.includeEmptyChapters.toString());
+    }
+    if (options?.multiFile !== undefined) {
+      params.append('multi_file', options.multiFile.toString());
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/export/markdown?${params.toString()}`,
+      {
+        headers: await this.getHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      throw await this.exportError(response);
+    }
+
+    return response.blob();
+  }
+
+  /**
    * Get available export formats and book statistics
    */
   public async getExportFormats(bookId: string): Promise<{

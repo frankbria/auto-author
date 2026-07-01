@@ -729,6 +729,103 @@ class ExportService:
         output.seek(0)
         return output.getvalue()
 
+    async def generate_markdown(
+        self,
+        book_data: Dict,
+        chapters: List[Dict],
+        multi_file: bool = False,
+    ) -> bytes:
+        """
+        Generate Markdown from book data and chapters.
+
+        ``multi_file=False`` returns a single ``.md`` file (UTF-8 bytes);
+        ``multi_file=True`` returns a ZIP archive with one ``NN-slug.md`` per
+        chapter. Runs in a worker thread so large books don't block the loop and
+        an outer asyncio timeout can cancel — same pattern as PDF/DOCX/EPUB.
+        """
+        return await asyncio.to_thread(
+            self._build_markdown, book_data, chapters, multi_file
+        )
+
+    @staticmethod
+    def _slugify(text: str) -> str:
+        """Lowercase, hyphenate, strip non-word chars for safe filenames."""
+        slug = re.sub(r'[^\w\s-]', '', (text or '').lower()).strip()
+        slug = re.sub(r'[\s_-]+', '-', slug).strip('-')
+        return slug or 'chapter'
+
+    def _content_to_markdown(self, content: str) -> str:
+        """Convert chapter HTML to Markdown, preserving images and links.
+
+        Uses a dedicated html2text instance with ``ignore_images=False`` so
+        ``<img>`` becomes ``![alt](src)`` (issue #61 AC: images referenced with
+        correct paths), unlike the shared text-extraction converter.
+        """
+        if not content:
+            return "*(No content yet)*"
+        if HTML2TEXT_AVAILABLE:
+            h2t = html2text.HTML2Text()
+            h2t.ignore_links = False
+            h2t.ignore_images = False
+            h2t.body_width = 0
+            md = h2t.handle(content)
+        else:
+            # ponytail: no html2text — reuse the block-preserving tag strip.
+            md = self._clean_html_content(content)
+        return re.sub(r'\n{3,}', '\n\n', md).strip()
+
+    def _chapter_markdown(self, chapter: Dict, index: int) -> str:
+        """Render one chapter to Markdown (heading level tracks nesting depth)."""
+        title = chapter.get('title', f'Chapter {index}')
+        # level 1 chapter -> '##' (book title owns '#'); deeper nests indent.
+        heading = '#' * min(6, chapter.get('level', 1) + 1)
+        parts = [f"{heading} Chapter {index}: {title}"]
+        if chapter.get('description'):
+            parts.append(f"*{chapter['description']}*")
+        parts.append(self._content_to_markdown(chapter.get('content', '')))
+        return "\n\n".join(parts)
+
+    def _build_markdown(
+        self, book_data: Dict, chapters: List[Dict], multi_file: bool = False
+    ) -> bytes:
+        if not HTML2TEXT_AVAILABLE:
+            raise ExportUnavailableError(
+                "Markdown export unavailable: html2text is not installed"
+            )
+
+        if multi_file:
+            output = io.BytesIO()
+            import zipfile
+            with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for i, chapter in enumerate(chapters, 1):
+                    name = f"{i:02d}-{self._slugify(chapter.get('title', ''))}.md"
+                    zf.writestr(name, self._chapter_markdown(chapter, i) + "\n")
+            output.seek(0)
+            return output.getvalue()
+
+        lines = [f"# {book_data.get('title', 'Untitled')}"]
+        if book_data.get('subtitle'):
+            # Emphasis, not a heading: the subtitle shouldn't compete with
+            # chapter headings in a Markdown viewer's outline.
+            lines.append(f"*{book_data['subtitle']}*")
+        author = book_data.get('author_name') or book_data.get('owner_name')
+        if author:
+            lines.append(f"by {author}")
+        metadata_parts = []
+        if book_data.get('genre'):
+            metadata_parts.append(f"Genre: {book_data['genre']}")
+        if book_data.get('target_audience'):
+            metadata_parts.append(f"Target Audience: {book_data['target_audience']}")
+        if metadata_parts:
+            lines.append(' • '.join(metadata_parts))
+        if book_data.get('description'):
+            lines.append(book_data['description'])
+
+        for i, chapter in enumerate(chapters, 1):
+            lines.append(self._chapter_markdown(chapter, i))
+
+        return ("\n\n".join(lines).strip() + "\n").encode('utf-8')
+
     def _flatten_chapters(self, chapters: List[Dict], level: int = 1) -> List[Dict]:
         """Flatten nested chapter structure for export."""
         flattened = []
@@ -810,6 +907,7 @@ class ExportService:
         timeout_seconds: Optional[float] = None,
         template_id: Optional[str] = None,
         custom_options: Optional[Dict] = None,
+        multi_file: bool = False,
     ) -> bytes:
         """
         Export a book in the specified format.
@@ -842,6 +940,11 @@ class ExportService:
         elif fmt == 'epub':
             # EPUB has its own reflowable layout — no page_size/template styling.
             generator = self.generate_epub(book_data, flattened_chapters)
+        elif fmt in ('markdown', 'md'):
+            # Markdown is plain text — no page_size/template styling.
+            generator = self.generate_markdown(
+                book_data, flattened_chapters, multi_file=multi_file
+            )
         else:
             raise ValueError(f"Unsupported export format: {format}")
 
