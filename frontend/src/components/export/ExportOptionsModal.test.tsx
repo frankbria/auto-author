@@ -102,6 +102,55 @@ describe('ExportOptionsModal', () => {
     expect(screen.queryByLabelText(/A4.*International Standard/i)).not.toBeInTheDocument();
   });
 
+  it('should render a Markdown format option', async () => {
+    render(
+      <ExportOptionsModal
+        bookId={mockBookId}
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        onExport={mockOnExport}
+      />
+    );
+
+    expect(await screen.findByLabelText(/^Markdown$/i)).toBeInTheDocument();
+  });
+
+  it('should call onExport with Markdown format and multi-file flag', async () => {
+    render(
+      <ExportOptionsModal
+        bookId={mockBookId}
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        onExport={mockOnExport}
+      />
+    );
+
+    fireEvent.click(await screen.findByLabelText(/^Markdown$/i));
+    // The multi-file switch only appears for Markdown.
+    fireEvent.click(screen.getByLabelText(/Separate File Per Chapter/i));
+    fireEvent.click(screen.getByRole('button', { name: /export markdown/i }));
+
+    expect(mockOnExport).toHaveBeenCalledWith({
+      format: 'markdown',
+      includeEmptyChapters: false,
+      markdownMultiFile: true,
+    });
+  });
+
+  it('should hide the multi-file switch for non-Markdown formats', async () => {
+    render(
+      <ExportOptionsModal
+        bookId={mockBookId}
+        isOpen={true}
+        onOpenChange={mockOnOpenChange}
+        onExport={mockOnExport}
+      />
+    );
+
+    await screen.findByLabelText(/PDF Document/i);
+    expect(screen.queryByLabelText(/Separate File Per Chapter/i)).not.toBeInTheDocument();
+  });
+
   it('should call onExport with selected PDF format and default options', async () => {
     render(
       <ExportOptionsModal

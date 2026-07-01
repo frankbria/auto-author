@@ -196,6 +196,51 @@ class TestExportEndpoints:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
+    async def test_export_markdown_success(self, test_book_with_content):
+        """Test successful single-file Markdown export."""
+        client, book_id = test_book_with_content
+
+        response = await client.get(f"/api/v1/books/{book_id}/export/markdown")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/markdown")
+        assert ".md" in response.headers.get("content-disposition", "")
+        # Book content converted to Markdown.
+        assert response.content.decode("utf-8").startswith("# ")
+
+    @pytest.mark.asyncio
+    async def test_export_markdown_multi_file(self, test_book_with_content):
+        """multi_file=true returns a ZIP archive of per-chapter Markdown files."""
+        client, book_id = test_book_with_content
+
+        response = await client.get(
+            f"/api/v1/books/{book_id}/export/markdown?multi_file=true"
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/zip"
+        assert ".zip" in response.headers.get("content-disposition", "")
+        assert response.content.startswith(b"PK")
+
+    @pytest.mark.asyncio
+    async def test_export_markdown_not_owner(self, auth_client_factory):
+        """A non-owner gets 403 on Markdown export (ownership enforced)."""
+        client1 = await auth_client_factory()
+        response = await client1.post("/api/v1/books/", json={"title": "Private MD"})
+        book_id = response.json()["id"]
+
+        client2 = await auth_client_factory(overrides={"auth_id": "different_auth_id"})
+        response = await client2.get(f"/api/v1/books/{book_id}/export/markdown")
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_export_markdown_book_not_found(self, auth_client_factory):
+        """Markdown export of a missing book returns 404."""
+        client = await auth_client_factory()
+        response = await client.get("/api/v1/books/nonexistent_id/export/markdown")
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
     async def test_export_formats_endpoint(self, test_book_with_content):
         """Test the export formats information endpoint."""
         client, book_id = test_book_with_content
@@ -206,7 +251,7 @@ class TestExportEndpoints:
         data = response.json()
 
         assert "formats" in data
-        assert len(data["formats"]) == 3
+        assert len(data["formats"]) == 4
 
         # Check PDF format
         pdf_format = next(f for f in data["formats"] if f["format"] == "pdf")
@@ -224,6 +269,13 @@ class TestExportEndpoints:
         assert epub_format["name"] == "EPUB Ebook"
         assert epub_format["extension"] == ".epub"
         assert epub_format["mime_type"] == "application/epub+zip"
+
+        # Check Markdown format
+        md_format = next(f for f in data["formats"] if f["format"] == "markdown")
+        assert md_format["name"] == "Markdown Document"
+        assert md_format["extension"] == ".md"
+        assert md_format["mime_type"] == "text/markdown"
+        assert "multi_file" in md_format["options"]
 
         # Check book stats
         assert "book_stats" in data
@@ -404,6 +456,7 @@ class TestExportAvailability:
             "pdf": export_endpoint.PDF_AVAILABLE,
             "docx": export_endpoint.DOCX_AVAILABLE,
             "epub": export_endpoint.EPUB_AVAILABLE,
+            "markdown": export_endpoint.HTML2TEXT_AVAILABLE,
         }
         for fmt in data["formats"]:
             assert "available" in fmt

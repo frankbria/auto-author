@@ -236,6 +236,11 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           return await bookClient.exportEPUB(bookId, {
             includeEmptyChapters: options.includeEmptyChapters,
           });
+        } else if (options.format === 'markdown') {
+          return await bookClient.exportMarkdown(bookId, {
+            includeEmptyChapters: options.includeEmptyChapters,
+            multiFile: options.markdownMultiFile,
+          });
         } else {
           return await bookClient.exportDOCX(bookId, {
             includeEmptyChapters: options.includeEmptyChapters,
@@ -264,8 +269,11 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       // Success!
       setExportProgress(100);
 
-      // Generate filename and download
-      const filename = generateFilename(book.title, options.format);
+      // Generate filename and download. Multi-file Markdown downloads a ZIP.
+      const filename =
+        options.format === 'markdown' && options.markdownMultiFile
+          ? generateFilename(book.title, 'markdown', 'zip')
+          : generateFilename(book.title, options.format);
       setExportFilename(filename);
       downloadBlob(result.data, filename);
 

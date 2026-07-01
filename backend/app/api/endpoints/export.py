@@ -17,6 +17,7 @@ from app.services.export_service import (
     PDF_AVAILABLE,
     DOCX_AVAILABLE,
     EPUB_AVAILABLE,
+    HTML2TEXT_AVAILABLE,
 )
 from app.services.export_templates import list_templates
 from app.services.chapter_access_service import chapter_access_service
@@ -341,6 +342,104 @@ async def export_book_epub(
         )
 
 
+@router.get("/markdown")
+async def export_book_markdown(
+    book_id: str,
+    current_user: Dict = Depends(get_current_user_from_session),
+    include_empty_chapters: bool = Query(
+        False,
+        description="Include chapters without content"
+    ),
+    multi_file: bool = Query(
+        False,
+        description="Export one Markdown file per chapter as a ZIP archive"
+    ),
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 exports per hour
+):
+    """
+    Export a book as Markdown.
+
+    Returns a single ``.md`` file, or (with ``multi_file=true``) a ZIP archive
+    containing one Markdown file per chapter — ideal for version control and
+    platform compatibility.
+    """
+    # Get book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to export this book"
+        )
+
+    # Log the export request
+    try:
+        await chapter_access_service.log_access(
+            user_id=current_user.get("auth_id"),
+            book_id=book_id,
+            chapter_id=None,  # Book-level access
+            access_type="export_markdown",
+            metadata={
+                "include_empty_chapters": include_empty_chapters,
+                "multi_file": multi_file,
+                "export_timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    except Exception:
+        logger.error("Failed to log export access", exc_info=True)
+
+    try:
+        # Generate Markdown
+        md_content = await export_service.export_book(
+            book_data=book,
+            format="markdown",
+            include_empty_chapters=include_empty_chapters,
+            timeout_seconds=settings.EXPORT_TIMEOUT_SECONDS,
+            multi_file=multi_file,
+        )
+
+        # Create filename
+        safe_title = "".join(
+            c for c in book.get("title", "untitled")
+            if c.isalnum() or c in (' ', '-', '_')
+        ).rstrip()
+        if multi_file:
+            filename = f"{safe_title}_chapters.zip"
+            media_type = "application/zip"
+        else:
+            filename = f"{safe_title}.md"
+            media_type = "text/markdown"
+
+        # Return as streaming response
+        return StreamingResponse(
+            io.BytesIO(md_content),
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(md_content)),
+            }
+        )
+
+    except ExportValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ExportTimeoutError as e:
+        logger.warning("Markdown export timed out for book %s", book_id)
+        raise HTTPException(status_code=504, detail=str(e)) from e
+    except ExportUnavailableError as e:
+        logger.warning("Markdown export unavailable: %s", e)
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        logger.error("Failed to generate Markdown", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate Markdown"
+        ) from e
+
+
 @router.get("/formats")
 async def get_export_formats(
     book_id: str,
@@ -396,6 +495,18 @@ async def get_export_formats(
                 "available": EPUB_AVAILABLE,
                 "options": {
                     "include_empty_chapters": "boolean"
+                }
+            },
+            {
+                "format": "markdown",
+                "name": "Markdown Document",
+                "description": "Markdown format - ideal for version control and platform compatibility",
+                "mime_type": "text/markdown",
+                "extension": ".md",
+                "available": HTML2TEXT_AVAILABLE,
+                "options": {
+                    "include_empty_chapters": "boolean",
+                    "multi_file": "boolean"
                 }
             }
         ],

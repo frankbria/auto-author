@@ -53,15 +53,20 @@ export function downloadBlob(blob: Blob, filename: string): void {
  * // Returns: 'my-book-a-story.pdf'
  * ```
  */
-export function generateFilename(bookTitle: string, format: ExportFormat): string {
+export function generateFilename(
+  bookTitle: string,
+  format: ExportFormat,
+  extensionOverride?: string
+): string {
   // Sanitize title: lowercase, replace spaces/special chars with hyphens
   const sanitized = bookTitle
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 
-  // Add extension
-  return `${sanitized}.${format}`;
+  // 'markdown' uses the conventional .md extension; multi-file passes 'zip'.
+  const extension = extensionOverride ?? (format === 'markdown' ? 'md' : format);
+  return `${sanitized}.${extension}`;
 }
 
 /**
@@ -108,10 +113,10 @@ export function validateExportOptions(
   bookTitle?: string
 ): { isValid: boolean; error?: string } {
   // Check format
-  if (!['pdf', 'docx'].includes(format)) {
+  if (!['pdf', 'docx', 'epub', 'markdown'].includes(format)) {
     return {
       isValid: false,
-      error: 'Invalid export format. Must be "pdf" or "docx".',
+      error: 'Invalid export format. Must be "pdf", "docx", "epub", or "markdown".',
     };
   }
 

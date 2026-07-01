@@ -88,9 +88,10 @@ const FORMATS_BODY = {
 };
 
 test.describe('Export templates (issue #59)', () => {
-  // The export options dialog is tall once the template list is added; use a
-  // viewport that fits its footer so the "Export PDF" action stays reachable.
-  test.use({ viewport: { width: 1280, height: 1500 } });
+  // The export options dialog is tall once the template list plus all four
+  // format cards (PDF/DOCX/EPUB/Markdown) are added; use a viewport that fits
+  // its footer so the "Export PDF" action stays reachable.
+  test.use({ viewport: { width: 1280, height: 1700 } });
 
   test.skip(
     ({ browserName }) => browserName === 'webkit',

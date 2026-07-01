@@ -67,6 +67,7 @@ export function ExportOptionsModal({
   const [format, setFormat] = useState<ExportFormat>('pdf');
   const [pageSize, setPageSize] = useState<PageSize>('letter');
   const [includeEmptyChapters, setIncludeEmptyChapters] = useState(false);
+  const [markdownMultiFile, setMarkdownMultiFile] = useState(false);
 
   // Template state (issue #59)
   const [templates, setTemplates] = useState<ExportTemplate[]>([]);
@@ -107,6 +108,8 @@ export function ExportOptionsModal({
       includeEmptyChapters,
       // A template defines its own page size, so don't also send pageSize.
       pageSize: format === 'pdf' && !templateId ? pageSize : undefined,
+      // Multi-file only applies to Markdown.
+      ...(format === 'markdown' ? { markdownMultiFile } : {}),
       // Only attach template fields when a template is actually selected, so the
       // default export payload stays unchanged (legacy behaviour preserved).
       ...(templateId
@@ -236,8 +239,43 @@ export function ExportOptionsModal({
                 </div>
                 <HugeiconsIcon icon={File01Icon} size={20} className="text-green-500" />
               </div>
+
+              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent">
+                <RadioGroupItem value="markdown" id="format-markdown" />
+                <div className="flex-1">
+                  <Label
+                    htmlFor="format-markdown"
+                    className="font-medium cursor-pointer"
+                  >
+                    Markdown
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Plain-text Markdown - ideal for version control and platform compatibility.
+                  </p>
+                </div>
+                <HugeiconsIcon icon={File01Icon} size={20} className="text-gray-500" />
+              </div>
             </RadioGroup>
           </div>
+
+          {/* Multi-file option (Markdown only) */}
+          {format === 'markdown' && (
+            <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+              <div className="space-y-0.5 flex-1">
+                <Label htmlFor="markdown-multi-file" className="text-base cursor-pointer">
+                  Separate File Per Chapter
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Export each chapter as its own .md file inside a ZIP archive
+                </p>
+              </div>
+              <Switch
+                id="markdown-multi-file"
+                checked={markdownMultiFile}
+                onCheckedChange={setMarkdownMultiFile}
+              />
+            </div>
+          )}
 
           {/* Page Size (PDF only) */}
           {format === 'pdf' && (

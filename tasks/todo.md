@@ -1,51 +1,27 @@
-# Issue #94 (P3.1) — Decompose books.py: map + extract chapters slice
+# Issue #61 — [P3.3] Implement Markdown export format
 
-**Branch**: `feature/issue-94-decompose-books-chapters`
-**Type**: tech-debt / behavior-preserving move. NOT a redesign.
+**Branch**: `feature/issue-61-markdown-export`
+Mirror the EPUB pattern (#147). Fourth export format alongside PDF/DOCX/EPUB.
 
-## Context (drift re-derived)
-- `books.py` is now **3,496 lines** (plan was written at 3,184; drift confirmed, ranges re-derived).
-- 43 route handlers, no module-level helper functions (every `async def` is a route handler).
-- The chapter-management cluster is a **contiguous block, lines 1440–1994**
-  (`# Individual Chapter CRUD Operations` → end of `save_tab_state`), fully self-contained
-  (uses only module imports; no shared local helpers).
+## Scope decisions (adapted from Traycer/CodeRabbit plans)
+- **Keep**: single-file `.md` + multi-file `.zip` (AC explicitly requires "single file vs. multiple files"); images preserved (`ignore_images=False`); `/markdown` endpoint; `/formats` entry.
+- **Drop (YAGNI)**: GFM-vs-standard flavor toggle — not in AC; html2text output is already standard/GitHub-compatible Markdown.
+- **Leave alone**: dedicated `export/page.tsx` (only does pdf/docx, already lacks EPUB — same as #147 left it). Primary path is `page.tsx` → `ExportOptionsModal`.
 
-## Chapters slice = 9 handlers moving to `chapters.py`
-create_chapter, get_chapters_metadata, get_tab_state, get_chapter, update_chapter,
-delete_chapter, list_chapters, update_chapter_status_bulk, save_tab_state.
-(Content/analytics/batch-content, questions, drafts stay — each a future slice.)
+## Backend
+- [ ] `export_service.generate_markdown(book_data, chapters, multi_file=False)` → async, `asyncio.to_thread(_build_markdown)`. Single: UTF-8 `# title` + metadata + `## Chapter N: title` + html2text(content, images on). Multi: zip of `NN-slug.md` per chapter. Guard `HTML2TEXT_AVAILABLE` → `ExportUnavailableError`.
+- [ ] `export_book()`: add `multi_file` param + `'markdown'`/`'md'` dispatch.
+- [ ] `/markdown` endpoint (mirror EPUB): `include_empty_chapters` + `multi_file` query; auth/ownership/rate-limit; `text/markdown` or `application/zip`; `access_type="export_markdown"`.
+- [ ] `/formats`: add markdown entry (`available: HTML2TEXT_AVAILABLE`, options incl. `multi_file`).
+- [ ] Tests: service + endpoint. Update `len(formats)==3`->`4` + availability dict.
 
-## Steps
-- [x] Step 1 — Decomposition map -> `plans/010-books-decomposition-map.md` (deliverable)
-- [x] Step 2 — Route-table snapshot before change (`/tmp/routes_before.txt`, 69 routes)
-- [x] Step 3 — Characterization safety net (`test_chapters_characterization.py` route-table identity + existing CRUD/content suites)
-- [x] Step 4 — Extracted `chapters.py`; removed moved handlers from `books.py` (3496→2938); trimmed 10 orphaned imports; wired `router.py`
-- [x] Step 5 — Routes byte-identical (69, diff clean); full suite **961 passed / 15 skipped, 92.38% cov**; net-new ruff issues cleared
+## Frontend
+- [ ] `ExportFormat` += `'markdown'`; `ExportOptions` += `markdownMultiFile?`.
+- [ ] `ExportOptionsModal`: markdown radio option + "Separate file per chapter" switch (markdown-only).
+- [ ] `bookClient.exportMarkdown(bookId, {includeEmptyChapters, multiFile})`.
+- [ ] `page.tsx` handleExport: route markdown; filename `.md` (single) / `.zip` (multi).
+- [ ] `generateFilename`: map `markdown`->`md`. Fix stale `validateExportOptions` allowlist.
+- [ ] Tests: modal option + switch; bookClient URL; generateFilename md.
 
-## Result
-- `books.py`: 3,496 → 2,938 lines (−558); 43 → 34 handlers
-- `chapters.py`: new, 9 handlers, 87% covered
-- Route table (method, path) **byte-identical** before/after
-
-## Acceptance criteria (from issue)
-- [ ] `plans/010-books-decomposition-map.md` catalogs all handlers by cluster + line range
-- [ ] `chapters.py` holds the chapter handlers; `books.py` no longer contains them
-- [ ] (method, path) route set byte-identical before/after
-- [ ] Characterization tests pass before AND after extraction
-- [ ] `books.py` line count meaningfully reduced (report before/after)
-- [ ] `ruff check app/` exit 0; `pytest tests/` no NEW failures
-- [ ] No URL/schema/status-code changes; no out-of-scope files touched
-
-## Autonomous decisions (no architectural fork)
-1. **Characterization tests**: an equivalent behavioral suite already exists
-   (`test_books_chapters_crud_coverage.py` + `test_books_chapter_content_coverage.py`
-   cover CRUD/metadata/bulk-status/tab-state, happy/auth/not-owned/404). Rather than
-   duplicate ~740 lines, add a lean `test_chapters_characterization.py` whose unique
-   value is the **route-table identity** assertion (every chapter path still served
-   after the move — the one invariant specific to this refactor) plus tab-state smoke
-   coverage. Existing suites remain the behavioral net (pass before + after).
-2. **Test file location**: `tests/test_api/test_routes/` (where all chapter tests live),
-   not the plan's literal `tests/test_api/` — sibling convention wins.
-3. **Mount**: `router.include_router(chapters.router, prefix="/books", tags=["chapters"])`
-   after the books include; ordering within `chapters.py` preserves metadata/tab-state
-   before `{chapter_id}` so no route shadowing.
+## Gates
+- [ ] Backend pytest --cov >=85; frontend gates 85/85/75/85; lint/typecheck; E2E green; demo AC.
