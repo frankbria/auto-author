@@ -1,7 +1,11 @@
 /**
- * Tests for the ChapterEditor Write / Interview Questions view toggle (#105/#54).
+ * Tests for the ChapterEditor Interview Questions / Chapter Editor tabs (#105/#54/#110).
  * Wiring the interview-questions Q&A panel into the live editor is what makes the
  * #54 "answers persist after refresh" flow reachable in the navigable app.
+ *
+ * #110 replaced the hand-rolled button toggle with Radix Tabs and added
+ * per-chapter sessionStorage persistence + Ctrl+1/Ctrl+2/Ctrl+Tab shortcuts.
+ * The writing/editor view remains the default.
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -32,20 +36,22 @@ describe('ChapterEditor view toggle', () => {
     chapterTitle: 'Test Chapter',
     initialContent: '<p>hi</p>',
   };
+  const storageKey = `chapterQuestionsTab_${props.bookId}_${props.chapterId}`;
 
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
     mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>hi</p>' });
   });
 
-  it('defaults to the write view (editor visible, questions hidden)', async () => {
+  it('defaults to the writing view (editor visible, questions hidden)', async () => {
     render(<ChapterEditor {...props} />);
     await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
     expect(screen.queryByTestId('question-container')).not.toBeInTheDocument();
   });
 
-  it('shows the interview-questions panel when the Questions tab is selected', async () => {
+  it('shows the interview-questions panel when the Interview Questions tab is selected', async () => {
     const user = userEvent.setup();
     render(<ChapterEditor {...props} />);
     await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
@@ -58,7 +64,7 @@ describe('ChapterEditor view toggle', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('returns to the editor when the Write tab is selected again', async () => {
+  it('returns to the editor when the Chapter Editor tab is selected again', async () => {
     const user = userEvent.setup();
     render(<ChapterEditor {...props} />);
     await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
@@ -66,8 +72,29 @@ describe('ChapterEditor view toggle', () => {
     await user.click(screen.getByRole('tab', { name: /interview questions/i }));
     expect(screen.getByTestId('question-container')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: /^write$/i }));
+    await user.click(screen.getByRole('tab', { name: /chapter editor/i }));
     expect(screen.queryByTestId('question-container')).not.toBeInTheDocument();
     expect(screen.getByRole('textbox')).toBeInTheDocument();
+  });
+
+  it('persists the selected tab per chapter in sessionStorage', async () => {
+    const user = userEvent.setup();
+    render(<ChapterEditor {...props} />);
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('tab', { name: /interview questions/i }));
+    expect(sessionStorage.getItem(storageKey)).toBe('questions');
+
+    await user.click(screen.getByRole('tab', { name: /chapter editor/i }));
+    expect(sessionStorage.getItem(storageKey)).toBe('editor');
+  });
+
+  it('restores the interview-questions view from sessionStorage on mount', async () => {
+    sessionStorage.setItem(storageKey, 'questions');
+    render(<ChapterEditor {...props} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('question-container')).toBeInTheDocument()
+    );
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 });
