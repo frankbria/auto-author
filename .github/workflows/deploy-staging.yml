@@ -1,12 +1,16 @@
 name: Deploy to Staging
 
 on:
-  push:
-    branches: [main]
+  # Deploy only after the real test workflow ("Tests and Quality Checks" in
+  # tests.yml) succeeds on main. The old name "Test Suite" matched no workflow,
+  # so this trigger never fired and the removed `push` trigger deployed every
+  # push regardless of test results. See #163.
   workflow_run:
-    workflows: ["Test Suite"]
+    workflows: ["Tests and Quality Checks"]
     types: [completed]
     branches: [main]
+  # Allow on-demand deploys (e.g. server bring-up, re-deploy without a code push).
+  workflow_dispatch:
 
 env:
   NODE_VERSION: '18'
@@ -48,7 +52,8 @@ jobs:
   build-and-deploy:
     name: Build and Deploy to Staging
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
+    # Deploy on a manual dispatch, or when the upstream test workflow passed.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     environment:
       name: staging
@@ -57,6 +62,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Deploy the exact commit that passed "Tests and Quality Checks",
+          # not whatever HEAD happens to be when this workflow_run fires.
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -116,11 +125,20 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
           chmod 600 ~/.ssh/staging_key
-          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+          # NOTE: no `nc` preflight or `ssh-keyscan` here. Those open connections
+          # that close *before authenticating*, which the staging host's
+          # fail2ban (aggressive mode, maxretry=4) counts as attacks — the
+          # nc + 3x keyscan burst hit the threshold and banned the runner every
+          # run (see #162). The scp/ssh steps below authenticate on the first
+          # connection via StrictHostKeyChecking=accept-new, so the runner only
+          # ever makes successful ("Accepted publickey") connections. An
+          # unreachable host now surfaces as a clear scp/ssh failure below.
 
       - name: Upload package to server
         run: |
-          scp -i ~/.ssh/staging_key /tmp/deploy-package.tar.gz \
+          scp -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new \
+            /tmp/deploy-package.tar.gz \
             ${{ secrets.USER }}@${{ secrets.HOST }}:/tmp/
 
       - name: Validate security configuration
@@ -142,7 +160,7 @@ jobs:
 
       - name: Deploy to staging
         run: |
-          ssh -i ~/.ssh/staging_key \
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new \
             ${{ secrets.USER }}@${{ secrets.HOST }} \
             'bash -s' << 'ENDSSH'
           set -euo pipefail
@@ -189,8 +207,13 @@ jobs:
             echo "DATABASE_URL=${{ secrets.MONGODB_URI }}"
             echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}"
             echo ""
-            echo "# CORS Settings"
-            echo "BACKEND_CORS_ORIGINS=[\"$FRONTEND_URL\",\"$API_URL\"]"
+            echo "# CORS Settings — plain comma-separated origins (the app's
+            # config validator splits on ',' for non-JSON values). A quoted
+            # JSON array here gets its quotes mangled by the dotenv reader into
+            # invalid JSON, crashing Settings() on startup. Only the frontend
+            # origin makes cross-origin calls to the API; an API URL with a
+            # /api/v1 path is not a valid Origin, so it is not listed."
+            echo "BACKEND_CORS_ORIGINS=$FRONTEND_URL"
             echo ""
             echo "# OpenAI"
             echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}"
@@ -254,7 +277,11 @@ jobs:
           rm -rf .next
 
           echo "==> Installing frontend dependencies..."
-          npm ci
+          # --include=dev: NODE_ENV=production (exported above) makes `npm ci`
+          # skip devDependencies, but the build needs them — notably typescript,
+          # which `next build` requires to load next.config.ts. Without this the
+          # build fails with "Cannot find module 'typescript'".
+          npm ci --include=dev
 
           echo "==> Building frontend..."
           npm run build

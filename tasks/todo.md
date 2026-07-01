@@ -1,40 +1,27 @@
-# Issue #50 — P2.10 Accessibility (WCAG 2.1 AA)
+# Issue #61 — [P3.3] Implement Markdown export format
 
-Branch: `feature/50-accessibility`. Frontend-only. Driven by the real axe audit + explorer evidence, not blind edits. Solid foundation already exists (Radix, jest-axe 0 violations on 6 components, correct form labels).
+**Branch**: `feature/issue-61-markdown-export`
+Mirror the EPUB pattern (#147). Fourth export format alongside PDF/DOCX/EPUB.
 
-## Scope: concrete, automatable, testable deliverables (mapped to ACs)
+## Scope decisions (adapted from Traycer/CodeRabbit plans)
+- **Keep**: single-file `.md` + multi-file `.zip` (AC explicitly requires "single file vs. multiple files"); images preserved (`ignore_images=False`); `/markdown` endpoint; `/formats` entry.
+- **Drop (YAGNI)**: GFM-vs-standard flavor toggle — not in AC; html2text output is already standard/GitHub-compatible Markdown.
+- **Leave alone**: dedicated `export/page.tsx` (only does pdf/docx, already lacks EPUB — same as #147 left it). Primary path is `page.tsx` → `ExportOptionsModal`.
 
-### A. ARIA labels on icon-only buttons (AC: all interactive elements have ARIA labels)
-- [ ] `components/chapters/EditorToolbar.tsx` — 13 buttons have `title=` but NO `aria-label` (titles aren't read by SRs). Add `aria-label` to each.
-- [ ] `components/chapters/TabBar.tsx` — scroll up/down buttons: add `aria-label`.
-- [ ] `components/chapters/TabOverflowMenu.tsx` — trigger: `aria-label="Show more tabs"`.
-- [ ] `components/ui/user-button.tsx` — avatar trigger: `aria-label="Account menu"`.
-- (Forms already labeled — sign-in/up, BookMetadataForm verified correct → no change.)
+## Backend
+- [ ] `export_service.generate_markdown(book_data, chapters, multi_file=False)` → async, `asyncio.to_thread(_build_markdown)`. Single: UTF-8 `# title` + metadata + `## Chapter N: title` + html2text(content, images on). Multi: zip of `NN-slug.md` per chapter. Guard `HTML2TEXT_AVAILABLE` → `ExportUnavailableError`.
+- [ ] `export_book()`: add `multi_file` param + `'markdown'`/`'md'` dispatch.
+- [ ] `/markdown` endpoint (mirror EPUB): `include_empty_chapters` + `multi_file` query; auth/ownership/rate-limit; `text/markdown` or `application/zip`; `access_type="export_markdown"`.
+- [ ] `/formats`: add markdown entry (`available: HTML2TEXT_AVAILABLE`, options incl. `multi_file`).
+- [ ] Tests: service + endpoint. Update `len(formats)==3`->`4` + availability dict.
 
-### B. Keyboard navigation (AC: full keyboard nav — tab/arrow/enter/escape)
-- [x] ~~Arrow/Home/End roving tab navigation~~ — **DEFERRED (documented)**: `TabBar` renders tabs via react-beautiful-dnd `Draggable`s, which reserve Space/arrow keys for keyboard drag-reorder. Roving arrow nav would conflict and risk breaking accessible reordering. Tabs are already keyboard-operable (each `tabIndex=0`, Enter/Space activates → WCAG 2.1.1 met) + Ctrl+1-9 quick-switch. Arrow roving is an ARIA-APG recommendation, not an AA criterion.
-- [ ] `components/books/DeleteBookModal.tsx` — wrap confirm input + actions in `<form onSubmit>` so Enter submits when confirmation matches.
-
-### C. Landmarks + skip link (AC: skip links available)
-- [ ] `app/layout.tsx` — add a `Skip to main content` link (`sr-only focus:not-sr-only`) at the top; change the wrapper `<main>` to a `<div>` (it's a layout wrapper, and nesting banner/contentinfo inside `main` is an axe violation).
-- [ ] `app/dashboard/layout.tsx` — convert content `<div className="flex-1 bg-gray-950">` to `<main id="main-content">`; add `aria-label` to the `<nav>`s.
-- [ ] `app/page.tsx` + auth `sign-in`/`sign-up` — ensure a single `<main id="main-content">` landmark wraps page content (skip-link target on public pages).
-
-### D. Focus indicators (AC: focus indicators clearly visible)
-- [ ] `app/globals.css` — add a global `*:focus-visible` outline fallback (complements component rings) for elements without their own ring.
-
-### E. Color contrast (AC: contrast meets AA) — narrow; dark theme mostly passes
-- [ ] `components/SummaryInput.tsx:104` `text-gray-500 dark:text-gray-600` help text → bump dark to `gray-400` (gray-600 on dark fails AA). Spot-fix only genuine failures; do NOT mass-swap (most `gray-400` on dark passes ~6:1).
-
-### F. Automated a11y tests (AC: automated a11y tests pass)
-- [ ] Extend `src/__tests__/accessibility/ComponentAccessibilityAudit.test.tsx` — unskip/ add Navigation (dashboard layout), EditorToolbar, and a SkipLink/landmark test (jest-axe → 0 violations).
-- [ ] Unit tests: EditorToolbar aria-labels, ChapterTabs arrow/Home/End nav, DeleteBookModal Enter-submits, skip-link present + targets `#main-content`.
-
-## ACs that are manual/deploy-time (documented, not auto-verifiable here)
-- Lighthouse a11y >95 — deploy/manual (changes only improve it).
-- Screen reader (NVDA/JAWS) announcements — manual; we wire the correct ARIA (role=alert/aria-live already documented + used).
+## Frontend
+- [ ] `ExportFormat` += `'markdown'`; `ExportOptions` += `markdownMultiFile?`.
+- [ ] `ExportOptionsModal`: markdown radio option + "Separate file per chapter" switch (markdown-only).
+- [ ] `bookClient.exportMarkdown(bookId, {includeEmptyChapters, multiFile})`.
+- [ ] `page.tsx` handleExport: route markdown; filename `.md` (single) / `.zip` (multi).
+- [ ] `generateFilename`: map `markdown`->`md`. Fix stale `validateExportOptions` allowlist.
+- [ ] Tests: modal option + switch; bookClient URL; generateFilename md.
 
 ## Gates
-- [ ] lint + typecheck clean; full unit suite + coverage (≥85/85/75/85) green.
-- [ ] jest-axe suite green (existing + new).
-- [ ] codex cross-family review clean.
+- [ ] Backend pytest --cov >=85; frontend gates 85/85/75/85; lint/typecheck; E2E green; demo AC.

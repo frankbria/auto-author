@@ -731,6 +731,47 @@ describe('BookClient.exportEPUB', () => {
 });
 
 // ---------------------------------------------------------------------------
+// exportMarkdown – success with and without options
+// ---------------------------------------------------------------------------
+
+describe('BookClient.exportMarkdown', () => {
+  it('GETs the Markdown blob without options', async () => {
+    const blob = new Blob(['# Title'], { type: 'text/markdown' });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: async () => blob,
+    });
+
+    const result = await bookClient.exportMarkdown('book123');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/api/v1/books/book123/export/markdown?',
+      expect.objectContaining({ credentials: 'include' })
+    );
+    expect(result).toBeInstanceOf(Blob);
+  });
+
+  it('appends multi_file and includeEmptyChapters when specified', async () => {
+    const blob = new Blob(['PK...']);
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: async () => blob,
+    });
+
+    await bookClient.exportMarkdown('book123', {
+      includeEmptyChapters: true,
+      multiFile: true,
+    });
+
+    const calledUrl = (global.fetch as jest.Mock).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('include_empty_chapters=true');
+    expect(calledUrl).toContain('multi_file=true');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // exportError – structured detail.message branch
 // ---------------------------------------------------------------------------
 
