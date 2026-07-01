@@ -370,6 +370,23 @@ async def test_bulk_status_helper_happy_increments_version(seed_book):
 
 
 @pytest.mark.asyncio
+async def test_bulk_status_helper_versionless_toc_no_false_conflict(seed_book):
+    """A legacy TOC with no `version` field must not produce a false conflict."""
+    toc = {"chapters": [{"id": "c1", "title": "C1", "status": "draft"}]}  # no version
+    book_id, owner = await seed_book(toc=toc)
+
+    result = await tx.update_chapter_statuses_with_version_guard(
+        book_id=book_id, chapter_ids=["c1"], new_status="in-progress",
+        user_auth_id=owner, expected_version=1,
+    )
+
+    assert result["updated_chapters"] == ["c1"]
+    stored = await _get_toc(book_id)
+    assert stored["version"] == 2
+    assert stored["chapters"][0]["status"] == "in-progress"
+
+
+@pytest.mark.asyncio
 async def test_bulk_status_helper_stale_version_conflicts(seed_book):
     """A stale expected_version must NOT overwrite — this is the lost-update fix."""
     toc = _toc(version=5, chapters=[{"id": "c1", "title": "C1", "status": "draft"}])
@@ -449,7 +466,7 @@ async def test_bulk_status_helper_wrong_owner_not_authorized(seed_book):
     toc = _toc(version=1, chapters=[{"id": "c1", "title": "C1", "status": "draft"}])
     book_id, _ = await seed_book(toc=toc, owner_id="real-owner")
 
-    with pytest.raises(ValueError, match="[Nn]ot authorized"):
+    with pytest.raises(ValueError, match=r"[Nn]ot authorized"):
         await tx.update_chapter_statuses_with_version_guard(
             book_id=book_id, chapter_ids=["c1"], new_status="in-progress",
             user_auth_id="intruder", expected_version=1,

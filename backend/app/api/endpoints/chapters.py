@@ -575,19 +575,23 @@ async def update_chapter_status_bulk(
             status_code=500, detail="Failed to update chapter statuses"
         )
 
-    # Log the bulk status change
-    for chapter_id in updated_chapters:
-        await chapter_access_service.log_access(
-            user_id=current_user.get("auth_id"),
-            book_id=book_id,
-            chapter_id=chapter_id,
-            access_type="status_update",
-            metadata={
-                "old_status": chapter_statuses[chapter_id],
-                "new_status": update_data.status.value,
-                "bulk_update": True,
-            },
-        )
+    # Log the bulk status change. The status update has already committed, so a
+    # logging failure must not turn a successful update into a failed request.
+    try:
+        for chapter_id in updated_chapters:
+            await chapter_access_service.log_access(
+                user_id=current_user.get("auth_id"),
+                book_id=book_id,
+                chapter_id=chapter_id,
+                access_type="status_update",
+                metadata={
+                    "old_status": chapter_statuses[chapter_id],
+                    "new_status": update_data.status.value,
+                    "bulk_update": True,
+                },
+            )
+    except Exception:
+        logger.error("Failed to log bulk status change", exc_info=True)
 
     return {
         "book_id": book_id,

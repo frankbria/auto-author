@@ -473,12 +473,17 @@ async def update_chapter_statuses_with_version_guard(
     }
 
     # Compare-and-swap: the version filter makes this a no-op if another writer
-    # bumped the TOC since we read it, so concurrent edits can't clobber.
+    # bumped the TOC since we read it, so concurrent edits can't clobber. A
+    # legacy TOC with no version field is matched on its absence (not on the
+    # defaulted 1) so it doesn't produce a false conflict on first write.
+    version_guard = (
+        current_version if "version" in current_toc else {"$exists": False}
+    )
     update_result = await books_collection.update_one(
         {
             "_id": book_oid,
             "owner_id": user_auth_id,
-            "table_of_contents.version": current_version,
+            "table_of_contents.version": version_guard,
         },
         {
             "$set": {

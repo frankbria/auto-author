@@ -104,6 +104,35 @@ async def test_bulk_status_unexpected_error_returns_structured_500(
     assert resp.json()["detail"] == "Failed to update chapter statuses"
 
 
+@pytest.mark.asyncio
+async def test_bulk_status_logging_failure_does_not_fail_committed_update(
+    auth_client_factory, monkeypatch
+):
+    """The status update has committed; a post-commit log_access error must not
+    turn the request into a failure."""
+    api = await auth_client_factory()
+    book_id = await create_book(api)
+    chapter_id = await add_chapter(api, book_id)
+
+    async def _boom(*a, **k):
+        raise RuntimeError("logging down")
+
+    monkeypatch.setattr(chapters.chapter_access_service, "log_access", _boom)
+
+    resp = await api.patch(
+        f"/api/v1/books/{book_id}/chapters/bulk-status",
+        json={"chapter_ids": [chapter_id], "status": "in-progress"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["updated_chapters"] == [chapter_id]
+    # The update really persisted (list_chapters does not log access, so it is
+    # unaffected by the patched-to-fail log_access).
+    after = await api.get(f"/api/v1/books/{book_id}/chapters")
+    statuses = {c["id"]: c["status"] for c in after.json()["chapters"]}
+    assert statuses[chapter_id] == "in-progress"
+
+
 # --------------------------------------------------------------------------- #
 # Part 2: read/aggregate handlers -> structured 500 (preserving 404/403)
 # --------------------------------------------------------------------------- #
