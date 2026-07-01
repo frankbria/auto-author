@@ -207,8 +207,13 @@ jobs:
             echo "DATABASE_URL=${{ secrets.MONGODB_URI }}"
             echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}"
             echo ""
-            echo "# CORS Settings"
-            echo "BACKEND_CORS_ORIGINS=[\"$FRONTEND_URL\",\"$API_URL\"]"
+            echo "# CORS Settings — plain comma-separated origins (the app's
+            # config validator splits on ',' for non-JSON values). A quoted
+            # JSON array here gets its quotes mangled by the dotenv reader into
+            # invalid JSON, crashing Settings() on startup. Only the frontend
+            # origin makes cross-origin calls to the API; an API URL with a
+            # /api/v1 path is not a valid Origin, so it is not listed."
+            echo "BACKEND_CORS_ORIGINS=$FRONTEND_URL"
             echo ""
             echo "# OpenAI"
             echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}"
@@ -272,7 +277,11 @@ jobs:
           rm -rf .next
 
           echo "==> Installing frontend dependencies..."
-          npm ci
+          # --include=dev: NODE_ENV=production (exported above) makes `npm ci`
+          # skip devDependencies, but the build needs them — notably typescript,
+          # which `next build` requires to load next.config.ts. Without this the
+          # build fails with "Cannot find module 'typescript'".
+          npm ci --include=dev
 
           echo "==> Building frontend..."
           npm run build
