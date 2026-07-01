@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 # Configuration
 UPLOAD_DIR = Path("uploads")
 COVER_IMAGES_DIR = UPLOAD_DIR / "cover_images"
+PROFILE_PICTURES_DIR = UPLOAD_DIR / "profile_pictures"
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+# Guard against decompression bombs: a small file can decode to enormous
+# pixel dimensions and exhaust memory/CPU. 50MP comfortably covers real photos.
+MAX_IMAGE_PIXELS = 50_000_000
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_MIME_TYPES = {
     "image/jpeg",
@@ -30,21 +34,34 @@ ALLOWED_MIME_TYPES = {
 MAX_IMAGE_WIDTH = 1200
 MAX_IMAGE_HEIGHT = 1800
 THUMBNAIL_SIZE = (300, 450)
+# Avatars are square and small — one image, no thumbnail.
+PROFILE_PICTURE_SIZE = (400, 400)
 
 COVER_IMAGE_URL_PREFIX = "/uploads/cover_images/"
+PROFILE_IMAGE_URL_PREFIX = "/uploads/profile_pictures/"
 
 
-def _resolve_local_cover_path(image_url: str) -> Optional[Path]:
-    """Resolve a /uploads/cover_images/<name> URL to a path INSIDE
-    COVER_IMAGES_DIR, or return None if it would escape the directory."""
-    if not image_url or not image_url.startswith(COVER_IMAGE_URL_PREFIX):
+def _resolve_local_path(image_url: str, prefix: str, base_dir: Path) -> Optional[Path]:
+    """Resolve a <prefix><name> URL to a path INSIDE base_dir, or None if it
+    would escape the directory (path-traversal guard)."""
+    if not image_url or not image_url.startswith(prefix):
         return None
-    filename = image_url[len(COVER_IMAGE_URL_PREFIX):]
-    base = COVER_IMAGES_DIR.resolve()
+    filename = image_url[len(prefix):]
+    base = base_dir.resolve()
     candidate = (base / filename).resolve()
     if not candidate.is_relative_to(base):
         return None
     return candidate
+
+
+def _resolve_local_cover_path(image_url: str) -> Optional[Path]:
+    """Resolve a /uploads/cover_images/<name> URL to a path inside COVER_IMAGES_DIR."""
+    return _resolve_local_path(image_url, COVER_IMAGE_URL_PREFIX, COVER_IMAGES_DIR)
+
+
+def _resolve_local_profile_path(image_url: str) -> Optional[Path]:
+    """Resolve a /uploads/profile_pictures/<name> URL to a path inside PROFILE_PICTURES_DIR."""
+    return _resolve_local_path(image_url, PROFILE_IMAGE_URL_PREFIX, PROFILE_PICTURES_DIR)
 
 
 class FileUploadService:
@@ -56,6 +73,7 @@ class FileUploadService:
         if self.cloud_storage is None:
             # Only create local directories if not using cloud storage
             COVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+            PROFILE_PICTURES_DIR.mkdir(parents=True, exist_ok=True)
             logger.info("Using local file storage for uploads")
         else:
             logger.info("Using cloud storage for uploads")
@@ -87,14 +105,19 @@ class FileUploadService:
         if file_size > MAX_FILE_SIZE:
             return False, f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB"
 
-        # Validate it's actually an image
+        # Validate it's actually an image, and guard against decompression bombs
+        # (a small file that decodes to enormous dimensions).
         try:
             file.file.seek(0)
             image = Image.open(file.file)
+            width, height = image.size
             image.verify()
             file.file.seek(0)  # Reset after verify
         except Exception:
             return False, "Invalid image file"
+
+        if width * height > MAX_IMAGE_PIXELS:
+            return False, "Image dimensions too large"
 
         return True, None
 
@@ -221,6 +244,81 @@ class FileUploadService:
         except Exception as e:
             # Log error but don't fail the operation
             logger.error(f"Error deleting image files: {e}")
+
+    async def process_and_save_profile_picture(
+        self,
+        file: UploadFile,
+        user_id: str,
+    ) -> str:
+        """
+        Process and save a square avatar for a user. Returns the image URL.
+        Mirrors process_and_save_cover_image but produces a single 400x400 image
+        (avatars don't need a thumbnail).
+        """
+        is_valid, error_msg = await self.validate_image_upload(file)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg,
+            )
+
+        file_ext = Path(file.filename).suffix.lower()
+        unique_filename = f"{user_id}_{uuid.uuid4().hex}{file_ext}"
+        image_path = PROFILE_PICTURES_DIR / unique_filename
+
+        try:
+            file.file.seek(0)
+            image = Image.open(file.file)
+
+            # Convert to RGB if necessary (for JPEG)
+            if image.mode in ('RGBA', 'LA', 'P'):
+                rgb_image = Image.new('RGB', image.size, (255, 255, 255))
+                rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+                image = rgb_image
+
+            # Downscale to at most 400x400, preserving aspect ratio
+            image.thumbnail(PROFILE_PICTURE_SIZE, Image.Resampling.LANCZOS)
+
+            if self.cloud_storage:
+                buffer = BytesIO()
+                image_format = 'JPEG' if file_ext in ['.jpg', '.jpeg'] else 'PNG'
+                image.save(buffer, format=image_format, quality=85, optimize=True)
+                buffer.seek(0)
+                return await self.cloud_storage.upload_image(
+                    file_data=buffer.read(),
+                    filename=unique_filename,
+                    content_type=f"image/{image_format.lower()}",
+                    folder=f"profile_pictures/{user_id}",
+                )
+
+            image.save(image_path, quality=85, optimize=True)
+            return f"{PROFILE_IMAGE_URL_PREFIX}{unique_filename}"
+
+        except Exception:
+            if image_path.exists():
+                image_path.unlink()
+            logger.error("Failed to process profile picture", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to process image",
+            )
+
+    async def delete_profile_picture(self, image_url: str):
+        """Delete a previously-stored avatar (cloud or local). Never raises."""
+        try:
+            if not image_url:
+                return
+            if self.cloud_storage:
+                await self.cloud_storage.delete_image(image_url)
+                return
+            path = _resolve_local_profile_path(image_url)
+            if path is None:
+                logger.warning("Refusing to delete profile picture outside uploads dir")
+                return
+            if path.exists():
+                path.unlink()
+        except Exception as e:
+            logger.error(f"Error deleting profile picture: {e}")
 
     def get_upload_stats(self) -> dict:
         """Get statistics about uploaded files."""

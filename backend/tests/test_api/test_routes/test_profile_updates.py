@@ -141,3 +141,40 @@ async def test_invalid_preference_format(auth_client_factory, test_user):
         if len(err.get("loc", [])) >= 2 and err["loc"][1] == "preferences"
     ]
     assert prefs_errors, f"No preference-related error in {body['errors']}"
+
+
+@pytest.mark.asyncio
+async def test_reject_overlong_fields(auth_client_factory):
+    """first_name/last_name (>50), display_name (>100), bio (>1000) are rejected (422)."""
+    client = await auth_client_factory()
+    cases = [
+        {"first_name": "x" * 51},
+        {"last_name": "y" * 51},
+        {"display_name": "z" * 101},
+        {"bio": "b" * 1001},
+    ]
+    for payload in cases:
+        response = await client.patch("/api/v1/users/me", json=payload)
+        assert response.status_code == 422, f"{payload} should be rejected"
+
+
+@pytest.mark.asyncio
+async def test_reject_invalid_theme(auth_client_factory):
+    """An unknown theme value is rejected (422)."""
+    client = await auth_client_factory()
+    response = await client.patch(
+        "/api/v1/users/me", json={"preferences": {"theme": "neon"}}
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_accept_max_length_fields(auth_client_factory, test_user):
+    """Values exactly at the limit are accepted (boundary)."""
+    client = await auth_client_factory()
+    payload = {"first_name": "a" * 50, "bio": "b" * 1000, "display_name": "d" * 100}
+    updated = test_user.copy()
+    updated.update(payload)
+    with patch("app.api.endpoints.users.update_user", return_value=updated):
+        response = await client.patch("/api/v1/users/me", json=payload)
+    assert response.status_code == 200

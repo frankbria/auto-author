@@ -2,10 +2,35 @@
 Test Export API endpoints
 """
 import pytest
+import zipfile
 from unittest.mock import Mock, patch, AsyncMock
 import io
 from bson import ObjectId
 from app.db import base
+from app.api.endpoints.export import _with_author_info
+
+
+def test_with_author_info_prefers_display_name():
+    book = _with_author_info({"title": "T"}, {"display_name": "Pen Name", "first_name": "A", "last_name": "B", "bio": "hi"})
+    assert book["author_name"] == "Pen Name"
+    assert book["author_bio"] == "hi"
+
+
+def test_with_author_info_falls_back_to_first_last():
+    book = _with_author_info({"title": "T"}, {"display_name": None, "first_name": "Ada", "last_name": "Lovelace"})
+    assert book["author_name"] == "Ada Lovelace"
+    assert "author_bio" not in book
+
+
+def test_with_author_info_no_name_no_key():
+    book = _with_author_info({"title": "T"}, {"display_name": "", "first_name": "", "last_name": ""})
+    assert "author_name" not in book
+
+
+def test_with_author_info_does_not_mutate_input():
+    original = {"title": "T"}
+    _with_author_info(original, {"display_name": "X", "bio": "y"})
+    assert original == {"title": "T"}
 
 
 async def _seed_toc(book_id: str, toc: dict) -> None:
@@ -111,6 +136,51 @@ class TestExportEndpoints:
         content = response.content
         assert content.startswith(b'%PDF')
         assert len(content) > 1000  # Should have substantial content
+
+    @pytest.mark.asyncio
+    async def test_export_injects_author_from_profile(self, test_book_with_content):
+        """The owner's profile (display_name + bio) is merged into book_data."""
+        client, book_id = test_book_with_content
+        with patch(
+            "app.api.endpoints.export.export_service.export_book",
+            new=AsyncMock(return_value=b"%PDF-1.4 stub"),
+        ) as export_mock:
+            response = await client.get(f"/api/v1/books/{book_id}/export/pdf")
+        assert response.status_code == 200
+        passed_book = export_mock.call_args.kwargs["book_data"]
+        assert passed_book["author_name"] == "Tester"  # test_user display_name
+        assert passed_book["author_bio"] == "I am a test user"  # test_user bio
+
+    @pytest.mark.asyncio
+    async def test_export_docx_contains_author_bio(self, test_book_with_content):
+        """A real DOCX export renders the 'About the Author' bio section."""
+        client, book_id = test_book_with_content
+        response = await client.get(f"/api/v1/books/{book_id}/export/docx")
+        assert response.status_code == 200
+        with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+            document_xml = zf.read("word/document.xml").decode("utf-8")
+        assert "About the Author" in document_xml
+        assert "I am a test user" in document_xml
+        assert "Tester" in document_xml
+
+    @pytest.mark.asyncio
+    async def test_export_pdf_with_markup_in_bio_does_not_crash(self, auth_client_factory):
+        """A bio containing XML-like markup is escaped, not fed raw to ReportLab."""
+        client = await auth_client_factory(overrides={"bio": "I <3 <b>books</b> & prose"})
+        book = await client.post("/api/v1/books/", json={"title": "Markup Book"})
+        assert book.status_code == 201
+        book_id = book.json()["id"]
+        await _seed_toc(book_id, {
+            "chapters": [{
+                "id": "c1", "title": "Ch", "content": "<p>hi</p>", "order": 1,
+                "level": 1, "parent_id": None, "status": "completed",
+                "word_count": 1, "subchapters": [],
+            }],
+            "total_chapters": 1, "estimated_pages": 1, "status": "edited",
+        })
+        response = await client.get(f"/api/v1/books/{book_id}/export/pdf")
+        assert response.status_code == 200
+        assert response.content.startswith(b"%PDF")
 
     @pytest.mark.asyncio
     async def test_export_pdf_with_options(self, test_book_with_content):

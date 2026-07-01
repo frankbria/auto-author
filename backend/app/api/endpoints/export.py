@@ -33,6 +33,25 @@ router = APIRouter(
 logger = logging.getLogger(__name__)
 
 
+def _with_author_info(book: Dict, owner: Dict) -> Dict:
+    """Merge the owner's profile author info into book_data for export.
+
+    ``owner`` is the verified book owner (current_user), so no extra DB lookup
+    is needed. Sets ``author_name`` (display_name, else "first last") and
+    ``author_bio`` so exports show the author's profile. Existing book values
+    are only overridden when the profile supplies a value.
+    """
+    author = (owner.get("display_name") or "").strip() or (
+        f"{owner.get('first_name') or ''} {owner.get('last_name') or ''}".strip()
+    )
+    merged = dict(book)
+    if author:
+        merged["author_name"] = author
+    if owner.get("bio"):
+        merged["author_bio"] = owner["bio"]
+    return merged
+
+
 def _parse_custom_options(raw: Optional[str]) -> Optional[Dict]:
     """Parse the optional custom_options JSON string, 400 on malformed input."""
     if not raw:
@@ -108,6 +127,7 @@ async def export_book_pdf(
 
     try:
         # Generate PDF
+        book = _with_author_info(book, current_user)
         pdf_content = await export_service.export_book(
             book_data=book,
             format="pdf",
@@ -209,6 +229,7 @@ async def export_book_docx(
 
     try:
         # Generate DOCX
+        book = _with_author_info(book, current_user)
         docx_content = await export_service.export_book(
             book_data=book,
             format="docx",
@@ -300,6 +321,7 @@ async def export_book_epub(
 
     try:
         # Generate EPUB
+        book = _with_author_info(book, current_user)
         epub_content = await export_service.export_book(
             book_data=book,
             format="epub",
@@ -392,6 +414,7 @@ async def export_book_markdown(
 
     try:
         # Generate Markdown
+        book = _with_author_info(book, current_user)
         md_content = await export_service.export_book(
             book_data=book,
             format="markdown",

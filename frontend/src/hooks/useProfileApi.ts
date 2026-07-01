@@ -1,59 +1,55 @@
 import { useAuthFetch } from '@/hooks/useAuthFetch';
 
-type UserProfile = {
-  id: string;
-  clerk_id: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string;
-  avatar_url: string | null;
-  bio: string | null;
-  preferences: {
-    theme: "light" | "dark" | "system";
-    email_notifications: boolean;
-    marketing_emails: boolean;
-  };
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+export type UserPreferences = {
+  theme: 'light' | 'dark' | 'system';
+  email_notifications: boolean;
+  marketing_emails: boolean;
 };
 
-type ProfileUpdateData = {
+export type UserProfile = {
+  id: string;
+  auth_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  preferences: UserPreferences;
+};
+
+export type ProfileUpdateData = {
   first_name?: string;
   last_name?: string;
+  display_name?: string;
   bio?: string;
-  preferences?: {
-    theme?: "light" | "dark" | "system";
-    email_notifications?: boolean;
-    marketing_emails?: boolean;
-  };
+  preferences?: Partial<UserPreferences>;
 };
 
 /**
- * Custom hook for managing user profile operations
+ * Hook for user profile operations against the better-auth backend.
+ * All requests are cookie-authenticated via useAuthFetch (credentials: 'include').
  */
 export const useProfileApi = () => {
-  const { authFetch } = useAuthFetch();
+  const { authFetch } = useAuthFetch({ baseUrl: API_BASE_URL });
 
-  /**
-   * Get the current user's profile data
-   */
   const getUserProfile = async (): Promise<UserProfile> => {
-    // This function is deprecated - authFetch no longer works
-    throw new Error('Profile API is deprecated. Use Clerk user management instead.');
+    return authFetch<UserProfile>('/users/me');
   };
 
-  /**
-   * Update the current user's profile data
-   */
-  const updateUserProfile = async (profileData: ProfileUpdateData): Promise<UserProfile> => {
-    // This function is deprecated - authFetch no longer works
-    throw new Error('Profile API is deprecated. Use Clerk user management instead.');
+  const updateUserProfile = async (
+    profileData: ProfileUpdateData
+  ): Promise<UserProfile> => {
+    return authFetch<UserProfile>('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(profileData),
+    });
   };
 
-  /**
-   * Delete the current user's account
-   */
   const deleteUserAccount = async (): Promise<void> => {
-    // This function is deprecated - authFetch no longer works
-    throw new Error('Profile API is deprecated. Use Clerk user management instead.');
+    await authFetch('/users/me', { method: 'DELETE' });
   };
 
   return {
