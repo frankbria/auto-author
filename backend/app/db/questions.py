@@ -645,6 +645,13 @@ async def replace_question_in_place(
         return None
 
     # The prior answer no longer applies to the replaced question.
+    # ponytail: a response save that races this exact question's regeneration could
+    # re-attach a stale answer after this delete. Accepted — the window is a
+    # self-inflicted same-question save-vs-regenerate collision, non-corrupting
+    # (worst case a mismatched answer the user can re-answer), and a real fix needs
+    # either a version guard threaded through the hot save path or a multi-doc
+    # transaction (unavailable on standalone Mongo). Tracked as tech debt like the
+    # other non-transactional question mutations.
     await responses_collection.delete_many({
         "question_id": question_id,
         "user_id": user_id
