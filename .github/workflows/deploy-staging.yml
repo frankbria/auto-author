@@ -1,10 +1,12 @@
 name: Deploy to Staging
 
 on:
-  push:
-    branches: [main]
+  # Deploy only after the real test workflow ("Tests and Quality Checks" in
+  # tests.yml) succeeds on main. The old name "Test Suite" matched no workflow,
+  # so this trigger never fired and the removed `push` trigger deployed every
+  # push regardless of test results. See #163.
   workflow_run:
-    workflows: ["Test Suite"]
+    workflows: ["Tests and Quality Checks"]
     types: [completed]
     branches: [main]
 
@@ -48,7 +50,7 @@ jobs:
   build-and-deploy:
     name: Build and Deploy to Staging
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     environment:
       name: staging
@@ -57,6 +59,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Deploy the exact commit that passed "Tests and Quality Checks",
+          # not whatever HEAD happens to be when this workflow_run fires.
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -112,11 +118,34 @@ jobs:
           tar -czf /tmp/deploy-package.tar.gz .
 
       - name: Setup SSH
+        env:
+          HOST: ${{ secrets.HOST }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
           chmod 600 ~/.ssh/staging_key
-          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+          # Preflight: confirm the staging host answers on TCP/22 before doing
+          # anything SSH. Without this, an unreachable host (see #162) surfaces
+          # only as an opaque "Process completed with exit code 1" from the 5s
+          # ssh-keyscan timeout, masking a server outage as a deploy failure.
+          if ! nc -z -w5 "$HOST" 22; then
+            echo "::error::Staging host ($HOST):22 is unreachable — the server may be down or firewalled, not a deploy bug. See #162."
+            exit 1
+          fi
+
+          # Retry ssh-keyscan to ride out transient network blips.
+          for attempt in 1 2 3; do
+            if ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
+              break
+            fi
+            echo "ssh-keyscan attempt $attempt/3 failed"
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::ssh-keyscan failed for the staging host after 3 attempts. See #162."
+              exit 1
+            fi
+            sleep 3
+          done
 
       - name: Upload package to server
         run: |
