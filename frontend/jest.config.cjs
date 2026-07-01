@@ -23,7 +23,6 @@ const customJestConfig = {
     '<rootDir>/e2e/',                    // Exclude Playwright E2E tests
     '<rootDir>/src/__tests__/e2e/',      // Exclude E2E tests in __tests__
     'SystemE2E.test.tsx',                // Exclude specific E2E test
-    'ProfilePage.test.tsx',              // Exclude - missing module
     'SystemIntegration.test.tsx',        // Exclude - missing module
     '.spec.ts',                          // Exclude Playwright spec files
     'responsive.spec.ts',                // Exclude Playwright E2E specs

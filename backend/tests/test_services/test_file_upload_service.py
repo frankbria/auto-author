@@ -9,7 +9,95 @@ from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from fastapi import UploadFile, HTTPException
 from PIL import Image
 from io import BytesIO
-from app.services.file_upload_service import FileUploadService, COVER_IMAGES_DIR
+from app.services.file_upload_service import (
+    FileUploadService,
+    COVER_IMAGES_DIR,
+    PROFILE_PICTURES_DIR,
+    PROFILE_IMAGE_URL_PREFIX,
+)
+
+
+class TestProfilePictureUpload:
+    """Profile picture (avatar) processing — local and cloud paths."""
+
+    def _make_file(self, name="a.jpg", ctype="image/jpeg", size=(600, 600)):
+        img = Image.new("RGB", size, color="blue")
+        buf = BytesIO()
+        img.save(buf, format="JPEG")
+        buf.seek(0)
+        mock = Mock(spec=UploadFile)
+        mock.filename = name
+        mock.content_type = ctype
+        mock.file = buf
+        return mock
+
+    @pytest.fixture
+    def cleanup_profile_files(self):
+        yield
+        if PROFILE_PICTURES_DIR.exists():
+            for f in PROFILE_PICTURES_DIR.glob("user-1_*"):
+                f.unlink()
+
+    @pytest.mark.asyncio
+    async def test_process_saves_local_and_downscales(self, cleanup_profile_files):
+        with patch("app.services.file_upload_service.get_cloud_storage_service", return_value=None):
+            service = FileUploadService()
+            url = await service.process_and_save_profile_picture(self._make_file(), "user-1")
+        assert url.startswith(PROFILE_IMAGE_URL_PREFIX)
+        saved = PROFILE_PICTURES_DIR / url[len(PROFILE_IMAGE_URL_PREFIX):]
+        assert saved.exists()
+        with Image.open(saved) as im:
+            assert im.width <= 400 and im.height <= 400  # downscaled to <=400px
+
+    @pytest.mark.asyncio
+    async def test_process_rejects_non_image(self):
+        with patch("app.services.file_upload_service.get_cloud_storage_service", return_value=None):
+            service = FileUploadService()
+            with pytest.raises(HTTPException) as exc:
+                await service.process_and_save_profile_picture(
+                    self._make_file(name="a.txt", ctype="text/plain"), "user-1"
+                )
+        assert exc.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_process_uses_cloud_storage(self):
+        cloud = AsyncMock()
+        cloud.upload_image.return_value = "https://cdn.example.com/avatar.jpg"
+        with patch("app.services.file_upload_service.get_cloud_storage_service", return_value=cloud):
+            service = FileUploadService()
+            url = await service.process_and_save_profile_picture(self._make_file(), "user-1")
+        assert url == "https://cdn.example.com/avatar.jpg"
+        cloud.upload_image.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_local_avatar(self, cleanup_profile_files):
+        with patch("app.services.file_upload_service.get_cloud_storage_service", return_value=None):
+            service = FileUploadService()
+            url = await service.process_and_save_profile_picture(self._make_file(), "user-1")
+            saved = PROFILE_PICTURES_DIR / url[len(PROFILE_IMAGE_URL_PREFIX):]
+            assert saved.exists()
+            await service.delete_profile_picture(url)
+            assert not saved.exists()
+
+    @pytest.mark.asyncio
+    async def test_validate_rejects_decompression_bomb(self):
+        """A file whose image decodes to huge dimensions is rejected."""
+        with patch("app.services.file_upload_service.get_cloud_storage_service", return_value=None):
+            service = FileUploadService()
+        fake_image = MagicMock()
+        fake_image.size = (10000, 10000)  # 100MP > MAX_IMAGE_PIXELS
+        fake_image.verify.return_value = None
+        with patch("app.services.file_upload_service.Image.open", return_value=fake_image):
+            ok, err = await service.validate_image_upload(self._make_file())
+        assert ok is False
+        assert "dimensions" in err.lower()
+
+    @pytest.mark.asyncio
+    async def test_delete_refuses_path_traversal(self):
+        with patch("app.services.file_upload_service.get_cloud_storage_service", return_value=None):
+            service = FileUploadService()
+            # Must not raise, must not touch anything outside the dir.
+            await service.delete_profile_picture("/uploads/profile_pictures/../../etc/passwd")
 
 
 class TestFileUploadService:
