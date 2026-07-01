@@ -8,7 +8,6 @@ unchanged. Handler order (metadata / tab-state before ``{chapter_id}``) is
 preserved so path matching is identical to the original single-file router.
 """
 import logging
-from datetime import datetime, timezone
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -23,11 +22,12 @@ from app.schemas.book import (
     ChapterMetadata,
     ChapterStatus,
 )
-from app.db.database import get_book_by_id, update_book
+from app.db.database import get_book_by_id
 from app.db.toc_transactions import (
     add_chapter_with_transaction,
     update_chapter_with_transaction,
     delete_chapter_with_transaction,
+    update_chapter_statuses_with_version_guard,
 )
 from app.services.chapter_access_service import chapter_access_service
 from app.services.chapter_status_service import chapter_status_service
@@ -118,69 +118,77 @@ async def get_chapters_metadata(
     Get comprehensive metadata for all chapters in a book.
     Optimized for tab interface rendering.
     """
-    # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book's chapters"
+    try:
+        # Get the book and verify ownership
+        book = await get_book_by_id(book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+        if book.get("owner_id") != current_user.get("auth_id"):
+            raise HTTPException(
+                status_code=403, detail="Not authorized to access this book's chapters"
+            )
+
+        # Get current TOC
+        current_toc = book.get("table_of_contents", {})
+        chapters = current_toc.get("chapters", [])
+
+        # Convert chapters to metadata format
+        chapter_metadata_list = []
+
+        def process_chapters(chapter_list, level=1):
+            for chapter in chapter_list:
+                # Calculate reading time if word count exists
+                word_count = chapter.get("word_count", 0)
+                estimated_reading_time = chapter_status_service.calculate_reading_time(
+                    word_count
+                )
+
+                metadata = ChapterMetadata(
+                    id=chapter.get("id"),
+                    title=chapter.get("title"),
+                    status=chapter.get("status", ChapterStatus.DRAFT.value),
+                    word_count=word_count,
+                    last_modified=chapter.get("last_modified"),
+                    estimated_reading_time=estimated_reading_time,
+                    order=chapter.get("order", 0),
+                    level=chapter.get("level", level),
+                    has_content=word_count > 0,
+                    description=chapter.get("description"),
+                    parent_id=chapter.get("parent_id"),
+                )
+                chapter_metadata_list.append(metadata)
+
+                # Process subchapters
+                if chapter.get("subchapters"):
+                    process_chapters(chapter["subchapters"], level + 1)
+
+        process_chapters(chapters)
+
+        # Calculate completion stats
+        completion_stats = chapter_status_service.get_completion_stats(
+            [chapter.dict() for chapter in chapter_metadata_list]
         )
 
-    # Get current TOC
-    current_toc = book.get("table_of_contents", {})
-    chapters = current_toc.get("chapters", [])
+        # Get last active chapter from recent access logs
+        recent_chapters = await chapter_access_service.get_user_recent_chapters(
+            current_user.get("auth_id"), book_id, limit=1
+        )
+        last_active_chapter = recent_chapters[0]["_id"] if recent_chapters else None
 
-    # Convert chapters to metadata format
-    chapter_metadata_list = []
-
-    def process_chapters(chapter_list, level=1):
-        for chapter in chapter_list:
-            # Calculate reading time if word count exists
-            word_count = chapter.get("word_count", 0)
-            estimated_reading_time = chapter_status_service.calculate_reading_time(
-                word_count
-            )
-
-            metadata = ChapterMetadata(
-                id=chapter.get("id"),
-                title=chapter.get("title"),
-                status=chapter.get("status", ChapterStatus.DRAFT.value),
-                word_count=word_count,
-                last_modified=chapter.get("last_modified"),
-                estimated_reading_time=estimated_reading_time,
-                order=chapter.get("order", 0),
-                level=chapter.get("level", level),
-                has_content=word_count > 0,
-                description=chapter.get("description"),
-                parent_id=chapter.get("parent_id"),
-            )
-            chapter_metadata_list.append(metadata)
-
-            # Process subchapters
-            if chapter.get("subchapters"):
-                process_chapters(chapter["subchapters"], level + 1)
-
-    process_chapters(chapters)
-
-    # Calculate completion stats
-    completion_stats = chapter_status_service.get_completion_stats(
-        [chapter.dict() for chapter in chapter_metadata_list]
-    )
-
-    # Get last active chapter from recent access logs
-    recent_chapters = await chapter_access_service.get_user_recent_chapters(
-        current_user.get("auth_id"), book_id, limit=1
-    )
-    last_active_chapter = recent_chapters[0]["_id"] if recent_chapters else None
-
-    return ChapterMetadataResponse(
-        book_id=book_id,
-        chapters=chapter_metadata_list,
-        total_chapters=len(chapter_metadata_list),
-        completion_stats=completion_stats,
-        last_active_chapter=last_active_chapter,
-    )
+        return ChapterMetadataResponse(
+            book_id=book_id,
+            chapters=chapter_metadata_list,
+            total_chapters=len(chapter_metadata_list),
+            completion_stats=completion_stats,
+            last_active_chapter=last_active_chapter,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Failed to retrieve chapter metadata", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve chapter metadata"
+        )
 
 
 @router.get("/{book_id}/chapters/tab-state", response_model=dict)
@@ -188,38 +196,44 @@ async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_u
     """
     Retrieve saved tab state for restoration.
     """
-    # Verify book ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book"
+    try:
+        # Verify book ownership
+        book = await get_book_by_id(book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+        if book.get("owner_id") != current_user.get("auth_id"):
+            raise HTTPException(
+                status_code=403, detail="Not authorized to access this book"
+            )
+
+        # Get latest tab state
+        tab_state = await chapter_access_service.get_user_tab_state(
+            current_user.get("auth_id"), book_id
         )
 
-    # Get latest tab state
-    tab_state = await chapter_access_service.get_user_tab_state(
-        current_user.get("auth_id"), book_id
-    )
+        if not tab_state:
+            return {
+                "book_id": book_id,
+                "tab_state": None,
+                "message": "No saved tab state found",
+            }
 
-    if not tab_state:
+        metadata = tab_state.get("metadata", {})
         return {
             "book_id": book_id,
-            "tab_state": None,
-            "message": "No saved tab state found",
+            "tab_state": {
+                "active_chapter_id": metadata.get("active_chapter_id"),
+                "open_tab_ids": metadata.get("open_tab_ids", []),
+                "tab_order": metadata.get("tab_order", []),
+                "last_updated": tab_state.get("timestamp"),
+            },
+            "success": True,
         }
-
-    metadata = tab_state.get("metadata", {})
-    return {
-        "book_id": book_id,
-        "tab_state": {
-            "active_chapter_id": metadata.get("active_chapter_id"),
-            "open_tab_ids": metadata.get("open_tab_ids", []),
-            "tab_order": metadata.get("tab_order", []),
-            "last_updated": tab_state.get("timestamp"),
-        },
-        "success": True,
-    }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Failed to retrieve tab state", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve tab state")
 
 
 @router.get("/{book_id}/chapters/{chapter_id}", response_model=dict)
@@ -409,55 +423,61 @@ async def list_chapters(
     List all chapters in the book's TOC.
     Can return either hierarchical structure (default) or flat list.
     """
-    # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book's chapters"
-        )
+    try:
+        # Get the book and verify ownership
+        book = await get_book_by_id(book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+        if book.get("owner_id") != current_user.get("auth_id"):
+            raise HTTPException(
+                status_code=403, detail="Not authorized to access this book's chapters"
+            )
 
-    # Get TOC
-    current_toc = book.get("table_of_contents", {})
-    chapters = current_toc.get("chapters", [])
+        # Get TOC
+        current_toc = book.get("table_of_contents", {})
+        chapters = current_toc.get("chapters", [])
 
-    if flat:
-        # Return flat list of all chapters and subchapters
-        def flatten_chapters(chapter_list, result=None):
-            if result is None:
-                result = []
-            for chapter in chapter_list:
-                result.append(
-                    {
-                        "id": chapter.get("id"),
-                        "title": chapter.get("title"),
-                        "description": chapter.get("description", ""),
-                        "level": chapter.get("level", 1),
-                        "order": chapter.get("order", 0),
-                    }
-                )
-                if chapter.get("subchapters"):
-                    flatten_chapters(chapter["subchapters"], result)
-            return result
+        if flat:
+            # Return flat list of all chapters and subchapters
+            def flatten_chapters(chapter_list, result=None):
+                if result is None:
+                    result = []
+                for chapter in chapter_list:
+                    result.append(
+                        {
+                            "id": chapter.get("id"),
+                            "title": chapter.get("title"),
+                            "description": chapter.get("description", ""),
+                            "level": chapter.get("level", 1),
+                            "order": chapter.get("order", 0),
+                        }
+                    )
+                    if chapter.get("subchapters"):
+                        flatten_chapters(chapter["subchapters"], result)
+                return result
 
-        flat_chapters = flatten_chapters(chapters)
-        return {
-            "book_id": book_id,
-            "chapters": flat_chapters,
-            "total_chapters": len(flat_chapters),
-            "structure": "flat",
-            "success": True,
-        }
-    else:
-        # Return hierarchical structure
-        return {
-            "book_id": book_id,
-            "chapters": chapters,
-            "total_chapters": current_toc.get("total_chapters", len(chapters)),
-            "structure": "hierarchical",
-            "success": True,
-        }
+            flat_chapters = flatten_chapters(chapters)
+            return {
+                "book_id": book_id,
+                "chapters": flat_chapters,
+                "total_chapters": len(flat_chapters),
+                "structure": "flat",
+                "success": True,
+            }
+        else:
+            # Return hierarchical structure
+            return {
+                "book_id": book_id,
+                "chapters": chapters,
+                "total_chapters": current_toc.get("total_chapters", len(chapters)),
+                "structure": "hierarchical",
+                "success": True,
+            }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Failed to list chapters", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list chapters")
 
 
 # Enhanced Chapter Metadata and Tab Management Endpoints
@@ -482,27 +502,26 @@ async def update_chapter_status_bulk(
             status_code=403, detail="Not authorized to modify this book's chapters"
         )
 
-    # Get current TOC
+    # Get current TOC. The version read here is used as the optimistic-locking
+    # baseline: the persist below only succeeds if the TOC hasn't changed since.
     current_toc = book.get("table_of_contents", {})
     chapters = current_toc.get("chapters", [])
+    current_version = current_toc.get("version", 1)
 
-    # Collect current statuses for validation
+    # Collect current statuses and validate transitions up front (so an invalid
+    # transition still surfaces as a 400 before any write).
     chapter_statuses = {}
     updated_chapters = []
 
-    def collect_and_update_statuses(chapter_list):
+    def collect_and_validate_statuses(chapter_list):
         for chapter in chapter_list:
             if chapter.get("id") in update_data.chapter_ids:
                 current_status = chapter.get("status", ChapterStatus.DRAFT.value)
-                chapter_statuses[chapter["id"]] = current_status
 
-                # Validate transition
                 if chapter_status_service.validate_status_transition(
                     current_status, update_data.status.value
                 ):
-                    chapter["status"] = update_data.status.value
-                    if update_data.update_timestamp:
-                        chapter["last_modified"] = datetime.now(timezone.utc)
+                    chapter_statuses[chapter["id"]] = current_status
                     updated_chapters.append(chapter["id"])
                 else:
                     raise HTTPException(
@@ -512,27 +531,49 @@ async def update_chapter_status_bulk(
 
             # Process subchapters
             if chapter.get("subchapters"):
-                collect_and_update_statuses(chapter["subchapters"])
+                collect_and_validate_statuses(chapter["subchapters"])
 
-    collect_and_update_statuses(chapters)
+    collect_and_validate_statuses(chapters)
 
     if not updated_chapters:
         raise HTTPException(status_code=404, detail="No matching chapters found")
 
-    # Update TOC in database
-    updated_toc = {
-        **current_toc,
-        "chapters": chapters,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "edited",
-        "version": current_toc.get("version", 1) + 1,
-    }
-
-    update_book_data = {
-        "table_of_contents": updated_toc,
-        "updated_at": datetime.now(timezone.utc),
-    }
-    await update_book(book_id, update_book_data, current_user.get("auth_id"))
+    # Persist through the optimistic-concurrency helper so a concurrent TOC edit
+    # produces a clean 409 instead of silently clobbering the other write.
+    try:
+        await update_chapter_statuses_with_version_guard(
+            book_id=book_id,
+            chapter_ids=updated_chapters,
+            new_status=update_data.status.value,
+            user_auth_id=current_user.get("auth_id"),
+            expected_version=current_version,
+            update_timestamp=update_data.update_timestamp,
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        msg = str(e)
+        low = msg.lower()
+        if "version conflict" in low:
+            raise HTTPException(
+                status_code=409,
+                detail="The TOC has been modified by another user. Please refresh and try again.",
+            )
+        elif "not authorized" in low:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to modify this book's chapters"
+            )
+        elif "no matching chapters" in low:
+            raise HTTPException(status_code=404, detail="No matching chapters found")
+        elif "not found" in low:
+            raise HTTPException(status_code=404, detail="Book not found")
+        else:
+            raise HTTPException(status_code=400, detail=msg)
+    except Exception:
+        logger.error("Failed to bulk-update chapter statuses", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="Failed to update chapter statuses"
+        )
 
     # Log the bulk status change
     for chapter_id in updated_chapters:
@@ -566,27 +607,33 @@ async def save_tab_state(
     """
     Save current tab state for persistence across sessions.
     """
-    # Verify book ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book"
+    try:
+        # Verify book ownership
+        book = await get_book_by_id(book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+        if book.get("owner_id") != current_user.get("auth_id"):
+            raise HTTPException(
+                status_code=403, detail="Not authorized to access this book"
+            )
+
+        # Save tab state via access logging service
+        log_id = await chapter_access_service.save_tab_state(
+            user_id=current_user.get("auth_id"),
+            book_id=book_id,
+            active_chapter_id=tab_state.active_chapter_id,
+            open_tab_ids=tab_state.open_tab_ids,
+            tab_order=tab_state.tab_order,
         )
 
-    # Save tab state via access logging service
-    log_id = await chapter_access_service.save_tab_state(
-        user_id=current_user.get("auth_id"),
-        book_id=book_id,
-        active_chapter_id=tab_state.active_chapter_id,
-        open_tab_ids=tab_state.open_tab_ids,
-        tab_order=tab_state.tab_order,
-    )
-
-    return {
-        "book_id": book_id,
-        "tab_state_id": log_id,
-        "success": True,
-        "message": "Tab state saved successfully",
-    }
+        return {
+            "book_id": book_id,
+            "tab_state_id": log_id,
+            "success": True,
+            "message": "Tab state saved successfully",
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Failed to save tab state", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to save tab state")

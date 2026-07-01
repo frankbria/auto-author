@@ -328,3 +328,129 @@ async def test_update_toc_failed_write_raises(seed_book, monkeypatch):
     monkeypatch.setattr(tx.books_collection, "update_one", _fake_update_one)
     with pytest.raises(ValueError, match="Failed to update TOC"):
         await tx.update_toc_with_transaction(book_id, {"chapters": []}, owner)
+
+
+# ---------------------------------------------------------------------------
+# update_chapter_statuses_with_version_guard  (issue #159)
+# ---------------------------------------------------------------------------
+
+
+def _toc(version=1, chapters=None):
+    return {"version": version, "status": "generated", "chapters": chapters or []}
+
+
+@pytest.mark.asyncio
+async def test_bulk_status_helper_happy_increments_version(seed_book):
+    toc = _toc(version=3, chapters=[
+        {"id": "c1", "title": "C1", "status": "draft"},
+        {"id": "c2", "title": "C2", "status": "draft"},
+    ])
+    book_id, owner = await seed_book(toc=toc)
+
+    result = await tx.update_chapter_statuses_with_version_guard(
+        book_id=book_id,
+        chapter_ids=["c1"],
+        new_status="in-progress",
+        user_auth_id=owner,
+        expected_version=3,
+    )
+
+    assert result["updated_chapters"] == ["c1"]
+    stored = await _get_toc(book_id)
+    assert stored["version"] == 4
+    statuses = {c["id"]: c["status"] for c in stored["chapters"]}
+    assert statuses == {"c1": "in-progress", "c2": "draft"}
+
+    # The book-level audit entry the previous update_book() path emitted is preserved.
+    audit = await tx._db.get_collection("audit_logs").find_one(
+        {"target_id": book_id, "action": "book_update"}
+    )
+    assert audit is not None
+    assert "table_of_contents" in audit["details"]["updated_fields"]
+
+
+@pytest.mark.asyncio
+async def test_bulk_status_helper_stale_version_conflicts(seed_book):
+    """A stale expected_version must NOT overwrite — this is the lost-update fix."""
+    toc = _toc(version=5, chapters=[{"id": "c1", "title": "C1", "status": "draft"}])
+    book_id, owner = await seed_book(toc=toc)
+
+    with pytest.raises(ValueError, match="Version conflict"):
+        await tx.update_chapter_statuses_with_version_guard(
+            book_id=book_id,
+            chapter_ids=["c1"],
+            new_status="in-progress",
+            user_auth_id=owner,
+            expected_version=4,  # stale
+        )
+
+    # Nothing was written.
+    stored = await _get_toc(book_id)
+    assert stored["version"] == 5
+    assert stored["chapters"][0]["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_bulk_status_helper_updates_nested_subchapter(seed_book):
+    toc = _toc(version=1, chapters=[
+        {"id": "p1", "title": "P", "status": "draft", "subchapters": [
+            {"id": "s1", "title": "S", "status": "draft"},
+        ]},
+    ])
+    book_id, owner = await seed_book(toc=toc)
+
+    result = await tx.update_chapter_statuses_with_version_guard(
+        book_id=book_id, chapter_ids=["s1"], new_status="in-progress",
+        user_auth_id=owner, expected_version=1,
+    )
+
+    assert result["updated_chapters"] == ["s1"]
+    stored = await _get_toc(book_id)
+    assert stored["chapters"][0]["subchapters"][0]["status"] == "in-progress"
+
+
+@pytest.mark.asyncio
+async def test_bulk_status_helper_no_matching_chapters(seed_book):
+    toc = _toc(version=1, chapters=[{"id": "c1", "title": "C1", "status": "draft"}])
+    book_id, owner = await seed_book(toc=toc)
+
+    with pytest.raises(ValueError, match="No matching chapters found"):
+        await tx.update_chapter_statuses_with_version_guard(
+            book_id=book_id, chapter_ids=["nope"], new_status="in-progress",
+            user_auth_id=owner, expected_version=1,
+        )
+
+
+@pytest.mark.asyncio
+async def test_bulk_status_helper_timestamp_sets_last_modified(seed_book):
+    toc = _toc(version=1, chapters=[{"id": "c1", "title": "C1", "status": "draft"}])
+    book_id, owner = await seed_book(toc=toc)
+
+    await tx.update_chapter_statuses_with_version_guard(
+        book_id=book_id, chapter_ids=["c1"], new_status="in-progress",
+        user_auth_id=owner, expected_version=1, update_timestamp=True,
+    )
+
+    stored = await _get_toc(book_id)
+    assert stored["chapters"][0].get("last_modified") is not None
+
+
+@pytest.mark.asyncio
+async def test_bulk_status_helper_book_not_found(motor_reinit_db):
+    with pytest.raises(ValueError, match="Book not found"):
+        await tx.update_chapter_statuses_with_version_guard(
+            book_id=str(ObjectId()), chapter_ids=["c1"], new_status="in-progress",
+            user_auth_id="someone", expected_version=1,
+        )
+
+
+@pytest.mark.asyncio
+async def test_bulk_status_helper_wrong_owner_not_authorized(seed_book):
+    toc = _toc(version=1, chapters=[{"id": "c1", "title": "C1", "status": "draft"}])
+    book_id, _ = await seed_book(toc=toc, owner_id="real-owner")
+
+    with pytest.raises(ValueError, match="[Nn]ot authorized"):
+        await tx.update_chapter_statuses_with_version_guard(
+            book_id=book_id, chapter_ids=["c1"], new_status="in-progress",
+            user_auth_id="intruder", expected_version=1,
+        )
