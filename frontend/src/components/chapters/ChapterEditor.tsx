@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -26,6 +26,7 @@ declare module '@tiptap/react' {
   }
 }
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import bookClient from '@/lib/api/bookClient';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
@@ -92,8 +93,47 @@ export function ChapterEditor({
   // Snapshot + target range before a content enhancement, for single-level revert (#57).
   const [preEnhanceContent, setPreEnhanceContent] = useState<string | null>(null);
   const enhanceRangeRef = useRef<{ from: number; to: number } | null>(null);
-  // Toggle between writing the chapter and answering its interview questions (#105/#54).
-  const [view, setView] = useState<'write' | 'questions'>('write');
+  // Toggle between writing the chapter and answering its interview questions (#105/#54/#110).
+  // Radix Tabs values: 'editor' = writing view, 'questions' = interview questions.
+  // Default is the writing view (matches shipped UX + editor-focused unit tests); the
+  // last choice is remembered per chapter in sessionStorage.
+  const viewStorageKey = `chapterQuestionsTab_${bookId}_${chapterId}`;
+  // Default to the writing view. The saved per-chapter choice is restored in the
+  // effect below (not the initializer) so it (a) re-runs when this editor is
+  // reused for a different chapter — TabContent renders it without a key — and
+  // (b) can't cause an SSR hydration mismatch.
+  const [view, setView] = useState<'questions' | 'editor'>('editor');
+
+  const handleViewChange = useCallback(
+    (next: string) => {
+      if (next !== 'questions' && next !== 'editor') return;
+      setView(next);
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(viewStorageKey, next);
+        } catch {
+          // Persisting the tab choice is best-effort.
+        }
+      }
+    },
+    [viewStorageKey]
+  );
+
+  // Restore (or reset) the tab whenever the chapter changes.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = sessionStorage.getItem(viewStorageKey);
+      setView(saved === 'questions' || saved === 'editor' ? saved : 'editor');
+    } catch {
+      setView('editor');
+    }
+  }, [viewStorageKey]);
+
+  // Keyboard access to the tabs is Radix's native arrow-key roving (WCAG tab
+  // pattern) plus clicking. Ctrl+digit is intentionally NOT bound here — it is
+  // owned by the ChapterTabs chapter quick-switch (Ctrl+1..9), so binding it to
+  // the view toggle would hijack chapter navigation.
 
   const router = useRouter();
 
@@ -433,42 +473,48 @@ export function ChapterEditor({
         </div>
       )}
 
-      {/* Write / Interview Questions view toggle (#105/#54) */}
-      <div className="border-b border-border px-2 py-1 bg-muted/20 flex gap-1 items-center" role="tablist" aria-label="Chapter editor view">
-        <Button
-          size="sm"
-          variant={view === 'write' ? 'default' : 'ghost'}
-          onClick={() => setView('write')}
-          role="tab"
-          aria-selected={view === 'write'}
-          className="text-xs"
+      {/* Interview Questions / Chapter Editor tabs (#105/#54/#110) */}
+      <Tabs
+        value={view}
+        onValueChange={handleViewChange}
+        className="flex-1 flex flex-col min-h-0"
+      >
+        <TabsList
+          className="w-full justify-start rounded-none border-b border-border bg-muted/20 h-auto px-2 py-1"
+          aria-label="Chapter editor view"
         >
-          Write
-        </Button>
-        <Button
-          size="sm"
-          variant={view === 'questions' ? 'default' : 'ghost'}
-          onClick={() => setView('questions')}
-          role="tab"
-          aria-selected={view === 'questions'}
-          className="text-xs"
-        >
-          Interview Questions
-        </Button>
-      </div>
+          <TabsTrigger
+            value="questions"
+            data-testid="chapter-tab"
+            data-tab="questions"
+            className="text-xs"
+          >
+            Interview Questions
+          </TabsTrigger>
+          <TabsTrigger
+            value="editor"
+            data-testid="chapter-tab"
+            data-tab="draft"
+            className="text-xs"
+          >
+            Chapter Editor
+          </TabsTrigger>
+        </TabsList>
 
-      {view === 'questions' ? (
-        <div className="flex-1 overflow-auto">
+        <TabsContent value="questions" className="flex-1 overflow-auto mt-0">
           <QuestionContainer
             bookId={bookId}
             chapterId={chapterId}
             chapterTitle={chapterTitle}
             onDraftGenerated={handleDraftGenerated}
-            onSwitchToEditor={() => setView('write')}
+            onSwitchToEditor={() => handleViewChange('editor')}
           />
-        </div>
-      ) : (
-      <>
+        </TabsContent>
+
+        {/* No display utility (flex/grid) on TabsContent — it would override
+            Radix's `hidden` attribute and leave the inactive panel visible. */}
+        <TabsContent value="editor" className="flex-1 min-h-0 mt-0">
+        <div className="h-full flex flex-col min-h-0">
       {/* Editor Toolbar */}
       <div className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center justify-between">
         <div className="flex flex-wrap gap-1 items-center">
@@ -766,8 +812,9 @@ export function ChapterEditor({
           {isSaving ? 'Saving...' : 'Save'}
         </Button>
       </div>
-      </>
-      )}
+        </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

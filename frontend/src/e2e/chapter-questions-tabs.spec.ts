@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   createTestBookWithTOC,
   deleteTestBook,
@@ -8,21 +8,36 @@ import {
 } from './helpers/testData';
 
 /**
- * E2E tests for ChapterQuestions tab navigation
+ * E2E tests for the chapter editor's Interview Questions / Chapter Editor tabs.
  *
- * Tests the Radix UI tabs implementation including:
+ * These are the Radix UI tabs wired into ChapterEditor by #110 (building on the
+ * #105 interview-questions integration). They cover:
  * - Tab click switching
- * - Keyboard navigation (Ctrl+1, Ctrl+2, Ctrl+Tab)
- * - Session storage persistence
- * - Accessibility compliance
+ * - Keyboard navigation (Radix arrow-key roving; Ctrl+digit is owned by the
+ *   ChapterTabs chapter quick-switch and is intentionally not bound here)
+ * - Session storage persistence (per-chapter, key `chapterQuestionsTab_*`)
+ * - Accessibility (role=tablist/tab/tabpanel, aria-selected, focus ring)
+ *
+ * The writing/editor view is the default; tests explicitly activate the tab
+ * they assert on rather than assuming questions is pre-selected.
  *
  * Requirements:
- * - Backend running with MongoDB connection (MONGODB_URI for Atlas)
+ * - Backend running with MongoDB connection
  * - Frontend running (localhost:3000)
  * - BYPASS_AUTH=true for test authentication
+ * The TOC here uses the deterministic POST /toc path (no AI), so these run in CI.
  */
 
-test.describe('ChapterQuestions Tabs Navigation', () => {
+/**
+ * Open the first chapter from the sidebar. The inner editor tab triggers also
+ * carry data-testid="chapter-tab", so scope to the sidebar tabs (no data-tab).
+ */
+async function openFirstChapter(page: Page): Promise<void> {
+  await page.locator('[data-testid="chapter-tab"]:not([data-tab])').first().click();
+  await page.waitForLoadState('networkidle');
+}
+
+test.describe('Chapter Editor Tabs Navigation', () => {
 
   let testBook: TestBook;
   let testChapters: TestChapter[];
@@ -31,7 +46,7 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
     // Create test book with chapters for each test
     const result = await createTestBookWithTOC(page, {
       title: `Tabs Test Book ${Date.now()}`,
-      description: 'Test book for ChapterQuestions tabs E2E tests'
+      description: 'Test book for chapter editor tabs E2E tests'
     });
     testBook = result.book;
     testChapters = result.chapters;
@@ -48,41 +63,40 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
   });
 
   test.describe('Tab Click Navigation', () => {
-    // SKIP: asserts on ChapterQuestions "Interview Questions"/"Chapter Editor" tabs,
-    // which are not wired into the live editor yet. Tracked in #110.
-    test.skip('user can click tabs to switch between questions and editor', async ({ page }) => {
-      // Click on first chapter tab to open ChapterQuestions
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
+    test('user can click tabs to switch between questions and editor', async ({ page }) => {
+      await openFirstChapter(page);
 
-      // Verify Interview Questions tab is visible and active
       const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
-      await expect(questionsTab).toBeVisible();
-      await expect(questionsTab).toHaveAttribute('aria-selected', 'true');
-
-      // Click on Chapter Editor tab if available
       const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
-      if (await editorTab.isVisible()) {
-        await editorTab.click();
 
-        // Verify editor tab is now active
-        await expect(editorTab).toHaveAttribute('aria-selected', 'true');
-        await expect(questionsTab).toHaveAttribute('aria-selected', 'false');
-      }
+      await expect(questionsTab).toBeVisible();
+      await expect(editorTab).toBeVisible();
+
+      // Editor is the default active view.
+      await expect(editorTab).toHaveAttribute('aria-selected', 'true');
+      await expect(questionsTab).toHaveAttribute('aria-selected', 'false');
+
+      // Switch to questions.
+      await questionsTab.click();
+      await expect(questionsTab).toHaveAttribute('aria-selected', 'true');
+      await expect(editorTab).toHaveAttribute('aria-selected', 'false');
+
+      // Switch back to the editor.
+      await editorTab.click();
+      await expect(editorTab).toHaveAttribute('aria-selected', 'true');
+      await expect(questionsTab).toHaveAttribute('aria-selected', 'false');
     });
 
-    // SKIP: depends on ChapterQuestions tabs not yet wired into the editor. Tracked in #110.
-    test.skip('active tab has visual indicator', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
+    test('active tab has visual indicator', async ({ page }) => {
+      await openFirstChapter(page);
 
-      const activeTab = page.getByRole('tab', { name: /Interview Questions/i });
+      const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
+      await questionsTab.click();
 
-      // Verify the active tab has the correct state attribute
-      await expect(activeTab).toHaveAttribute('data-state', 'active');
+      // Radix marks the active trigger with data-state="active".
+      await expect(questionsTab).toHaveAttribute('data-state', 'active');
 
-      // Optionally check for visual styling (shadow, background)
-      const hasActiveStyles = await activeTab.evaluate((el) => {
+      const hasActiveStyles = await questionsTab.evaluate((el) => {
         const styles = window.getComputedStyle(el);
         return styles.boxShadow !== 'none' || styles.backgroundColor !== 'transparent';
       });
@@ -91,200 +105,124 @@ test.describe('ChapterQuestions Tabs Navigation', () => {
   });
 
   test.describe('Keyboard Navigation', () => {
-    test('Ctrl+1 switches to Interview Questions tab', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
-
-      // First switch to editor tab if available
-      const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
-      if (await editorTab.isVisible()) {
-        await editorTab.click();
-        await expect(editorTab).toHaveAttribute('aria-selected', 'true');
-
-        // Press Ctrl+1
-        await page.keyboard.press('Control+1');
-
-        // Verify questions tab is active
-        const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
-        await expect(questionsTab).toHaveAttribute('aria-selected', 'true');
-      }
-    });
-
-    // SKIP: depends on ChapterQuestions tabs not yet wired into the editor. Tracked in #110.
-    test.skip('Ctrl+2 switches to Chapter Editor tab', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
-
-      // Verify questions tab is active initially
-      const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
-      await expect(questionsTab).toHaveAttribute('aria-selected', 'true');
-
-      // Press Ctrl+2
-      await page.keyboard.press('Control+2');
-
-      // Verify editor tab is active
-      const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
-      if (await editorTab.isVisible()) {
-        await expect(editorTab).toHaveAttribute('aria-selected', 'true');
-      }
-    });
-
-    test('Ctrl+Tab cycles through tabs', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
-
-      const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
-      const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
-
-      if (await editorTab.isVisible()) {
-        // Verify questions tab is active initially
-        await expect(questionsTab).toHaveAttribute('aria-selected', 'true');
-
-        // Press Ctrl+Tab to go to next tab
-        await page.keyboard.press('Control+Tab');
-        await expect(editorTab).toHaveAttribute('aria-selected', 'true');
-
-        // Press Ctrl+Tab again to cycle back
-        await page.keyboard.press('Control+Tab');
-        await expect(questionsTab).toHaveAttribute('aria-selected', 'true');
-      }
-    });
-
+    // NOTE: Ctrl+digit shortcuts are intentionally NOT bound to the view toggle —
+    // ChapterTabs owns Ctrl+1..9 for chapter quick-switch. Tabs are keyboard-
+    // operable via Radix's native arrow-key roving (the WCAG tab pattern) below.
     test('Arrow keys navigate between tabs', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
+      await openFirstChapter(page);
 
       const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
       const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
 
-      if (await editorTab.isVisible()) {
-        // Focus the questions tab
-        await questionsTab.focus();
-
-        // Press ArrowRight to move to editor tab
-        await page.keyboard.press('ArrowRight');
-
-        // Editor tab should be focused
-        await expect(editorTab).toBeFocused();
-      }
+      // Radix roving focus: ArrowRight moves focus to the next tab.
+      await questionsTab.focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(editorTab).toBeFocused();
     });
   });
 
   test.describe('Session Storage Persistence', () => {
     test('tab state persists during session', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
+      await openFirstChapter(page);
 
+      const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
       const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
-      if (await editorTab.isVisible()) {
-        // Switch to editor tab
-        await editorTab.click();
-        await expect(editorTab).toHaveAttribute('aria-selected', 'true');
 
-        // Verify sessionStorage was updated
-        const storageValue = await page.evaluate(() => {
-          // Find the storage key that matches the pattern
-          for (let i = 0; i < sessionStorage.length; i++) {
-            const key = sessionStorage.key(i);
-            if (key && key.startsWith('chapterQuestionsTab_')) {
-              return sessionStorage.getItem(key);
-            }
+      // Switch away then to the editor so onValueChange fires and persists.
+      await questionsTab.click();
+      await editorTab.click();
+      await expect(editorTab).toHaveAttribute('aria-selected', 'true');
+
+      const storageValue = await page.evaluate(() => {
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key && key.startsWith('chapterQuestionsTab_')) {
+            return sessionStorage.getItem(key);
           }
-          return null;
-        });
+        }
+        return null;
+      });
 
-        expect(storageValue).toBe('editor');
-      }
+      expect(storageValue).toBe('editor');
     });
 
     test('tab state is restored after navigation', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
+      await openFirstChapter(page);
+
+      // Select the non-default (questions) tab so the restore is meaningful.
+      await page.getByRole('tab', { name: /Interview Questions/i }).click();
+      await expect(
+        page.getByRole('tab', { name: /Interview Questions/i })
+      ).toHaveAttribute('aria-selected', 'true');
+
+      // Navigate away and back (sessionStorage survives same-tab navigation).
+      await page.goto('/dashboard');
       await page.waitForLoadState('networkidle');
+      await navigateToBookEditor(page, testBook.id);
+      await openFirstChapter(page);
 
-      const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
-      if (await editorTab.isVisible()) {
-        // Switch to editor tab
-        await editorTab.click();
-
-        // Navigate away and back
-        await page.goto('/dashboard');
-        await page.waitForLoadState('networkidle');
-        await navigateToBookEditor(page, testBook.id);
-        await page.locator('[data-testid="chapter-tab"]').first().click();
-
-        // Verify editor tab is still active (restored from session storage)
-        await expect(editorTab).toHaveAttribute('aria-selected', 'true');
-      }
+      // Questions tab is restored active from session storage.
+      await expect(
+        page.getByRole('tab', { name: /Interview Questions/i })
+      ).toHaveAttribute('aria-selected', 'true');
     });
   });
 
   test.describe('Tab Content', () => {
-    test('tab switching does not lose question progress', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
+    // AI-dependent: exercising a real answer textarea requires generated
+    // questions (generate-questions is an AI call), which CI cannot run without
+    // an OpenAI key. Tab-switching state preservation is otherwise covered by
+    // the persistence tests above. Tracked with the journey spec (needs AI).
+    test.skip('tab switching does not lose question progress', async ({ page }) => {
+      await openFirstChapter(page);
 
-      // Find a question response textarea and enter some text
       const textarea = page.getByPlaceholder(/response/i);
-      if (await textarea.isVisible()) {
-        await textarea.fill('Test response text');
+      await textarea.fill('Test response text');
 
-        // Switch to editor tab and back
-        const editorTab = page.getByRole('tab', { name: /Chapter Editor/i });
-        if (await editorTab.isVisible()) {
-          await editorTab.click();
+      await page.getByRole('tab', { name: /Chapter Editor/i }).click();
+      await page.getByRole('tab', { name: /Interview Questions/i }).click();
 
-          const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
-          await questionsTab.click();
-
-          // Verify the text is still there
-          await expect(textarea).toHaveValue('Test response text');
-        }
-      }
+      await expect(textarea).toHaveValue('Test response text');
     });
   });
 
   test.describe('Accessibility', () => {
-    // SKIP: depends on ChapterQuestions tabs not yet wired into the editor. Tracked in #110.
-    test.skip('tabs have proper ARIA attributes', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
+    test('tabs have proper ARIA attributes', async ({ page }) => {
+      await openFirstChapter(page);
 
-      // Verify tablist role
-      const tablist = page.getByRole('tablist');
+      const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
+      await questionsTab.click();
+
+      // The editor's tablist is uniquely labeled.
+      const tablist = page.getByRole('tablist', { name: /chapter editor view/i });
       await expect(tablist).toBeVisible();
 
-      // Verify tab role and aria-selected
-      const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
-      await expect(questionsTab).toHaveRole('tab');
       await expect(questionsTab).toHaveAttribute('aria-selected', 'true');
 
-      // Verify tabpanel role
-      const tabpanel = page.getByRole('tabpanel');
+      // The active tabpanel is labelled by its trigger ("Interview Questions").
+      const tabpanel = page.getByRole('tabpanel', { name: /Interview Questions/i });
       await expect(tabpanel).toBeVisible();
       await expect(tabpanel).toHaveAttribute('aria-labelledby');
     });
 
-    // SKIP: depends on ChapterQuestions tabs not yet wired into the editor. Tracked in #110.
-    test.skip('focus is visible on tabs', async ({ page }) => {
-      await page.locator('[data-testid="chapter-tab"]').first().click();
-      await page.waitForLoadState('networkidle');
+    test('focus is visible on tabs', async ({ page }) => {
+      await openFirstChapter(page);
 
       const questionsTab = page.getByRole('tab', { name: /Interview Questions/i });
 
-      // Focus the tab
       await questionsTab.focus();
       await expect(questionsTab).toBeFocused();
 
-      // Verify focus ring is visible (check for ring styles)
+      // A focus-visible ring is defined on the trigger (Tailwind utility) and/or
+      // an active-state shadow is present.
       const hasFocusRing = await questionsTab.evaluate((el) => {
         const styles = window.getComputedStyle(el);
-        // Check for focus-visible ring styles
-        return styles.outlineStyle !== 'none' ||
-               styles.boxShadow.includes('ring') ||
-               el.classList.contains('focus-visible');
+        return (
+          styles.outlineStyle !== 'none' ||
+          styles.boxShadow !== 'none' ||
+          el.className.includes('focus-visible:ring')
+        );
       });
-
-      // The focus indicator should be visible in some form
       expect(hasFocusRing).toBeTruthy();
     });
   });
