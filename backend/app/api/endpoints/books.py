@@ -47,6 +47,7 @@ from app.schemas.book import (
     QuestionRating,
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
+    RegenerateQuestionRequest,
     QuestionListParams,
     QuestionListResponse,
     QuestionProgressResponse,
@@ -77,7 +78,11 @@ from app.services.ai_errors import (
 )
 from app.services.chapter_access_service import chapter_access_service
 from app.services.chapter_status_service import chapter_status_service
-from app.services.question_generation_service import get_question_generation_service
+from app.services.question_generation_service import (
+    get_question_generation_service,
+    RegenerationLimitError,
+    QuestionNotFoundError,
+)
 from bson import ObjectId
 
 logger = logging.getLogger(__name__)
@@ -2251,6 +2256,96 @@ async def rate_question(
             question_id=question_id,
             user_id=current_user.get("auth_id"),
             rating_value=rating_data.rating,
+            request_id=request_id
+        )
+
+
+@router.post(
+    "/{book_id}/chapters/{chapter_id}/questions/{question_id}/regenerate",
+    response_model=Question
+)
+async def regenerate_single_question(
+    book_id: str,
+    chapter_id: str,
+    question_id: str,
+    request_data: RegenerateQuestionRequest = Body(default=RegenerateQuestionRequest()),
+    current_user: Dict = Depends(get_current_user_from_session),
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=2, window=180)),  # 2 per 3 minutes
+):
+    """
+    Regenerate a single question, replacing it with a fresh, meaningfully different one.
+
+    The new question avoids duplicating the chapter's other questions and incorporates any
+    prior rating feedback. Each question may be regenerated up to a fixed limit.
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - QUESTION_NOT_FOUND (404): Question does not exist or isn't owned by the user
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - REGENERATION_LIMIT_REACHED (429): Question hit its regeneration cap
+        - RATE_LIMIT_EXCEEDED (429): Too many requests
+        - QUESTION_GENERATION_FAILED (500/503): Regeneration failed
+    """
+    request_id = generate_request_id()
+
+    # Get the book and verify ownership
+    book = await get_book_by_id(book_id)
+    if not book:
+        raise handle_book_not_found(book_id, request_id)
+
+    if book.get("owner_id") != current_user.get("auth_id"):
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
+        )
+
+    question_service = get_question_generation_service()
+
+    try:
+        result = await question_service.regenerate_single_question(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            question_id=question_id,
+            user_id=current_user.get("auth_id"),
+            focus=request_data.focus.value if request_data.focus else None,
+        )
+
+        await audit_request(
+            request=None,
+            current_user=current_user,
+            action="regenerate_single_question",
+            resource_type="question",
+            target_id=question_id,
+            metadata={
+                "book_id": book_id,
+                "chapter_id": chapter_id,
+                "focus": request_data.focus.value if request_data.focus else None,
+                "regeneration_count": result.regeneration_count,
+                "request_id": request_id,
+            }
+        )
+
+        return result
+
+    except QuestionNotFoundError:
+        raise handle_question_not_found(question_id, request_id)
+    except RegenerationLimitError as e:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "REGENERATION_LIMIT_REACHED",
+                "message": str(e),
+                "request_id": request_id,
+            }
+        )
+    except Exception as e:
+        raise handle_question_generation_error(
+            error=e,
+            book_id=book_id,
+            chapter_id=chapter_id,
             request_id=request_id
         )
 

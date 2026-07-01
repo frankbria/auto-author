@@ -52,8 +52,10 @@ from .questions import (
     save_question_response,
     get_question_response,
     save_question_rating,
+    get_ratings_for_chapter,
     get_chapter_question_progress,
     delete_questions_for_chapter,
+    delete_question_by_id,
     get_question_by_id,
 )
 
@@ -103,8 +105,10 @@ __all__ += [
     "save_question_response",
     "get_question_response",
     "save_question_rating",
+    "get_ratings_for_chapter",
     "get_chapter_question_progress",
     "delete_questions_for_chapter",
+    "delete_question_by_id",
     "get_question_by_id",
     # TOC transaction DAOs
     "update_toc_with_transaction",

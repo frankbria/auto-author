@@ -402,6 +402,43 @@ async def save_question_rating(
         return rating_dict
 
 
+async def get_ratings_for_chapter(
+    book_id: str,
+    chapter_id: str,
+    user_id: str
+) -> List[Dict[str, Any]]:
+    """Return this user's ratings for a chapter's questions, joined with question text.
+
+    Each item is ``{"question_text": str, "rating": int, "feedback": Optional[str]}``.
+    Used to feed prior feedback into regeneration prompts. Returns an empty list when
+    the chapter has no rated questions.
+    """
+    questions_collection = await get_collection("questions")
+    ratings_collection = await get_collection("question_ratings")
+
+    questions = await questions_collection.find({
+        "book_id": book_id,
+        "chapter_id": chapter_id,
+        "user_id": user_id
+    }).to_list(length=None)
+
+    results: List[Dict[str, Any]] = []
+    for question in questions:
+        question_id = str(question["_id"])
+        rating = await ratings_collection.find_one({
+            "question_id": question_id,
+            "user_id": user_id
+        })
+        if rating:
+            results.append({
+                "question_text": question.get("question_text", ""),
+                "rating": rating.get("rating"),
+                "feedback": rating.get("feedback"),
+            })
+
+    return results
+
+
 async def get_chapter_question_progress(
     book_id: str,
     chapter_id: str,
@@ -553,6 +590,31 @@ async def get_question_by_id(question_id: str, user_id: str) -> Optional[Dict[st
         return question
 
     return None
+
+
+async def delete_question_by_id(question_id: str, user_id: str) -> bool:
+    """Delete a single question (and its response) by id. Returns True if deleted."""
+    questions_collection = await get_collection("questions")
+    responses_collection = await get_collection("question_responses")
+
+    try:
+        object_id = ObjectId(question_id)
+    except Exception:
+        return False
+
+    result = await questions_collection.delete_one({
+        "_id": object_id,
+        "user_id": user_id
+    })
+
+    if result.deleted_count:
+        await responses_collection.delete_many({
+            "question_id": question_id,
+            "user_id": user_id
+        })
+        return True
+
+    return False
 
 
 async def save_question_responses_batch(

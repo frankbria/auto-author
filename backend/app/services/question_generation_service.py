@@ -19,6 +19,7 @@ from app.schemas.book import (
 )
 from app.services.ai_service import AIService
 from app.utils.validators import validate_text_safety
+from app.core.config import settings
 from app.db.database import (
     create_question,
     create_questions_batch,
@@ -26,13 +27,23 @@ from app.db.database import (
     save_question_response as db_save_question_response,
     get_question_response as db_get_question_response,
     save_question_rating as db_save_question_rating,
+    get_ratings_for_chapter as db_get_ratings_for_chapter,
     get_chapter_question_progress as db_get_chapter_question_progress,
     delete_questions_for_chapter,
+    delete_question_by_id,
     get_question_by_id,
     get_book_by_id,
 )
 
 logger = logging.getLogger(__name__)
+
+
+class RegenerationLimitError(Exception):
+    """Raised when a question has hit the per-question regeneration cap."""
+
+
+class QuestionNotFoundError(Exception):
+    """Raised when a question to regenerate does not exist or isn't owned by the user."""
 
 class QuestionGenerationService:
     """Service for generating and managing chapter-specific questions."""
@@ -40,44 +51,21 @@ class QuestionGenerationService:
     def __init__(self, ai_service: AIService):
         self.ai_service = ai_service
 
-    async def generate_questions_for_chapter(
+    async def _load_chapter_context(
         self,
         book_id: str,
-        chapter_id: str,
-        count: int = 10,
-        difficulty: Optional[str] = None,
-        focus: Optional[List[str]] = None,
-        user_id: str = None,
-        current_user: Dict[str, Any] = None
-    ) -> GenerateQuestionsResponse:
+        chapter_id: str
+    ) -> Dict[str, Any]:
+        """Load the chapter title/content and book metadata used to build prompts.
+
+        Raises ValueError if the book does not exist.
         """
-        Generate interview-style questions for a specific chapter and save them to the database.
-
-        Args:
-            book_id: The ID of the book
-            chapter_id: The ID of the chapter
-            count: Number of questions to generate (default: 10)
-            difficulty: Optional difficulty level for questions
-            focus: Optional list of question types to focus on
-            user_id: User ID for storing questions
-            current_user: Current user context
-
-        Returns:
-            GenerateQuestionsResponse with generated questions
-        """
-        logger.info(
-            f"Generating {count} questions for chapter {chapter_id} in book {book_id}"
-        )
-
-        # Get book and chapter info
         book = await get_book_by_id(book_id)
         if not book:
             raise ValueError("Book not found")
 
-        # Find chapter in TOC
         chapter_title = "Chapter"
         chapter_content = ""
-        chapter_description = ""
 
         def find_chapter(chapters):
             for ch in chapters:
@@ -96,14 +84,55 @@ class QuestionGenerationService:
         if chapter:
             chapter_title = chapter.get("title", "Chapter")
             chapter_content = chapter.get("content", "")
-            chapter_description = chapter.get("description", "")
 
-        # Prepare book metadata
-        book_metadata = {
-            "title": book.get("title", ""),
-            "genre": book.get("genre", ""),
-            "target_audience": book.get("target_audience", ""),
+        return {
+            "chapter_title": chapter_title,
+            "chapter_content": chapter_content,
+            "book_metadata": {
+                "title": book.get("title", ""),
+                "genre": book.get("genre", ""),
+                "target_audience": book.get("target_audience", ""),
+            },
         }
+
+    async def generate_questions_for_chapter(
+        self,
+        book_id: str,
+        chapter_id: str,
+        count: int = 10,
+        difficulty: Optional[str] = None,
+        focus: Optional[List[str]] = None,
+        user_id: str = None,
+        current_user: Dict[str, Any] = None,
+        previous_questions: Optional[List[str]] = None,
+        feedback_guidance: Optional[str] = None
+    ) -> GenerateQuestionsResponse:
+        """
+        Generate interview-style questions for a specific chapter and save them to the database.
+
+        Args:
+            book_id: The ID of the book
+            chapter_id: The ID of the chapter
+            count: Number of questions to generate (default: 10)
+            difficulty: Optional difficulty level for questions
+            focus: Optional list of question types to focus on
+            user_id: User ID for storing questions
+            current_user: Current user context
+            previous_questions: Existing question texts to avoid duplicating (regeneration)
+            feedback_guidance: Prompt guidance derived from prior user ratings (regeneration)
+
+        Returns:
+            GenerateQuestionsResponse with generated questions
+        """
+        logger.info(
+            f"Generating {count} questions for chapter {chapter_id} in book {book_id}"
+        )
+
+        # Get book and chapter info
+        context = await self._load_chapter_context(book_id, chapter_id)
+        chapter_title = context["chapter_title"]
+        chapter_content = context["chapter_content"]
+        book_metadata = context["book_metadata"]
 
         # Convert difficulty and focus to enum types
         difficulty_enum = None
@@ -134,7 +163,9 @@ class QuestionGenerationService:
                 book_metadata=book_metadata,
                 count=count,
                 difficulty=difficulty_enum,
-                focus_types=focus_types
+                focus_types=focus_types,
+                previous_questions=previous_questions,
+                feedback_guidance=feedback_guidance
             )
 
             # Save questions to database atomically using batch insert
@@ -285,6 +316,55 @@ class QuestionGenerationService:
         """Get question progress for a chapter."""
         return await db_get_chapter_question_progress(book_id, chapter_id, user_id)
 
+    @staticmethod
+    def _build_feedback_guidance(ratings: List[Dict[str, Any]]) -> Optional[str]:
+        """Turn prior question ratings into short prompt guidance, or None if no signal.
+
+        Only low ratings (<= 2 out of 5) are treated as actionable negative feedback.
+        """
+        if not ratings:
+            return None
+
+        low = [r for r in ratings if isinstance(r.get("rating"), int) and r["rating"] <= 2]
+        if not low:
+            return None
+
+        lines = [
+            "The author rated some earlier questions as unhelpful. Improve on them; "
+            "avoid the issues they had."
+        ]
+        for r in low:
+            feedback = (r.get("feedback") or "").strip()
+            if feedback:
+                lines.append(f"- \"{r.get('question_text', '')}\" — the author said: {feedback}")
+            else:
+                lines.append(f"- \"{r.get('question_text', '')}\" was rated poorly.")
+        return "\n".join(lines)
+
+    async def _gather_regeneration_context(
+        self,
+        book_id: str,
+        chapter_id: str,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """Collect existing question texts (for de-duplication) and feedback guidance."""
+        existing = await db_get_questions_for_chapter(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            user_id=user_id,
+            page=1,
+            limit=50
+        )
+        previous_questions = [q.question_text for q in existing.questions]
+
+        ratings = await db_get_ratings_for_chapter(book_id, chapter_id, user_id)
+        feedback_guidance = self._build_feedback_guidance(ratings)
+
+        return {
+            "previous_questions": previous_questions,
+            "feedback_guidance": feedback_guidance,
+        }
+
     async def regenerate_chapter_questions(
         self,
         book_id: str,
@@ -306,6 +386,10 @@ class QuestionGenerationService:
 
         user_id = user_id or current_user.get("auth_id")
 
+        # Capture existing questions + prior feedback BEFORE deleting, so the new
+        # questions can avoid duplicating them and can act on the author's feedback.
+        regen_context = await self._gather_regeneration_context(book_id, chapter_id, user_id)
+
         # Delete existing questions (preserving those with responses if requested)
         deleted_count = await delete_questions_for_chapter(
             book_id=book_id,
@@ -324,7 +408,9 @@ class QuestionGenerationService:
                 difficulty=difficulty,
                 focus=focus,
                 user_id=user_id,
-                current_user=current_user
+                current_user=current_user,
+                previous_questions=regen_context["previous_questions"],
+                feedback_guidance=regen_context["feedback_guidance"]
             )
 
             # Add metadata about the regeneration
@@ -341,6 +427,88 @@ class QuestionGenerationService:
                 total=0
             )
 
+    async def regenerate_single_question(
+        self,
+        book_id: str,
+        chapter_id: str,
+        question_id: str,
+        user_id: str,
+        focus: Optional[str] = None,
+    ) -> Question:
+        """Regenerate one individual question, replacing it with a fresh, different one.
+
+        Enforces the per-question regeneration cap, feeds the sibling questions in as
+        "avoid duplicating" context, and carries prior rating feedback into the prompt.
+        Raises QuestionNotFoundError (404) or RegenerationLimitError (429).
+        """
+        existing = await get_question_by_id(question_id, user_id)
+        if (
+            not existing
+            or existing.get("book_id") != book_id
+            or existing.get("chapter_id") != chapter_id
+        ):
+            raise QuestionNotFoundError("Question not found or access denied")
+
+        current_count = existing.get("regeneration_count", 0) or 0
+        if current_count >= settings.MAX_QUESTION_REGENERATION_COUNT:
+            raise RegenerationLimitError(
+                "Question has reached the maximum number of regenerations "
+                f"({settings.MAX_QUESTION_REGENERATION_COUNT})"
+            )
+
+        context = await self._load_chapter_context(book_id, chapter_id)
+        regen_context = await self._gather_regeneration_context(book_id, chapter_id, user_id)
+
+        # Focus: explicit override, else keep the original question's type
+        focus_types: List[QuestionType] = []
+        chosen_focus = focus or existing.get("question_type")
+        if chosen_focus:
+            try:
+                focus_types = [QuestionType(chosen_focus)]
+            except ValueError:
+                focus_types = []
+
+        # Keep the original difficulty when possible
+        difficulty_enum = None
+        raw_difficulty = existing.get("difficulty")
+        if raw_difficulty:
+            try:
+                difficulty_enum = QuestionDifficulty(raw_difficulty)
+            except ValueError:
+                difficulty_enum = None
+
+        # Generate the replacement BEFORE mutating anything (no partial state on AI failure).
+        candidates = await self.generate_chapter_questions(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            chapter_title=context["chapter_title"],
+            chapter_content=context["chapter_content"],
+            book_metadata=context["book_metadata"],
+            count=1,
+            difficulty=difficulty_enum,
+            focus_types=focus_types or None,
+            previous_questions=regen_context["previous_questions"],
+            feedback_guidance=regen_context["feedback_guidance"],
+        )
+        if not candidates:
+            raise Exception("Failed to generate a replacement question")
+
+        new_question = candidates[0]
+        # Preserve the question's slot and bump the per-question counter
+        new_question.order = existing.get("order", new_question.order)
+        new_question.regeneration_count = current_count + 1
+
+        # Delete the original FIRST and use it as the concurrency guard: a MongoDB
+        # delete_one on a unique _id matches for exactly one caller, so two racing
+        # regenerations of the same question can't both create a replacement (which
+        # would duplicate the slot and undercount regenerations). The loser aborts here.
+        deleted = await delete_question_by_id(question_id, user_id)
+        if not deleted:
+            raise QuestionNotFoundError("Question not found or already regenerated")
+
+        created = await create_question(new_question, user_id)
+        return Question(**created)
+
     async def generate_chapter_questions(
         self,
         book_id: str,
@@ -350,7 +518,9 @@ class QuestionGenerationService:
         book_metadata: Dict[str, Any],
         count: int = 10,
         difficulty: Optional[QuestionDifficulty] = None,
-        focus_types: Optional[List[QuestionType]] = None
+        focus_types: Optional[List[QuestionType]] = None,
+        previous_questions: Optional[List[str]] = None,
+        feedback_guidance: Optional[str] = None
     ) -> List[QuestionCreate]:
         """
         Generate interview-style questions for a specific chapter.
@@ -372,8 +542,9 @@ class QuestionGenerationService:
             f"Generating {count} questions for chapter {chapter_id} in book {book_id}"
         )
 
-        # Limit question count to reasonable range
-        count = max(3, min(count, 20))
+        # Clamp to a sane range. Floor of 1 supports single-question regeneration;
+        # bulk callers already pre-clamp to >= 3 before reaching here.
+        count = max(1, min(count, 20))
 
         # Prepare question generation prompt
         prompt = self._build_question_generation_prompt(
@@ -382,7 +553,9 @@ class QuestionGenerationService:
             book_metadata=book_metadata,
             count=count,
             difficulty=difficulty,
-            focus_types=focus_types
+            focus_types=focus_types,
+            previous_questions=previous_questions,
+            feedback_guidance=feedback_guidance
         )
 
         # Generate questions using AI service
@@ -420,7 +593,9 @@ class QuestionGenerationService:
         book_metadata: Dict[str, Any],
         count: int,
         difficulty: Optional[QuestionDifficulty] = None,
-        focus_types: Optional[List[QuestionType]] = None
+        focus_types: Optional[List[QuestionType]] = None,
+        previous_questions: Optional[List[str]] = None,
+        feedback_guidance: Optional[str] = None
     ) -> str:
         """Build the prompt for generating questions."""
 
@@ -492,6 +667,21 @@ class QuestionGenerationService:
             if focus_descriptions:
                 focus_text = ", ".join(focus_descriptions)
                 prompt += f"\n\nFocus the questions primarily on {focus_text}."
+
+        # Avoid regenerating duplicates of prior questions
+        if previous_questions:
+            prior = "\n".join(f"- {q}" for q in previous_questions if q)
+            if prior:
+                prompt += (
+                    "\n\nThe author has already seen the questions below. Generate "
+                    "meaningfully different questions and do NOT repeat or lightly "
+                    "reword any of them:\n"
+                    f"{prior}"
+                )
+
+        # Incorporate guidance derived from the author's prior ratings/feedback
+        if feedback_guidance:
+            prompt += f"\n\n{feedback_guidance}"
 
         # Add question structure guidance
         prompt += """

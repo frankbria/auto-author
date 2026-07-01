@@ -1,3 +1,6 @@
+// Per-question regeneration cap (mirrors backend MAX_QUESTION_REGENERATION_COUNT).
+export const MAX_REGENERATION_COUNT = 5;
+
 export enum QuestionType {
   CHARACTER = "character",
   PLOT = "plot",
@@ -35,6 +38,7 @@ export interface Question {
   metadata: QuestionMetadata;
   has_response?: boolean;
   response_status?: ResponseStatus;
+  regeneration_count?: number;
 }
 
 export interface QuestionResponse {

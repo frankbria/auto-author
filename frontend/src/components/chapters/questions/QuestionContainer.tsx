@@ -13,6 +13,7 @@ import QuestionGenerator from './QuestionGenerator';
 import QuestionDisplay from './QuestionDisplay';
 import QuestionProgress from './QuestionProgress';
 import QuestionNavigation from './QuestionNavigation';
+import RegenerateQuestionsDialog from './RegenerateQuestionsDialog';
 import { DraftGenerationButton } from './DraftGenerationButton';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ export default function QuestionContainer({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [progress, setProgress] = useState<QuestionProgressResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showRegenerateAll, setShowRegenerateAll] = useState(false);
 
   const isMobile = useMediaQuery('(max-width: 767px)');
   const isTablet = useMediaQuery('(min-width: 768px) and (max-width: 1023px)');
@@ -175,42 +177,80 @@ export default function QuestionContainer({
     }
   };
 
-  // Regenerate specific question
+  // Regenerate a single question in place
   const handleRegenerateQuestion = async (questionId: string) => {
     try {
       setIsGenerating(true);
 
-      // Find the question to regenerate
       const questionToRegenerate = questions.find(q => q.id === questionId);
       if (!questionToRegenerate) {
         throw new Error('Question not found');
       }
 
-      // Call the API to regenerate questions (this will regenerate a single question)
-      const response = await bookClient.generateQuestions(bookId);
+      // Regenerate just this question — the backend replaces it with a fresh,
+      // meaningfully different one (and returns a new id + regeneration_count).
+      const newQuestion = await bookClient.regenerateSingleQuestion(
+        bookId,
+        chapterId,
+        questionId,
+        { focus: questionToRegenerate.question_type }
+      );
 
-      if (response.questions && response.questions.length > 0) {
-        // Replace the old question with a new one
-        const newQuestion = response.questions[0]; // Take the first generated question
+      setQuestions(prev => prev.map(q => (q.id === questionId ? newQuestion : q)));
 
-        const updatedQuestions = questions.map(q =>
-          q.id === questionId ? { ...(newQuestion as any), id: questionId } as Question : q
-        );
-
-        setQuestions(updatedQuestions);
-
-        toast({
-          title: "Question regenerated",
-          description: "A new question has been generated for you.",
-          variant: "success"
-        });
-      }
+      toast({
+        title: 'Question regenerated',
+        description: 'A new question has been generated for you.',
+        variant: 'success',
+      });
     } catch (error) {
       console.error('Failed to regenerate question:', error);
+      // Surface the per-question regeneration cap distinctly from generic failures.
+      const isLimit = error instanceof Error && error.message.includes('429');
       toast({
-        title: "Error",
-        description: "Failed to regenerate question. Please try again.",
-        variant: "destructive"
+        title: isLimit ? 'Regeneration limit reached' : 'Error',
+        description: isLimit
+          ? 'This question has been regenerated the maximum number of times.'
+          : 'Failed to regenerate question. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Regenerate the whole question set (optionally keeping answered questions)
+  const handleRegenerateAll = async (
+    options: { difficulty?: QuestionDifficulty; focus?: QuestionType[] },
+    preserveResponses: boolean
+  ) => {
+    try {
+      setIsGenerating(true);
+      setError(null);
+
+      const response = await bookClient.regenerateChapterQuestions(
+        bookId,
+        chapterId,
+        { count: questions.length || 10, ...options },
+        preserveResponses
+      );
+
+      setShowRegenerateAll(false);
+      // Reload so preserved + newly generated questions render in order.
+      await fetchQuestions(true);
+      setCurrentQuestionIndex(0);
+
+      toast({
+        title: 'Questions regenerated',
+        description: `${response.total} questions are ready for this chapter.`,
+        variant: 'success',
+      });
+    } catch (err) {
+      console.error('Error regenerating questions:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to regenerate questions. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsGenerating(false);
@@ -421,6 +461,29 @@ export default function QuestionContainer({
           </div>
         </div>
       )}
+
+      {/* Toolbar: regenerate the whole set */}
+      {questions.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRegenerateAll(true)}
+            disabled={isGenerating}
+            className="min-h-[44px]"
+          >
+            <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2" />
+            Regenerate All
+          </Button>
+        </div>
+      )}
+
+      <RegenerateQuestionsDialog
+        isOpen={showRegenerateAll}
+        onOpenChange={setShowRegenerateAll}
+        onConfirm={handleRegenerateAll}
+        isRegenerating={isGenerating}
+      />
 
       {/* Progress bar */}
       {progress && (

@@ -436,6 +436,36 @@ describe('QuestionDisplay - regenerate question', () => {
     fireEvent.click(screen.getByLabelText('Generate a new question'));
     expect(onRegenerateQuestion).toHaveBeenCalledWith('q-1');
   });
+
+  it('shows the regeneration count once a question has been regenerated', () => {
+    render(
+      <QuestionDisplay
+        {...defaultProps}
+        question={makeQuestion({ regeneration_count: 2 })}
+      />
+    );
+    expect(screen.getByTestId('regeneration-count')).toHaveTextContent('Regenerated 2/5');
+  });
+
+  it('does not show a count for a never-regenerated question', () => {
+    render(<QuestionDisplay {...defaultProps} question={makeQuestion({ regeneration_count: 0 })} />);
+    expect(screen.queryByTestId('regeneration-count')).not.toBeInTheDocument();
+  });
+
+  it('disables regenerate and does not fire the handler once the limit is reached', () => {
+    const onRegenerateQuestion = jest.fn();
+    render(
+      <QuestionDisplay
+        {...defaultProps}
+        question={makeQuestion({ regeneration_count: 5 })}
+        onRegenerateQuestion={onRegenerateQuestion}
+      />
+    );
+    const button = screen.getByLabelText('Generate a new question');
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onRegenerateQuestion).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

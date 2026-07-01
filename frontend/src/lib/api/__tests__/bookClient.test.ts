@@ -605,6 +605,41 @@ describe('BookClient.regenerateChapterQuestions', () => {
 });
 
 // ---------------------------------------------------------------------------
+// regenerateSingleQuestion
+// ---------------------------------------------------------------------------
+
+describe('BookClient.regenerateSingleQuestion', () => {
+  const bookId = 'book123';
+  const chapterId = 'ch1';
+  const questionId = 'q1';
+
+  it('posts to the per-question regenerate endpoint and returns the new question', async () => {
+    const newQuestion = { id: 'q-new', question_text: 'Fresh?', regeneration_count: 1 } as any;
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson(newQuestion));
+
+    const result = await bookClient.regenerateSingleQuestion(bookId, chapterId, questionId, {
+      focus: 'theme' as any,
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `http://localhost:8000/api/v1/books/${bookId}/chapters/${chapterId}/questions/${questionId}/regenerate`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' })
+    );
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body).toEqual({ focus: 'theme' });
+    expect(result).toEqual(newQuestion);
+  });
+
+  it('surfaces the status code on failure (e.g. 429 limit)', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(429, 'limit'));
+
+    await expect(
+      bookClient.regenerateSingleQuestion(bookId, chapterId, questionId)
+    ).rejects.toThrow('Failed to regenerate question: 429 limit');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // exportPDF – success with and without options
 // ---------------------------------------------------------------------------
 

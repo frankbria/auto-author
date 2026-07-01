@@ -1595,6 +1595,32 @@ export class BookClient {
     return response.json();
   }
 
+  /**
+   * Regenerate a single question, replacing it with a fresh, different one.
+   * Returns the new question (with an incremented regeneration_count).
+   */
+  public async regenerateSingleQuestion(
+    bookId: string,
+    chapterId: string,
+    questionId: string,
+    options: { focus?: QuestionType } = {}
+  ): Promise<Question> {
+    const response = await fetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/regenerate`,
+      {
+        method: 'POST',
+        headers: await this.getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(options),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to regenerate question: ${response.status} ${error}`);
+    }
+    return response.json();
+  }
+
 
 
   /**
