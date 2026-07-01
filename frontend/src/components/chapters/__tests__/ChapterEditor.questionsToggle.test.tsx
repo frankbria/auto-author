@@ -97,4 +97,19 @@ describe('ChapterEditor view toggle', () => {
     );
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
+
+  it('resets the view per chapter when the editor is reused (no remount)', async () => {
+    // Chapter 1 has a saved "questions" preference.
+    sessionStorage.setItem(storageKey, 'questions');
+    const { rerender } = render(<ChapterEditor {...props} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('question-container')).toBeInTheDocument()
+    );
+
+    // Switching to chapter 2 (no saved preference) must fall back to the editor,
+    // not carry chapter 1's "questions" view across.
+    rerender(<ChapterEditor {...props} chapterId="chapter-2" />);
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
+    expect(screen.queryByTestId('question-container')).not.toBeInTheDocument();
+  });
 });

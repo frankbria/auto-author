@@ -98,17 +98,11 @@ export function ChapterEditor({
   // Default is the writing view (matches shipped UX + editor-focused unit tests); the
   // last choice is remembered per chapter in sessionStorage.
   const viewStorageKey = `chapterQuestionsTab_${bookId}_${chapterId}`;
-  const [view, setView] = useState<'questions' | 'editor'>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = sessionStorage.getItem(`chapterQuestionsTab_${bookId}_${chapterId}`);
-        if (saved === 'questions' || saved === 'editor') return saved;
-      } catch {
-        // sessionStorage unavailable (private mode / SSR) — fall through to default.
-      }
-    }
-    return 'editor';
-  });
+  // Default to the writing view. The saved per-chapter choice is restored in the
+  // effect below (not the initializer) so it (a) re-runs when this editor is
+  // reused for a different chapter — TabContent renders it without a key — and
+  // (b) can't cause an SSR hydration mismatch.
+  const [view, setView] = useState<'questions' | 'editor'>('editor');
 
   const handleViewChange = useCallback(
     (next: string) => {
@@ -124,6 +118,17 @@ export function ChapterEditor({
     },
     [viewStorageKey]
   );
+
+  // Restore (or reset) the tab whenever the chapter changes.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = sessionStorage.getItem(viewStorageKey);
+      setView(saved === 'questions' || saved === 'editor' ? saved : 'editor');
+    } catch {
+      setView('editor');
+    }
+  }, [viewStorageKey]);
 
   // Keyboard access to the tabs is Radix's native arrow-key roving (WCAG tab
   // pattern) plus clicking. Ctrl+digit is intentionally NOT bound here — it is
