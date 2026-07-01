@@ -409,6 +409,105 @@ async def _delete_chapter_internal(
     return True
 
 
+async def update_chapter_statuses_with_version_guard(
+    book_id: str,
+    chapter_ids: List[str],
+    new_status: str,
+    user_auth_id: str,
+    expected_version: int,
+    update_timestamp: bool = False,
+) -> Dict[str, Any]:
+    """
+    Bulk-update chapter statuses under an optimistic-concurrency guard.
+
+    A bulk status change touches a single book document, so a single
+    compare-and-swap ``update_one`` (filtered on ``table_of_contents.version``,
+    the same guard ``_update_toc_internal`` uses) is atomic on its own — no
+    multi-document transaction needed. If a concurrent TOC edit bumps the
+    version between the read and the write, ``modified_count`` is 0 and we raise
+    a ``Version conflict`` instead of silently clobbering the other write. This
+    holds on both replica-set and standalone deployments (unlike a transaction,
+    which would surface a concurrent commit as a WriteConflict).
+
+    ``expected_version`` is the version the caller validated against.
+    """
+    book_oid = ObjectId(book_id)
+    book = await books_collection.find_one({"_id": book_oid, "owner_id": user_auth_id})
+    if not book:
+        if await books_collection.find_one({"_id": book_oid}):
+            raise ValueError("Not authorized to update this book")
+        raise ValueError("Book not found")
+
+    current_toc = book.get("table_of_contents", {})
+    current_version = current_toc.get("version", 1)
+    if current_version != expected_version:
+        raise ValueError(
+            f"Version conflict: expected {expected_version}, current {current_version}"
+        )
+
+    chapters = current_toc.get("chapters", [])
+    id_set = set(chapter_ids)
+    updated_chapters: List[str] = []
+
+    def apply_statuses(chapter_list):
+        for chapter in chapter_list:
+            if chapter.get("id") in id_set:
+                chapter["status"] = new_status
+                if update_timestamp:
+                    chapter["last_modified"] = datetime.now(timezone.utc)
+                updated_chapters.append(chapter["id"])
+            if chapter.get("subchapters"):
+                apply_statuses(chapter["subchapters"])
+
+    apply_statuses(chapters)
+
+    if not updated_chapters:
+        raise ValueError("No matching chapters found")
+
+    updated_toc = {
+        **current_toc,
+        "chapters": chapters,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "status": "edited",
+        "version": current_version + 1,
+    }
+
+    # Compare-and-swap: the version filter makes this a no-op if another writer
+    # bumped the TOC since we read it, so concurrent edits can't clobber. A
+    # legacy TOC with no version field is matched on its absence (not on the
+    # defaulted 1) so it doesn't produce a false conflict on first write.
+    version_guard = (
+        current_version if "version" in current_toc else {"$exists": False}
+    )
+    update_result = await books_collection.update_one(
+        {
+            "_id": book_oid,
+            "owner_id": user_auth_id,
+            "table_of_contents.version": version_guard,
+        },
+        {
+            "$set": {
+                "table_of_contents": updated_toc,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
+    )
+
+    if update_result.modified_count == 0:
+        raise ValueError("Version conflict: TOC was updated by another process")
+
+    # Preserve the book-level audit entry the previous update_book() path emitted.
+    await create_audit_log(
+        action="book_update",
+        actor_id=user_auth_id,
+        target_id=book_id,
+        resource_type="book",
+        details={"updated_fields": ["table_of_contents", "updated_at"]},
+    )
+
+    return {"updated_chapters": updated_chapters}
+
+
 async def reorder_chapters_with_transaction(
     book_id: str,
     chapter_orders: List[Dict[str, Any]],
