@@ -503,32 +503,33 @@ class TestRegenerationImprovements:
         mock_ai_service.generate_chapter_questions.return_value = [
             {"question_text": "A brand new distinct question about the hero?", "question_type": "character", "difficulty": "medium"}
         ]
-        created = _saved_question_dict(qid="q-new", order=3)
-        created["question_text"] = "A brand new distinct question about the hero?"
-        created["regeneration_count"] = 2
+        # In-place replace keeps the same id; returns the updated doc.
+        updated = _saved_question_dict(qid="q-old", order=3)
+        updated["question_text"] = "A brand new distinct question about the hero?"
+        updated["regeneration_count"] = 2
 
         with patch(f"{MODULE}.get_question_by_id", AsyncMock(return_value=existing)), \
              patch(f"{MODULE}.get_book_by_id", AsyncMock(return_value=book)), \
              patch(f"{MODULE}.db_get_questions_for_chapter",
                    AsyncMock(return_value=QuestionListResponse(questions=[existing], total=1, page=1, pages=1))), \
              patch(f"{MODULE}.db_get_ratings_for_chapter", AsyncMock(return_value=[])), \
-             patch(f"{MODULE}.delete_question_by_id", AsyncMock(return_value=True)) as mock_del, \
-             patch(f"{MODULE}.create_question", AsyncMock(return_value=created)) as mock_create:
+             patch(f"{MODULE}.replace_question_in_place", AsyncMock(return_value=updated)) as mock_replace:
             result = await service.regenerate_single_question(
                 book_id="book-1", chapter_id="ch-1", question_id="q-old", user_id="u1",
             )
 
-        mock_del.assert_awaited_once()
-        # the persisted question carried the incremented counter and preserved slot
-        saved_arg = mock_create.await_args.args[0]
-        assert saved_arg.regeneration_count == 2
-        assert saved_arg.order == 3
-        assert result.id == "q-new"
+        # CAS uses the current count as the guard, writes the incremented count + preserved slot
+        mock_replace.assert_awaited_once()
+        kwargs = mock_replace.await_args.kwargs
+        assert kwargs["expected_regeneration_count"] == 1
+        assert kwargs["new_fields"]["regeneration_count"] == 2
+        assert kwargs["new_fields"]["order"] == 3
+        assert result.id == "q-old"
         assert result.regeneration_count == 2
 
-    async def test_regenerate_single_question_lost_race_does_not_create(self, service, mock_ai_service):
-        # If another concurrent regeneration already deleted the original, delete
-        # returns False and this caller must abort WITHOUT creating a duplicate.
+    async def test_regenerate_single_question_lost_race_raises(self, service, mock_ai_service):
+        # If a concurrent regeneration already replaced the original, the CAS matches
+        # no document (returns None) and this caller must abort with a not-found error.
         existing = _saved_question_dict(qid="q-old", order=1)
         book = {
             "id": "book-1", "title": "Bk", "genre": "", "target_audience": "",
@@ -542,13 +543,11 @@ class TestRegenerationImprovements:
              patch(f"{MODULE}.db_get_questions_for_chapter",
                    AsyncMock(return_value=QuestionListResponse(questions=[existing], total=1, page=1, pages=1))), \
              patch(f"{MODULE}.db_get_ratings_for_chapter", AsyncMock(return_value=[])), \
-             patch(f"{MODULE}.delete_question_by_id", AsyncMock(return_value=False)), \
-             patch(f"{MODULE}.create_question", AsyncMock()) as mock_create:
+             patch(f"{MODULE}.replace_question_in_place", AsyncMock(return_value=None)):
             with pytest.raises(QuestionNotFoundError):
                 await service.regenerate_single_question(
                     book_id="book-1", chapter_id="ch-1", question_id="q-old", user_id="u1",
                 )
-        mock_create.assert_not_awaited()
 
     async def test_generate_chapter_questions_honors_count_one(self, service, mock_ai_service):
         # Single-question regeneration relies on count=1 not being bumped to 3.

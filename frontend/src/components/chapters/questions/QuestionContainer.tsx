@@ -196,7 +196,12 @@ export default function QuestionContainer({
         { focus: questionToRegenerate.question_type }
       );
 
-      setQuestions(prev => prev.map(q => (q.id === questionId ? newQuestion : q)));
+      const updated = questions.map(q => (q.id === questionId ? newQuestion : q));
+      setQuestions(updated);
+      // Keep the stale-while-revalidate cache and progress in sync: the backend
+      // cleared the old answer, so answered-state and the cached list would drift.
+      setCachedQuestions(updated);
+      await fetchProgress();
 
       toast({
         title: 'Question regenerated',
@@ -206,7 +211,7 @@ export default function QuestionContainer({
     } catch (error) {
       console.error('Failed to regenerate question:', error);
       // Surface the per-question regeneration cap distinctly from generic failures.
-      const isLimit = error instanceof Error && error.message.includes('429');
+      const isLimit = (error as { statusCode?: number })?.statusCode === 429;
       toast({
         title: isLimit ? 'Regeneration limit reached' : 'Error',
         description: isLimit
@@ -517,6 +522,7 @@ export default function QuestionContainer({
           question={currentQuestion}
           onResponseSaved={handleResponseSaved}
           onRegenerateQuestion={() => handleRegenerateQuestion(currentQuestion.id)}
+          isRegenerating={isGenerating}
         />
       )}
 

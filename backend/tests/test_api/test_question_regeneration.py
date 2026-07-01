@@ -73,14 +73,41 @@ async def test_regenerate_single_question_success(auth_client_factory, motor_rei
     assert resp.status_code == 200, resp.text
     new_q = resp.json()
 
-    # The old question was replaced by a fresh one that occupies the same slot
-    assert new_q["id"] != original["id"]
+    # The question is replaced in place (same id/slot), with the counter bumped
+    assert new_q["id"] == original["id"]
     assert new_q["order"] == original["order"]
     assert new_q["regeneration_count"] == 1
 
-    # The old question id is gone
+    # The question still exists at that id
     coll = await get_collection("questions")
-    assert await coll.find_one({"_id": ObjectId(original["id"])}) is None
+    assert await coll.find_one({"_id": ObjectId(original["id"])}) is not None
+
+
+@pytest.mark.asyncio
+async def test_regenerate_single_question_clears_stale_response(auth_client_factory, motor_reinit_db):
+    client = await auth_client_factory()
+    book_id, chapter_id = await _create_book_with_chapter(client)
+    questions = await _generate_questions(client, book_id, chapter_id)
+    qid = questions[0]["id"]
+
+    # Answer the question, then regenerate it — the old answer no longer applies.
+    save = await client.put(
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qid}/response",
+        json={"response_text": "My previous answer", "status": "completed"},
+    )
+    assert save.status_code == 200, save.text
+
+    regen = await client.post(
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qid}/regenerate",
+        json={},
+    )
+    assert regen.status_code == 200, regen.text
+
+    resp = await client.get(
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qid}/response"
+    )
+    assert resp.status_code == 200
+    assert resp.json()["has_response"] is False
 
 
 @pytest.mark.asyncio

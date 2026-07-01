@@ -452,6 +452,21 @@ describe('QuestionDisplay - regenerate question', () => {
     expect(screen.queryByTestId('regeneration-count')).not.toBeInTheDocument();
   });
 
+  it('disables regenerate while a regeneration is in flight', () => {
+    const onRegenerateQuestion = jest.fn();
+    render(
+      <QuestionDisplay
+        {...defaultProps}
+        onRegenerateQuestion={onRegenerateQuestion}
+        isRegenerating
+      />
+    );
+    const button = screen.getByLabelText('Generate a new question');
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onRegenerateQuestion).not.toHaveBeenCalled();
+  });
+
   it('disables regenerate and does not fire the handler once the limit is reached', () => {
     const onRegenerateQuestion = jest.fn();
     render(

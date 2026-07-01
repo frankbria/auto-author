@@ -36,6 +36,7 @@ interface QuestionDisplayProps {
   question: Question;
   onResponseSaved: () => void;
   onRegenerateQuestion: (questionId: string) => void;
+  isRegenerating?: boolean;
 }
 
 /**
@@ -47,7 +48,8 @@ export default function QuestionDisplay({
   chapterId,
   question,
   onResponseSaved,
-  onRegenerateQuestion
+  onRegenerateQuestion,
+  isRegenerating = false
 }: QuestionDisplayProps) {
   // State for response text
   const [responseText, setResponseText] = useState('');
@@ -431,7 +433,7 @@ export default function QuestionDisplay({
   const regenerationLimitReached = (question.regeneration_count ?? 0) >= MAX_REGENERATION_COUNT;
 
   const handleRegenerateQuestion = () => {
-    if (regenerationLimitReached) {
+    if (regenerationLimitReached || isRegenerating) {
       return;
     }
     if (onRegenerateQuestion) {
@@ -652,7 +654,7 @@ export default function QuestionDisplay({
               variant="ghost"
               size="sm"
               onClick={handleRegenerateQuestion}
-              disabled={regenerationLimitReached}
+              disabled={regenerationLimitReached || isRegenerating}
               title={
                 regenerationLimitReached
                   ? 'This question has reached its regeneration limit'
@@ -661,7 +663,7 @@ export default function QuestionDisplay({
               className="min-h-[44px] min-w-[44px]"
               aria-label="Generate a new question"
             >
-              <HugeiconsIcon icon={RefreshIcon} size={16} />
+              <HugeiconsIcon icon={RefreshIcon} size={16} className={isRegenerating ? 'animate-spin' : undefined} />
             </Button>
           </div>
         </div>

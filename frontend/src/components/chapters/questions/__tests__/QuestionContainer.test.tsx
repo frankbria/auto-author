@@ -409,7 +409,7 @@ describe('QuestionContainer - handleRegenerateQuestion', () => {
     const { toast } = require('@/lib/toast');
     setupTwoQuestions();
     mockedBookClient.regenerateSingleQuestion.mockRejectedValue(
-      new Error('Failed to regenerate question: 429 limit')
+      Object.assign(new Error('cap reached'), { statusCode: 429 })
     );
 
     render(<QuestionContainer {...defaultProps} />);

@@ -630,12 +630,17 @@ describe('BookClient.regenerateSingleQuestion', () => {
     expect(result).toEqual(newQuestion);
   });
 
-  it('surfaces the status code on failure (e.g. 429 limit)', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(429, 'limit'));
+  it('attaches the status code and a clean detail message on failure', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      errorResponse(429, 'ignored', { detail: { error: 'REGENERATION_LIMIT_REACHED', message: 'cap reached' } })
+    );
 
-    await expect(
-      bookClient.regenerateSingleQuestion(bookId, chapterId, questionId)
-    ).rejects.toThrow('Failed to regenerate question: 429 limit');
+    const err = await bookClient
+      .regenerateSingleQuestion(bookId, chapterId, questionId)
+      .catch((e) => e);
+
+    expect(err.message).toBe('cap reached');
+    expect(err.statusCode).toBe(429);
   });
 });
 

@@ -3,6 +3,7 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from bson import ObjectId
+from pymongo import ReturnDocument
 import logging
 import math
 
@@ -592,29 +593,65 @@ async def get_question_by_id(question_id: str, user_id: str) -> Optional[Dict[st
     return None
 
 
-async def delete_question_by_id(question_id: str, user_id: str) -> bool:
-    """Delete a single question (and its response) by id. Returns True if deleted."""
+async def replace_question_in_place(
+    question_id: str,
+    user_id: str,
+    expected_regeneration_count: int,
+    new_fields: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Atomically replace a question's content in place, guarding on regeneration_count.
+
+    A single ``find_one_and_update`` on the unique ``_id`` is the concurrency guard:
+    the compare-and-swap on ``regeneration_count`` means only one of two racing
+    regenerations of the same question succeeds (no duplicate slot, no double-count,
+    no delete/create window that could lose the question). Keeping the same ``_id``
+    also preserves the question's prior rating so feedback isn't orphaned.
+
+    The question's stale response (the answer to the old wording) is cleared on success.
+    Returns the updated question dict, or None if no document matched (already
+    regenerated concurrently, gone, or not owned).
+    """
     questions_collection = await get_collection("questions")
     responses_collection = await get_collection("question_responses")
 
     try:
         object_id = ObjectId(question_id)
     except Exception:
-        return False
+        return None
 
-    result = await questions_collection.delete_one({
-        "_id": object_id,
+    # Legacy questions predate the regeneration_count field; treat absent as 0.
+    if expected_regeneration_count == 0:
+        query = {
+            "_id": object_id,
+            "user_id": user_id,
+            "$or": [
+                {"regeneration_count": 0},
+                {"regeneration_count": {"$exists": False}},
+            ],
+        }
+    else:
+        query = {
+            "_id": object_id,
+            "user_id": user_id,
+            "regeneration_count": expected_regeneration_count,
+        }
+
+    updated = await questions_collection.find_one_and_update(
+        query,
+        {"$set": {**new_fields, "updated_at": datetime.now(timezone.utc)}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not updated:
+        return None
+
+    # The prior answer no longer applies to the replaced question.
+    await responses_collection.delete_many({
+        "question_id": question_id,
         "user_id": user_id
     })
 
-    if result.deleted_count:
-        await responses_collection.delete_many({
-            "question_id": question_id,
-            "user_id": user_id
-        })
-        return True
-
-    return False
+    updated["id"] = str(updated.pop("_id"))
+    return updated
 
 
 async def save_question_responses_batch(

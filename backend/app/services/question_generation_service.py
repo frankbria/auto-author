@@ -21,7 +21,6 @@ from app.services.ai_service import AIService
 from app.utils.validators import validate_text_safety
 from app.core.config import settings
 from app.db.database import (
-    create_question,
     create_questions_batch,
     get_questions_for_chapter as db_get_questions_for_chapter,
     save_question_response as db_save_question_response,
@@ -30,7 +29,7 @@ from app.db.database import (
     get_ratings_for_chapter as db_get_ratings_for_chapter,
     get_chapter_question_progress as db_get_chapter_question_progress,
     delete_questions_for_chapter,
-    delete_question_by_id,
+    replace_question_in_place,
     get_question_by_id,
     get_book_by_id,
 )
@@ -91,6 +90,9 @@ class QuestionGenerationService:
             "book_metadata": {
                 "title": book.get("title", ""),
                 "genre": book.get("genre", ""),
+                # The prompt builder reads "audience"; expose both keys so audience
+                # guidance is actually applied (previously dropped via a key mismatch).
+                "audience": book.get("target_audience", ""),
                 "target_audience": book.get("target_audience", ""),
             },
         }
@@ -494,20 +496,31 @@ class QuestionGenerationService:
             raise Exception("Failed to generate a replacement question")
 
         new_question = candidates[0]
-        # Preserve the question's slot and bump the per-question counter
-        new_question.order = existing.get("order", new_question.order)
-        new_question.regeneration_count = current_count + 1
+        dumped = new_question.model_dump()
 
-        # Delete the original FIRST and use it as the concurrency guard: a MongoDB
-        # delete_one on a unique _id matches for exactly one caller, so two racing
-        # regenerations of the same question can't both create a replacement (which
-        # would duplicate the slot and undercount regenerations). The loser aborts here.
-        deleted = await delete_question_by_id(question_id, user_id)
-        if not deleted:
+        # Replace the question's content IN PLACE (same _id) via an atomic
+        # compare-and-swap on regeneration_count. This avoids the delete+create
+        # window that could drop the question, serializes concurrent regenerations
+        # (only one CAS matches), and keeps any prior rating attached to the slot.
+        updated = await replace_question_in_place(
+            question_id=question_id,
+            user_id=user_id,
+            expected_regeneration_count=current_count,
+            new_fields={
+                "question_text": dumped["question_text"],
+                "question_type": dumped["question_type"],
+                "difficulty": dumped["difficulty"],
+                "category": dumped["category"],
+                "metadata": dumped["metadata"],
+                "order": existing.get("order", dumped["order"]),
+                "regeneration_count": current_count + 1,
+                "generated_at": datetime.now(timezone.utc),
+            },
+        )
+        if not updated:
             raise QuestionNotFoundError("Question not found or already regenerated")
 
-        created = await create_question(new_question, user_id)
-        return Question(**created)
+        return Question(**updated)
 
     async def generate_chapter_questions(
         self,

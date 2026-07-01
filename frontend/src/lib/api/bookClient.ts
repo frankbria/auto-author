@@ -1615,8 +1615,23 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to regenerate question: ${response.status} ${error}`);
+      // Parse the backend's structured detail for a clean message, and attach the
+      // status code so callers can distinguish the 429 regeneration cap without
+      // string-matching the message.
+      let message: string | undefined;
+      try {
+        const body = await response.json();
+        const detail = body?.detail;
+        if (typeof detail === 'string' && detail) message = detail;
+        else if (detail?.message) message = detail.message;
+      } catch {
+        // Non-JSON body — fall through to the generic message.
+      }
+      const err = new Error(
+        message || `Failed to regenerate question: ${response.status}`
+      ) as Error & { statusCode: number };
+      err.statusCode = response.status;
+      throw err;
     }
     return response.json();
   }
