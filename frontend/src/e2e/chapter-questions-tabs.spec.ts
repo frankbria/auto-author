@@ -13,7 +13,8 @@ import {
  * These are the Radix UI tabs wired into ChapterEditor by #110 (building on the
  * #105 interview-questions integration). They cover:
  * - Tab click switching
- * - Keyboard navigation (Ctrl+1, Ctrl+2, Ctrl+Tab, arrow roving)
+ * - Keyboard navigation (Radix arrow-key roving; Ctrl+digit is owned by the
+ *   ChapterTabs chapter quick-switch and is intentionally not bound here)
  * - Session storage persistence (per-chapter, key `chapterQuestionsTab_*`)
  * - Accessibility (role=tablist/tab/tabpanel, aria-selected, focus ring)
  *
