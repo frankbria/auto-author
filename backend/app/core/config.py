@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     AI_CACHE_ENABLED: bool = True
     AI_MAX_RETRIES: int = 3
 
+    # Max times a single question may be regenerated (per-question abuse cap,
+    # complementing the endpoint rate limit)
+    MAX_QUESTION_REGENERATION_COUNT: int = 5
+
     # Export Settings
     EXPORT_TIMEOUT_SECONDS: int = 120  # Hard cap on a single export's generation
 

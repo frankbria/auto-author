@@ -1,6 +1,6 @@
 'use client';
 
-import { Question, QuestionType, QuestionDifficulty, ResponseStatus } from '@/types/chapter-questions';
+import { Question, QuestionType, QuestionDifficulty, ResponseStatus, MAX_REGENERATION_COUNT } from '@/types/chapter-questions';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -36,6 +36,7 @@ interface QuestionDisplayProps {
   question: Question;
   onResponseSaved: () => void;
   onRegenerateQuestion: (questionId: string) => void;
+  isRegenerating?: boolean;
 }
 
 /**
@@ -47,7 +48,8 @@ export default function QuestionDisplay({
   chapterId,
   question,
   onResponseSaved,
-  onRegenerateQuestion
+  onRegenerateQuestion,
+  isRegenerating = false
 }: QuestionDisplayProps) {
   // State for response text
   const [responseText, setResponseText] = useState('');
@@ -428,7 +430,12 @@ export default function QuestionDisplay({
   };
 
   // Handle regenerating the question
+  const regenerationLimitReached = (question.regeneration_count ?? 0) >= MAX_REGENERATION_COUNT;
+
   const handleRegenerateQuestion = () => {
+    if (regenerationLimitReached || isRegenerating) {
+      return;
+    }
     if (onRegenerateQuestion) {
       onRegenerateQuestion(question.id);
     }
@@ -634,15 +641,29 @@ export default function QuestionDisplay({
               <HugeiconsIcon icon={ThumbsUpIcon} size={16} className="text-green-500" />
             </Button>
 
+            {(question.regeneration_count ?? 0) > 0 && (
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="regeneration-count"
+              >
+                Regenerated {question.regeneration_count}/{MAX_REGENERATION_COUNT}
+              </span>
+            )}
+
             <Button
               variant="ghost"
               size="sm"
               onClick={handleRegenerateQuestion}
-              title="Generate a new question"
+              disabled={regenerationLimitReached || isRegenerating}
+              title={
+                regenerationLimitReached
+                  ? 'This question has reached its regeneration limit'
+                  : 'Generate a new question'
+              }
               className="min-h-[44px] min-w-[44px]"
               aria-label="Generate a new question"
             >
-              <HugeiconsIcon icon={RefreshIcon} size={16} />
+              <HugeiconsIcon icon={RefreshIcon} size={16} className={isRegenerating ? 'animate-spin' : undefined} />
             </Button>
           </div>
         </div>

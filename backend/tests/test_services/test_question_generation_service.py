@@ -14,6 +14,8 @@ import pytest
 from app.services.question_generation_service import (
     QuestionGenerationService,
     get_question_generation_service,
+    RegenerationLimitError,
+    QuestionNotFoundError,
 )
 from app.schemas.book import (
     QuestionType,
@@ -412,7 +414,9 @@ class TestGenerateQuestionsForChapter:
 class TestRegenerate:
     async def test_regenerates_when_questions_deleted(self, service):
         gen_result = GenerateQuestionsResponse(questions=[], generation_id="g", total=2)
+        ctx = {"previous_questions": ["old q"], "feedback_guidance": None}
         with patch(f"{MODULE}.delete_questions_for_chapter", AsyncMock(return_value=2)), \
+             patch.object(service, "_gather_regeneration_context", AsyncMock(return_value=ctx)), \
              patch.object(service, "generate_questions_for_chapter", AsyncMock(return_value=gen_result)) as mock_gen:
             result = await service.regenerate_chapter_questions(
                 book_id="book-1",
@@ -422,12 +426,16 @@ class TestRegenerate:
                 preserve_responses=True,
             )
         mock_gen.assert_awaited_once()
+        # previous questions + feedback guidance are threaded into generation
+        assert mock_gen.await_args.kwargs["previous_questions"] == ["old q"]
         assert result.new_count == 2
         assert result.preserved_count == 5 - 2
 
     async def test_nothing_deleted_returns_empty(self, service):
         # preserve_responses True, deleted 0 -> new_count 0 -> empty result (338)
-        with patch(f"{MODULE}.delete_questions_for_chapter", AsyncMock(return_value=0)):
+        ctx = {"previous_questions": [], "feedback_guidance": None}
+        with patch(f"{MODULE}.delete_questions_for_chapter", AsyncMock(return_value=0)), \
+             patch.object(service, "_gather_regeneration_context", AsyncMock(return_value=ctx)):
             result = await service.regenerate_chapter_questions(
                 book_id="book-1",
                 chapter_id="ch-1",
@@ -438,6 +446,144 @@ class TestRegenerate:
         assert isinstance(result, GenerateQuestionsResponse)
         assert result.total == 0
         assert result.questions == []
+
+
+# --------------------------------------------------------------------------- #
+# Regeneration improvements: prompt context, feedback guidance, single-question
+# --------------------------------------------------------------------------- #
+class TestRegenerationImprovements:
+    def test_prompt_includes_previous_questions(self, service):
+        prompt = service._build_question_generation_prompt(
+            chapter_title="Ch",
+            chapter_content="content",
+            book_metadata={},
+            count=3,
+            previous_questions=["What is the theme?", "Who is the villain?"],
+        )
+        assert "meaningfully different" in prompt
+        assert "What is the theme?" in prompt
+        assert "Who is the villain?" in prompt
+
+    def test_prompt_includes_feedback_guidance(self, service):
+        prompt = service._build_question_generation_prompt(
+            chapter_title="Ch",
+            chapter_content="content",
+            book_metadata={},
+            count=3,
+            feedback_guidance="The author rated some earlier questions as unhelpful. Be more specific.",
+        )
+        assert "rated some earlier questions as unhelpful" in prompt
+        assert "Be more specific" in prompt
+
+    def test_build_feedback_guidance_none_without_low_ratings(self, service):
+        assert service._build_feedback_guidance([]) is None
+        assert service._build_feedback_guidance(
+            [{"question_text": "q", "rating": 5, "feedback": "great"}]
+        ) is None
+
+    def test_build_feedback_guidance_summarizes_low_ratings(self, service):
+        guidance = service._build_feedback_guidance([
+            {"question_text": "Too vague?", "rating": 1, "feedback": "too generic"},
+            {"question_text": "Fine one", "rating": 4, "feedback": None},
+            {"question_text": "No feedback low", "rating": 2, "feedback": None},
+        ])
+        assert guidance is not None
+        assert "too generic" in guidance
+        assert "Too vague?" in guidance
+        # 4-star question is not treated as negative signal
+        assert "Fine one" not in guidance
+
+    async def test_regenerate_single_question_success_increments_count(self, service, mock_ai_service):
+        existing = _saved_question_dict(qid="q-old", order=3, qtype="character")
+        existing["regeneration_count"] = 1
+        book = {
+            "id": "book-1", "title": "Bk", "genre": "", "target_audience": "",
+            "table_of_contents": {"chapters": [{"id": "ch-1", "title": "Ch", "content": ""}]},
+        }
+        mock_ai_service.generate_chapter_questions.return_value = [
+            {"question_text": "A brand new distinct question about the hero?", "question_type": "character", "difficulty": "medium"}
+        ]
+        # In-place replace keeps the same id; returns the updated doc.
+        updated = _saved_question_dict(qid="q-old", order=3)
+        updated["question_text"] = "A brand new distinct question about the hero?"
+        updated["regeneration_count"] = 2
+
+        with patch(f"{MODULE}.get_question_by_id", AsyncMock(return_value=existing)), \
+             patch(f"{MODULE}.get_book_by_id", AsyncMock(return_value=book)), \
+             patch(f"{MODULE}.db_get_questions_for_chapter",
+                   AsyncMock(return_value=QuestionListResponse(questions=[existing], total=1, page=1, pages=1))), \
+             patch(f"{MODULE}.db_get_ratings_for_chapter", AsyncMock(return_value=[])), \
+             patch(f"{MODULE}.replace_question_in_place", AsyncMock(return_value=updated)) as mock_replace:
+            result = await service.regenerate_single_question(
+                book_id="book-1", chapter_id="ch-1", question_id="q-old", user_id="u1",
+            )
+
+        # CAS uses the current count as the guard, writes the incremented count + preserved slot
+        mock_replace.assert_awaited_once()
+        kwargs = mock_replace.await_args.kwargs
+        assert kwargs["expected_regeneration_count"] == 1
+        assert kwargs["new_fields"]["regeneration_count"] == 2
+        assert kwargs["new_fields"]["order"] == 3
+        assert result.id == "q-old"
+        assert result.regeneration_count == 2
+
+    async def test_regenerate_single_question_lost_race_raises(self, service, mock_ai_service):
+        # If a concurrent regeneration already replaced the original, the CAS matches
+        # no document (returns None) and this caller must abort with a not-found error.
+        existing = _saved_question_dict(qid="q-old", order=1)
+        book = {
+            "id": "book-1", "title": "Bk", "genre": "", "target_audience": "",
+            "table_of_contents": {"chapters": [{"id": "ch-1", "title": "Ch", "content": ""}]},
+        }
+        mock_ai_service.generate_chapter_questions.return_value = [
+            {"question_text": "A distinct new question about the plot?", "question_type": "plot", "difficulty": "medium"}
+        ]
+        with patch(f"{MODULE}.get_question_by_id", AsyncMock(return_value=existing)), \
+             patch(f"{MODULE}.get_book_by_id", AsyncMock(return_value=book)), \
+             patch(f"{MODULE}.db_get_questions_for_chapter",
+                   AsyncMock(return_value=QuestionListResponse(questions=[existing], total=1, page=1, pages=1))), \
+             patch(f"{MODULE}.db_get_ratings_for_chapter", AsyncMock(return_value=[])), \
+             patch(f"{MODULE}.replace_question_in_place", AsyncMock(return_value=None)):
+            with pytest.raises(QuestionNotFoundError):
+                await service.regenerate_single_question(
+                    book_id="book-1", chapter_id="ch-1", question_id="q-old", user_id="u1",
+                )
+
+    async def test_generate_chapter_questions_honors_count_one(self, service, mock_ai_service):
+        # Single-question regeneration relies on count=1 not being bumped to 3.
+        mock_ai_service.generate_chapter_questions.return_value = [
+            {"question_text": "One good question about the theme?", "question_type": "theme", "difficulty": "medium"}
+        ]
+        result = await service.generate_chapter_questions(
+            book_id="book-1", chapter_id="ch-1", chapter_title="Ch",
+            chapter_content="content", book_metadata={}, count=1,
+        )
+        assert len(result) == 1
+
+    async def test_regenerate_single_question_at_limit_raises(self, service):
+        existing = _saved_question_dict(qid="q-old")
+        existing["regeneration_count"] = 5  # == MAX default
+        with patch(f"{MODULE}.get_question_by_id", AsyncMock(return_value=existing)):
+            with pytest.raises(RegenerationLimitError):
+                await service.regenerate_single_question(
+                    book_id="book-1", chapter_id="ch-1", question_id="q-old", user_id="u1",
+                )
+
+    async def test_regenerate_single_question_not_found_raises(self, service):
+        with patch(f"{MODULE}.get_question_by_id", AsyncMock(return_value=None)):
+            with pytest.raises(QuestionNotFoundError):
+                await service.regenerate_single_question(
+                    book_id="book-1", chapter_id="ch-1", question_id="missing", user_id="u1",
+                )
+
+    async def test_regenerate_single_question_wrong_chapter_raises(self, service):
+        existing = _saved_question_dict(qid="q-old")
+        existing["chapter_id"] = "different-chapter"
+        with patch(f"{MODULE}.get_question_by_id", AsyncMock(return_value=existing)):
+            with pytest.raises(QuestionNotFoundError):
+                await service.regenerate_single_question(
+                    book_id="book-1", chapter_id="ch-1", question_id="q-old", user_id="u1",
+                )
 
 
 # --------------------------------------------------------------------------- #

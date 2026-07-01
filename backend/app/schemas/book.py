@@ -77,6 +77,9 @@ class QuestionBase(BaseModel):
     category: str
     order: int
     metadata: QuestionMetadata
+    # Number of times this individual question has been regenerated. Defaults to 0
+    # so legacy documents (persisted before this field existed) read back as 0.
+    regeneration_count: int = 0
 
 
 class QuestionCreate(QuestionBase):
@@ -334,6 +337,12 @@ class GenerateQuestionsRequest(BaseModel):
     count: Optional[int] = Field(10, ge=1, le=50)
     difficulty: Optional[QuestionDifficulty] = None
     focus: Optional[List[QuestionType]] = None
+
+
+class RegenerateQuestionRequest(BaseModel):
+    """Request schema for regenerating a single question."""
+
+    focus: Optional[QuestionType] = None
 
 
 class GenerateQuestionsResponse(BaseModel):

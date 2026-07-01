@@ -107,6 +107,21 @@ jest.mock('../DraftGenerationButton', () => ({
   DraftGenerationButton: () => <div data-testid="draft-generation-button" />,
 }));
 
+jest.mock('../RegenerateQuestionsDialog', () => ({
+  __esModule: true,
+  default: ({ isOpen, onConfirm }: any) =>
+    isOpen ? (
+      <div data-testid="regenerate-all-dialog">
+        <button
+          data-testid="confirm-regenerate-all"
+          onClick={() => onConfirm({ focus: undefined }, true)}
+        >
+          Confirm
+        </button>
+      </div>
+    ) : null,
+}));
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -356,15 +371,15 @@ describe('QuestionContainer - handleRetryOrGenerate (retry path)', () => {
 describe('QuestionContainer - handleRegenerateQuestion', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('replaces a question after regeneration', async () => {
-    const { toast } = require('@/lib/toast');
+  it('regenerates a single question via the dedicated endpoint and replaces it', async () => {
     setupTwoQuestions();
 
-    const newQuestion = makeQuestion({ id: 'new-q', question_text: 'New regenerated question' });
-    mockedBookClient.generateQuestions.mockResolvedValue({
-      questions: [newQuestion],
-      success: true,
-    } as any);
+    const newQuestion = makeQuestion({
+      id: 'new-q',
+      question_text: 'New regenerated question',
+      regeneration_count: 1,
+    });
+    mockedBookClient.regenerateSingleQuestion.mockResolvedValue(newQuestion);
 
     render(<QuestionContainer {...defaultProps} />);
 
@@ -375,14 +390,47 @@ describe('QuestionContainer - handleRegenerateQuestion', () => {
     fireEvent.click(screen.getByTestId('regenerate-question-btn'));
 
     await waitFor(() => {
-      expect(mockedBookClient.generateQuestions).toHaveBeenCalledWith('book-1');
+      expect(mockedBookClient.regenerateSingleQuestion).toHaveBeenCalledWith(
+        'book-1',
+        'ch-1',
+        'q-1',
+        { focus: QuestionType.CHARACTER }
+      );
+    });
+    // Must NOT use the TOC clarifying-questions endpoint (the original bug)
+    expect(mockedBookClient.generateQuestions).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(screen.getByText('New regenerated question')).toBeInTheDocument();
     });
   });
 
-  it('shows error toast when regeneration fails', async () => {
+  it('shows the limit toast when the backend returns 429', async () => {
     const { toast } = require('@/lib/toast');
     setupTwoQuestions();
-    mockedBookClient.generateQuestions.mockRejectedValue(new Error('Regeneration failed'));
+    mockedBookClient.regenerateSingleQuestion.mockRejectedValue(
+      Object.assign(new Error('cap reached'), { statusCode: 429 })
+    );
+
+    render(<QuestionContainer {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('question-display')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('regenerate-question-btn'));
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Regeneration limit reached' })
+      );
+    });
+  });
+
+  it('shows a generic error toast when regeneration fails', async () => {
+    const { toast } = require('@/lib/toast');
+    setupTwoQuestions();
+    mockedBookClient.regenerateSingleQuestion.mockRejectedValue(new Error('Regeneration failed'));
 
     render(<QuestionContainer {...defaultProps} />);
 
@@ -395,6 +443,37 @@ describe('QuestionContainer - handleRegenerateQuestion', () => {
     await waitFor(() => {
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ title: 'Error' })
+      );
+    });
+  });
+});
+
+describe('QuestionContainer - handleRegenerateAll', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('regenerates the whole set through the regenerate-all dialog', async () => {
+    setupTwoQuestions();
+    mockedBookClient.regenerateChapterQuestions.mockResolvedValue({
+      questions: [makeQuestion({ id: 'r-1' })],
+      generation_id: 'g',
+      total: 1,
+    });
+
+    render(<QuestionContainer {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('question-display')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /regenerate all/i }));
+    fireEvent.click(screen.getByTestId('confirm-regenerate-all'));
+
+    await waitFor(() => {
+      expect(mockedBookClient.regenerateChapterQuestions).toHaveBeenCalledWith(
+        'book-1',
+        'ch-1',
+        expect.objectContaining({ count: 2 }),
+        true
       );
     });
   });

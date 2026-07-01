@@ -605,6 +605,46 @@ describe('BookClient.regenerateChapterQuestions', () => {
 });
 
 // ---------------------------------------------------------------------------
+// regenerateSingleQuestion
+// ---------------------------------------------------------------------------
+
+describe('BookClient.regenerateSingleQuestion', () => {
+  const bookId = 'book123';
+  const chapterId = 'ch1';
+  const questionId = 'q1';
+
+  it('posts to the per-question regenerate endpoint and returns the new question', async () => {
+    const newQuestion = { id: 'q-new', question_text: 'Fresh?', regeneration_count: 1 } as any;
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson(newQuestion));
+
+    const result = await bookClient.regenerateSingleQuestion(bookId, chapterId, questionId, {
+      focus: 'theme' as any,
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `http://localhost:8000/api/v1/books/${bookId}/chapters/${chapterId}/questions/${questionId}/regenerate`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' })
+    );
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body).toEqual({ focus: 'theme' });
+    expect(result).toEqual(newQuestion);
+  });
+
+  it('attaches the status code and a clean detail message on failure', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      errorResponse(429, 'ignored', { detail: { error: 'REGENERATION_LIMIT_REACHED', message: 'cap reached' } })
+    );
+
+    const err = await bookClient
+      .regenerateSingleQuestion(bookId, chapterId, questionId)
+      .catch((e) => e);
+
+    expect(err.message).toBe('cap reached');
+    expect(err.statusCode).toBe(429);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // exportPDF – success with and without options
 // ---------------------------------------------------------------------------
 

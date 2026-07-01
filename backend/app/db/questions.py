@@ -3,6 +3,7 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from bson import ObjectId
+from pymongo import ReturnDocument
 import logging
 import math
 
@@ -402,6 +403,43 @@ async def save_question_rating(
         return rating_dict
 
 
+async def get_ratings_for_chapter(
+    book_id: str,
+    chapter_id: str,
+    user_id: str
+) -> List[Dict[str, Any]]:
+    """Return this user's ratings for a chapter's questions, joined with question text.
+
+    Each item is ``{"question_text": str, "rating": int, "feedback": Optional[str]}``.
+    Used to feed prior feedback into regeneration prompts. Returns an empty list when
+    the chapter has no rated questions.
+    """
+    questions_collection = await get_collection("questions")
+    ratings_collection = await get_collection("question_ratings")
+
+    questions = await questions_collection.find({
+        "book_id": book_id,
+        "chapter_id": chapter_id,
+        "user_id": user_id
+    }).to_list(length=None)
+
+    results: List[Dict[str, Any]] = []
+    for question in questions:
+        question_id = str(question["_id"])
+        rating = await ratings_collection.find_one({
+            "question_id": question_id,
+            "user_id": user_id
+        })
+        if rating:
+            results.append({
+                "question_text": question.get("question_text", ""),
+                "rating": rating.get("rating"),
+                "feedback": rating.get("feedback"),
+            })
+
+    return results
+
+
 async def get_chapter_question_progress(
     book_id: str,
     chapter_id: str,
@@ -553,6 +591,74 @@ async def get_question_by_id(question_id: str, user_id: str) -> Optional[Dict[st
         return question
 
     return None
+
+
+async def replace_question_in_place(
+    question_id: str,
+    user_id: str,
+    expected_regeneration_count: int,
+    new_fields: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Atomically replace a question's content in place, guarding on regeneration_count.
+
+    A single ``find_one_and_update`` on the unique ``_id`` is the concurrency guard:
+    the compare-and-swap on ``regeneration_count`` means only one of two racing
+    regenerations of the same question succeeds (no duplicate slot, no double-count,
+    no delete/create window that could lose the question). Keeping the same ``_id``
+    also preserves the question's prior rating so feedback isn't orphaned.
+
+    The question's stale response (the answer to the old wording) is cleared on success.
+    Returns the updated question dict, or None if no document matched (already
+    regenerated concurrently, gone, or not owned).
+    """
+    questions_collection = await get_collection("questions")
+    responses_collection = await get_collection("question_responses")
+
+    try:
+        object_id = ObjectId(question_id)
+    except Exception:
+        return None
+
+    # Legacy questions predate the regeneration_count field; treat absent as 0.
+    if expected_regeneration_count == 0:
+        query = {
+            "_id": object_id,
+            "user_id": user_id,
+            "$or": [
+                {"regeneration_count": 0},
+                {"regeneration_count": {"$exists": False}},
+            ],
+        }
+    else:
+        query = {
+            "_id": object_id,
+            "user_id": user_id,
+            "regeneration_count": expected_regeneration_count,
+        }
+
+    updated = await questions_collection.find_one_and_update(
+        query,
+        {"$set": {**new_fields, "updated_at": datetime.now(timezone.utc)}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not updated:
+        return None
+
+    # The prior answer no longer applies to the replaced question.
+    # ponytail: a response save that races this exact question's regeneration could
+    # re-attach a stale answer after this delete. Accepted — the window is a
+    # self-inflicted same-question save-vs-regenerate collision, non-corrupting
+    # (worst case a mismatched answer the user can re-answer), and a real fix needs
+    # either a version guard threaded through the hot save path or a multi-doc
+    # transaction (unavailable on standalone Mongo). Tracked as tech debt like the
+    # other non-transactional question mutations.
+    await responses_collection.delete_many({
+        "question_id": question_id,
+        "user_id": user_id
+    })
+
+    updated["id"] = str(updated.pop("_id"))
+    return updated
 
 
 async def save_question_responses_batch(
