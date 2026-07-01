@@ -71,9 +71,17 @@ def test_metadata_and_tab_state_registered_before_parameterized_route():
     match them as chapter_id='metadata'/'tab-state'. Guards the route-ordering
     bug that #121 previously fixed.
     """
+    # Only the *GET* literal sub-paths need ordering: they share the GET method
+    # with GET /chapters/{chapter_id}, so a wrong order makes them match as
+    # chapter_id='metadata'/'tab-state'. /chapters/bulk-status is PATCH-only
+    # (no PATCH /{chapter_id} exists), so its order relative to {chapter_id} is
+    # irrelevant — it sits after {chapter_id} here, exactly as in the original.
     order = [r.path for r in chapters.router.routes if getattr(r, "methods", None)]
-    param = order.index("/{book_id}/chapters/{chapter_id}")
+    param_path = "/{book_id}/chapters/{chapter_id}"
+    assert param_path in order, f"{param_path} not registered on chapters.router"
+    param = order.index(param_path)
     for literal in ("/{book_id}/chapters/metadata", "/{book_id}/chapters/tab-state"):
+        assert literal in order, f"{literal} not registered on chapters.router"
         assert order.index(literal) < param, (
             f"{literal} must be registered before /chapters/{{chapter_id}}"
         )
