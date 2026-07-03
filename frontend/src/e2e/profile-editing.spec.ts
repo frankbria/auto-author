@@ -62,6 +62,21 @@ test.describe('Profile editing (issue #63)', () => {
     await expect(page.getByText('Profile updated')).toBeVisible();
   });
 
+  test('seeds display name from full name when unset (no truncation on save)', async ({ page }) => {
+    await page.route('**/users/me', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...PROFILE, display_name: null }),
+      })
+    );
+
+    await page.goto('/profile');
+    // Must seed "Ada Lovelace", not "Ada" — a save persists this value and
+    // exports prefer display_name over the first/last fallback.
+    await expect(page.locator('#displayName')).toHaveValue('Ada Lovelace');
+  });
+
   test('uploads a profile picture', async ({ page }) => {
     let avatarPosted = false;
 

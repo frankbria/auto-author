@@ -87,7 +87,11 @@ export default function UserProfile() {
         form.reset({
           firstName: p.first_name ?? firstName,
           lastName: p.last_name ?? lastName,
-          displayName: p.display_name ?? p.first_name ?? firstName,
+          // Fall back to the full name — exports prefer display_name, so
+          // seeding only first_name would truncate the author name on save.
+          displayName:
+            p.display_name ??
+            [p.first_name ?? firstName, p.last_name ?? lastName].filter(Boolean).join(' '),
           bio: p.bio ?? '',
           theme: p.preferences?.theme ?? 'system',
           emailNotifications: p.preferences?.email_notifications ?? true,
