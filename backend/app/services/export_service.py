@@ -349,8 +349,8 @@ class ExportService:
         # characters like '<' would break PDF generation.
         if book_data.get('author_bio'):
             story.append(Spacer(1, 0.25*inch))
-            story.append(Paragraph("About the Author", styles['Heading2']))
-            story.append(Paragraph(html.escape(book_data['author_bio']), styles['Normal']))
+            story.append(Paragraph("About the Author", heading2_style))
+            story.append(Paragraph(html.escape(book_data['author_bio']), body_style))
 
         # Genre and audience
         metadata_parts = []

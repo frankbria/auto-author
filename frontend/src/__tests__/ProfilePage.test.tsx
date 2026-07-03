@@ -130,6 +130,7 @@ function createMockFormAndValues() {
   type Values = {
     firstName: string;
     lastName: string;
+    displayName: string;
     bio: string;
     theme: string;
     emailNotifications: boolean;
@@ -139,6 +140,7 @@ function createMockFormAndValues() {
   const values: Values = {
     firstName: 'Jane',
     lastName: 'Doe',
+    displayName: 'Jane Doe',
     bio: 'Test bio',
     theme: 'dark',
     emailNotifications: true,
@@ -154,8 +156,11 @@ function createMockFormAndValues() {
     }) as jest.Mock,
     control: {
       register: jest.fn(),
-      _formState: {}
     },
+    formState: {
+      errors: {},
+      isDirty: false,
+    } as Record<string, unknown>,
     watch: jest.fn((fieldName?: string) => fieldName ? values[fieldName] : values),
     getValues: jest.fn(() => ({ ...values })),
     setValue: jest.fn((name: string, value: string | boolean) => {
@@ -206,6 +211,7 @@ describe('UserProfile page', () => {
   interface MockFormValues {
     firstName: string;
     lastName: string;
+    displayName: string;
     bio: string;
     theme: string;
     emailNotifications: boolean;
@@ -216,6 +222,7 @@ describe('UserProfile page', () => {
   const mockFormValuesTemplate: MockFormValues = {
     firstName: 'Jane',
     lastName: 'Doe',
+    displayName: 'Jane Doe',
     bio: 'Test bio',
     theme: 'dark',
     emailNotifications: true,
@@ -234,8 +241,11 @@ describe('UserProfile page', () => {
     }),
     control: {
       register: jest.fn(),
-      _formState: {}
     },
+    formState: {
+      errors: {},
+      isDirty: false,
+    } as Record<string, unknown>,
     watch: jest.fn().mockImplementation((fieldName?: string) => {
       if (fieldName) return mockFormValuesTemplate[fieldName];
       return mockFormValuesTemplate;
@@ -308,14 +318,13 @@ describe('UserProfile page', () => {
     // Create a form with errors
     const formWithErrors = {
       ...mockForm,
-      control: {
-        ...mockForm.control,
-        _formState: {
-          errors: {
-            firstName: { message: 'First name is required' }
-          }
-        }
-      }
+      formState: {
+        errors: {
+          firstName: { message: 'First name is required' },
+          bio: { message: 'Max 1000 characters' },
+        },
+        isDirty: false,
+      },
     };
     // Set up react-hook-form mock
     const rhfModule = jest.requireMock('react-hook-form');
@@ -323,12 +332,15 @@ describe('UserProfile page', () => {
 
     render(<UserProfile />);
     // In a real component, we'd test for error messages in the DOM
-    // With our mocked components, we'll just verify the form is using the control with errors
+    // With our mocked components, we'll just verify the form is using the public
+    // formState with errors (the page reads form.formState.errors, not the
+    // private control._formState).
     const formFields = screen.getAllByTestId('form-field');
     expect(formFields.length).toBeGreaterThan(0);
-    // Verify that error state exists on the form
-    expect(formWithErrors.control._formState.errors.firstName).toBeDefined();
-    expect(formWithErrors.control._formState.errors.firstName.message).toBe('First name is required');
+    // Verify that error state exists on the form's public formState
+    expect(formWithErrors.formState.errors.firstName).toBeDefined();
+    expect((formWithErrors.formState.errors.firstName as { message: string }).message).toBe('First name is required');
+    expect(formWithErrors.formState.errors.bio).toBeDefined();
   });  // Test user preferences are saved and applied correctly
   it('saves and applies user preferences correctly', async () => {
     const updateProfileSpy = jest.fn().mockResolvedValue({ success: true });

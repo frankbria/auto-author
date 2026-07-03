@@ -26,8 +26,9 @@ import ProfilePictureUpload from '@/components/profile/ProfilePictureUpload';
 const BIO_MAX = 1000;
 
 const profileSchema = z.object({
-  firstName: z.string().min(1, 'First name is required').max(50, 'Max 50 characters'),
-  lastName: z.string().min(1, 'Last name is required').max(50, 'Max 50 characters'),
+  firstName: z.string().trim().max(50, 'Max 50 characters'),
+  lastName: z.string().trim().max(50, 'Max 50 characters'),
+  displayName: z.string().trim().max(100, 'Max 100 characters'),
   bio: z.string().max(BIO_MAX, `Max ${BIO_MAX} characters`).optional(),
   theme: z.enum(['light', 'dark', 'system']),
   emailNotifications: z.boolean(),
@@ -51,6 +52,7 @@ export default function UserProfile() {
     defaultValues: {
       firstName: '',
       lastName: '',
+      displayName: '',
       bio: '',
       theme: 'system',
       emailNotifications: true,
@@ -58,14 +60,17 @@ export default function UserProfile() {
     },
   });
 
-  // Seed from the session immediately, then hydrate full profile (bio, prefs)
-  // from the backend when available. getUserProfile can be absent in tests.
+  // Seed from the session immediately, then hydrate full profile (bio, prefs,
+  // display_name) from the backend when available. getUserProfile can be absent
+  // in tests. The async hydration skips reset if the user has already started
+  // editing, so a slow fetch never clobbers in-progress input.
   useEffect(() => {
     const [firstName = '', ...rest] = (user?.name ?? '').trim().split(' ');
     const lastName = rest.join(' ');
     form.reset({
       firstName,
       lastName,
+      displayName: user?.name ?? '',
       bio: '',
       theme: 'system',
       emailNotifications: true,
@@ -73,23 +78,30 @@ export default function UserProfile() {
     });
     if (user?.image) setAvatarUrl(user.image);
 
-    if (getUserProfile) {
-      getUserProfile()
-        .then((p) => {
-          form.reset({
-            firstName: p.first_name ?? firstName,
-            lastName: p.last_name ?? lastName,
-            bio: p.bio ?? '',
-            theme: p.preferences?.theme ?? 'system',
-            emailNotifications: p.preferences?.email_notifications ?? true,
-            marketingEmails: p.preferences?.marketing_emails ?? false,
-          });
-          if (p.avatar_url) setAvatarUrl(p.avatar_url);
-        })
-        .catch(() => {
-          /* keep session-seeded defaults */
+    let cancelled = false;
+    const loadProfile = async () => {
+      if (!getUserProfile) return;
+      try {
+        const p = await getUserProfile();
+        if (cancelled || form.formState.isDirty) return;
+        form.reset({
+          firstName: p.first_name ?? firstName,
+          lastName: p.last_name ?? lastName,
+          displayName: p.display_name ?? p.first_name ?? firstName,
+          bio: p.bio ?? '',
+          theme: p.preferences?.theme ?? 'system',
+          emailNotifications: p.preferences?.email_notifications ?? true,
+          marketingEmails: p.preferences?.marketing_emails ?? false,
         });
-    }
+        if (p.avatar_url) setAvatarUrl(p.avatar_url);
+      } catch {
+        /* keep session-seeded defaults */
+      }
+    };
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -98,6 +110,7 @@ export default function UserProfile() {
       await updateUserProfile({
         first_name: values.firstName,
         last_name: values.lastName,
+        display_name: values.displayName,
         bio: values.bio,
         preferences: {
           theme: values.theme,
@@ -131,12 +144,8 @@ export default function UserProfile() {
     }
   };
 
-  // Read validation errors off the live control state. This works with both the
-  // real react-hook-form Control and the mocked form used in unit tests.
-  const controlState = (
-    form.control as unknown as { _formState?: { errors?: Record<string, { message?: string }> } }
-  )?._formState;
-  const errors = controlState?.errors ?? {};
+  // Read validation errors off the public react-hook-form state.
+  const errors = form.formState.errors;
   const bioValue = (form.watch('bio') as string) ?? '';
 
   return (
@@ -191,6 +200,22 @@ export default function UserProfile() {
 
           <FormField
             control={form.control}
+            name="displayName"
+            render={({ field }) => (
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Display name</Label>
+                <Input id="displayName" placeholder="Name shown to readers" {...field} />
+                {errors.displayName?.message && (
+                  <p role="alert" className="text-destructive text-sm">
+                    {String(errors.displayName.message)}
+                  </p>
+                )}
+              </div>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="bio"
             render={({ field }) => (
               <div className="space-y-2">
@@ -201,6 +226,11 @@ export default function UserProfile() {
                   placeholder="Tell readers about yourself. Markdown is supported."
                   {...field}
                 />
+                {errors.bio?.message && (
+                  <p role="alert" className="text-destructive text-sm">
+                    {String(errors.bio.message)}
+                  </p>
+                )}
                 <p className="text-muted-foreground text-right text-xs">
                   {bioValue.length}/{BIO_MAX}
                 </p>

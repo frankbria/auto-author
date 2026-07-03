@@ -48,13 +48,16 @@ test.describe('Profile editing (issue #63)', () => {
     const firstName = page.locator('#firstName');
     await expect(firstName).toHaveValue('Ada');
     await expect(page.locator('#bio')).toHaveValue('Original bio');
+    await expect(page.locator('#displayName')).toHaveValue('Ada L.');
 
     // Edit and save.
     await firstName.fill('Grace');
+    await page.locator('#displayName').fill('Grace H.');
     await page.locator('#bio').fill('New bio about writing');
     await page.getByRole('button', { name: /save changes/i }).click();
 
     await expect.poll(() => patchedBody?.first_name).toBe('Grace');
+    expect(patchedBody?.display_name).toBe('Grace H.');
     expect(patchedBody?.bio).toBe('New bio about writing');
     await expect(page.getByText('Profile updated')).toBeVisible();
   });
