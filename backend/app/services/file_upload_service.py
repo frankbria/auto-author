@@ -34,7 +34,8 @@ ALLOWED_MIME_TYPES = {
 MAX_IMAGE_WIDTH = 1200
 MAX_IMAGE_HEIGHT = 1800
 THUMBNAIL_SIZE = (300, 450)
-# Avatars are square and small — one image, no thumbnail.
+# Avatars are small — one image, no thumbnail. Downscaled to fit 400x400
+# preserving aspect ratio; the UI crops to a circle via object-cover.
 PROFILE_PICTURE_SIZE = (400, 400)
 
 COVER_IMAGE_URL_PREFIX = "/uploads/cover_images/"
@@ -251,9 +252,9 @@ class FileUploadService:
         user_id: str,
     ) -> str:
         """
-        Process and save a square avatar for a user. Returns the image URL.
-        Mirrors process_and_save_cover_image but produces a single 400x400 image
-        (avatars don't need a thumbnail).
+        Process and save an avatar for a user. Returns the image URL.
+        Mirrors process_and_save_cover_image but produces a single image
+        downscaled to fit 400x400 (aspect ratio preserved, no thumbnail).
         """
         is_valid, error_msg = await self.validate_image_upload(file)
         if not is_valid:
