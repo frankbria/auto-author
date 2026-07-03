@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import ExportSettingsForm from '@/components/settings/ExportSettingsForm';
 import NotificationSettingsForm from '@/components/settings/NotificationSettingsForm';
@@ -20,6 +20,15 @@ import { toast } from '@/lib/toast';
 export default function SettingsPage() {
   const { getUserProfile, updateUserProfile } = useProfileApi();
   const { setTheme } = useTheme();
+  // next-themes may hand back a new setTheme identity after a theme change; a
+  // ref keeps it out of loadPreferences' deps so changing the theme can't
+  // re-fire the loader and clobber in-progress edits.
+  const setThemeRef = useRef(setTheme);
+  useEffect(() => {
+    setThemeRef.current = setTheme;
+  });
+  // Sync the stored theme once per page visit — not on retries after edits.
+  const themeSyncedRef = useRef(false);
   const [activeTab, setActiveTab] = useState('writing');
   const [isSaving, setIsSaving] = useState(false);
   // 'loading' | 'loaded' | 'error'. Saving is only allowed after a successful load
@@ -35,8 +44,15 @@ export default function SettingsPage() {
     getUserProfile()
       .then((profile) => {
         if (!active) return;
-        setPreferences(profile?.preferences ?? {});
+        const loaded = profile?.preferences ?? {};
+        setPreferences(loaded);
         setLoadState('loaded');
+        // The stored preference is the source of truth — sync next-themes
+        // (which persists per-browser) so all devices converge on it.
+        if (loaded.theme && !themeSyncedRef.current) {
+          themeSyncedRef.current = true;
+          setThemeRef.current(loaded.theme);
+        }
       })
       .catch(() => {
         // Do NOT enable saving: saving now would overwrite persisted fields with defaults.

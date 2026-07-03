@@ -22,10 +22,15 @@ jest.mock('@/lib/auth-client', () => ({
   },
 }));
 
-// Theme changes must be applied immediately via next-themes
+// Theme changes must be applied immediately via next-themes.
+// A FRESH setTheme identity is returned on every render (as next-themes can
+// do after a theme change) — the page must not let that re-fire its loader.
 const mockSetTheme = jest.fn();
 jest.mock('next-themes', () => ({
-  useTheme: () => ({ setTheme: mockSetTheme, theme: 'dark' }),
+  useTheme: () => ({
+    setTheme: (...args: unknown[]) => mockSetTheme(...args),
+    theme: 'dark',
+  }),
 }));
 
 // Capture toast calls. The component calls the base toast({ title, variant })
@@ -120,6 +125,30 @@ describe('SettingsPage', () => {
     );
     // Consumers of the shared preference cache see fresh values
     expect(invalidateUserPreferencesCache).toHaveBeenCalled();
+  });
+
+  it('keeps in-progress edits when the theme changes (loader must not re-fire)', async () => {
+    mockAuthFetch.mockResolvedValue(
+      loadedProfile({ theme: 'dark', default_writing_style: 'conversational' })
+    );
+    render(<SettingsPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /save settings/i })).toBeEnabled()
+    );
+    const getCallsAfterLoad = mockAuthFetch.mock.calls.length;
+
+    fireEvent.change(screen.getByLabelText('Default Writing Style'), {
+      target: { value: 'technical' },
+    });
+    // Changing the theme hands the page a new setTheme identity — this used
+    // to re-run loadPreferences and clobber the style edit back to stored.
+    fireEvent.change(screen.getByLabelText('Editor Theme'), {
+      target: { value: 'light' },
+    });
+
+    expect(screen.getByLabelText('Default Writing Style')).toHaveValue('technical');
+    expect(mockAuthFetch.mock.calls.length).toBe(getCallsAfterLoad);
   });
 
   it('applies theme changes immediately via next-themes', async () => {

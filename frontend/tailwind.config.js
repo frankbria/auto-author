@@ -22,38 +22,44 @@ const config = {
         sans: ['var(--font-nunito-sans)', 'system-ui', 'sans-serif'],
       },
       colors: {
-        border: "var(--color-border)",
-        input: "var(--color-input)",
-        ring: "var(--color-ring)",
-        background: "var(--color-background)",
-        foreground: "var(--color-foreground)",
+        // Neutral families read the :root/.dark CSS variables (globals.css) so
+        // the stored theme preference (#64) actually flips light/dark. The
+        // .dark values match the previous hardcoded RGBs, so the default dark
+        // look is unchanged. NB: the old var(--color-*) names only existed in
+        // the Tailwind-v4 @theme block, which v3 ignores — they never resolved.
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        // Brand colors stay fixed across themes.
         primary: {
           DEFAULT: "rgb(79, 70, 229)",
           foreground: "white",
         },
         secondary: {
-          DEFAULT: "rgb(30, 41, 59)",
-          foreground: "rgb(248, 250, 252)",
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
         },
         destructive: {
           DEFAULT: "rgb(239, 68, 68)",
           foreground: "white",
         },
         muted: {
-          DEFAULT: "rgb(39, 39, 42)",
-          foreground: "rgb(161, 161, 170)",
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)",
         },
         accent: {
-          DEFAULT: "rgb(39, 39, 42)",
-          foreground: "white",
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)",
         },
         popover: {
-          DEFAULT: "rgb(24, 24, 27)",
-          foreground: "rgb(250, 250, 250)",
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)",
         },
         card: {
-          DEFAULT: "rgb(24, 24, 27)",
-          foreground: "rgb(250, 250, 250)",
+          DEFAULT: "var(--card)",
+          foreground: "var(--card-foreground)",
         },
       },
       borderRadius: {
