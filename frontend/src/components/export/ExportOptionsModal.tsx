@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Download01Icon, File01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { toast } from '@/lib/toast';
@@ -18,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { ExportOptions, ExportFormat, PageSize, BookExportStats, ExportTemplate, TemplateCustomization } from '@/types/export';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
+import { useUserPreferences } from '@/hooks/useUserPreferences';
 import bookClient from '@/lib/api/bookClient';
 import { TemplateSelector } from './TemplateSelector';
 
@@ -68,6 +69,22 @@ export function ExportOptionsModal({
   const [pageSize, setPageSize] = useState<PageSize>('letter');
   const [includeEmptyChapters, setIncludeEmptyChapters] = useState(false);
   const [markdownMultiFile, setMarkdownMultiFile] = useState(false);
+
+  // Pre-select the user's stored export defaults (#64) until they interact.
+  const userPreferences = useUserPreferences();
+  const optionsTouchedRef = useRef(false);
+  useEffect(() => {
+    if (!userPreferences || optionsTouchedRef.current) return;
+    if (userPreferences.default_export_format) {
+      setFormat(userPreferences.default_export_format);
+    }
+    if (userPreferences.default_page_size) {
+      setPageSize(userPreferences.default_page_size);
+    }
+    if (typeof userPreferences.include_empty_chapters === 'boolean') {
+      setIncludeEmptyChapters(userPreferences.include_empty_chapters);
+    }
+  }, [userPreferences]);
 
   // Template state (issue #59)
   const [templates, setTemplates] = useState<ExportTemplate[]>([]);
@@ -191,7 +208,13 @@ export function ExportOptionsModal({
           {/* Format Selection */}
           <div className="space-y-3">
             <Label className="text-base font-semibold">Export Format</Label>
-            <RadioGroup value={format} onValueChange={(value) => setFormat(value as ExportFormat)}>
+            <RadioGroup
+              value={format}
+              onValueChange={(value) => {
+                optionsTouchedRef.current = true;
+                setFormat(value as ExportFormat);
+              }}
+            >
               <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent">
                 <RadioGroupItem value="pdf" id="format-pdf" />
                 <div className="flex-1">
@@ -281,7 +304,13 @@ export function ExportOptionsModal({
           {format === 'pdf' && (
             <div className="space-y-3">
               <Label className="text-base font-semibold">Page Size</Label>
-              <RadioGroup value={pageSize} onValueChange={(value) => setPageSize(value as PageSize)}>
+              <RadioGroup
+                value={pageSize}
+                onValueChange={(value) => {
+                  optionsTouchedRef.current = true;
+                  setPageSize(value as PageSize);
+                }}
+              >
                 <div className="flex items-center space-x-3 space-y-0">
                   <RadioGroupItem value="letter" id="size-letter" />
                   <Label htmlFor="size-letter" className="font-normal cursor-pointer">
@@ -316,7 +345,10 @@ export function ExportOptionsModal({
             <Switch
               id="include-empty"
               checked={includeEmptyChapters}
-              onCheckedChange={setIncludeEmptyChapters}
+              onCheckedChange={(checked) => {
+                optionsTouchedRef.current = true;
+                setIncludeEmptyChapters(checked);
+              }}
             />
           </div>
 

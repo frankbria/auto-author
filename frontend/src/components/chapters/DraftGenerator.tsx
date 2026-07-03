@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import DOMPurify from 'dompurify';
 import { LoadingStateManager } from '@/components/loading';
 import { createProgressTracker } from '@/lib/loading';
+import { useUserPreferences } from '@/hooks/useUserPreferences';
+import { WRITING_STYLES, isWritingStyle } from '@/lib/constants/writing-styles';
 
 interface DraftGeneratorProps {
   bookId: string;
@@ -28,16 +30,6 @@ interface QuestionResponse {
   question: string;
   answer: string;
 }
-
-// Styles documented in AUTO_AUTHOR_USER_MANUAL.md and issue #55 acceptance criteria.
-// Backend is style-agnostic (free-text into the prompt), so this list is the source of truth.
-const WRITING_STYLES = [
-  { value: 'professional', label: 'Professional' },
-  { value: 'conversational', label: 'Conversational' },
-  { value: 'academic', label: 'Academic' },
-  { value: 'creative', label: 'Creative' },
-  { value: 'technical', label: 'Technical' },
-];
 
 const SAMPLE_QUESTIONS = [
   "What is the main concept or idea you want to convey in this chapter?",
@@ -62,6 +54,16 @@ export function DraftGenerator({
   );
   const [writingStyle, setWritingStyle] = useState('conversational');
   const [targetLength, setTargetLength] = useState(2000);
+  // Pre-select the user's default writing style (#64) unless they've already
+  // picked one in this dialog.
+  const userPreferences = useUserPreferences();
+  const styleTouchedRef = useRef(false);
+  useEffect(() => {
+    const preferred = userPreferences?.default_writing_style;
+    if (preferred && isWritingStyle(preferred) && !styleTouchedRef.current) {
+      setWritingStyle(preferred);
+    }
+  }, [userPreferences]);
   const [generatedDraft, setGeneratedDraft] = useState<string | null>(null);
   const [draftMetadata, setDraftMetadata] = useState<{
     word_count: number;
@@ -210,7 +212,13 @@ export function DraftGenerator({
               {/* Writing Style Selection */}
               <div className="space-y-2">
                 <Label htmlFor="draft-writing-style">Writing Style</Label>
-                <Select value={writingStyle} onValueChange={setWritingStyle}>
+                <Select
+                  value={writingStyle}
+                  onValueChange={(value) => {
+                    styleTouchedRef.current = true;
+                    setWritingStyle(value);
+                  }}
+                >
                   <SelectTrigger id="draft-writing-style">
                     <SelectValue />
                   </SelectTrigger>

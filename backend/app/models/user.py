@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Annotated
+from typing import Optional, List, Dict, Any, Annotated, Literal
 from pydantic import BaseModel, Field, ConfigDict, PlainValidator
 from bson import ObjectId
 
@@ -25,6 +25,19 @@ class UserPreferences(BaseModel):
     theme: str = "dark"  # light, dark, system
     email_notifications: bool = True
     marketing_emails: bool = False
+    # Writing preferences (#64)
+    default_writing_style: Literal[
+        "professional", "conversational", "academic", "creative", "technical"
+    ] = "conversational"
+    auto_save_interval: int = Field(default=3, ge=3, le=30)  # seconds
+    # Export preferences (#64)
+    default_export_format: Literal["pdf", "docx", "epub", "markdown"] = "pdf"
+    default_page_size: Literal["letter", "A4"] = "letter"
+    include_empty_chapters: bool = False
+    # Notification preferences (#64) — stored contract; no email sender exists yet
+    writing_reminders: bool = False
+    progress_updates: bool = True
+    backup_notifications: bool = True
 
 
 class UserBase(BaseModel):
