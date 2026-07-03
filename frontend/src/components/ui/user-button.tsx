@@ -69,7 +69,7 @@ export function UserButton() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+        <DropdownMenuItem onClick={() => router.push("/profile")}>
           <HugeiconsIcon icon={User02Icon} size={16} className="mr-2" />
           <span>Profile</span>
         </DropdownMenuItem>

@@ -449,6 +449,21 @@ Template margins are kept within print-on-demand safe limits (KDP / IngramSpark)
 
 ## ⚙️ Configuration & Settings
 
+### Your Profile
+
+**Access**: Click your avatar (top right) → **Profile** (or go to `/profile`).
+
+Your profile is where your author identity lives:
+
+- **Profile picture**: Click **Change photo** to upload a JPEG, PNG, WebP, or GIF (max 5MB). It's cropped to a square avatar. Uploading a new photo replaces the old one.
+- **First & last name**: Up to 50 characters each.
+- **Bio**: Up to 1,000 characters. Markdown is supported — this text appears as an **"About the Author"** section in your exported books (PDF and DOCX).
+- **Preferences**: Theme (Light / Dark / System), email notifications, and marketing emails.
+
+Click **Save Changes** to persist edits; a confirmation appears when they're saved. **Delete Account** (with confirmation) permanently removes your account and books.
+
+> Your author name in exports uses your display name if set, otherwise your first and last name.
+
 ### Writing Preferences
 
 **Access**: Profile → Writing Preferences

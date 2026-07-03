@@ -1,12 +1,12 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 
 class UserPreferences(BaseModel):
     """User preferences schema"""
 
-    theme: str = "dark"  # light, dark, system
+    theme: Literal["light", "dark", "system"] = "dark"
     email_notifications: bool = True
     marketing_emails: bool = False
 
@@ -66,11 +66,11 @@ class UserUpdate(BaseModel):
     """Schema for updating an existing user"""
 
     email: Optional[EmailStr] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    display_name: Optional[str] = None
+    first_name: Optional[str] = Field(None, max_length=50)
+    last_name: Optional[str] = Field(None, max_length=50)
+    display_name: Optional[str] = Field(None, max_length=100)
     avatar_url: Optional[str] = None
-    bio: Optional[str] = None
+    bio: Optional[str] = Field(None, max_length=1000)
     preferences: Optional[UserPreferences] = None
     metadata: Optional[Dict[str, Any]] = None
     role: Optional[str] = None

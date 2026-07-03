@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.security import HTTPBearer
 from typing import List, Dict
 from datetime import datetime, timezone
@@ -183,6 +183,73 @@ async def delete_profile(
     )
 
     return {"message": "Account successfully deleted"}
+
+
+@router.post("/me/avatar", status_code=status.HTTP_200_OK)
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    request: Request = None,
+    current_user: Dict = Depends(get_current_user_from_session),
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=5, window=60)),
+):
+    """Upload a profile picture (avatar) for the current user.
+
+    Processes the image, stores it (cloud or local), replaces any previous
+    avatar, and persists the new ``avatar_url`` on the user record.
+    """
+    from app.services.file_upload_service import FileUploadService
+
+    try:
+        upload_service = FileUploadService()
+        avatar_url = await upload_service.process_and_save_profile_picture(
+            file, current_user["auth_id"]
+        )
+
+        # Persist first; only remove the previous avatar once the new URL is
+        # safely stored. If persistence fails, clean up the just-saved file so
+        # we don't leak an orphan or point the record at a deleted image.
+        try:
+            updated_user = await update_user(
+                auth_id=current_user["auth_id"],
+                user_data={
+                    "avatar_url": avatar_url,
+                    "updated_at": datetime.now(timezone.utc),
+                },
+                actor_id=current_user["auth_id"],
+            )
+        except Exception:
+            await upload_service.delete_profile_picture(avatar_url)
+            raise
+        if not updated_user:
+            await upload_service.delete_profile_picture(avatar_url)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+
+        old_avatar = current_user.get("avatar_url")
+        if old_avatar and old_avatar != avatar_url:
+            await upload_service.delete_profile_picture(old_avatar)
+
+        if request:
+            await audit_request(
+                request=request,
+                current_user=current_user,
+                action="avatar_upload",
+                resource_type="user",
+                target_id=current_user["auth_id"],
+                metadata={"filename": file.filename, "avatar_url": avatar_url},
+            )
+
+        return {"message": "Profile picture updated", "avatar_url": avatar_url}
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Failed to upload profile picture", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload profile picture",
+        )
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

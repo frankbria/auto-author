@@ -344,6 +344,14 @@ class ExportService:
         if book_data.get('author_name'):
             story.append(Paragraph(f"by {book_data['author_name']}", subtitle_style))
 
+        # About the Author (from the owner's profile bio). Escape the free-text
+        # bio — ReportLab's Paragraph parses XML-like markup, so unescaped
+        # characters like '<' would break PDF generation.
+        if book_data.get('author_bio'):
+            story.append(Spacer(1, 0.25*inch))
+            story.append(Paragraph("About the Author", heading2_style))
+            story.append(Paragraph(html.escape(book_data['author_bio']), body_style))
+
         # Genre and audience
         metadata_parts = []
         if book_data.get('genre'):
@@ -535,6 +543,14 @@ class ExportService:
             author = doc.add_paragraph(f"by {book_data['author_name']}")
             author.alignment = WD_ALIGN_PARAGRAPH.CENTER
             author.runs[0].font.size = Pt(14)
+
+        # About the Author (from the owner's profile bio)
+        if book_data.get('author_bio'):
+            doc.add_paragraph()
+            about = doc.add_heading("About the Author", level=2)
+            about.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            bio_p = doc.add_paragraph(book_data['author_bio'])
+            bio_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         # Metadata
         metadata_parts = []
