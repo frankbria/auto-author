@@ -494,6 +494,15 @@ jest.mock('@tiptap/extension-character-count', () => {
   return jest.fn(() => ({ name: 'characterCount' }));
 });
 
+// Mock the shared user-preferences cache hook so component suites stay
+// hermetic. Suites asserting preference-driven behavior override this locally.
+jest.mock('@/hooks/useUserPreferences', () => ({
+  __esModule: true,
+  useUserPreferences: jest.fn(() => null),
+  invalidateUserPreferencesCache: jest.fn(),
+  default: jest.fn(() => null),
+}));
+
 // Mock better-auth for all tests
 jest.mock('@/lib/auth-client', () => {
   const mockForgetPassword = jest.fn().mockResolvedValue({
@@ -577,6 +586,23 @@ jest.mock('@/lib/auth-client', () => {
       }),
       forgetPassword: mockForgetPassword,
       resetPassword: mockResetPassword,
+      // Account security methods (#64)
+      changePassword: jest.fn().mockResolvedValue({ data: {}, error: null }),
+      listSessions: jest.fn().mockResolvedValue({ data: [], error: null }),
+      revokeSession: jest.fn().mockResolvedValue({ data: {}, error: null }),
+      revokeOtherSessions: jest.fn().mockResolvedValue({ data: {}, error: null }),
+      twoFactor: {
+        enable: jest.fn().mockResolvedValue({
+          data: {
+            totpURI: 'otpauth://totp/Auto%20Author:test@example.com?secret=TESTSECRET',
+            backupCodes: ['AAAA-1111', 'BBBB-2222'],
+          },
+          error: null,
+        }),
+        disable: jest.fn().mockResolvedValue({ data: {}, error: null }),
+        verifyTotp: jest.fn().mockResolvedValue({ data: {}, error: null }),
+        verifyBackupCode: jest.fn().mockResolvedValue({ data: {}, error: null }),
+      },
     },
     // Direct exports for password reset methods
     forgetPassword: mockForgetPassword,

@@ -12,6 +12,7 @@ const customJestConfig = {
     '^@/(.*)$': '<rootDir>/src/$1',
     // Mock better-auth to avoid ESM issues
     '^better-auth/client$': '<rootDir>/src/__mocks__/better-auth-client.ts',
+    '^better-auth/client/plugins$': '<rootDir>/src/__mocks__/better-auth-client-plugins.ts',
     '^better-auth/react$': '<rootDir>/src/__mocks__/better-auth-react.ts',
   },
   transformIgnorePatterns: [

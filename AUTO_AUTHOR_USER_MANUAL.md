@@ -466,43 +466,43 @@ Click **Save Changes** to persist edits; a confirmation appears when they're sav
 
 ### Writing Preferences
 
-**Access**: Profile → Writing Preferences
+**Access**: Settings → Writing tab (dashboard sidebar → Settings)
 
 **Options**:
-- **Default Writing Style**: Choose your preferred AI writing style
-- **Auto-Save Frequency**: Set how often content is saved (3-30 seconds)
-- **Voice Input Language**: Select your preferred language
-- **Editor Theme**: Light, Dark, or System default
+- **Default Writing Style**: Professional, Conversational, Academic, Creative, or Technical — pre-selected whenever you generate a chapter draft with AI
+- **Auto-Save Interval**: How often the chapter editor saves your work (3–30 seconds)
+- **Editor Theme**: Light, Dark, or System default — applied immediately across the app
+
+Click **Save Settings** to persist changes.
 
 ### Export Settings
 
-**Access**: Profile → Export Settings
+**Access**: Settings → Export tab
 
 **Options**:
-- **Default Export Format**: PDF or DOCX
-- **Page Size**: Letter or A4 (for PDF)
-- **Include Empty Chapters**: Yes/No
-- **Filename Format**: Choose how exported files are named
+- **Default Export Format**: PDF, DOCX, EPUB, or Markdown — pre-selected in the export dialog
+- **Page Size**: Letter or A4 (PDF only)
+- **Include Empty Chapters**: Yes/No default for exports
 
 ### Notification Settings
 
-**Access**: Profile → Notification Settings
+**Access**: Settings → Notifications tab
 
 **Options**:
-- **Email Notifications**: Enable/disable various email alerts
+- **Email Notifications**: Account updates and important activity
+- **Marketing Emails**: Product news and promotional content
 - **Writing Reminders**: Get reminders to write regularly
 - **Progress Updates**: Receive milestone achievements
 - **Backup Notifications**: Alerts about local backups
 
 ### Security Settings
 
-**Access**: Profile → Security Settings
+**Access**: Settings → Security tab
 
 **Options**:
-- **Password**: Change your account password
-- **Two-Factor Authentication**: Enable/disable 2FA
-- **Active Sessions**: View and revoke sessions
-- **API Access**: Manage API keys for integrations
+- **Password**: Change your account password (other devices are signed out for safety)
+- **Two-Factor Authentication**: Enable TOTP 2FA — scan the QR code with an authenticator app, store your one-time backup codes, and confirm with a 6-digit code. At sign-in you'll be asked for a code (or a backup code), with an option to trust the device for 30 days.
+- **Active Sessions**: See which devices are signed in, revoke any of them, or sign out all other devices at once
 
 ## 💡 Tips for Best Results
 

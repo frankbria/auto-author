@@ -125,6 +125,173 @@ async def test_preferences_default_values(auth_client_factory):
 
 
 @pytest.mark.asyncio
+async def test_update_extended_preferences(auth_client_factory):
+    """
+    Test that all extended settings preferences (#64) can be updated.
+    Covers writing, export, and notification preference fields.
+    """
+    preferences_update = {
+        "preferences": {
+            "theme": "light",
+            "email_notifications": True,
+            "marketing_emails": False,
+            "default_writing_style": "academic",
+            "auto_save_interval": 10,
+            "default_export_format": "epub",
+            "default_page_size": "A4",
+            "include_empty_chapters": True,
+            "writing_reminders": True,
+            "progress_updates": False,
+            "backup_notifications": False,
+        }
+    }
+
+    client = await auth_client_factory()
+
+    response = await client.patch("/api/v1/users/me", json=preferences_update)
+
+    assert response.status_code == 200
+    data = response.json()
+
+    prefs = data["preferences"]
+    assert prefs["default_writing_style"] == "academic"
+    assert prefs["auto_save_interval"] == 10
+    assert prefs["default_export_format"] == "epub"
+    assert prefs["default_page_size"] == "A4"
+    assert prefs["include_empty_chapters"] is True
+    assert prefs["writing_reminders"] is True
+    assert prefs["progress_updates"] is False
+    assert prefs["backup_notifications"] is False
+
+
+@pytest.mark.asyncio
+async def test_extended_preferences_round_trip(auth_client_factory, test_user):
+    """
+    Integration: extended preferences persist to the database on PATCH.
+
+    GET /users/me echoes the session user (mocked in this harness), so
+    persistence is asserted against the users collection directly.
+    """
+    from app.db import base
+
+    client = await auth_client_factory()
+
+    update = {
+        "preferences": {
+            "theme": "dark",
+            "default_writing_style": "technical",
+            "auto_save_interval": 30,
+            "default_export_format": "markdown",
+            "default_page_size": "letter",
+            "include_empty_chapters": True,
+            "writing_reminders": True,
+            "progress_updates": True,
+            "backup_notifications": False,
+        }
+    }
+    patch_response = await client.patch("/api/v1/users/me", json=update)
+    assert patch_response.status_code == 200
+
+    stored = await base.users_collection.find_one({"auth_id": test_user["auth_id"]})
+    assert stored is not None
+    prefs = stored["preferences"]
+    assert prefs["default_writing_style"] == "technical"
+    assert prefs["auto_save_interval"] == 30
+    assert prefs["default_export_format"] == "markdown"
+    assert prefs["default_page_size"] == "letter"
+    assert prefs["include_empty_chapters"] is True
+    assert prefs["writing_reminders"] is True
+    assert prefs["progress_updates"] is True
+    assert prefs["backup_notifications"] is False
+
+
+@pytest.mark.asyncio
+async def test_extended_preferences_defaults(auth_client_factory):
+    """
+    New/legacy users with no stored extended preferences get sane defaults
+    matching current shipped behavior (3s auto-save, conversational, pdf/letter).
+    """
+    user_without_preferences = {
+        "id": "user_123",
+        "_id": "user_123",
+        "auth_id": "auth_user_123",
+        "email": "test@example.com",
+        "first_name": "Test",
+        "last_name": "User",
+        "display_name": "Test User",
+        "role": "user",
+    }
+
+    client = await auth_client_factory(overrides=user_without_preferences)
+
+    response = await client.get("/api/v1/users/me")
+
+    assert response.status_code == 200
+    prefs = response.json()["preferences"]
+    assert prefs["default_writing_style"] == "conversational"
+    assert prefs["auto_save_interval"] == 3
+    assert prefs["default_export_format"] == "pdf"
+    assert prefs["default_page_size"] == "letter"
+    assert prefs["include_empty_chapters"] is False
+    assert prefs["writing_reminders"] is False
+    assert prefs["progress_updates"] is True
+    assert prefs["backup_notifications"] is True
+
+
+@pytest.mark.asyncio
+async def test_invalid_writing_style_rejected(auth_client_factory):
+    """default_writing_style outside the 5 shipped styles is a 422."""
+    client = await auth_client_factory()
+
+    response = await client.patch(
+        "/api/v1/users/me",
+        json={"preferences": {"default_writing_style": "narrative"}},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_invalid_export_format_rejected(auth_client_factory):
+    """default_export_format outside pdf/docx/epub/markdown is a 422."""
+    client = await auth_client_factory()
+
+    response = await client.patch(
+        "/api/v1/users/me",
+        json={"preferences": {"default_export_format": "rtf"}},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_invalid_page_size_rejected(auth_client_factory):
+    """default_page_size outside letter/A4 is a 422."""
+    client = await auth_client_factory()
+
+    response = await client.patch(
+        "/api/v1/users/me",
+        json={"preferences": {"default_page_size": "legal"}},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interval,expected_status", [(2, 422), (3, 200), (30, 200), (31, 422)])
+async def test_auto_save_interval_bounds(auth_client_factory, interval, expected_status):
+    """auto_save_interval must be within 3-30 seconds inclusive."""
+    client = await auth_client_factory()
+
+    response = await client.patch(
+        "/api/v1/users/me",
+        json={"preferences": {"auto_save_interval": interval}},
+    )
+
+    assert response.status_code == expected_status
+
+
+@pytest.mark.asyncio
 async def test_invalid_preference_values(auth_client_factory):
     """
     Test validation of preference values.

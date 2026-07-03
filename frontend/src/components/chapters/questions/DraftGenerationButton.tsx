@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,6 +13,8 @@ import { LoadingStateManager } from '@/components/loading';
 import { createProgressTracker } from '@/lib/loading';
 import DOMPurify from 'dompurify';
 import { cn } from '@/lib/utils';
+import { useUserPreferences } from '@/hooks/useUserPreferences';
+import { WRITING_STYLES, isWritingStyle } from '@/lib/constants/writing-styles';
 
 interface DraftGenerationButtonProps {
   bookId: string;
@@ -25,16 +27,6 @@ interface DraftGenerationButtonProps {
   className?: string;
   minimumResponses?: number;
 }
-
-// Styles documented in AUTO_AUTHOR_USER_MANUAL.md and issue #55 acceptance criteria.
-// Backend is style-agnostic (free-text into the prompt), so this list is the source of truth.
-const WRITING_STYLES = [
-  { value: 'professional', label: 'Professional' },
-  { value: 'conversational', label: 'Conversational' },
-  { value: 'academic', label: 'Academic' },
-  { value: 'creative', label: 'Creative' },
-  { value: 'technical', label: 'Technical' },
-];
 
 const TARGET_LENGTHS = [
   { value: '500', label: '500 words (Short)' },
@@ -75,6 +67,16 @@ export function DraftGenerationButton({
   // Options
   const [writingStyle, setWritingStyle] = useState('conversational');
   const [targetLength, setTargetLength] = useState('2000');
+  // Pre-select the user's default writing style (#64) unless they've already
+  // picked one in this dialog.
+  const userPreferences = useUserPreferences();
+  const styleTouchedRef = useRef(false);
+  useEffect(() => {
+    const preferred = userPreferences?.default_writing_style;
+    if (preferred && isWritingStyle(preferred) && !styleTouchedRef.current) {
+      setWritingStyle(preferred);
+    }
+  }, [userPreferences]);
   const [includeInProgressResponses, setIncludeInProgressResponses] = useState(false);
 
   // Generation state
@@ -263,7 +265,13 @@ export function DraftGenerationButton({
               {/* Writing Style Selection */}
               <div className="space-y-2">
                 <Label htmlFor="writing-style">Writing Style</Label>
-                <Select value={writingStyle} onValueChange={setWritingStyle}>
+                <Select
+                  value={writingStyle}
+                  onValueChange={(value) => {
+                    styleTouchedRef.current = true;
+                    setWritingStyle(value);
+                  }}
+                >
                   <SelectTrigger id="writing-style">
                     <SelectValue />
                   </SelectTrigger>

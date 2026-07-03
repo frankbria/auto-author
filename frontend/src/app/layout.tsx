@@ -26,7 +26,9 @@ export const viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
-      <body className={`${nunitoSans.className} bg-gray-950 text-gray-100 min-h-screen`}>
+      {/* Token classes (not hardcoded gray-950) so the stored theme preference
+          actually flips light/dark; defaultTheme="dark" keeps the shipped look. */}
+      <body className={`${nunitoSans.className} bg-background text-foreground min-h-screen`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

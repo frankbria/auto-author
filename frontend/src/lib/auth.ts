@@ -2,6 +2,7 @@ import 'server-only'
 
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
+import { twoFactor } from "better-auth/plugins";
 import { MongoClient, Db } from "mongodb";
 
 const mongoUrl = process.env.DATABASE_URL || "mongodb://localhost:27017/auto_author";
@@ -131,7 +132,11 @@ export async function getAuth() {
   // Create auth instance with connected database
   try {
     authInstance = betterAuth({
+      appName: "Auto Author",
       database: mongodbAdapter(db),
+      // TOTP two-factor authentication (#64). The MongoDB adapter creates the
+      // twoFactor collection on demand — no migration step required.
+      plugins: [twoFactor()],
       emailAndPassword: {
         enabled: true,
         autoSignIn: true,

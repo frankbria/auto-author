@@ -104,6 +104,12 @@ function SignInForm() {
         return;
       }
 
+      // A 2FA-enabled account returns a twoFactorRedirect flag instead of a
+      // session; the twoFactorClient handler navigates to /auth/verify-2fa.
+      if (data && 'twoFactorRedirect' in data && (data as { twoFactorRedirect?: boolean }).twoFactorRedirect) {
+        return;
+      }
+
       // Success - redirect to dashboard or original destination
       router.push(redirect);
     } catch (err) {

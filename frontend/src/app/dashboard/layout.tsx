@@ -32,7 +32,8 @@ export default function DashboardLayout({
     <ProtectedRoute>
       <div className="flex flex-col min-h-screen">
         {/* Header/Navigation */}
-        <header className="bg-gray-900 border-b border-gray-800 py-4 px-6 sticky top-0 z-50">
+        {/* Theme-token surfaces so the stored theme preference (#64) is visible */}
+        <header className="bg-card border-b border-border py-4 px-6 sticky top-0 z-50">
           <div className="container mx-auto flex justify-between items-center">
             <Link href="/dashboard" className="text-2xl font-bold text-indigo-500">Auto Author</Link>
 
@@ -46,8 +47,8 @@ export default function DashboardLayout({
                         href={item.href}
                         className={`${
                           item.active
-                            ? 'text-indigo-400 font-medium'
-                            : 'text-gray-400 hover:text-indigo-400'
+                            ? 'text-primary font-medium'
+                            : 'text-muted-foreground hover:text-primary'
                         } transition-colors`}
                       >
                         {item.name}
@@ -64,7 +65,7 @@ export default function DashboardLayout({
               <UserButton />
               <button
                 onClick={toggleMobileMenu}
-                className="flex items-center justify-center min-h-11 min-w-11 text-gray-400 hover:text-gray-100 transition-colors"
+                className="flex items-center justify-center min-h-11 min-w-11 text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="Toggle mobile menu"
               >
                 <svg
@@ -93,13 +94,13 @@ export default function DashboardLayout({
               />
 
               {/* Menu Panel */}
-              <div className="fixed top-0 right-0 h-full w-64 bg-gray-900 border-l border-gray-800 z-50 md:hidden transform transition-transform duration-300 ease-in-out">
+              <div className="fixed top-0 right-0 h-full w-64 bg-card border-l border-border z-50 md:hidden transform transition-transform duration-300 ease-in-out">
                 <div className="p-6">
                   <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-lg font-semibold text-gray-100">Menu</h2>
+                    <h2 className="text-lg font-semibold text-foreground">Menu</h2>
                     <button
                       onClick={closeMobileMenu}
-                      className="flex items-center justify-center min-h-11 min-w-11 text-gray-400 hover:text-gray-100 transition-colors"
+                      className="flex items-center justify-center min-h-11 min-w-11 text-muted-foreground hover:text-foreground transition-colors"
                       aria-label="Close menu"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,8 +118,8 @@ export default function DashboardLayout({
                             onClick={closeMobileMenu}
                             className={`block py-3 px-4 rounded-lg transition-colors ${
                               item.active
-                                ? 'bg-indigo-600 text-white font-medium'
-                                : 'text-gray-300 hover:bg-gray-800 hover:text-indigo-400'
+                                ? 'bg-primary text-primary-foreground font-medium'
+                                : 'text-muted-foreground hover:bg-accent hover:text-primary'
                             }`}
                           >
                             {item.name}
@@ -134,13 +135,13 @@ export default function DashboardLayout({
         </header>
 
         {/* Main Content */}
-        <main id="main-content" tabIndex={-1} className="flex-1 bg-gray-950">
+        <main id="main-content" tabIndex={-1} className="flex-1 bg-background">
           {children}
         </main>
 
         {/* Footer */}
-        <footer className="bg-gray-900 border-t border-gray-800 py-4 px-6">
-          <div className="container mx-auto text-center text-gray-500 text-sm">
+        <footer className="bg-card border-t border-border py-4 px-6">
+          <div className="container mx-auto text-center text-muted-foreground text-sm">
             <p>© 2025 Noatak Enterprises, LLC, dba Auto Author. All rights reserved.</p>
           </div>
         </footer>

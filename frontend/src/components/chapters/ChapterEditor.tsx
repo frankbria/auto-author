@@ -49,6 +49,8 @@ import {
 } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
+import { useUserPreferences } from '@/hooks/useUserPreferences';
+import { AUTO_SAVE_DEFAULT_SECONDS, isValidAutoSaveInterval } from '@/lib/constants/auto-save';
 import { DraftGenerator } from './DraftGenerator';
 import { StyleTransformer } from './StyleTransformer';
 import { ContentEnhancer } from './ContentEnhancer';
@@ -80,6 +82,14 @@ export function ChapterEditor({
   onContentChange
 }: ChapterEditorProps) {
   const { trackOperation } = usePerformanceTracking();
+  // Auto-save frequency honors the user's stored preference (#64); anything
+  // missing/out-of-range falls back to the shipped 3s default.
+  const userPreferences = useUserPreferences();
+  const preferredAutoSaveInterval = userPreferences?.auto_save_interval;
+  const autoSaveDelayMs =
+    (isValidAutoSaveInterval(preferredAutoSaveInterval)
+      ? preferredAutoSaveInterval
+      : AUTO_SAVE_DEFAULT_SECONDS) * 1000;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -278,10 +288,10 @@ export function ChapterEditor({
       } finally {
         setIsSaving(false);
       }
-    }, 3000);
+    }, autoSaveDelayMs);
 
     return () => clearTimeout(timer);
-  }, [autoSavePending, bookId, chapterId, editor, isSaving, lastAutoSavedContent]);
+  }, [autoSavePending, autoSaveDelayMs, bookId, chapterId, editor, isSaving, lastAutoSavedContent]);
 
   const handleSave = async (isAutoSave: boolean = false) => {
     if (isSaving || !editor) return;
