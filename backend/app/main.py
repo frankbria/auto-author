@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from contextlib import asynccontextmanager
 from app.api.endpoints.router import router as api_router
-from app.core.config import settings
+from app.core.config import settings, is_production_env
 import logging
 import os
 from pathlib import Path
@@ -28,9 +28,9 @@ def validate_production_security() -> None:
     Raises:
         RuntimeError: If BYPASS_AUTH is enabled in production environment
     """
-    node_env = os.getenv("NODE_ENV")
-
-    if node_env == "production":
+    # PM2 sets ENVIRONMENT (not NODE_ENV) on the backend, so resolve production
+    # from whichever marker the deployment sets (issue #176).
+    if is_production_env():
         if settings.BYPASS_AUTH:
             logger.critical(
                 "FATAL SECURITY ERROR: BYPASS_AUTH is enabled in production. "
@@ -43,8 +43,9 @@ def validate_production_security() -> None:
             )
         logger.info("Production security validation passed: BYPASS_AUTH is disabled")
     elif settings.BYPASS_AUTH:
+        current_env = os.getenv("ENVIRONMENT") or os.getenv("NODE_ENV") or "unset"
         logger.warning(
-            f"BYPASS_AUTH is enabled in {node_env or 'unset'} environment. "
+            f"BYPASS_AUTH is enabled in {current_env} environment. "
             "Authentication will be bypassed - DO NOT use in production."
         )
 

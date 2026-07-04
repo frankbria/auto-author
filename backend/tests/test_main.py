@@ -92,3 +92,33 @@ class TestStartupSecurityValidation:
             from app.main import validate_production_security
             # Should not raise - backward compatibility
             validate_production_security()
+
+    def test_startup_validation_blocks_bypass_when_environment_is_production(self, monkeypatch):
+        """PM2 sets ENVIRONMENT (not NODE_ENV) on the backend, so startup must
+        block BYPASS_AUTH on ENVIRONMENT=production too (issue #176)."""
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "production")
+
+        mock_settings = MagicMock()
+        mock_settings.BYPASS_AUTH = True
+
+        with patch("app.main.settings", mock_settings):
+            from app.main import validate_production_security
+            with pytest.raises(RuntimeError) as exc_info:
+                validate_production_security()
+
+            assert "BYPASS_AUTH" in str(exc_info.value)
+            assert "production" in str(exc_info.value).lower()
+
+    def test_startup_validation_allows_bypass_when_environment_is_staging(self, monkeypatch):
+        """ENVIRONMENT=staging must still allow BYPASS_AUTH for E2E (issue #176)."""
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "staging")
+
+        mock_settings = MagicMock()
+        mock_settings.BYPASS_AUTH = True
+
+        with patch("app.main.settings", mock_settings):
+            from app.main import validate_production_security
+            # Should not raise
+            validate_production_security()

@@ -4,6 +4,17 @@ from typing import List, Union
 import os
 
 
+def is_production_env() -> bool:
+    """True when the deployment marker says production.
+
+    PM2 sets ENVIRONMENT (not NODE_ENV) on the backend process, while the
+    frontend/legacy path sets NODE_ENV — check both so the production
+    fail-safes fire on the real deployment (issue #176). Staging
+    (ENVIRONMENT=staging) intentionally does not match.
+    """
+    return "production" in (os.getenv("ENVIRONMENT"), os.getenv("NODE_ENV"))
+
+
 class Settings(BaseSettings):
     # MongoDB connection - MONGODB_URI takes precedence over DATABASE_URL
     MONGODB_URI: str = ""  # Standard env var name (e.g., for Atlas)
@@ -113,7 +124,7 @@ class Settings(BaseSettings):
         ci_test_secret = "test-secret-for-ci-minimum-32-characters-long-safe-for-testing"
         if v == ci_test_secret:
             # Only allow in test/CI environments, not production
-            if os.getenv("NODE_ENV") == "production":
+            if is_production_env():
                 raise ValueError(
                     "FATAL: Cannot use test secret in production environment. "
                     "Generate a strong secret with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
@@ -137,7 +148,7 @@ class Settings(BaseSettings):
             )
 
         # Warn if running in production without proper secret
-        if os.getenv("NODE_ENV") == "production" and len(v) < 64:
+        if is_production_env() and len(v) < 64:
             import warnings
             warnings.warn(
                 f"BETTER_AUTH_SECRET should be at least 64 characters in production. "
@@ -154,7 +165,7 @@ class Settings(BaseSettings):
         BYPASS_AUTH allows skipping authentication for E2E testing but must
         NEVER be enabled in production as it would expose all user data.
         """
-        if v is True and os.getenv("NODE_ENV") == "production":
+        if v is True and is_production_env():
             raise ValueError(
                 "FATAL SECURITY ERROR: BYPASS_AUTH cannot be enabled in production environment. "
                 "This would allow unauthorized access to all user data and features. "
