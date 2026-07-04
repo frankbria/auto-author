@@ -79,3 +79,57 @@ Replaced with a minimal rating→prompt-guidance wiring so the already-collected
   matching #56/#57/#58 precedent.
 
 No substantive architectural fork → proceeding autonomously per Phase 4.
+---
+
+# Issue #106 - [P3.7] Add staging E2E edge-case + visual/load coverage
+
+## Auto-Pick Summary
+Picked by `implementing-issue-plans --next` because #106 has the lowest open priority prefix (`P3.7`) after filtering unassigned, unblocked issues with no open linked PRs. Runner-up: #158 (`P3.9`). Dependency #105 is closed.
+
+## Plan Source
+Self-authored. The issue body lists deferred coverage areas but no concrete implementation plan; the only issue comment is a CodeRabbit placeholder.
+
+## Assumptions and Design Decisions
+- Keep the PR inside existing infrastructure: Playwright staging tests, GitHub Actions artifacts/summaries, and a staging-specific Locust smoke script.
+- Avoid adding Slack/Discord or other external notification services; provide scheduled-run failure visibility through GitHub Actions summaries and retained artifacts.
+- Keep staging tests sequential by default to avoid shared staging account conflicts; add a documented opt-in for parallelism rather than changing CI behavior.
+- Use deterministic edge-case assertions and lightweight screenshots/load smoke checks so scheduled staging runs do not hammer live AI services.
+
+## Acceptance Criteria Checklist
+- [ ] Add staging E2E edge-case coverage for session expiration, concurrent book creation, network interruption during TOC generation, large TOC/chapter handling, Unicode metadata, and XSS-like metadata.
+- [ ] Add visual coverage for key staging pages without introducing a new visual regression service.
+- [ ] Add load-smoke coverage for staging API/TOC-readiness boundaries using backend Locust tooling.
+- [ ] Improve scheduled-run failure visibility through workflow summaries/artifacts.
+- [ ] Preserve existing staging test workflow behavior unless explicitly opted in.
+
+## Implementation Steps
+1. Add staging edge-case Playwright tests.
+   - Create `frontend/tests/e2e/staging/edge-cases.spec.ts`.
+   - Reuse `auth.fixture.ts` and `journey.helpers.ts` where possible.
+   - Keep tests web-first and network-aware; avoid arbitrary sleeps and silent skips.
+
+2. Add staging visual smoke coverage.
+   - Create `frontend/tests/e2e/staging/visual-smoke.spec.ts`.
+   - Capture deterministic screenshots for authenticated dashboard/book-summary surfaces and assert screenshots are non-empty and stable enough for artifact review.
+   - Use Playwright artifacts instead of a new visual regression SaaS or snapshot baseline service.
+
+3. Add load-smoke support to CI.
+   - Create `backend/tests/load/staging_smoke.py` for Better Auth staging smoke behavior.
+   - Add a manual workflow-dispatch load-smoke job that runs Locust headlessly at very low volume.
+   - Keep it opt-in to avoid scheduled AI/API spend.
+
+4. Improve staging workflow reporting.
+   - Upload visual artifacts/test results.
+   - Write a GitHub Actions summary on failure/success with artifact pointers and run context.
+   - Document the parallelism opt-in rather than making CI parallel by default.
+
+5. Validate locally.
+   - Run frontend type-check.
+   - Run targeted Playwright list/compile checks for the staging config.
+   - Run Python compile checks for the staging Locust smoke script.
+
+## Test Strategy
+- `npm run typecheck` in `frontend` verifies new Playwright TypeScript files compile.
+- `npx playwright test --config=tests/e2e/staging/playwright.config.ts --list` verifies staging tests are discoverable without credentials/live traffic.
+- `uv run python -m py_compile tests/load/staging_smoke.py` verifies load script syntax.
+- Full live staging E2E/load execution remains gated by staging credentials and workflow/manual dispatch.

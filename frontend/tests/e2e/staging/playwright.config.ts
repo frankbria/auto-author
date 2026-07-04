@@ -30,7 +30,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
 
   // Opt out of parallel tests on CI
-  workers: 1, // Single worker to avoid session conflicts
+  workers: process.env.STAGING_E2E_WORKERS ? Number(process.env.STAGING_E2E_WORKERS) : 1, // Single worker by default to avoid session conflicts
 
   // Reporter to use
   reporter: [
