@@ -96,6 +96,132 @@ async def update_book(
     return updated_book
 
 
+async def apply_chapter_content_update(
+    book_id: str,
+    chapter_id: str,
+    parent_chapter_id: Optional[str],
+    chapter_fields: Dict,
+    user_auth_id: str,
+) -> bool:
+    """Concurrency-safe, targeted update of a SINGLE chapter's fields.
+
+    The old autosave path rewrote the whole ``table_of_contents`` via
+    ``update_book``'s version-less ``$set``, so a concurrent autosave to a
+    *different* chapter (or a reorder) silently clobbered this one — the #177
+    lost update. This positional ``$set`` (via ``array_filters``) touches only
+    the target chapter's fields and bumps the TOC version atomically with
+    ``$inc``, so concurrent saves to different chapters no longer collide and no
+    version guard / 409 round-trip is needed.
+
+    ponytail: supports a top-level chapter or one level of subchapter — the data
+    model's max depth (matches ``add_chapter_with_transaction``). Deeper nesting
+    would need another ``array_filters`` level.
+
+    The query filter requires the target chapter (and parent, for a subchapter)
+    to still exist, so a chapter deleted/moved since the caller's read is a clean
+    no-match rather than a false success that only bumps the version. Returns
+    True when the update matched (and thus applied), False otherwise.
+    """
+    now = datetime.now(timezone.utc)
+    query = {"_id": ObjectId(book_id), "owner_id": user_auth_id}
+    if parent_chapter_id:
+        prefix = "table_of_contents.chapters.$[p].subchapters.$[c]."
+        array_filters = [{"p.id": parent_chapter_id}, {"c.id": chapter_id}]
+        # Require the parent+child to exist so a chapter deleted/moved since the
+        # caller's read makes this a clean no-match (returns False) instead of a
+        # false success that only bumps the version.
+        query["table_of_contents.chapters"] = {
+            "$elemMatch": {"id": parent_chapter_id, "subchapters.id": chapter_id}
+        }
+    else:
+        prefix = "table_of_contents.chapters.$[c]."
+        array_filters = [{"c.id": chapter_id}]
+        query["table_of_contents.chapters.id"] = chapter_id
+
+    set_doc = {prefix + key: value for key, value in chapter_fields.items()}
+    set_doc["table_of_contents.updated_at"] = now.isoformat()
+    set_doc["table_of_contents.status"] = "edited"
+    set_doc["updated_at"] = now
+
+    result = await books_collection.update_one(
+        query,
+        {"$set": set_doc, "$inc": {"table_of_contents.version": 1}},
+        array_filters=array_filters,
+    )
+    return result.matched_count > 0
+
+
+async def update_book_summary_atomic(
+    book_id: str,
+    summary: str,
+    user_auth_id: str,
+) -> Optional[Dict]:
+    """Persist a book summary, atomically archiving the *document's current*
+    summary to history at write time.
+
+    The endpoint used to read ``summary_history``, append in memory, then ``$set``
+    the whole array — two concurrent saves read the same list and one overwrote
+    the other's appended revision (#177). This uses an aggregation-pipeline update
+    so the revision archived is the value stored on the document when the write
+    commits, not a value the caller read earlier. Single-document writes serialize,
+    so two concurrent edits (A->B, A->C) both land in history: the second write
+    sees the first's committed summary and archives it. History is capped at the
+    last 20 revisions. An unchanged or empty prior summary archives nothing.
+
+    Returns the updated document (or None if the book wasn't found / not owned).
+    """
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    update = [
+        {
+            "$set": {
+                "summary_history": {
+                    "$slice": [
+                        {
+                            "$concatArrays": [
+                                {"$ifNull": ["$summary_history", []]},
+                                {
+                                    "$cond": [
+                                        {
+                                            "$and": [
+                                                {"$ne": [{"$ifNull": ["$summary", ""]}, ""]},
+                                                # $literal: a user summary starting with
+                                                # "$" would otherwise be read as a field path.
+                                                {"$ne": ["$summary", {"$literal": summary}]},
+                                            ]
+                                        },
+                                        [{"summary": "$summary", "timestamp": now_iso}],
+                                        [],
+                                    ]
+                                },
+                            ]
+                        },
+                        -20,
+                    ]
+                }
+            }
+        },
+        {"$set": {"summary": {"$literal": summary}, "updated_at": now}},
+    ]
+
+    updated_book = await books_collection.find_one_and_update(
+        {"_id": ObjectId(book_id), "owner_id": user_auth_id},
+        update,
+        return_document=True,
+    )
+
+    if updated_book:
+        await create_audit_log(
+            action="book_update",
+            actor_id=user_auth_id,
+            target_id=book_id,
+            resource_type="book",
+            details={"updated_fields": ["summary", "summary_history"]},
+        )
+
+    return updated_book
+
+
 async def delete_book(book_id: str, user_auth_id: str) -> bool:
     """Delete a book and cascade-delete all of its related data.
 

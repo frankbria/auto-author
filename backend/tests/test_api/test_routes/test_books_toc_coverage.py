@@ -149,6 +149,35 @@ class TestGenerateToc:
         assert len(m.call_args[0][1]) == 2
 
     @pytest.mark.asyncio
+    async def test_regenerate_increments_version_not_reset_to_1(
+        self, auth_client_factory
+    ):
+        """Regenerating a TOC bumps the version from the current value (#177),
+        rather than hardcoding 1 and resetting the compare-and-swap counter."""
+        import app.db.base as base
+        from bson import ObjectId
+
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        await _set_summary(api, book_id)
+
+        # Simulate an existing edited TOC already at version 5.
+        await base.books_collection.update_one(
+            {"_id": ObjectId(book_id)},
+            {"$set": {"table_of_contents": {"chapters": [], "version": 5}}},
+        )
+
+        with patch(AI_PATCH_TARGET, new=AsyncMock(return_value=MOCK_TOC_RESULT)):
+            resp = await api.post(
+                f"/api/v1/books/{book_id}/generate-toc",
+                json={"question_responses": [{"question": "Q", "answer": "A"}]},
+            )
+        assert resp.status_code == 200, resp.text
+
+        book = await base.books_collection.find_one({"_id": ObjectId(book_id)})
+        assert book["table_of_contents"]["version"] == 6  # 5 + 1, not reset to 1
+
+    @pytest.mark.asyncio
     async def test_happy_path_falls_back_to_persisted_responses(
         self, auth_client_factory
     ):

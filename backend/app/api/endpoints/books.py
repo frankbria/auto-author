@@ -54,7 +54,8 @@ from app.schemas.book import (
 )
 from app.db.database import (
     create_book, get_book_by_id, get_books_by_user,
-    update_book, delete_book
+    update_book, apply_chapter_content_update, update_book_summary_atomic,
+    delete_book
 )
 from app.db.toc_transactions import (
     update_toc_with_transaction,
@@ -641,22 +642,15 @@ async def update_book_summary(
         raise HTTPException(
             status_code=403, detail="Not authorized to update this book"
         )
-    # Store revision history
-    summary_history = book.get("summary_history", [])
-    if book.get("summary") and book["summary"] != summary:
-        summary_history.append(
-            {
-                "summary": book["summary"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-    update_data = {
-        "summary": summary,
-        "summary_history": summary_history[-20:],  # Keep last 20 revisions
-        "updated_at": datetime.now(timezone.utc),
-    }
-    await update_book(book_id, update_data, current_user.get("auth_id"))
-    return {"summary": summary, "summary_history": summary_history[-20:]}
+    # Persist atomically (archives the document's current summary at write time,
+    # bounded to the last 20) so concurrent saves can't clobber history (#177).
+    updated_book = await update_book_summary_atomic(
+        book_id=book_id,
+        summary=summary,
+        user_auth_id=current_user.get("auth_id"),
+    )
+    history = (updated_book or {}).get("summary_history", [])
+    return {"summary": summary, "summary_history": history}
 
 
 @router.patch("/{book_id}/summary", status_code=status.HTTP_200_OK)
@@ -690,22 +684,15 @@ async def patch_book_summary(
             raise HTTPException(
                 status_code=400, detail=f"Summary must be at most {max_len} characters."
             )
-        # Store revision history if changed
-        summary_history = book.get("summary_history", [])
-        if book.get("summary") and book["summary"] != summary:
-            summary_history.append(
-                {
-                    "summary": book["summary"],
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-        update_data = {
-            "summary": summary,
-            "summary_history": summary_history[-20:],
-            "updated_at": datetime.now(timezone.utc),
-        }
-        await update_book(book_id, update_data, current_user.get("auth_id"))
-        return {"summary": summary, "summary_history": summary_history[-20:]}
+        # Persist atomically (same concurrency-safe path as PUT /summary) so
+        # concurrent summary edits can't clobber each other's history (#177).
+        updated_book = await update_book_summary_atomic(
+            book_id=book_id,
+            summary=summary,
+            user_auth_id=current_user.get("auth_id"),
+        )
+        history = (updated_book or {}).get("summary_history", [])
+        return {"summary": summary, "summary_history": history}
     # If no summary provided, return current summary
     return {
         "summary": book.get("summary"),
@@ -1223,12 +1210,16 @@ async def generate_table_of_contents(
             summary, responses, book_metadata
         )
 
-        # Store generated TOC in book record
+        # Store generated TOC in book record. Increment the version from the
+        # current TOC (0 -> 1 on first generation) rather than hardcoding 1, so a
+        # regenerate doesn't reset the compare-and-swap counter other writers
+        # rely on (#177).
+        current_version = (book.get("table_of_contents") or {}).get("version", 0)
         toc_data = {
             **toc_result["toc"],
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "status": "generated",
-            "version": 1,
+            "version": current_version + 1,
         }
 
         update_data = {
@@ -1545,42 +1536,41 @@ async def update_chapter_content(
     current_toc = book.get("table_of_contents", {})
     chapters = current_toc.get("chapters", [])
 
-    def update_chapter_in_list(chapter_list):
+    # Locate the chapter and compute only the fields that change. We persist via
+    # a targeted arrayFilters $set (below) instead of rewriting the whole TOC, so
+    # a concurrent autosave to a different chapter can't clobber this one (#177).
+    def compute_chapter_update(chapter_list, parent_id=None):
         for chapter in chapter_list:
             if chapter.get("id") == chapter_id:
-                # Update content
-                chapter["content"] = content
-
+                fields = {"content": content}
                 if auto_update_metadata:
-                    # Update metadata
                     word_count = len(content.split()) if content else 0
-                    chapter["word_count"] = word_count
-                    chapter["last_modified"] = datetime.now(timezone.utc).isoformat()
-                    # Calculate reading time synchronously (simple calculation)
-                    chapter["estimated_reading_time"] = max(
-                        1, word_count // 200
-                    )  # ~200 words per minute
-
-                    # Set status based on content length (simple heuristic)
+                    fields["word_count"] = word_count
+                    fields["last_modified"] = datetime.now(timezone.utc).isoformat()
+                    # ~200 words per minute
+                    fields["estimated_reading_time"] = max(1, word_count // 200)
+                    # Status transition based on content length (simple heuristic)
                     current_status = chapter.get("status", "draft")
                     if word_count > 100 and current_status == "draft":
-                        chapter["status"] = "in-progress"
+                        fields["status"] = "in-progress"
                     elif word_count > 500 and current_status == "in-progress":
-                        chapter["status"] = "completed"
-
-                return chapter
-            # Recursively search subchapters
+                        fields["status"] = "completed"
+                return fields, parent_id
+            # Recursively search subchapters (parent is this chapter's id)
             if chapter.get("subchapters"):
-                result = update_chapter_in_list(chapter["subchapters"])
+                result = compute_chapter_update(
+                    chapter["subchapters"], parent_id=chapter.get("id")
+                )
                 if result:
                     return result
         return None
 
-    updated_chapter = update_chapter_in_list(chapters)
-    if not updated_chapter:
+    computed = compute_chapter_update(chapters)
+    if not computed:
         raise HTTPException(
             status_code=404, detail="Chapter not found"
         )  # Log chapter access
+    chapter_fields, parent_chapter_id = computed
     try:
         await chapter_access_service.log_access(
             user_id=current_user.get("auth_id"),
@@ -1596,21 +1586,18 @@ async def update_chapter_content(
     except Exception:
         logger.error("Failed to log chapter content update", exc_info=True)
 
-    # Update TOC data
-    updated_toc = {
-        **current_toc,
-        "chapters": chapters,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "edited",
-        "version": current_toc.get("version", 1) + 1,
-    }
-
-    # Save to database
-    update_data = {
-        "table_of_contents": updated_toc,
-        "updated_at": datetime.now(timezone.utc),
-    }
-    await update_book(book_id, update_data, current_user.get("auth_id"))
+    # Persist via a targeted, concurrency-safe positional update (only this
+    # chapter's fields + an atomic version $inc) rather than a whole-TOC rewrite.
+    persisted = await apply_chapter_content_update(
+        book_id=book_id,
+        chapter_id=chapter_id,
+        parent_chapter_id=parent_chapter_id,
+        chapter_fields=chapter_fields,
+        user_auth_id=current_user.get("auth_id"),
+    )
+    if not persisted:
+        # The chapter was deleted/moved between the read above and this write.
+        raise HTTPException(status_code=404, detail="Chapter not found")
 
     return {
         "book_id": book_id,
