@@ -4,17 +4,30 @@ name: E2E Staging Tests
 #
 # Triggers (chosen to avoid hammering live staging / spending AI tokens on every PR):
 #   - schedule: every 6 hours
-#   - workflow_dispatch: manual runs
+#   - workflow_dispatch: manual runs, with optional load-smoke and worker controls
 #   - pull_request: ONLY when the PR carries the `e2e-staging` label
 #
 # Required GitHub Secrets (in the `staging` environment):
 #   - TEST_USER_EMAIL
 #   - TEST_USER_PASSWORD
+# Optional GitHub Secrets (in the `staging` environment):
+#   - SLACK_WEBHOOK_URL
+#   - DISCORD_WEBHOOK_URL
 
 on:
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
+    inputs:
+      staging_e2e_workers:
+        description: 'Number of Playwright workers for staging tests (default: 1)'
+        required: false
+        default: '1'
+      run_load_smoke:
+        description: 'Run a low-impact Locust load smoke against staging'
+        required: false
+        type: boolean
+        default: false
   pull_request:
     types: [labeled, opened, synchronize, reopened]
 
@@ -27,7 +40,7 @@ jobs:
   e2e-staging:
     name: E2E Staging (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     # TEST_USER_EMAIL / TEST_USER_PASSWORD live in the `staging` environment.
     environment:
       name: staging
@@ -63,7 +76,21 @@ jobs:
           # env names the auth fixture reads first.
           STAGING_TEST_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           STAGING_TEST_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          STAGING_E2E_WORKERS: ${{ github.event.inputs.staging_e2e_workers || '1' }}
         run: npm run test:e2e:staging
+
+      - name: Write staging E2E summary
+        if: always()
+        run: |
+          {
+            echo "## Staging E2E run"
+            echo ""
+            echo "- Environment: https://dev.autoauthor.app"
+            echo "- Workflow result: ${{ job.status }}"
+            echo "- Workers: ${{ github.event.inputs.staging_e2e_workers || '1' }}"
+            echo "- Visual smoke screenshots: see the staging test-results artifact"
+            echo "- Playwright HTML report: see the playwright-report-staging artifact"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Playwright report
         if: always()
@@ -73,10 +100,115 @@ jobs:
           path: frontend/tests/e2e/staging/playwright-report-staging/
           retention-days: 7
 
+      - name: Upload staging test results and visual smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-test-results
+          path: |
+            frontend/tests/e2e/staging/test-results/
+            frontend/test-results/
+          retention-days: 7
+
       - name: Upload failure artifacts (screenshots/videos/traces)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: staging-failure-artifacts
-          path: frontend/tests/e2e/staging/test-results/
+          path: |
+            frontend/tests/e2e/staging/test-results/
+            frontend/test-results/
+          retention-days: 7
+
+      - name: Notify scheduled staging failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          message="Scheduled staging E2E failed for ${GITHUB_REPOSITORY}: ${RUN_URL}"
+
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            jq -n --arg text "$message" '{text: $text}' \
+              | curl -fsS -X POST -H "Content-Type: application/json" --data @- "$SLACK_WEBHOOK_URL" \
+              || echo "Slack failure notification could not be delivered."
+          fi
+
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            jq -n --arg content "$message" '{content: $content}' \
+              | curl -fsS -X POST -H "Content-Type: application/json" --data @- "$DISCORD_WEBHOOK_URL" \
+              || echo "Discord failure notification could not be delivered."
+          fi
+
+          if [ -z "$SLACK_WEBHOOK_URL" ] && [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "No Slack or Discord webhook configured; skipped scheduled failure notification."
+          fi
+
+  load-smoke:
+    name: Staging Load Smoke (Locust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
+    needs: e2e-staging
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.run_load_smoke == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Setup Python
+        working-directory: backend
+        run: uv python install 3.13
+
+      - name: Install backend load dependencies
+        working-directory: backend
+        run: uv sync --extra load
+
+      - name: Run low-impact staging load smoke
+        working-directory: backend
+        env:
+          STAGING_TEST_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          STAGING_TEST_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          STAGING_API_URL: https://api.dev.autoauthor.app/api/v1
+        run: >-
+          uv run locust -f tests/load/staging_smoke.py StagingSmokeUser
+          --headless
+          --host=https://dev.autoauthor.app
+          --users=2
+          --spawn-rate=1
+          --run-time=30s
+          --html=load-smoke-report.html
+          --csv=load-smoke
+
+      - name: Write load smoke summary
+        if: always()
+        run: |
+          {
+            echo "## Staging load smoke"
+            echo ""
+            echo "- Target: https://dev.autoauthor.app"
+            echo "- Users: 2"
+            echo "- Duration: 30s"
+            echo "- Report: see staging-load-smoke artifact"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload load smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-load-smoke
+          path: |
+            backend/load-smoke-report.html
+            backend/load-smoke*.csv
           retention-days: 7
