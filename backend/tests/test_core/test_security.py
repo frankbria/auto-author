@@ -428,3 +428,49 @@ class TestProductionSecurityValidation:
         # Should not raise - this is the expected secure configuration
         settings = Settings()
         assert settings.BYPASS_AUTH is False
+
+    def test_bypass_auth_blocked_when_environment_is_production(self, monkeypatch):
+        """PM2 sets ENVIRONMENT (not NODE_ENV) on the backend, so the guard must
+        fire on ENVIRONMENT=production too (issue #176)."""
+        from pydantic import ValidationError as PydanticValidationError
+        from app.core.config import Settings
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "production-secret-that-is-at-least-32-characters-long")
+
+        with pytest.raises(PydanticValidationError) as exc_info:
+            Settings()
+
+        assert "BYPASS_AUTH" in str(exc_info.value)
+
+    def test_ci_test_secret_rejected_when_environment_is_production(self, monkeypatch):
+        """The built-in CI test secret must be rejected on the real deployment,
+        where ENVIRONMENT=production is the only marker set (issue #176)."""
+        from pydantic import ValidationError as PydanticValidationError
+        from app.core.config import Settings
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("BYPASS_AUTH", "false")
+        monkeypatch.setenv(
+            "BETTER_AUTH_SECRET",
+            "test-secret-for-ci-minimum-32-characters-long-safe-for-testing",
+        )
+
+        with pytest.raises(PydanticValidationError) as exc_info:
+            Settings()
+
+        assert "test secret" in str(exc_info.value).lower()
+
+    def test_bypass_auth_allowed_when_environment_is_staging(self, monkeypatch):
+        """ENVIRONMENT=staging must still allow BYPASS_AUTH for E2E (issue #176)."""
+        from app.core.config import Settings
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "staging")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+
+        settings = Settings()
+        assert settings.BYPASS_AUTH is True
