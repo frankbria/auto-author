@@ -9,8 +9,9 @@ assert that interleaved writers no longer lose each other's updates.
 
 ``apply_chapter_content_update`` uses a positional ``$set`` (arrayFilters) that
 touches only the target chapter, so a concurrent save to a *different* chapter
-can't overwrite it. ``update_book_summary_atomic`` uses ``$push``/``$slice`` so
-concurrent history appends both survive.
+can't overwrite it. ``update_book_summary_atomic`` uses an aggregation-pipeline
+update (``$concatArrays``/``$slice``) that archives the document's current summary
+at write time, so concurrent history appends both survive.
 """
 
 import asyncio
@@ -250,6 +251,24 @@ async def test_summary_with_leading_dollar_is_literal(motor_reinit_db):
     # And the prior "$"-summary is archived verbatim on the next change.
     updated = await bookdao.update_book_summary_atomic(book_id, "plain again", OWNER)
     assert dollar in [h["summary"] for h in updated["summary_history"]]
+
+
+@pytest.mark.asyncio
+async def test_summary_atomic_returns_none_for_missing_or_unowned_book(
+    motor_reinit_db,
+):
+    # Nonexistent book -> None (the endpoint turns this into a 404).
+    assert (
+        await bookdao.update_book_summary_atomic(str(ObjectId()), "x" * 40, OWNER)
+        is None
+    )
+    # Existing book, wrong owner -> None.
+    book_id = await _seed(summary="A")
+    assert (
+        await bookdao.update_book_summary_atomic(book_id, "y" * 40, "not-owner")
+        is None
+    )
+    assert (await _book(book_id))["summary"] == "A"  # untouched
 
 
 @pytest.mark.asyncio

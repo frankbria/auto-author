@@ -649,7 +649,10 @@ async def update_book_summary(
         summary=summary,
         user_auth_id=current_user.get("auth_id"),
     )
-    history = (updated_book or {}).get("summary_history", [])
+    if not updated_book:
+        # The book was deleted between the ownership check and this write.
+        raise HTTPException(status_code=404, detail="Book not found")
+    history = updated_book.get("summary_history", [])
     return {"summary": summary, "summary_history": history}
 
 
@@ -691,7 +694,10 @@ async def patch_book_summary(
             summary=summary,
             user_auth_id=current_user.get("auth_id"),
         )
-        history = (updated_book or {}).get("summary_history", [])
+        if not updated_book:
+            # The book was deleted between the ownership check and this write.
+            raise HTTPException(status_code=404, detail="Book not found")
+        history = updated_book.get("summary_history", [])
         return {"summary": summary, "summary_history": history}
     # If no summary provided, return current summary
     return {
