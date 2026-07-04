@@ -53,6 +53,24 @@ def fake_get_rate_limiter(limit: int = 10, window: int = 60):
 real_get_rate_limiter = getattr(deps, "_real_get_rate_limiter", deps.get_rate_limiter)
 deps._real_get_rate_limiter = real_get_rate_limiter
 deps.get_rate_limiter = fake_get_rate_limiter
+
+
+def fake_get_ai_usage_quota():
+    """No-op AI quota dependency, so test suites can generate freely.
+    Mirrors fake_get_rate_limiter; enforcement is exercised via `real_ai_quota`."""
+
+    async def _always_allow():
+        return None
+
+    return _always_allow
+
+
+# Same idempotent stash-the-real / install-the-fake dance as the rate limiter.
+real_get_ai_usage_quota = getattr(
+    deps, "_real_get_ai_usage_quota", deps.get_ai_usage_quota
+)
+deps._real_get_ai_usage_quota = real_get_ai_usage_quota
+deps.get_ai_usage_quota = fake_get_ai_usage_quota
 import pytest, pytest_asyncio
 
 
@@ -61,6 +79,13 @@ def real_rate_limiter():
     """The genuine get_rate_limiter, for tests that exercise real rate limiting
     (the module-level override above replaces it with a no-op everywhere else)."""
     return real_get_rate_limiter
+
+
+@pytest.fixture
+def real_ai_quota():
+    """The genuine get_ai_usage_quota, for tests that assert the 429 at the cap
+    (the module-level override above replaces it with a no-op everywhere else)."""
+    return real_get_ai_usage_quota
 
 
 from httpx import AsyncClient, ASGITransport

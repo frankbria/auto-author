@@ -58,6 +58,14 @@ class Settings(BaseSettings):
     # complementing the endpoint rate limit)
     MAX_QUESTION_REGENERATION_COUNT: int = 5
 
+    # Per-user AI generation quota (cost control). Every AI generation endpoint
+    # increments a per-user counter; at the cap the endpoint returns 429. Limits
+    # are configurable per environment; a limit <= 0 disables that window.
+    # Keys off the user's auth_id today; swap to plan/entitlement when P0.2 lands.
+    AI_QUOTA_ENABLED: bool = True
+    AI_QUOTA_DAILY_LIMIT: int = 50
+    AI_QUOTA_MONTHLY_LIMIT: int = 500
+
     # Export Settings
     EXPORT_TIMEOUT_SECONDS: int = 120  # Hard cap on a single export's generation
 

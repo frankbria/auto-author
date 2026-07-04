@@ -45,6 +45,8 @@ from .book import (
 
 from .audit_log import create_audit_log
 
+from .usage import increment_usage
+
 from .questions import (
     create_question,
     create_questions_batch,
@@ -98,6 +100,8 @@ __all__ += [
     "delete_book",
     # Audit log DAOs
     "create_audit_log",
+    # Usage counter DAOs
+    "increment_usage",
     # Question DAOs
     "create_question",
     "create_questions_batch",
