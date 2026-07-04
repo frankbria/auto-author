@@ -434,6 +434,53 @@ def handle_rating_save_error(
     )
 
 
+def handle_entitlement_denied(
+    feature: str,
+    plan: str,
+    request_id: Optional[str] = None,
+) -> HTTPException:
+    """Create HTTPException for an entitlement denial (issue #174, P0.2).
+
+    Returns 402 Payment Required — a clear "upgrade required" signal distinct
+    from the transient 429 rate-limit path — with machine-readable headers and
+    details the frontend renders as an upgrade CTA.
+
+    Args:
+        feature: The AI feature that was requested (e.g. "generate_toc")
+        plan: The caller's current plan (e.g. "free", "restricted")
+        request_id: Optional request correlation ID
+
+    Returns:
+        HTTPException with standardized 402 error response
+    """
+    request_id = request_id or generate_request_id()
+
+    error_response = create_error_response(
+        error_code=ErrorCode.ENTITLEMENT_REQUIRED,
+        message="Your plan does not include this feature.",
+        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+        details=[
+            ErrorDetail(
+                field="plan",
+                message=f"The '{plan}' plan is not entitled to '{feature}'.",
+                code=ErrorCode.ENTITLEMENT_REQUIRED.value,
+                value=plan,
+            )
+        ],
+        request_id=request_id,
+    )
+
+    logger.warning(
+        f"Entitlement denied: plan={plan}, feature={feature} [request_id={request_id}]"
+    )
+
+    return HTTPException(
+        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+        detail=error_response.model_dump(mode="json"),
+        headers={"X-Entitlement-Plan": plan, "X-Entitlement-Feature": feature},
+    )
+
+
 def handle_generic_error(
     error: Exception,
     operation: str,

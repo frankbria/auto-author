@@ -339,6 +339,27 @@ describe('showErrorNotification', () => {
     expect(mockToast.error).toHaveBeenCalled();
   });
 
+  // --- ENTITLEMENT (issue #174) ---
+  it('shows an Upgrade CTA (not a retry) for ENTITLEMENT errors', () => {
+    const onRetry = jest.fn();
+    const error = makeError({
+      type: ErrorType.ENTITLEMENT,
+      message: 'Upgrade required',
+      details: 'Your plan does not include this feature.',
+      retryable: false,
+    });
+    showErrorNotification(error, { onRetry });
+    expect(mockToast.error).toHaveBeenCalledWith(
+      'Upgrade required',
+      expect.objectContaining({
+        action: expect.objectContaining({ label: 'Upgrade' }),
+      })
+    );
+    // No retry action label is offered for a paywall.
+    const call = mockToast.error.mock.calls[0][1];
+    expect(call.action.label).not.toBe('Retry');
+  });
+
   // --- PERMANENT ---
   it('calls toast.error with fieldErrors as description for PERMANENT errors', () => {
     const error = makeError({

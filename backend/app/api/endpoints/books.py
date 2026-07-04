@@ -61,7 +61,8 @@ from app.db.toc_transactions import (
     reorder_chapters_with_transaction,
 )
 from app.api.dependencies import (
-    rate_limit, audit_request, sanitize_input, get_rate_limiter, get_ai_usage_quota
+    rate_limit, audit_request, sanitize_input, get_rate_limiter, get_ai_usage_quota,
+    get_entitlement_checker
 )
 from app.services.ai_service import ai_service
 from app.services.style_templates import available_styles, is_valid_style
@@ -712,7 +713,7 @@ async def patch_book_summary(
     }
 
 
-@router.post("/{book_id}/analyze-summary", status_code=status.HTTP_200_OK, dependencies=[Depends(get_ai_usage_quota())])
+@router.post("/{book_id}/analyze-summary", status_code=status.HTTP_200_OK, dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("analyze_summary"))])
 async def analyze_book_summary(
     book_id: str,
     current_user: Dict = Depends(get_current_user_from_session),
@@ -833,7 +834,7 @@ async def analyze_book_summary(
         )
 
 
-@router.post("/{book_id}/generate-questions", status_code=status.HTTP_200_OK, dependencies=[Depends(get_ai_usage_quota())])
+@router.post("/{book_id}/generate-questions", status_code=status.HTTP_200_OK, dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("generate_questions"))])
 async def generate_clarifying_questions(
     book_id: str,
     data: dict = Body(default={}),
@@ -1166,7 +1167,7 @@ async def check_toc_generation_readiness(
         }
 
 
-@router.post("/{book_id}/generate-toc", status_code=status.HTTP_200_OK, dependencies=[Depends(get_ai_usage_quota())])
+@router.post("/{book_id}/generate-toc", status_code=status.HTTP_200_OK, dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("generate_toc"))])
 async def generate_table_of_contents(
     book_id: str,
     data: dict = Body(default={}),
@@ -1772,7 +1773,7 @@ async def batch_get_chapter_content(
 
 # Interview-Style Questions Endpoints
 
-@router.post("/{book_id}/chapters/{chapter_id}/generate-questions", response_model=GenerateQuestionsResponse, dependencies=[Depends(get_ai_usage_quota())])
+@router.post("/{book_id}/chapters/{chapter_id}/generate-questions", response_model=GenerateQuestionsResponse, dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("chapter_generate_questions"))])
 async def generate_chapter_questions(
     book_id: str,
     chapter_id: str,
@@ -2263,7 +2264,7 @@ async def rate_question(
 @router.post(
     "/{book_id}/chapters/{chapter_id}/questions/{question_id}/regenerate",
     response_model=Question,
-    dependencies=[Depends(get_ai_usage_quota())],
+    dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("regenerate_question"))],
 )
 async def regenerate_single_question(
     book_id: str,
@@ -2430,7 +2431,7 @@ async def get_chapter_question_progress(
 @router.post(
     "/{book_id}/chapters/{chapter_id}/regenerate-questions",
     response_model=GenerateQuestionsResponse,
-    dependencies=[Depends(get_ai_usage_quota())],
+    dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("regenerate_questions"))],
 )
 async def regenerate_chapter_questions(
     book_id: str,
@@ -2537,7 +2538,7 @@ async def regenerate_chapter_questions(
         )
 
 
-@router.post("/{book_id}/chapters/{chapter_id}/generate-draft", response_model=dict, dependencies=[Depends(get_ai_usage_quota())])
+@router.post("/{book_id}/chapters/{chapter_id}/generate-draft", response_model=dict, dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("generate_draft"))])
 async def generate_chapter_draft(
     book_id: str,
     chapter_id: str,
@@ -2673,7 +2674,7 @@ async def generate_chapter_draft(
         )
 
 
-@router.post("/{book_id}/chapters/{chapter_id}/transform-style", response_model=dict, dependencies=[Depends(get_ai_usage_quota())])
+@router.post("/{book_id}/chapters/{chapter_id}/transform-style", response_model=dict, dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("transform_style"))])
 async def transform_chapter_style(
     book_id: str,
     chapter_id: str,
@@ -2737,7 +2738,7 @@ async def transform_chapter_style(
     }
 
 
-@router.post("/{book_id}/chapters/{chapter_id}/enhance-text", response_model=dict, dependencies=[Depends(get_ai_usage_quota())])
+@router.post("/{book_id}/chapters/{chapter_id}/enhance-text", response_model=dict, dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("enhance_text"))])
 async def enhance_chapter_text(
     book_id: str,
     chapter_id: str,
@@ -2821,7 +2822,7 @@ async def enhance_chapter_text(
 @router.post(
     "/{book_id}/chapters/{chapter_id}/enhance-transcription",
     response_model=dict,
-    dependencies=[Depends(get_ai_usage_quota())],
+    dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("enhance_transcription"))],
 )
 async def enhance_chapter_transcription(
     book_id: str,

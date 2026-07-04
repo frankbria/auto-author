@@ -51,6 +51,7 @@ class SessionRoleChecker:
                 "first_name": "Test",
                 "last_name": "User",
                 "role": "admin",  # Grant admin for testing
+                "plan": "free",
                 "metadata": {}
             }
 
@@ -102,6 +103,7 @@ async def get_current_user_from_session(request: Request) -> Dict:
             "first_name": "Test",
             "last_name": "User",
             "role": "user",
+            "plan": "free",
             "metadata": {}
         }
 
@@ -183,6 +185,7 @@ async def get_current_user_from_session(request: Request) -> Dict:
                 "first_name": first_name,
                 "last_name": last_name,
                 "role": "user",
+                "plan": "free",  # Entitlement default (issue #174)
                 "is_active": True,
                 "created_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),

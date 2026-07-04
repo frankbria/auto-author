@@ -15,7 +15,7 @@ export interface AIErrorResponse {
   cached_content_available?: boolean;
   cached_content?: unknown;
   estimated_retry_after?: number; // seconds
-  error_type?: 'rate_limit' | 'network' | 'service_unavailable' | 'validation' | 'unknown';
+  error_type?: 'rate_limit' | 'network' | 'service_unavailable' | 'validation' | 'entitlement' | 'unknown';
 }
 
 /**
@@ -36,27 +36,32 @@ function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
   // Handle Error objects
   if (error instanceof Error) {
     const message = error.message;
+    // Callers (e.g. bookClient.aiError) may attach the HTTP status directly.
+    const attachedStatus = (error as Error & { statusCode?: number }).statusCode;
 
     // Try to parse JSON from error message
     try {
       const jsonMatch = message.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
+        const statusCode = parsed.status_code || attachedStatus || extractStatusCode(message);
         return {
-          message: parsed.message || parsed.detail || message,
-          status_code: parsed.status_code || extractStatusCode(message),
+          message: parsed.message || parsed.error || parsed.detail || message,
+          status_code: statusCode,
           cached_content_available: parsed.cached_content_available,
           cached_content: parsed.cached_content,
           estimated_retry_after: parsed.estimated_retry_after,
-          error_type: parsed.error_type,
+          // Backend structured errors don't send error_type; derive it from the
+          // status code so a 402 is classified as an entitlement denial (#174).
+          error_type: parsed.error_type || determineErrorType(statusCode, message),
         };
       }
     } catch {
       // Not JSON, continue with plain error message
     }
 
-    // Extract status code from message
-    const statusCode = extractStatusCode(message);
+    // Prefer an attached status; else extract from the message text.
+    const statusCode = attachedStatus || extractStatusCode(message);
 
     return {
       message,
@@ -68,13 +73,15 @@ function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
   // Handle plain objects
   if (typeof error === 'object' && error !== null) {
     const err = error as Record<string, unknown>;
+    const statusCode = Number(err.status_code || err.statusCode || 500);
+    const message = String(err.message || err.detail || 'An unknown error occurred');
     return {
-      message: String(err.message || err.detail || 'An unknown error occurred'),
-      status_code: Number(err.status_code || err.statusCode || 500),
+      message,
+      status_code: statusCode,
       cached_content_available: Boolean(err.cached_content_available),
       cached_content: err.cached_content,
       estimated_retry_after: Number(err.estimated_retry_after || 0),
-      error_type: err.error_type as AIErrorResponse['error_type'],
+      error_type: (err.error_type as AIErrorResponse['error_type']) || determineErrorType(statusCode, message),
     };
   }
 
@@ -98,6 +105,7 @@ function extractStatusCode(message: string): number {
  * Determine error type from status code and message
  */
 function determineErrorType(statusCode: number, message: string): AIErrorResponse['error_type'] {
+  if (statusCode === 402) return 'entitlement';
   if (statusCode === 429) return 'rate_limit';
   if (statusCode === 422 || statusCode === 400) return 'validation';
   if (statusCode === 503 || statusCode === 504) return 'service_unavailable';
@@ -125,6 +133,9 @@ function getUserFriendlyMessage(errorDetails: Partial<AIErrorResponse>): string 
 
     case 'validation':
       return 'Invalid request data. Please check your input and try again.';
+
+    case 'entitlement':
+      return 'Your current plan does not include this feature. Upgrade your plan to continue.';
 
     default:
       return errorDetails.message || 'An error occurred while processing your request.';
@@ -164,6 +175,30 @@ export async function handleAIServiceError<T>(
   const errorDetails = extractErrorDetails(error);
   const userMessage = getUserFriendlyMessage(errorDetails);
   const retryable = isRetryable(errorDetails);
+
+  // Entitlement denial (issue #174): a paywall, not a transient failure. Show an
+  // upgrade path — never a retry or cached content.
+  if (errorDetails.error_type === 'entitlement') {
+    showErrorNotification(
+      {
+        type: ErrorType.ENTITLEMENT,
+        severity: ErrorSeverity.HIGH,
+        message: 'Upgrade required',
+        details: userMessage,
+        statusCode: errorDetails.status_code,
+        retryable: false,
+        correlationId: `entitlement-${Date.now()}`,
+        timestamp: new Date(),
+        suggestedActions: [
+          'Upgrade your plan to unlock this feature',
+          'Contact support if you believe this is a mistake',
+        ],
+      },
+      { duration: 12000 }
+    );
+
+    return { error: userMessage, canRetry: false };
+  }
 
   // Check if cached content is available
   if (errorDetails.cached_content_available && errorDetails.cached_content) {

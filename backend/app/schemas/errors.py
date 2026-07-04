@@ -52,6 +52,9 @@ class ErrorCode(str, Enum):
     # Rate limiting
     RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
 
+    # Entitlement / plan (issue #174) — caller's plan does not permit the feature
+    ENTITLEMENT_REQUIRED = "ENTITLEMENT_REQUIRED"
+
     # General errors
     INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"

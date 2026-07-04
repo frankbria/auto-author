@@ -143,15 +143,23 @@ export class BookClient {
    * so the wizard can show a meaningful message instead of a generic one.
    */
   private async aiError(response: Response, fallback: string): Promise<Error> {
+    let message: string | undefined;
     try {
       const body = await response.json();
       const detail = body?.detail;
-      if (typeof detail === 'string' && detail) return new Error(detail);
-      if (detail?.message) return new Error(detail.message);
+      if (typeof detail === 'string' && detail) message = detail;
+      else if (detail?.message) message = detail.message;
+      // Structured errors (e.g. the 402 entitlement denial, #174) carry their
+      // text under `detail.error`, not `detail.message`.
+      else if (detail?.error) message = detail.error;
     } catch {
       // Non-JSON body — fall through to the generic fallback message.
     }
-    return new Error(fallback);
+    // Attach the status so the unified classifier maps it correctly (402 →
+    // entitlement/upgrade, 429 → rate limit) instead of a generic system error.
+    const err = new Error(message || fallback) as Error & { statusCode: number };
+    err.statusCode = response.status;
+    return err;
   }
 
   /**
