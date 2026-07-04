@@ -1,12 +1,16 @@
-from fastapi import Header, HTTPException, status, Request
+from fastapi import Depends, Header, HTTPException, status, Request
 from typing import Dict, Optional, Callable, Any
 import time
 import re
 from pydantic import BaseModel
 
+from datetime import datetime, timezone
+
 from app.db.database import get_collection
 from app.db.database import create_audit_log
+from app.db.usage import increment_usage
 from app.core.config import settings
+from app.core.security import get_current_user_from_session
 
 # Simple in-memory cache for rate limiting
 # In production, this should be replaced with Redis or similar
@@ -120,6 +124,61 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
         }
 
     return rate_limiter
+
+
+def get_ai_usage_quota():
+    """Create a per-user AI-generation quota dependency (issue #173, cost control).
+
+    Increments a per-user counter (daily + monthly) in Mongo on every call and
+    raises 429 once the configured cap is exceeded — enforced *before* the AI
+    call so a leaked cookie or runaway client can't rack up unbounded spend.
+
+    Counts off the user's ``auth_id`` today; swap to plan/entitlement when P0.2
+    lands. ponytail: rejected calls still increment (matches the in-memory
+    limiter) — the counter tracks attempts, which is fine for a spend cap.
+    """
+
+    async def check_quota(
+        current_user: Dict = Depends(get_current_user_from_session),
+    ):
+        # Skip in auth-bypass mode (E2E/test) and when disabled, mirroring the
+        # rate limiter so test suites can generate freely.
+        if settings.BYPASS_AUTH or not settings.AI_QUOTA_ENABLED:
+            return
+
+        user_id = (
+            current_user.get("auth_id")
+            or current_user.get("id")
+            or current_user.get("clerk_id")
+        )
+        if not user_id:
+            # Auth runs before this dependency, so an authenticated user always
+            # has an id; fail closed rather than silently un-metering if not.
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unable to identify user for AI usage metering.",
+            )
+
+        now = datetime.now(timezone.utc)
+        windows = (
+            ("day", now.strftime("%Y-%m-%d"), settings.AI_QUOTA_DAILY_LIMIT, 2 * 86400),
+            ("month", now.strftime("%Y-%m"), settings.AI_QUOTA_MONTHLY_LIMIT, 40 * 86400),
+        )
+        for period, bucket, limit, ttl in windows:
+            if limit <= 0:  # window disabled
+                continue
+            count = await increment_usage(user_id, f"{period}:{bucket}", ttl)
+            if count > limit:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        f"AI usage limit reached ({limit} generations per {period}). "
+                        "Try again later or contact support to raise your limit."
+                    ),
+                    headers={"X-AI-Quota-Limit": str(limit), "X-AI-Quota-Period": period},
+                )
+
+    return check_quota
 
 
 # Keep this for backward compatibility but mark as deprecated
