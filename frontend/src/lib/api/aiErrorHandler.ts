@@ -36,13 +36,15 @@ function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
   // Handle Error objects
   if (error instanceof Error) {
     const message = error.message;
+    // Callers (e.g. bookClient.aiError) may attach the HTTP status directly.
+    const attachedStatus = (error as Error & { statusCode?: number }).statusCode;
 
     // Try to parse JSON from error message
     try {
       const jsonMatch = message.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        const statusCode = parsed.status_code || extractStatusCode(message);
+        const statusCode = parsed.status_code || attachedStatus || extractStatusCode(message);
         return {
           message: parsed.message || parsed.error || parsed.detail || message,
           status_code: statusCode,
@@ -58,8 +60,8 @@ function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
       // Not JSON, continue with plain error message
     }
 
-    // Extract status code from message
-    const statusCode = extractStatusCode(message);
+    // Prefer an attached status; else extract from the message text.
+    const statusCode = attachedStatus || extractStatusCode(message);
 
     return {
       message,
