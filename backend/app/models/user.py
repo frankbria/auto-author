@@ -53,6 +53,9 @@ class UserBase(BaseModel):
     preferences: UserPreferences = Field(default_factory=UserPreferences)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     role: str = "user"  # Default role
+    # Entitlement plan (issue #174). Free-invite beta: everyone is "free".
+    # Default treats legacy documents lacking the field as free — no backfill.
+    plan: str = "free"
 
 
 class UserCreate(UserBase):

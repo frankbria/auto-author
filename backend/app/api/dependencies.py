@@ -181,6 +181,35 @@ def get_ai_usage_quota():
     return check_quota
 
 
+def get_entitlement_checker(feature: str):
+    """Create a per-request entitlement gate for an AI ``feature`` (issue #174).
+
+    Mirrors ``get_ai_usage_quota``: resolves the caller (cached via ``Depends``),
+    checks their ``plan`` against ``app.core.entitlements``, and raises 402 when
+    the plan doesn't permit ``feature``. For the free-invite beta every plan is
+    ``free`` (full access) so this never denies a real user — it's the hook so
+    P0.1 keys caps off plan and paid launch adds a tier, not a rebuild.
+
+    Bypassed under ``BYPASS_AUTH`` / when ``PLAN_ENFORCEMENT_ENABLED`` is off,
+    matching the rate limiter and quota so tests/E2E aren't gated.
+    """
+
+    async def check_entitlement(
+        current_user: Dict = Depends(get_current_user_from_session),
+    ):
+        from app.core.entitlements import DEFAULT_PLAN, is_feature_allowed
+        from app.utils.error_handlers import handle_entitlement_denied
+
+        if settings.BYPASS_AUTH or not settings.PLAN_ENFORCEMENT_ENABLED:
+            return
+
+        plan = current_user.get("plan")
+        if not is_feature_allowed(plan, feature):
+            raise handle_entitlement_denied(feature=feature, plan=plan or DEFAULT_PLAN)
+
+    return check_entitlement
+
+
 # Keep this for backward compatibility but mark as deprecated
 async def rate_limit(
     request: Request, limit: int = 10, window: int = 60, key_func: Callable = None

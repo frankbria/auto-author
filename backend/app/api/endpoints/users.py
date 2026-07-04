@@ -75,6 +75,7 @@ async def read_users_me(
             avatar_url=current_user.get("avatar_url", None),
             bio=current_user.get("bio", None),
             role=current_user.get("role", "user"),
+            plan=current_user.get("plan", "free"),
             created_at=current_user.get("created_at"),
             updated_at=current_user.get("updated_at"),
             books=current_user.get("books", []),
@@ -284,6 +285,7 @@ async def create_new_user(user: UserCreate):
             "books": [],
             "is_active": True,
             "role": "user",  # Default role for new users
+            "plan": "free",  # Entitlement default (issue #174)
         }
     )
 

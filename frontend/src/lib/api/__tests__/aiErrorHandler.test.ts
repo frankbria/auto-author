@@ -41,6 +41,30 @@ describe('aiErrorHandler', () => {
       );
     });
 
+    it('should classify a 402 as an entitlement denial with an upgrade path (not retryable)', async () => {
+      // Backend structured 402 (no error_type field — derived from status).
+      const error = new Error(
+        'Request failed: 402 {"error":"Your plan does not include this feature.","error_code":"ENTITLEMENT_REQUIRED","status_code":402}'
+      );
+      const onRetry = jest.fn();
+
+      const result = await handleAIServiceError(error, onRetry);
+
+      expect(result.canRetry).toBe(false);
+      expect(result.data).toBeUndefined();
+      expect(result.fromCache).toBeUndefined();
+      expect(result.error).toContain('plan');
+
+      // Notification is an entitlement type, not retryable, and no onRetry wired.
+      expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'entitlement',
+          retryable: false,
+        }),
+        expect.not.objectContaining({ onRetry: expect.anything() })
+      );
+    });
+
     it('should handle cached content fallback', async () => {
       const cachedData = { questions: ['Q1', 'Q2', 'Q3'] };
       const error = new Error(

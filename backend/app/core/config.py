@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     AI_QUOTA_DAILY_LIMIT: int = 50
     AI_QUOTA_MONTHLY_LIMIT: int = 500
 
+    # Plan/entitlement enforcement (issue #174, P0.2). When True, AI endpoints
+    # check the caller's plan against app.core.entitlements before running. Free
+    # beta users are entitled to everything, so this is safe to leave on; it is
+    # bypassed alongside BYPASS_AUTH in tests/E2E. Set False to disable the gate.
+    PLAN_ENFORCEMENT_ENABLED: bool = True
+
     # Export Settings
     EXPORT_TIMEOUT_SECONDS: int = 120  # Hard cap on a single export's generation
 

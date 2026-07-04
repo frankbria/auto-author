@@ -9,12 +9,14 @@
  * - Permanent: Errors requiring user action (validation, permissions)
  * - System: Infrastructure errors requiring technical support
  * - AI_SERVICE: AI service errors with cached content fallback support
+ * - ENTITLEMENT: Plan does not include this feature — needs an upgrade, not a retry (issue #174)
  */
 export enum ErrorType {
   TRANSIENT = 'transient',
   PERMANENT = 'permanent',
   SYSTEM = 'system',
   AI_SERVICE = 'ai_service',
+  ENTITLEMENT = 'entitlement',
 }
 
 /**
@@ -118,6 +120,7 @@ export const HTTP_STATUS_TO_ERROR_TYPE: Record<number, ErrorType> = {
   // 4xx - Client errors (usually permanent)
   400: ErrorType.PERMANENT, // Bad Request
   401: ErrorType.PERMANENT, // Unauthorized
+  402: ErrorType.ENTITLEMENT, // Payment Required — plan doesn't include this feature (issue #174)
   403: ErrorType.PERMANENT, // Forbidden
   404: ErrorType.PERMANENT, // Not Found
   409: ErrorType.PERMANENT, // Conflict
@@ -139,4 +142,5 @@ export const ERROR_TYPE_TO_SEVERITY: Record<ErrorType, ErrorSeverity> = {
   [ErrorType.PERMANENT]: ErrorSeverity.HIGH,
   [ErrorType.SYSTEM]: ErrorSeverity.CRITICAL,
   [ErrorType.AI_SERVICE]: ErrorSeverity.MEDIUM,
+  [ErrorType.ENTITLEMENT]: ErrorSeverity.HIGH,
 };

@@ -31,6 +31,7 @@ export type UserProfile = {
   avatar_url: string | null;
   bio: string | null;
   preferences: UserPreferences;
+  plan?: string; // Entitlement plan (issue #174); optional to tolerate older responses
 };
 
 export type ProfileUpdateData = {

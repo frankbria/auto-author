@@ -1,135 +1,61 @@
-# Issue #62 [P3.4] — Question regeneration with improved quality
+# Issue #174 — [P0.2] Billing / entitlement gate for paid access (epic)
 
-**Branch**: `feature/question-regeneration-62`
-**Plan source**: CodeRabbit + Traycer comments, heavily adapted (Phase 2 was stale — see deviations).
+**Decision (from issue + CodeRabbit plan, matches roadmap):** free-invite beta, single
+`free` plan now, Stripe deferred. Deliver the *entitlement hook* so P0.1 can key AI caps
+off plan and paid launch isn't a rebuild. **No payment provider built now.**
 
-## Reality check vs. the plan (verified in codebase)
-Already exist → NOT rebuilt: per-question regenerate button, full-set `POST .../regenerate-questions`
-endpoint + `bookClient.regenerateChapterQuestions`, rating UI (thumbs → `rate_question` →
-`question_ratings`), focus types (CHARACTER/PLOT/SETTING/THEME/RESEARCH), rate limiting
-(gen 3/120s, regen 2/180s).
+Adapted from the CodeRabbit plan against the real codebase (verified #173 already ships the
+per-user AI quota — the closest analog; entitlement gate mirrors it exactly).
 
-**Bug confirmed**: `QuestionContainer.handleRegenerateQuestion` calls `bookClient.generateQuestions(bookId)`
-(the TOC clarifying-questions method) instead of a chapter regenerate → per-question regenerate is broken.
+## Ponytail notes (deliberate simplifications)
+- Entitlement is a **hook**: today `free` allows every AI feature, so no real beta user is
+  ever denied. A named `restricted` plan is the demonstrable deny path (invite revoked /
+  trial expired). No paid tiers invented (YAGNI).
+- Use the **factory-function** dependency form `get_entitlement_checker(feature)` in
+  `dependencies.py` (next to its siblings `get_ai_usage_quota`/`get_rate_limiter`), not a
+  class in `security.py`. Matches the two deps already on these exact endpoints and gets
+  `Depends`-caching of the user for free. (Plan said class/security.py — deviation noted.)
+- One feature string per endpoint (self-documenting, matches quota wiring); registry stays
+  trivial (`free` → `{"*"}`). Per-feature paid granularity is future config, no code change.
+- Only add `ENTITLEMENT_REQUIRED` (402). Skip `ENTITLEMENT_LIMIT_EXCEEDED` — the over-limit
+  case already ships as a 429 in #173; an unused enum is dead code.
 
-**Stale plan section**: CodeRabbit Phase 2 wires in `QuestionFeedbackService` / `question_quality_service` /
-`RefinementAction` / `analyze_question_feedback_trends` — ALL deleted in #120. Not resurrected (YAGNI).
-Replaced with a minimal rating→prompt-guidance wiring so the already-collected ratings finally influence output.
+## Phase 1 — Decision record + epic decomposition
+- [ ] ADR `docs/adr/2026-07-04-beta-entitlement-model.md` (committed): decision, alternatives,
+      why paid deferred, entitlement contract (402 `ENTITLEMENT_REQUIRED`), how P0.1 keys caps.
+- [ ] GitHub sub-issues (P0.2.x) for deferred Stripe work, referencing #174 + ADR:
+      customer/subscription model + webhook (raw-body HMAC verify), checkout/upgrade flow,
+      billing settings UI, (optional) invite-gating enforcement. Out of scope this PR.
 
-## Acceptance criteria → coverage
-- [ ] Regenerate button per question — EXISTS; fix its wiring (Step 6)
-- [ ] Regenerate entire set — endpoint EXISTS; add UI (Step 7)
-- [ ] Regenerated questions meaningfully different — Step 3 (previous-questions in prompt)
-- [ ] Mark helpful/not helpful — EXISTS (thumbs rating)
-- [ ] Feedback influences future questions — Step 4 (minimal rating aggregation → prompt)
-- [ ] Specify question focus — regen endpoint already accepts `focus`; expose in UI (Step 7/6)
-- [ ] Limit on regeneration attempts — rate limit EXISTS; add per-question `regeneration_count` cap (Step 1,5)
-- [ ] E2E test — Step 10
+## Phase 2 — Backend entitlement foundation
+- [ ] `app/core/entitlements.py`: `AI_FEATURES`, `PLAN_ENTITLEMENTS` (`free`→`{"*"}`,
+      `restricted`→`{}`), `DEFAULT_PLAN="free"`, `is_feature_allowed(plan, feature)`
+      (None→free; unknown explicit plan → deny/fail-closed).
+- [ ] `plan: str = "free"` on `UserBase` (models/user.py) + `UserResponse` (schemas/user.py);
+      set in lazy create dict (`security.py`), legacy `POST /users/` dict (users.py), and
+      `read_users_me` UserResponse. No migration (model default covers legacy docs).
+- [ ] `config.py`: `PLAN_ENFORCEMENT_ENABLED: bool = True` (+ `.env.example`), bypassed with
+      `BYPASS_AUTH`.
+- [ ] `errors.py`: `ErrorCode.ENTITLEMENT_REQUIRED`.
+- [ ] `error_handlers.py`: `handle_entitlement_denied(feature, plan, request_id)` → 402 via
+      `create_error_response`, `X-Entitlement-Plan/-Feature` headers.
+- [ ] `dependencies.py`: `get_entitlement_checker(feature)` — mirrors `get_ai_usage_quota`;
+      short-circuits on BYPASS_AUTH / !PLAN_ENFORCEMENT_ENABLED; else denies via helper.
+- [ ] Wire `Depends(get_entitlement_checker("<feature>"))` onto the 10 AI endpoints in
+      `books.py` (alongside existing quota dep).
+- [ ] Fixtures: add `plan` to conftest `test_user`/`fake_user` + both BYPASS_AUTH dicts.
+- [ ] Tests: `test_entitlements.py` (registry), checker (allow/deny/bypass/disabled),
+      route-level 402 `ENTITLEMENT_REQUIRED` on an AI endpoint w/ restricted user.
 
-## Steps
+## Phase 3 — Frontend clear-path (upgrade) UX
+- [ ] `useProfileApi.ts`: `plan?: string` on `UserProfile`.
+- [ ] `errors/types.ts`: `ErrorType.ENTITLEMENT`; map `402`; severity HIGH.
+- [ ] `aiErrorHandler.ts`: classify 402 as `entitlement` (not retryable), upgrade copy,
+      carry plan/feature; upgrade branch in `handleAIServiceError`.
+- [ ] `ErrorNotification.tsx`: entitlement branch → toast with upgrade CTA (link
+      settings/contact), no RetryCountdown.
+- [ ] Tests: aiErrorHandler 402 classification; ErrorNotification upgrade CTA.
 
-### Backend
-1. **`regeneration_count` field** — add `regeneration_count: int = 0` to `QuestionBase` (schemas/book.py)
-   so it flows through `model_dump()` on create + reads back on `Question` (default 0 for legacy docs).
-   Add `MAX_QUESTION_REGENERATION_COUNT: int = 5` to `core/config.py`.
-2. **DB helper** — `get_ratings_for_chapter(book_id, chapter_id, user_id)` in `db/questions.py`:
-   join `question_ratings` to the chapter's questions, return `[{question_text, rating, feedback}]`.
-   Export via `db/database.py` re-export (match existing pattern).
-3. **Prompt builder** — add `previous_questions: Optional[List[str]] = None` +
-   `feedback_guidance: Optional[str] = None` to `_build_question_generation_prompt`; append an
-   "avoid duplicating these" block and (if present) a "users found these unhelpful" block. Thread the
-   params through `generate_chapter_questions` and `generate_questions_for_chapter`.
-4. **Feedback wiring (minimal)** — small service helper `_build_feedback_guidance(ratings)` → short string
-   from low ratings (<=2) + their feedback text (None if no signal). Used by both regen paths.
-5. **Single-question regen service + endpoint**:
-   - service `regenerate_single_question(book_id, chapter_id, question_id, user_id, focus=None)`:
-     fetch question (404 if missing/not-owned/wrong chapter); if `regeneration_count >=
-     MAX_QUESTION_REGENERATION_COUNT` raise `RegenerationLimitError` → 429; gather sibling question texts
-     (previous_questions) + feedback guidance; generate ONE question (reuse `generate_chapter_questions`,
-     count=1, focus = passed focus or original type); delete old question (+its response) and create the
-     new one with `order` preserved and `regeneration_count = old+1`; return the new `Question`.
-   - endpoint `POST /{book_id}/chapters/{chapter_id}/questions/{question_id}/regenerate` in books.py
-     (ownership 403/404, rate limit 2/180s, 429 on limit). No route-shadow (distinct `/regenerate` suffix).
-   - full-set `regenerate_chapter_questions`: fetch existing question texts BEFORE delete → pass as
-     previous_questions; also pass feedback guidance.
-
-### Frontend
-6. **Fix bug + single regen** — add `bookClient.regenerateSingleQuestion(bookId, chapterId, questionId, {focus?})`
-   (POST new endpoint); rewire `QuestionContainer.handleRegenerateQuestion` to it; replace the one question
-   in state from the response. Add `regeneration_count` to `Question` type.
-7. **Regenerate-all UI** — "Regenerate All" button in QuestionContainer (visible when questions exist) →
-   small dialog (mirror existing Radix Dialog pattern) with focus checkboxes + preserve-responses toggle →
-   `bookClient.regenerateChapterQuestions(..., options, preserve)`; loading state.
-8. **Limit display** — show `Regenerated N/5` per question in QuestionDisplay; disable regenerate + tooltip
-   when at max.
-
-### Tests
-9. **Backend** — unit (prompt includes previous-questions + feedback guidance; `_build_feedback_guidance`);
-   integration (`test_question_regeneration.py`): single-regen success + count increments + 429 at limit +
-   404 wrong owner; full-regen passes previous questions.
-10. **Frontend + E2E** — unit (bookClient method, handler rewire, limit-disable render); route-mocked E2E
-    `question-regeneration.spec.ts` (regenerate one → replaced; regenerate-all dialog; limit disables button).
-
-## Deviations from original plan
-- Phase 2 (feedback service resurrection) dropped — service deleted in #120; replaced with minimal
-  rating→prompt wiring (no new service/enum). YAGNI.
-- Single-question regen kept (needed: the only existing regen endpoint nukes the whole set).
-- "Limit" satisfied by BOTH existing rate limiting AND a per-question `regeneration_count` cap.
-- Real-AI E2E (asserting semantic difference) stays out of CI (no OpenAI key) — route-mocked E2E instead,
-  matching #56/#57/#58 precedent.
-
-No substantive architectural fork → proceeding autonomously per Phase 4.
----
-
-# Issue #106 - [P3.7] Add staging E2E edge-case + visual/load coverage
-
-## Auto-Pick Summary
-Picked by `implementing-issue-plans --next` because #106 has the lowest open priority prefix (`P3.7`) after filtering unassigned, unblocked issues with no open linked PRs. Runner-up: #158 (`P3.9`). Dependency #105 is closed.
-
-## Plan Source
-Self-authored. The issue body lists deferred coverage areas but no concrete implementation plan; the only issue comment is a CodeRabbit placeholder.
-
-## Assumptions and Design Decisions
-- Keep the PR inside existing infrastructure: Playwright staging tests, GitHub Actions artifacts/summaries, and a staging-specific Locust smoke script.
-- Avoid adding Slack/Discord or other external notification services; provide scheduled-run failure visibility through GitHub Actions summaries and retained artifacts.
-- Keep staging tests sequential by default to avoid shared staging account conflicts; add a documented opt-in for parallelism rather than changing CI behavior.
-- Use deterministic edge-case assertions and lightweight screenshots/load smoke checks so scheduled staging runs do not hammer live AI services.
-
-## Acceptance Criteria Checklist
-- [ ] Add staging E2E edge-case coverage for session expiration, concurrent book creation, network interruption during TOC generation, large TOC/chapter handling, Unicode metadata, and XSS-like metadata.
-- [ ] Add visual coverage for key staging pages without introducing a new visual regression service.
-- [ ] Add load-smoke coverage for staging API/TOC-readiness boundaries using backend Locust tooling.
-- [ ] Improve scheduled-run failure visibility through workflow summaries/artifacts.
-- [ ] Preserve existing staging test workflow behavior unless explicitly opted in.
-
-## Implementation Steps
-1. Add staging edge-case Playwright tests.
-   - Create `frontend/tests/e2e/staging/edge-cases.spec.ts`.
-   - Reuse `auth.fixture.ts` and `journey.helpers.ts` where possible.
-   - Keep tests web-first and network-aware; avoid arbitrary sleeps and silent skips.
-
-2. Add staging visual smoke coverage.
-   - Create `frontend/tests/e2e/staging/visual-smoke.spec.ts`.
-   - Capture deterministic screenshots for authenticated dashboard/book-summary surfaces and assert screenshots are non-empty and stable enough for artifact review.
-   - Use Playwright artifacts instead of a new visual regression SaaS or snapshot baseline service.
-
-3. Add load-smoke support to CI.
-   - Create `backend/tests/load/staging_smoke.py` for Better Auth staging smoke behavior.
-   - Add a manual workflow-dispatch load-smoke job that runs Locust headlessly at very low volume.
-   - Keep it opt-in to avoid scheduled AI/API spend.
-
-4. Improve staging workflow reporting.
-   - Upload visual artifacts/test results.
-   - Write a GitHub Actions summary on failure/success with artifact pointers and run context.
-   - Document the parallelism opt-in rather than making CI parallel by default.
-
-5. Validate locally.
-   - Run frontend type-check.
-   - Run targeted Playwright list/compile checks for the staging config.
-   - Run Python compile checks for the staging Locust smoke script.
-
-## Test Strategy
-- `npm run typecheck` in `frontend` verifies new Playwright TypeScript files compile.
-- `npx playwright test --config=tests/e2e/staging/playwright.config.ts --list` verifies staging tests are discoverable without credentials/live traffic.
-- `uv run python -m py_compile tests/load/staging_smoke.py` verifies load script syntax.
-- Full live staging E2E/load execution remains gated by staging credentials and workflow/manual dispatch.
+## Gates
+- Backend `uv run pytest --cov=app --cov-fail-under=85`; Frontend jest ≥85/85/75/85;
+  lint+typecheck; demo 402→upgrade; CI green.

@@ -44,6 +44,7 @@ class UserResponse(UserBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     role: str = "user"
+    plan: str = "free"  # Entitlement plan (issue #174); legacy docs default to free
     book_ids: List[str] = []
     preferences: Optional[UserPreferences] = Field(default_factory=UserPreferences)
 

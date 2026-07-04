@@ -86,6 +86,22 @@ export function showErrorNotification(
      error.type === ErrorType.AI_SERVICE ? (isFromCache ? 10000 : 15000) :
      error.type === ErrorType.PERMANENT ? 7000 : 10000);
 
+  // Entitlement denial (issue #174): show an upgrade CTA, never a retry.
+  if (error.type === ErrorType.ENTITLEMENT) {
+    toast.error(error.message, {
+      description: error.details || 'Your plan does not include this feature.',
+      duration: defaultDuration,
+      action: {
+        label: 'Upgrade',
+        onClick: () => {
+          window.location.href = '/dashboard/settings';
+        },
+      },
+      onDismiss,
+    });
+    return;
+  }
+
   // AI Service error with special handling
   if (error.type === ErrorType.AI_SERVICE) {
     if (isFromCache) {
