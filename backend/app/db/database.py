@@ -40,6 +40,8 @@ from .book import (
     get_book_by_id,
     get_books_by_user,
     update_book,
+    apply_chapter_content_update,
+    update_book_summary_atomic,
     delete_book,
 )
 
