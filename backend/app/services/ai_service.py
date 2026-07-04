@@ -202,7 +202,10 @@ class AIService:
             )
 
         async def _async_wrapper():
-            return _sync_request()
+            # Offload the blocking OpenAI HTTP call to a worker thread so it
+            # doesn't freeze the event loop (#175). A single in-flight
+            # generation must not stall health checks or other users' requests.
+            return await asyncio.to_thread(_sync_request)
 
         return await self._retry_with_backoff(_async_wrapper)
 
