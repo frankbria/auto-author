@@ -63,9 +63,13 @@ async def lifespan(app: FastAPI):
 
     # Import here to avoid circular dependencies
     from app.db.questions import ensure_question_indexes
+    from app.db.user import ensure_user_indexes
 
     # Create indexes for question collections
     await ensure_question_indexes()
+
+    # Create unique indexes guarding against duplicate user records (issue #178)
+    await ensure_user_indexes()
 
     logger.info("Startup tasks completed")
 

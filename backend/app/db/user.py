@@ -6,9 +6,40 @@ from .base import users_collection, books_collection
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
+from pymongo.errors import DuplicateKeyError
 from .audit_log import create_audit_log
 
 logger = logging.getLogger(__name__)
+
+
+async def ensure_user_indexes() -> None:
+    """Create the users collection's unique indexes (issue #178).
+
+    Without a unique index on auth_id, the check-then-insert in the auth
+    auto-create path lets parallel first-load requests each insert a doc for the
+    same user. The index makes create_user's DuplicateKeyError guard effective.
+
+    Idempotent (MongoDB skips existing indexes). Per-index try/except so a
+    startup can't be bricked by one index.
+
+    ponytail: if the collection ALREADY holds duplicate auth_id/email docs, the
+    unique build fails here and is logged — an operator must dedupe first
+    (one-time cleanup), the app keeps running with the race still open until then.
+    """
+    try:
+        await users_collection.create_index(
+            "auth_id", name="auth_id_unique_idx", unique=True, background=True
+        )
+    except Exception:
+        logger.error("Failed to create unique index on users.auth_id", exc_info=True)
+
+    try:
+        # sparse: legacy/partial docs without an email don't all collide on null.
+        await users_collection.create_index(
+            "email", name="email_unique_idx", unique=True, sparse=True, background=True
+        )
+    except Exception:
+        logger.error("Failed to create unique index on users.email", exc_info=True)
 
 
 # User-related database operations
@@ -30,11 +61,24 @@ async def get_user_by_email(email: str) -> Optional[Dict]:
     return user
 
 
-async def create_user(user_data: Dict) -> Dict:
-    """Create a new user in the database"""
-    result = await users_collection.insert_one(user_data)
-    created_user = await get_user_by_id(str(result.inserted_id))
-    return created_user
+async def create_user(user_data: Dict) -> Optional[Dict]:
+    """Create a new user in the database.
+
+    Idempotent under the auth_id race (issue #178): if a concurrent request won
+    the insert, the unique index raises DuplicateKeyError and we re-fetch the
+    existing record instead of creating a duplicate. A DuplicateKeyError on a
+    *different* key (e.g. an email already taken by another auth_id) has no
+    matching auth_id doc to return, so it re-raises for the caller to map to a
+    real conflict rather than silently returning None.
+    """
+    try:
+        result = await users_collection.insert_one(user_data)
+        return await get_user_by_id(str(result.inserted_id))
+    except DuplicateKeyError:
+        existing = await get_user_by_auth_id(user_data.get("auth_id"))
+        if existing is None:
+            raise
+        return existing
 
 
 async def update_user(

@@ -160,6 +160,22 @@ async def test_create_user_db_error_returns_500(auth_client_factory):
     assert resp.status_code == 500
 
 
+async def test_create_user_duplicate_key_race_returns_409(auth_client_factory):
+    # A concurrent insert slips past the pre-checks and hits the unique index
+    # (issue #178): create_user re-raises DuplicateKeyError → mapped to 409.
+    from pymongo.errors import DuplicateKeyError
+
+    client = await auth_client_factory()
+    with patch(
+        f"{USERS}.create_user", AsyncMock(side_effect=DuplicateKeyError("dup"))
+    ):
+        resp = await client.post(
+            "/api/v1/users/",
+            json={"auth_id": "race-new-id", "email": "race-new@example.com"},
+        )
+    assert resp.status_code == 409
+
+
 # ---------------------------------------------------------------------------
 # update_user_data (PUT /{auth_id})
 # ---------------------------------------------------------------------------
