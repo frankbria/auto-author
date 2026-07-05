@@ -6,7 +6,6 @@ from .base import users_collection, books_collection
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
-from pymongo.errors import DuplicateKeyError
 from .audit_log import create_audit_log
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ async def ensure_user_indexes() -> None:
     """
     try:
         await users_collection.create_index(
-            "auth_id", name="auth_id_unique_idx", unique=True, background=True
+            "auth_id", name="auth_id_unique_idx", unique=True
         )
     except Exception:
         logger.error("Failed to create unique index on users.auth_id", exc_info=True)
@@ -36,7 +35,7 @@ async def ensure_user_indexes() -> None:
     try:
         # sparse: legacy/partial docs without an email don't all collide on null.
         await users_collection.create_index(
-            "email", name="email_unique_idx", unique=True, sparse=True, background=True
+            "email", name="email_unique_idx", unique=True, sparse=True
         )
     except Exception:
         logger.error("Failed to create unique index on users.email", exc_info=True)
@@ -61,24 +60,17 @@ async def get_user_by_email(email: str) -> Optional[Dict]:
     return user
 
 
-async def create_user(user_data: Dict) -> Optional[Dict]:
-    """Create a new user in the database.
+async def create_user(user_data: Dict) -> Dict:
+    """Insert a new user.
 
-    Idempotent under the auth_id race (issue #178): if a concurrent request won
-    the insert, the unique index raises DuplicateKeyError and we re-fetch the
-    existing record instead of creating a duplicate. A DuplicateKeyError on a
-    *different* key (e.g. an email already taken by another auth_id) has no
-    matching auth_id doc to return, so it re-raises for the caller to map to a
-    real conflict rather than silently returning None.
+    Pure insert primitive: raises DuplicateKeyError when a unique index
+    (auth_id/email, issue #178) rejects the insert. Callers apply their own
+    policy — the auth auto-create path treats a duplicate auth_id as a
+    concurrent-first-load race and re-fetches the winner; the legacy POST /users/
+    endpoint treats it as a real conflict and returns 409.
     """
-    try:
-        result = await users_collection.insert_one(user_data)
-        return await get_user_by_id(str(result.inserted_id))
-    except DuplicateKeyError:
-        existing = await get_user_by_auth_id(user_data.get("auth_id"))
-        if existing is None:
-            raise
-        return existing
+    result = await users_collection.insert_one(user_data)
+    return await get_user_by_id(str(result.inserted_id))
 
 
 async def update_user(

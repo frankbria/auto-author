@@ -33,6 +33,12 @@ def _user(**overrides):
 
 class TestEnsureUserIndexes:
     async def test_creates_unique_indexes(self, motor_reinit_db):
+        # motor_reinit_db drops the DB immediately before this test; a real
+        # round-trip drains that async drop so the first createIndexes below
+        # can't be lost to it (a drop-then-index test artifact, not a prod path).
+        await base.users_collection.insert_one({"warmup": True})
+        await base.users_collection.delete_many({})
+
         await ensure_user_indexes()
 
         indexes = await base.users_collection.index_information()
@@ -53,26 +59,29 @@ class TestEnsureUserIndexes:
         await ensure_user_indexes()
 
 
-class TestConcurrentCreateIsIdempotent:
+class TestConcurrentCreateProducesOneRecord:
     async def test_concurrent_first_loads_produce_one_record(self, motor_reinit_db):
         await ensure_user_indexes()
 
-        # Simulate an SPA's parallel first-load requests all auto-creating the
-        # same user at once.
-        results = await asyncio.gather(*[create_user(_user()) for _ in range(8)])
+        # Simulate an SPA's parallel first-load requests all inserting the same
+        # user at once. With the unique index, exactly one insert wins and every
+        # other is rejected — no silent duplicates.
+        results = await asyncio.gather(
+            *[create_user(_user()) for _ in range(8)], return_exceptions=True
+        )
 
         count = await base.users_collection.count_documents({"auth_id": "auth-race"})
         assert count == 1
 
-        # Every caller gets the one real record back (not None / not a crash).
-        ids = {str(r["_id"]) for r in results}
-        assert len(ids) == 1
+        winners = [r for r in results if not isinstance(r, Exception)]
+        rejected = [r for r in results if isinstance(r, DuplicateKeyError)]
+        assert len(winners) == 1
+        assert len(rejected) == 7  # every duplicate insert hit the unique index
 
-    async def test_email_collision_on_different_auth_id_reraises(self, motor_reinit_db):
-        # A duplicate on some OTHER key than auth_id (e.g. email taken by a
-        # different auth_id) has no auth_id winner to return, so create_user
-        # re-raises rather than silently returning None. The legacy endpoint
-        # maps this to a 409.
+    async def test_duplicate_insert_raises(self, motor_reinit_db):
+        # create_user is a pure insert primitive: a duplicate (auth_id or email)
+        # raises DuplicateKeyError for the caller to handle, rather than silently
+        # inserting a second doc.
         await ensure_user_indexes()
 
         await create_user(_user(auth_id="auth-a", email="taken@example.com"))
