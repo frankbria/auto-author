@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.security import HTTPBearer
+from pymongo.errors import DuplicateKeyError
 from typing import List, Dict
 from datetime import datetime, timezone
 
@@ -292,6 +293,13 @@ async def create_new_user(user: UserCreate):
     try:
         created_user = await create_user(user_data)
         return created_user
+    except DuplicateKeyError:
+        # Concurrent insert slipped past the pre-checks and hit the unique index
+        # (issue #178) — surface the intended conflict, not a 500.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with this auth ID or email already exists",
+        )
     except Exception:
         logger.error("Error creating user", exc_info=True)
         raise HTTPException(

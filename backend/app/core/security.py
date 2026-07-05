@@ -1,4 +1,5 @@
 from passlib.context import CryptContext
+from pymongo.errors import DuplicateKeyError
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException, status, Request
 from app.core.better_auth_session import (
@@ -197,6 +198,20 @@ async def get_current_user_from_session(request: Request) -> Dict:
 
         except HTTPException:
             raise
+        except DuplicateKeyError:
+            # A concurrent first-load request won the insert (issue #178). Re-fetch
+            # so both requests resolve to the one shared record instead of erroring.
+            logger.info(
+                f"Concurrent auto-create race for {user_id}; using the existing record"
+            )
+            from app.db.user import get_user_by_auth_id
+
+            user = await get_user_by_auth_id(user_id)
+            if user is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to create user account. Please try signing in again or contact support."
+                )
         except Exception as e:
             logger.error(f"Failed to auto-create user {user_id}: {str(e)}")
             raise HTTPException(

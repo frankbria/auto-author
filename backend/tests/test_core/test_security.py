@@ -302,6 +302,68 @@ class TestGetCurrentUserFromSession:
         assert exc_info.value.status_code == 500
         assert "Failed to create user account" in exc_info.value.detail
 
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.security.get_better_auth_user")
+    @patch("app.db.user.get_user_by_auth_id")
+    @patch("app.db.user.create_user")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_from_session_auto_create_race_reuses_winner(
+        self, mock_settings, mock_create_user, mock_get_user, mock_get_auth_user, mock_validate
+    ):
+        """Concurrent first-load race (issue #178): create_user raises
+        DuplicateKeyError because a parallel request already inserted; the path
+        re-fetches and returns that winning record instead of erroring."""
+        from pymongo.errors import DuplicateKeyError
+
+        winner = {
+            "id": "winner_id",
+            "auth_id": "user_123",
+            "email": "test@example.com",
+            "first_name": "Test",
+        }
+        mock_settings.BYPASS_AUTH = False
+        mock_validate.return_value = {"userId": "user_123"}
+        mock_get_auth_user.return_value = {
+            "id": "user_123",
+            "email": "test@example.com",
+            "name": "Test User",
+        }
+        # First call (pre-check) finds nothing; re-fetch after the race returns the winner.
+        mock_get_user.side_effect = [None, winner]
+        mock_create_user.side_effect = DuplicateKeyError("dup auth_id")
+
+        result = await get_current_user_from_session(Mock(spec=Request))
+
+        assert result == winner
+
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.security.get_better_auth_user")
+    @patch("app.db.user.get_user_by_auth_id")
+    @patch("app.db.user.create_user")
+    @patch("app.core.config.settings")
+    async def test_get_current_user_from_session_auto_create_race_missing_winner(
+        self, mock_settings, mock_create_user, mock_get_user, mock_get_auth_user, mock_validate
+    ):
+        """If the duplicate was on some other key (no auth_id winner to re-fetch),
+        the race handler surfaces a 500 rather than returning None."""
+        from pymongo.errors import DuplicateKeyError
+
+        mock_settings.BYPASS_AUTH = False
+        mock_validate.return_value = {"userId": "user_123"}
+        mock_get_auth_user.return_value = {
+            "id": "user_123",
+            "email": "test@example.com",
+            "name": "Test User",
+        }
+        mock_get_user.side_effect = [None, None]  # pre-check + re-fetch both empty
+        mock_create_user.side_effect = DuplicateKeyError("dup email")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user_from_session(Mock(spec=Request))
+
+        assert exc_info.value.status_code == 500
+        assert "Failed to create user account" in exc_info.value.detail
+
 
 @pytest.mark.asyncio
 class TestOptionalSessionSecurity:
