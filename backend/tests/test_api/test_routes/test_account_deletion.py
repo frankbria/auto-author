@@ -1,6 +1,37 @@
-import pytest, pytest_asyncio
+import pytest
 from unittest.mock import patch, AsyncMock
-import app
+
+from bson.objectid import ObjectId
+
+from app.db.base import get_collection
+
+
+async def _seed_book_with_children(owner_id: str) -> str:
+    """Insert a book owned by ``owner_id`` plus a question, response, rating,
+    and chapter access log (the collections delete_book cascades). Returns the
+    book id."""
+    books = await get_collection("books")
+    questions = await get_collection("questions")
+    responses = await get_collection("question_responses")
+    ratings = await get_collection("question_ratings")
+    access_logs = await get_collection("chapter_access_logs")
+
+    book_id = str(
+        (await books.insert_one({"title": "Mine", "owner_id": owner_id})).inserted_id
+    )
+    question_id = str(
+        (
+            await questions.insert_one(
+                {"book_id": book_id, "user_id": owner_id, "text": "Q?"}
+            )
+        ).inserted_id
+    )
+    await responses.insert_one(
+        {"question_id": question_id, "user_id": owner_id, "answer": "A"}
+    )
+    await ratings.insert_one({"question_id": question_id, "rating": 4})
+    await access_logs.insert_one({"book_id": book_id, "user_id": owner_id})
+    return book_id
 
 
 @pytest.mark.asyncio
@@ -53,25 +84,91 @@ def test_account_deletion_user_not_found(auth_client_factory, fake_user):
     assert "not found" in data["detail"].lower()
 
 
-@pytest.mark.skip(reason="Skipping test: No books data table yet")
-def test_account_deletion_with_data_cleanup(auth_client_factory):
-    """
-    Test account deletion with associated data cleanup.
-    Verifies that the API cleans up all user data during deletion.
-    """
-    # Create a client with user data that has books
-    books = ["book_id_1", "book_id_2"]
-    client = auth_client_factory({"books": books})
+@pytest.mark.asyncio
+async def test_account_deletion_with_data_cleanup(auth_client_factory):
+    """DELETE /users/me cascades the user's books and their questions,
+    responses, ratings and access logs; the user record itself is soft-deleted
+    (retained with is_active False). Issue #179."""
+    client = await auth_client_factory()
+    owner_id = "test-auth-id-123"  # conftest test_user auth_id
 
-    # Mock function to delete books
+    book_a = await _seed_book_with_children(owner_id)
+    book_b = await _seed_book_with_children(owner_id)
+    # Another user's book must survive.
+    other_book = await _seed_book_with_children("someone-else")
 
-    # Make the request to delete account
-    response = client.delete("/api/v1/users/me")
-
-    # Assert successful response
+    response = await client.delete("/api/v1/users/me")
     assert response.status_code == 200
 
-    # Verify that the books were deleted
+    books = await get_collection("books")
+    questions = await get_collection("questions")
+    responses = await get_collection("question_responses")
+    ratings = await get_collection("question_ratings")
+    access_logs = await get_collection("chapter_access_logs")
+    users = await get_collection("users")
+
+    assert await books.count_documents({"owner_id": owner_id}) == 0
+    for book_id in (book_a, book_b):
+        assert await questions.count_documents({"book_id": book_id}) == 0
+        assert await access_logs.count_documents({"book_id": book_id}) == 0
+    assert await responses.count_documents({"user_id": owner_id}) == 0
+    assert await ratings.count_documents({}) == 1  # only the other user's
+
+    assert await books.find_one({"_id": ObjectId(other_book)}) is not None
+    assert (
+        await questions.count_documents({"book_id": other_book}) == 1
+    ), "another user's data must not be touched"
+
+    user_doc = await users.find_one({"auth_id": owner_id})
+    assert user_doc is not None, "user record is soft-deleted, not removed"
+    assert user_doc["is_active"] is False
+
+
+@pytest.mark.asyncio
+async def test_account_deletion_cascade_failure_keeps_user_active(
+    auth_client_factory, monkeypatch
+):
+    """If the book cascade fails, the account deletion 500s and the user is
+    NOT soft-deleted — children first, parent last — so a retry can finish
+    the job."""
+    import app.api.endpoints.users as users_endpoint
+
+    client = await auth_client_factory(overrides={"is_active": True})
+    owner_id = "test-auth-id-123"
+    book_id = await _seed_book_with_children(owner_id)
+
+    async def _boom(user_auth_id):
+        raise RuntimeError("simulated mongo failure")
+
+    monkeypatch.setattr(users_endpoint, "delete_all_user_books", _boom)
+
+    response = await client.delete("/api/v1/users/me")
+    assert response.status_code == 500
+
+    books = await get_collection("books")
+    users = await get_collection("users")
+    assert await books.find_one({"_id": ObjectId(book_id)}) is not None
+    user_doc = await users.find_one({"auth_id": owner_id})
+    assert (
+        user_doc["is_active"] is True
+    ), "user must stay active after a failed cascade"
+
+
+@pytest.mark.asyncio
+async def test_delete_by_auth_id_also_cascades(auth_client_factory):
+    """The self-or-admin DELETE /users/{auth_id} path cascades books too —
+    it previously orphaned them exactly like /me (#179 review finding)."""
+    client = await auth_client_factory()
+    owner_id = "test-auth-id-123"
+    await _seed_book_with_children(owner_id)
+
+    response = await client.delete(f"/api/v1/users/{owner_id}")
+    assert response.status_code == 204
+
+    books = await get_collection("books")
+    questions = await get_collection("questions")
+    assert await books.count_documents({"owner_id": owner_id}) == 0
+    assert await questions.count_documents({"user_id": owner_id}) == 0
 
 
 @pytest.mark.asyncio

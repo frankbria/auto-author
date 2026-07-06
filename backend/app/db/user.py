@@ -132,6 +132,10 @@ async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
     """
     Delete books associated with a user
 
+    NB: raw ``delete_many`` on the books collection only — questions, responses,
+    ratings and access logs survive. For account deletion use
+    ``app.db.book.delete_all_user_books``, which cascades per book (#179).
+
     Args:
         user_id: The user's ID (auth_id or MongoDB _id)
         book_ids: Optional list of specific book IDs to delete. If None, deletes all user's books.
@@ -140,18 +144,17 @@ async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
         bool: True if deletion was successful, False otherwise
     """
     try:
-        # Get books collection
-
-        # Prepare filter to find books
+        # Books store their owner as owner_id (see create_book) — a user_id
+        # filter matches nothing (issue #179).
         if book_ids:
             # Delete specific books for the user
             query = {
-                "user_id": user_id,
+                "owner_id": user_id,
                 "_id": {"$in": [ObjectId(bid) for bid in book_ids]},
             }
         else:
             # Delete all books for the user
-            query = {"user_id": user_id}
+            query = {"owner_id": user_id}
 
         # Delete the books
         result = await books_collection.delete_many(query)

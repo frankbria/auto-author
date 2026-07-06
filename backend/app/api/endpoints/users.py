@@ -14,6 +14,7 @@ from app.db.database import (
     create_user,
     update_user,
     delete_user,
+    delete_all_user_books,
     get_collection,  # Added missing import
 )
 from app.api.dependencies import (
@@ -163,7 +164,31 @@ async def delete_profile(
     current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=3, window=300)),
 ):
-    """Delete the current user's account"""
+    """Delete the current user's account.
+
+    Cascades the user's books (and their questions/responses/ratings/access
+    logs, via the atomic per-book delete) BEFORE soft-deleting the user record,
+    so a mid-cascade failure leaves the account active and retryable (#179).
+    The user document itself is retained with is_active=False.
+    """
+    try:
+        deleted_books = await delete_all_user_books(current_user["auth_id"])
+    except Exception:
+        logger.error(
+            "Account-deletion cascade failed for %s",
+            current_user["auth_id"],
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error deleting account data",
+        )
+    logger.info(
+        "Account deletion for %s cascade-deleted %d books",
+        current_user["auth_id"],
+        deleted_books,
+    )
+
     # Delete user (soft delete by default)
     success = await delete_user(
         auth_id=current_user["auth_id"], actor_id=current_user["auth_id"]
@@ -397,8 +422,9 @@ async def delete_user_account(
             detail="Not enough permissions to delete this user",
         )
 
-    # Delete the user
+    # Delete the user (cascade owned books first — same ordering as /me, #179)
     try:
+        await delete_all_user_books(auth_id)
         result = await delete_user(auth_id)
         if not result:
             raise HTTPException(

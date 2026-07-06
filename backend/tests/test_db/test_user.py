@@ -117,13 +117,15 @@ class TestDeleteUser:
 
 class TestDeleteUserBooks:
     async def test_delete_all_user_books(self, bind_books):
+        # Books are stored with owner_id (see create_book); seeding user_id here
+        # used to mask the #179 wrong-field bug.
         uid = "owner-1"
         await base.books_collection.insert_many(
-            [{"user_id": uid, "title": "A"}, {"user_id": uid, "title": "B"}]
+            [{"owner_id": uid, "title": "A"}, {"owner_id": uid, "title": "B"}]
         )
         ok = await delete_user_books(uid)
         assert ok is True
-        assert await base.books_collection.count_documents({"user_id": uid}) == 0
+        assert await base.books_collection.count_documents({"owner_id": uid}) == 0
 
     async def test_delete_specific_books(self, bind_books):
         uid = "owner-2"
@@ -131,13 +133,13 @@ class TestDeleteUserBooks:
         drop = ObjectId()
         await base.books_collection.insert_many(
             [
-                {"_id": keep, "user_id": uid, "title": "keep"},
-                {"_id": drop, "user_id": uid, "title": "drop"},
+                {"_id": keep, "owner_id": uid, "title": "keep"},
+                {"_id": drop, "owner_id": uid, "title": "drop"},
             ]
         )
         ok = await delete_user_books(uid, book_ids=[str(drop)])
         assert ok is True
-        remaining = await base.books_collection.find({"user_id": uid}).to_list(None)
+        remaining = await base.books_collection.find({"owner_id": uid}).to_list(None)
         assert {b["_id"] for b in remaining} == {keep}
 
     async def test_delete_no_books_returns_false(self, bind_books):

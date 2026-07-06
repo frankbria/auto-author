@@ -279,6 +279,27 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
     return True
 
 
+async def delete_all_user_books(user_auth_id: str) -> int:
+    """Cascade-delete every book the user owns (account deletion, issue #179).
+
+    Reuses ``delete_book`` per book, so each book's questions, responses,
+    ratings and access logs go with it — atomically per book on a replica set.
+    A failure propagates so the caller can abort before touching the user
+    record (children first, parent last). Returns the number of books deleted.
+    """
+    ids = [
+        str(doc["_id"])
+        async for doc in books_collection.find(
+            {"owner_id": user_auth_id}, {"_id": 1}
+        )
+    ]
+    deleted = 0
+    for book_id in ids:
+        if await delete_book(book_id, user_auth_id):
+            deleted += 1
+    return deleted
+
+
 async def _delete_book_internal(
     book_id: str,
     user_auth_id: str,

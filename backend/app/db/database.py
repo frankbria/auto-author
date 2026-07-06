@@ -43,6 +43,7 @@ from .book import (
     apply_chapter_content_update,
     update_book_summary_atomic,
     delete_book,
+    delete_all_user_books,
 )
 
 from .audit_log import create_audit_log
@@ -100,6 +101,7 @@ __all__ += [
     "get_books_by_user",
     "update_book",
     "delete_book",
+    "delete_all_user_books",
     # Audit log DAOs
     "create_audit_log",
     # Usage counter DAOs
