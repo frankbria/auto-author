@@ -144,7 +144,11 @@ curl -X PATCH "http://localhost:8000/api/users/me" \
 
 ### Delete User Account
 
-Permanently deletes the authenticated user's account and associated data.
+Deletes the authenticated user's account. All owned content — books and their
+questions, responses, ratings, and chapter access logs — is permanently
+cascade-deleted (issue #179); the user record itself is retained but
+deactivated (`is_active: false`). If the content cascade fails, the request
+returns 500 and the account stays active so it can be retried.
 
 **Endpoint**: `DELETE /users/me`
 
@@ -164,7 +168,7 @@ Permanently deletes the authenticated user's account and associated data.
 - `401 Unauthorized`: Invalid or missing authentication token
 - `404 Not Found`: User not found or already deleted
 - `429 Too Many Requests`: Rate limit exceeded
-- `500 Internal Server Error`: Server-side error
+- `500 Internal Server Error`: Content cascade failed — account left active, retry
 
 **Example Request**:
 ```bash
@@ -172,7 +176,7 @@ curl -X DELETE "http://localhost:8000/api/users/me" \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..."
 ```
 
-> ⚠️ **Warning**: This operation is irreversible. All user data will be permanently deleted.
+> ⚠️ **Warning**: This operation is irreversible. All books and related content are permanently deleted; the account record is deactivated.
 
 ---
 

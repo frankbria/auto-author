@@ -16,7 +16,7 @@ import pytest
 from bson.objectid import ObjectId
 
 import app.db.book as book_dao
-from app.db.book import delete_book
+from app.db.book import delete_book, delete_all_user_books
 from app.db.base import get_collection
 
 
@@ -85,6 +85,40 @@ async def test_delete_book_not_owned_removes_nothing(motor_reinit_db):
     questions = await get_collection("questions")
     assert await books.find_one({"_id": ObjectId(book_id)}) is not None
     assert await questions.count_documents({"book_id": book_id}) == 1
+
+
+@pytest.mark.asyncio
+async def test_delete_all_user_books_only_touches_owner(motor_reinit_db):
+    """delete_all_user_books cascades every owned book (returning the count)
+    and leaves other users' data alone (issue #179)."""
+    await _seed_book_with_children("victim")
+    await _seed_book_with_children("victim")
+    kept = await _seed_book_with_children("bystander")
+
+    assert await delete_all_user_books("victim") == 2
+    assert await delete_all_user_books("victim") == 0  # idempotent second pass
+
+    books = await get_collection("books")
+    questions = await get_collection("questions")
+    assert await books.count_documents({"owner_id": "victim"}) == 0
+    assert await questions.count_documents({"user_id": "victim"}) == 0
+    assert await books.find_one({"_id": ObjectId(kept)}) is not None
+    assert await questions.count_documents({"book_id": kept}) == 1
+
+
+@pytest.mark.asyncio
+async def test_delete_all_user_books_propagates_failure(motor_reinit_db, monkeypatch):
+    """A per-book cascade failure propagates so the account-deletion caller can
+    abort before touching the user record."""
+    await _seed_book_with_children("victim-2")
+
+    async def _boom(book_id, user_auth_id):
+        raise RuntimeError("simulated mongo failure")
+
+    monkeypatch.setattr(book_dao, "delete_book", _boom)
+
+    with pytest.raises(RuntimeError, match="simulated mongo failure"):
+        await delete_all_user_books("victim-2")
 
 
 @pytest.mark.asyncio
