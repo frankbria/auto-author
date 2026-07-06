@@ -1,5 +1,5 @@
 from fastapi import Depends, Header, HTTPException, status, Request
-from typing import Dict, Optional, Callable, Any
+from typing import Dict, Optional, Any
 import time
 import re
 from pydantic import BaseModel
@@ -11,10 +11,6 @@ from app.db.database import create_audit_log
 from app.db.usage import increment_usage
 from app.core.config import settings
 from app.core.security import get_current_user_from_session
-
-# Simple in-memory cache for rate limiting
-# In production, this should be replaced with Redis or similar
-rate_limit_cache = {}
 
 
 # MongoDB collection dependency
@@ -64,7 +60,13 @@ class SanitizedModel(BaseModel):
 
 
 def get_rate_limiter(limit: int = 10, window: int = 60):
-    """Create a rate limiter dependency with specific limits
+    """Create a rate limiter dependency with specific limits (issue #180).
+
+    Buckets are keyed per **authenticated user** (every rate-limited endpoint
+    also requires session auth, so FastAPI's per-request dependency cache makes
+    the user lookup free) and persisted in Mongo via the same atomic
+    ``$inc``+TTL counter as the AI quota (#173) — shared across uvicorn
+    workers, surviving restarts, self-evicting. Fixed epoch-aligned windows.
 
     Args:
         limit: Maximum number of requests allowed in the time window
@@ -74,53 +76,52 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
         A dependency function that can be used with Depends()
     """
 
-    async def rate_limiter(request: Request):
+    async def rate_limiter(
+        request: Request,
+        current_user: Dict = Depends(get_current_user_from_session),
+    ):
         """Rate limiting dependency function"""
         # Skip rate limiting in auth-bypass mode (E2E/test only; BYPASS_AUTH is
         # rejected in production by Settings validation), so test suites can
-        # create many resources from a single IP without tripping the limiter.
+        # create many resources without tripping the limiter.
         if settings.BYPASS_AUTH:
             return {"limit": limit, "remaining": limit, "reset": 0}
 
-        # Default: use client IP
-        client_ip = request.client.host
-        endpoint = request.url.path
-        key = f"{client_ip}:{endpoint}"
+        # Key per authenticated user; client IP only as a defense-in-depth
+        # fallback if a caller somehow has no id.
+        subject = (
+            current_user.get("auth_id")
+            or current_user.get("id")
+            or current_user.get("clerk_id")
+            or request.client.host
+        )
 
-        # Get current timestamp
         now = time.time()
+        bucket_start = int(now // window) * window
+        reset_at = bucket_start + window
 
-        # Initialize or reset cache entry if needed
-        if key not in rate_limit_cache or rate_limit_cache[key]["reset_at"] < now:
-            rate_limit_cache[key] = {"count": 0, "reset_at": now + window}
+        # TTL of 2 windows: the bucket outlives its own window, then Mongo reaps it.
+        count = await increment_usage(
+            subject, f"rl:{request.url.path}:{bucket_start}", ttl_seconds=window * 2
+        )
 
-        # Increment request count
-        rate_limit_cache[key]["count"] += 1
-
-        # Check if limit exceeded
-        if rate_limit_cache[key]["count"] > limit:
-            # Calculate retry-after time
-            retry_after = int(rate_limit_cache[key]["reset_at"] - now)
-
-            # Set headers for response
-            headers = {
-                "X-RateLimit-Limit": str(limit),
-                "X-RateLimit-Remaining": "0",
-                "X-RateLimit-Reset": str(int(rate_limit_cache[key]["reset_at"])),
-                "Retry-After": str(retry_after),
-            }
-
+        if count > limit:
+            retry_after = max(1, int(reset_at - now) + 1)
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Rate limit exceeded. Try again in {retry_after} seconds.",
-                headers=headers,
+                headers={
+                    "X-RateLimit-Limit": str(limit),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(reset_at),
+                    "Retry-After": str(retry_after),
+                },
             )
 
-        # Return current rate limit status
         return {
             "limit": limit,
-            "remaining": limit - rate_limit_cache[key]["count"],
-            "reset": rate_limit_cache[key]["reset_at"],
+            "remaining": limit - count,
+            "reset": reset_at,
         }
 
     return rate_limiter
@@ -208,68 +209,6 @@ def get_entitlement_checker(feature: str):
             raise handle_entitlement_denied(feature=feature, plan=plan or DEFAULT_PLAN)
 
     return check_entitlement
-
-
-# Keep this for backward compatibility but mark as deprecated
-async def rate_limit(
-    request: Request, limit: int = 10, window: int = 60, key_func: Callable = None
-):
-    """
-    DEPRECATED: Use get_rate_limiter instead
-
-    Rate limiting dependency
-
-    Args:
-        request: The FastAPI request object
-        limit: Maximum number of requests allowed in the time window
-        window: Time window in seconds
-        key_func: Function that returns a string key for the rate limit
-                  If None, uses the client's IP address
-    """
-    # Get rate limit key
-    if key_func:
-        key = key_func(request)
-    else:
-        # Default: use client IP
-        client_ip = request.client.host
-        endpoint = request.url.path
-        key = f"{client_ip}:{endpoint}"
-
-    # Get current timestamp
-    now = time.time()
-
-    # Initialize or reset cache entry if needed
-    if key not in rate_limit_cache or rate_limit_cache[key]["reset_at"] < now:
-        rate_limit_cache[key] = {"count": 0, "reset_at": now + window}
-
-    # Increment request count
-    rate_limit_cache[key]["count"] += 1
-
-    # Check if limit exceeded
-    if rate_limit_cache[key]["count"] > limit:
-        # Calculate retry-after time
-        retry_after = int(rate_limit_cache[key]["reset_at"] - now)
-
-        # Set headers for response
-        headers = {
-            "X-RateLimit-Limit": str(limit),
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": str(int(rate_limit_cache[key]["reset_at"])),
-            "Retry-After": str(retry_after),
-        }
-
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Rate limit exceeded. Try again in {retry_after} seconds.",
-            headers=headers,
-        )
-
-    # Return current rate limit status
-    return {
-        "limit": limit,
-        "remaining": limit - rate_limit_cache[key]["count"],
-        "reset": rate_limit_cache[key]["reset_at"],
-    }
 
 
 async def audit_request(
