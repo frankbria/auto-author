@@ -62,7 +62,7 @@ from app.db.toc_transactions import (
     reorder_chapters_with_transaction,
 )
 from app.api.dependencies import (
-    rate_limit, audit_request, sanitize_input, get_rate_limiter, get_ai_usage_quota,
+    audit_request, sanitize_input, get_rate_limiter, get_ai_usage_quota,
     get_entitlement_checker
 )
 from app.services.ai_service import ai_service

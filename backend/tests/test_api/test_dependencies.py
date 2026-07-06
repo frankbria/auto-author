@@ -7,16 +7,12 @@ Tests rate limiting, input sanitization, API keys, and better-auth integration.
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi import HTTPException, Request
-import time
 
 import app.api.dependencies as deps
 from app.api.dependencies import (
     sanitize_input,
-    get_rate_limiter,
-    rate_limit,
     get_api_key,
     audit_request,
-    rate_limit_cache,
     get_database_collection,
     SanitizedModel,
 )
@@ -110,212 +106,202 @@ class TestInputSanitization:
         assert result == text.strip()
 
 
+def _mock_request(path: str = "/api/test", ip: str = "10.0.0.1") -> Mock:
+    """A minimal Request stand-in for calling the limiter directly."""
+    request = Mock(spec=Request)
+    request.client = Mock()
+    request.client.host = ip
+    request.url = Mock()
+    request.url.path = path
+    return request
+
+
+USER_A = {"auth_id": "rl-user-a"}
+USER_B = {"auth_id": "rl-user-b"}
+
+
 @pytest.mark.asyncio
 class TestRateLimiting:
-    """Test rate limiting functionality"""
+    """Rate limiter: per-authenticated-user buckets in a shared Mongo store (#180).
 
-    def setup_method(self):
-        """Clear rate limit cache before each test"""
-        rate_limit_cache.clear()
+    Uses the real limiter (`real_rate_limiter` fixture) and real Mongo
+    (`motor_reinit_db`), since the whole point is the shared persistent store.
+    """
 
-    @pytest.mark.asyncio
-    async def test_rate_limiter_allows_within_limit(self):
-        """Test that requests within limit are allowed"""
-        mock_request = Mock(spec=Request)
-        mock_request.client.host = "192.168.1.1"
-        mock_request.url.path = "/api/test"
-
-        limiter = get_rate_limiter(limit=5, window=60)
-
-        # Make 5 requests (within limit)
-        for i in range(5):
-            result = await limiter(mock_request)
-            assert result["remaining"] >= 0
-
-    @pytest.mark.asyncio
-    async def test_rate_limiter_blocks_over_limit(self, real_rate_limiter):
-        """Test that requests over limit are blocked.
-
-        The limiter short-circuits when BYPASS_AUTH is on (test default), so
-        patch it off to exercise the real counting path.
-        """
-        rate_limit_cache.clear()
-
-        mock_request = Mock(spec=Request)
-        mock_request.client = Mock()
-        mock_request.client.host = "10.99.99.1"  # Unique IP
-        mock_request.url = Mock()
-        mock_request.url.path = "/api/test_blocks_over_limit"  # Unique path
-
-        limiter = real_rate_limiter(limit=3, window=60)
+    async def test_two_users_do_not_share_a_bucket(
+        self, motor_reinit_db, real_rate_limiter
+    ):
+        """AC: user A exhausting the limit must not 429 user B on the same endpoint."""
+        limiter = real_rate_limiter(limit=2, window=60)
+        request = _mock_request("/api/shared-endpoint")
 
         with patch.object(deps.settings, "BYPASS_AUTH", False):
-            # Make 3 requests (at limit) - should succeed
-            results = [await limiter(mock_request) for _ in range(3)]
-
-            # Verify requests were allowed
-            assert results[0]["remaining"] == 2
-            assert results[1]["remaining"] == 1
-            assert results[2]["remaining"] == 0
-
-            # 4th request should be blocked
+            await limiter(request, current_user=USER_A)
+            await limiter(request, current_user=USER_A)
             with pytest.raises(HTTPException) as exc_info:
-                await limiter(mock_request)
+                await limiter(request, current_user=USER_A)
+            assert exc_info.value.status_code == 429
+
+            # User B is unaffected by A's exhausted bucket
+            result = await limiter(request, current_user=USER_B)
+        assert result["remaining"] == 1
+
+    async def test_bucket_shared_across_limiter_instances(
+        self, motor_reinit_db, real_rate_limiter
+    ):
+        """Two limiter closures (like two uvicorn workers) count against one bucket."""
+        worker1 = real_rate_limiter(limit=3, window=60)
+        worker2 = real_rate_limiter(limit=3, window=60)
+        request = _mock_request("/api/multi-worker")
+
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            await worker1(request, current_user=USER_A)
+            await worker2(request, current_user=USER_A)
+            await worker1(request, current_user=USER_A)
+            # 4th request overall -- worker2 must see the shared count of 3
+            with pytest.raises(HTTPException) as exc_info:
+                await worker2(request, current_user=USER_A)
+
+        assert exc_info.value.status_code == 429
+
+    async def test_blocks_over_limit_with_headers(
+        self, motor_reinit_db, real_rate_limiter
+    ):
+        """Over the limit -> 429 with the standard X-RateLimit-*/Retry-After headers."""
+        limiter = real_rate_limiter(limit=3, window=60)
+        request = _mock_request("/api/headers-check")
+
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            results = [
+                await limiter(request, current_user=USER_A) for _ in range(3)
+            ]
+            assert [r["remaining"] for r in results] == [2, 1, 0]
+
+            with pytest.raises(HTTPException) as exc_info:
+                await limiter(request, current_user=USER_A)
 
         assert exc_info.value.status_code == 429
         assert "Rate limit exceeded" in exc_info.value.detail
-
-    @pytest.mark.asyncio
-    async def test_rate_limiter_includes_headers(self, real_rate_limiter):
-        """Test that rate limit response includes proper headers"""
-        rate_limit_cache.clear()
-
-        mock_request = Mock(spec=Request)
-        mock_request.client = Mock()
-        mock_request.client.host = "10.99.99.2"  # Unique IP
-        mock_request.url = Mock()
-        mock_request.url.path = "/api/test_headers_check"  # Unique path
-
-        limiter = real_rate_limiter(limit=2, window=60)
-
-        with patch.object(deps.settings, "BYPASS_AUTH", False):
-            # Make 2 requests (at limit) - should succeed
-            await limiter(mock_request)
-            result2 = await limiter(mock_request)
-            assert result2["remaining"] == 0
-
-            # 3rd request should be blocked with headers
-            with pytest.raises(HTTPException) as exc_info:
-                await limiter(mock_request)
-
         headers = exc_info.value.headers
-        assert "X-RateLimit-Limit" in headers
-        assert "X-RateLimit-Remaining" in headers
+        assert headers["X-RateLimit-Limit"] == "3"
+        assert headers["X-RateLimit-Remaining"] == "0"
         assert "X-RateLimit-Reset" in headers
-        assert "Retry-After" in headers
+        assert 0 < int(headers["Retry-After"]) <= 60
 
-    @pytest.mark.asyncio
-    async def test_rate_limiter_bypass_auth_short_circuits(self, real_rate_limiter):
+    async def test_bypass_auth_short_circuits(self, real_rate_limiter):
         """With BYPASS_AUTH on, the limiter returns full quota without counting."""
-        rate_limit_cache.clear()
-        mock_request = Mock(spec=Request)
         limiter = real_rate_limiter(limit=2, window=60)
+        request = _mock_request("/api/bypass")
 
         with patch.object(deps.settings, "BYPASS_AUTH", True):
             for _ in range(5):
-                result = await limiter(mock_request)
+                result = await limiter(request, current_user=USER_A)
                 assert result["remaining"] == 2
-        assert rate_limit_cache == {}
 
-    @pytest.mark.asyncio
-    async def test_rate_limiter_per_endpoint(self):
-        """Test that rate limits are per endpoint"""
-        mock_request1 = Mock(spec=Request)
-        mock_request1.client.host = "192.168.1.1"
-        mock_request1.url.path = "/api/endpoint1"
+    async def test_rate_limiter_per_endpoint(
+        self, motor_reinit_db, real_rate_limiter
+    ):
+        """The same user gets independent buckets per endpoint."""
+        limiter = real_rate_limiter(limit=2, window=60)
 
-        mock_request2 = Mock(spec=Request)
-        mock_request2.client.host = "192.168.1.1"
-        mock_request2.url.path = "/api/endpoint2"
-
-        limiter = get_rate_limiter(limit=2, window=60)
-
-        # Make 2 requests to endpoint1 (at limit)
-        await limiter(mock_request1)
-        await limiter(mock_request1)
-
-        # Request to endpoint2 should still work (different endpoint)
-        result = await limiter(mock_request2)
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            await limiter(_mock_request("/api/endpoint1"), current_user=USER_A)
+            await limiter(_mock_request("/api/endpoint1"), current_user=USER_A)
+            result = await limiter(
+                _mock_request("/api/endpoint2"), current_user=USER_A
+            )
         assert result["remaining"] > 0
 
-    @pytest.mark.asyncio
-    async def test_rate_limiter_per_client(self):
-        """Test that rate limits are per client IP"""
-        mock_request1 = Mock(spec=Request)
-        mock_request1.client.host = "192.168.1.1"
-        mock_request1.url.path = "/api/test"
+    async def test_rate_limiter_window_reset(
+        self, motor_reinit_db, real_rate_limiter
+    ):
+        """A new window re-allows a user who exhausted the previous one.
 
-        mock_request2 = Mock(spec=Request)
-        mock_request2.client.host = "192.168.1.2"
-        mock_request2.url.path = "/api/test"
+        The clock is patched so both windows are deterministic (no sleeps,
+        no boundary-straddle flakes on loaded CI).
+        """
+        limiter = real_rate_limiter(limit=1, window=60)
+        request = _mock_request("/api/window-reset")
 
-        limiter = get_rate_limiter(limit=2, window=60)
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            with patch.object(deps.time, "time", return_value=1_000_000.0):
+                await limiter(request, current_user=USER_A)
+                with pytest.raises(HTTPException):
+                    await limiter(request, current_user=USER_A)
 
-        # Make 2 requests from client1 (at limit)
-        await limiter(mock_request1)
-        await limiter(mock_request1)
+            # Next window (one full window later)
+            with patch.object(deps.time, "time", return_value=1_000_060.0):
+                result = await limiter(request, current_user=USER_A)
+        assert result["remaining"] == 0
 
-        # Request from client2 should still work (different IP)
-        result = await limiter(mock_request2)
-        assert result["remaining"] > 0
+    async def test_mongo_failure_fails_closed(self, real_rate_limiter):
+        """A store failure propagates (fail-closed) rather than waving traffic
+        through — auth on rate-limited endpoints already requires the same
+        Mongo, so this adds no new availability dependency."""
+        limiter = real_rate_limiter(limit=5, window=60)
+        request = _mock_request("/api/mongo-down")
 
-    @pytest.mark.asyncio
-    async def test_rate_limiter_window_reset(self):
-        """Test that rate limit resets after window expires"""
-        mock_request = Mock(spec=Request)
-        mock_request.client.host = "192.168.1.1"
-        mock_request.url.path = "/api/test"
+        with patch.object(deps.settings, "BYPASS_AUTH", False), patch.object(
+            deps, "increment_usage", side_effect=RuntimeError("mongo down")
+        ):
+            with pytest.raises(RuntimeError):
+                await limiter(request, current_user=USER_A)
 
-        limiter = get_rate_limiter(limit=2, window=1)  # 1 second window
+    async def test_dependency_wiring_resolves_user_via_http(
+        self, motor_reinit_db, real_rate_limiter
+    ):
+        """End-to-end DI check: mounted via Depends(), the limiter resolves the
+        authenticated user itself and keys buckets per user (a regression that
+        drops the current_user sub-dependency fails this)."""
+        from fastapi import Depends, FastAPI
+        from httpx import ASGITransport, AsyncClient
 
-        # Make 2 requests (at limit)
-        await limiter(mock_request)
-        await limiter(mock_request)
+        from app.core.security import get_current_user_from_session
 
-        # Wait for window to expire
-        time.sleep(1.1)
+        test_app = FastAPI()
+        active_user = {"value": USER_A}
 
-        # Should be able to make request again
-        result = await limiter(mock_request)
-        assert result["remaining"] > 0
+        @test_app.get("/limited")
+        async def limited(
+            rate_limit_info=Depends(real_rate_limiter(limit=1, window=60)),
+        ):
+            return {"ok": True}
 
-    @pytest.mark.asyncio
-    async def test_deprecated_rate_limit_function(self):
-        """Test deprecated rate_limit function still works"""
-        mock_request = Mock(spec=Request)
-        mock_request.client.host = "192.168.1.1"
-        mock_request.url.path = "/api/test"
+        test_app.dependency_overrides[get_current_user_from_session] = (
+            lambda: active_user["value"]
+        )
 
-        # Clear cache
-        rate_limit_cache.clear()
+        transport = ASGITransport(app=test_app)
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            async with AsyncClient(
+                transport=transport, base_url="http://test"
+            ) as client:
+                assert (await client.get("/limited")).status_code == 200
+                assert (await client.get("/limited")).status_code == 429
 
-        result = await rate_limit(mock_request, limit=5, window=60)
+                active_user["value"] = USER_B  # switch users → fresh bucket
+                assert (await client.get("/limited")).status_code == 200
 
-        assert result["limit"] == 5
-        assert result["remaining"] == 4  # 1 request made
+    async def test_missing_user_id_falls_back_to_client_ip(
+        self, motor_reinit_db, real_rate_limiter
+    ):
+        """No resolvable user id -> per-IP buckets (defense in depth)."""
+        limiter = real_rate_limiter(limit=1, window=60)
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_with_custom_key_func(self):
-        """Test rate_limit with custom key function"""
-        def custom_key(request):
-            return f"custom_key_{request.url.path}"
-
-        mock_request = Mock(spec=Request)
-        mock_request.client.host = "192.168.1.1"
-        mock_request.url.path = "/api/test"
-
-        rate_limit_cache.clear()
-
-        result = await rate_limit(mock_request, limit=5, window=60, key_func=custom_key)
-
-        assert result is not None
-        # Verify custom key was used in cache
-        assert any("custom_key" in key for key in rate_limit_cache.keys())
-
-    @pytest.mark.asyncio
-    async def test_deprecated_rate_limit_blocks_over_limit(self):
-        """Deprecated rate_limit raises 429 with headers once the limit is passed."""
-        rate_limit_cache.clear()
-        mock_request = Mock(spec=Request)
-        mock_request.client.host = "10.50.50.1"
-        mock_request.url.path = "/api/deprecated_block"
-
-        await rate_limit(mock_request, limit=1, window=60)
-        with pytest.raises(HTTPException) as exc_info:
-            await rate_limit(mock_request, limit=1, window=60)
-
-        assert exc_info.value.status_code == 429
-        assert "Retry-After" in exc_info.value.headers
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            await limiter(
+                _mock_request("/api/ip-fallback", ip="203.0.113.1"), current_user={}
+            )
+            with pytest.raises(HTTPException):
+                await limiter(
+                    _mock_request("/api/ip-fallback", ip="203.0.113.1"),
+                    current_user={},
+                )
+            # A different IP still passes
+            result = await limiter(
+                _mock_request("/api/ip-fallback", ip="203.0.113.2"), current_user={}
+            )
+        assert result["remaining"] == 0
 
 
 @pytest.mark.asyncio

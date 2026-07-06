@@ -1,33 +1,42 @@
-# Issue #177 — Lost update: chapter-content auto-save overwrites entire TOC (P0.5, critical/data-integrity)
+# Issue #180 — [P0.8] Rate limiting is tenant-wide and bypassable behind nginx
 
-## Problem
-`update_chapter_content` (3s autosave), `update_book_summary`, and `generate_table_of_contents`
-all persist via `update_book`'s version-less `$set` of the WHOLE `table_of_contents` (or history array).
-Concurrent writers silently clobber each other → real data loss. `generate_toc` also hardcodes `version:1`.
+**Plan source**: self-authored (no plan comment on issue). **Approved autonomously** — no architectural fork: the shared store is Mongo via the existing `increment_usage` DAO (#173 pattern; Redis isn't in this stack), and per-user keying follows directly from the verified fact that every rate-limited endpoint already requires session auth.
 
-## Approach (precedent: `update_chapter_statuses_with_version_guard` from #159)
-- **`update_chapter_content`** → targeted **arrayFilters `$set`** of the ONE chapter's fields + atomic
-  `$inc table_of_contents.version`. Touches only the target chapter, so concurrent saves to *different*
-  chapters no longer collide. No version guard / no 409 / no frontend change needed. (AC1: "targeted
-  positional/arrayFilters `$set`" branch — better than CAS for the high-frequency autosave path since it
-  produces zero false conflicts.)
-- **`update_book_summary`** → atomic **`$push` with `$slice:-20`** for `summary_history` (was read-modify-write
-  of the whole array → lost revisions). (AC2)
-- **`generate_table_of_contents`** → increment version from current, don't hardcode 1. (AC2)
+## Findings (Phase 2)
 
-## Tasks
-- [ ] `db/book.py`: add `apply_chapter_content_update()` (targeted arrayFilters set + $inc version)
-- [ ] `db/book.py`: add `update_book_summary_atomic()` ($push/$slice history)
-- [ ] `db/database.py`: re-export both
-- [ ] `endpoints/books.py`: rewire `update_chapter_content` to compute changed fields + parent id, call helper
-- [ ] `endpoints/books.py`: rewire `update_book_summary` to call helper
-- [ ] `endpoints/books.py`: `generate_table_of_contents` version = current+1 (0 default → 1 on first gen)
-- [ ] Tests (real Mongo): interleaved chapter-content writers → no lost update; interleaved summary
-      writers → both revisions kept; generate_toc increments from current version; subchapter targeted update
-- [ ] Full backend suite green, coverage ≥85%
+- `get_rate_limiter` (`app/api/dependencies.py:66`) keys `{client_ip}:{endpoint}` in a plain in-process dict → per-worker (PM2 runs `--workers 2` since #175), resets on restart, never evicted.
+- **Issue premise partially stale**: uvicorn 0.35 defaults `proxy_headers=True` with `forwarded_allow_ips=127.0.0.1`; staging nginx sets `X-Forwarded-For` and proxies via localhost. Staging backend logs already show real client IPs (`174.138.89.152:0` — the `:0` port is the ProxyHeadersMiddleware rewrite signature). AC1 still wants it explicit — cheap one-line pin.
+- **Every** `get_rate_limiter` call site (books.py, chapters via books, export.py, users.py — verified by scanning all route signatures) also depends on `get_current_user_from_session` → the limiter can depend on it too; FastAPI's per-request dependency cache means zero extra DB hits.
+- `increment_usage` (`app/db/usage.py`) is a generic atomic `$inc`+TTL counter keyed `_id = f"{user_id}:{period_key}"` — reusable as-is for rate buckets. TTL index already ensured.
+- Only `tests/test_api/test_dependencies.py` exercises the real limiter (via `real_rate_limiter` fixture); all route tests get the conftest no-op fake. Blast radius contained.
+- Deprecated `rate_limit()` + `rate_limit_cache` dict: zero production callers (books.py imports `rate_limit` but never uses it). This IS the "never evicted" dict from the issue → delete it.
 
-## Ceiling / notes (ponytail)
-- arrayFilters path supports top-level + 1 level of subchapter = the data model's max depth
-  (matches `add_chapter_with_transaction`). Deeper nesting would need another `$[...]` level.
-- `generate_toc` stays a full-TOC replace (intended semantics for an explicit regenerate); only the
-  hardcoded version is fixed. Interleaving test focuses on the real bug (content autosave + summary history).
+## Design
+
+- `get_rate_limiter(limit, window)` keeps its signature and 429/`X-RateLimit-*`/`Retry-After` contract. Internals change:
+  - New dep param `current_user: Dict = Depends(get_current_user_from_session)`; subject = `auth_id` (fallback `id`/`clerk_id`).
+  - Fixed epoch-aligned window: `bucket = int(now // window) * window`; count via `increment_usage(subject, f"rl:{path}:{bucket}", ttl=window*2)` → shared across workers, survives restarts, self-evicting (Mongo TTL).
+  - `BYPASS_AUTH` short-circuit unchanged.
+  - Unauthenticated callers now 401 before counting (previously counted then 401 in the endpoint) — strictly better.
+- `ecosystem.config.template.js`: backend args += ` --proxy-headers --forwarded-allow-ips=127.0.0.1` (pins the uvicorn default per AC1; nginx proxies via localhost).
+- Delete deprecated `rate_limit()`, `rate_limit_cache`, and their tests; drop the dead `rate_limit` import in books.py.
+
+## Steps (TDD)
+
+- [x] 1. **RED**: rewrote `TestRateLimiting` (7 tests, real Mongo via `motor_reinit_db`) — all would TypeError against the old signature (no `current_user` param), so failing-first is by construction.
+- [x] 2. **GREEN**: Mongo-backed per-user limiter in `dependencies.py`; deleted deprecated `rate_limit`/`rate_limit_cache` + their 3 tests + dead books.py import.
+- [x] 3. Ecosystem template: `--proxy-headers --forwarded-allow-ips=127.0.0.1` added.
+- [x] 4. Full backend suite: **1084 passed / 13 skipped, 91.87% cov**. Ruff: my files clean; 9 pre-existing books.py dead imports left alone (out of scope, #94 precedent).
+- [x] 5. Deslop clean; opencode (GLM) review ×3 rounds (5 fixed, M1/M2/M3 rebutted+verified, triage posted to PR #230); demo posted (real uvicorn 2-workers + real better-auth sessions, all 3 ACs evidenced incl. restart-persistence 429); docs synced (CLAUDE.md).
+
+## Acceptance criteria
+
+- [x] Uvicorn runs with `--proxy-headers --forwarded-allow-ips=<nginx>` (ecosystem template; verified staging nginx sends XFF from localhost).
+- [x] Limiter uses a shared store consistent across workers/restarts and keys per authenticated user.
+- [x] Test asserts two different users don't share a bucket.
+
+## Out of scope
+
+- Redis (new infra for what Mongo already does here).
+- The per-IP fallback becoming primary for any future unauthenticated endpoints (none exist among rate-limited routes today).
+- nginx config changes (already correct on staging).

@@ -7,7 +7,10 @@ module.exports = {
       name: 'auto-author-backend',
       script: '.venv/bin/uvicorn',
       // ≥2 workers so an in-flight AI generation can't stall the whole app (#175).
-      args: 'app.main:app --host 0.0.0.0 --port 8000 --workers 2',
+      // --proxy-headers + --forwarded-allow-ips pin uvicorn to trust nginx's
+      // X-Forwarded-For from localhost only, so rate limiting / audit logs see
+      // real client IPs and clients can't spoof theirs (#180).
+      args: 'app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=127.0.0.1',
       cwd: '__BACKEND_CWD__', // Will be replaced with actual release path
       interpreter: 'none', // Don't use Node.js interpreter
       env: {
