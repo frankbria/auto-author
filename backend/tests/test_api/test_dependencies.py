@@ -7,7 +7,6 @@ Tests rate limiting, input sanitization, API keys, and better-auth integration.
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi import HTTPException, Request
-import time
 
 import app.api.dependencies as deps
 from app.api.dependencies import (
