@@ -1,16 +1,60 @@
 """Integration tests for single-question regeneration (issue #62).
 
 Exercises the ``POST /books/{book_id}/chapters/{chapter_id}/questions/{question_id}/regenerate``
-endpoint end to end against a real (test) MongoDB with mocked session auth. AI generation
-falls back to deterministic template questions when no AI key is configured, which is enough
-to verify replacement, the per-question regeneration cap, and ownership/error handling.
+endpoint end to end against a real (test) MongoDB with mocked session auth. The AI wire
+method is patched to return deterministic questions: these tests target replacement, the
+per-question regeneration cap, and ownership/error handling — not AI generation. (They
+previously leaned on an unconfigured OpenAI key being swallowed into template fallbacks;
+since #182 genuine AI failures correctly surface as 503 instead.)
 """
+
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from bson import ObjectId
 from httpx import AsyncClient
 
 from app.db.base import get_collection
+from app.services.ai_errors import AIRateLimitError
+
+AI_METHOD = "app.services.ai_service.ai_service.generate_chapter_questions"
+
+
+# Marker phrases the prompt builder emits per focus type, so the stub can
+# honor a requested focus the way the real model would.
+_FOCUS_MARKERS = {
+    "character development, motivations": "character",
+    "plot structure, events": "plot",
+    "setting details, world-building": "setting",
+    "themes, messages, symbolism": "theme",
+    "research needs, factual accuracy": "research",
+}
+
+
+def _ai_question_dicts(prompt, count):
+    qtype = "character"
+    for marker, t in _FOCUS_MARKERS.items():
+        if marker in prompt:
+            qtype = t
+            break
+    return [
+        {
+            "question_text": f"What drives the {qtype} elements in scene {i} of this chapter?",
+            "question_type": qtype,
+            "difficulty": "medium",
+        }
+        for i in range(count)
+    ]
+
+
+@pytest.fixture(autouse=True)
+def _deterministic_ai():
+    """Patch the AI boundary so generation succeeds deterministically."""
+    async def _fake(prompt, count=10):
+        return _ai_question_dicts(prompt, count)
+
+    with patch(AI_METHOD, new=AsyncMock(side_effect=_fake)):
+        yield
 
 
 async def _create_book_with_chapter(client: AsyncClient) -> tuple[str, str]:
@@ -77,10 +121,60 @@ async def test_regenerate_single_question_success(auth_client_factory, motor_rei
     assert new_q["id"] == original["id"]
     assert new_q["order"] == original["order"]
     assert new_q["regeneration_count"] == 1
+    # AI-path replacement is not tagged as a template fallback (#182)
+    assert new_q["is_fallback"] is False
 
     # The question still exists at that id
     coll = await get_collection("questions")
     assert await coll.find_one({"_id": ObjectId(original["id"])}) is not None
+
+
+@pytest.mark.asyncio
+async def test_regenerate_single_question_openai_outage_503(auth_client_factory, motor_reinit_db):
+    """A genuine AI outage during single-question regeneration surfaces as a
+    structured 503, not a silent template replacement (#182)."""
+    client = await auth_client_factory()
+    book_id, chapter_id = await _create_book_with_chapter(client)
+    questions = await _generate_questions(client, book_id, chapter_id)
+    qid = questions[0]["id"]
+
+    with patch(AI_METHOD, new=AsyncMock(side_effect=AIRateLimitError("OpenAI outage"))):
+        resp = await client.post(
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qid}/regenerate",
+            json={},
+        )
+    assert resp.status_code == 503
+    assert resp.json()["detail"]["error_code"] == "QUESTION_GENERATION_FAILED"
+
+    # The original question is untouched (generation happens before any mutation).
+    coll = await get_collection("questions")
+    doc = await coll.find_one({"_id": ObjectId(qid)})
+    assert doc is not None
+    assert doc.get("regeneration_count", 0) == 0
+
+
+@pytest.mark.asyncio
+async def test_regenerate_single_question_fallback_replacement_tagged(auth_client_factory, motor_reinit_db):
+    """When the AI responds but yields nothing usable, the in-place template
+    replacement carries is_fallback=True instead of inheriting False (#182)."""
+    client = await auth_client_factory()
+    book_id, chapter_id = await _create_book_with_chapter(client)
+    questions = await _generate_questions(client, book_id, chapter_id)
+    qid = questions[0]["id"]
+    assert questions[0]["is_fallback"] is False
+
+    with patch(AI_METHOD, new=AsyncMock(return_value=[])):
+        resp = await client.post(
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qid}/regenerate",
+            json={},
+        )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["is_fallback"] is True
+
+    # The tag is persisted on the replaced document, not just echoed.
+    coll = await get_collection("questions")
+    doc = await coll.find_one({"_id": ObjectId(qid)})
+    assert doc["is_fallback"] is True
 
 
 @pytest.mark.asyncio

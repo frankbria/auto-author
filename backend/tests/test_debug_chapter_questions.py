@@ -3,11 +3,33 @@
 import pytest
 import asyncio
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch
 from bson import ObjectId
 
 from app.services.question_generation_service import get_question_generation_service
 from app.db import base  # Use fixture-managed collections
 from app.schemas.book import QuestionDifficulty
+
+
+@pytest.fixture(autouse=True)
+def _deterministic_ai():
+    """Patch the AI boundary: since #182 a failing OpenAI call raises instead of
+    silently falling back to templates, so generation must be stubbed here."""
+    async def _fake(prompt, count=10):
+        return [
+            {
+                "question_text": f"What is the driving idea behind section {i} of this chapter?",
+                "question_type": "plot",
+                "difficulty": "medium",
+            }
+            for i in range(count)
+        ]
+
+    with patch(
+        "app.services.ai_service.ai_service.generate_chapter_questions",
+        new=AsyncMock(side_effect=_fake),
+    ):
+        yield
 
 
 async def create_test_book():

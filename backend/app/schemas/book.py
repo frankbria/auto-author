@@ -80,6 +80,10 @@ class QuestionBase(BaseModel):
     # Number of times this individual question has been regenerated. Defaults to 0
     # so legacy documents (persisted before this field existed) read back as 0.
     regeneration_count: int = 0
+    # True when this question came from the template fallback rather than AI
+    # generation, so clients can tell real AI output from canned questions (#182).
+    # Defaults to False so legacy documents read back as AI-generated.
+    is_fallback: bool = False
 
 
 class QuestionCreate(QuestionBase):

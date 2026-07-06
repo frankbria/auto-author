@@ -811,6 +811,11 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             logger.info(f"Generated {len(questions)} questions for chapter")
             return questions
 
+        except AIServiceError as e:
+            # A genuine OpenAI failure must surface as a structured error (like
+            # the TOC path), not masquerade as an empty result (#182).
+            logger.error(f"AI service error generating chapter questions: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Error generating chapter questions: {str(e)}")
             # Return empty list, fallback questions will be handled by the service

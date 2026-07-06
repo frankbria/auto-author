@@ -17,6 +17,7 @@ from app.schemas.book import (
     ResponseStatus,
     QuestionMetadata
 )
+from app.services.ai_errors import AIServiceError
 from app.services.ai_service import AIService
 from app.utils.validators import validate_text_safety
 from app.core.config import settings
@@ -514,6 +515,9 @@ class QuestionGenerationService:
                 "metadata": dumped["metadata"],
                 "order": existing.get("order", dumped["order"]),
                 "regeneration_count": current_count + 1,
+                # Carry the replacement's provenance so a template replacement
+                # doesn't inherit the old question's is_fallback=False (#182).
+                "is_fallback": dumped["is_fallback"],
                 "generated_at": datetime.now(timezone.utc),
             },
         )
@@ -587,9 +591,14 @@ class QuestionGenerationService:
 
             return questions
 
+        except AIServiceError as e:
+            # A genuine OpenAI outage must propagate to the API layer, which maps
+            # it to a structured 503/500 — not degrade into template questions (#182).
+            logger.error(f"AI service error generating questions: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Error generating questions: {str(e)}")
-            # Fallback to template questions if AI generation fails
+            # Fallback to template questions for non-AI, unexpected failures
             return self._generate_fallback_questions(
                 book_id=book_id,
                 chapter_id=chapter_id,
@@ -837,7 +846,9 @@ class QuestionGenerationService:
         difficulty: Optional[QuestionDifficulty] = None,
         focus_types: Optional[List[QuestionType]] = None
     ) -> List[QuestionCreate]:
-        """Generate fallback questions if AI generation fails."""
+        """Generate tagged template questions when the AI responded but produced
+        no usable output, or a non-AI unexpected error occurred. Genuine
+        ``AIServiceError`` outages propagate instead of reaching this path (#182)."""
 
         logger.info(f"Generating {count} fallback questions for chapter {chapter_id}")
 
@@ -931,7 +942,7 @@ class QuestionGenerationService:
                 examples=helper_data.get("examples")
             )
 
-            # Create question
+            # Create question, tagged so it can't masquerade as AI output (#182)
             question = QuestionCreate(
                 book_id=book_id,
                 chapter_id=chapter_id,
@@ -940,7 +951,8 @@ class QuestionGenerationService:
                 difficulty=difficulty,
                 category="development",
                 order=i + 1,
-                metadata=metadata
+                metadata=metadata,
+                is_fallback=True
             )
 
             questions.append(question)

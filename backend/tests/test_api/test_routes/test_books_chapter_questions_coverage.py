@@ -182,6 +182,45 @@ async def test_generate_questions_ai_service_error_503(auth_client_factory):
 
 
 @pytest.mark.asyncio
+async def test_generate_questions_openai_outage_503_not_200(auth_client_factory):
+    """AC #182: a failing ``_make_openai_request`` must surface as a structured
+    503 through the full stack, not HTTP 200 with template questions."""
+    api = await auth_client_factory()
+    book_id = await _create_book(api)
+    chapter_id = await _create_chapter(api, book_id)
+
+    with patch(
+        "app.services.ai_service.ai_service._make_openai_request",
+        new=AsyncMock(side_effect=AIRateLimitError("OpenAI outage")),
+    ):
+        resp = await api.post(
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-questions",
+            json={"count": 5},
+        )
+    assert resp.status_code == 503
+    assert resp.json()["detail"]["error_code"] == "QUESTION_GENERATION_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_generate_questions_empty_ai_response_tagged_fallback(auth_client_factory):
+    """AI responded but yielded nothing usable -> 200 with template questions
+    explicitly tagged ``is_fallback`` so clients can tell real from fallback (#182)."""
+    api = await auth_client_factory()
+    book_id = await _create_book(api)
+    chapter_id = await _create_chapter(api, book_id)
+
+    with patch(AI_METHOD, new=AsyncMock(return_value=[])):
+        resp = await api.post(
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-questions",
+            json={"count": 5},
+        )
+    assert resp.status_code == 200, resp.text
+    questions = resp.json()["questions"]
+    assert len(questions) >= 1
+    assert all(q["is_fallback"] is True for q in questions)
+
+
+@pytest.mark.asyncio
 async def test_generate_questions_value_error_422(auth_client_factory):
     api = await auth_client_factory()
     book_id = await _create_book(api)
@@ -607,6 +646,27 @@ async def test_regenerate_questions_happy_path(auth_client_factory):
     data = resp.json()
     assert data["total"] >= 1
     assert len(data["questions"]) >= 1
+    # AI-generated questions are not tagged as fallback (#182).
+    assert all(q["is_fallback"] is False for q in data["questions"])
+
+
+@pytest.mark.asyncio
+async def test_regenerate_questions_openai_outage_503(auth_client_factory):
+    """The regeneration route maps a genuine OpenAI failure to 503 too (#182)."""
+    api = await auth_client_factory()
+    book_id = await _create_book(api)
+    chapter_id = await _create_chapter(api, book_id)
+
+    with patch(
+        "app.services.ai_service.ai_service._make_openai_request",
+        new=AsyncMock(side_effect=AIRateLimitError("OpenAI outage")),
+    ):
+        resp = await api.post(
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/regenerate-questions?preserve_responses=false",
+            json={"count": 4},
+        )
+    assert resp.status_code == 503
+    assert resp.json()["detail"]["error_code"] == "QUESTION_GENERATION_FAILED"
 
 
 @pytest.mark.asyncio
