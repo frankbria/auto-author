@@ -286,6 +286,10 @@ async def delete_all_user_books(user_auth_id: str) -> int:
     ratings and access logs go with it — atomically per book on a replica set.
     A failure propagates so the caller can abort before touching the user
     record (children first, parent last). Returns the number of books deleted.
+
+    ponytail: the id list is a snapshot — a book created mid-cascade survives.
+    Benign here (the owner is being deactivated); don't "fix" it with a
+    multi-book transaction, which standalone Mongo doesn't support.
     """
     ids = [
         str(doc["_id"])

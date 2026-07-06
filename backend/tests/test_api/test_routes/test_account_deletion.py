@@ -167,8 +167,41 @@ async def test_delete_by_auth_id_also_cascades(auth_client_factory):
 
     books = await get_collection("books")
     questions = await get_collection("questions")
+    responses = await get_collection("question_responses")
+    ratings = await get_collection("question_ratings")
+    access_logs = await get_collection("chapter_access_logs")
     assert await books.count_documents({"owner_id": owner_id}) == 0
     assert await questions.count_documents({"user_id": owner_id}) == 0
+    assert await responses.count_documents({"user_id": owner_id}) == 0
+    assert await ratings.count_documents({}) == 0
+    assert await access_logs.count_documents({"user_id": owner_id}) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_by_auth_id_cascade_failure_keeps_user_active(
+    auth_client_factory, monkeypatch
+):
+    """The /users/{auth_id} path also aborts before the user record when the
+    cascade fails (surfaced via that endpoint's pre-existing 504 mapping)."""
+    import app.api.endpoints.users as users_endpoint
+
+    client = await auth_client_factory(overrides={"is_active": True})
+    owner_id = "test-auth-id-123"
+    book_id = await _seed_book_with_children(owner_id)
+
+    async def _boom(user_auth_id):
+        raise RuntimeError("simulated mongo failure")
+
+    monkeypatch.setattr(users_endpoint, "delete_all_user_books", _boom)
+
+    response = await client.delete(f"/api/v1/users/{owner_id}")
+    assert response.status_code == 504
+
+    books = await get_collection("books")
+    users = await get_collection("users")
+    assert await books.find_one({"_id": ObjectId(book_id)}) is not None
+    user_doc = await users.find_one({"auth_id": owner_id})
+    assert user_doc["is_active"] is True
 
 
 @pytest.mark.asyncio
