@@ -170,3 +170,59 @@ class TestAIServiceDraftGeneration:
         # The _generate_improvement_suggestions method should return a list
         assert isinstance(result["suggestions"], list)
         assert len(result["suggestions"]) > 0
+
+    # -- Issue #181: drafts silently truncated to the 1000-token default --
+
+    @pytest.mark.asyncio
+    async def test_max_tokens_scaled_from_target_length(self, ai_service):
+        """The completion budget must scale with the requested word count."""
+        await ai_service.generate_chapter_draft(
+            chapter_title="Test",
+            chapter_description="Test",
+            question_responses=[],
+            book_metadata={},
+            target_length=2000,
+        )
+        call_args = ai_service.client.chat.completions.create.call_args
+        assert call_args[1]["max_tokens"] == 3200  # 2000 words * 1.6
+
+    @pytest.mark.asyncio
+    async def test_max_tokens_clamped_to_model_cap(self, ai_service):
+        """A huge target_length must not exceed the gpt-4 output cap."""
+        await ai_service.generate_chapter_draft(
+            chapter_title="Test",
+            chapter_description="Test",
+            question_responses=[],
+            book_metadata={},
+            target_length=10000,
+        )
+        call_args = ai_service.client.chat.completions.create.call_args
+        assert call_args[1]["max_tokens"] == 4000
+
+    @pytest.mark.asyncio
+    async def test_max_tokens_has_headroom_floor_for_small_targets(self, ai_service):
+        """Tiny targets get a 500-token floor so overshoot can't trip the guard."""
+        await ai_service.generate_chapter_draft(
+            chapter_title="Test",
+            chapter_description="Test",
+            question_responses=[],
+            book_metadata={},
+            target_length=100,
+        )
+        call_args = ai_service.client.chat.completions.create.call_args
+        assert call_args[1]["max_tokens"] == 500
+
+    @pytest.mark.asyncio
+    async def test_truncated_output_is_rejected_not_saved(self, ai_service):
+        """A length-truncated draft must fail loudly, not return success (#181)."""
+        ai_service.client.chat.completions.create.return_value.choices[0].finish_reason = "length"
+        result = await ai_service.generate_chapter_draft(
+            chapter_title="Test",
+            chapter_description="Test",
+            question_responses=[],
+            book_metadata={},
+            target_length=5000,
+        )
+        assert result["success"] is False
+        assert "cut off" in result["error"].lower() or "too long" in result["error"].lower()
+        assert result["draft"] == ""

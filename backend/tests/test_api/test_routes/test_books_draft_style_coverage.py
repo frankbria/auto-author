@@ -188,7 +188,8 @@ async def test_generate_draft_malformed_response_400(auth_client_factory):
 
 
 @pytest.mark.asyncio
-async def test_generate_draft_ai_returns_failure_500(auth_client_factory):
+async def test_generate_draft_ai_returns_failure_503(auth_client_factory):
+    """AI failure (incl. #181 truncation) surfaces its message as a 503, not a generic 500."""
     api = await auth_client_factory()
     book_id = await _create_book(api)
     chapter_id = await _seed_toc_chapter(book_id)
@@ -201,9 +202,8 @@ async def test_generate_draft_ai_returns_failure_500(auth_client_factory):
             f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-draft",
             json={"question_responses": _QA},
         )
-    # The failure HTTPException is re-wrapped by the broad except into a 500.
-    assert r.status_code == 500
-    assert r.json()["detail"] == "Error generating draft"
+    assert r.status_code == 503
+    assert r.json()["detail"] == "Failed to generate draft: model down"
 
 
 @pytest.mark.asyncio
