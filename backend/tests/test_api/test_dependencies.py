@@ -216,22 +216,72 @@ class TestRateLimiting:
     async def test_rate_limiter_window_reset(
         self, motor_reinit_db, real_rate_limiter
     ):
-        """A new window re-allows a user who exhausted the previous one."""
-        limiter = real_rate_limiter(limit=1, window=1)  # 1-second window
+        """A new window re-allows a user who exhausted the previous one.
+
+        The clock is patched so both windows are deterministic (no sleeps,
+        no boundary-straddle flakes on loaded CI).
+        """
+        limiter = real_rate_limiter(limit=1, window=60)
         request = _mock_request("/api/window-reset")
 
         with patch.object(deps.settings, "BYPASS_AUTH", False):
-            # Align to just after a window boundary so both calls land in one bucket
-            time.sleep(1.0 - (time.time() % 1.0) + 0.05)
+            with patch.object(deps.time, "time", return_value=1_000_000.0):
+                await limiter(request, current_user=USER_A)
+                with pytest.raises(HTTPException):
+                    await limiter(request, current_user=USER_A)
 
-            await limiter(request, current_user=USER_A)
-            with pytest.raises(HTTPException):
+            # Next window (one full window later)
+            with patch.object(deps.time, "time", return_value=1_000_060.0):
+                result = await limiter(request, current_user=USER_A)
+        assert result["remaining"] == 0
+
+    async def test_mongo_failure_fails_closed(self, real_rate_limiter):
+        """A store failure propagates (fail-closed) rather than waving traffic
+        through — auth on rate-limited endpoints already requires the same
+        Mongo, so this adds no new availability dependency."""
+        limiter = real_rate_limiter(limit=5, window=60)
+        request = _mock_request("/api/mongo-down")
+
+        with patch.object(deps.settings, "BYPASS_AUTH", False), patch.object(
+            deps, "increment_usage", side_effect=RuntimeError("mongo down")
+        ):
+            with pytest.raises(RuntimeError):
                 await limiter(request, current_user=USER_A)
 
-            time.sleep(1.0)  # next window
+    async def test_dependency_wiring_resolves_user_via_http(
+        self, motor_reinit_db, real_rate_limiter
+    ):
+        """End-to-end DI check: mounted via Depends(), the limiter resolves the
+        authenticated user itself and keys buckets per user (a regression that
+        drops the current_user sub-dependency fails this)."""
+        from fastapi import Depends, FastAPI
+        from httpx import ASGITransport, AsyncClient
 
-            result = await limiter(request, current_user=USER_A)
-        assert result["remaining"] == 0
+        from app.core.security import get_current_user_from_session
+
+        test_app = FastAPI()
+        active_user = {"value": USER_A}
+
+        @test_app.get("/limited")
+        async def limited(
+            rate_limit_info=Depends(real_rate_limiter(limit=1, window=60)),
+        ):
+            return {"ok": True}
+
+        test_app.dependency_overrides[get_current_user_from_session] = (
+            lambda: active_user["value"]
+        )
+
+        transport = ASGITransport(app=test_app)
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            async with AsyncClient(
+                transport=transport, base_url="http://test"
+            ) as client:
+                assert (await client.get("/limited")).status_code == 200
+                assert (await client.get("/limited")).status_code == 429
+
+                active_user["value"] = USER_B  # switch users → fresh bucket
+                assert (await client.get("/limited")).status_code == 200
 
     async def test_missing_user_id_falls_back_to_client_ip(
         self, motor_reinit_db, real_rate_limiter

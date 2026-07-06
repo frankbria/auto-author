@@ -66,7 +66,13 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
     also requires session auth, so FastAPI's per-request dependency cache makes
     the user lookup free) and persisted in Mongo via the same atomic
     ``$inc``+TTL counter as the AI quota (#173) — shared across uvicorn
-    workers, surviving restarts, self-evicting. Fixed epoch-aligned windows.
+    workers, surviving restarts, self-evicting.
+
+    Fixed epoch-aligned windows: a client can burst up to 2x the limit across
+    a window boundary (standard fixed-window tradeoff; the boundary is now
+    predictable, unlike the old first-request-anchored reset). Mongo failure
+    propagates (fail-closed) — auth on these endpoints already requires the
+    same Mongo, so there's no new blast radius.
 
     Args:
         limit: Maximum number of requests allowed in the time window
@@ -93,7 +99,7 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
             current_user.get("auth_id")
             or current_user.get("id")
             or current_user.get("clerk_id")
-            or request.client.host
+            or (request.client.host if request.client else "unknown")
         )
 
         now = time.time()
