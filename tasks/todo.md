@@ -27,13 +27,13 @@
 - [x] 2. **GREEN**: Mongo-backed per-user limiter in `dependencies.py`; deleted deprecated `rate_limit`/`rate_limit_cache` + their 3 tests + dead books.py import.
 - [x] 3. Ecosystem template: `--proxy-headers --forwarded-allow-ips=127.0.0.1` added.
 - [x] 4. Full backend suite: **1084 passed / 13 skipped, 91.87% cov**. Ruff: my files clean; 9 pre-existing books.py dead imports left alone (out of scope, #94 precedent).
-- [ ] 5. Deslop scan (clean — small diff, −112 net lines); pre-PR third-party review (opencode/GLM primary); PR; demo; CI gate; docs sync; merge.
+- [x] 5. Deslop clean; opencode (GLM) review ×3 rounds (5 fixed, M1/M2/M3 rebutted+verified, triage posted to PR #230); demo posted (real uvicorn 2-workers + real better-auth sessions, all 3 ACs evidenced incl. restart-persistence 429); docs synced (CLAUDE.md).
 
 ## Acceptance criteria
 
-- [ ] Uvicorn runs with `--proxy-headers --forwarded-allow-ips=<nginx>` (ecosystem template; verified staging nginx sends XFF from localhost).
-- [ ] Limiter uses a shared store consistent across workers/restarts and keys per authenticated user.
-- [ ] Test asserts two different users don't share a bucket.
+- [x] Uvicorn runs with `--proxy-headers --forwarded-allow-ips=<nginx>` (ecosystem template; verified staging nginx sends XFF from localhost).
+- [x] Limiter uses a shared store consistent across workers/restarts and keys per authenticated user.
+- [x] Test asserts two different users don't share a bucket.
 
 ## Out of scope
 
