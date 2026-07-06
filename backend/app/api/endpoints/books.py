@@ -2621,7 +2621,7 @@ async def generate_chapter_draft(
 
         if not result.get("success"):
             raise HTTPException(
-                status_code=500,
+                status_code=503,
                 detail=f"Failed to generate draft: {result.get('error', 'Unknown error')}"
             )
 
@@ -2660,6 +2660,8 @@ async def generate_chapter_draft(
             "message": "Draft generated successfully"
         }
 
+    except HTTPException:
+        raise
     except Exception:
         logger.error("Error generating draft", exc_info=True)
         raise HTTPException(

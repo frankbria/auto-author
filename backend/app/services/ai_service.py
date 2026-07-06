@@ -38,6 +38,12 @@ from app.services.ai_cache_service import (
 
 logger = logging.getLogger(__name__)
 
+# Draft-generation token budget (#181): ~1.6 tokens per English word, clamped
+# to a conservative gpt-4 output cap that leaves prompt headroom in the 8192
+# context window (matches the fixed max_tokens=4000 the sibling methods use).
+DRAFT_WORDS_TO_TOKENS_FACTOR = 1.6
+DRAFT_MAX_COMPLETION_TOKENS = 4000
+
 
 class AIService:
     """
@@ -932,11 +938,31 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 {"role": "user", "content": prompt}
             ]
 
+            # Floor of 500 gives small targets headroom so a modest overshoot
+            # can't spuriously trip the truncation guard below.
+            max_tokens = min(
+                max(int(target_length * DRAFT_WORDS_TO_TOKENS_FACTOR), 500),
+                DRAFT_MAX_COMPLETION_TOKENS,
+            )
             response = await self._make_openai_request(
-                messages, temperature=0.8
+                messages, temperature=0.8, max_tokens=max_tokens
             )
 
-            draft_content = response.choices[0].message.content
+            choice = response.choices[0]
+            # Refuse to return a truncated draft: it would be inserted into the
+            # editor as-is with success:true, silently losing content (#181).
+            if getattr(choice, "finish_reason", None) == "length":
+                return {
+                    "success": False,
+                    "error": (
+                        "The generated draft was cut off before it finished. "
+                        "Try a shorter target length."
+                    ),
+                    "draft": "",
+                    "metadata": {},
+                }
+
+            draft_content = choice.message.content
 
             # Calculate metadata
             word_count = len(draft_content.split())
