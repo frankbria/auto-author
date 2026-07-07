@@ -188,6 +188,30 @@ async def test_generate_chapter_questions(ai_service):
 
 
 @pytest.mark.asyncio
+async def test_generate_chapter_questions_reraises_ai_service_error(ai_service):
+    """A genuine OpenAI failure must propagate, not become an empty list (#182)."""
+    from app.services.ai_errors import AIRateLimitError, AIServiceError
+
+    with patch.object(ai_service, '_make_openai_request',
+                      AsyncMock(side_effect=AIRateLimitError("rate limited"))):
+        with pytest.raises(AIServiceError) as exc_info:
+            await ai_service.generate_chapter_questions(prompt="Generate questions", count=3)
+
+    assert exc_info.value.retryable is True
+    assert exc_info.value.error_code == "AI_RATE_LIMIT"
+
+
+@pytest.mark.asyncio
+async def test_generate_chapter_questions_non_ai_error_returns_empty(ai_service):
+    """Non-AI unexpected errors keep the conservative empty-list path (#182)."""
+    with patch.object(ai_service, '_make_openai_request',
+                      AsyncMock(side_effect=RuntimeError("unexpected"))):
+        result = await ai_service.generate_chapter_questions(prompt="Generate questions", count=3)
+
+    assert result == []
+
+
+@pytest.mark.asyncio
 async def test_generate_chapter_draft(ai_service):
     """Test chapter draft generation"""
     # Mock OpenAI response

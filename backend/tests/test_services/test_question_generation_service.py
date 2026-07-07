@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.services.ai_errors import AIRateLimitError, AIServiceError
 from app.services.question_generation_service import (
     QuestionGenerationService,
     get_question_generation_service,
@@ -207,6 +208,23 @@ class TestProcessGeneratedQuestions:
         )
         assert len(result) == 5  # fallback questions (line 528)
         assert all(isinstance(q, QuestionCreate) for q in result)
+        assert all(q.is_fallback is True for q in result)  # tagged templates (#182)
+
+    def test_mixed_ai_and_fallback_tagging(self, service):
+        # One valid AI question + count=3 -> template fill; only the fill is
+        # tagged, so a mixed response gives clients per-question provenance (#182).
+        raw = [
+            {"question_text": "A single valid AI question about the plot here?", "question_type": "plot", "difficulty": "medium"}
+        ]
+        result = service._process_generated_questions(
+            raw_questions=raw,
+            book_id="book-1",
+            chapter_id="ch-1",
+            count=3,
+        )
+        assert len(result) == 3
+        assert result[0].is_fallback is False
+        assert all(q.is_fallback is True for q in result[1:])
 
     def test_skips_short_and_unsafe_then_fills_fallback(self, service):
         raw = [
@@ -312,15 +330,55 @@ class TestGenerateChapterQuestions:
             book_metadata={},
             count=4,
         )
-        # fallback path (404-407)
+        # fallback path (404-407) — templates must be tagged so they can't
+        # masquerade as AI output (#182)
         assert len(result) == 4
         assert all(isinstance(q, QuestionCreate) for q in result)
+        assert all(q.is_fallback is True for q in result)
+
+    async def test_ai_service_error_propagates(self, service, mock_ai_service):
+        """A structured AI outage must raise, not silently become templates (#182)."""
+        mock_ai_service.generate_chapter_questions.side_effect = AIRateLimitError("outage")
+        with pytest.raises(AIServiceError):
+            await service.generate_chapter_questions(
+                book_id="book-1",
+                chapter_id="ch-1",
+                chapter_title="Ch",
+                chapter_content="",
+                book_metadata={},
+                count=4,
+            )
+
+    async def test_ai_path_questions_not_tagged_fallback(self, service, mock_ai_service):
+        mock_ai_service.generate_chapter_questions.return_value = [
+            {"question_text": f"A solid AI question number {i} for testing?", "question_type": "plot", "difficulty": "medium"}
+            for i in range(3)
+        ]
+        result = await service.generate_chapter_questions(
+            book_id="book-1",
+            chapter_id="ch-1",
+            chapter_title="Ch",
+            chapter_content="content",
+            book_metadata={},
+            count=3,
+        )
+        assert all(q.is_fallback is False for q in result)
 
 
 # --------------------------------------------------------------------------- #
 # generate_questions_for_chapter (full async orchestration)
 # --------------------------------------------------------------------------- #
 class TestGenerateQuestionsForChapter:
+    async def test_ai_service_error_propagates_to_caller(self, service, mock_ai_service):
+        """The orchestration layer must not re-swallow structured AI errors (#182)."""
+        book = {"title": "Bk", "table_of_contents": {"chapters": []}}
+        mock_ai_service.generate_chapter_questions.side_effect = AIRateLimitError("outage")
+        with patch(f"{MODULE}.get_book_by_id", AsyncMock(return_value=book)):
+            with pytest.raises(AIServiceError):
+                await service.generate_questions_for_chapter(
+                    book_id="book-1", chapter_id="ch-1", user_id="u1"
+                )
+
     async def test_book_not_found_raises(self, service):
         with patch(f"{MODULE}.get_book_by_id", AsyncMock(return_value=None)):
             with pytest.raises(ValueError, match="Book not found"):

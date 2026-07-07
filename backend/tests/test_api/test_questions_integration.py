@@ -14,6 +14,7 @@ verifying that all components work together correctly:
 """
 
 import pytest
+from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
 from datetime import datetime, timezone
 from bson import ObjectId
@@ -25,6 +26,30 @@ from app.schemas.book import (
     QuestionDifficulty,
     ResponseStatus,
 )
+
+AI_METHOD = "app.services.ai_service.ai_service.generate_chapter_questions"
+
+
+@pytest.fixture(autouse=True)
+def _deterministic_ai():
+    """Patch the AI boundary so question generation succeeds deterministically.
+
+    These lifecycle tests previously leaned on the unconfigured OpenAI key being
+    swallowed into template fallbacks; since #182 genuine AI failures correctly
+    surface as structured errors, so the AI method must be patched for 200 paths.
+    """
+    async def _fake(prompt, count=10):
+        return [
+            {
+                "question_text": f"What is the driving idea behind section {i} of this chapter?",
+                "question_type": "plot",
+                "difficulty": "medium",
+            }
+            for i in range(count)
+        ]
+
+    with patch(AI_METHOD, new=AsyncMock(side_effect=_fake)):
+        yield
 
 
 # Helper functions for test data creation
