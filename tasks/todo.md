@@ -12,17 +12,17 @@ Wire `ChapterTabIndexManager(base._db).create_all_indexes()` into the existing l
 **One justified deviation**: drop the `chapter_content_text_idx` spec from `create_book_toc_indexes`. No `$text` query exists anywhere in `app/`; a text index over every chapter's full content re-tokenizes on each 3s autosave — pure write amplification with zero readers. AC only requires the `owner_id` and TTL indexes ("or equivalent").
 
 ## Changes
-- [ ] 1. RED: `backend/tests/test_startup_indexes.py`
+- [x] 1. RED: `backend/tests/test_startup_indexes.py`
   - `create_all_indexes()` → books has `owner_book_id_idx` + `owner_updated_idx`; `chapter_access_logs` has `access_logs_ttl_idx` with `expireAfterSeconds == 7776000` (90 days) + the 4 access-pattern indexes.
   - Idempotent: run twice, no error, indexes intact.
   - No text index on books (regression for the removal).
   - Lifespan wiring: patch `ChapterTabIndexManager.create_all_indexes`, run `app.router.lifespan_context(app)`, assert awaited.
   - NB memory `motor-reinit-drop-index-race`: warm both collections with a real insert before creating/asserting indexes.
-- [ ] 2. GREEN: `backend/app/main.py` lifespan — instantiate `ChapterTabIndexManager` on `app.db.base._db` (module attribute at call time, so test rebinds are honored) and await `create_all_indexes()`.
-- [ ] 3. GREEN: `backend/app/db/indexing_strategy.py` — remove the text-index spec.
-- [ ] 4. Gates: full backend suite + coverage, ruff.
-- [ ] 5. opencode (GLM) pre-PR review on branch diff.
-- [ ] 6. PR → post-PR review comment → demo (real Mongo: startup creates indexes, TTL visible via `listIndexes`) → CI green → merge.
+- [x] 2. GREEN: `backend/app/main.py` lifespan — instantiate `ChapterTabIndexManager` on `app.db.base._db` (module attribute at call time, so test rebinds are honored) and await `create_all_indexes()`.
+- [x] 3. GREEN: `backend/app/db/indexing_strategy.py` — remove the text-index spec.
+- [x] 4. Gates: full backend suite + coverage, ruff.
+- [x] 5. opencode (GLM) pre-PR review on branch diff.
+- [x] 6. PR → post-PR review comment → demo (real Mongo: startup creates indexes, TTL visible via `listIndexes`) → CI green → merge.
 
 ## Acceptance criteria mapping
 1. `create_all_indexes()` runs at lifespan startup, idempotent → change 2 + lifespan-wiring test.
