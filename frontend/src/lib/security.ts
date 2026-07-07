@@ -104,6 +104,46 @@ export function sanitizeUrl(url: string): string {
 }
 
 /**
+ * Validate a post-auth redirect target, allowing only same-origin relative
+ * paths. Anything else (absolute URLs, protocol-relative //host, backslash
+ * variants, scheme prefixes, embedded ://) falls back to /dashboard —
+ * prevents open-redirect phishing via ?redirect on the sign-in page.
+ */
+export function sanitizeRedirectPath(path: string | null): string {
+  const fallback = '/dashboard';
+  if (typeof path !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = path.trim();
+
+  // Validate against the percent-decoded value so encoded separators
+  // (%2F, %5C) can't smuggle "//host" or "\" past the checks; the original
+  // (still-encoded) path is what gets returned.
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(trimmed);
+  } catch {
+    return fallback; // malformed percent-encoding
+  }
+
+  // Must be a single-slash-rooted path: not "//host", not "/\host",
+  // no backslashes, no protocol separator, no control characters.
+  if (
+    !trimmed.startsWith('/') ||
+    decoded.startsWith('//') ||
+    decoded.includes('\\') ||
+    decoded.includes('://') ||
+    // eslint-disable-next-line no-control-regex
+    /[\x00-\x1f\x7f]/.test(decoded)
+  ) {
+    return fallback;
+  }
+
+  return trimmed;
+}
+
+/**
  * Sanitize file names to prevent path traversal
  */
 export function sanitizeFileName(fileName: string): string {

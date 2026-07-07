@@ -16,6 +16,7 @@ import {
   sanitizeText,
   sanitizeEmail,
   sanitizeUrl,
+  sanitizeRedirectPath,
   sanitizeFileName,
   loginRateLimiter,
   apiRateLimiter,
@@ -292,6 +293,80 @@ describe('sanitizeUrl', () => {
 
   it('trims whitespace around the URL', () => {
     expect(sanitizeUrl('  https://example.com  ')).toBe('https://example.com');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sanitizeRedirectPath
+// ---------------------------------------------------------------------------
+
+describe('sanitizeRedirectPath', () => {
+  it('allows same-origin relative paths', () => {
+    expect(sanitizeRedirectPath('/dashboard/books/123')).toBe('/dashboard/books/123');
+    expect(sanitizeRedirectPath('/profile?tab=security#top')).toBe('/profile?tab=security#top');
+    expect(sanitizeRedirectPath('/')).toBe('/');
+  });
+
+  it('rejects protocol-relative URLs (//evil.com)', () => {
+    expect(sanitizeRedirectPath('//evil.com')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('//evil.com/phish')).toBe('/dashboard');
+  });
+
+  it('rejects absolute external URLs (https://evil.com)', () => {
+    expect(sanitizeRedirectPath('https://evil.com')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('http://evil.com')).toBe('/dashboard');
+  });
+
+  it('rejects javascript: and other scheme inputs', () => {
+    expect(sanitizeRedirectPath('javascript:alert(1)')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('JavaScript:void(0)')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('data:text/html,<h1>x</h1>')).toBe('/dashboard');
+  });
+
+  it('rejects backslash variants browsers normalize to //', () => {
+    expect(sanitizeRedirectPath('/\\evil.com')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('\\\\evil.com')).toBe('/dashboard');
+  });
+
+  it('rejects paths that embed a protocol separator (per AC)', () => {
+    expect(sanitizeRedirectPath('/redirect?url=https://evil.com')).toBe('/dashboard');
+  });
+
+  it('rejects percent-encoded separator smuggling', () => {
+    expect(sanitizeRedirectPath('/%2F%2Fevil.com')).toBe('/dashboard'); // decodes to ///evil.com
+    expect(sanitizeRedirectPath('/%2Fevil.com')).toBe('/dashboard'); // decodes to //evil.com
+    expect(sanitizeRedirectPath('/%5Cevil.com')).toBe('/dashboard'); // decodes to /\evil.com
+    expect(sanitizeRedirectPath('/search?q=https%3A%2F%2Fevil.com')).toBe('/dashboard');
+  });
+
+  it('rejects malformed percent-encoding (including bare % in legit-looking paths)', () => {
+    expect(sanitizeRedirectPath('/%E0%A4%A')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('/%C0%AFevil.com')).toBe('/dashboard'); // overlong UTF-8 /
+    expect(sanitizeRedirectPath('/promo/50%off')).toBe('/dashboard'); // deliberate: bare % falls back
+  });
+
+  it('allows double-encoded input (deliberate: single decode matches browser behavior)', () => {
+    // Decodes once to /%2F%2Fevil.com — still a slash-rooted relative path in
+    // every sink; no consumer double-decodes.
+    expect(sanitizeRedirectPath('/%252F%252Fevil.com')).toBe('/%252F%252Fevil.com');
+  });
+
+  it('rejects control characters and whitespace smuggling', () => {
+    expect(sanitizeRedirectPath('/dash\r\nboard')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('/dash%0D%0Aboard')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('/evil\x00.com')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('/\t/evil.com')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('  //evil.com')).toBe('/dashboard'); // trim doesn't rescue //
+  });
+
+  it('still allows benign percent-encoded path characters', () => {
+    expect(sanitizeRedirectPath('/books/My%20Book')).toBe('/books/My%20Book');
+  });
+
+  it('falls back for null, empty, and non-path values', () => {
+    expect(sanitizeRedirectPath(null)).toBe('/dashboard');
+    expect(sanitizeRedirectPath('')).toBe('/dashboard');
+    expect(sanitizeRedirectPath('dashboard')).toBe('/dashboard');
   });
 });
 
