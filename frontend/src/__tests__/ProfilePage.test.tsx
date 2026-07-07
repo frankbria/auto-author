@@ -497,6 +497,8 @@ describe('UserProfile page authentication guard (#185)', () => {
     });
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(screen.queryByText('Save Changes')).not.toBeInTheDocument();
+    // The issue's stated risk surface: delete-account UI must not render.
+    expect(screen.queryByText(/delete account/i)).not.toBeInTheDocument();
   });
 
   it('shows a loading state (not the form) while the session is pending', () => {

@@ -155,183 +155,183 @@ export default function UserProfile() {
 
   return (
     <ProtectedRoute>
-    <div className="container mx-auto max-w-2xl py-8">
-      <h1 className="mb-8 text-3xl font-bold">Profile</h1>
+      <div className="container mx-auto max-w-2xl py-8">
+        <h1 className="mb-8 text-3xl font-bold">Profile</h1>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-8">
-        {/* Avatar */}
-        <section className="space-y-2">
-          <Label>Profile picture</Label>
-          <ProfilePictureUpload currentAvatarUrl={avatarUrl} onUploaded={setAvatarUrl} />
-        </section>
+        <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-8">
+          {/* Avatar */}
+          <section className="space-y-2">
+            <Label>Profile picture</Label>
+            <ProfilePictureUpload currentAvatarUrl={avatarUrl} onUploaded={setAvatarUrl} />
+          </section>
 
-        {/* Basic info */}
-        <section className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={user?.email ?? ''} disabled readOnly />
+          {/* Basic info */}
+          <section className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={user?.email ?? ''} disabled readOnly />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First name</Label>
+                  <Input id="firstName" {...field} />
+                  {errors.firstName?.message && (
+                    <p role="alert" className="text-destructive text-sm">
+                      {String(errors.firstName.message)}
+                    </p>
+                  )}
+                </div>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last name</Label>
+                  <Input id="lastName" {...field} />
+                  {errors.lastName?.message && (
+                    <p role="alert" className="text-destructive text-sm">
+                      {String(errors.lastName.message)}
+                    </p>
+                  )}
+                </div>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="displayName"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Display name</Label>
+                  <Input id="displayName" placeholder="Name shown to readers" {...field} />
+                  {errors.displayName?.message && (
+                    <p role="alert" className="text-destructive text-sm">
+                      {String(errors.displayName.message)}
+                    </p>
+                  )}
+                </div>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="bio"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <textarea
+                    id="bio"
+                    className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    placeholder="Tell readers about yourself. Markdown is supported."
+                    {...field}
+                  />
+                  {errors.bio?.message && (
+                    <p role="alert" className="text-destructive text-sm">
+                      {String(errors.bio.message)}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground text-right text-xs">
+                    {bioValue.length}/{BIO_MAX}
+                  </p>
+                </div>
+              )}
+            />
+          </section>
+
+          {/* Preferences */}
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">Preferences</h2>
+
+            <FormField
+              control={form.control}
+              name="theme"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <Label htmlFor="theme">Theme</Label>
+                  <select
+                    id="theme"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={field.value}
+                    onChange={field.onChange}
+                  >
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="system">System</option>
+                  </select>
+                </div>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="emailNotifications"
+              render={({ field }) => (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="emailNotifications">Email notifications</Label>
+                  <Switch
+                    id="emailNotifications"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </div>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="marketingEmails"
+              render={({ field }) => (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="marketingEmails">Marketing emails</Label>
+                  <Switch
+                    id="marketingEmails"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </div>
+              )}
+            />
+          </section>
+
+          <div className="flex items-center justify-between">
+            <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
+              Delete Account
+            </Button>
+            <Button type="submit">Save Changes</Button>
           </div>
+        </form>
 
-          <FormField
-            control={form.control}
-            name="firstName"
-            render={({ field }) => (
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First name</Label>
-                <Input id="firstName" {...field} />
-                {errors.firstName?.message && (
-                  <p role="alert" className="text-destructive text-sm">
-                    {String(errors.firstName.message)}
-                  </p>
-                )}
-              </div>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="lastName"
-            render={({ field }) => (
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
-                <Input id="lastName" {...field} />
-                {errors.lastName?.message && (
-                  <p role="alert" className="text-destructive text-sm">
-                    {String(errors.lastName.message)}
-                  </p>
-                )}
-              </div>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="displayName"
-            render={({ field }) => (
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Display name</Label>
-                <Input id="displayName" placeholder="Name shown to readers" {...field} />
-                {errors.displayName?.message && (
-                  <p role="alert" className="text-destructive text-sm">
-                    {String(errors.displayName.message)}
-                  </p>
-                )}
-              </div>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="bio"
-            render={({ field }) => (
-              <div className="space-y-2">
-                <Label htmlFor="bio">Bio</Label>
-                <textarea
-                  id="bio"
-                  className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="Tell readers about yourself. Markdown is supported."
-                  {...field}
-                />
-                {errors.bio?.message && (
-                  <p role="alert" className="text-destructive text-sm">
-                    {String(errors.bio.message)}
-                  </p>
-                )}
-                <p className="text-muted-foreground text-right text-xs">
-                  {bioValue.length}/{BIO_MAX}
-                </p>
-              </div>
-            )}
-          />
-        </section>
-
-        {/* Preferences */}
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Preferences</h2>
-
-          <FormField
-            control={form.control}
-            name="theme"
-            render={({ field }) => (
-              <div className="space-y-2">
-                <Label htmlFor="theme">Theme</Label>
-                <select
-                  id="theme"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={field.value}
-                  onChange={field.onChange}
-                >
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                  <option value="system">System</option>
-                </select>
-              </div>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="emailNotifications"
-            render={({ field }) => (
-              <div className="flex items-center justify-between">
-                <Label htmlFor="emailNotifications">Email notifications</Label>
-                <Switch
-                  id="emailNotifications"
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </div>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="marketingEmails"
-            render={({ field }) => (
-              <div className="flex items-center justify-between">
-                <Label htmlFor="marketingEmails">Marketing emails</Label>
-                <Switch
-                  id="marketingEmails"
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </div>
-            )}
-          />
-        </section>
-
-        <div className="flex items-center justify-between">
-          <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
-            Delete Account
-          </Button>
-          <Button type="submit">Save Changes</Button>
-        </div>
-      </form>
-
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete account</DialogTitle>
-            <DialogDescription>
-              This permanently deletes your account and all your books. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDeleteAccount}
-              disabled={deleting}
-            >
-              {deleting ? 'Deleting…' : 'Delete account'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete account</DialogTitle>
+              <DialogDescription>
+                This permanently deletes your account and all your books. This cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting…' : 'Delete account'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </ProtectedRoute>
   );
 }
