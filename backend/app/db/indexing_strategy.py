@@ -1,7 +1,6 @@
 # Database Indexing Strategy for Chapter Tabs Functionality
 # This file contains MongoDB index definitions to optimize chapter access patterns
 
-from typing import Dict, List
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
 
@@ -92,19 +91,8 @@ class ChapterTabIndexManager:
                 "name": "owner_updated_idx",
                 "background": True,
             },
-            # Text index for chapter content search (if needed)
-            {
-                "keys": [
-                    ("table_of_contents.chapters.title", "text"),
-                    ("table_of_contents.chapters.content", "text"),
-                ],
-                "name": "chapter_content_text_idx",
-                "background": True,
-                "weights": {
-                    "table_of_contents.chapters.title": 10,
-                    "table_of_contents.chapters.content": 1,
-                },
-            },
+            # No text index: nothing queries $text, and indexing full chapter
+            # content would re-tokenize on every 3s autosave (issue #183).
         ]
 
         for index_spec in indexes:
