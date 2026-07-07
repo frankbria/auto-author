@@ -10,10 +10,13 @@ import { middleware } from '../middleware';
 
 const BASE = 'http://localhost:3000';
 
-function requestFor(path: string, withSession = false): NextRequest {
+function requestFor(
+  path: string,
+  cookieName?: 'better-auth.session_token' | '__Secure-better-auth.session_token'
+): NextRequest {
   const req = new NextRequest(`${BASE}${path}`);
-  if (withSession) {
-    req.cookies.set('better-auth.session_token', 'session-token-value');
+  if (cookieName) {
+    req.cookies.set(cookieName, 'session-token-value');
   }
   return req;
 }
@@ -38,7 +41,15 @@ describe('middleware route protection', () => {
   });
 
   it('allows /profile through with a session cookie', async () => {
-    const res = await middleware(requestFor('/profile', true));
+    const res = await middleware(requestFor('/profile', 'better-auth.session_token'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('allows /profile through with the production (HTTPS) session cookie', async () => {
+    const res = await middleware(
+      requestFor('/profile', '__Secure-better-auth.session_token')
+    );
     expect(res.status).toBe(200);
     expect(res.headers.get('location')).toBeNull();
   });

@@ -9,10 +9,11 @@
 - `ProtectedRoute` pushes `/auth/sign-in` without the redirect param — same as dashboard, consistent, not in scope.
 
 ## Steps (TDD)
-1. [ ] Tests first:
-   - `src/__tests__/middleware.test.ts` (node env): `/profile` without session cookie → redirect to `/auth/sign-in?redirect=/profile`; with cookie → pass; `/dashboard` regression; public `/` passes.
-   - `ProfilePage.test.tsx`: unauthenticated (`data: null, isPending: false`) → `router.push('/auth/sign-in')`, profile form NOT rendered; `isPending` → loading state, form not rendered.
-2. [ ] `middleware.ts`: `isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/profile')`.
-3. [ ] `app/profile/page.tsx`: wrap page JSX in `<ProtectedRoute>` (same as `dashboard/layout.tsx`).
-4. [ ] Full frontend suite + lint + typecheck.
-5. [ ] Deslop scan, quality gate (opencode GLM pre-PR review), PR, post-PR review, demo (two real dev servers: main leaks profile page unauthenticated vs branch redirects), CI, merge.
+1. [x] Tests first:
+   - `src/__tests__/middleware.test.ts` (node env): `/profile` without session cookie → redirect to `/auth/sign-in?redirect=/profile`; with cookie (both dev + `__Secure-` prod names) → pass; `/dashboard` regression; public `/` passes.
+   - `ProfilePage.test.tsx`: unauthenticated (`data: null, isPending: false`) → `router.push('/auth/sign-in')`, profile form + delete-account UI NOT rendered; `isPending` → loading state; authenticated regression.
+2. [x] `middleware.ts`: `isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/profile')`.
+3. [x] `app/profile/page.tsx`: wrap page JSX in `<ProtectedRoute>` (same as `dashboard/layout.tsx`). Side effect: `jest.setup.ts` browser globals guarded for node-env suites.
+4. [x] Full frontend suite (110 suites, 2035 passed / 8 skipped) + lint 0 errors + typecheck clean.
+5. [x] PR #238. opencode (GLM) pre-PR ×2 rounds → "clean to merge" (M2 indent + N2 assertion fixed; M1/M3/M4/N1/N3 rebutted). Post-PR fresh session → "clean to merge" (M1 `__Secure-` cookie test added; N4 deep-link drop filed as #239).
+6. [ ] Demo (hard gate), CI green, merge.
