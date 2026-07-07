@@ -8,14 +8,19 @@ if (typeof global.TextEncoder === 'undefined') {
   global.TextDecoder = TextDecoder;
 }
 
+// Browser-global setup only applies under jsdom; node-environment suites
+// (e.g. middleware.test.ts) skip it.
+const hasWindow = typeof window !== 'undefined';
+
 // Clear localStorage before each test to prevent JSON parse errors
 beforeEach(() => {
+  if (!hasWindow) return;
   localStorage.clear();
   sessionStorage.clear();
 });
 
 // Mock window.matchMedia for responsive component tests
-Object.defineProperty(window, 'matchMedia', {
+if (hasWindow) Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: jest.fn().mockImplementation(query => ({
     matches: false,
@@ -58,13 +63,15 @@ class MockSpeechRecognition {
   abort = jest.fn();
 }
 
-// @ts-expect-error - Mocking global Speech Recognition
-window.SpeechRecognition = MockSpeechRecognition;
-// @ts-expect-error - Mocking global webkit Speech Recognition
-window.webkitSpeechRecognition = MockSpeechRecognition;
+if (hasWindow) {
+  // @ts-expect-error - Mocking global Speech Recognition
+  window.SpeechRecognition = MockSpeechRecognition;
+  // @ts-expect-error - Mocking global webkit Speech Recognition
+  window.webkitSpeechRecognition = MockSpeechRecognition;
+}
 
 // Mock Media Devices API
-Object.defineProperty(navigator, 'mediaDevices', {
+if (hasWindow) Object.defineProperty(navigator, 'mediaDevices', {
   writable: true,
   value: {
     getUserMedia: jest.fn().mockResolvedValue({
@@ -110,22 +117,23 @@ jest.mock('date-fns', () => ({
   format: jest.fn((date) => new Date(date).toISOString()),
 }), { virtual: true });
 
-// Mock hasPointerCapture for Radix UI Select components
-if (typeof Element.prototype.hasPointerCapture === 'undefined') {
-  Element.prototype.hasPointerCapture = jest.fn().mockReturnValue(false);
-}
+// Mock pointer-capture + scrollIntoView for Radix UI Select components
+if (typeof Element !== 'undefined') {
+  if (typeof Element.prototype.hasPointerCapture === 'undefined') {
+    Element.prototype.hasPointerCapture = jest.fn().mockReturnValue(false);
+  }
 
-if (typeof Element.prototype.setPointerCapture === 'undefined') {
-  Element.prototype.setPointerCapture = jest.fn();
-}
+  if (typeof Element.prototype.setPointerCapture === 'undefined') {
+    Element.prototype.setPointerCapture = jest.fn();
+  }
 
-if (typeof Element.prototype.releasePointerCapture === 'undefined') {
-  Element.prototype.releasePointerCapture = jest.fn();
-}
+  if (typeof Element.prototype.releasePointerCapture === 'undefined') {
+    Element.prototype.releasePointerCapture = jest.fn();
+  }
 
-// Mock scrollIntoView for Radix UI Select components
-if (typeof Element.prototype.scrollIntoView === 'undefined') {
-  Element.prototype.scrollIntoView = jest.fn();
+  if (typeof Element.prototype.scrollIntoView === 'undefined') {
+    Element.prototype.scrollIntoView = jest.fn();
+  }
 }
 
 // Mock ResizeObserver for Radix UI components

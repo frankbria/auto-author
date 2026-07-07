@@ -34,7 +34,8 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Define protected routes
-  const isProtectedRoute = pathname.startsWith('/dashboard');
+  const isProtectedRoute =
+    pathname.startsWith('/dashboard') || pathname.startsWith('/profile');
 
   // Skip session check for public routes
   if (!isProtectedRoute) {

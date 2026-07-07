@@ -1,30 +1,18 @@
-# Issue #183 — DB indexes never created at startup + unbounded chapter_access_logs (no TTL)
+# Issue #185 — [P1.5] /profile route has no authentication guard
 
-**Plan source**: self-authored from issue body (no plan comment). Issue evidence verified 2026-07-06 — all cited lines accurate: `main.py:69-72` only runs question+user indexes; `ChapterTabIndexManager` (`app/db/indexing_strategy.py`) holds the book `owner_id` indexes and the 90-day access-log TTL but has zero runtime callers (only an unmounted migration script + one integration test). No architectural fork → approved autonomously.
+**Plan source**: self-authored (no plan comment on issue). No architectural fork — AC permits either guard; we apply both to mirror the dashboard exactly → approved autonomously.
 
-## Problem
-- Dashboard `find({owner_id})` (`app/db/book.py:67`) full-scans books.
-- `chapter_access_logs` written on ~every read/edit, never expires, analytics queries unindexed.
+## Findings
+- `middleware.ts:37` protects only `/dashboard*`; `app/profile/page.tsx` uses `useSession` but never guards/redirects → profile page (edit name/bio, delete-account UI) renders for unauthenticated visitors.
+- Dashboard fails closed via BOTH middleware (server redirect + `?redirect=` deep link) and `ProtectedRoute` in `dashboard/layout.tsx` (client guard); profile has neither.
+- `?redirect=/profile` flows into #184's `sanitizeRedirectPath` — relative path, so deep-link back after sign-in works.
+- `ProtectedRoute` pushes `/auth/sign-in` without the redirect param — same as dashboard, consistent, not in scope.
 
-## Design
-Wire `ChapterTabIndexManager(base._db).create_all_indexes()` into the existing lifespan startup block, right after `ensure_user_indexes()`. The manager is already idempotent and per-index try/except (a failed index logs, never bricks startup) — matches the `ensure_user_indexes` pattern.
-
-**One justified deviation**: drop the `chapter_content_text_idx` spec from `create_book_toc_indexes`. No `$text` query exists anywhere in `app/`; a text index over every chapter's full content re-tokenizes on each 3s autosave — pure write amplification with zero readers. AC only requires the `owner_id` and TTL indexes ("or equivalent").
-
-## Changes
-- [x] 1. RED: `backend/tests/test_startup_indexes.py`
-  - `create_all_indexes()` → books has `owner_book_id_idx` + `owner_updated_idx`; `chapter_access_logs` has `access_logs_ttl_idx` with `expireAfterSeconds == 7776000` (90 days) + the 4 access-pattern indexes.
-  - Idempotent: run twice, no error, indexes intact.
-  - No text index on books (regression for the removal).
-  - Lifespan wiring: patch `ChapterTabIndexManager.create_all_indexes`, run `app.router.lifespan_context(app)`, assert awaited.
-  - NB memory `motor-reinit-drop-index-race`: warm both collections with a real insert before creating/asserting indexes.
-- [x] 2. GREEN: `backend/app/main.py` lifespan — instantiate `ChapterTabIndexManager` on `app.db.base._db` (module attribute at call time, so test rebinds are honored) and await `create_all_indexes()`.
-- [x] 3. GREEN: `backend/app/db/indexing_strategy.py` — remove the text-index spec.
-- [x] 4. Gates: full backend suite + coverage, ruff.
-- [x] 5. opencode (GLM) pre-PR review on branch diff.
-- [x] 6. PR → post-PR review comment → demo (real Mongo: startup creates indexes, TTL visible via `listIndexes`) → CI green → merge.
-
-## Acceptance criteria mapping
-1. `create_all_indexes()` runs at lifespan startup, idempotent → change 2 + lifespan-wiring test.
-2. 90-day TTL index exists → TTL assertion test + demo `listIndexes` evidence.
-3. Test asserts `owner_id` + TTL indexes exist after startup → `test_startup_indexes.py`.
+## Steps (TDD)
+1. [ ] Tests first:
+   - `src/__tests__/middleware.test.ts` (node env): `/profile` without session cookie → redirect to `/auth/sign-in?redirect=/profile`; with cookie → pass; `/dashboard` regression; public `/` passes.
+   - `ProfilePage.test.tsx`: unauthenticated (`data: null, isPending: false`) → `router.push('/auth/sign-in')`, profile form NOT rendered; `isPending` → loading state, form not rendered.
+2. [ ] `middleware.ts`: `isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/profile')`.
+3. [ ] `app/profile/page.tsx`: wrap page JSX in `<ProtectedRoute>` (same as `dashboard/layout.tsx`).
+4. [ ] Full frontend suite + lint + typecheck.
+5. [ ] Deslop scan, quality gate (opencode GLM pre-PR review), PR, post-PR review, demo (two real dev servers: main leaks profile page unauthenticated vs branch redirects), CI, merge.

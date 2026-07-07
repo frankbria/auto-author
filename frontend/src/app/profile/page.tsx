@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/lib/toast';
 import ProfilePictureUpload from '@/components/profile/ProfilePictureUpload';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const BIO_MAX = 1000;
 
@@ -153,6 +154,7 @@ export default function UserProfile() {
   const bioValue = (form.watch('bio') as string) ?? '';
 
   return (
+    <ProtectedRoute>
     <div className="container mx-auto max-w-2xl py-8">
       <h1 className="mb-8 text-3xl font-bold">Profile</h1>
 
@@ -330,5 +332,6 @@ export default function UserProfile() {
         </DialogContent>
       </Dialog>
     </div>
+    </ProtectedRoute>
   );
 }
