@@ -4,20 +4,16 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import SignInPage from "@/app/auth/sign-in/page";
+// auth-client is the real module; better-auth/react is moduleNameMapper'd to
+// src/__mocks__/better-auth-react.ts, so signIn.email is already a jest.fn.
+import { authClient } from "@/lib/auth-client";
 
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(),
   useSearchParams: jest.fn(),
 }));
 
-const mockSignInEmail = jest.fn();
-jest.mock("@/lib/auth-client", () => ({
-  authClient: {
-    signIn: {
-      email: (...args: unknown[]) => mockSignInEmail(...args),
-    },
-  },
-}));
+const mockSignInEmail = authClient.signIn.email as unknown as jest.Mock;
 
 function setup(redirectParam: string | null) {
   (useSearchParams as jest.Mock).mockReturnValue(
@@ -72,5 +68,16 @@ describe("SignInPage redirect handling", () => {
     const { push } = setup("javascript:alert(1)");
     await signIn();
     expect(push).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("does not navigate at all when sign-in fails", async () => {
+    mockSignInEmail.mockResolvedValue({
+      data: null,
+      error: { message: "Invalid credentials" },
+    });
+    const { push } = setup("/dashboard/books/1");
+    await signIn();
+    expect(mockSignInEmail).toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
   });
 });
