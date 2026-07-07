@@ -44,6 +44,9 @@ async def test_create_all_indexes_creates_owner_and_ttl_indexes(motor_reinit_db)
         "user_book_access_type_idx",
     ):
         assert name in access_indexes
+    assert access_indexes["user_book_access_type_idx"]["partialFilterExpression"] == {
+        "access_type": "tab_state"
+    }
 
 
 @pytest.mark.asyncio

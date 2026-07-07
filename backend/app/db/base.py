@@ -42,6 +42,11 @@ async def get_collection(name: str):
     return _db.get_collection(name)
 
 
+def get_database():
+    """Current database handle (reads the module global, so test rebinds win)."""
+    return _db
+
+
 # Only exports the truly "core" things
 __all__ = [
     "users_collection",
@@ -49,5 +54,6 @@ __all__ = [
     "audit_logs_collection",
     "sessions_collection",
     "get_collection",
+    "get_database",
     "ObjectId",
 ]
