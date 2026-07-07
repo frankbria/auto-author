@@ -62,6 +62,8 @@ async def lifespan(app: FastAPI):
     logger.info("Running startup tasks...")
 
     # Import here to avoid circular dependencies
+    from app.db.base import get_database
+    from app.db.indexing_strategy import ChapterTabIndexManager
     from app.db.questions import ensure_question_indexes
     from app.db.user import ensure_user_indexes
 
@@ -70,6 +72,13 @@ async def lifespan(app: FastAPI):
 
     # Create unique indexes guarding against duplicate user records (issue #178)
     await ensure_user_indexes()
+
+    # Book owner_id indexes + chapter_access_logs indexes and 90-day TTL
+    # (issue #183). Idempotent; per-index errors are logged, never fatal —
+    # the app must still boot (queries work unindexed, just slower).
+    result = await ChapterTabIndexManager(get_database()).create_all_indexes()
+    if not result.get("success"):
+        logger.error(f"Startup index creation failed: {result.get('message')}")
 
     logger.info("Startup tasks completed")
 

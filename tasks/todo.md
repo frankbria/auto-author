@@ -1,42 +1,30 @@
-# Issue #180 — [P0.8] Rate limiting is tenant-wide and bypassable behind nginx
+# Issue #183 — DB indexes never created at startup + unbounded chapter_access_logs (no TTL)
 
-**Plan source**: self-authored (no plan comment on issue). **Approved autonomously** — no architectural fork: the shared store is Mongo via the existing `increment_usage` DAO (#173 pattern; Redis isn't in this stack), and per-user keying follows directly from the verified fact that every rate-limited endpoint already requires session auth.
+**Plan source**: self-authored from issue body (no plan comment). Issue evidence verified 2026-07-06 — all cited lines accurate: `main.py:69-72` only runs question+user indexes; `ChapterTabIndexManager` (`app/db/indexing_strategy.py`) holds the book `owner_id` indexes and the 90-day access-log TTL but has zero runtime callers (only an unmounted migration script + one integration test). No architectural fork → approved autonomously.
 
-## Findings (Phase 2)
-
-- `get_rate_limiter` (`app/api/dependencies.py:66`) keys `{client_ip}:{endpoint}` in a plain in-process dict → per-worker (PM2 runs `--workers 2` since #175), resets on restart, never evicted.
-- **Issue premise partially stale**: uvicorn 0.35 defaults `proxy_headers=True` with `forwarded_allow_ips=127.0.0.1`; staging nginx sets `X-Forwarded-For` and proxies via localhost. Staging backend logs already show real client IPs (`174.138.89.152:0` — the `:0` port is the ProxyHeadersMiddleware rewrite signature). AC1 still wants it explicit — cheap one-line pin.
-- **Every** `get_rate_limiter` call site (books.py, chapters via books, export.py, users.py — verified by scanning all route signatures) also depends on `get_current_user_from_session` → the limiter can depend on it too; FastAPI's per-request dependency cache means zero extra DB hits.
-- `increment_usage` (`app/db/usage.py`) is a generic atomic `$inc`+TTL counter keyed `_id = f"{user_id}:{period_key}"` — reusable as-is for rate buckets. TTL index already ensured.
-- Only `tests/test_api/test_dependencies.py` exercises the real limiter (via `real_rate_limiter` fixture); all route tests get the conftest no-op fake. Blast radius contained.
-- Deprecated `rate_limit()` + `rate_limit_cache` dict: zero production callers (books.py imports `rate_limit` but never uses it). This IS the "never evicted" dict from the issue → delete it.
+## Problem
+- Dashboard `find({owner_id})` (`app/db/book.py:67`) full-scans books.
+- `chapter_access_logs` written on ~every read/edit, never expires, analytics queries unindexed.
 
 ## Design
+Wire `ChapterTabIndexManager(base._db).create_all_indexes()` into the existing lifespan startup block, right after `ensure_user_indexes()`. The manager is already idempotent and per-index try/except (a failed index logs, never bricks startup) — matches the `ensure_user_indexes` pattern.
 
-- `get_rate_limiter(limit, window)` keeps its signature and 429/`X-RateLimit-*`/`Retry-After` contract. Internals change:
-  - New dep param `current_user: Dict = Depends(get_current_user_from_session)`; subject = `auth_id` (fallback `id`/`clerk_id`).
-  - Fixed epoch-aligned window: `bucket = int(now // window) * window`; count via `increment_usage(subject, f"rl:{path}:{bucket}", ttl=window*2)` → shared across workers, survives restarts, self-evicting (Mongo TTL).
-  - `BYPASS_AUTH` short-circuit unchanged.
-  - Unauthenticated callers now 401 before counting (previously counted then 401 in the endpoint) — strictly better.
-- `ecosystem.config.template.js`: backend args += ` --proxy-headers --forwarded-allow-ips=127.0.0.1` (pins the uvicorn default per AC1; nginx proxies via localhost).
-- Delete deprecated `rate_limit()`, `rate_limit_cache`, and their tests; drop the dead `rate_limit` import in books.py.
+**One justified deviation**: drop the `chapter_content_text_idx` spec from `create_book_toc_indexes`. No `$text` query exists anywhere in `app/`; a text index over every chapter's full content re-tokenizes on each 3s autosave — pure write amplification with zero readers. AC only requires the `owner_id` and TTL indexes ("or equivalent").
 
-## Steps (TDD)
+## Changes
+- [x] 1. RED: `backend/tests/test_startup_indexes.py`
+  - `create_all_indexes()` → books has `owner_book_id_idx` + `owner_updated_idx`; `chapter_access_logs` has `access_logs_ttl_idx` with `expireAfterSeconds == 7776000` (90 days) + the 4 access-pattern indexes.
+  - Idempotent: run twice, no error, indexes intact.
+  - No text index on books (regression for the removal).
+  - Lifespan wiring: patch `ChapterTabIndexManager.create_all_indexes`, run `app.router.lifespan_context(app)`, assert awaited.
+  - NB memory `motor-reinit-drop-index-race`: warm both collections with a real insert before creating/asserting indexes.
+- [x] 2. GREEN: `backend/app/main.py` lifespan — instantiate `ChapterTabIndexManager` on `app.db.base._db` (module attribute at call time, so test rebinds are honored) and await `create_all_indexes()`.
+- [x] 3. GREEN: `backend/app/db/indexing_strategy.py` — remove the text-index spec.
+- [x] 4. Gates: full backend suite + coverage, ruff.
+- [x] 5. opencode (GLM) pre-PR review on branch diff.
+- [x] 6. PR → post-PR review comment → demo (real Mongo: startup creates indexes, TTL visible via `listIndexes`) → CI green → merge.
 
-- [x] 1. **RED**: rewrote `TestRateLimiting` (7 tests, real Mongo via `motor_reinit_db`) — all would TypeError against the old signature (no `current_user` param), so failing-first is by construction.
-- [x] 2. **GREEN**: Mongo-backed per-user limiter in `dependencies.py`; deleted deprecated `rate_limit`/`rate_limit_cache` + their 3 tests + dead books.py import.
-- [x] 3. Ecosystem template: `--proxy-headers --forwarded-allow-ips=127.0.0.1` added.
-- [x] 4. Full backend suite: **1084 passed / 13 skipped, 91.87% cov**. Ruff: my files clean; 9 pre-existing books.py dead imports left alone (out of scope, #94 precedent).
-- [x] 5. Deslop clean; opencode (GLM) review ×3 rounds (5 fixed, M1/M2/M3 rebutted+verified, triage posted to PR #230); demo posted (real uvicorn 2-workers + real better-auth sessions, all 3 ACs evidenced incl. restart-persistence 429); docs synced (CLAUDE.md).
-
-## Acceptance criteria
-
-- [x] Uvicorn runs with `--proxy-headers --forwarded-allow-ips=<nginx>` (ecosystem template; verified staging nginx sends XFF from localhost).
-- [x] Limiter uses a shared store consistent across workers/restarts and keys per authenticated user.
-- [x] Test asserts two different users don't share a bucket.
-
-## Out of scope
-
-- Redis (new infra for what Mongo already does here).
-- The per-IP fallback becoming primary for any future unauthenticated endpoints (none exist among rate-limited routes today).
-- nginx config changes (already correct on staging).
+## Acceptance criteria mapping
+1. `create_all_indexes()` runs at lifespan startup, idempotent → change 2 + lifespan-wiring test.
+2. 90-day TTL index exists → TTL assertion test + demo `listIndexes` evidence.
+3. Test asserts `owner_id` + TTL indexes exist after startup → `test_startup_indexes.py`.
