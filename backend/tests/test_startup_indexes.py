@@ -4,8 +4,6 @@ ChapterTabIndexManager held the book owner_id indexes and the 90-day
 access-log TTL but ran nowhere at runtime. These tests pin that the manager
 creates them and that the app lifespan actually invokes it.
 """
-from unittest.mock import AsyncMock, patch
-
 import pytest
 
 from app.db import base
@@ -57,13 +55,20 @@ async def test_create_all_indexes_is_idempotent(motor_reinit_db):
 
     books_indexes = await _index_map(base._db.books)
     assert "owner_book_id_idx" in books_indexes
+    access_indexes = await _index_map(base._db.chapter_access_logs)
+    assert "access_logs_ttl_idx" in access_indexes
 
 
 @pytest.mark.asyncio
 async def test_no_text_index_on_books(motor_reinit_db):
     """The unused chapter-content text index was removed (no $text queries;
-    it re-tokenized full chapter content on every autosave)."""
+    it re-tokenized full chapter content on every autosave), and a stale one
+    left by an earlier manual run gets dropped."""
     await _warm_collections()
+    await base._db.books.create_index(
+        [("table_of_contents.chapters.title", "text")],
+        name="chapter_content_text_idx",
+    )
     await ChapterTabIndexManager(base._db).create_all_indexes()
 
     books_indexes = await _index_map(base._db.books)
@@ -71,12 +76,16 @@ async def test_no_text_index_on_books(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_lifespan_runs_chapter_tab_index_creation(motor_reinit_db):
-    """App startup must invoke create_all_indexes (the actual #183 bug)."""
-    with patch.object(
-        ChapterTabIndexManager, "create_all_indexes", new_callable=AsyncMock
-    ) as mock_create:
-        mock_create.return_value = {"success": True}
-        async with app.router.lifespan_context(app):
-            pass
-    mock_create.assert_awaited_once()
+async def test_lifespan_creates_owner_and_ttl_indexes(motor_reinit_db):
+    """The actual #183 bug: app startup never created these indexes. Run the
+    real lifespan and assert they exist afterwards."""
+    await _warm_collections()
+    async with app.router.lifespan_context(app):
+        pass
+
+    books_indexes = await _index_map(base._db.books)
+    assert "owner_book_id_idx" in books_indexes
+
+    access_indexes = await _index_map(base._db.chapter_access_logs)
+    assert "access_logs_ttl_idx" in access_indexes
+    assert access_indexes["access_logs_ttl_idx"]["expireAfterSeconds"] == NINETY_DAYS

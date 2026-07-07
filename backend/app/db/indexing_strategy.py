@@ -95,6 +95,14 @@ class ChapterTabIndexManager:
             # content would re-tokenize on every 3s autosave (issue #183).
         ]
 
+        # Drop the removed text index if an earlier manual/migration run
+        # created it, so it stops taxing every chapter save.
+        try:
+            await collection.drop_index("chapter_content_text_idx")
+            logger.info("Dropped stale index: chapter_content_text_idx")
+        except Exception:
+            pass  # index doesn't exist (the normal case)
+
         for index_spec in indexes:
             try:
                 keys = index_spec.pop("keys")
