@@ -461,3 +461,64 @@ describe('UserProfile page', () => {
     }, { timeout: 4000, interval: 100 });
   });
 });
+
+// #185: /profile must fail closed like the dashboard — the page is wrapped in
+// ProtectedRoute, so an unauthenticated visitor is redirected to sign-in and
+// never sees the profile form (name/bio editing, delete-account UI).
+describe('UserProfile page authentication guard (#185)', () => {
+  const mockPush = jest.fn();
+  const originalBypass = process.env.NEXT_PUBLIC_BYPASS_AUTH;
+
+  beforeEach(() => {
+    // .env.test sets NEXT_PUBLIC_BYPASS_AUTH=true, which would short-circuit
+    // ProtectedRoute (same handling as ProtectedRoute.test.tsx).
+    delete process.env.NEXT_PUBLIC_BYPASS_AUTH;
+    const { useRouter } = jest.requireMock('next/navigation');
+    (useRouter as jest.Mock).mockReturnValue({ push: mockPush });
+  });
+
+  afterAll(() => {
+    if (originalBypass !== undefined) {
+      process.env.NEXT_PUBLIC_BYPASS_AUTH = originalBypass;
+    }
+  });
+
+  it('redirects unauthenticated users to sign-in and hides the profile form', async () => {
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: false,
+      error: null,
+    });
+
+    render(<UserProfile />);
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/auth/sign-in');
+    });
+    expect(screen.queryByText('Profile')).not.toBeInTheDocument();
+    expect(screen.queryByText('Save Changes')).not.toBeInTheDocument();
+    // The issue's stated risk surface: delete-account UI must not render.
+    expect(screen.queryByText(/delete account/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a loading state (not the form) while the session is pending', () => {
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: true,
+      error: null,
+    });
+
+    render(<UserProfile />);
+
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByText('Save Changes')).not.toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('renders the profile form for an authenticated user (regression)', () => {
+    render(<UserProfile />);
+
+    expect(screen.getByText('Profile')).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+});
