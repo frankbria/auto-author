@@ -2,16 +2,13 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.security import HTTPBearer
-from pymongo.errors import DuplicateKeyError
 from typing import List, Dict
 from datetime import datetime, timezone
 
 from app.core.security import get_current_user_from_session, SessionRoleChecker
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.user import UserUpdate, UserResponse
 from app.db.database import (
     get_user_by_auth_id,
-    get_user_by_email,
-    create_user,
     update_user,
     delete_user,
     delete_all_user_books,
@@ -276,60 +273,6 @@ async def upload_profile_picture(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload profile picture",
-        )
-
-
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_new_user(user: UserCreate):
-    """Create a new user mapping in the database
-
-    This endpoint is typically called when a user signs up via better-auth
-    """
-    # Check if user with this auth_id already exists
-    existing_user = await get_user_by_auth_id(user.auth_id)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User with this auth ID already exists",
-        )
-
-    # Check if user with this email already exists
-    existing_email = await get_user_by_email(user.email)
-    if existing_email:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User with this email already exists",
-        )
-
-    # Create user with current timestamps
-    now = datetime.now(timezone.utc)
-    user_data = user.model_dump()
-    user_data.update(
-        {
-            "created_at": now,
-            "updated_at": now,
-            "books": [],
-            "is_active": True,
-            "role": "user",  # Default role for new users
-            "plan": "free",  # Entitlement default (issue #174)
-        }
-    )
-
-    try:
-        created_user = await create_user(user_data)
-        return created_user
-    except DuplicateKeyError:
-        # Concurrent insert slipped past the pre-checks and hit the unique index
-        # (issue #178) — surface the intended conflict, not a 500.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User with this auth ID or email already exists",
-        )
-    except Exception:
-        logger.error("Error creating user", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error creating user",
         )
 
 

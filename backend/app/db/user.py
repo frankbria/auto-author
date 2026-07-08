@@ -66,8 +66,8 @@ async def create_user(user_data: Dict) -> Dict:
     Pure insert primitive: raises DuplicateKeyError when a unique index
     (auth_id/email, issue #178) rejects the insert. Callers apply their own
     policy — the auth auto-create path treats a duplicate auth_id as a
-    concurrent-first-load race and re-fetches the winner; the legacy POST /users/
-    endpoint treats it as a real conflict and returns 409.
+    concurrent-first-load race and re-fetches the winner. (The legacy
+    unauthenticated POST /users/ endpoint was removed in issue #186.)
     """
     result = await users_collection.insert_one(user_data)
     return await get_user_by_id(str(result.inserted_id))
