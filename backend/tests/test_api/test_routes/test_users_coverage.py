@@ -1,8 +1,8 @@
 """
 Integration coverage tests for app/api/endpoints/users.py.
 
-Covers the previously-untested endpoints (create_new_user, update_user_data,
-get_all_users, delete_user_account) plus the error branches of read_users_me,
+Covers the previously-untested endpoints (update_user_data, get_all_users,
+delete_user_account) plus the error branches of read_users_me,
 update_profile, and delete_profile. Real MongoDB is used (session auth mocked
 via auth_client_factory); only the DB helper calls that simulate failures are
 patched per-test.
@@ -115,65 +115,30 @@ async def test_delete_me_not_found_returns_404(auth_client_factory):
 
 
 # ---------------------------------------------------------------------------
-# create_new_user (POST /)
+# POST / — removed (issue #186)
+#
+# The unauthenticated create endpoint was an enumeration oracle (distinct 409s
+# for existing auth_id vs email vs 201) and a junk-record vector. Signup rides
+# the better-auth session auto-create in app/core/security.py instead.
 # ---------------------------------------------------------------------------
-async def test_create_user_happy_path(auth_client_factory):
+async def test_post_users_route_is_gone_for_anonymous(auth_client_factory):
+    client = await auth_client_factory(auth=False)
+    resp = await client.post(
+        "/api/v1/users/",
+        json={"auth_id": "attacker-id", "email": "victim@example.com"},
+    )
+    assert resp.status_code in (404, 405)
+
+
+async def test_post_users_route_is_gone_even_authenticated(auth_client_factory):
+    # test_user (auth_id test-auth-id-123, tester@example.com) is seeded by the
+    # factory — an existing record must NOT be distinguishable via 409/201.
     client = await auth_client_factory()
     resp = await client.post(
         "/api/v1/users/",
-        json={"auth_id": "brand-new-id", "email": "brandnew@example.com", "first_name": "New"},
+        json={"auth_id": "test-auth-id-123", "email": "tester@example.com"},
     )
-    assert resp.status_code == 201
-    data = resp.json()
-    assert data["auth_id"] == "brand-new-id"
-    assert data["email"] == "brandnew@example.com"
-
-
-async def test_create_user_duplicate_auth_id_returns_409(auth_client_factory):
-    # test_user (auth_id test-auth-id-123) is seeded by the factory.
-    client = await auth_client_factory()
-    resp = await client.post(
-        "/api/v1/users/",
-        json={"auth_id": "test-auth-id-123", "email": "other@example.com"},
-    )
-    assert resp.status_code == 409
-    assert "auth ID" in resp.json()["detail"]
-
-
-async def test_create_user_duplicate_email_returns_409(auth_client_factory):
-    client = await auth_client_factory()
-    resp = await client.post(
-        "/api/v1/users/",
-        json={"auth_id": "unique-id-1", "email": "tester@example.com"},
-    )
-    assert resp.status_code == 409
-    assert "email" in resp.json()["detail"]
-
-
-async def test_create_user_db_error_returns_500(auth_client_factory):
-    client = await auth_client_factory()
-    with patch(f"{USERS}.create_user", AsyncMock(side_effect=Exception("db down"))):
-        resp = await client.post(
-            "/api/v1/users/",
-            json={"auth_id": "another-new-id", "email": "another@example.com"},
-        )
-    assert resp.status_code == 500
-
-
-async def test_create_user_duplicate_key_race_returns_409(auth_client_factory):
-    # A concurrent insert slips past the pre-checks and hits the unique index
-    # (issue #178): create_user re-raises DuplicateKeyError → mapped to 409.
-    from pymongo.errors import DuplicateKeyError
-
-    client = await auth_client_factory()
-    with patch(
-        f"{USERS}.create_user", AsyncMock(side_effect=DuplicateKeyError("dup"))
-    ):
-        resp = await client.post(
-            "/api/v1/users/",
-            json={"auth_id": "race-new-id", "email": "race-new@example.com"},
-        )
-    assert resp.status_code == 409
+    assert resp.status_code in (404, 405)
 
 
 # ---------------------------------------------------------------------------
