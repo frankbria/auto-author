@@ -84,9 +84,11 @@ async def create_checkout_session(
         )
     except stripe.StripeError:
         logger.error("Stripe checkout failed for user %s", auth_id, exc_info=True)
+        # from None: the StripeError is already logged above; keep it out of the
+        # sanitized 502's traceback chain.
         raise HTTPException(
             status_code=502, detail="Payment provider error — please try again"
-        )
+        ) from None
 
     return CheckoutResponse(url=session.url)
 
@@ -131,6 +133,6 @@ async def create_portal_session(
         )
         raise HTTPException(
             status_code=502, detail="Payment provider error — please try again"
-        )
+        ) from None
 
     return PortalResponse(url=session.url)
