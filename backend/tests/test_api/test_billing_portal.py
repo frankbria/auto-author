@@ -51,7 +51,10 @@ async def test_portal_returns_session_url(
     assert len(portal_stub) == 1
     kwargs = portal_stub[0]
     assert kwargs["customer"] == "cus_paid_001"
-    assert kwargs["return_url"].endswith("/dashboard/settings?tab=billing")
+    assert (
+        kwargs["return_url"]
+        == f"{settings.BETTER_AUTH_URL.rstrip('/')}/dashboard/settings?tab=billing"
+    )
 
     # Plan is never mutated here — reconciliation stays webhook-only (#220).
     user_doc = _sync_users.find_one({"stripe_customer_id": "cus_paid_001"})

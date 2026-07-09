@@ -71,9 +71,13 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
         ) : (
           <>
             <div className="space-y-1">
-              <p className="font-medium">Free plan</p>
+              <p className="font-medium">
+                {plan === 'restricted' ? 'Your subscription is inactive' : 'Free plan'}
+              </p>
               <p className="text-sm text-muted-foreground">
-                Upgrade to Pro for full access to every AI writing feature.
+                {plan === 'restricted'
+                  ? 'Fix your payment method below, or start a new upgrade to restore full access.'
+                  : 'Upgrade to Pro for full access to every AI writing feature.'}
               </p>
             </div>
             <Button onClick={handleUpgrade} disabled={isRedirecting}>

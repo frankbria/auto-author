@@ -134,5 +134,8 @@ describe('BillingSettingsForm', () => {
 
     expect(screen.getByRole('button', { name: /manage billing/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeInTheDocument();
+    // The heading must not mislabel a lapsed subscriber as "Free plan".
+    expect(screen.getByText(/subscription is inactive/i)).toBeInTheDocument();
+    expect(screen.queryByText(/free plan/i)).not.toBeInTheDocument();
   });
 });
