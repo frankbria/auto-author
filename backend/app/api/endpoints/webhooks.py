@@ -76,7 +76,7 @@ async def stripe_webhook(request: Request):
 
     try:
         subscription = (event.get("data") or {}).get("object") or {}
-        return await _apply_subscription_event(event_type, subscription)
+        return await _apply_subscription_event(event_type, subscription, event_id)
     except Exception:
         # Release the claim so Stripe's retry of this failure isn't treated as
         # a replay, then surface a 500 (Stripe retries non-2xx).
@@ -85,13 +85,16 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=500, detail="Failed to process Stripe event")
 
 
-async def _apply_subscription_event(event_type: str, subscription: dict) -> dict:
+async def _apply_subscription_event(
+    event_type: str, subscription: dict, event_id: str
+) -> dict:
     """Resolve the plan for a verified customer.subscription.* event and persist it."""
     customer_id = subscription.get("customer")
     subscription_id = subscription.get("id")
 
     if event_type == "customer.subscription.deleted":
         plan = DEFAULT_PLAN
+        subscription_id = None  # the subscription is gone; don't retain a dead id
     else:
         items = (subscription.get("items") or {}).get("data") or []
         price_id = ((items[0] or {}).get("price") or {}).get("id") if items else None
@@ -111,6 +114,11 @@ async def _apply_subscription_event(event_type: str, subscription: dict) -> dict
         )
         return {"status": "no_matching_user"}
 
+    # If a DIFFERENT user already owns this stripe_customer_id, the unique index
+    # rejects the $set -> 500 -> Stripe retries and its dashboard flags the
+    # failing endpoint. That's the right ops signal for a genuinely inconsistent
+    # billing state; checkout (#221) enforces the 1:1 link at creation time.
+    # actor_id makes every plan transition auditable (billing disputes).
     await update_user(
         user["auth_id"],
         {
@@ -118,6 +126,7 @@ async def _apply_subscription_event(event_type: str, subscription: dict) -> dict
             "stripe_customer_id": customer_id,
             "stripe_subscription_id": subscription_id,
         },
+        actor_id=f"stripe:{event_id}",
     )
     logger.info(
         "Stripe %s: user %s plan set to %s", event_type, user["auth_id"], plan

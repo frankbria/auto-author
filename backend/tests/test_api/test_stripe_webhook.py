@@ -93,6 +93,8 @@ async def _seed_user(**overrides):
 
 class TestSignatureVerification:
     async def test_valid_signed_event_updates_plan(self, webhook_client):
+        from app.db import base
+
         await _seed_user(stripe_customer_id="cus_test_1")
         payload = subscription_event()
         resp = await webhook_client.post(
@@ -103,6 +105,12 @@ class TestSignatureVerification:
         assert user["plan"] == "pro"
         assert user["stripe_customer_id"] == "cus_test_1"
         assert user["stripe_subscription_id"] == "sub_test_1"
+        # Plan transitions are billing-relevant: the webhook must leave an
+        # audit trail attributing the change to the Stripe event.
+        audit = await base.audit_logs_collection.find_one(
+            {"action": "user_update", "actor_id": "stripe:evt_test_1"}
+        )
+        assert audit is not None
 
     async def test_tampered_payload_rejected_400(self, webhook_client):
         await _seed_user(stripe_customer_id="cus_test_1")
@@ -147,7 +155,9 @@ class TestSignatureVerification:
 
 class TestEventRouting:
     async def test_subscription_deleted_reverts_to_free(self, webhook_client):
-        await _seed_user(stripe_customer_id="cus_test_1", plan="pro")
+        await _seed_user(
+            stripe_customer_id="cus_test_1", stripe_subscription_id="sub_test_1", plan="pro"
+        )
         payload = subscription_event(
             event_id="evt_del_1", event_type="customer.subscription.deleted"
         )
@@ -157,6 +167,8 @@ class TestEventRouting:
         assert resp.status_code == 200
         user = await get_user_by_auth_id("auth-stripe-1")
         assert user["plan"] == "free"
+        # The subscription no longer exists — don't retain a dead-looking id.
+        assert user["stripe_subscription_id"] is None
 
     async def test_unknown_price_maps_to_free(self, webhook_client):
         await _seed_user(stripe_customer_id="cus_test_1", plan="pro")
@@ -221,6 +233,24 @@ class TestReplayIdempotency:
         replay = await webhook_client.post(WEBHOOK_URL, content=payload, headers=headers)
         assert replay.status_code == 200
         assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "free"
+
+    async def test_full_app_middleware_preserves_raw_body(self, motor_reinit_db, monkeypatch):
+        """Regression guard: the REAL app's middleware chain (request validation +
+        session middleware) must not consume/alter the body before the endpoint —
+        raw-body HMAC verification breaks silently otherwise."""
+        from app.main import app as real_app
+
+        monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
+        monkeypatch.setattr(settings, "STRIPE_PRICE_ID_PRO", TEST_PRO_PRICE_ID)
+        await _seed_user(stripe_customer_id="cus_test_1")
+        payload = subscription_event(event_id="evt_full_app_1")
+        transport = ASGITransport(app=real_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                WEBHOOK_URL, content=payload, headers={"stripe-signature": sign(payload)}
+            )
+        assert resp.status_code == 200
+        assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
 
     async def test_mark_event_processed_dao(self, motor_reinit_db):
         from app.db.stripe_events import mark_event_processed, unmark_event
