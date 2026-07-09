@@ -20,7 +20,7 @@ Parent epic #174 (ADR `docs/adr/2026-07-04-beta-entitlement-model.md`). Full-sta
   - `Depends(get_current_user_from_session)` + `Depends(get_rate_limiter(limit=5, window=300))`.
   - Body: `{plan: Literal["pro"]}` (default `"pro"`) — unknown tier is a 422 for free.
   - 503 fail-closed when `STRIPE_SECRET_KEY` or `STRIPE_PRICE_ID_PRO` unset (webhook convention).
-  - 409 when the user is already on a paid plan (`plan == "pro"` / has active `stripe_subscription_id`).
+  - 409 when the user is already on a paid plan (`plan` in the paid set — plan is the SSOT per #174; subscription id is not consulted).
   - Reuse `current_user["stripe_customer_id"]`; else `stripe.Customer.create(email, metadata={auth_id})` with `idempotency_key` keyed on auth_id (dedups the concurrent-double-click race within Stripe's 24h idempotency window) and persist via `update_user(auth_id, {"stripe_customer_id": ...}, actor_id=auth_id)`.
   - `stripe.checkout.Session.create(mode="subscription", customer=..., line_items=[{price: STRIPE_PRICE_ID_PRO, quantity: 1}], client_reference_id=auth_id, subscription_data={"metadata": {"auth_id": auth_id}}, success_url=f"{BETTER_AUTH_URL}/dashboard/settings?checkout=success", cancel_url=...?checkout=cancel)` — the `subscription_data.metadata.auth_id` stamp is what webhooks.py:112 reads.
   - Both SDK calls behind `asyncio.to_thread`. `stripe.StripeError` → structured 502 (no internals leaked); plan flip NEVER happens here — webhook-only (#220).

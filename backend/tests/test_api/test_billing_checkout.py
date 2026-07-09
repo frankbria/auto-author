@@ -146,6 +146,24 @@ async def test_stripe_failure_returns_502_without_leaking(
     assert _sync_users.find_one({"stripe_customer_id": "cus_new_001"}) is not None
 
 
+async def test_customer_create_failure_returns_502_without_leaking(
+    auth_client_factory, stripe_configured, stripe_stub, monkeypatch
+):
+    """Pins that the Customer.create call is inside the sanitizing try-block too."""
+
+    def boom(**kwargs):
+        raise stripe.StripeError("secret internal detail sk_live_abc")
+
+    monkeypatch.setattr(stripe.Customer, "create", boom)
+    client = await auth_client_factory()
+    resp = await client.post("/api/v1/billing/checkout", json={"plan": "pro"})
+
+    assert resp.status_code == 502
+    assert "sk_live" not in resp.text
+    assert stripe_stub["session"] == []
+    assert _sync_users.find_one({"stripe_customer_id": {"$ne": None}}) is None
+
+
 async def test_stripe_secret_key_defaults_empty():
     """Checkout ships fail-closed: no key in the env means 503, never a crash."""
     assert Settings(_env_file=None).STRIPE_SECRET_KEY == ""
