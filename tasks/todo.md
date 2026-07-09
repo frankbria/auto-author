@@ -23,7 +23,7 @@ the normal read path never surfaces.
   `questions.find({"_id": {"$in": ids}, "user_id": user_id, "book_id": book_id,
   "chapter_id": chapter_id}, {"_id": 1})` → `valid_ids` set (string form).
 - Per item: after the existing non-empty checks, `question_id not in valid_ids`
-  → per-item failure ("Question not found in this chapter") — covers
+  → per-item failure ("Question not found in this book/chapter") — covers
   nonexistent, foreign-book/chapter, other-user, and malformed IDs. No response
   doc is written for rejected items.
 - Per-item flag (not whole-request 4xx) preserves the endpoint's documented
@@ -33,17 +33,21 @@ the normal read path never surfaces.
   path; adding one is indirection for nothing — YAGNI).
 
 ## Steps (TDD)
-1. [ ] RED: new DB-layer tests in `test_batch_question_responses.py`:
+1. [x] RED: new DB-layer tests in `test_batch_question_responses.py`:
    foreign-chapter question rejected + no orphan doc in `question_responses`;
    other-user's question rejected; nonexistent/malformed id rejected; mixed
    batch saves only the valid item. New endpoint test in
    `test_books_draft_style_coverage.py`: POST with a foreign question_id →
    per-item rejection, no orphan.
-2. [ ] GREEN: implement the `$in` pre-fetch + per-item rejection; thread
+2. [x] GREEN: implement the `$in` pre-fetch + per-item rejection; thread
    `book_id`/`chapter_id` from the endpoint.
-3. [ ] Fix bug-characterizing tests: existing endpoint tests post fabricated
+3. [x] Fix bug-characterizing tests: existing endpoint tests post fabricated
    ids ("q1", "qX") and assert success — rewrite them to create real questions
    first (via `create_question`, like the DB-layer tests). Update the 7
    positional DB-test call sites for the new signature.
-4. [ ] Full backend suite + coverage gate; ruff.
-5. [ ] Reviews (opencode GLM pre-PR + post-PR), PR, demo (hard gate), CI, merge.
+4. [x] Full backend suite + coverage gate (1106→1107 passed / 13 skipped,
+   92.06%); new lint findings: none (all pre-existing).
+5. [x] Reviews: opencode GLM pre-PR ("clean to merge") + post-PR fresh session
+   ("no Critical/Major — ship as-is"; route-level cross-user test adopted,
+   duplicate-id-in-batch gap filed as #242). PR #241; demo
+   `docs/demos/2026-07-08-issue-187-batch-response-validation.md`; CI green.
