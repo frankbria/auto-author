@@ -42,11 +42,16 @@ jest.mock('@/hooks/useAuthFetch', () => ({
   useAuthFetch: () => ({ authFetch: mockAuthFetch }),
 }));
 
-const loadedProfile = (plan: string, preferences: Record<string, unknown> = {}) => ({
+const loadedProfile = (
+  plan: string,
+  preferences: Record<string, unknown> = {},
+  stripe_customer_id: string | null = null
+) => ({
   id: 'u1',
   auth_id: 'auth-1',
   email: 'a@b.com',
   plan,
+  stripe_customer_id,
   preferences,
 });
 
@@ -102,6 +107,47 @@ describe('SettingsPage billing tab', () => {
       'active'
     );
     expect(window.location.search).toBe('');
+  });
+
+  it('shows Manage billing for a lapsed user with a Stripe customer (issue #222)', async () => {
+    const user = userEvent.setup();
+    mockAuthFetch.mockResolvedValue(loadedProfile('restricted', {}, 'cus_lapsed_001'));
+    render(<SettingsPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /save settings/i })).toBeEnabled()
+    );
+    await user.click(screen.getByRole('tab', { name: /billing/i }));
+
+    expect(screen.getByRole('button', { name: /manage billing/i })).toBeInTheDocument();
+  });
+
+  // --- ?tab= deep-link (issue #222) ---
+  it('selects the Billing tab for ?tab=billing without any toast', async () => {
+    setSearch('?tab=billing');
+    mockAuthFetch.mockResolvedValue(loadedProfile('free'));
+    render(<SettingsPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /billing/i })).toHaveAttribute(
+        'data-state',
+        'active'
+      )
+    );
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('ignores an unknown ?tab= value and stays on the default tab', async () => {
+    setSearch('?tab=bogus');
+    mockAuthFetch.mockResolvedValue(loadedProfile('free'));
+    render(<SettingsPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /writing/i })).toHaveAttribute(
+        'data-state',
+        'active'
+      )
+    );
   });
 
   it('selects the Billing tab and shows a canceled toast for ?checkout=cancel', async () => {

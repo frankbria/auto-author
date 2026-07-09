@@ -32,6 +32,7 @@ export type UserProfile = {
   bio: string | null;
   preferences: UserPreferences;
   plan?: string; // Entitlement plan (issue #174); optional to tolerate older responses
+  stripe_customer_id?: string | null; // Stripe linkage (issue #221/#222)
 };
 
 export type ProfileUpdateData = {

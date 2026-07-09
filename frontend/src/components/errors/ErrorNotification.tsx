@@ -94,7 +94,7 @@ export function showErrorNotification(
       action: {
         label: 'Upgrade',
         onClick: () => {
-          window.location.href = '/dashboard/settings';
+          window.location.href = '/dashboard/settings?tab=billing';
         },
       },
       onDismiss,

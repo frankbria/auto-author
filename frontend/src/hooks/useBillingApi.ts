@@ -8,6 +8,10 @@ export type CheckoutSession = {
   url: string;
 };
 
+export type PortalSession = {
+  url: string;
+};
+
 /**
  * Hook for billing operations against the better-auth backend.
  * All requests are cookie-authenticated via useAuthFetch (credentials: 'include').
@@ -25,8 +29,15 @@ export const useBillingApi = () => {
     [authFetch]
   );
 
+  const openBillingPortal = useCallback(async (): Promise<PortalSession> => {
+    return authFetch<PortalSession>('/billing/portal', {
+      method: 'POST',
+    });
+  }, [authFetch]);
+
   return {
     startCheckout,
+    openBillingPortal,
   };
 };
 

@@ -1,4 +1,4 @@
-"""Billing endpoints (issue #221): start a Stripe Checkout upgrade.
+"""Billing endpoints: Stripe Checkout upgrade (#221) + billing portal (#222).
 
 The plan itself is NEVER changed here — the #220 webhook is the only writer
 (the client redirect back from Stripe is untrusted). This endpoint only
@@ -84,8 +84,55 @@ async def create_checkout_session(
         )
     except stripe.StripeError:
         logger.error("Stripe checkout failed for user %s", auth_id, exc_info=True)
+        # from None: the StripeError is already logged above; keep it out of the
+        # sanitized 502's traceback chain.
         raise HTTPException(
             status_code=502, detail="Payment provider error — please try again"
-        )
+        ) from None
 
     return CheckoutResponse(url=session.url)
+
+
+class PortalResponse(BaseModel):
+    url: str
+
+
+@router.post("/portal", response_model=PortalResponse)
+async def create_portal_session(
+    current_user: Dict = Depends(get_current_user_from_session),
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=5, window=300)),
+):
+    """Create a Stripe billing-portal session so a paying user can manage billing.
+
+    Gated on having a Stripe customer, not on plan — a lapsed ("restricted")
+    user still needs the portal to fix their payment method.
+    """
+    if not settings.STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Stripe billing is not configured")
+
+    customer_id = current_user.get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(
+            status_code=409,
+            detail="No billing account yet — upgrade to a paid plan first",
+        )
+
+    frontend_base = settings.BETTER_AUTH_URL.rstrip("/")
+    try:
+        session = await asyncio.to_thread(
+            stripe.billing_portal.Session.create,
+            api_key=settings.STRIPE_SECRET_KEY,
+            customer=customer_id,
+            return_url=f"{frontend_base}/dashboard/settings?tab=billing",
+        )
+    except stripe.StripeError:
+        logger.error(
+            "Stripe portal session failed for user %s",
+            current_user.get("auth_id"),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=502, detail="Payment provider error — please try again"
+        ) from None
+
+    return PortalResponse(url=session.url)
