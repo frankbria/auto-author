@@ -1,5 +1,19 @@
 # Environment Variable Refactoring Summary
 
+## Stripe Checkout (2026-07-09)
+
+### Overview
+
+Issue #221: `POST /api/v1/billing/checkout` creates a Stripe Checkout session for upgrading `free` → `pro`. The plan flip stays webhook-only (#220); checkout only establishes the customer/subscription linkage.
+
+### Changes
+
+- **STRIPE_SECRET_KEY** (`app/core/config.py`): the Stripe API secret key (`sk_test_...`/`sk_live_...`). Unset ⇒ checkout fails closed with 503 and never calls Stripe. This closes the "deliberately omitted until #221" note from the webhook entry below.
+
+### Test Coverage
+
+`tests/test_api/test_billing_checkout.py` (real Mongo; Stripe SDK boundary stubbed).
+
 ## Stripe Webhook Integration (2026-07-09)
 
 ### Overview

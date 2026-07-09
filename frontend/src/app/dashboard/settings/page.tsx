@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import BillingSettingsForm from '@/components/settings/BillingSettingsForm';
 import ExportSettingsForm from '@/components/settings/ExportSettingsForm';
 import NotificationSettingsForm from '@/components/settings/NotificationSettingsForm';
 import SecuritySettingsForm from '@/components/settings/SecuritySettingsForm';
@@ -37,6 +38,8 @@ export default function SettingsPage() {
   // Full preferences object from the server, merged with edits before every save so
   // fields this page doesn't expose are never reset (PATCH replaces the whole object).
   const [preferences, setPreferences] = useState<Partial<UserPreferences>>({});
+  // Entitlement plan (issue #174/#221) — read-only here, the Billing tab drives it via Stripe checkout.
+  const [plan, setPlan] = useState<string | undefined>(undefined);
 
   const loadPreferences = useCallback(() => {
     let active = true;
@@ -46,6 +49,7 @@ export default function SettingsPage() {
         if (!active) return;
         const loaded = profile?.preferences ?? {};
         setPreferences(loaded);
+        setPlan(profile?.plan);
         setLoadState('loaded');
         // The stored preference is the source of truth — sync next-themes
         // (which persists per-browser) so all devices converge on it.
@@ -64,6 +68,36 @@ export default function SettingsPage() {
   }, [getUserProfile]);
 
   useEffect(() => loadPreferences(), [loadPreferences]);
+
+  // Land back from Stripe checkout (issue #221) on the Billing tab with a status toast,
+  // then strip the query param so a refresh can't re-toast.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get('checkout');
+    if (checkout === 'success') {
+      setActiveTab('billing');
+      toast({
+        title: 'Checkout complete',
+        description: 'Payment received — your plan will update shortly once Stripe confirms it.',
+      });
+    } else if (checkout === 'cancel') {
+      setActiveTab('billing');
+      toast({
+        title: 'Checkout canceled',
+        description: 'You have not been charged.',
+      });
+    }
+    if (checkout) {
+      params.delete('checkout');
+      const query = params.toString();
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isLoaded = loadState === 'loaded';
   const intervalValid = isValidAutoSaveInterval(preferences.auto_save_interval ?? 3);
@@ -117,6 +151,7 @@ export default function SettingsPage() {
           <TabsTrigger value="writing">Writing</TabsTrigger>
           <TabsTrigger value="export">Export</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
@@ -149,6 +184,9 @@ export default function SettingsPage() {
                 disabled={!isLoaded}
               />
             </TabsContent>
+            <TabsContent value="billing">
+              <BillingSettingsForm plan={plan} />
+            </TabsContent>
           </>
         )}
 
@@ -170,8 +208,8 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Security actions save themselves; the shared button covers preference tabs */}
-      {activeTab !== 'security' && (
+      {/* Security and Billing actions save/self-serve themselves; the shared button covers preference tabs */}
+      {activeTab !== 'security' && activeTab !== 'billing' && (
         <div className="mt-6 flex justify-end">
           <Button
             onClick={handleSaveSettings}

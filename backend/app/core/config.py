@@ -97,15 +97,19 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
-    # Stripe billing (issue #220). STRIPE_WEBHOOK_SECRET verifies webhook
+    # Stripe billing (issues #220/#221). STRIPE_WEBHOOK_SECRET verifies webhook
     # payloads (raw-body HMAC); unset => POST /webhooks/stripe fails closed
     # with 503. STRIPE_PRICE_ID_PRO maps that Stripe price to the "pro" plan
-    # (app.core.entitlements.resolve_plan_for_price). The Stripe API key is
-    # deliberately NOT added until checkout (#221) consumes it.
+    # (app.core.entitlements.resolve_plan_for_price). STRIPE_SECRET_KEY is the
+    # API key (dashboard -> Developers -> API keys) used by checkout (#221);
+    # unset => POST /billing/checkout fails closed with 503.
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRICE_ID_PRO: str = ""
+    STRIPE_SECRET_KEY: str = ""
 
-    @field_validator("STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID_PRO", mode="before")
+    @field_validator(
+        "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID_PRO", "STRIPE_SECRET_KEY", mode="before"
+    )
     @classmethod
     def strip_stripe_values(cls, v):
         # A trailing newline from `.env`/`$(cat secret)` would make every
