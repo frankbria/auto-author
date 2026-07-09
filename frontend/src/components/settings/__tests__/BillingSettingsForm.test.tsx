@@ -30,6 +30,11 @@ describe('BillingSettingsForm', () => {
     expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeInTheDocument();
   });
 
+  const realLocation = window.location;
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { value: realLocation, writable: true });
+  });
+
   it('starts checkout and redirects to the returned url on click', async () => {
     const assignSpy = jest.fn();
     Object.defineProperty(window, 'location', {

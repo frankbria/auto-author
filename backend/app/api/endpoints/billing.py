@@ -21,6 +21,8 @@ from app.db.user import update_user
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Only paying plans block a new checkout — "restricted" users (lapsed/revoked)
+# are deliberately allowed through as the re-upgrade path.
 PAID_PLANS = frozenset({"pro"})
 
 

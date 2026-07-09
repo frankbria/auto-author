@@ -79,6 +79,7 @@ export default function SettingsPage() {
       toast({
         title: 'Checkout complete',
         description: 'Payment received — your plan will update shortly once Stripe confirms it.',
+        variant: 'success',
       });
     } else if (checkout === 'cancel') {
       setActiveTab('billing');
