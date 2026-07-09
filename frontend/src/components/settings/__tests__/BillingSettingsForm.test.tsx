@@ -13,14 +13,19 @@ jest.mock('@/lib/toast', () => ({
 const mockToast = toast as unknown as jest.Mock;
 
 const mockStartCheckout = jest.fn();
+const mockOpenBillingPortal = jest.fn();
 jest.mock('@/hooks/useBillingApi', () => ({
-  useBillingApi: () => ({ startCheckout: mockStartCheckout }),
+  useBillingApi: () => ({
+    startCheckout: mockStartCheckout,
+    openBillingPortal: mockOpenBillingPortal,
+  }),
 }));
 
 describe('BillingSettingsForm', () => {
   beforeEach(() => {
     mockToast.mockClear();
     mockStartCheckout.mockReset();
+    mockOpenBillingPortal.mockReset();
   });
 
   it('shows an Upgrade button for a free plan', () => {
@@ -76,5 +81,58 @@ describe('BillingSettingsForm', () => {
 
     expect(screen.getByText(/pro plan/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /upgrade to pro/i })).not.toBeInTheDocument();
+  });
+
+  // --- Billing portal (issue #222) ---
+  it('opens the billing portal and redirects for a pro user', async () => {
+    const assignSpy = jest.fn();
+    Object.defineProperty(window, 'location', {
+      value: { assign: assignSpy },
+      writable: true,
+    });
+    mockOpenBillingPortal.mockResolvedValue({
+      url: 'https://billing.stripe.com/p/session/xyz',
+    });
+
+    render(<BillingSettingsForm plan="pro" hasBillingAccount />);
+    fireEvent.click(screen.getByRole('button', { name: /manage billing/i }));
+
+    expect(screen.getByRole('button', { name: /redirecting/i })).toBeDisabled();
+
+    await waitFor(() => expect(mockOpenBillingPortal).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(assignSpy).toHaveBeenCalledWith('https://billing.stripe.com/p/session/xyz')
+    );
+  });
+
+  it('shows a destructive toast and re-enables Manage billing on portal error', async () => {
+    mockOpenBillingPortal.mockRejectedValue(new Error('Payment provider error'));
+
+    render(<BillingSettingsForm plan="pro" hasBillingAccount />);
+    fireEvent.click(screen.getByRole('button', { name: /manage billing/i }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'destructive',
+          description: 'Payment provider error',
+        })
+      )
+    );
+    expect(screen.getByRole('button', { name: /manage billing/i })).toBeEnabled();
+  });
+
+  it('does not show Manage billing for a free user with no billing account', () => {
+    render(<BillingSettingsForm plan="free" />);
+    expect(screen.queryByRole('button', { name: /manage billing/i })).not.toBeInTheDocument();
+  });
+
+  it('shows BOTH Manage billing and Upgrade for a lapsed (restricted) user', () => {
+    // A lapsed subscriber must be able to fix their payment method (portal)
+    // or start a fresh checkout — the backend allows both deliberately.
+    render(<BillingSettingsForm plan="restricted" hasBillingAccount />);
+
+    expect(screen.getByRole('button', { name: /manage billing/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeInTheDocument();
   });
 });

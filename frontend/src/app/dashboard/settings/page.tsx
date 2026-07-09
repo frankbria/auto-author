@@ -18,6 +18,9 @@ import { useProfileApi, type UserPreferences } from '@/hooks/useProfileApi';
 import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
 import { toast } from '@/lib/toast';
 
+// Keep in sync with the TabsTrigger values rendered below.
+const SETTINGS_TABS = ['writing', 'export', 'notifications', 'billing', 'security'];
+
 export default function SettingsPage() {
   const { getUserProfile, updateUserProfile } = useProfileApi();
   const { setTheme } = useTheme();
@@ -40,6 +43,8 @@ export default function SettingsPage() {
   const [preferences, setPreferences] = useState<Partial<UserPreferences>>({});
   // Entitlement plan (issue #174/#221) — read-only here, the Billing tab drives it via Stripe checkout.
   const [plan, setPlan] = useState<string | undefined>(undefined);
+  // Stripe customer linkage (#222) — gates the billing-portal button exactly like the backend.
+  const [hasBillingAccount, setHasBillingAccount] = useState(false);
 
   const loadPreferences = useCallback(() => {
     let active = true;
@@ -50,6 +55,7 @@ export default function SettingsPage() {
         const loaded = profile?.preferences ?? {};
         setPreferences(loaded);
         setPlan(profile?.plan);
+        setHasBillingAccount(Boolean(profile?.stripe_customer_id));
         setLoadState('loaded');
         // The stored preference is the source of truth — sync next-themes
         // (which persists per-browser) so all devices converge on it.
@@ -70,9 +76,15 @@ export default function SettingsPage() {
   useEffect(() => loadPreferences(), [loadPreferences]);
 
   // Land back from Stripe checkout (issue #221) on the Billing tab with a status toast,
-  // then strip the query param so a refresh can't re-toast.
+  // then strip the query param so a refresh can't re-toast. Also honor ?tab= deep links
+  // (issue #222) — window.location.search instead of useSearchParams keeps the page out
+  // of a Suspense boundary; the param is benign so it stays in the URL.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab && SETTINGS_TABS.includes(tab)) {
+      setActiveTab(tab);
+    }
     const checkout = params.get('checkout');
     if (checkout === 'success') {
       setActiveTab('billing');
@@ -186,7 +198,7 @@ export default function SettingsPage() {
               />
             </TabsContent>
             <TabsContent value="billing">
-              <BillingSettingsForm plan={plan} />
+              <BillingSettingsForm plan={plan} hasBillingAccount={hasBillingAccount} />
             </TabsContent>
           </>
         )}

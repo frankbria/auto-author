@@ -44,4 +44,23 @@ describe('useBillingApi', () => {
       'You are already on this plan.'
     );
   });
+
+  it('openBillingPortal POSTs to /billing/portal and returns the url', async () => {
+    authFetch.mockResolvedValue({ url: 'https://billing.stripe.com/p/session/abc' });
+    const { result } = renderHook(() => useBillingApi());
+
+    const response = await result.current.openBillingPortal();
+
+    expect(authFetch).toHaveBeenCalledWith('/billing/portal', { method: 'POST' });
+    expect(response).toEqual({ url: 'https://billing.stripe.com/p/session/abc' });
+  });
+
+  it('propagates portal errors from the backend', async () => {
+    authFetch.mockRejectedValue(new Error('No billing account yet'));
+    const { result } = renderHook(() => useBillingApi());
+
+    await expect(result.current.openBillingPortal()).rejects.toThrow(
+      'No billing account yet'
+    );
+  });
 });

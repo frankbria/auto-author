@@ -360,6 +360,22 @@ describe('showErrorNotification', () => {
     expect(call.action.label).not.toBe('Retry');
   });
 
+  it('Upgrade CTA deep-links to the billing settings tab (issue #222)', () => {
+    const realLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      value: { href: '' },
+      writable: true,
+    });
+    try {
+      showErrorNotification(makeError({ type: ErrorType.ENTITLEMENT, retryable: false }));
+      const call = mockToast.error.mock.calls[0][1];
+      call.action.onClick();
+      expect(window.location.href).toBe('/dashboard/settings?tab=billing');
+    } finally {
+      Object.defineProperty(window, 'location', { value: realLocation, writable: true });
+    }
+  });
+
   // --- PERMANENT ---
   it('calls toast.error with fieldErrors as description for PERMANENT errors', () => {
     const error = makeError({
