@@ -40,6 +40,20 @@ async def ensure_user_indexes() -> None:
     except Exception:
         logger.error("Failed to create unique index on users.email", exc_info=True)
 
+    try:
+        # Stripe webhook lookups (issue #220); sparse — most users have no
+        # Stripe customer, unique — one Stripe customer maps to one user.
+        await users_collection.create_index(
+            "stripe_customer_id",
+            name="stripe_customer_id_unique_idx",
+            unique=True,
+            sparse=True,
+        )
+    except Exception:
+        logger.error(
+            "Failed to create unique index on users.stripe_customer_id", exc_info=True
+        )
+
 
 # User-related database operations
 async def get_user_by_auth_id(auth_id: str) -> Optional[Dict]:
@@ -58,6 +72,11 @@ async def get_user_by_email(email: str) -> Optional[Dict]:
     """Get a user by their email address"""
     user = await users_collection.find_one({"email": email})
     return user
+
+
+async def get_user_by_stripe_customer_id(stripe_customer_id: str) -> Optional[Dict]:
+    """Get a user by their Stripe customer id (issue #220)."""
+    return await users_collection.find_one({"stripe_customer_id": stripe_customer_id})
 
 
 async def create_user(user_data: Dict) -> Dict:
