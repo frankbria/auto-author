@@ -528,3 +528,26 @@ async def test_batch_responses_foreign_question_rejected(auth_client_factory):
     from app.db.questions import get_question_response
     assert await get_question_response(foreign_q, "test-auth-id-123") is None
     assert await get_question_response(valid_q, "test-auth-id-123") is not None
+
+
+@pytest.mark.asyncio
+async def test_batch_responses_other_users_question_rejected(auth_client_factory):
+    """#187: referencing another user's question id through your own book's
+    batch endpoint is rejected — the check is scoped to the caller's user_id."""
+    api = await auth_client_factory()
+    book_id = await _create_book(api)
+    victim_q = await _create_question(book_id, user_id="victim-user-999")
+
+    r = await api.post(
+        _batch_url(book_id),
+        json=[{"question_id": victim_q, "response_text": "Hijack attempt.", "status": "draft"}],
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["success"] is False
+    assert body["saved"] == 0
+    assert body["failed"] == 1
+    assert "not found" in body["errors"][0]["error"].lower()
+
+    from app.db.questions import get_question_response
+    assert await get_question_response(victim_q, "test-auth-id-123") is None
