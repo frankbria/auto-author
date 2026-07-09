@@ -96,9 +96,14 @@ async def _apply_subscription_event(
         plan = DEFAULT_PLAN
         subscription_id = None  # the subscription is gone; don't retain a dead id
     else:
-        items = (subscription.get("items") or {}).get("data") or []
-        price_id = ((items[0] or {}).get("price") or {}).get("id") if items else None
-        plan = resolve_plan_for_price(price_id)
+        # Scan every line item — a multi-item subscription may not list the
+        # plan-bearing price first.
+        plan = DEFAULT_PLAN
+        for item in (subscription.get("items") or {}).get("data") or []:
+            resolved = resolve_plan_for_price(((item or {}).get("price") or {}).get("id"))
+            if resolved != DEFAULT_PLAN:
+                plan = resolved
+                break
 
     user = await get_user_by_stripe_customer_id(customer_id) if customer_id else None
     if user is None:
@@ -108,17 +113,25 @@ async def _apply_subscription_event(
         user = await get_user_by_auth_id(auth_id) if auth_id else None
     if user is None:
         # Ack with 200 so Stripe stops retrying — there is no user to update
-        # (e.g. deleted account, or a customer created outside this app).
+        # (e.g. deleted account, or a customer created outside this app). But
+        # RELEASE the replay marker: once the user is linked later, an operator
+        # can "Resend" the event from the Stripe dashboard (same event id) and
+        # it must reprocess instead of being swallowed as a replay.
+        await unmark_event(event_id)
         logger.warning(
             "Stripe %s for customer %s matches no user", event_type, customer_id
         )
         return {"status": "no_matching_user"}
 
-    # If a DIFFERENT user already owns this stripe_customer_id, the unique index
-    # rejects the $set -> 500 -> Stripe retries and its dashboard flags the
-    # failing endpoint. That's the right ops signal for a genuinely inconsistent
-    # billing state; checkout (#221) enforces the 1:1 link at creation time.
-    # actor_id makes every plan transition auditable (billing disputes).
+    # If a concurrent request linked this stripe_customer_id to a DIFFERENT user
+    # between our lookup and this write (TOCTOU — the only way to reach it, since
+    # the lookup above wins otherwise), the unique index rejects the $set -> 500
+    # -> Stripe retries and its dashboard flags the failing endpoint. That's the
+    # right ops signal for an inconsistent billing state; checkout (#221)
+    # enforces the 1:1 link at creation time. On subscription.deleted the
+    # customer id is deliberately RETAINED — the Stripe customer still exists,
+    # only the subscription ended. actor_id makes every plan transition
+    # auditable (billing disputes).
     await update_user(
         user["auth_id"],
         {

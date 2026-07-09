@@ -105,6 +105,13 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRICE_ID_PRO: str = ""
 
+    @field_validator("STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID_PRO", mode="before")
+    @classmethod
+    def strip_stripe_values(cls, v):
+        # A trailing newline from `.env`/`$(cat secret)` would make every
+        # webhook fail signature verification with no obvious cause.
+        return v.strip() if isinstance(v, str) else v
+
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod
     def assemble_cors_origins(cls, v):

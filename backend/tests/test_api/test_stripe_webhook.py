@@ -71,8 +71,13 @@ def subscription_event(
 @pytest_asyncio.fixture
 async def webhook_client(motor_reinit_db, monkeypatch):
     """Bare app with only the webhook router, Stripe test config, fresh Mongo."""
+    import app.db.stripe_events as stripe_events_dao
+
     monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
     monkeypatch.setattr(settings, "STRIPE_PRICE_ID_PRO", TEST_PRO_PRICE_ID)
+    # motor_reinit_db dropped the DB; force the lazy TTL-index ensure to re-run
+    # against the fresh collection.
+    monkeypatch.setattr(stripe_events_dao, "_ttl_index_ensured", False)
     app = FastAPI()
     app.include_router(webhooks.router, prefix="/api/v1/webhooks")
     transport = ASGITransport(app=app)
@@ -169,6 +174,8 @@ class TestEventRouting:
         assert user["plan"] == "free"
         # The subscription no longer exists — don't retain a dead-looking id.
         assert user["stripe_subscription_id"] is None
+        # The Stripe customer still exists — the link is deliberately retained.
+        assert user["stripe_customer_id"] == "cus_test_1"
 
     async def test_unknown_price_maps_to_free(self, webhook_client):
         await _seed_user(stripe_customer_id="cus_test_1", plan="pro")
@@ -200,6 +207,41 @@ class TestEventRouting:
             WEBHOOK_URL, content=payload, headers={"stripe-signature": sign(payload)}
         )
         assert resp.status_code == 200
+
+    async def test_unmatched_event_recoverable_after_user_linked(self, webhook_client):
+        # An event for a not-yet-linked customer must NOT be permanently
+        # swallowed by the replay guard: once the user is linked, a Stripe
+        # dashboard "Resend" (same event id) has to reprocess.
+        from app.db.user import update_user
+
+        await _seed_user()  # no stripe_customer_id yet, no metadata fallback
+        payload = subscription_event(event_id="evt_recover_1", customer="cus_late_link")
+        headers = {"stripe-signature": sign(payload)}
+
+        first = await webhook_client.post(WEBHOOK_URL, content=payload, headers=headers)
+        assert first.status_code == 200
+        assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "free"
+
+        await update_user("auth-stripe-1", {"stripe_customer_id": "cus_late_link"})
+
+        resend = await webhook_client.post(WEBHOOK_URL, content=payload, headers=headers)
+        assert resend.status_code == 200
+        assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
+
+    async def test_multi_item_subscription_finds_pro_price_anywhere(self, webhook_client):
+        # The plan-bearing price isn't guaranteed to be items[0].
+        await _seed_user(stripe_customer_id="cus_test_1")
+        event = json.loads(subscription_event().decode())
+        event["data"]["object"]["items"]["data"] = [
+            {"price": {"id": "price_addon_seat"}},
+            {"price": {"id": TEST_PRO_PRICE_ID}},
+        ]
+        payload = json.dumps(event).encode()
+        resp = await webhook_client.post(
+            WEBHOOK_URL, content=payload, headers={"stripe-signature": sign(payload)}
+        )
+        assert resp.status_code == 200
+        assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
 
     async def test_metadata_auth_id_fallback_links_customer(self, webhook_client):
         # User not yet linked to a Stripe customer (checkout #221 will set
@@ -250,6 +292,32 @@ class TestReplayIdempotency:
                 WEBHOOK_URL, content=payload, headers={"stripe-signature": sign(payload)}
             )
         assert resp.status_code == 200
+        assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
+
+    async def test_processing_failure_releases_marker_so_retry_works(
+        self, webhook_client, monkeypatch
+    ):
+        # Failure injection at our own persistence seam: if the user update
+        # blows up, the endpoint must 500 AND release the replay marker so
+        # Stripe's automatic retry reprocesses instead of hitting a "replay".
+        from app.api.endpoints import webhooks as webhooks_module
+
+        await _seed_user(stripe_customer_id="cus_test_1")
+        payload = subscription_event(event_id="evt_fail_1")
+        headers = {"stripe-signature": sign(payload)}
+
+        real_update = webhooks_module.update_user
+
+        async def exploding_update(*args, **kwargs):
+            raise RuntimeError("injected persistence failure")
+
+        monkeypatch.setattr(webhooks_module, "update_user", exploding_update)
+        failed = await webhook_client.post(WEBHOOK_URL, content=payload, headers=headers)
+        assert failed.status_code == 500
+
+        monkeypatch.setattr(webhooks_module, "update_user", real_update)
+        retry = await webhook_client.post(WEBHOOK_URL, content=payload, headers=headers)
+        assert retry.status_code == 200
         assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
 
     async def test_mark_event_processed_dao(self, motor_reinit_db):
