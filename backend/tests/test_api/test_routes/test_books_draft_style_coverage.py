@@ -353,14 +353,38 @@ def _batch_url(book_id, chapter_id="ch1"):
     return f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/responses/batch"
 
 
+async def _create_question(book_id, chapter_id="ch1", user_id="test-auth-id-123", order=0):
+    """Persist a real question so batch saves pass the ownership check (#187)."""
+    from app.db.questions import create_question
+    from app.schemas.book import (
+        QuestionCreate, QuestionType, QuestionDifficulty, QuestionMetadata,
+    )
+    question = await create_question(
+        QuestionCreate(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            question_text=f"Coverage question {order + 1}, what happens?",
+            question_type=QuestionType.PLOT,
+            difficulty=QuestionDifficulty.MEDIUM,
+            category="plot",
+            order=order,
+            metadata=QuestionMetadata(suggested_response_length="100-200 words"),
+        ),
+        user_id,
+    )
+    return question["id"]
+
+
 @pytest.mark.asyncio
 async def test_batch_responses_happy_path(auth_client_factory):
     api = await auth_client_factory()
     book_id = await _create_book(api)
+    q1 = await _create_question(book_id)
+    q2 = await _create_question(book_id, order=1)
 
     payload = [
-        {"question_id": "q1", "response_text": "First answer here.", "status": "draft"},
-        {"question_id": "q2", "response_text": "Second answer, completed.", "status": "completed"},
+        {"question_id": q1, "response_text": "First answer here.", "status": "draft"},
+        {"question_id": q2, "response_text": "Second answer, completed.", "status": "completed"},
     ]
     r = await api.post(_batch_url(book_id), json=payload)
     assert r.status_code == 200, r.text
@@ -380,9 +404,10 @@ async def test_batch_responses_partial_failure(auth_client_factory):
     api = await auth_client_factory()
     book_id = await _create_book(api)
 
+    q1 = await _create_question(book_id)
     payload = [
-        {"question_id": "q1", "response_text": "Valid answer.", "status": "draft"},
-        {"question_id": "q2", "response_text": "", "status": "draft"},  # missing text -> fails
+        {"question_id": q1, "response_text": "Valid answer.", "status": "draft"},
+        {"question_id": q1, "response_text": "", "status": "draft"},  # missing text -> fails
         {"question_id": "", "response_text": "No question id.", "status": "draft"},  # missing id -> fails
     ]
     r = await api.post(_batch_url(book_id), json=payload)
@@ -402,14 +427,15 @@ async def test_batch_responses_update_existing(auth_client_factory):
     api = await auth_client_factory()
     book_id = await _create_book(api)
 
+    q_id = await _create_question(book_id)
     first = await api.post(
         _batch_url(book_id),
-        json=[{"question_id": "qX", "response_text": "Original.", "status": "draft"}],
+        json=[{"question_id": q_id, "response_text": "Original.", "status": "draft"}],
     )
     assert first.status_code == 200
     second = await api.post(
         _batch_url(book_id),
-        json=[{"question_id": "qX", "response_text": "Edited and longer.", "status": "completed"}],
+        json=[{"question_id": q_id, "response_text": "Edited and longer.", "status": "completed"}],
     )
     assert second.status_code == 200, second.text
     body = second.json()
@@ -470,3 +496,35 @@ async def test_batch_responses_wrong_owner_403(auth_client_factory):
     assert r.status_code == 403
     detail = r.json()["detail"]
     assert detail["error_code"] == "FORBIDDEN_OPERATION"
+
+
+@pytest.mark.asyncio
+async def test_batch_responses_foreign_question_rejected(auth_client_factory):
+    """#187: a question_id from another book/chapter is flagged, not silently
+    saved as an orphaned response."""
+    api = await auth_client_factory()
+    book_id = await _create_book(api)
+    other_book_id = await _create_book(api, title="Other Book")
+
+    valid_q = await _create_question(book_id)
+    foreign_q = await _create_question(other_book_id)  # same owner, wrong book
+
+    r = await api.post(
+        _batch_url(book_id),
+        json=[
+            {"question_id": valid_q, "response_text": "Legit answer.", "status": "draft"},
+            {"question_id": foreign_q, "response_text": "Misrouted answer.", "status": "draft"},
+        ],
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["success"] is False
+    assert body["saved"] == 1
+    assert body["failed"] == 1
+    errors = {e["question_id"]: e for e in body["errors"]}
+    assert "not found" in errors[foreign_q]["error"].lower()
+
+    # The rejected item wrote nothing — no orphaned response document.
+    from app.db.questions import get_question_response
+    assert await get_question_response(foreign_q, "test-auth-id-123") is None
+    assert await get_question_response(valid_q, "test-auth-id-123") is not None

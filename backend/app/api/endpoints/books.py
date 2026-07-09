@@ -2973,7 +2973,9 @@ async def save_question_responses_batch_endpoint(
         # Save responses using batch function
         result = await db_save_batch(
             responses=responses,
-            user_id=current_user.get("auth_id")
+            user_id=current_user.get("auth_id"),
+            book_id=book_id,
+            chapter_id=chapter_id,
         )
 
         # Log batch save operation
