@@ -3,6 +3,7 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from bson import ObjectId
+from bson.errors import InvalidId
 from pymongo import ReturnDocument
 import logging
 import math
@@ -663,14 +664,22 @@ async def replace_question_in_place(
 
 async def save_question_responses_batch(
     responses: List[Dict[str, Any]],
-    user_id: str
+    user_id: str,
+    book_id: str,
+    chapter_id: str
 ) -> Dict[str, Any]:
     """
     Save multiple question responses efficiently using MongoDB bulk write operations.
 
+    Each question_id must reference an existing question owned by user_id in the
+    given book/chapter (mirrors the single-response path's membership check);
+    unknown or foreign ids are flagged per-item and nothing is written for them.
+
     Args:
         responses: List of dicts with keys: question_id, response_text, status
         user_id: User ID for ownership
+        book_id: Book the responses' questions must belong to
+        chapter_id: Chapter the responses' questions must belong to
 
     Returns:
         Dict with:
@@ -682,6 +691,28 @@ async def save_question_responses_batch(
             - errors: List of error details for failed responses
     """
     responses_collection = await get_collection("question_responses")
+    questions_collection = await get_collection("questions")
+
+    # One batch fetch of every referenced question, scoped to owner + book +
+    # chapter. Unparseable ids simply never match.
+    referenced_ids = []
+    for response_item in responses:
+        try:
+            referenced_ids.append(ObjectId(response_item.get("question_id")))
+        except (InvalidId, TypeError):
+            continue
+    valid_question_ids = set()
+    if referenced_ids:
+        cursor = questions_collection.find(
+            {
+                "_id": {"$in": referenced_ids},
+                "user_id": user_id,
+                "book_id": book_id,
+                "chapter_id": chapter_id,
+            },
+            {"_id": 1},
+        )
+        valid_question_ids = {str(doc["_id"]) async for doc in cursor}
 
     total = len(responses)
     results = []
@@ -719,6 +750,21 @@ async def save_question_responses_batch(
                     "index": idx,
                     "question_id": question_id,
                     "error": "Missing response_text"
+                })
+                continue
+
+            if question_id not in valid_question_ids:
+                error = "Question not found in this book/chapter"
+                results.append({
+                    "index": idx,
+                    "question_id": question_id,
+                    "success": False,
+                    "error": error
+                })
+                failed_responses.append({
+                    "index": idx,
+                    "question_id": question_id,
+                    "error": error
                 })
                 continue
 

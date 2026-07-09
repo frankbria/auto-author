@@ -8,6 +8,22 @@ from app.db.questions import save_question_responses_batch, create_question
 from app.schemas.book import QuestionCreate, QuestionType, QuestionDifficulty, QuestionMetadata
 
 
+async def _make_question(user_id, book_id, chapter_id, order=0):
+    question_data = QuestionCreate(
+        book_id=book_id,
+        chapter_id=chapter_id,
+        question_text=f"Test question {order + 1}?",
+        question_type=QuestionType.PLOT,
+        difficulty=QuestionDifficulty.MEDIUM,
+        category="plot",
+        order=order,
+        metadata=QuestionMetadata(
+            suggested_response_length="100-200 words"
+        )
+    )
+    return await create_question(question_data, user_id)
+
+
 @pytest.mark.asyncio
 async def test_batch_save_new_responses(motor_reinit_db):
     """Test batch saving new question responses."""
@@ -55,7 +71,7 @@ async def test_batch_save_new_responses(motor_reinit_db):
     ]
 
     # Save batch
-    result = await save_question_responses_batch(responses, user_id)
+    result = await save_question_responses_batch(responses, user_id, book_id=book_id, chapter_id=chapter_id)
 
     # Assertions
     assert result["success"] is True
@@ -103,7 +119,7 @@ async def test_batch_save_update_existing_responses(motor_reinit_db):
             "status": "draft"
         }
     ]
-    initial_result = await save_question_responses_batch(initial_responses, user_id)
+    initial_result = await save_question_responses_batch(initial_responses, user_id, book_id=book_id, chapter_id=chapter_id)
     assert initial_result["saved"] == 1
 
     # Update response
@@ -114,7 +130,7 @@ async def test_batch_save_update_existing_responses(motor_reinit_db):
             "status": "completed"
         }
     ]
-    update_result = await save_question_responses_batch(updated_responses, user_id)
+    update_result = await save_question_responses_batch(updated_responses, user_id, book_id=book_id, chapter_id=chapter_id)
 
     # Assertions
     assert update_result["success"] is True
@@ -166,7 +182,7 @@ async def test_batch_save_partial_failure(motor_reinit_db):
         }
     ]
 
-    result = await save_question_responses_batch(responses, user_id)
+    result = await save_question_responses_batch(responses, user_id, book_id=book_id, chapter_id=chapter_id)
 
     # Assertions
     assert result["success"] is False  # Overall failure due to partial failures
@@ -189,7 +205,9 @@ async def test_batch_save_empty_list(motor_reinit_db):
     user_id = "test_user_123"
     responses = []
 
-    result = await save_question_responses_batch(responses, user_id)
+    result = await save_question_responses_batch(
+        responses, user_id, book_id="book_123", chapter_id="chapter_123"
+    )
 
     assert result["success"] is True  # Empty batch is technically successful
     assert result["total"] == 0
@@ -230,7 +248,7 @@ async def test_batch_save_word_count_calculation(motor_reinit_db):
         }
     ]
 
-    result = await save_question_responses_batch(responses, user_id)
+    result = await save_question_responses_batch(responses, user_id, book_id=book_id, chapter_id=chapter_id)
 
     # Verify save succeeded
     assert result["saved"] == 1
@@ -274,7 +292,7 @@ async def test_batch_save_edit_history_tracking(motor_reinit_db):
             "status": "draft"
         }
     ]
-    await save_question_responses_batch(initial_responses, user_id)
+    await save_question_responses_batch(initial_responses, user_id, book_id=book_id, chapter_id=chapter_id)
 
     # Update response
     updated_responses = [
@@ -284,7 +302,7 @@ async def test_batch_save_edit_history_tracking(motor_reinit_db):
             "status": "completed"
         }
     ]
-    await save_question_responses_batch(updated_responses, user_id)
+    await save_question_responses_batch(updated_responses, user_id, book_id=book_id, chapter_id=chapter_id)
 
     # Get the response and check edit history
     from app.db.questions import get_question_response
@@ -335,7 +353,7 @@ async def test_batch_save_mixed_new_and_updates(motor_reinit_db):
             "status": "draft"
         }
     ]
-    await save_question_responses_batch(initial_responses, user_id)
+    await save_question_responses_batch(initial_responses, user_id, book_id=book_id, chapter_id=chapter_id)
 
     # Batch with update to first and new response for second
     mixed_responses = [
@@ -351,7 +369,7 @@ async def test_batch_save_mixed_new_and_updates(motor_reinit_db):
         }
     ]
 
-    result = await save_question_responses_batch(mixed_responses, user_id)
+    result = await save_question_responses_batch(mixed_responses, user_id, book_id=book_id, chapter_id=chapter_id)
 
     # Assertions
     assert result["success"] is True
@@ -363,3 +381,76 @@ async def test_batch_save_mixed_new_and_updates(motor_reinit_db):
     results_by_question = {r["question_id"]: r for r in result["results"]}
     assert results_by_question[questions[0]["id"]]["is_update"] is True
     assert results_by_question[questions[1]["id"]]["is_update"] is False
+
+# ---------------------------------------------------------------------------
+# Ownership / existence validation (#187)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_batch_rejects_question_from_another_chapter(motor_reinit_db):
+    """A question_id belonging to a different chapter is flagged, not saved."""
+    user_id = "test_user_123"
+    book_id = "book_123"
+    chapter_id = "chapter_123"
+
+    valid_q = await _make_question(user_id, book_id, chapter_id)
+    foreign_q = await _make_question(user_id, book_id, "other_chapter", order=1)
+
+    responses = [
+        {"question_id": valid_q["id"], "response_text": "Valid answer", "status": "draft"},
+        {"question_id": foreign_q["id"], "response_text": "Should be rejected", "status": "draft"},
+    ]
+    result = await save_question_responses_batch(
+        responses, user_id, book_id=book_id, chapter_id=chapter_id
+    )
+
+    assert result["success"] is False
+    assert result["saved"] == 1
+    assert result["failed"] == 1
+    errors = {e["question_id"]: e for e in result["errors"]}
+    assert foreign_q["id"] in errors
+    assert "not found" in errors[foreign_q["id"]]["error"].lower()
+
+    # No orphaned response document was written for the rejected item.
+    from app.db.questions import get_question_response
+    assert await get_question_response(foreign_q["id"], user_id) is None
+    assert await get_question_response(valid_q["id"], user_id) is not None
+
+
+@pytest.mark.asyncio
+async def test_batch_rejects_other_users_question(motor_reinit_db):
+    """A question owned by another user is flagged, not saved."""
+    book_id = "book_123"
+    chapter_id = "chapter_123"
+    victim_q = await _make_question("victim_user", book_id, chapter_id)
+
+    attacker = "attacker_user"
+    result = await save_question_responses_batch(
+        [{"question_id": victim_q["id"], "response_text": "Hijack attempt", "status": "draft"}],
+        attacker, book_id=book_id, chapter_id=chapter_id,
+    )
+
+    assert result["success"] is False
+    assert result["saved"] == 0
+    assert result["failed"] == 1
+
+    from app.db.questions import get_question_response
+    assert await get_question_response(victim_q["id"], attacker) is None
+
+
+@pytest.mark.asyncio
+async def test_batch_rejects_nonexistent_and_malformed_ids(motor_reinit_db):
+    """Nonexistent ObjectIds and unparseable ids are both flagged cleanly."""
+    user_id = "test_user_123"
+    responses = [
+        {"question_id": str(ObjectId()), "response_text": "Ghost question", "status": "draft"},
+        {"question_id": "not-an-objectid", "response_text": "Garbage id", "status": "draft"},
+    ]
+    result = await save_question_responses_batch(
+        responses, user_id, book_id="book_123", chapter_id="chapter_123"
+    )
+
+    assert result["success"] is False
+    assert result["saved"] == 0
+    assert result["failed"] == 2
+    assert all("not found" in e["error"].lower() for e in result["errors"])
