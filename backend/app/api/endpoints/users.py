@@ -75,6 +75,8 @@ async def read_users_me(
             bio=current_user.get("bio", None),
             role=current_user.get("role", "user"),
             plan=current_user.get("plan", "free"),
+            stripe_customer_id=current_user.get("stripe_customer_id"),
+            stripe_subscription_id=current_user.get("stripe_subscription_id"),
             created_at=current_user.get("created_at"),
             updated_at=current_user.get("updated_at"),
             books=current_user.get("books", []),

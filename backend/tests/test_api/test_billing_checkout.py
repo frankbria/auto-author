@@ -164,6 +164,25 @@ async def test_customer_create_failure_returns_502_without_leaking(
     assert _sync_users.find_one({"stripe_customer_id": {"$ne": None}}) is None
 
 
+async def test_users_me_surfaces_stripe_linkage(auth_client_factory):
+    """Regression (#220 drift found during the #221 demo): read_users_me built
+    UserResponse field-by-field and silently dropped the stripe ids."""
+    client = await auth_client_factory(
+        overrides={
+            "plan": "pro",
+            "stripe_customer_id": "cus_visible",
+            "stripe_subscription_id": "sub_visible",
+        }
+    )
+    resp = await client.get("/api/v1/users/me")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["plan"] == "pro"
+    assert body["stripe_customer_id"] == "cus_visible"
+    assert body["stripe_subscription_id"] == "sub_visible"
+
+
 async def test_stripe_secret_key_defaults_empty():
     """Checkout ships fail-closed: no key in the env means 503, never a crash."""
     assert Settings(_env_file=None).STRIPE_SECRET_KEY == ""
