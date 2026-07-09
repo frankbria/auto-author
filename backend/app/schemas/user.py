@@ -45,6 +45,10 @@ class UserResponse(UserBase):
     updated_at: Optional[datetime] = None
     role: str = "user"
     plan: str = "free"  # Entitlement plan (issue #174); legacy docs default to free
+    # Stripe billing identity (issue #220) — read-only via the API; written by
+    # the Stripe webhook. Deliberately NOT mirrored into UserUpdate.
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
     book_ids: List[str] = []
     preferences: Optional[UserPreferences] = Field(default_factory=UserPreferences)
 

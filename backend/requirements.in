@@ -12,6 +12,9 @@ python-jose[cryptography]
 python-multipart
 passlib[bcrypt]
 
+# Billing (Stripe webhook, issue #220)
+stripe>=15.3.0
+
 # AWS SDK for transcription and S3
 boto3>=1.26.0
 

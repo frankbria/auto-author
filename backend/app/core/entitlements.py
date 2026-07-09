@@ -33,8 +33,22 @@ DEFAULT_PLAN = "free"
 # here (e.g. "pro": frozenset({"*"})) with no code change at call sites.
 PLAN_ENTITLEMENTS: dict[str, frozenset[str]] = {
     "free": frozenset({"*"}),  # beta: full AI access
+    "pro": frozenset({"*"}),  # paid tier (issue #220); differentiation at paid launch
     "restricted": frozenset(),  # deny path: no AI features
 }
+
+
+def resolve_plan_for_price(price_id: Optional[str]) -> str:
+    """Map a Stripe price id to an internal plan (issue #220).
+
+    Only the configured pro price resolves to ``pro``; anything unknown or
+    missing falls back to the default free plan. Pure — no I/O.
+    """
+    from app.core.config import settings
+
+    if price_id and settings.STRIPE_PRICE_ID_PRO and price_id == settings.STRIPE_PRICE_ID_PRO:
+        return "pro"
+    return DEFAULT_PLAN
 
 
 def is_feature_allowed(plan: Optional[str], feature: str) -> bool:

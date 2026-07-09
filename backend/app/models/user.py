@@ -56,6 +56,11 @@ class UserBase(BaseModel):
     # Entitlement plan (issue #174). Free-invite beta: everyone is "free".
     # Default treats legacy documents lacking the field as free — no backfill.
     plan: str = "free"
+    # Stripe billing identity (issue #220). Written only by the Stripe webhook
+    # (and future checkout, #221) — deliberately absent from schemas.UserUpdate
+    # so no user can set their own plan/billing ids via PATCH /users/me.
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
 
 
 class UserCreate(UserBase):

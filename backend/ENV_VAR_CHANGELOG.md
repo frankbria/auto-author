@@ -1,5 +1,21 @@
 # Environment Variable Refactoring Summary
 
+## Stripe Webhook Integration (2026-07-09)
+
+### Overview
+
+Issue #220: `POST /api/v1/webhooks/stripe` verifies Stripe webhook payloads against the raw request body (HMAC) and syncs `customer.subscription.*` events to the user's `plan`.
+
+### Changes
+
+- **STRIPE_WEBHOOK_SECRET** (`app/core/config.py`): the Stripe webhook signing secret (`whsec_...`). Unset ⇒ the endpoint fails closed with 503 and never processes a payload.
+- **STRIPE_PRICE_ID_PRO** (`app/core/config.py`): the Stripe price id mapped to the `pro` plan by `app/core/entitlements.py::resolve_plan_for_price`; unknown/missing prices resolve to `free`.
+- **Deliberately omitted**: no `STRIPE_SECRET_KEY` yet — nothing calls the Stripe API until checkout (#221).
+
+### Test Coverage
+
+`tests/test_api/test_stripe_webhook.py` (real HMAC signatures + real Mongo) and `tests/test_core/test_entitlements.py::TestStripePricePlanResolution`.
+
 ## Security Enhancement: BYPASS_AUTH Production Protection (2025-12-18)
 
 ### Overview

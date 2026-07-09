@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator, Field, ValidationError
+from pydantic import field_validator, Field
 from typing import List, Union
 import os
 
@@ -96,6 +96,21 @@ class Settings(BaseSettings):
     CLOUDINARY_CLOUD_NAME: str = ""
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
+
+    # Stripe billing (issue #220). STRIPE_WEBHOOK_SECRET verifies webhook
+    # payloads (raw-body HMAC); unset => POST /webhooks/stripe fails closed
+    # with 503. STRIPE_PRICE_ID_PRO maps that Stripe price to the "pro" plan
+    # (app.core.entitlements.resolve_plan_for_price). The Stripe API key is
+    # deliberately NOT added until checkout (#221) consumes it.
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_ID_PRO: str = ""
+
+    @field_validator("STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID_PRO", mode="before")
+    @classmethod
+    def strip_stripe_values(cls, v):
+        # A trailing newline from `.env`/`$(cat secret)` would make every
+        # webhook fail signature verification with no obvious cause.
+        return v.strip() if isinstance(v, str) else v
 
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod
