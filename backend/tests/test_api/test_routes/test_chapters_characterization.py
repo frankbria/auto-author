@@ -34,15 +34,18 @@ MOVED_CHAPTER_ROUTES = {
 
 
 def _app_routes():
-    """Set of (method, full-path) pairs registered on the app."""
-    pairs = set()
-    for route in app.routes:
-        methods = getattr(route, "methods", None)
-        if not methods:
-            continue
-        for method in methods:
-            pairs.add((method, route.path))
-    return pairs
+    """Set of (METHOD, full-path) pairs the app serves, via the OpenAPI schema.
+
+    Enumerated through app.openapi() rather than app.routes: FastAPI >= 0.138
+    keeps include_router mounts lazy (an _IncludedRouter node), so app.routes
+    no longer flattens to APIRoutes. The OpenAPI schema is public API and lists
+    every served route with its composed path on all supported versions.
+    """
+    return {
+        (method.upper(), path)
+        for path, operations in app.openapi()["paths"].items()
+        for method in operations
+    }
 
 
 def test_moved_chapter_routes_still_served_by_app():
