@@ -50,7 +50,7 @@ jobs:
         # Enforced (#118): gate is green at baseline, so a coverage regression must fail CI.
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         if: always()
         with:
           files: ./frontend/coverage/lcov.info
@@ -106,7 +106,7 @@ jobs:
         # Enforced (#118): gate is green at baseline, so a coverage regression must fail CI.
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         if: always()
         with:
           files: ./backend/coverage.xml
