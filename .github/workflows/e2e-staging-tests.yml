@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-staging
           path: frontend/tests/e2e/staging/playwright-report-staging/
@@ -102,7 +102,7 @@ jobs:
 
       - name: Upload staging test results and visual smoke screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: staging-test-results
           path: |
@@ -112,7 +112,7 @@ jobs:
 
       - name: Upload failure artifacts (screenshots/videos/traces)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: staging-failure-artifacts
           path: |
@@ -205,7 +205,7 @@ jobs:
 
       - name: Upload load smoke report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: staging-load-smoke
           path: |
