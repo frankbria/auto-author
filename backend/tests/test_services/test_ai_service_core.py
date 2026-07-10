@@ -260,9 +260,12 @@ async def test_ai_service_error_handling(ai_service):
     """Test error handling in AI service"""
     from app.services.ai_errors import AIServiceError
 
-    # Test that AIServiceError is raised on API error
-    with patch.object(ai_service, '_make_openai_request',
-                      AsyncMock(side_effect=Exception("API Error"))):
+    # Test that AIServiceError is raised on API error. Mock at the real OpenAI
+    # boundary: _make_openai_request's internal retry layer owns the
+    # raw-exception -> AIServiceError conversion (#188 removed the outer
+    # wrapper that used to duplicate it).
+    with patch.object(ai_service.client.chat.completions, 'create',
+                      side_effect=Exception("API Error")):
         # Should raise AIServiceError
         with pytest.raises(AIServiceError) as exc_info:
             await ai_service.generate_clarifying_questions(

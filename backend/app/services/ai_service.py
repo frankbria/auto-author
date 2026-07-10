@@ -53,7 +53,11 @@ class AIService:
 
     def __init__(self, cache_service: Optional[AICacheService] = None):
         """Initialize the AI service with OpenAI client and cache."""
-        self.client = OpenAI(api_key=settings.openai_api_key)
+        # max_retries=0: the SDK silently retries each request (default 2) on
+        # top of _retry_with_backoff, multiplying real API calls per failure
+        # (observed 3x3=9 on the wire). Retry ownership lives in
+        # _retry_with_backoff only (#188).
+        self.client = OpenAI(api_key=settings.openai_api_key, max_retries=0)
         self.model = "gpt-4"  # Using GPT-4 for better analysis capabilities
         self.max_retries = settings.AI_MAX_RETRIES
         self.base_delay = 1.0  # Base delay for exponential backoff
@@ -185,15 +189,25 @@ class AIService:
             )
 
     async def _make_openai_request(
-        self, messages: List[Dict], temperature: float = 0.3, max_tokens: int = 1000
+        self,
+        messages: List[Dict],
+        temperature: float = 0.3,
+        max_tokens: int = 1000,
+        correlation_id: Optional[str] = None,
     ):
         """
         Make an OpenAI API request with retry logic.
+
+        Retry lives HERE and only here — callers must not wrap this in
+        _retry_with_backoff again, or a persistent failure makes up to
+        AI_MAX_RETRIES**2 real API calls (#188).
 
         Args:
             messages: List of message dictionaries for the chat completion
             temperature: Temperature for response generation
             max_tokens: Maximum tokens for the response
+            correlation_id: Optional correlation ID so retry logs stay
+                correlated with the calling request
 
         Returns:
             OpenAI response object
@@ -213,7 +227,7 @@ class AIService:
             # generation must not stall health checks or other users' requests.
             return await asyncio.to_thread(_sync_request)
 
-        return await self._retry_with_backoff(_async_wrapper)
+        return await self._retry_with_backoff(_async_wrapper, correlation_id=correlation_id)
 
     async def analyze_summary_for_toc(
         self, summary: str, book_metadata: Optional[Dict] = None
@@ -311,12 +325,11 @@ class AIService:
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self._retry_with_backoff(
-                self._make_openai_request,
+            response = await self._make_openai_request(
                 messages=messages,
                 temperature=0.4,
                 max_tokens=800,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
             questions_text = response.choices[0].message.content
@@ -552,12 +565,11 @@ Make questions specific, actionable, and focused on content structure rather tha
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self._retry_with_backoff(
-                self._make_openai_request,
+            response = await self._make_openai_request(
                 messages=messages,
                 temperature=0.4,
                 max_tokens=1500,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
             toc_text = response.choices[0].message.content
