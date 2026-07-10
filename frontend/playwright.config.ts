@@ -98,8 +98,9 @@ export default defineConfig({
       // Environment
       NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT || 'test',
       NODE_ENV: process.env.NODE_ENV || 'test',
-      // Pass CI flag to allow BYPASS_AUTH in production builds during CI
-      CI: process.env.CI || 'false'
+      // Purpose-built opt-in (#192): lets BYPASS_AUTH work in the CI prod
+      // build (npm run build && npm start). Never set in real deploys.
+      E2E_ALLOW_BYPASS: '1'
     }
   },
 
