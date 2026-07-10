@@ -91,9 +91,17 @@ class UserUpdate(BaseModel):
     bio: Optional[str] = Field(None, max_length=1000)
     preferences: Optional[UserPreferences] = None
     metadata: Optional[Dict[str, Any]] = None
-    role: Optional[str] = None
+    # role is deliberately absent (#244): it flows into a generic $set in the
+    # /users handlers, so exposing it here lets any user self-elevate to admin.
+    # Same policy as plan/stripe_* (#220) — privileged fields are not
+    # API-writable; roles are managed directly in the database.
 
     model_config = ConfigDict(
+        # extra="forbid" (#244): these fields ARE the writable allowlist for the
+        # generic $set in the /users handlers. Unknown keys (role, plan, …) are
+        # a loud 422, not a silent ignore — adding a privileged field here is
+        # the only way to make it writable, and that takes a review.
+        extra="forbid",
         json_schema_extra={
             "example": {
                 "email": "updated@example.com",
@@ -108,7 +116,6 @@ class UserUpdate(BaseModel):
                     "marketing_emails": False,
                 },
                 "metadata": {"preferences": {"theme": "dark"}},
-                "role": "admin",
             }
         }
     )

@@ -162,13 +162,84 @@ async def test_put_user_other_non_admin_returns_403(auth_client_factory):
     assert "permissions" in resp.json()["detail"]
 
 
-async def test_put_user_non_admin_role_change_returns_403(auth_client_factory):
+# ---------------------------------------------------------------------------
+# Issue #244 — privileged fields are not writable via the API
+# UserUpdate is extra="forbid", so an unknown/privileged key is a 422 and the
+# handler (and its generic $set) never runs.
+# ---------------------------------------------------------------------------
+PRIVILEGED_FIELDS = [
+    ("role", "admin"),
+    ("plan", "pro"),
+    ("is_active", False),
+    ("stripe_customer_id", "cus_evil"),
+    ("stripe_subscription_id", "sub_evil"),
+    ("book_ids", ["not-yours"]),
+    ("auth_id", "someone-else"),
+]
+
+
+@pytest.mark.parametrize("field,value", PRIVILEGED_FIELDS)
+async def test_patch_me_privileged_field_rejected_and_not_persisted(
+    auth_client_factory, field, value
+):
+    """AC (#244): authenticated PATCH /users/me with a privileged field is
+    rejected with 422 and the stored document is byte-identical afterwards."""
+    from app.db import base
+
+    client = await auth_client_factory()
+    before = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    assert before is not None  # fail fast if the factory didn't seed the user
+    resp = await client.patch("/api/v1/users/me", json={field: value})
+    assert resp.status_code == 422
+    after = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    assert after == before
+
+
+async def test_patch_me_declared_fields_still_persist(auth_client_factory):
+    """extra="forbid" (#244) must not break a normal update: declared fields
+    still round-trip to the stored document."""
+    from app.db import base
+
+    client = await auth_client_factory()
+    resp = await client.patch(
+        "/api/v1/users/me", json={"first_name": "Ada", "bio": "Mathematician"}
+    )
+    assert resp.status_code == 200
+    stored = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    assert stored["first_name"] == "Ada"
+    assert stored["bio"] == "Mathematician"
+
+
+async def test_put_user_role_rejected_and_not_persisted(auth_client_factory):
+    """#244: role is unwritable via PUT /users/{auth_id} as well."""
+    from app.db import base
+
     client = await auth_client_factory()
     resp = await client.put(
-        "/api/v1/users/test-auth-id-123", json={"role": "admin"}
+        "/api/v1/users/test-auth-id-123",
+        json={"role": "admin", "first_name": "Kept"},
     )
-    assert resp.status_code == 403
-    assert "admins" in resp.json()["detail"]
+    assert resp.status_code == 422
+    stored = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    assert stored["role"] == "user"
+    assert stored["first_name"] != "Kept"
+
+
+async def test_put_user_role_rejected_even_for_admin(auth_client_factory):
+    """#244: no API path writes role — an admin PUT targeting another user is
+    422 too; roles are managed directly in the database."""
+    from app.db import base
+
+    admin_client = await auth_client_factory(
+        overrides={"role": "admin", "auth_id": "admin-244"}
+    )
+    await auth_client_factory()  # seeds the default test-auth-id-123 user
+    resp = await admin_client.put(
+        "/api/v1/users/test-auth-id-123", json={"role": "superadmin"}
+    )
+    assert resp.status_code == 422
+    stored = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    assert stored["role"] == "user"
 
 
 async def test_put_user_fetch_error_returns_504(auth_client_factory):

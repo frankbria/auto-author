@@ -254,6 +254,10 @@ curl -X GET "http://localhost:8000/api/users/admin/users" \
 
 **Request Body**: Same format as PATCH /users/me
 
+> **Note**: `role` is not writable through the API (issue #244). A `role` key
+> (or any other undeclared field) in the request body is rejected with a 422
+> error; roles are managed directly in the database.
+
 **Response**: Updated user object
 
 **Example Request**:
@@ -262,7 +266,6 @@ curl -X PUT "http://localhost:8000/api/users/user_2NxAa1pyy8THf937QUAhKR2tXCI" \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..." \
   -H "Content-Type: application/json" \
   -d '{
-    "role": "admin",
     "bio": "Admin user"
   }'
 ```

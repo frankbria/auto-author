@@ -310,13 +310,6 @@ async def update_user_data(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    # Prevent non-admin users from changing their role
-    if user_update.role and current_user["role"] != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins can change user roles",
-        )
-
     # Update with current timestamp
     update_data = {
         k: v
