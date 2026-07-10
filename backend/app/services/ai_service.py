@@ -53,7 +53,11 @@ class AIService:
 
     def __init__(self, cache_service: Optional[AICacheService] = None):
         """Initialize the AI service with OpenAI client and cache."""
-        self.client = OpenAI(api_key=settings.openai_api_key)
+        # max_retries=0: the SDK silently retries each request (default 2) on
+        # top of _retry_with_backoff, multiplying real API calls per failure
+        # (observed 3x3=9 on the wire). Retry ownership lives in
+        # _retry_with_backoff only (#188).
+        self.client = OpenAI(api_key=settings.openai_api_key, max_retries=0)
         self.model = "gpt-4"  # Using GPT-4 for better analysis capabilities
         self.max_retries = settings.AI_MAX_RETRIES
         self.base_delay = 1.0  # Base delay for exponential backoff

@@ -443,3 +443,11 @@ class TestSingleRetryLayer:
             and (m := re.search(r"correlation_id=([0-9a-f-]+)", r.message))
         }
         assert len(ids) == 1
+
+    def test_sdk_internal_retries_disabled(self, ai_service_with_mock_cache):
+        """The openai SDK retries each request itself (default max_retries=2),
+        stacking a third retry layer under _retry_with_backoff: a persistent
+        failure made 3x3=9 real HTTP requests on the wire. The app layer is
+        the sole retry owner, so the client must be built with max_retries=0.
+        """
+        assert ai_service_with_mock_cache.client.max_retries == 0
