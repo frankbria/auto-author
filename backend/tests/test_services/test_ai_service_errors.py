@@ -353,6 +353,11 @@ class TestSingleRetryLayer:
     _retry_with_backoff. These tests pin single-layer behavior: a persistently
     failing call makes exactly AI_MAX_RETRIES real requests, logs one attempt
     line per request, and all attempt logs share one correlation id.
+
+    NB: the two call-count tests pin the issue's AC but would also pass with
+    the old double-wrap (the outer layer re-raised AIServiceError without
+    retrying, so squaring never actually occurred). The log-based tests are
+    the ones that fail if a second retry layer is reintroduced.
     """
 
     def _rate_limit_error(self):
