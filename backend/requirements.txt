@@ -156,13 +156,13 @@ pyasn1==0.6.1
     #   rsa
 pycparser==2.22
     # via cffi
-pydantic==2.11.7
+pydantic==2.13.4
     # via
     #   -r requirements.in
     #   fastapi
     #   openai
     #   pydantic-settings
-pydantic-core==2.33.2
+pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.10.1
     # via -r requirements.in
@@ -250,7 +250,7 @@ typing-extensions==4.14.1
     #   python-docx
     #   stripe
     #   typing-inspection
-typing-inspection==0.4.1
+typing-inspection==0.4.2
     # via
     #   pydantic
     #   pydantic-settings
