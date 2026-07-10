@@ -9,9 +9,12 @@
 - nginx vhosts proxy to `http://localhost:8000` / `http://localhost:3002`; `/etc/hosts` maps `localhost` to both `127.0.0.1` and `::1`.
 
 ## Plan (AC branch 1: bind loopback; + document firewall as branch 2 evidence)
-- [ ] `ecosystem.config.template.js`: backend `--host 127.0.0.1`; frontend `args: 'start -- -H 127.0.0.1'`
-- [ ] `scripts/deploy.sh:110`, `scripts/deploy-fixed.sh:191`: `--host 127.0.0.1`
-- [ ] `.github/workflows/deploy-production.yml.disabled:201`: same (drift prevention if re-enabled)
-- [ ] `docs/STAGING-DEPLOYMENT.md`: document loopback binding + the verified ufw baseline
-- [ ] Server-side (ops, during demo): nginx `proxy_pass` → explicit `127.0.0.1` (avoids ::1 failover retries), apply loopback bind to running PM2 config, verify site still serves + ports loopback-only
-- [ ] No unit tests: config-only change; verification is the live demo (ss output + https round trip)
+- [x] `ecosystem.config.template.js`: backend `--host 127.0.0.1`; frontend `args: 'start -- -H 127.0.0.1'`
+- [x] `scripts/deploy.sh`, `scripts/deploy-fixed.sh`: backend AND frontend start lines loopback (frontend lines were opencode round-1 Major)
+- [x] `.github/workflows/deploy-production.yml.disabled`: same (drift prevention if re-enabled)
+- [x] `docs/STAGING-DEPLOYMENT.md`: Network Exposure section + manual examples fixed
+- [x] Server-side (ops, applied live in demo): nginx `proxy_pass` → explicit `127.0.0.1`, deployed ecosystem.config.js patched, pm2 restarted — ss loopback-only, https 200, external ports dead
+- [x] Post-PR minor: legacy scripts' health checks curl 127.0.0.1 explicitly
+- [x] No unit tests: config-only change; demo is the verification (docs/demos/2026-07-10-issue-189-loopback-bind.md)
+
+## Status: PR #268 open, reviews clean (opencode pre-PR ×2 + post-PR fresh), demo done, awaiting CI → merge
