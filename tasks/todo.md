@@ -27,25 +27,25 @@ exactly the AC's second bullet.
 
 ## Steps (TDD)
 
-- [ ] 1. RED: extend `frontend/src/__tests__/middleware.test.ts` with a production-guard describe:
+- [x] 1. RED: extend `frontend/src/__tests__/middleware.test.ts` with a production-guard describe:
   - `NODE_ENV=production` + `BYPASS_AUTH=true` + `CI=true` → **throws** (the regression pin for this bug)
   - `NODE_ENV=production` + `BYPASS_AUTH=true` (nothing else) → throws
   - `NODE_ENV=production` + `BYPASS_AUTH=true` + `E2E_ALLOW_BYPASS=1` → bypasses (200, no redirect)
   - `NODE_ENV=test` + `BYPASS_AUTH=true` → still bypasses without the flag (no local-workflow breakage)
-- [ ] 2. GREEN: `middleware.ts` — replace `isCI` with `E2E_ALLOW_BYPASS === '1'`; guard fatal for
+- [x] 2. GREEN: `middleware.ts` — replace `isCI` with `E2E_ALLOW_BYPASS === '1'`; guard fatal for
   `NODE_ENV==='production'` regardless of `CI`; update comments.
-- [ ] 3. `playwright.config.ts` webServer env: replace the `CI` passthrough with `E2E_ALLOW_BYPASS: '1'`
+- [x] 3. `playwright.config.ts` webServer env: replace the `CI` passthrough with `E2E_ALLOW_BYPASS: '1'`
   so the CI prod-build E2E run opts in explicitly.
-- [ ] 4. Quality gate: frontend jest suite + lint + typecheck; opencode (GLM) pre-PR review.
-- [ ] 5. Demo (hard gate): prod build + `npm start` with `BYPASS_AUTH=true CI=true` → middleware FATAL
+- [x] 4. Quality gate: frontend jest suite + lint + typecheck; opencode (GLM) pre-PR review.
+- [x] 5. Demo (hard gate): prod build + `npm start` with `BYPASS_AUTH=true CI=true` → middleware FATAL
   (auth NOT silently disabled); same build with `E2E_ALLOW_BYPASS=1` → bypass works; no-bypass prod
   run → normal redirect-to-sign-in.
 - [ ] 6. PR, post-PR review, CI green, docs sync, merge.
 
 ## Acceptance criteria
 
-- [ ] Bypass gated on a purpose-built flag (`E2E_ALLOW_BYPASS=1`) never present in real deploys
-- [ ] Guard stays fatal for `NODE_ENV==='production'` regardless of `CI`
+- [x] Bypass gated on a purpose-built flag (`E2E_ALLOW_BYPASS=1`) never present in real deploys
+- [x] Guard stays fatal for `NODE_ENV==='production'` regardless of `CI`
 
 ## Out of scope
 
