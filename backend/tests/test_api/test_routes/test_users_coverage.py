@@ -188,10 +188,26 @@ async def test_patch_me_privileged_field_rejected_and_not_persisted(
 
     client = await auth_client_factory()
     before = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    assert before is not None  # fail fast if the factory didn't seed the user
     resp = await client.patch("/api/v1/users/me", json={field: value})
     assert resp.status_code == 422
     after = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
     assert after == before
+
+
+async def test_patch_me_declared_fields_still_persist(auth_client_factory):
+    """extra="forbid" (#244) must not break a normal update: declared fields
+    still round-trip to the stored document."""
+    from app.db import base
+
+    client = await auth_client_factory()
+    resp = await client.patch(
+        "/api/v1/users/me", json={"first_name": "Ada", "bio": "Mathematician"}
+    )
+    assert resp.status_code == 200
+    stored = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    assert stored["first_name"] == "Ada"
+    assert stored["bio"] == "Mathematician"
 
 
 async def test_put_user_role_rejected_and_not_persisted(auth_client_factory):
