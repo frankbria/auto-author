@@ -107,7 +107,7 @@ echo "==> Starting backend service with correct Python interpreter..."
 pm2 start .venv/bin/python \
     --name auto-author-backend \
     --cwd "$CURRENT_DIR/backend" \
-    -- -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+    -- -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 # Restart frontend
 cd "$CURRENT_DIR/frontend"

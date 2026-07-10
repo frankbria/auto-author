@@ -36,6 +36,25 @@ frankbria-inspiron-7586 (Staging Server)
 └── PostgreSQL Database → Port 5432
 ```
 
+### Network Exposure (#189)
+
+The staging VPS is shared with other applications. Only nginx may face the
+internet; the app processes must not be directly reachable:
+
+- **Loopback binding (primary)**: both PM2 apps bind `127.0.0.1` —
+  uvicorn via `--host 127.0.0.1` and Next via `next start -H 127.0.0.1`
+  (see `ecosystem.config.template.js`). nginx on the same box proxies
+  `dev.autoauthor.app` → `127.0.0.1:3002` and `api.dev.autoauthor.app` →
+  `127.0.0.1:8000`, terminating TLS and applying CORS/security headers.
+- **Host firewall (defense-in-depth)**: ufw is active with default-deny
+  inbound; only 22/80/443 are allowed. Ports 8000/3002 are dropped at the
+  host even if a process ever binds `0.0.0.0` again.
+  Verified 2026-07-10: `curl http://<public-ip>:8000` and `:3002` time out
+  from off-box while `https://dev.autoauthor.app` serves normally.
+- **Verify after deploy**: `ss -tlnp | grep -E ':8000|:3002'` must show only
+  `127.0.0.1` binds; health checks use `http://localhost:...` and are
+  unaffected.
+
 ---
 
 ## Prerequisites

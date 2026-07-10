@@ -10,7 +10,9 @@ module.exports = {
       // --proxy-headers + --forwarded-allow-ips pin uvicorn to trust nginx's
       // X-Forwarded-For from localhost only, so rate limiting / audit logs see
       // real client IPs and clients can't spoof theirs (#180).
-      args: 'app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=127.0.0.1',
+      // --host 127.0.0.1: shared VPS — only nginx (same box) may reach the app;
+      // a 0.0.0.0 bind exposed the API on the public IP without TLS/CORS (#189).
+      args: 'app.main:app --host 127.0.0.1 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=127.0.0.1',
       cwd: '__BACKEND_CWD__', // Will be replaced with actual release path
       interpreter: 'none', // Don't use Node.js interpreter
       env: {
@@ -27,7 +29,9 @@ module.exports = {
     {
       name: 'auto-author-frontend',
       script: 'npm',
-      args: 'start',
+      // -H 127.0.0.1: same reasoning as the backend bind (#189) — Next binds
+      // 0.0.0.0 by default, exposing :3002 past nginx.
+      args: 'start -- -H 127.0.0.1',
       cwd: '__FRONTEND_CWD__', // Will be replaced with actual release path
       interpreter: 'none',
       env: {
