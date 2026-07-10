@@ -12,17 +12,17 @@
 
 ## Plan
 - [x] Verify premise (repo visibility, env protection, trigger semantics)
-- [ ] Branch `fix/issue-191-staging-pwn-request`
-- [ ] RED: with `act --list` + synthetic fork-PR-labeled event, show the *current* workflow schedules `e2e-staging` for a fork PR
-- [ ] Edit `.github/workflows/e2e-staging-tests.yml`: job `if:` adds `github.event.pull_request.head.repo.full_name == github.repository` AND'd with the label check for PR events; update header + inline comments
-- [ ] GREEN: same synthetic fork event → job skipped; same-repo labeled event → job still runs; schedule/dispatch unaffected
-- [ ] `actionlint` clean
-- [ ] opencode (GLM) pre-PR review on branch diff
-- [ ] PR with Known Limitations (public-repo default already withholds fork secrets; this is defense-in-depth + fork-code-execution/abuse prevention)
-- [ ] Demo (showboat): actionlint + act job-plan truth table old vs new (fork-labeled / same-repo-labeled / schedule)
-- [ ] opencode post-PR review posted as PR comment; triage bot findings
+- [x] Branch `fix/issue-191-staging-pwn-request`
+- [x] RED: with `act --list` + synthetic fork-PR-labeled event, show the *current* workflow schedules `e2e-staging` for a fork PR
+- [x] Edit `.github/workflows/e2e-staging-tests.yml`: job `if:` adds `github.event.pull_request.head.repo.full_name == github.repository` AND'd with the label check for PR events; update header + inline comments
+- [x] GREEN: same synthetic fork event → job skipped; same-repo labeled event → job still runs; schedule/dispatch unaffected
+- [x] `actionlint` clean
+- [x] opencode (GLM) pre-PR review on branch diff
+- [x] PR with Known Limitations (public-repo default already withholds fork secrets; this is defense-in-depth + fork-code-execution/abuse prevention)
+- [x] Demo (showboat): actionlint + act job-plan truth table old vs new (fork-labeled / same-repo-labeled / schedule)
+- [x] opencode post-PR review posted as PR comment; triage bot findings
 - [ ] CI green; docs sync (CLAUDE.md changelog); merge
-- [ ] Follow-up issue (prioritized): `glm-review.yml` same latent class (`pull_request` + `ZHIPU_API_KEY` on fork-runnable trigger)
+- [x] Follow-up issue (filed: #270 [P2.21]) (prioritized): `glm-review.yml` same latent class (`pull_request` + `ZHIPU_API_KEY` on fork-runnable trigger)
 
 ## Notes
 - No unit-test framework exists for workflow YAML; the #189 precedent (config-only, evidence-is-verification) applies. RED/GREEN is done with `act --list` event evaluation.
