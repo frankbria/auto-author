@@ -23,7 +23,7 @@ cloudinary>=1.36.0
 Pillow>=10.0.1
 
 # Export functionality
-reportlab>=4.0.0
+reportlab>=5.0.0
 python-docx>=0.8.11
 html2text>=2020.1.16
 ebooklib>=0.18

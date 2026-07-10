@@ -28,7 +28,7 @@ dependencies = [
     "cloudinary==1.44.1",
     "pillow==11.3.0",
     # Export functionality
-    "reportlab==4.4.3",
+    "reportlab==5.0.0",
     "python-docx==1.2.0",
     "html2text==2025.4.15",
     "ebooklib==0.20",

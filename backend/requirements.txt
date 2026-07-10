@@ -206,7 +206,7 @@ pyzmq==27.0.0
     # via locust
 redis==8.0.1
     # via -r requirements.in
-reportlab==4.4.3
+reportlab==5.0.0
     # via -r requirements.in
 requests==2.32.4
     # via
