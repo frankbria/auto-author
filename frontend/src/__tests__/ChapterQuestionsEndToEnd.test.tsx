@@ -46,16 +46,6 @@ jest.mock('../lib/api/bookClient', () => {
   };
 });
 
-jest.mock('../lib/api/draftClient', () => ({
-  draftClient: {
-    generateChapterDraft: jest.fn(),
-    getDraftContent: jest.fn(),
-    saveDraftContent: jest.fn(),
-  }
-}));
-
-const mockDraftClient = jest.requireMock('../lib/api/draftClient').draftClient;
-
 // Mock notifications
 jest.mock('../lib/toast', () => ({
   toast: jest.fn()

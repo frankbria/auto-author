@@ -185,11 +185,12 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       // Navigate to the edit TOC page
       router.push(`/dashboard/books/${bookId}/edit-toc`);
     } catch (error) {
+      // Stays on REVIEW (no step change), so only the message state is kept —
+      // updateToc is a CRUD save, not an entitlement-gated AI call.
       console.error('Error saving TOC:', error);
       setWizardState(prev => ({
         ...prev,
         error: error instanceof Error ? error.message : 'Failed to save table of contents. Please try again.',
-        errorStatusCode: statusCodeOf(error),
         isLoading: false
       }));
     }
