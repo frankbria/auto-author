@@ -1,20 +1,29 @@
-# Issue #189 — [P1.9] Backend binds 0.0.0.0 on shared VPS
+# Issue #191 [P1.11] — e2e-staging workflow runs fork PR code with live staging secrets (pwn-request)
 
-**Plan source**: self-authored (no plan comment on the issue).
-**Approved**: autonomously (no architectural fork — the AC's first branch, bind loopback, is clearly right; the verified ufw firewall is documented as defense-in-depth, covering the OR branch too).
+**Plan source**: self-authored (no plan comment on the issue — only CodeRabbit boilerplate).
+**Approved**: autonomously (no architectural fork — AC branch 1 (env approval) would gate the 6-hour cron too and break it; branch 3 removes the documented labeled-PR path; branch 2 (same-repo head guard) is the only sound choice).
 
-## Findings (verified live on staging 2026-07-10)
-- Backend listens `0.0.0.0:8000`, Next listens `*:3002` (confirmed via `ss -tlnp`).
-- ufw is ACTIVE, default-deny: only 22/80/443 allowed. External curl to `195.35.14.177:8000/3002` times out — the firewall already blocks direct access, but nothing in the repo documents/verifies it.
-- nginx vhosts proxy to `http://localhost:8000` / `http://localhost:3002`; `/etc/hosts` maps `localhost` to both `127.0.0.1` and `::1`.
+## Premise verification (done)
+- Repo is **public** → GitHub already withholds all secrets (incl. `staging` environment secrets) from `pull_request` runs on fork PRs. The headline "exfiltrate staging creds" attack is **not exploitable today** via this trigger.
+- Residual real risks the fix closes: fork PR code still *executes* (npm ci lifecycle scripts + Playwright specs) against live staging; and the config is one drift step (`pull_request_target` swap, repo going private with fork-secrets enabled) from a genuine credential leak. Defense-in-depth per AC.
+- `staging` environment has **no protection rules** — AC branch 1 (required reviewers) would also gate every scheduled run (protection rules apply to all runs referencing the environment) → breaks the 6-hourly cron. **Rejected.**
+- AC branch 3 (workflow_dispatch-only) removes the documented, in-use labeled-PR path. **Rejected.**
+- **Chosen: AC branch 2** — restrict the label-gated job to same-repo head.
 
-## Plan (AC branch 1: bind loopback; + document firewall as branch 2 evidence)
-- [x] `ecosystem.config.template.js`: backend `--host 127.0.0.1`; frontend `args: 'start -- -H 127.0.0.1'`
-- [x] `scripts/deploy.sh`, `scripts/deploy-fixed.sh`: backend AND frontend start lines loopback (frontend lines were opencode round-1 Major)
-- [x] `.github/workflows/deploy-production.yml.disabled`: same (drift prevention if re-enabled)
-- [x] `docs/STAGING-DEPLOYMENT.md`: Network Exposure section + manual examples fixed
-- [x] Server-side (ops, applied live in demo): nginx `proxy_pass` → explicit `127.0.0.1`, deployed ecosystem.config.js patched, pm2 restarted — ss loopback-only, https 200, external ports dead
-- [x] Post-PR minor: legacy scripts' health checks curl 127.0.0.1 explicitly
-- [x] No unit tests: config-only change; demo is the verification (docs/demos/2026-07-10-issue-189-loopback-bind.md)
+## Plan
+- [x] Verify premise (repo visibility, env protection, trigger semantics)
+- [ ] Branch `fix/issue-191-staging-pwn-request`
+- [ ] RED: with `act --list` + synthetic fork-PR-labeled event, show the *current* workflow schedules `e2e-staging` for a fork PR
+- [ ] Edit `.github/workflows/e2e-staging-tests.yml`: job `if:` adds `github.event.pull_request.head.repo.full_name == github.repository` AND'd with the label check for PR events; update header + inline comments
+- [ ] GREEN: same synthetic fork event → job skipped; same-repo labeled event → job still runs; schedule/dispatch unaffected
+- [ ] `actionlint` clean
+- [ ] opencode (GLM) pre-PR review on branch diff
+- [ ] PR with Known Limitations (public-repo default already withholds fork secrets; this is defense-in-depth + fork-code-execution/abuse prevention)
+- [ ] Demo (showboat): actionlint + act job-plan truth table old vs new (fork-labeled / same-repo-labeled / schedule)
+- [ ] opencode post-PR review posted as PR comment; triage bot findings
+- [ ] CI green; docs sync (CLAUDE.md changelog); merge
+- [ ] Follow-up issue (prioritized): `glm-review.yml` same latent class (`pull_request` + `ZHIPU_API_KEY` on fork-runnable trigger)
 
-## Status: PR #268 open, reviews clean (opencode pre-PR ×2 + post-PR fresh), demo done, awaiting CI → merge
+## Notes
+- No unit-test framework exists for workflow YAML; the #189 precedent (config-only, evidence-is-verification) applies. RED/GREEN is done with `act --list` event evaluation.
+- `load-smoke` job untouched: already gated to `workflow_dispatch` only.

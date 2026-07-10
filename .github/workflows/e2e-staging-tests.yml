@@ -5,7 +5,9 @@ name: E2E Staging Tests
 # Triggers (chosen to avoid hammering live staging / spending AI tokens on every PR):
 #   - schedule: every 6 hours
 #   - workflow_dispatch: manual runs, with optional load-smoke and worker controls
-#   - pull_request: ONLY when the PR carries the `e2e-staging` label
+#   - pull_request: ONLY when the PR carries the `e2e-staging` label AND the PR
+#     head branch lives in this repository (fork PRs never run — their code would
+#     execute against live staging inside the `staging` environment; see #191)
 #
 # Required GitHub Secrets (in the `staging` environment):
 #   - TEST_USER_EMAIL
@@ -45,10 +47,15 @@ jobs:
     environment:
       name: staging
       url: https://dev.autoauthor.app
-    # Skip on PRs unless explicitly labeled `e2e-staging`.
+    # Skip on PRs unless explicitly labeled `e2e-staging` AND the head branch is
+    # in this repo. The same-repo guard blocks pwn-requests (#191): without it, a
+    # maintainer labeling a fork PR lets later attacker pushes (`synchronize`)
+    # re-run fork-controlled code (npm lifecycle scripts, Playwright specs) in the
+    # `staging` environment against the live staging site.
     if: >-
       github.event_name != 'pull_request' ||
-      contains(github.event.pull_request.labels.*.name, 'e2e-staging')
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       contains(github.event.pull_request.labels.*.name, 'e2e-staging'))
 
     steps:
       - name: Checkout repository
