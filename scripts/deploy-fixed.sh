@@ -46,7 +46,7 @@ rollback() {
     sleep 5
 
     # Verify rollback worked
-    if curl -sf http://localhost:8000/api/v1/health > /dev/null; then
+    if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null; then
         echo "✅ Rollback complete to: $PREVIOUS"
         return 0
     else
@@ -220,14 +220,14 @@ sleep 5
 echo "==> Running health checks..."
 HEALTH_CHECK_FAILED=false
 
-if curl -sf http://localhost:8000/api/v1/health > /dev/null; then
+if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null; then
     echo "✅ Backend health check passed"
 else
     echo "❌ Backend health check failed"
     HEALTH_CHECK_FAILED=true
 fi
 
-if curl -sf http://localhost:3002 > /dev/null; then
+if curl -sf http://127.0.0.1:3002 > /dev/null; then
     echo "✅ Frontend health check passed"
 else
     echo "❌ Frontend health check failed"

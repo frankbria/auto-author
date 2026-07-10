@@ -133,14 +133,14 @@ sleep 5
 
 # Health checks
 echo "==> Running health checks..."
-if curl -f http://localhost:8000/api/v1/health; then
+if curl -f http://127.0.0.1:8000/api/v1/health; then
     echo "✅ Backend health check passed"
 else
     echo "❌ Backend health check failed"
     exit 1
 fi
 
-if curl -f http://localhost:3002; then
+if curl -f http://127.0.0.1:3002; then
     echo "✅ Frontend health check passed"
 else
     echo "❌ Frontend health check failed"
