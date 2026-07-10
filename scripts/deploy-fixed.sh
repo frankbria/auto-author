@@ -46,7 +46,7 @@ rollback() {
     sleep 5
 
     # Verify rollback worked
-    if curl -sf http://localhost:8000/api/v1/health > /dev/null; then
+    if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null; then
         echo "✅ Rollback complete to: $PREVIOUS"
         return 0
     else
@@ -188,7 +188,7 @@ echo "==> Starting backend service with correct Python interpreter..."
 pm2 start .venv/bin/python \
     --name auto-author-backend \
     --cwd "$CURRENT_DIR/backend" \
-    -- -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+    -- -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 # ============================================
 # FIX 5: Correct Frontend Directory Path
@@ -205,7 +205,7 @@ if pm2 describe auto-author-frontend > /dev/null 2>&1; then
 fi
 
 echo "==> Starting frontend service..."
-pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start
+pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start -- -H 127.0.0.1
 
 # Save PM2 configuration
 pm2 save
@@ -220,14 +220,14 @@ sleep 5
 echo "==> Running health checks..."
 HEALTH_CHECK_FAILED=false
 
-if curl -sf http://localhost:8000/api/v1/health > /dev/null; then
+if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null; then
     echo "✅ Backend health check passed"
 else
     echo "❌ Backend health check failed"
     HEALTH_CHECK_FAILED=true
 fi
 
-if curl -sf http://localhost:3002 > /dev/null; then
+if curl -sf http://127.0.0.1:3002 > /dev/null; then
     echo "✅ Frontend health check passed"
 else
     echo "❌ Frontend health check failed"

@@ -198,13 +198,13 @@ jobs:
           pm2 start .venv/bin/python \
             --name auto-author-backend \
             --cwd "$CURRENT_DIR/backend" \
-            -- -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+            -- -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
           cd "$CURRENT_DIR/frontend"
           if pm2 describe auto-author-frontend > /dev/null 2>&1; then
             pm2 delete auto-author-frontend
           fi
-          pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start
+          pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start -- -H 127.0.0.1
 
           pm2 save
 

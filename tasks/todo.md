@@ -1,28 +1,20 @@
-# Issue #244 — [P0.9] Privilege escalation: PATCH /users/me accepts role
+# Issue #189 — [P1.9] Backend binds 0.0.0.0 on shared VPS
 
-**Plan source**: self-authored (no plan comment on the issue; CodeRabbit boilerplate only).
-**Approved**: autonomously (no architectural fork — the AC itself allows "removed … or ignored/stripped"; removal matches repo precedent: #220 deliberately kept stripe fields out of `UserUpdate`, #186 deleted rather than gated).
+**Plan source**: self-authored (no plan comment on the issue).
+**Approved**: autonomously (no architectural fork — the AC's first branch, bind loopback, is clearly right; the verified ufw firewall is documented as defense-in-depth, covering the OR branch too).
 
-## Root cause
-`UserUpdate` (`backend/app/schemas/user.py:94`) exposes `role: Optional[str]`; `PATCH /api/v1/users/me` (`update_profile`) dumps `exclude_unset=True` straight into the generic `update_user()` `$set` — any authenticated user can persist `{"role": "admin"}` and everything gated on `SessionRoleChecker` is escalatable.
+## Findings (verified live on staging 2026-07-10)
+- Backend listens `0.0.0.0:8000`, Next listens `*:3002` (confirmed via `ss -tlnp`).
+- ufw is ACTIVE, default-deny: only 22/80/443 allowed. External curl to `195.35.14.177:8000/3002` times out — the firewall already blocks direct access, but nothing in the repo documents/verifies it.
+- nginx vhosts proxy to `http://localhost:8000` / `http://localhost:3002`; `/etc/hosts` maps `localhost` to both `127.0.0.1` and `::1`.
 
-## Decision
-Remove `role` from `UserUpdate` entirely (root fix — no current or future handler can pass it through), rather than stripping it in one handler. Consequences:
-- `PUT /users/{auth_id}`'s non-admin role guard becomes dead code (references the removed field) → deleted. Role is now unwritable via the API for **everyone**, admins included — no admin role-change path exists in any UI/script/test today (verified), so per YAGNI roles are managed directly in the DB.
-- Unknown `role` key in a request body is ignored by pydantic (BaseModel default) → 200 with role untouched, other fields applied.
+## Plan (AC branch 1: bind loopback; + document firewall as branch 2 evidence)
+- [x] `ecosystem.config.template.js`: backend `--host 127.0.0.1`; frontend `args: 'start -- -H 127.0.0.1'`
+- [x] `scripts/deploy.sh`, `scripts/deploy-fixed.sh`: backend AND frontend start lines loopback (frontend lines were opencode round-1 Major)
+- [x] `.github/workflows/deploy-production.yml.disabled`: same (drift prevention if re-enabled)
+- [x] `docs/STAGING-DEPLOYMENT.md`: Network Exposure section + manual examples fixed
+- [x] Server-side (ops, applied live in demo): nginx `proxy_pass` → explicit `127.0.0.1`, deployed ecosystem.config.js patched, pm2 restarted — ss loopback-only, https 200, external ports dead
+- [x] Post-PR minor: legacy scripts' health checks curl 127.0.0.1 explicitly
+- [x] No unit tests: config-only change; demo is the verification (docs/demos/2026-07-10-issue-189-loopback-bind.md)
 
-## Audit of other privileged fields (AC 3)
-- `plan`, `stripe_customer_id`, `stripe_subscription_id`, `is_active`, `book_ids`, `auth_id`: already absent from `UserUpdate` (deliberate, #220).
-- `metadata` (arbitrary dict): stored under its own key, never read for authz anywhere in `app/` — not privileged.
-- `email`: self-service with duplicate-key guard; pre-existing intended behavior, out of scope.
-→ `role` was the only privileged field reachable.
-
-## Steps (TDD)
-- [ ] 1. Branch `fix/244-role-self-elevation`
-- [ ] 2. RED — tests in `tests/test_api/test_routes/test_users_coverage.py`:
-  - AC regression: `PATCH /users/me` with `{"role": "admin", "first_name": "X"}` → 200, response role `user`, **stored DB role unchanged**, first_name applied
-  - Same stored-role-unchanged property for `PUT /users/{auth_id}` (self-target)
-  - Re-target `test_put_user_non_admin_role_change_returns_403`: the 403 guard is superseded by field removal — replaced with a strictly stronger assertion (stored role unchanged; the 403 only proved the request was rejected, not that role was unwritable)
-- [ ] 3. GREEN — remove `role` from `UserUpdate` + its json_schema example; delete the dead PUT role guard
-- [ ] 4. Full backend suite + coverage + ruff
-- [ ] 5. Deslop scan, quality gate (opencode GLM pre-PR review), PR, post-PR review, demo (two real servers: main self-elevates, branch doesn't), CI, docs sync, merge
+## Status: PR #268 open, reviews clean (opencode pre-PR ×2 + post-PR fresh), demo done, awaiting CI → merge
