@@ -68,3 +68,69 @@ describe('middleware route protection', () => {
     expect(res.headers.get('location')).toBeNull();
   });
 });
+
+describe('production bypass guard (#192)', () => {
+  const env = process.env as Record<string, string | undefined>;
+  const original = {
+    BYPASS_AUTH: env.BYPASS_AUTH,
+    NODE_ENV: env.NODE_ENV,
+    CI: env.CI,
+    E2E_ALLOW_BYPASS: env.E2E_ALLOW_BYPASS,
+  };
+
+  beforeEach(() => {
+    env.BYPASS_AUTH = 'true';
+    env.NODE_ENV = 'production';
+    delete env.CI;
+    delete env.E2E_ALLOW_BYPASS;
+  });
+
+  afterAll(() => {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) delete env[key];
+      else env[key] = value;
+    }
+  });
+
+  it('throws in production even when CI=true (the #192 hole)', async () => {
+    env.CI = 'true';
+    await expect(middleware(requestFor('/dashboard'))).rejects.toThrow(
+      /FATAL SECURITY ERROR/
+    );
+  });
+
+  it('throws in production with no exemption flag', async () => {
+    await expect(middleware(requestFor('/dashboard'))).rejects.toThrow(
+      /FATAL SECURITY ERROR/
+    );
+  });
+
+  it('allows bypass in production only with E2E_ALLOW_BYPASS=1', async () => {
+    env.E2E_ALLOW_BYPASS = '1';
+    const res = await middleware(requestFor('/dashboard'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('still bypasses outside production without the flag', async () => {
+    env.NODE_ENV = 'test';
+    const res = await middleware(requestFor('/dashboard'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('E2E_ALLOW_BYPASS alone is not a bypass — auth still enforced', async () => {
+    env.BYPASS_AUTH = 'false';
+    env.E2E_ALLOW_BYPASS = '1';
+    const res = await middleware(requestFor('/dashboard'));
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get('location')!).pathname).toBe('/auth/sign-in');
+  });
+
+  it('only the exact value "1" exempts — loose values still throw', async () => {
+    env.E2E_ALLOW_BYPASS = 'true';
+    await expect(middleware(requestFor('/dashboard'))).rejects.toThrow(
+      /FATAL SECURITY ERROR/
+    );
+  });
+});

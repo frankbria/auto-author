@@ -14,10 +14,14 @@ export async function middleware(request: NextRequest) {
   // This prevents exposing test mode to client-side code
   const bypassAuth = process.env.BYPASS_AUTH === 'true';
 
-  // Production safety check - prevent accidental bypass in production
-  // Allow BYPASS_AUTH in CI/testing environments (GitHub Actions sets CI=true)
-  const isCI = process.env.CI === 'true';
-  if (bypassAuth && process.env.NODE_ENV === 'production' && !isCI) {
+  // Production safety check - prevent accidental bypass in production.
+  // The ONLY exemption is the purpose-built E2E_ALLOW_BYPASS=1 flag, set
+  // explicitly by the Playwright webServer config and never by real deploys.
+  // Deliberately NOT keyed on the generic CI env var (#192): CI=true is set
+  // by most CI/PaaS/container runtimes, so it would silently disable auth in
+  // any production artifact that happens to run with it.
+  const e2eAllowBypass = process.env.E2E_ALLOW_BYPASS === '1';
+  if (bypassAuth && process.env.NODE_ENV === 'production' && !e2eAllowBypass) {
     console.error('FATAL: BYPASS_AUTH cannot be enabled in production environment');
     throw new Error(
       'FATAL SECURITY ERROR: BYPASS_AUTH is enabled in production. ' +

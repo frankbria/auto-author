@@ -1,29 +1,56 @@
-# Issue #191 [P1.11] — e2e-staging workflow runs fork PR code with live staging secrets (pwn-request)
+# Issue #192 [P1.12] — Production auth-bypass guard keyed on generic CI env var
 
-**Plan source**: self-authored (no plan comment on the issue — only CodeRabbit boilerplate).
-**Approved**: autonomously (no architectural fork — AC branch 1 (env approval) would gate the 6-hour cron too and break it; branch 3 removes the documented labeled-PR path; branch 2 (same-repo head guard) is the only sound choice).
+**Plan source**: self-authored (no CodeRabbit plan on the issue; enrichment comment only).
+**Approved**: autonomously (no architectural fork — the AC's "and/or" is an equivalent-options choice; the purpose-built flag is the stronger, simpler branch).
 
-## Premise verification (done)
-- Repo is **public** → GitHub already withholds all secrets (incl. `staging` environment secrets) from `pull_request` runs on fork PRs. The headline "exfiltrate staging creds" attack is **not exploitable today** via this trigger.
-- Residual real risks the fix closes: fork PR code still *executes* (npm ci lifecycle scripts + Playwright specs) against live staging; and the config is one drift step (`pull_request_target` swap, repo going private with fork-secrets enabled) from a genuine credential leak. Defense-in-depth per AC.
-- `staging` environment has **no protection rules** — AC branch 1 (required reviewers) would also gate every scheduled run (protection rules apply to all runs referencing the environment) → breaks the 6-hourly cron. **Rejected.**
-- AC branch 3 (workflow_dispatch-only) removes the documented, in-use labeled-PR path. **Rejected.**
-- **Chosen: AC branch 2** — restrict the label-gated job to same-repo head.
+## Problem
 
-## Plan
-- [x] Verify premise (repo visibility, env protection, trigger semantics)
-- [x] Branch `fix/issue-191-staging-pwn-request`
-- [x] RED: with `act --list` + synthetic fork-PR-labeled event, show the *current* workflow schedules `e2e-staging` for a fork PR
-- [x] Edit `.github/workflows/e2e-staging-tests.yml`: job `if:` adds `github.event.pull_request.head.repo.full_name == github.repository` AND'd with the label check for PR events; update header + inline comments
-- [x] GREEN: same synthetic fork event → job skipped; same-repo labeled event → job still runs; schedule/dispatch unaffected
-- [x] `actionlint` clean
-- [x] opencode (GLM) pre-PR review on branch diff
-- [x] PR with Known Limitations (public-repo default already withholds fork secrets; this is defense-in-depth + fork-code-execution/abuse prevention)
-- [x] Demo (showboat): actionlint + act job-plan truth table old vs new (fork-labeled / same-repo-labeled / schedule)
-- [x] opencode post-PR review posted as PR comment; triage bot findings
-- [ ] CI green; docs sync (CLAUDE.md changelog); merge
-- [x] Follow-up issue (filed: #270 [P2.21]) (prioritized): `glm-review.yml` same latent class (`pull_request` + `ZHIPU_API_KEY` on fork-runnable trigger)
+`frontend/src/middleware.ts:19-26` — the FATAL guard fires only when
+`bypassAuth && NODE_ENV==='production' && !isCI`, where `isCI = process.env.CI === 'true'`.
+`CI=true` is set by most CI/PaaS/container runtimes, so a production artifact running with
+`CI=true` and `BYPASS_AUTH=true` silently disables auth. The E2E infra
+(`playwright.config.ts:85,91,102-103`) deliberately drives a prod build (`npm run build && npm start`)
+through this hole by forwarding `CI`.
 
-## Notes
-- No unit-test framework exists for workflow YAML; the #189 precedent (config-only, evidence-is-verification) applies. RED/GREEN is done with `act --list` event evaluation.
-- `load-smoke` job untouched: already gated to `workflow_dispatch` only.
+## Design decision (autonomous — AC says "and/or")
+
+AC offers: purpose-built flag (`E2E_ALLOW_BYPASS=1`) **and/or** require `NEXT_PUBLIC_ENVIRONMENT==='test'`.
+Taking the **purpose-built flag only** branch:
+- `E2E_ALLOW_BYPASS=1` is opt-in, never present in real deploys, and grep-ably single-purpose.
+- `NEXT_PUBLIC_ENVIRONMENT` is a general-purpose var (also used for staging labeling); keying a
+  security guard on it re-creates the same "generic env var" defect class this issue removes.
+- The `CI` env var is no longer consulted anywhere in the guard.
+
+Dev-mode behavior unchanged: `BYPASS_AUTH=true` alone still bypasses when `NODE_ENV !== 'production'`
+(local `npm run dev` workflows, jest, dev-mode playwright runs). The hardening targets production builds —
+exactly the AC's second bullet.
+
+## Steps (TDD)
+
+- [x] 1. RED: extend `frontend/src/__tests__/middleware.test.ts` with a production-guard describe:
+  - `NODE_ENV=production` + `BYPASS_AUTH=true` + `CI=true` → **throws** (the regression pin for this bug)
+  - `NODE_ENV=production` + `BYPASS_AUTH=true` (nothing else) → throws
+  - `NODE_ENV=production` + `BYPASS_AUTH=true` + `E2E_ALLOW_BYPASS=1` → bypasses (200, no redirect)
+  - `NODE_ENV=test` + `BYPASS_AUTH=true` → still bypasses without the flag (no local-workflow breakage)
+- [x] 2. GREEN: `middleware.ts` — replace `isCI` with `E2E_ALLOW_BYPASS === '1'`; guard fatal for
+  `NODE_ENV==='production'` regardless of `CI`; update comments.
+- [x] 3. `playwright.config.ts` webServer env: replace the `CI` passthrough with `E2E_ALLOW_BYPASS: '1'`
+  so the CI prod-build E2E run opts in explicitly.
+- [x] 4. Quality gate: frontend jest suite + lint + typecheck; opencode (GLM) pre-PR review.
+- [x] 5. Demo (hard gate): prod build + `npm start` with `BYPASS_AUTH=true CI=true` → middleware FATAL
+  (auth NOT silently disabled); same build with `E2E_ALLOW_BYPASS=1` → bypass works; no-bypass prod
+  run → normal redirect-to-sign-in.
+- [ ] 6. PR, post-PR review, CI green, docs sync, merge.
+
+## Acceptance criteria
+
+- [x] Bypass gated on a purpose-built flag (`E2E_ALLOW_BYPASS=1`) never present in real deploys
+- [x] Guard stays fatal for `NODE_ENV==='production'` regardless of `CI`
+
+## Out of scope
+
+- Client-side `NEXT_PUBLIC_BYPASS_AUTH` (`ProtectedRoute`, dashboard `isE2EMode`) — build-time-baked,
+  different mechanism, not named by the issue.
+- Backend `BYPASS_AUTH` guard (`config.py`, hardened in #176) — separate system, keyed on
+  `ENVIRONMENT`/`NODE_ENV`, not `CI`.
+- `deploy-staging.yml`'s BYPASS_AUTH secret check — independent defense-in-depth, unchanged.
