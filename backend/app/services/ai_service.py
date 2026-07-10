@@ -185,15 +185,25 @@ class AIService:
             )
 
     async def _make_openai_request(
-        self, messages: List[Dict], temperature: float = 0.3, max_tokens: int = 1000
+        self,
+        messages: List[Dict],
+        temperature: float = 0.3,
+        max_tokens: int = 1000,
+        correlation_id: Optional[str] = None,
     ):
         """
         Make an OpenAI API request with retry logic.
+
+        Retry lives HERE and only here — callers must not wrap this in
+        _retry_with_backoff again, or a persistent failure makes up to
+        AI_MAX_RETRIES**2 real API calls (#188).
 
         Args:
             messages: List of message dictionaries for the chat completion
             temperature: Temperature for response generation
             max_tokens: Maximum tokens for the response
+            correlation_id: Optional correlation ID so retry logs stay
+                correlated with the calling request
 
         Returns:
             OpenAI response object
@@ -213,7 +223,7 @@ class AIService:
             # generation must not stall health checks or other users' requests.
             return await asyncio.to_thread(_sync_request)
 
-        return await self._retry_with_backoff(_async_wrapper)
+        return await self._retry_with_backoff(_async_wrapper, correlation_id=correlation_id)
 
     async def analyze_summary_for_toc(
         self, summary: str, book_metadata: Optional[Dict] = None
@@ -311,12 +321,11 @@ class AIService:
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self._retry_with_backoff(
-                self._make_openai_request,
+            response = await self._make_openai_request(
                 messages=messages,
                 temperature=0.4,
                 max_tokens=800,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
             questions_text = response.choices[0].message.content
@@ -552,12 +561,11 @@ Make questions specific, actionable, and focused on content structure rather tha
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self._retry_with_backoff(
-                self._make_openai_request,
+            response = await self._make_openai_request(
                 messages=messages,
                 temperature=0.4,
                 max_tokens=1500,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
             toc_text = response.choices[0].message.content

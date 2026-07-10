@@ -1,28 +1,29 @@
-# Issue #247 — Entitlement 402s never reach the Upgrade CTA (wizard + draft dialog; draft dialog leaks raw JSON)
+# Issue #188 — [P1.8] Nested retry wrappers can multiply OpenAI calls to max_retries²
 
-Frontend-only. PR target: main. Plan source: CodeRabbit comment on #247, adapted. **No architectural fork** — the plan's two design choices are already resolved (inline affordance; deep-link target), and my changes are drift corrections → approved autonomously.
+Backend-only. No plan comment on the issue — plan authored from the codebase. **No architectural fork** → approved autonomously.
 
-## Plan drift corrections (vs the CodeRabbit plan)
+## Premise verification (drift check)
+- Confirmed nesting: `_make_openai_request` (ai_service.py:216) already wraps itself in `_retry_with_backoff`; `generate_clarifying_questions` (:314) and `generate_table_of_contents` (:555) wrap it in a second `_retry_with_backoff`.
+- **Premise partially stale**: no actual `AI_MAX_RETRIES²` call multiplication occurs today. The inner layer converts every OpenAI error into an `AIServiceError` subclass (ai_errors.py), and the outer wrapper's `except AIServiceError: raise` re-raises without retrying. A persistent failure makes exactly `AI_MAX_RETRIES` real calls on main.
+- Real defects the nesting causes today:
+  1. Outer logs a spurious extra "Attempting API call (attempt 1/N)" per request — 4 log records for 3 real calls.
+  2. The caller's `correlation_id` is consumed by the outer wrapper; the inner retry loop (where the real attempts/backoff happen) generates its OWN uuid — retry/backoff logs are uncorrelated with the request.
+  3. The non-squaring is accidental: it depends on the inner layer never leaking a raw `openai.*` exception. Any future edit to the inner error conversion silently re-introduces squaring.
+- AC unchanged and valid: retry at exactly one layer; test pins ≤ AI_MAX_RETRIES requests on persistent failure.
 
-1. **Phase 4 DROPPED — already shipped in #246 (#222)**: `ErrorNotification.tsx:97` already navigates to `/dashboard/settings?tab=billing`, and `dashboard/settings/page.tsx` already validates `?tab=` against `SETTINGS_TABS` and strips it via `replaceState`. The plan was generated pre-#246.
-2. **NotReadyMessage optional task SKIPPED (YAGNI)**: its swallowed analyze-summary failure calls `onRetry()` → fresh `checkTocReadiness` → analyze 402 → now routes to the entitlement ERROR panel anyway. No extra plumbing needed.
-3. The "skipped `TocGenerationWizard.test.tsx`" the plan references is a placeholder test that never mounts the wizard (router-context excuse). New wizard entitlement tests go in `frontend/src/components/toc/__tests__/` with a `next/navigation` mock (established repo pattern).
+## Plan (TDD)
+1. **RED** — new `TestSingleRetryLayer` class in `backend/tests/test_services/test_ai_service_errors.py`:
+   - Persistent `openai.RateLimitError`: `generate_clarifying_questions` makes exactly `settings.AI_MAX_RETRIES` calls to `client.chat.completions.create` (AC pin — passes on main too; regression guard against squaring).
+   - Same assertion for `generate_table_of_contents` (AC pin).
+   - Log-based red test: exactly `AI_MAX_RETRIES` "Attempting API call" log records (caplog) — FAILS on main (outer layer adds one more), proving single-layer.
+   - Correlation red test: every "Attempting API call" record carries the same correlation_id (main has two distinct ids: outer's vs inner's uuid).
+   - Patch `asyncio.sleep` in ai_service to keep tests fast.
+2. **GREEN** — `backend/app/services/ai_service.py`:
+   - `_make_openai_request` gains optional `correlation_id: Optional[str] = None`, forwarded to its internal `_retry_with_backoff` (preserves request-scoped correlation in retry logs; the other 5 direct call sites are unaffected).
+   - Sites ~314 and ~555: replace `await self._retry_with_backoff(self._make_openai_request, ...)` with direct `await self._make_openai_request(messages=..., temperature=..., max_tokens=..., correlation_id=correlation_id)`.
+3. Targeted tests → full backend suite + ruff (ping mongod first — pre-commit hang gotcha).
+4. Deslop scan → pre-PR opencode (GLM) review → PR → post-PR review → demo (wire-boundary stub per stale-local-key memory; show attempt-count + single-layer log evidence main vs branch) → CI gate → docs sync → merge.
 
-## Steps
-
-- [ ] 1. `bookClient.generateChapterDraft` non-OK branch → `throw await this.aiError(response, 'Failed to generate draft')` (kills the raw-JSON leak, attaches `statusCode` for the 402 classifier).
-- [ ] 2. `DraftGenerator.handleGenerateDraft` → call `generateChapterDraftWithErrorHandling` (inside `trackOperation`); branch on `result.data`; delete the local `Generation Failed` toast (the wrapper fires the classified notification — Upgrade toast for 402).
-- [ ] 3. `DraftGenerationButton.handleGenerateDraft` → keep the local try/catch for `getChapterQAResponses` + minimum-responses check (non-AI errors keep the inline error state); the draft call goes through the wrapper; on failure set inline `error` from `result.error` (clean message), `step='options'`, no raw toast.
-- [ ] 4. `WizardState` gains `errorStatusCode?: number` (`frontend/src/types/toc.ts`).
-- [ ] 5. `TocGenerationWizard`: nested analyze-summary catch routes `statusCode === 402` to the ERROR step (no longer swallowed); all outer catches (`checkTocReadiness`, `generateQuestions`, `handleQuestionSubmit`, `handleRegenerateToc`, `handleAcceptToc`) capture `statusCode` into `errorStatusCode`; ERROR render passes it to `ErrorDisplay`.
-- [ ] 6. `ErrorDisplay`: optional `statusCode` prop; when 402 → "Upgrade Required" panel with an Upgrade link to `/dashboard/settings?tab=billing`, entitlement copy, no "Try Again", no generic troubleshooting tips.
-- [ ] 7. Tests (TDD):
-  - `bookClient.test.ts`: update `generateChapterDraft` non-OK expectation (parsed message + `statusCode`, no raw body); add 402 `detail.error` case.
-  - `DraftGenerator.test.tsx` / `DraftGenerationButton.test.tsx`: mock the wrapper; assert no raw payload rendered/toasted; entitlement path returns without local toast; non-entitlement failure shows friendly `result.error`.
-  - New wizard test: analyze-summary 402 → ERROR step renders Upgrade link (`?tab=billing`), no "Try Again"; non-402 analyze failure still proceeds to readiness check (regression).
-- [ ] 8. Quality gate: full frontend suite + lint + typecheck; opencode pre-PR review; PR; post-PR review; demo (hard gate); CI; merge.
-
-## Acceptance criteria (from issue)
-
-- Entitlement denials in the TOC wizard surface an upgrade affordance deep-linking to `/dashboard/settings?tab=billing` (not "Try Again").
-- Draft dialog 402 shows the Upgrade CTA path; **no raw JSON payload renders in the UI** anywhere in these flows.
+## Decisions (no fork)
+- Keep the retry inside `_make_openai_request`, strip the outer wrappers (AC's first branch) — 5 other call sites already rely on the internal retry; stripping the internal one would touch 7 sites.
+- Thread `correlation_id` through rather than dropping it — preserves the only useful thing the outer layer provided.
