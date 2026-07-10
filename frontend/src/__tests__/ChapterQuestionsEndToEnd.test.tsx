@@ -35,7 +35,7 @@ jest.mock('../lib/api/bookClient', () => {
     getChaptersMetadata: jest.fn(),
     getTabState: jest.fn(),
     saveTabState: jest.fn(),
-    generateChapterDraft: jest.fn(),
+    generateChapterDraftWithErrorHandling: jest.fn(),
     getChapterQAResponses: jest.fn(),
   };
 
@@ -641,14 +641,16 @@ describe('Chapter Questions End-to-End Tests', () => {
           { question: 'Question 3?', answer: 'Answer 3', status: 'completed' }
         ]
       });
-      (mockBookClient.generateChapterDraft as jest.Mock).mockResolvedValue({
-        draft: 'Generated draft content based on question responses...',
-        metadata: {
-          word_count: 500,
-          estimated_reading_time: 2,
-          writing_style: 'professional'
-        },
-        suggestions: []
+      (mockBookClient.generateChapterDraftWithErrorHandling as jest.Mock).mockResolvedValue({
+        data: {
+          draft: 'Generated draft content based on question responses...',
+          metadata: {
+            word_count: 500,
+            estimated_reading_time: 2,
+            writing_style: 'professional'
+          },
+          suggestions: []
+        }
       });
 
       render(
@@ -684,7 +686,7 @@ describe('Chapter Questions End-to-End Tests', () => {
 
         // Verify the API was called with correct parameters
         await waitFor(() => {
-          expect(mockBookClient.generateChapterDraft).toHaveBeenCalledWith(
+          expect(mockBookClient.generateChapterDraftWithErrorHandling).toHaveBeenCalledWith(
             'test-book-id',
             'test-chapter-id',
             expect.objectContaining({

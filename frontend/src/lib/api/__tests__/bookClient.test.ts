@@ -1809,11 +1809,40 @@ describe('BookClient core CRUD – success paths', () => {
     expect(result).toEqual(data);
   });
 
-  it('generateChapterDraft throws on non-ok response', async () => {
+  it('generateChapterDraft throws the parsed detail message (not the raw body) on non-ok response', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(500, 'AI down'));
-    await expect(
-      bookClient.generateChapterDraft(BOOK_ID, CHAPTER_ID, { question_responses: [] })
-    ).rejects.toThrow('Failed to generate draft: 500 AI down');
+    let thrown: (Error & { statusCode?: number }) | undefined;
+    try {
+      await bookClient.generateChapterDraft(BOOK_ID, CHAPTER_ID, { question_responses: [] });
+    } catch (e) {
+      thrown = e as Error & { statusCode?: number };
+    }
+    expect(thrown).toBeDefined();
+    expect(thrown!.message).toBe('AI down');
+    expect(thrown!.statusCode).toBe(500);
+  });
+
+  it('generateChapterDraft surfaces a clean entitlement message and statusCode on 402 (issue #247)', async () => {
+    const body = {
+      detail: {
+        error: 'Your current plan does not include AI draft generation.',
+        error_type: 'ENTITLEMENT_REQUIRED',
+      },
+    };
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      errorResponse(402, JSON.stringify(body), body)
+    );
+    let thrown: (Error & { statusCode?: number }) | undefined;
+    try {
+      await bookClient.generateChapterDraft(BOOK_ID, CHAPTER_ID, { question_responses: [] });
+    } catch (e) {
+      thrown = e as Error & { statusCode?: number };
+    }
+    expect(thrown).toBeDefined();
+    // The raw JSON payload must never leak into the message shown to users.
+    expect(thrown!.message).toBe('Your current plan does not include AI draft generation.');
+    expect(thrown!.message).not.toContain('{');
+    expect(thrown!.statusCode).toBe(402);
   });
 
   // generateChapterQuestions – success and error

@@ -1199,8 +1199,9 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to generate draft: ${response.status} ${error}`);
+      // Parsed message + statusCode (never the raw body) so the unified
+      // classifier maps 402 → entitlement/upgrade (issue #247).
+      throw await this.aiError(response, 'Failed to generate draft. Please try again.');
     }
 
     return response.json();

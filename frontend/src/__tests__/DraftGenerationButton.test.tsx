@@ -10,7 +10,7 @@ import { ResponseStatus } from '@/types/chapter-questions';
 jest.mock('@/lib/api/bookClient', () => ({
   bookClient: {
     getChapterQAResponses: jest.fn(),
-    generateChapterDraft: jest.fn(),
+    generateChapterDraftWithErrorHandling: jest.fn(),
   }
 }));
 
@@ -74,7 +74,7 @@ describe('DraftGenerationButton', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (bookClient.getChapterQAResponses as jest.Mock).mockResolvedValue(mockQAResponses);
-    (bookClient.generateChapterDraft as jest.Mock).mockResolvedValue(mockDraftResponse);
+    (bookClient.generateChapterDraftWithErrorHandling as jest.Mock).mockResolvedValue({ data: mockDraftResponse });
   });
 
   afterEach(() => {
@@ -234,7 +234,7 @@ describe('DraftGenerationButton', () => {
       });
 
       await waitFor(() => {
-        expect(bookClient.generateChapterDraft).toHaveBeenCalled();
+        expect(bookClient.generateChapterDraftWithErrorHandling).toHaveBeenCalled();
       });
     });
 
@@ -375,8 +375,13 @@ describe('DraftGenerationButton', () => {
   });
 
   describe('Error Handling', () => {
-    it('shows error message when draft generation fails', async () => {
-      (bookClient.generateChapterDraft as jest.Mock).mockRejectedValue(new Error('API Error'));
+    it('shows the friendly classified message inline when draft generation fails', async () => {
+      // The wrapper never throws — it classifies the failure, fires the shared
+      // notification, and returns a friendly { error } message.
+      (bookClient.generateChapterDraftWithErrorHandling as jest.Mock).mockResolvedValue({
+        error: 'AI service is temporarily unavailable. Please try again in a moment.',
+        canRetry: true,
+      });
 
       render(
         <DraftGenerationButton
@@ -395,8 +400,39 @@ describe('DraftGenerationButton', () => {
       await userEvent.click(generateButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/api error/i)).toBeInTheDocument();
+        expect(screen.getByText(/AI service is temporarily unavailable/i)).toBeInTheDocument();
       });
+    });
+
+    it('never renders a raw error payload on an entitlement denial (issue #247)', async () => {
+      // A 402 comes back from the wrapper as a clean upgrade message; the raw
+      // JSON body must not appear anywhere in the dialog.
+      (bookClient.generateChapterDraftWithErrorHandling as jest.Mock).mockResolvedValue({
+        error: 'Your current plan does not include this feature. Upgrade your plan to continue.',
+        canRetry: false,
+      });
+
+      render(
+        <DraftGenerationButton
+          bookId={mockBookId}
+          chapterId={mockChapterId}
+          chapterTitle={mockChapterTitle}
+          completedCount={5}
+          totalQuestions={10}
+        />
+      );
+
+      const openButton = screen.getByRole('button', { name: /generate draft from answers/i });
+      await userEvent.click(openButton);
+      const generateButton = screen.getByRole('button', { name: /^generate draft$/i });
+      await userEvent.click(generateButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Upgrade your plan to continue/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/"detail"/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/402/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Failed to generate draft: /)).not.toBeInTheDocument();
     });
 
     it('shows error when not enough completed responses', async () => {

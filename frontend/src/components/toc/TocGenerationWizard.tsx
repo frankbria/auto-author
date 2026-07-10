@@ -21,6 +21,13 @@ interface TocGenerationWizardProps {
   bookId: string;
 }
 
+/** HTTP status attached by bookClient.aiError, when present (402 → entitlement, issue #247). */
+function statusCodeOf(error: unknown): number | undefined {
+  return error instanceof Error
+    ? (error as Error & { statusCode?: number }).statusCode
+    : undefined;
+}
+
 export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -56,6 +63,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         ...prev,
         step: WizardStep.ERROR,
         error: error instanceof Error ? error.message : 'Failed to generate clarifying questions. Please try again.',
+        errorStatusCode: statusCodeOf(error),
         isLoading: false
       }));
     }
@@ -72,6 +80,11 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         }, { bookId });
         console.log('Summary analysis completed');
       } catch (analysisError) {
+        // An entitlement denial is a paywall, not a transient analysis
+        // failure — surface the upgrade path instead of swallowing it (#247).
+        if (statusCodeOf(analysisError) === 402) {
+          throw analysisError;
+        }
         console.warn('Summary analysis failed, proceeding with basic check:', analysisError);
         // Continue with readiness check even if analysis fails
       }
@@ -98,6 +111,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         ...prev,
         step: WizardStep.ERROR,
         error: error instanceof Error ? error.message : 'Failed to check if your summary is ready for TOC generation. Please try again.',
+        errorStatusCode: statusCodeOf(error),
         isLoading: false
       }));
     }
@@ -153,6 +167,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         ...prev,
         step: WizardStep.ERROR,
         error: error instanceof Error ? error.message : 'Failed to generate table of contents. Please try again.',
+        errorStatusCode: statusCodeOf(error),
         isLoading: false
       }));
     }
@@ -174,6 +189,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       setWizardState(prev => ({
         ...prev,
         error: error instanceof Error ? error.message : 'Failed to save table of contents. Please try again.',
+        errorStatusCode: statusCodeOf(error),
         isLoading: false
       }));
     }
@@ -185,7 +201,8 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         ...prev,
         step: WizardStep.GENERATING,
         isLoading: true,
-        error: undefined
+        error: undefined,
+        errorStatusCode: undefined
       }));
 
       const { data: result } = await trackOperation('toc-generation', async () => {
@@ -224,6 +241,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         ...prev,
         step: WizardStep.ERROR,
         error: error instanceof Error ? error.message : 'Failed to regenerate table of contents. Please try again.',
+        errorStatusCode: statusCodeOf(error),
         isLoading: false
       }));
     }
@@ -277,6 +295,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
           <ErrorDisplay
             error={wizardState.error!}
             onRetry={handleRetry}
+            statusCode={wizardState.errorStatusCode}
           />
         );
 
