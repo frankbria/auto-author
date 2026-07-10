@@ -71,5 +71,7 @@ export interface WizardState {
   questionResponses: QuestionResponse[];
   generatedToc?: TocGenerationResult;
   error?: string;
+  /** HTTP status of the failure, when known — 402 marks an entitlement denial (issue #247). */
+  errorStatusCode?: number;
   isLoading: boolean;
 }

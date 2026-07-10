@@ -8,7 +8,7 @@ import { toast } from '@/lib/toast';
 jest.mock('@/lib/api/bookClient', () => ({
   __esModule: true,
   default: {
-    generateChapterDraft: jest.fn(),
+    generateChapterDraftWithErrorHandling: jest.fn(),
   },
 }));
 
@@ -120,11 +120,13 @@ describe('DraftGenerator', () => {
       actual_length: 150,
     };
 
-    (bookClient.generateChapterDraft as any).mockResolvedValueOnce({
-      success: true,
-      draft: mockDraft,
-      metadata: mockMetadata,
-      suggestions: ['Add more examples', 'Consider breaking into sections'],
+    (bookClient.generateChapterDraftWithErrorHandling as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        draft: mockDraft,
+        metadata: mockMetadata,
+        suggestions: ['Add more examples', 'Consider breaking into sections'],
+      },
     });
 
     render(<DraftGenerator {...defaultProps} />);
@@ -140,7 +142,7 @@ describe('DraftGenerator', () => {
     await user.click(generateButton);
 
     await waitFor(() => {
-      expect(bookClient.generateChapterDraft).toHaveBeenCalledWith(
+      expect(bookClient.generateChapterDraftWithErrorHandling).toHaveBeenCalledWith(
         'test-book-id',
         'test-chapter-id',
         {
@@ -167,12 +169,15 @@ describe('DraftGenerator', () => {
     expect(screen.getByText(/1 min read/)).toBeInTheDocument();
   });
 
-  it('handles draft generation errors', async () => {
+  it('handles draft generation errors via the shared AI pipeline — no local raw toast (issue #247)', async () => {
     const user = userEvent.setup();
 
-    (bookClient.generateChapterDraft as any).mockRejectedValueOnce(
-      new Error('Failed to generate draft')
-    );
+    // The wrapper never throws: it classifies the error, fires the shared
+    // notification (Upgrade CTA for a 402), and returns { error }.
+    (bookClient.generateChapterDraftWithErrorHandling as any).mockResolvedValueOnce({
+      error: 'Your current plan does not include this feature. Upgrade your plan to continue.',
+      canRetry: false,
+    });
 
     render(<DraftGenerator {...defaultProps} />);
 
@@ -186,13 +191,17 @@ describe('DraftGenerator', () => {
     const generateButton = screen.getByRole('button', { name: /generate draft/i });
     await user.click(generateButton);
 
+    // Back on the form (not stuck generating); the shared pipeline owns
+    // failure presentation, so no local "Generation Failed" toast fires.
     await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith({
-        title: 'Generation Failed',
-        description: 'Failed to generate draft',
-        variant: 'destructive',
-      });
+      expect(screen.getByRole('button', { name: /generate draft/i })).toBeInTheDocument();
     });
+    expect(mockToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Generation Failed' })
+    );
+    // No raw payload fragments render in the dialog.
+    expect(screen.queryByText(/"detail"/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/402/)).not.toBeInTheDocument();
   });
 
   it('applies generated draft to editor', async () => {
@@ -200,14 +209,16 @@ describe('DraftGenerator', () => {
     const mockDraft = 'This is the generated content';
     const onDraftGenerated = jest.fn();
 
-    (bookClient.generateChapterDraft as any).mockResolvedValueOnce({
-      success: true,
-      draft: mockDraft,
-      metadata: {
-        word_count: 10,
-        estimated_reading_time: 1,
+    (bookClient.generateChapterDraftWithErrorHandling as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        draft: mockDraft,
+        metadata: {
+          word_count: 10,
+          estimated_reading_time: 1,
+        },
+        suggestions: [],
       },
-      suggestions: [],
     });
 
     render(<DraftGenerator {...defaultProps} onDraftGenerated={onDraftGenerated} />);
@@ -237,11 +248,13 @@ describe('DraftGenerator', () => {
   it('allows regenerating a new draft', async () => {
     const user = userEvent.setup();
 
-    (bookClient.generateChapterDraft as any).mockResolvedValueOnce({
-      success: true,
-      draft: 'First draft',
-      metadata: { word_count: 10 },
-      suggestions: [],
+    (bookClient.generateChapterDraftWithErrorHandling as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        draft: 'First draft',
+        metadata: { word_count: 10 },
+        suggestions: [],
+      },
     });
 
     render(<DraftGenerator {...defaultProps} />);
@@ -272,11 +285,13 @@ describe('DraftGenerator', () => {
       'Include a summary at the end',
     ];
 
-    (bookClient.generateChapterDraft as any).mockResolvedValueOnce({
-      success: true,
-      draft: 'Draft content',
-      metadata: { word_count: 100 },
-      suggestions,
+    (bookClient.generateChapterDraftWithErrorHandling as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        draft: 'Draft content',
+        metadata: { word_count: 100 },
+        suggestions,
+      },
     });
 
     render(<DraftGenerator {...defaultProps} />);
@@ -326,23 +341,25 @@ describe('DraftGenerator', () => {
     const textarea = screen.getAllByPlaceholderText(/your answer/i)[0];
     await user.type(textarea, 'Answer');
 
-    (bookClient.generateChapterDraft as any).mockResolvedValueOnce({
-      success: true,
-      draft: 'Draft',
-      metadata: { word_count: 50 },
-      suggestions: [],
+    (bookClient.generateChapterDraftWithErrorHandling as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        draft: 'Draft',
+        metadata: { word_count: 50 },
+        suggestions: [],
+      },
     });
 
     await user.click(screen.getByRole('button', { name: /generate draft/i }));
 
     await waitFor(() => {
-      expect(bookClient.generateChapterDraft).toHaveBeenCalledWith(
+      expect(bookClient.generateChapterDraftWithErrorHandling).toHaveBeenCalledWith(
         'test-book-id',
         'test-chapter-id',
         expect.any(Object)
       );
       // The style might be 'academic' or default depending on UI availability
-      const calls = (bookClient.generateChapterDraft as any).mock.calls;
+      const calls = (bookClient.generateChapterDraftWithErrorHandling as any).mock.calls;
       expect(calls.length).toBeGreaterThan(0);
     });
   });
@@ -352,7 +369,7 @@ describe('DraftGenerator', () => {
 
     // Hold the request open so the generating state is observable.
     let resolveRequest: (value: unknown) => void = () => {};
-    (bookClient.generateChapterDraft as any).mockReturnValueOnce(
+    (bookClient.generateChapterDraftWithErrorHandling as any).mockReturnValueOnce(
       new Promise((resolve) => {
         resolveRequest = resolve;
       })
@@ -372,10 +389,12 @@ describe('DraftGenerator', () => {
 
     // Resolve and let the preview render so the state update is wrapped.
     resolveRequest({
-      success: true,
-      draft: 'done',
-      metadata: { word_count: 1, estimated_reading_time: 1, writing_style: 'professional' },
-      suggestions: [],
+      data: {
+        success: true,
+        draft: 'done',
+        metadata: { word_count: 1, estimated_reading_time: 1, writing_style: 'professional' },
+        suggestions: [],
+      },
     });
     await waitFor(() => {
       expect(screen.getByText(/Generated Draft/i)).toBeInTheDocument();

@@ -1348,15 +1348,17 @@ describe('BookClient', () => {
         ok: false,
         status: 500,
         text: async () => 'Generation failed',
+        json: async () => ({ detail: 'Generation failed' }),
       });
 
       const draftData = {
         question_responses: [{ question: 'Test?', answer: 'Test answer' }],
       };
 
+      // The parsed detail message is surfaced — never the raw body (issue #247).
       await expect(
         bookClient.generateChapterDraft('book123', 'ch1', draftData)
-      ).rejects.toThrow('Failed to generate draft: 500 Generation failed');
+      ).rejects.toThrow('Generation failed');
     });
   });
 

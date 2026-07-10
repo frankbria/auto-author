@@ -1,9 +1,46 @@
 interface ErrorDisplayProps {
   error: string;
   onRetry: () => void;
+  /** HTTP status of the failure — 402 renders the upgrade panel instead of retry (issue #247). */
+  statusCode?: number;
 }
 
-export default function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
+export default function ErrorDisplay({ error, onRetry, statusCode }: ErrorDisplayProps) {
+  const isEntitlementError = statusCode === 402;
+
+  if (isEntitlementError) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-8">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-indigo-900/20 border border-indigo-700 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+
+          <h2 className="text-xl font-semibold text-gray-100 mb-3">
+            Upgrade Required
+          </h2>
+
+          <p className="text-gray-400 mb-6 max-w-md mx-auto">
+            {error}
+          </p>
+
+          <a
+            href="/dashboard/settings?tab=billing"
+            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-colors inline-flex items-center"
+          >
+            Upgrade Plan
+          </a>
+
+          <p className="text-gray-500 text-sm mt-6 max-w-md mx-auto">
+            Contact support if you believe this is a mistake.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-8">
       <div className="text-center">

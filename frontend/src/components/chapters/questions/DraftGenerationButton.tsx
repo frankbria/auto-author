@@ -147,36 +147,41 @@ export function DraftGenerationButton({
         answer: r.answer
       }));
 
-      // Generate the draft
-      const result = await bookClient.generateChapterDraft(bookId, chapterId, {
+      // Generate the draft through the error-handling wrapper: it never
+      // throws, classifies failures, and fires the shared notification
+      // (Upgrade CTA for a 402 entitlement denial, issue #247). The inline
+      // error state gets the wrapper's clean message — never a raw payload.
+      const result = await bookClient.generateChapterDraftWithErrorHandling(bookId, chapterId, {
         question_responses: questionResponses,
         writing_style: writingStyle,
         target_length: parseInt(targetLength)
       });
 
-      setGeneratedDraft(result.draft);
+      if (!result.data) {
+        setError(result.error || 'Failed to generate draft. Please try again.');
+        setStep('options');
+        return;
+      }
+
+      setGeneratedDraft(result.data.draft);
       setDraftMetadata({
-        word_count: result.metadata.word_count,
-        estimated_reading_time: result.metadata.estimated_reading_time,
-        writing_style: result.metadata.writing_style
+        word_count: result.data.metadata.word_count,
+        estimated_reading_time: result.data.metadata.estimated_reading_time,
+        writing_style: result.data.metadata.writing_style
       });
-      setSuggestions(result.suggestions || []);
+      setSuggestions(result.data.suggestions || []);
       setStep('preview');
 
       toast({
         title: 'Draft Generated!',
-        description: `Created a ${result.metadata.word_count} word draft from ${questionResponses.length} responses.`,
+        description: `Created a ${result.data.metadata.word_count} word draft from ${questionResponses.length} responses.`,
       });
     } catch (err) {
+      // Local pre-checks (fetching Q&A responses, minimum-response guard)
+      // still throw plain Errors with user-facing messages.
       console.error('Error generating draft:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate draft');
       setStep('options');
-
-      toast({
-        title: 'Generation Failed',
-        description: err instanceof Error ? err.message : 'Failed to generate draft',
-        variant: 'destructive',
-      });
     } finally {
       setIsGenerating(false);
     }

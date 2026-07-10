@@ -136,28 +136,29 @@ export function DraftGenerator({
         qr => qr.question.trim() && qr.answer.trim()
       );
 
+      // The error-handling wrapper never throws: it classifies failures and
+      // fires the shared notification (Upgrade CTA for a 402 entitlement
+      // denial, issue #247) — so no local error toast here, and raw error
+      // payloads can never surface in the UI.
       const { data: result } = await trackOperation('generate-draft', async () => {
-        return await bookClient.generateChapterDraft(bookId, chapterId, {
+        return await bookClient.generateChapterDraftWithErrorHandling(bookId, chapterId, {
           question_responses: validResponses,
           writing_style: writingStyle,
           target_length: targetLength,
         });
       }, { bookId, chapterId, writingStyle, targetLength, responseCount: validResponses.length });
 
-      setGeneratedDraft(result.draft);
-      setDraftMetadata(result.metadata);
-      setSuggestions(result.suggestions || []);
+      if (!result.data) {
+        return;
+      }
+
+      setGeneratedDraft(result.data.draft);
+      setDraftMetadata(result.data.metadata);
+      setSuggestions(result.data.suggestions || []);
 
       toast({
         title: 'Draft Generated!',
-        description: `Successfully generated a ${result.metadata.word_count} word draft.`,
-      });
-    } catch (error) {
-      console.error('Error generating draft:', error);
-      toast({
-        title: 'Generation Failed',
-        description: error instanceof Error ? error.message : 'Failed to generate draft',
-        variant: 'destructive',
+        description: `Successfully generated a ${result.data.metadata.word_count} word draft.`,
       });
     } finally {
       setIsGenerating(false);

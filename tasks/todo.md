@@ -1,33 +1,28 @@
-# Issue #222 — [P0.2.3] Billing settings UI (plan status + manage/upgrade)
+# Issue #247 — Entitlement 402s never reach the Upgrade CTA (wizard + draft dialog; draft dialog leaks raw JSON)
 
-Parent epic #174. **No architectural fork** — every decision mirrors the shipped #221 checkout idiom → approved autonomously.
+Frontend-only. PR target: main. Plan source: CodeRabbit comment on #247, adapted. **No architectural fork** — the plan's two design choices are already resolved (inline affordance; deep-link target), and my changes are drift corrections → approved autonomously.
 
-## Plan drift (CodeRabbit plan of 2026-07-04 predates #174/#220/#221 — mostly shipped)
+## Plan drift corrections (vs the CodeRabbit plan)
 
-- Its Phase 1 (`plan` field end-to-end) — **shipped** in #174 (+ `read_users_me` mapping fixed in #221). Its `Literal["free","paid"]` is also wrong: real plans are `free`/`pro`/`restricted`.
-- Its Phase 2 Tasks 2–4 (`useBillingApi`, `BillingSettingsForm`, Billing tab in settings) — **shipped** in #221 (PR #245), including the free-user Upgrade CTA → Stripe checkout.
-- Its `useSearchParams` + Suspense approach — **rejected in #221 deliberately**; the settings page reads `window.location.search` in a mount effect to avoid the Suspense-boundary requirement. The `?tab=` deep-link reuses that pattern.
-- Its "link free users to `/dashboard/checkout`" — **stale**: checkout is a backend-created Stripe redirect (`POST /billing/checkout`), shipped.
+1. **Phase 4 DROPPED — already shipped in #246 (#222)**: `ErrorNotification.tsx:97` already navigates to `/dashboard/settings?tab=billing`, and `dashboard/settings/page.tsx` already validates `?tab=` against `SETTINGS_TABS` and strips it via `replaceState`. The plan was generated pre-#246.
+2. **NotReadyMessage optional task SKIPPED (YAGNI)**: its swallowed analyze-summary failure calls `onRetry()` → fresh `checkTocReadiness` → analyze 402 → now routes to the entitlement ERROR panel anyway. No extra plumbing needed.
+3. The "skipped `TocGenerationWizard.test.tsx`" the plan references is a placeholder test that never mounts the wizard (router-context excuse). New wizard entitlement tests go in `frontend/src/components/toc/__tests__/` with a `next/navigation` mock (established repo pattern).
 
-## Remaining gaps (the actual work)
+## Steps
 
-AC recap: user sees plan ✅ (shipped) · free upgrade CTA ✅ (shipped) · **paid users can manage billing** ❌ · **ErrorNotification CTA deep-links to the billing tab** ❌.
+- [ ] 1. `bookClient.generateChapterDraft` non-OK branch → `throw await this.aiError(response, 'Failed to generate draft')` (kills the raw-JSON leak, attaches `statusCode` for the 402 classifier).
+- [ ] 2. `DraftGenerator.handleGenerateDraft` → call `generateChapterDraftWithErrorHandling` (inside `trackOperation`); branch on `result.data`; delete the local `Generation Failed` toast (the wrapper fires the classified notification — Upgrade toast for 402).
+- [ ] 3. `DraftGenerationButton.handleGenerateDraft` → keep the local try/catch for `getChapterQAResponses` + minimum-responses check (non-AI errors keep the inline error state); the draft call goes through the wrapper; on failure set inline `error` from `result.error` (clean message), `step='options'`, no raw toast.
+- [ ] 4. `WizardState` gains `errorStatusCode?: number` (`frontend/src/types/toc.ts`).
+- [ ] 5. `TocGenerationWizard`: nested analyze-summary catch routes `statusCode === 402` to the ERROR step (no longer swallowed); all outer catches (`checkTocReadiness`, `generateQuestions`, `handleQuestionSubmit`, `handleRegenerateToc`, `handleAcceptToc`) capture `statusCode` into `errorStatusCode`; ERROR render passes it to `ErrorDisplay`.
+- [ ] 6. `ErrorDisplay`: optional `statusCode` prop; when 402 → "Upgrade Required" panel with an Upgrade link to `/dashboard/settings?tab=billing`, entitlement copy, no "Try Again", no generic troubleshooting tips.
+- [ ] 7. Tests (TDD):
+  - `bookClient.test.ts`: update `generateChapterDraft` non-OK expectation (parsed message + `statusCode`, no raw body); add 402 `detail.error` case.
+  - `DraftGenerator.test.tsx` / `DraftGenerationButton.test.tsx`: mock the wrapper; assert no raw payload rendered/toasted; entitlement path returns without local toast; non-entitlement failure shows friendly `result.error`.
+  - New wizard test: analyze-summary 402 → ERROR step renders Upgrade link (`?tab=billing`), no "Try Again"; non-402 analyze failure still proceeds to readiness check (regression).
+- [ ] 8. Quality gate: full frontend suite + lint + typecheck; opencode pre-PR review; PR; post-PR review; demo (hard gate); CI; merge.
 
-- [x] **Backend `POST /api/v1/billing/portal`** (extend `billing.py`, mirrors checkout):
-  session auth + rate limit 5/300; **503 fail-closed** when `STRIPE_SECRET_KEY` unset (portal needs no price id); **409** when the user has no `stripe_customer_id` (nothing to manage — upgrade first); `stripe.billing_portal.Session.create(customer=…, return_url={BETTER_AUTH_URL}/dashboard/settings?tab=billing)` via `asyncio.to_thread`; `StripeError` → sanitized 502. No plan mutation.
-- [x] **`useBillingApi.openBillingPortal()`** — POST `/billing/portal`, returns `{url}`.
-- [x] **`BillingSettingsForm`**: Manage billing button gated on `hasBillingAccount` (`stripe_customer_id` presence — the portal's exact backend gate), NOT on plan: the pre-PR review's Major was that lapsed (`restricted`) users couldn't reach the payment-recovery portal through the UI. Restricted users see BOTH Upgrade and Manage billing, with "Your subscription is inactive" copy (post-PR minor).
-- [x] **Settings page `?tab=` deep-link**: mount effect reads `tab` from `window.location.search`, validated against `SETTINGS_TABS`; checkout param handling runs after and may override. `tab` param left in the URL.
-- [x] **ErrorNotification** ENTITLEMENT CTA: `/dashboard/settings` → `/dashboard/settings?tab=billing`. **Demo finding**: no shipped flow actually routes a 402 through that toast (wizard + draft dialog render inline errors; draft dialog leaks raw JSON) — filed as **#247**.
+## Acceptance criteria (from issue)
 
-## Tests (TDD — write first)
-
-- [x] `backend/tests/test_api/test_billing_portal.py` (6): happy path (full-string `return_url`, no plan flip), restricted-user allowed, 409 no-customer, 503 unconfigured, 401 unauth, 502 sanitized StripeError.
-- [x] `useBillingApi.test.ts`, `BillingSettingsForm.test.tsx` (8, incl. restricted both-buttons + inactive copy), `SettingsPageBilling.test.tsx` (7, incl. deep-link + restricted page-level), `ErrorNotification.test.tsx` CTA target.
-
-## Gates
-
-- [x] Backend **1144 passed / 13 skipped, 92.23% cov**; frontend **113 suites, 2054+ passed**, coverage/lint/typecheck clean
-- [x] opencode (GLM) pre-PR ×2 (1 Major fixed → "clean to merge"; 429-test minor rebutted, accepted) + post-PR fresh session "clean to merge" (2 of 4 minors fixed, 2 accepted) — posted to PR #246
-- [x] Demo `docs/demos/2026-07-09-issue-222-billing-portal.md` (found #247)
-- [ ] CI green → merge
+- Entitlement denials in the TOC wizard surface an upgrade affordance deep-linking to `/dashboard/settings?tab=billing` (not "Try Again").
+- Draft dialog 402 shows the Upgrade CTA path; **no raw JSON payload renders in the UI** anywhere in these flows.
