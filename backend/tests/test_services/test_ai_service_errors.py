@@ -343,3 +343,111 @@ class TestRetryMechanism:
                 await ai_service_with_mock_cache.generate_clarifying_questions(
                     summary="Test summary"
                 )
+
+
+class TestSingleRetryLayer:
+    """Issue #188: retry must happen at exactly one layer.
+
+    generate_clarifying_questions and generate_toc_from_summary_and_responses
+    used to wrap _make_openai_request (which retries internally) in a second
+    _retry_with_backoff. These tests pin single-layer behavior: a persistently
+    failing call makes exactly AI_MAX_RETRIES real requests, logs one attempt
+    line per request, and all attempt logs share one correlation id.
+
+    NB: the two call-count tests pin the issue's AC but would also pass with
+    the old double-wrap (the outer layer re-raised AIServiceError without
+    retrying, so squaring never actually occurred). The log-based tests are
+    the ones that fail if a second retry layer is reintroduced.
+    """
+
+    def _rate_limit_error(self):
+        return openai.RateLimitError(
+            "Rate limit exceeded",
+            response=httpx.Response(429, request=httpx.Request("POST", "https://api.openai.com")),
+            body=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_questions_persistent_failure_makes_at_most_max_retries_calls(
+        self, ai_service_with_mock_cache
+    ):
+        """AC: persistently-failing call makes at most AI_MAX_RETRIES requests."""
+        create_mock = MagicMock(side_effect=self._rate_limit_error())
+        with patch.object(
+            ai_service_with_mock_cache.client.chat.completions, 'create', create_mock
+        ), patch('app.services.ai_service.asyncio.sleep', new=AsyncMock()):
+            with pytest.raises(AIRateLimitError):
+                await ai_service_with_mock_cache.generate_clarifying_questions(
+                    summary="Test summary", num_questions=3
+                )
+
+        assert create_mock.call_count == ai_service_with_mock_cache.max_retries
+
+    @pytest.mark.asyncio
+    async def test_toc_persistent_failure_makes_at_most_max_retries_calls(
+        self, ai_service_with_mock_cache
+    ):
+        """AC: persistently-failing TOC generation makes at most AI_MAX_RETRIES requests."""
+        create_mock = MagicMock(side_effect=self._rate_limit_error())
+        with patch.object(
+            ai_service_with_mock_cache.client.chat.completions, 'create', create_mock
+        ), patch('app.services.ai_service.asyncio.sleep', new=AsyncMock()):
+            with pytest.raises(AIRateLimitError):
+                await ai_service_with_mock_cache.generate_toc_from_summary_and_responses(
+                    summary="Test summary",
+                    question_responses=[{"question": "Q?", "answer": "A."}],
+                )
+
+        assert create_mock.call_count == ai_service_with_mock_cache.max_retries
+
+    @pytest.mark.asyncio
+    async def test_exactly_one_attempt_log_per_real_request(
+        self, ai_service_with_mock_cache, caplog
+    ):
+        """A second retry layer logs its own extra 'Attempting API call' line."""
+        import logging as _logging
+        create_mock = MagicMock(side_effect=self._rate_limit_error())
+        with caplog.at_level(_logging.INFO, logger="app.services.ai_service"):
+            with patch.object(
+                ai_service_with_mock_cache.client.chat.completions, 'create', create_mock
+            ), patch('app.services.ai_service.asyncio.sleep', new=AsyncMock()):
+                with pytest.raises(AIRateLimitError):
+                    await ai_service_with_mock_cache.generate_clarifying_questions(
+                        summary="Test summary", num_questions=3
+                    )
+
+        attempt_logs = [r for r in caplog.records if "Attempting API call" in r.message]
+        assert len(attempt_logs) == create_mock.call_count
+
+    @pytest.mark.asyncio
+    async def test_attempt_logs_share_one_correlation_id(
+        self, ai_service_with_mock_cache, caplog
+    ):
+        """Nested layers each mint their own correlation id, splitting the trace."""
+        import logging as _logging
+        import re
+        create_mock = MagicMock(side_effect=self._rate_limit_error())
+        with caplog.at_level(_logging.INFO, logger="app.services.ai_service"):
+            with patch.object(
+                ai_service_with_mock_cache.client.chat.completions, 'create', create_mock
+            ), patch('app.services.ai_service.asyncio.sleep', new=AsyncMock()):
+                with pytest.raises(AIRateLimitError):
+                    await ai_service_with_mock_cache.generate_clarifying_questions(
+                        summary="Test summary", num_questions=3
+                    )
+
+        ids = {
+            m.group(1)
+            for r in caplog.records
+            if "Attempting API call" in r.message
+            and (m := re.search(r"correlation_id=([0-9a-f-]+)", r.message))
+        }
+        assert len(ids) == 1
+
+    def test_sdk_internal_retries_disabled(self, ai_service_with_mock_cache):
+        """The openai SDK retries each request itself (default max_retries=2),
+        stacking a third retry layer under _retry_with_backoff: a persistent
+        failure made 3x3=9 real HTTP requests on the wire. The app layer is
+        the sole retry owner, so the client must be built with max_retries=0.
+        """
+        assert ai_service_with_mock_cache.client.max_retries == 0
