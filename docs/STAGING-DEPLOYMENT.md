@@ -327,12 +327,12 @@ uv run alembic upgrade head
 ```bash
 # Backend
 cd backend
-pm2 start "uvicorn app.main:app --host 0.0.0.0 --port 8000" \
+pm2 start "uvicorn app.main:app --host 127.0.0.1 --port 8000" \
   --name "auto-author-backend-staging"
 
 # Frontend
 cd ../frontend
-pm2 start "npm start" --name "auto-author-frontend-staging"
+pm2 start "npm start -- -H 127.0.0.1" --name "auto-author-frontend-staging"
 
 # Save PM2 configuration
 pm2 save
@@ -345,11 +345,11 @@ pm2 startup  # Follow instructions to enable on boot
 # Backend
 cd backend
 source .venv/bin/activate
-nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
+nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
 
 # Frontend
 cd ../frontend
-nohup npm start > frontend.log 2>&1 &
+nohup npm start -- -H 127.0.0.1 > frontend.log 2>&1 &
 ```
 
 ---

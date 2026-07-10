@@ -205,7 +205,7 @@ if pm2 describe auto-author-frontend > /dev/null 2>&1; then
 fi
 
 echo "==> Starting frontend service..."
-pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start
+pm2 start npm --name auto-author-frontend --cwd "$CURRENT_DIR/frontend" -- start -- -H 127.0.0.1
 
 # Save PM2 configuration
 pm2 save
