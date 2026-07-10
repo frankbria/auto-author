@@ -60,7 +60,7 @@ ecdsa==0.19.1
     # via python-jose
 email-validator==2.2.0
     # via pydantic
-faker==37.4.2
+faker==40.23.0
     # via -r requirements.in
 fastapi==0.116.1
     # via -r requirements.in
@@ -254,8 +254,6 @@ typing-inspection==0.4.2
     # via
     #   pydantic
     #   pydantic-settings
-tzdata==2025.2
-    # via faker
 urllib3==2.5.0
     # via
     #   botocore
