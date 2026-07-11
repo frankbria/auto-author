@@ -24,18 +24,18 @@ A static `headers()` CSP can't carry a per-request nonce, so the CSP moves from 
 - styled-components + Tailwind inline styles → style-src keeps `'unsafe-inline'` **without** a nonce (a nonce in style-src makes browsers ignore unsafe-inline → would break all inline styles). Documented accepted risk; AC targets script-src.
 
 ### Steps (TDD)
-- [ ] 1. **RED**: `src/lib/__tests__/csp.test.ts` — pure `buildCsp(nonce, {isDev, apiUrl})`:
+- [x] 1. **RED**: `src/lib/__tests__/csp.test.ts` — pure `buildCsp(nonce, {isDev, apiUrl})`:
   - prod script-src = `'self' 'nonce-X' 'strict-dynamic'`, no unsafe-inline/unsafe-eval
   - dev script-src additionally has `'unsafe-eval'` (webpack HMR) — official Next.js conditional
   - no `clerk`/`clerk-telemetry`/`cloudflare`/`perplexity`/`googleapis`/`gstatic`/`auto-author.dev` substrings anywhere
   - connect-src = `'self'` + origin(NEXT_PUBLIC_API_URL); no `wss:`; localhost only when apiUrl is localhost (the CI/dev shape); dev adds `ws://localhost:*` for HMR
   - no frame-src; object-src 'none', base-uri/form-action 'self', frame-ancestors 'none' preserved
-- [ ] 2. **RED**: extend `src/__tests__/middleware.test.ts` — response carries CSP header (public + protected-authed paths, and the BYPASS_AUTH early-return path), `x-nonce` request header forwarded (and overwrites any client-sent value), nonce unique across two requests, script-src clean of unsafe-*
-- [ ] 3. **GREEN**: new `src/lib/csp.ts` (pure builder); wire into `middleware.ts` (nonce = base64 UUID; set CSP on request+response per official pattern — on every code path incl. bypass); auth logic unchanged
-- [ ] 4. **GREEN**: `next.config.ts` — delete the CSP entry from `headers()` (other security headers stay); `src/app/layout.tsx` — async RootLayout reads `(await headers()).get('x-nonce')`, passes `nonce` to `ThemeProvider`
-- [ ] 5. Full frontend suite + lint + typecheck; prod build sanity (`npm run build`)
-- [ ] 6. Deslop scan; opencode (GLM) pre-PR review; PR
-- [ ] 7. **Demo (hard gate)**: main vs branch prod builds — (a) curl shows old header with unsafe-*/clerk vs new nonce'd header; (b) real browser load on the branch: page renders, **zero CSP violations in console**, dark theme applied pre-hydration (nonce'd theme script ran), sign-in→dashboard round trip against real backend on localhost:8000 (proves derived connect-src); (c) nonce changes per request
+- [x] 2. **RED**: extend `src/__tests__/middleware.test.ts` — response carries CSP header (public + protected-authed paths, and the BYPASS_AUTH early-return path), `x-nonce` request header forwarded (and overwrites any client-sent value), nonce unique across two requests, script-src clean of unsafe-*
+- [x] 3. **GREEN**: new `src/lib/csp.ts` (pure builder); wire into `middleware.ts` (nonce = base64 UUID; set CSP on request+response per official pattern — on every code path incl. bypass); auth logic unchanged
+- [x] 4. **GREEN**: `next.config.ts` — delete the CSP entry from `headers()` (other security headers stay); `src/app/layout.tsx` — async RootLayout reads `(await headers()).get('x-nonce')`, passes `nonce` to `ThemeProvider`
+- [x] 5. Full frontend suite + lint + typecheck; prod build sanity (`npm run build`)
+- [x] 6. Deslop scan; opencode (GLM) pre-PR review; PR
+- [x] 7. **Demo (hard gate)**: main vs branch prod builds — (a) curl shows old header with unsafe-*/clerk vs new nonce'd header; (b) real browser load on the branch: page renders, **zero CSP violations in console**, dark theme applied pre-hydration (nonce'd theme script ran), sign-in→dashboard round trip against real backend on localhost:8000 (proves derived connect-src); (c) nonce changes per request
 - [ ] 8. CI green + post-PR review triage; docs sync (CLAUDE.md changelog); merge
 
 ### Accepted tradeoffs (documented in PR)
