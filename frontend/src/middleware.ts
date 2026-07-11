@@ -1,14 +1,32 @@
 // frontend/src/middleware.ts
 
 import { NextRequest, NextResponse } from 'next/server';
+import { buildCsp } from '@/lib/csp';
 
 // Middleware for route protection using better-auth session cookies
 // This will:
 // 1. Verify authentication for protected routes by checking session cookie
 // 2. Redirect unauthenticated users to sign-in page
 // 3. Keep middleware Edge Runtime compatible (no better-auth imports)
+// 4. Set a per-request nonce-based CSP (#190) — see lib/csp.ts
 //
 // For E2E testing: Set BYPASS_AUTH=true (server-only) to skip authentication
+
+// Forward the nonce'd CSP on both the request (Next.js reads it to stamp its
+// inline scripts; layout reads x-nonce for next-themes) and the response.
+function withCsp(request: NextRequest): NextResponse {
+  const nonce = btoa(crypto.randomUUID());
+  const csp = buildCsp(nonce, { isDev: process.env.NODE_ENV === 'development' });
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce); // set(), not append — clobbers any client-sent value
+  requestHeaders.set('Content-Security-Policy', csp);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('Content-Security-Policy', csp);
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   // SECURITY: Use server-side only env var (NOT NEXT_PUBLIC_)
   // This prevents exposing test mode to client-side code
@@ -32,7 +50,7 @@ export async function middleware(request: NextRequest) {
   // Allow bypass for E2E tests (development/test environments only)
   if (bypassAuth) {
     console.warn('⚠️  BYPASS_AUTH enabled - authentication is disabled for testing');
-    return NextResponse.next();
+    return withCsp(request);
   }
 
   const { pathname } = request.nextUrl;
@@ -43,7 +61,7 @@ export async function middleware(request: NextRequest) {
 
   // Skip session check for public routes
   if (!isProtectedRoute) {
-    return NextResponse.next();
+    return withCsp(request);
   }
 
   // Check for better-auth session cookie
@@ -60,7 +78,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Allow request to proceed - actual session validation happens in API routes
-  return NextResponse.next();
+  return withCsp(request);
 }
 
 export const config = {
