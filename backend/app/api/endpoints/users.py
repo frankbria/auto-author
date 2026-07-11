@@ -30,6 +30,17 @@ allow_admins = SessionRoleChecker(["admin"])
 allow_users_and_admins = SessionRoleChecker(["user", "admin"])
 
 
+def sanitize_string_fields(data: Dict) -> Dict:
+    """Sanitize every string value in an update payload (#265).
+
+    Shared by PATCH /me and PUT /{auth_id} so both endpoints store profile
+    strings with the same sanitization.
+    """
+    return {
+        k: sanitize_input(v) if isinstance(v, str) else v for k, v in data.items()
+    }
+
+
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(
     request: Request,
@@ -106,10 +117,9 @@ async def update_profile(
 ):
     """Update the current user's profile information"""
     # Sanitize input data
-    sanitized_data = {
-        k: sanitize_input(v) if isinstance(v, str) else v
-        for k, v in user_update.model_dump(exclude_unset=True).items()
-    }
+    sanitized_data = sanitize_string_fields(
+        user_update.model_dump(exclude_unset=True)
+    )
 
     # Add updated_at timestamp
     sanitized_data["updated_at"] = datetime.now(timezone.utc)
@@ -310,12 +320,14 @@ async def update_user_data(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    # Update with current timestamp
-    update_data = {
-        k: v
-        for k, v in user_update.model_dump(exclude_unset=True).items()
-        if v is not None
-    }
+    # Update with current timestamp (sanitized like PATCH /me — #265)
+    update_data = sanitize_string_fields(
+        {
+            k: v
+            for k, v in user_update.model_dump(exclude_unset=True).items()
+            if v is not None
+        }
+    )
     update_data["updated_at"] = datetime.now(timezone.utc)
 
     try:
