@@ -1,6 +1,7 @@
 // app/layout.tsx
 
 import { Nunito_Sans } from 'next/font/google';
+import { headers } from 'next/headers';
 import './globals.css';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -23,7 +24,11 @@ export const viewport = {
   viewportFit: 'cover' as const,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Per-request CSP nonce from middleware (#190). next-themes injects an
+  // inline theme script that must carry it. Reading headers() also forces
+  // dynamic rendering, which nonce-based CSP requires.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       {/* Token classes (not hardcoded gray-950) so the stored theme preference
@@ -34,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
+          nonce={nonce}
         >
           <ErrorBoundary
             fallback={

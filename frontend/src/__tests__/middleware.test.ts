@@ -134,3 +134,63 @@ describe('production bypass guard (#192)', () => {
     );
   });
 });
+
+describe('CSP header (#190)', () => {
+  const env = process.env as Record<string, string | undefined>;
+  const originalBypass = env.BYPASS_AUTH;
+
+  beforeEach(() => {
+    env.BYPASS_AUTH = 'false';
+  });
+
+  afterAll(() => {
+    if (originalBypass === undefined) delete env.BYPASS_AUTH;
+    else env.BYPASS_AUTH = originalBypass;
+  });
+
+  it('sets a nonce-based CSP with no unsafe-inline/unsafe-eval and no Clerk origins', async () => {
+    const res = await middleware(requestFor('/'));
+    const csp = res.headers.get('content-security-policy')!;
+    const scriptSrc = csp.split(';').find((d) => d.trim().startsWith('script-src'))!;
+    expect(scriptSrc).toMatch(/'nonce-[A-Za-z0-9+/=]+'/);
+    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain('unsafe-inline');
+    expect(scriptSrc).not.toContain('unsafe-eval');
+    expect(csp).not.toMatch(/clerk/i);
+  });
+
+  it('sets the CSP on authenticated protected routes', async () => {
+    const res = await middleware(requestFor('/dashboard', 'better-auth.session_token'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-security-policy')).toMatch(/'nonce-/);
+  });
+
+  it('sets the CSP on the BYPASS_AUTH early-return path', async () => {
+    env.BYPASS_AUTH = 'true';
+    const res = await middleware(requestFor('/dashboard'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-security-policy')).toMatch(/'nonce-/);
+  });
+
+  it('forwards x-nonce to the app matching the CSP nonce, overwriting any client-sent value', async () => {
+    const req = requestFor('/');
+    req.headers.set('x-nonce', 'attacker-controlled');
+    const res = await middleware(req);
+    // NextResponse.next({request}) exposes overridden request headers as
+    // x-middleware-request-* response headers.
+    const forwarded = res.headers.get('x-middleware-request-x-nonce')!;
+    expect(forwarded).not.toBe('attacker-controlled');
+    const cspNonce = res.headers
+      .get('content-security-policy')!
+      .match(/'nonce-([^']+)'/)![1];
+    expect(forwarded).toBe(cspNonce);
+  });
+
+  it('generates a fresh nonce per request', async () => {
+    const nonceOf = async () =>
+      (await middleware(requestFor('/'))).headers
+        .get('content-security-policy')!
+        .match(/'nonce-([^']+)'/)![1];
+    expect(await nonceOf()).not.toBe(await nonceOf());
+  });
+});
