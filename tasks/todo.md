@@ -44,7 +44,8 @@ A static `headers()` CSP can't carry a per-request nonce, so the CSP moves from 
 - Dev CSP keeps `'unsafe-eval'` (webpack) — matches the official Next.js example; production never gets it.
 
 ## Issue #265 — PUT /users/{auth_id} skips sanitize_input (P1.13)
-- [ ] RED: test — markup string stored identically (sanitized) via PATCH /me and PUT /{auth_id}
-- [ ] Shared helper `sanitize_string_fields` in users.py; wire into both endpoints
-- [ ] GREEN: users test file + full backend gates
-- [ ] opencode pre-PR review → PR → post-PR review → demo → CI → merge
+- [x] RED: test — markup string stored identically (sanitized) via PATCH /me and PUT /{auth_id}
+- [x] Shared helper `sanitize_string_fields` in users.py; wire into both endpoints
+- [x] GREEN: users test file (34) + full backend 1159 passed / 92.21% cov
+- [x] opencode pre-PR review "clean to merge" → PR #274 → demo (`docs/demos/2026-07-10-issue-265-put-sanitize.md`, showboat verify green)
+- [ ] post-PR review triage → CI green → merge
