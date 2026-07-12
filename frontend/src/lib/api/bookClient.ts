@@ -1,7 +1,9 @@
 'use client';
 
 import { BookProject } from '@/components/BookCard';
-// We don't need the TOC QuestionResponse import since we're using the one from chapter-questions
+// TOC clarifying-question responses ({question, answer}) — distinct from the
+// per-chapter QuestionResponse below, which carries response_text/status fields.
+import { QuestionResponse as TocQuestionResponse } from '@/types/toc';
 import { ChapterStatus } from '@/types/chapter-tabs';
 // Import only what we use to satisfy linting
 import {
@@ -926,7 +928,7 @@ export class BookClient {
   /**
    * Save question responses for TOC generation
    */
-  public async saveQuestionResponses(bookId: string, responses: QuestionResponse[]): Promise<{
+  public async saveQuestionResponses(bookId: string, responses: TocQuestionResponse[]): Promise<{
     book_id: string;
     responses_saved: number;
     answered_at: string;
@@ -949,7 +951,7 @@ export class BookClient {
    * Get saved question responses for a book
    */
   public async getQuestionResponses(bookId: string): Promise<{
-    responses: QuestionResponse[];
+    responses: TocQuestionResponse[];
     answered_at?: string;
     status: string;
   }> {
