@@ -1,27 +1,47 @@
-# Issue #193 — [P2.1] Live /chapters route serves hardcoded mock questions for every book
+# Issue #194 — [P2.2] Legacy export page offers EPUB/Markdown but errors 'not yet implemented'
 
-**Branch**: `fix/193-remove-mock-chapters-page`
-**Plan source**: CodeRabbit comment (2026-07-04, design choice resolved: delete, not rewire). Verified against codebase 2026-07-12.
+**Branch**: `fix/194-legacy-export-epub-markdown`
+**Plan source**: CodeRabbit comment (design choice resolved: **wire**, not filter/delete). Verified against codebase 2026-07-12.
 
-## Verified facts (plan adaptation)
+## Fork resolution (autonomous)
 
-- `frontend/src/app/dashboard/books/[bookId]/chapters/page.tsx` is the mock page (hardcoded ML questions, `setTimeout` fake regeneration, ignores `bookId`). No unit tests reference it; no `layout/loading/error` companions in the folder; sibling `[chapterId]/page.tsx` (legacy self-redirecting editor) stays.
-- Only reference: `frontend/src/e2e/complete-authoring-journey.spec.ts:201` — inside a `test.skip`'d journey (CI has no OpenAI key), so the rewrite keeps the spec valid for future un-skip but nothing runs it today.
-- **Plan correction**: chapter tab clicks don't update the URL (`?chapter=` is read-only initial state in `page.tsx:91`), so the rewritten step can't extract the chapter id from the URL. It opens the first sidebar tab (`[data-testid="chapter-tab"]:not([data-tab])`, mirroring `chapter-questions-tabs.spec.ts`), waits for the "Chapter editor view" tablist, and reads the id from the tab's `data-rfd-draggable-id` ancestor.
-- Step 5's `[data-testid="chapter-tab"][data-tab="questions"]` selector already matches the live ChapterEditor (`ChapterEditor.tsx:498-499`) — untouched.
-- `NavigationFix.test.tsx:55` asserts navigation does NOT push to '/chapters' — unaffected (stays green).
+Issue AC offers wire OR filter OR remove. CodeRabbit chose **wire**; exploration confirms:
+- The page is real and functional for PDF/DOCX (unlike #193's fabricated page) — URL-reachable, no trust defect.
+- Nothing in production links to it, but delete has wider blast radius: `tests/e2e/page-objects/export.page.ts` + deployment specs + `ChapterBreadcrumb` pathname check.
+- `bookClient.exportEPUB(bookId, {includeEmptyChapters})` and `exportMarkdown(bookId, {includeEmptyChapters, multiFile})` exist and match the plan's claimed signatures (verified `bookClient.ts:1733,1762`).
 
-## Steps
+## Plan corrections found in exploration
 
-- [x] 1. Delete `frontend/src/app/dashboard/books/[bookId]/chapters/page.tsx`
-- [x] 2. Rewrite journey spec step 4 (navigate via real tabbed interface, id from draggable attr)
-- [x] 3. Frontend suite + lint + typecheck green — 115 suites, 2096 passed / 8 skipped, coverage gates green
-- [x] 4. Deslop scan clean; opencode (GLM) pre-PR review: "clean to merge"
-- [x] 5. PR #278; post-PR fresh-session review "clean to merge", posted as comment
-- [x] 6. Demo (`docs/demos/2026-07-12-issue-193-remove-mock-chapters.md`, showboat verify green): main 200 + fake ML questions for real gardening book vs branch 404, same session; real Interview Questions tab shown working on branch
-- [x] 7. CI green + final triage; docs sync; merge
+1. **Plan defect**: "Leave `handleDownload` unchanged" is WRONG for markdown+multiFile — backend returns a ZIP but `format.extension` is `.md` (backend `export.py:528`). Fix: extension override to `.zip` when `selectedFormat==='markdown' && multiFile` (mirrors #61's `generateFilename` extensionOverride).
+2. **Dead code**: `getStatusColor`/`getStatusText` in page.tsx defined but never used in JSX — delete (also helps the first-tests coverage-denominator gotcha from #247).
 
-## Acceptance criteria
+## Tasks
 
-- [x] The abandoned page is deleted (AC "delete" branch); `/dashboard/books/<id>/chapters` no longer resolves (404 demoed)
-- [x] Real Q&A flow (ChapterEditor "Interview Questions" tab) unaffected (demoed)
+- [x] 1. Tests first (RED): new `src/app/dashboard/books/[bookId]/export/__tests__/page.test.tsx`
+  - dispatch pins: pdf→exportPDF(pageSize+includeEmpty), docx→exportDOCX(includeEmpty), epub→exportEPUB(includeEmpty), markdown→exportMarkdown(includeEmpty+multiFile)
+  - NO "not yet implemented" toast for epub/markdown (the regression pin)
+  - markdown+multiFile download → filename ends `.zip`; markdown single-file → `.md`; pdf → `.pdf`
+  - options UI: epub shows include-empty toggle; markdown shows include-empty + multi-file toggles
+  - export summary reflects epub/markdown selections
+  - extend `timeEstimator.test.ts`: `export.epub`/`export.markdown` budgets exist and estimate ≠ default fallback
+- [x] 2. `timeEstimator.ts`: add `export.epub` + `export.markdown` budgets (modeled on docx; markdown lighter); widen `OperationMetadata.exportFormat` to include `'epub' | 'markdown'`
+- [x] 3. `page.tsx`:
+  - `multiFile` state (default false)
+  - handleExport branches for epub/markdown (keep trailing else as unknown-format guard)
+  - handleDownload `.zip` override for markdown+multiFile
+  - icon map: epub 📖, markdown 📋 explicit
+  - options blocks for epub/markdown; summary lines
+  - getProgress: map selectedFormat → `export.{format}` key
+  - delete dead getStatusColor/getStatusText
+- [x] 4. GREEN: full frontend suite + lint + typecheck; coverage gates (page now in denominator)
+- [x] 5. Deslop scan
+- [ ] 6. Pre-PR third-party review (opencode GLM primary, codex fallback)
+- [ ] 7. PR, post-PR review posted as comment
+- [ ] 8. Demo (hard gate): real servers, branch vs main — main shows "not yet implemented" toast for EPUB/Markdown; branch downloads real .epub/.md/.zip files (verify file magic bytes)
+- [ ] 9. CI green + final triage → docs sync → merge
+
+## Acceptance criteria (from issue)
+
+- [ ] Selecting EPUB on the legacy export page produces a working export (no "not yet implemented")
+- [ ] Selecting Markdown likewise, including multi-file (ZIP) option
+- [ ] PDF/DOCX behavior unchanged

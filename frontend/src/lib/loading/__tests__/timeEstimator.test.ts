@@ -29,6 +29,8 @@ describe('estimateOperationTime', () => {
       ['toc.questions', 3000, 15000],
       ['export.pdf', 5000, 60000],
       ['export.docx', 3000, 40000],
+      ['export.epub', 3000, 40000],
+      ['export.markdown', 2000, 30000],
       ['chapter.create', 300, 2000],
       ['chapter.draft', 4000, 30000],
       ['chapter.questions', 3000, 15000],
@@ -441,6 +443,11 @@ describe('OPERATION_TIME_BUDGETS', () => {
   it('contains export.pdf budget', () => {
     expect(OPERATION_TIME_BUDGETS['export.pdf']).toBeDefined();
     expect(OPERATION_TIME_BUDGETS['export.pdf'].min).toBe(5000);
+  });
+
+  it('contains export.epub and export.markdown budgets (#194 — no silent DOCX fallback)', () => {
+    expect(OPERATION_TIME_BUDGETS['export.epub']).toBeDefined();
+    expect(OPERATION_TIME_BUDGETS['export.markdown']).toBeDefined();
   });
 
   it('contains default budget', () => {
