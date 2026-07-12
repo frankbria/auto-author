@@ -18,8 +18,8 @@
 - [x] 6. PR with Known Limitations (nightly-job branch rejected rationale; TOC text-extraction recovery + analyze-summary error dict deliberately untouched).
 - [x] 7. Post-PR opencode review posted as PR comment.
 - [x] 8. Demo (showboat): main-vs-branch differential — (a) bogus kwarg injected into `_sync_request` sails through bare-Mock tests on main but fails autospec tests on branch; (b) unparseable AI output returns 200 + 4 canned questions on main vs structured 500 AI_INVALID_RESPONSE on branch.
-- [ ] 9. CI green + final feedback triage.
-- [ ] 10. Docs sync (CLAUDE.md changelog) + merge + close issue.
+- [x] 9. CI green + final feedback triage.
+- [x] 10. Docs sync (CLAUDE.md changelog) + merge + close issue.
 
 ## Acceptance criteria
 
