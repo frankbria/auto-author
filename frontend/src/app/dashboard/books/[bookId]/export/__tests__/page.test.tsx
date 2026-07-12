@@ -56,7 +56,7 @@ const FORMATS = {
     },
     {
       format: 'epub',
-      name: 'EPUB eBook',
+      name: 'EPUB Ebook',
       description: 'Standard eBook format',
       extension: '.epub',
       mime_type: 'application/epub+zip',
@@ -64,7 +64,7 @@ const FORMATS = {
     },
     {
       format: 'markdown',
-      name: 'Markdown',
+      name: 'Markdown Document',
       description: 'Plain-text Markdown',
       extension: '.md',
       mime_type: 'text/markdown',
@@ -157,7 +157,7 @@ describe('ExportBookPage format dispatch', () => {
 
   it('exports EPUB instead of showing "not yet implemented" (#194)', async () => {
     renderPage();
-    await selectFormat('EPUB eBook');
+    await selectFormat('EPUB Ebook');
     fireEvent.click(screen.getByRole('button', { name: 'Export Book' }));
     await waitFor(() =>
       expect(mockBookClient.exportEPUB).toHaveBeenCalledWith('book-1', {
@@ -170,7 +170,7 @@ describe('ExportBookPage format dispatch', () => {
 
   it('exports Markdown instead of showing "not yet implemented" (#194)', async () => {
     renderPage();
-    await selectFormat('Markdown');
+    await selectFormat('Markdown Document');
     fireEvent.click(screen.getByRole('button', { name: 'Export Book' }));
     await waitFor(() =>
       expect(mockBookClient.exportMarkdown).toHaveBeenCalledWith('book-1', {
@@ -183,7 +183,7 @@ describe('ExportBookPage format dispatch', () => {
 
   it('passes multiFile: true when the Markdown multi-file toggle is on', async () => {
     renderPage();
-    await selectFormat('Markdown');
+    await selectFormat('Markdown Document');
     fireEvent.click(screen.getByLabelText('Separate File Per Chapter'));
     fireEvent.click(screen.getByRole('button', { name: 'Export Book' }));
     await waitFor(() =>
@@ -222,7 +222,7 @@ describe('ExportBookPage format dispatch', () => {
       .fn()
       .mockRejectedValue(new Error('boom'));
     renderPage();
-    await selectFormat('EPUB eBook');
+    await selectFormat('EPUB Ebook');
     fireEvent.click(screen.getByRole('button', { name: 'Export Book' }));
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith({
@@ -265,13 +265,13 @@ describe('ExportBookPage download filenames', () => {
 
   it('downloads single-file Markdown as .md', async () => {
     renderPage();
-    await exportAndDownload('Markdown');
+    await exportAndDownload('Markdown Document');
     expect(anchors[anchors.length - 1].download).toBe('my_great_book.md');
   });
 
   it('downloads multi-file Markdown as .zip (blob is a ZIP archive)', async () => {
     renderPage();
-    await selectFormat('Markdown');
+    await selectFormat('Markdown Document');
     fireEvent.click(screen.getByLabelText('Separate File Per Chapter'));
     fireEvent.click(screen.getByRole('button', { name: 'Export Book' }));
     fireEvent.click(await screen.findByRole('button', { name: /Download File/ }));
@@ -280,7 +280,7 @@ describe('ExportBookPage download filenames', () => {
 
   it('downloads EPUB as .epub', async () => {
     renderPage();
-    await exportAndDownload('EPUB eBook');
+    await exportAndDownload('EPUB Ebook');
     expect(anchors[anchors.length - 1].download).toBe('my_great_book.epub');
   });
 
@@ -294,14 +294,14 @@ describe('ExportBookPage download filenames', () => {
 describe('ExportBookPage per-format options UI', () => {
   it('EPUB shows include-empty toggle but no page size', async () => {
     renderPage();
-    await selectFormat('EPUB eBook');
+    await selectFormat('EPUB Ebook');
     expect(screen.getByText('Include Empty Chapters')).toBeInTheDocument();
     expect(screen.queryByText('Page Size')).not.toBeInTheDocument();
   });
 
   it('Markdown shows include-empty and multi-file toggles', async () => {
     renderPage();
-    await selectFormat('Markdown');
+    await selectFormat('Markdown Document');
     expect(screen.getByText('Include Empty Chapters')).toBeInTheDocument();
     expect(screen.getByText('Separate File Per Chapter')).toBeInTheDocument();
   });
@@ -314,7 +314,7 @@ describe('ExportBookPage per-format options UI', () => {
 
   it('export summary reflects Markdown multi-file selection', async () => {
     renderPage();
-    await selectFormat('Markdown');
+    await selectFormat('Markdown Document');
     fireEvent.click(screen.getByLabelText('Separate File Per Chapter'));
     expect(screen.getByText('Separate file per chapter')).toBeInTheDocument();
   });
@@ -322,8 +322,8 @@ describe('ExportBookPage per-format options UI', () => {
 
 describe('ExportBookPage progress tracking', () => {
   it.each([
-    ['EPUB eBook', 'export.epub'],
-    ['Markdown', 'export.markdown'],
+    ['EPUB Ebook', 'export.epub'],
+    ['Markdown Document', 'export.markdown'],
     ['PDF Document', 'export.pdf'],
     ['Word Document', 'export.docx'],
   ])('uses the %s budget key %s while exporting', async (name, key) => {
