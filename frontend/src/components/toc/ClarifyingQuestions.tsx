@@ -101,11 +101,9 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
     // Best-effort final persist (covers answers typed inside the debounce window).
     // Failure must not block TOC generation — responses also ride the generate-toc body.
     const nonEmptyResponses = questionResponses.filter(r => r.answer.trim().length > 0);
-    if (nonEmptyResponses.length > 0) {
-      bookClient.saveQuestionResponses(bookId, nonEmptyResponses).catch((error) => {
-        console.error('Failed to save responses on submit:', error);
-      });
-    }
+    bookClient.saveQuestionResponses(bookId, nonEmptyResponses).catch((error) => {
+      console.error('Failed to save responses on submit:', error);
+    });
 
     onSubmit(questionResponses);
   };
