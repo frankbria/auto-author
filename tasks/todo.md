@@ -36,9 +36,16 @@ A static `headers()` CSP can't carry a per-request nonce, so the CSP moves from 
 - [x] 5. Full frontend suite + lint + typecheck; prod build sanity (`npm run build`)
 - [x] 6. Deslop scan; opencode (GLM) pre-PR review; PR
 - [x] 7. **Demo (hard gate)**: main vs branch prod builds — (a) curl shows old header with unsafe-*/clerk vs new nonce'd header; (b) real browser load on the branch: page renders, **zero CSP violations in console**, dark theme applied pre-hydration (nonce'd theme script ran), sign-in→dashboard round trip against real backend on localhost:8000 (proves derived connect-src); (c) nonce changes per request
-- [ ] 8. CI green + post-PR review triage; docs sync (CLAUDE.md changelog); merge
+- [x] 8. CI green + post-PR review triage; docs sync (CLAUDE.md changelog); merge
 
 ### Accepted tradeoffs (documented in PR)
 - **All routes render dynamically** (nonce requires it; `headers()` in root layout forces it). App is auth-gated + VPS-served; static optimization loss is acceptable. This is the documented cost of the official pattern.
 - **style-src keeps 'unsafe-inline'** — inline-style injection is a far weaker primitive than script injection; required by styled-components/Tailwind/TipTap. AC targets script-src.
 - Dev CSP keeps `'unsafe-eval'` (webpack) — matches the official Next.js example; production never gets it.
+
+## Issue #265 — PUT /users/{auth_id} skips sanitize_input (P1.13)
+- [x] RED: test — markup string stored identically (sanitized) via PATCH /me and PUT /{auth_id}
+- [x] Shared helper `sanitize_string_fields` in users.py; wire into both endpoints
+- [x] GREEN: users test file (34) + full backend 1159 passed / 92.21% cov
+- [x] opencode pre-PR review "clean to merge" → PR #274 → demo (`docs/demos/2026-07-10-issue-265-put-sanitize.md`, showboat verify green)
+- [ ] post-PR review triage → CI green → merge

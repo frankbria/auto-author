@@ -153,6 +153,32 @@ async def test_put_user_self_happy_path(auth_client_factory):
     assert resp.json()["first_name"] == "Updated"
 
 
+MARKUP_BIO = "<script>alert(1)</script><b>bold</b>  claim"
+
+
+async def test_put_sanitizes_strings_same_as_patch(auth_client_factory):
+    """AC (#265): a string field containing markup is stored identically
+    (sanitized) whether written via PATCH /me or PUT /{auth_id}."""
+    from app.db import base
+
+    client = await auth_client_factory()
+    resp = await client.patch("/api/v1/users/me", json={"bio": MARKUP_BIO})
+    assert resp.status_code == 200
+    via_patch = (await base.users_collection.find_one({"auth_id": "test-auth-id-123"}))["bio"]
+    assert "<" not in via_patch  # PATCH already sanitizes — pin it
+
+    resp = await client.put(
+        "/api/v1/users/test-auth-id-123", json={"bio": "different"}
+    )
+    assert resp.status_code == 200
+    resp = await client.put(
+        "/api/v1/users/test-auth-id-123", json={"bio": MARKUP_BIO}
+    )
+    assert resp.status_code == 200
+    via_put = (await base.users_collection.find_one({"auth_id": "test-auth-id-123"}))["bio"]
+    assert via_put == via_patch
+
+
 async def test_put_user_other_non_admin_returns_403(auth_client_factory):
     client = await auth_client_factory()
     resp = await client.put(
