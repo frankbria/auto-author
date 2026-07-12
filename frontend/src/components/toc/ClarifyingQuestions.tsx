@@ -51,6 +51,10 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
   }, [bookId, questions]);
   // Auto-save responses with debouncing
   useEffect(() => {
+    // Every edit invalidates any in-flight save, so a stale completion can't
+    // claim "Auto-saved" for text that was changed while it was on the wire.
+    const generation = ++saveGenerationRef.current;
+
     const saveResponsesDebounced = async () => {
       if (Object.keys(responses).length === 0) return;
 
@@ -58,9 +62,12 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
       const nonEmptyResponses: QuestionResponse[] = questions
         .map((question, index) => ({ question, answer: responses[index] || '' }))
         .filter(r => r.answer.trim().length > 0);
-      if (nonEmptyResponses.length === 0) return;
+      if (nonEmptyResponses.length === 0) {
+        // A stale in-flight save skips its own cleanup — clear the spinner here
+        setIsSaving(false);
+        return;
+      }
 
-      const generation = ++saveGenerationRef.current;
       setIsSaving(true);
       try {
         const result = await bookClient.saveQuestionResponses(bookId, nonEmptyResponses);

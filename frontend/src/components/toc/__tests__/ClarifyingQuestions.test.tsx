@@ -458,6 +458,59 @@ describe('ClarifyingQuestions - auto-save', () => {
     jest.useRealTimers();
   });
 
+  it('does NOT show Auto-saved when an in-flight save resolves after the answer was edited again', async () => {
+    jest.useFakeTimers();
+
+    let resolveSave: (v: unknown) => void = () => {};
+    mockedBookClient.saveQuestionResponses.mockReturnValueOnce(
+      new Promise((resolve) => { resolveSave = resolve; }) as any
+    );
+
+    setup();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
+    fireEvent.change(textarea, { target: { value: 'First draft' } });
+
+    // Debounce fires — save of 'First draft' is now in flight
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenCalledTimes(1);
+
+    // User edits again while the save is still in flight
+    fireEvent.change(textarea, { target: { value: 'First draft, revised' } });
+
+    // The stale save resolves — it must NOT flip the indicator to Auto-saved
+    await act(async () => {
+      resolveSave({
+        book_id: 'book-1',
+        responses_saved: 1,
+        answered_at: '2024-06-01T10:00:00Z',
+        ready_for_toc_generation: true,
+      });
+    });
+    expect(screen.queryByText('Auto-saved')).not.toBeInTheDocument();
+
+    // The new debounce fires, saves the revised answer, and only then claims saved
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenLastCalledWith('book-1', [
+      { question: TWO_QUESTIONS[0], answer: 'First draft, revised' },
+    ]);
+    await waitFor(() => {
+      expect(screen.getByText('Auto-saved')).toBeInTheDocument();
+    });
+
+    jest.useRealTimers();
+  });
+
   it('does NOT show Auto-saved when the save fails, and surfaces an error', async () => {
     jest.useFakeTimers();
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
