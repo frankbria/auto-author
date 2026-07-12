@@ -363,6 +363,29 @@ describe('ClarifyingQuestions - load existing responses', () => {
     });
   });
 
+  it('hydrates a sparse saved list under the right questions (matched by text, not position)', async () => {
+    // Auto-save filters out empty answers, so only Q2 may be stored
+    mockedBookClient.getQuestionResponses.mockResolvedValue({
+      responses: [{ question: TWO_QUESTIONS[1], answer: 'Only Q2 was answered' }],
+      answered_at: '2024-01-01T12:00:00Z',
+      status: 'completed',
+    });
+
+    setup();
+
+    // Q1 must stay empty — the stored Q2 answer must not land under Q1
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
+    expect((textarea as HTMLTextAreaElement).value).toBe('');
+
+    // Navigate to Q2 and see its answer
+    fireEvent.change(textarea, { target: { value: 'A1' } });
+    fireEvent.click(screen.getByText('Next'));
+    await waitFor(() => {
+      const q2Textarea = screen.getByPlaceholderText('Type your answer here...');
+      expect((q2Textarea as HTMLTextAreaElement).value).toBe('Only Q2 was answered');
+    });
+  });
+
   it('sets lastSaved from answered_at when existing responses are loaded', async () => {
     mockedBookClient.getQuestionResponses.mockResolvedValue({
       responses: [{ question: TWO_QUESTIONS[0], answer: 'Existing answer' }],

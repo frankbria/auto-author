@@ -27,9 +27,12 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         const existingResponses = await bookClient.getQuestionResponses(bookId);
         if (existingResponses.responses && existingResponses.responses.length > 0) {
           const responseMap: Record<string, string> = {};
-          existingResponses.responses.forEach((response, index) => {
-            if (questions[index] && response.answer) {
-              responseMap[index] = response.answer;
+          // Match by question text, not position — auto-save omits empty
+          // answers, so the stored list can be sparse relative to `questions`.
+          existingResponses.responses.forEach((response) => {
+            const questionIndex = questions.indexOf(response.question);
+            if (questionIndex !== -1 && response.answer) {
+              responseMap[questionIndex] = response.answer;
             }
           });
           setResponses(responseMap);
