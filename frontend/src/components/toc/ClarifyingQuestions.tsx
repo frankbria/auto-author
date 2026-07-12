@@ -61,15 +61,12 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
     const saveResponsesDebounced = async () => {
       if (Object.keys(responses).length === 0) return;
 
-      // Only save non-empty responses (the backend rejects empty answers)
+      // Send only non-empty answers (the backend rejects empty ones). An empty
+      // list is still sent — PUT is a replacement, so clearing the last answer
+      // must persist the deletion or it resurrects on refresh.
       const nonEmptyResponses: QuestionResponse[] = questions
         .map((question, index) => ({ question, answer: responses[index] || '' }))
         .filter(r => r.answer.trim().length > 0);
-      if (nonEmptyResponses.length === 0) {
-        // A stale in-flight save skips its own cleanup — clear the spinner here
-        setIsSaving(false);
-        return;
-      }
 
       setIsSaving(true);
       try {

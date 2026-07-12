@@ -600,6 +600,36 @@ describe('ClarifyingQuestions - auto-save', () => {
     jest.useRealTimers();
   });
 
+  it('persists an empty list when the user clears their only answer (deletion survives refresh)', async () => {
+    jest.useFakeTimers();
+
+    setup();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
+    fireEvent.change(textarea, { target: { value: 'Answer to delete' } });
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenLastCalledWith('book-1', [
+      { question: TWO_QUESTIONS[0], answer: 'Answer to delete' },
+    ]);
+
+    // Clearing the answer must persist the deletion, not silently skip the save
+    fireEvent.change(textarea, { target: { value: '' } });
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenLastCalledWith('book-1', []);
+
+    jest.useRealTimers();
+  });
+
   it('auto-save does not trigger when responses are empty', async () => {
     jest.useFakeTimers();
 
