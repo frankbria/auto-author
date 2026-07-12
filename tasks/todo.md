@@ -48,4 +48,4 @@ A static `headers()` CSP can't carry a per-request nonce, so the CSP moves from 
 - [x] Shared helper `sanitize_string_fields` in users.py; wire into both endpoints
 - [x] GREEN: users test file (34) + full backend 1159 passed / 92.21% cov
 - [x] opencode pre-PR review "clean to merge" → PR #274 → demo (`docs/demos/2026-07-10-issue-265-put-sanitize.md`, showboat verify green)
-- [ ] post-PR review triage → CI green → merge
+- [x] post-PR review triage (codex fallback: no regression; 2× GLM CI: no defects) → CI green → merged PR #274
