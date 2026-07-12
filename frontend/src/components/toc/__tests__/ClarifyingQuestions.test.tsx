@@ -1,11 +1,9 @@
 /**
  * Tests for ClarifyingQuestions component.
  * Covers: rendering, handleResponseChange, handleNext, handlePrevious,
- * handleSubmit, jump-to-question, load-existing-responses, auto-save debounce,
- * isSaving/lastSaved status indicators, and allQuestionsAnswered gate.
- *
- * Note: The inner `getToken` function defined inside the first useEffect is
- * never invoked — it is dead code in the source. It cannot be covered by tests.
+ * handleSubmit, jump-to-question, load-existing-responses, auto-save debounce
+ * with real persistence (saveQuestionResponses success/failure gating the
+ * Auto-saved indicator, #203), and allQuestionsAnswered gate.
  */
 
 import React from 'react';
@@ -49,6 +47,12 @@ function setupEmptyResponsesMock() {
     responses: [],
     status: 'not_provided',
   } as any);
+  mockedBookClient.saveQuestionResponses.mockResolvedValue({
+    book_id: 'book-1',
+    responses_saved: 1,
+    answered_at: '2024-06-01T10:00:00Z',
+    ready_for_toc_generation: true,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +321,11 @@ describe('ClarifyingQuestions - submit', () => {
       { question: TWO_QUESTIONS[0], answer: 'Answer 1' },
       { question: TWO_QUESTIONS[1], answer: 'Answer 2' },
     ]);
+    // Final answers are persisted on submit too (covers the debounce window)
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenCalledWith('book-1', [
+      { question: TWO_QUESTIONS[0], answer: 'Answer 1' },
+      { question: TWO_QUESTIONS[1], answer: 'Answer 2' },
+    ]);
   });
 
   it('shows loading state on the submit button when isLoading=true', async () => {
@@ -336,13 +345,14 @@ describe('ClarifyingQuestions - load existing responses', () => {
   });
 
   it('pre-fills responses from existing data on mount', async () => {
+    // Backend returns the TOC shape: { question, answer }
     mockedBookClient.getQuestionResponses.mockResolvedValue({
       responses: [
-        { response_text: 'Pre-filled answer 1' } as any,
-        { response_text: 'Pre-filled answer 2' } as any,
+        { question: TWO_QUESTIONS[0], answer: 'Pre-filled answer 1' },
+        { question: TWO_QUESTIONS[1], answer: 'Pre-filled answer 2' },
       ],
       answered_at: '2024-01-01T12:00:00Z',
-      status: 'answered',
+      status: 'completed',
     });
 
     setup();
@@ -353,11 +363,34 @@ describe('ClarifyingQuestions - load existing responses', () => {
     });
   });
 
+  it('hydrates a sparse saved list under the right questions (matched by text, not position)', async () => {
+    // Auto-save filters out empty answers, so only Q2 may be stored
+    mockedBookClient.getQuestionResponses.mockResolvedValue({
+      responses: [{ question: TWO_QUESTIONS[1], answer: 'Only Q2 was answered' }],
+      answered_at: '2024-01-01T12:00:00Z',
+      status: 'completed',
+    });
+
+    setup();
+
+    // Q1 must stay empty — the stored Q2 answer must not land under Q1
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
+    expect((textarea as HTMLTextAreaElement).value).toBe('');
+
+    // Navigate to Q2 and see its answer
+    fireEvent.change(textarea, { target: { value: 'A1' } });
+    fireEvent.click(screen.getByText('Next'));
+    await waitFor(() => {
+      const q2Textarea = screen.getByPlaceholderText('Type your answer here...');
+      expect((q2Textarea as HTMLTextAreaElement).value).toBe('Only Q2 was answered');
+    });
+  });
+
   it('sets lastSaved from answered_at when existing responses are loaded', async () => {
     mockedBookClient.getQuestionResponses.mockResolvedValue({
-      responses: [{ response_text: 'Existing answer' } as any],
+      responses: [{ question: TWO_QUESTIONS[0], answer: 'Existing answer' }],
       answered_at: '2024-01-01T12:00:00Z',
-      status: 'answered',
+      status: 'completed',
     });
 
     setup();
@@ -401,8 +434,14 @@ describe('ClarifyingQuestions - auto-save', () => {
     setupEmptyResponsesMock();
   });
 
-  it('shows isSaving indicator during debounce then Auto-saved after', async () => {
+  it('persists via saveQuestionResponses and shows Auto-saved only after the save resolves', async () => {
     jest.useFakeTimers();
+
+    // Hold the save promise open so we can observe the pre-resolve state
+    let resolveSave: (v: unknown) => void = () => {};
+    mockedBookClient.saveQuestionResponses.mockReturnValue(
+      new Promise((resolve) => { resolveSave = resolve; }) as any
+    );
 
     setup();
 
@@ -413,16 +452,180 @@ describe('ClarifyingQuestions - auto-save', () => {
     const textarea = await screen.findByPlaceholderText('Type your answer here...');
     fireEvent.change(textarea, { target: { value: 'Some answer text' } });
 
-    // Advance past the 2-second debounce
+    // Advance past the 2-second debounce — the real save call fires
     await act(async () => {
       jest.advanceTimersByTime(2100);
       await Promise.resolve();
     });
 
-    // After debounce fires and there are non-empty responses, lastSaved is set
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenCalledWith('book-1', [
+      { question: TWO_QUESTIONS[0], answer: 'Some answer text' },
+    ]);
+    // Save still in flight: the indicator must NOT claim saved yet
+    expect(screen.queryByText('Auto-saved')).not.toBeInTheDocument();
+    expect(screen.getByText('Saving...')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveSave({
+        book_id: 'book-1',
+        responses_saved: 1,
+        answered_at: '2024-06-01T10:00:00Z',
+        ready_for_toc_generation: true,
+      });
+    });
+
     await waitFor(() => {
       expect(screen.getByText('Auto-saved')).toBeInTheDocument();
     });
+
+    jest.useRealTimers();
+  });
+
+  it('does NOT show Auto-saved when an in-flight save resolves after the answer was edited again', async () => {
+    jest.useFakeTimers();
+
+    let resolveSave: (v: unknown) => void = () => {};
+    mockedBookClient.saveQuestionResponses.mockReturnValueOnce(
+      new Promise((resolve) => { resolveSave = resolve; }) as any
+    );
+
+    setup();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
+    fireEvent.change(textarea, { target: { value: 'First draft' } });
+
+    // Debounce fires — save of 'First draft' is now in flight
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenCalledTimes(1);
+
+    // User edits again while the save is still in flight
+    fireEvent.change(textarea, { target: { value: 'First draft, revised' } });
+
+    // The stale save resolves — it must NOT flip the indicator to Auto-saved
+    await act(async () => {
+      resolveSave({
+        book_id: 'book-1',
+        responses_saved: 1,
+        answered_at: '2024-06-01T10:00:00Z',
+        ready_for_toc_generation: true,
+      });
+    });
+    expect(screen.queryByText('Auto-saved')).not.toBeInTheDocument();
+
+    // The new debounce fires, saves the revised answer, and only then claims saved
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenLastCalledWith('book-1', [
+      { question: TWO_QUESTIONS[0], answer: 'First draft, revised' },
+    ]);
+    await waitFor(() => {
+      expect(screen.getByText('Auto-saved')).toBeInTheDocument();
+    });
+
+    jest.useRealTimers();
+  });
+
+  it('does NOT show Auto-saved when the save fails, and surfaces an error', async () => {
+    jest.useFakeTimers();
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedBookClient.saveQuestionResponses.mockRejectedValue(new Error('Network error'));
+
+    setup();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
+    fireEvent.change(textarea, { target: { value: 'Doomed answer' } });
+
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/auto-save failed/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Auto-saved')).not.toBeInTheDocument();
+
+    consoleSpy.mockRestore();
+    jest.useRealTimers();
+  });
+
+  it('recovers to Auto-saved when a later save succeeds after a failure', async () => {
+    jest.useFakeTimers();
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedBookClient.saveQuestionResponses.mockRejectedValueOnce(new Error('Network error'));
+
+    setup();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
+    fireEvent.change(textarea, { target: { value: 'First try' } });
+
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/auto-save failed/i)).toBeInTheDocument();
+    });
+
+    // Next edit triggers a save that succeeds (default resolved mock)
+    fireEvent.change(textarea, { target: { value: 'Second try' } });
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Auto-saved')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/auto-save failed/i)).not.toBeInTheDocument();
+
+    consoleSpy.mockRestore();
+    jest.useRealTimers();
+  });
+
+  it('persists an empty list when the user clears their only answer (deletion survives refresh)', async () => {
+    jest.useFakeTimers();
+
+    setup();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const textarea = await screen.findByPlaceholderText('Type your answer here...');
+    fireEvent.change(textarea, { target: { value: 'Answer to delete' } });
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenLastCalledWith('book-1', [
+      { question: TWO_QUESTIONS[0], answer: 'Answer to delete' },
+    ]);
+
+    // Clearing the answer must persist the deletion, not silently skip the save
+    fireEvent.change(textarea, { target: { value: '' } });
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+      await Promise.resolve();
+    });
+    expect(mockedBookClient.saveQuestionResponses).toHaveBeenLastCalledWith('book-1', []);
 
     jest.useRealTimers();
   });
@@ -442,7 +645,8 @@ describe('ClarifyingQuestions - auto-save', () => {
       await Promise.resolve();
     });
 
-    // Auto-saved should NOT appear because responses is empty
+    // No network call and no saved claim when there is nothing to save
+    expect(mockedBookClient.saveQuestionResponses).not.toHaveBeenCalled();
     expect(screen.queryByText('Auto-saved')).not.toBeInTheDocument();
 
     jest.useRealTimers();

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { QuestionResponse } from '@/types/toc';
 import { bookClient } from '@/lib/api/bookClient';
 
@@ -14,7 +14,10 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState(false);
   const [isLoadingResponses, setIsLoadingResponses] = useState(true);
+  // Ignore out-of-order save completions so a stale response can't clobber newer state
+  const saveGenerationRef = useRef(0);
 
   // Load existing responses when component mounts
   useEffect(() => {
@@ -24,11 +27,12 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         const existingResponses = await bookClient.getQuestionResponses(bookId);
         if (existingResponses.responses && existingResponses.responses.length > 0) {
           const responseMap: Record<string, string> = {};
-          existingResponses.responses.forEach((response: any, index) => {
-            // Map responses to questions by index - note: this may need different logic
-            // since chapter-questions.QuestionResponse has response_text not answer
-            if (questions[index] && response.response_text) {
-              responseMap[index] = response.response_text;
+          // Match by question text, not position — auto-save omits empty
+          // answers, so the stored list can be sparse relative to `questions`.
+          existingResponses.responses.forEach((response) => {
+            const questionIndex = questions.indexOf(response.question);
+            if (questionIndex !== -1 && response.answer) {
+              responseMap[questionIndex] = response.answer;
             }
           });
           setResponses(responseMap);
@@ -50,27 +54,34 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
   }, [bookId, questions]);
   // Auto-save responses with debouncing
   useEffect(() => {
+    // Every edit invalidates any in-flight save, so a stale completion can't
+    // claim "Auto-saved" for text that was changed while it was on the wire.
+    const generation = ++saveGenerationRef.current;
+
     const saveResponsesDebounced = async () => {
-      if (Object.keys(responses).length > 0) {
-        try {
-          setIsSaving(true);
-          const questionResponses: QuestionResponse[] = questions.map((question, index) => ({
-            question,
-            answer: responses[index] || ''
-          }));
+      if (Object.keys(responses).length === 0) return;
 
-          // Only save non-empty responses
-          const nonEmptyResponses = questionResponses.filter(r => r.answer.trim().length > 0);
+      // Send only non-empty answers (the backend rejects empty ones). An empty
+      // list is still sent — PUT is a replacement, so clearing the last answer
+      // must persist the deletion or it resurrects on refresh.
+      const nonEmptyResponses: QuestionResponse[] = questions
+        .map((question, index) => ({ question, answer: responses[index] || '' }))
+        .filter(r => r.answer.trim().length > 0);
 
-          // Note: Skipping save call due to type mismatch between TOC and chapter questions
-          // This component is for TOC generation which has simpler question/answer structure
-          if (nonEmptyResponses.length > 0) {
-            setLastSaved(new Date().toISOString());
-          }
-        } catch (error) {
-          console.error('Failed to save responses:', error);
-          // Don't show error to user for auto-save, just log it
-        } finally {
+      setIsSaving(true);
+      try {
+        const result = await bookClient.saveQuestionResponses(bookId, nonEmptyResponses);
+        if (generation === saveGenerationRef.current) {
+          setLastSaved(result.answered_at || new Date().toISOString());
+          setSaveError(false);
+        }
+      } catch (error) {
+        console.error('Failed to save responses:', error);
+        if (generation === saveGenerationRef.current) {
+          setSaveError(true);
+        }
+      } finally {
+        if (generation === saveGenerationRef.current) {
           setIsSaving(false);
         }
       }
@@ -81,14 +92,18 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
     return () => clearTimeout(timeoutId);
   }, [responses, bookId, questions]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     const questionResponses: QuestionResponse[] = questions.map((question, index) => ({
       question,
       answer: responses[index] || ''
     }));
 
-    // Note: This component is for TOC generation, not chapter questions
-    // For now, skip saving to the chapter-questions API which has different structure
+    // Best-effort final persist (covers answers typed inside the debounce window).
+    // Failure must not block TOC generation — responses also ride the generate-toc body.
+    const nonEmptyResponses = questionResponses.filter(r => r.answer.trim().length > 0);
+    bookClient.saveQuestionResponses(bookId, nonEmptyResponses).catch((error) => {
+      console.error('Failed to save responses on submit:', error);
+    });
 
     onSubmit(questionResponses);
   };
@@ -133,6 +148,13 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
             <div className="flex items-center text-blue-400">
               <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-blue-400 mr-2"></div>
               Saving...
+            </div>
+          ) : saveError ? (
+            <div className="flex items-center text-red-400" role="alert">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              Auto-save failed — your latest answers may not be saved
             </div>
           ) : lastSaved ? (
             <div className="flex items-center text-green-400">
