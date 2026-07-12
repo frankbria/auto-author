@@ -13,24 +13,24 @@
 
 ## Steps
 
-- [ ] 1. `bookClient.ts`: alias `QuestionResponse as TocQuestionResponse` from `@/types/toc`; retype plural `saveQuestionResponses` / `getQuestionResponses` only; fix the stale top-of-file comment. Per-chapter singular methods untouched.
-- [ ] 2. `ClarifyingQuestions.tsx`:
+- [x] 1. `bookClient.ts`: alias `QuestionResponse as TocQuestionResponse` from `@/types/toc`; retype plural `saveQuestionResponses` / `getQuestionResponses` only; fix the stale top-of-file comment. Per-chapter singular methods untouched.
+- [x] 2. `ClarifyingQuestions.tsx`:
   - Debounced effect calls `bookClient.saveQuestionResponses(bookId, nonEmptyResponses)`; `lastSaved` set from returned `answered_at` only on success; failure → keep indicator un-saved + lightweight error state (no silent success).
   - Stale-response guard (generation counter ref) so an out-of-order save can't clobber newer UI state.
   - Hydration maps `answer` (not `response_text`).
   - `handleSubmit` best-effort saves before `onSubmit` (failure doesn't block TOC generation — responses ride the generate-toc body).
-- [ ] 3. Tests (`ClarifyingQuestions.test.tsx`) — TDD, updated first:
+- [x] 3. Tests (`ClarifyingQuestions.test.tsx`) — TDD, updated first:
   - Auto-saved appears only after mocked `saveQuestionResponses` resolves, called with `{question, answer}` payload.
   - Failure path: reject → no "Auto-saved", error affordance shown.
   - Hydration fixtures corrected to `{question, answer}`.
   - Submit-path save assertion.
-- [ ] 4. Full frontend suite + lint + typecheck; deslop scan.
-- [ ] 5. opencode (GLM) pre-PR review (codex fallback per hang memory).
-- [ ] 6. PR; post-PR review posted as comment.
-- [ ] 7. Demo (showboat + agent-browser): real servers, type answer → refresh → answer survives (main loses it).
-- [ ] 8. CI green + final triage; docs sync; merge.
+- [x] 4. Full frontend suite + lint + typecheck; deslop scan.
+- [x] 5. opencode (GLM) pre-PR review (codex fallback per hang memory).
+- [x] 6. PR; post-PR review posted as comment.
+- [x] 7. Demo (showboat + agent-browser): real servers, type answer → refresh → answer survives (main loses it).
+- [x] 8. CI green + final triage; docs sync; merge.
 
 ## Acceptance criteria
 
-- [ ] Debounced effect wired to real save endpoint (AC option 2)
-- [ ] A test asserts the indicator only shows after a real successful persist
+- [x] Debounced effect wired to real save endpoint (AC option 2)
+- [x] A test asserts the indicator only shows after a real successful persist
