@@ -1,30 +1,22 @@
-"""Tests for AIService.transform_text_style (issue #58)."""
+"""Tests for AIService.transform_text_style (issue #58).
+
+The OpenAI boundary uses the autospec helper (issue #202) so every
+``chat.completions.create`` call is validated against the real SDK signature
+instead of a bare Mock that accepts anything.
+"""
 import pytest
-from unittest.mock import Mock, patch
 from app.services.ai_service import AIService
-from openai import OpenAI
+from tests.test_services.openai_autospec import autospec_openai_client
 
 
 class TestAIServiceStyleTransformation:
     @pytest.fixture
-    def mock_openai_client(self):
-        mock_client = Mock(spec=OpenAI)
-        mock_completion = Mock()
-        mock_completion.choices = [
-            Mock(
-                message=Mock(content="The rewritten text in the requested style."),
-                finish_reason="stop",
-            )
-        ]
-        mock_client.chat.completions.create.return_value = mock_completion
-        return mock_client
-
-    @pytest.fixture
-    def ai_service(self, mock_openai_client):
-        with patch("app.services.ai_service.OpenAI", return_value=mock_openai_client):
-            service = AIService()
-            service.client = mock_openai_client
-            return service
+    def ai_service(self):
+        service = AIService()
+        service.client = autospec_openai_client(
+            content="The rewritten text in the requested style."
+        )
+        return service
 
     @pytest.mark.asyncio
     async def test_transform_success(self, ai_service):
@@ -67,7 +59,10 @@ class TestAIServiceStyleTransformation:
     @pytest.mark.asyncio
     async def test_truncated_output_is_rejected_not_saved(self, ai_service):
         """A length-truncated rewrite must fail, not silently overwrite the chapter."""
-        ai_service.client.chat.completions.create.return_value.choices[0].finish_reason = "length"
+        ai_service.client = autospec_openai_client(
+            content="The rewritten text in the requested style.",
+            finish_reason="length",
+        )
         result = await ai_service.transform_text_style(
             content="A very long chapter...", target_style="professional"
         )

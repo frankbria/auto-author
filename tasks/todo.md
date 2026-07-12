@@ -1,51 +1,34 @@
-# Issue #190 [P1.10] — CSP ships unsafe-inline/unsafe-eval and dead Clerk origins
+# Issue #202 — [P2.10] AI integration is unobservable in CI (fallback masks outages; mocks lack autospec)
 
-**Branch**: `fix/issue-190-csp-hardening` · frontend-only · security
-**Plan source**: self-authored (no plan comment on the issue).
-**Approved**: autonomously (no architectural fork — the AC mandates nonces; middleware-nonce + `strict-dynamic` is the single documented Next.js approach).
+**Plan source**: self-authored (no plan comment on issue). Branch: `fix/202-ai-observability-autospec`.
 
-## Problem
-`frontend/next.config.ts` ships a static CSP with `script-src 'unsafe-eval' 'unsafe-inline'` (neutering CSP as an XSS mitigation while the app renders AI/user-derived HTML via `dangerouslySetInnerHTML`), dead Clerk origins (`clerk.auto-author.dev`, `*.clerk.accounts.dev`, `clerk-telemetry.com` — app migrated to better-auth 2025-12), and `http://localhost:8000`/`wss:` in production connect-src.
+## Key design decisions (autonomous, precedent-backed)
 
-## Acceptance criteria (from issue)
-1. Drop `'unsafe-inline'`/`'unsafe-eval'` from script-src (nonces/hashes for required inline scripts)
-2. Remove all `clerk.*` / `clerk-telemetry` entries
-3. Drop `http://localhost:8000` / `wss:` from production connect-src
+1. **AC1 OR-branch: autospec mocks, NOT a nightly real-key job.** The AC explicitly offers either. A scheduled real-key job means recurring OpenAI spend, a required signal keyed on a secret whose validity can't be verified from the repo, and a flaky external dependency in CI. Rejected; documented in PR.
+2. **The AC's literal `create_autospec(OpenAI)` is unusable** — verified empirically: the client reaches `chat.completions` through `cached_property` descriptors, so `create_autospec(OpenAI, instance=True).chat.completions` raises `AttributeError`. Instead, autospec the **real bound method** `OpenAI(api_key="test").chat.completions.create`, which enforces the real SDK signature (verified: rejects bogus/missing kwargs, accepts production kwargs). A meta-test pins that the helper has teeth.
+3. **AC2: the one remaining silent fallback is `_parse_questions_response`** (ai_service.py:507-514) substituting 4 hard-coded clarifying questions when AI output is unparseable — indistinguishable from AI output. Fix: raise `AIServiceError(error_code="AI_INVALID_RESPONSE", retryable=True)`, consistent with the #48 TOC precedent (ai_service.py:765-776). Endpoint already maps this to structured 503 with retry info. Chapter-question fallback observability already shipped in #182 (`is_fallback`, asserted in 3 test files) — no code needed, cited in PR.
 
-## Approach: middleware-generated per-request nonce (official Next.js 15 pattern, verified via context7)
-A static `headers()` CSP can't carry a per-request nonce, so the CSP moves from `next.config.ts` to `src/middleware.ts`. Next.js extracts the nonce from the CSP **request** header and stamps its own inline bootstrap scripts automatically (dynamic rendering required).
+## Steps
 
-### Evidence gathered
-- `next-themes` `ThemeProvider` (root layout) injects an inline theme script → needs the nonce (supports `nonce` prop). No other app-authored inline scripts.
-- No WebSockets in app code → `wss:` is dead. Dev HMR is webpack `ws://localhost:3000` (dev-only CSP branch).
-- Fonts self-hosted via `next/font` → `fonts.googleapis.com`/`fonts.gstatic.com` dead. `r2cdn.perplexity.ai` (font-src) and `challenges.cloudflare.com` (Clerk-era captcha; no Turnstile in codebase) dead. `https://api.auto-author.dev` is the pre-migration domain — dead.
-- No `<iframe>` in src → drop `frame-src` (falls back to `default-src 'self'`).
-- `NEXT_PUBLIC_API_URL` is set at build time by all deploy paths (deploy-staging.yml, ecosystem template, legacy scripts) AND by CI E2E (`tests.yml:203` → `http://localhost:8000/api/v1`) → **derive connect-src from it** (same fallback as `bookClient.ts:46`). Prod deploys get only the real API origin; CI E2E keeps localhost automatically; no generic-env keying (#192 lesson).
-- styled-components + Tailwind inline styles → style-src keeps `'unsafe-inline'` **without** a nonce (a nonce in style-src makes browsers ignore unsafe-inline → would break all inline styles). Documented accepted risk; AC targets script-src.
+- [ ] 1. **Autospec helper + meta-tests** — new helper `backend/tests/test_services/openai_autospec.py`: `autospec_openai_client(content, finish_reason="stop")` returning a client mock whose `chat.completions.create` is `create_autospec` of the real bound method, returning a real typed `ChatCompletion`. Meta-tests: bogus kwarg → TypeError; missing required kwarg → TypeError; production kwargs accepted.
+- [ ] 2. **Request-shape regression tests** — `backend/tests/test_services/test_openai_request_shape.py`: real `AIService` with autospec'd client; drive `_make_openai_request` (the single choke point all 8 AI methods funnel through — verified) and one full public method; pin the exact kwarg set {model, messages, temperature, max_tokens}. Rewrite `test_ai_service_style_transformation.py` fixtures onto the helper (drops the bare `Mock(spec=OpenAI)` that validated nothing).
+- [ ] 3. **Kill silent clarifying-question substitution (AC2)** — `_parse_questions_response` raises `AIServiceError` AI_INVALID_RESPONSE when no questions are parseable; tests: parse-failure raises; endpoint 503 pass-through; happy path unchanged; fix/remove any tests characterizing the old default substitution.
+- [ ] 4. Full backend suite + coverage gate + ruff; deslop scan.
+- [ ] 5. opencode (GLM) pre-PR review of branch diff (codex fallback per hang memory).
+- [ ] 6. PR with Known Limitations (nightly-job branch rejected rationale; TOC text-extraction recovery + analyze-summary error dict deliberately untouched).
+- [ ] 7. Post-PR opencode review posted as PR comment.
+- [ ] 8. Demo (showboat): main-vs-branch differential — (a) bogus kwarg injected into `_sync_request` sails through bare-Mock tests on main but fails autospec tests on branch; (b) unparseable AI output returns 200 + 4 canned questions on main vs structured 503 AI_INVALID_RESPONSE on branch.
+- [ ] 9. CI green + final feedback triage.
+- [ ] 10. Docs sync (CLAUDE.md changelog) + merge + close issue.
 
-### Steps (TDD)
-- [x] 1. **RED**: `src/lib/__tests__/csp.test.ts` — pure `buildCsp(nonce, {isDev, apiUrl})`:
-  - prod script-src = `'self' 'nonce-X' 'strict-dynamic'`, no unsafe-inline/unsafe-eval
-  - dev script-src additionally has `'unsafe-eval'` (webpack HMR) — official Next.js conditional
-  - no `clerk`/`clerk-telemetry`/`cloudflare`/`perplexity`/`googleapis`/`gstatic`/`auto-author.dev` substrings anywhere
-  - connect-src = `'self'` + origin(NEXT_PUBLIC_API_URL); no `wss:`; localhost only when apiUrl is localhost (the CI/dev shape); dev adds `ws://localhost:*` for HMR
-  - no frame-src; object-src 'none', base-uri/form-action 'self', frame-ancestors 'none' preserved
-- [x] 2. **RED**: extend `src/__tests__/middleware.test.ts` — response carries CSP header (public + protected-authed paths, and the BYPASS_AUTH early-return path), `x-nonce` request header forwarded (and overwrites any client-sent value), nonce unique across two requests, script-src clean of unsafe-*
-- [x] 3. **GREEN**: new `src/lib/csp.ts` (pure builder); wire into `middleware.ts` (nonce = base64 UUID; set CSP on request+response per official pattern — on every code path incl. bypass); auth logic unchanged
-- [x] 4. **GREEN**: `next.config.ts` — delete the CSP entry from `headers()` (other security headers stay); `src/app/layout.tsx` — async RootLayout reads `(await headers()).get('x-nonce')`, passes `nonce` to `ThemeProvider`
-- [x] 5. Full frontend suite + lint + typecheck; prod build sanity (`npm run build`)
-- [x] 6. Deslop scan; opencode (GLM) pre-PR review; PR
-- [x] 7. **Demo (hard gate)**: main vs branch prod builds — (a) curl shows old header with unsafe-*/clerk vs new nonce'd header; (b) real browser load on the branch: page renders, **zero CSP violations in console**, dark theme applied pre-hydration (nonce'd theme script ran), sign-in→dashboard round trip against real backend on localhost:8000 (proves derived connect-src); (c) nonce changes per request
-- [x] 8. CI green + post-PR review triage; docs sync (CLAUDE.md changelog); merge
+## Acceptance criteria
 
-### Accepted tradeoffs (documented in PR)
-- **All routes render dynamically** (nonce requires it; `headers()` in root layout forces it). App is auth-gated + VPS-served; static optimization loss is acceptable. This is the documented cost of the official pattern.
-- **style-src keeps 'unsafe-inline'** — inline-style injection is a far weaker primitive than script injection; required by styled-components/Tailwind/TipTap. AC targets script-src.
-- Dev CSP keeps `'unsafe-eval'` (webpack) — matches the official Next.js example; production never gets it.
+- [ ] AC1: unit mocks validate kwargs against the real SDK signature (autospec branch of the OR; meta-test proves enforcement).
+- [ ] AC2: fallback output observable — chapter questions via `is_fallback` (#182, already asserted); clarifying-questions silent substitution eliminated (structured retryable error); mocked tests can assert the AI path was taken.
 
-## Issue #265 — PUT /users/{auth_id} skips sanitize_input (P1.13)
-- [x] RED: test — markup string stored identically (sanitized) via PATCH /me and PUT /{auth_id}
-- [x] Shared helper `sanitize_string_fields` in users.py; wire into both endpoints
-- [x] GREEN: users test file (34) + full backend 1159 passed / 92.21% cov
-- [x] opencode pre-PR review "clean to merge" → PR #274 → demo (`docs/demos/2026-07-10-issue-265-put-sanitize.md`, showboat verify green)
-- [x] post-PR review triage (codex fallback: no regression; 2× GLM CI: no defects) → CI green → merged PR #274
+## Non-goals (documented)
+
+- Nightly real-key CI job (AC1 OR-branch rejected — spend + unverifiable secret + flake).
+- TOC text-extraction recovery marker (`_create_fallback_toc` recovers real AI content; unrecoverable case already raises — #48).
+- `analyze_summary_for_toc` error dict (already observable: `error` key + `is_ready_for_toc: False`, never persisted — #105).
+- Autospec'ing high-level `ai_service` method patches in endpoint tests (own-method signatures, not SDK boundary).
