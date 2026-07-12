@@ -504,14 +504,22 @@ Make questions specific, actionable, and focused on content structure rather tha
             potential_questions = questions_text.split("?")
             questions = [q.strip() + "?" for q in potential_questions if q.strip()]
 
-        # Fallback to default questions if still no valid questions found
+        # No questions could be recovered from the AI response. Substituting
+        # hard-coded defaults here would be a silent failure (issue #202, same
+        # class as the #48 TOC fix): canned content indistinguishable from AI
+        # output. Surface a retryable error instead.
         if len(questions) == 0:
-            questions = [
-                "What is the main problem your book solves?",
-                "Who is your target audience?",
-                "What are the key topics you want to cover?",
-                "What should readers be able to do after reading your book?",
-            ]
+            correlation_id = str(uuid.uuid4())
+            logger.warning(
+                f"AI returned unparseable clarifying questions "
+                f"[correlation_id={correlation_id}]"
+            )
+            raise AIServiceError(
+                message="The AI returned unusable clarifying questions. Please try again.",
+                error_code="AI_INVALID_RESPONSE",
+                retryable=True,
+                correlation_id=correlation_id,
+            )
 
         return questions[:5]  # Limit to 5 questions max
 

@@ -302,17 +302,19 @@ SUGGESTIONS: Add more concrete examples. Define target audience clearly. Include
         assert "main problem" in result[0].lower()
         assert "target audience" in result[1].lower()
 
-    def test_parse_questions_response_with_fallback(self):
-        """Test fallback when questions parsing fails."""
+    def test_parse_questions_response_unparseable_raises(self):
+        """Unparseable AI output raises a retryable structured error instead of
+        silently substituting canned default questions (issue #202)."""
+        from app.services.ai_errors import AIServiceError
+
         service = AIService()
-        # Invalid format that should trigger fallback (no question marks)
         questions_text = "This is not a proper questions format"
 
-        result = service._parse_questions_response(questions_text)
+        with pytest.raises(AIServiceError) as exc_info:
+            service._parse_questions_response(questions_text)
 
-        # Should return fallback questions
-        assert len(result) == 4
-        assert all(question.endswith("?") for question in result)
+        assert exc_info.value.error_code == "AI_INVALID_RESPONSE"
+        assert exc_info.value.retryable is True
 
     def test_build_summary_analysis_prompt(self):
         """Test building of summary analysis prompt."""
