@@ -197,30 +197,37 @@ test.describe('Complete Authoring Journey E2E', () => {
     // Step 4: Add/navigate to first chapter from TOC
     // =================================================================
     chapterId = await test.step('Navigate to first chapter', async () => {
-      // Navigate to chapters page
-      await page.goto(`/dashboard/books/${bookId}/chapters`);
+      // Navigate to the tabbed book page (the real chapter interface; the old
+      // standalone /chapters mock route was removed in #193)
+      await page.goto(`/dashboard/books/${bookId}`);
       await page.waitForLoadState('networkidle');
 
-      // Look for first chapter link or tab
-      const firstChapter = page.locator('text=/chapter 1(?!\\d)/i').first();
+      // Open the first chapter from the sidebar tab list. The inner editor tab
+      // triggers also carry data-testid="chapter-tab", so scope to the sidebar
+      // tabs (no data-tab) — same pattern as chapter-questions-tabs.spec.ts.
+      const firstChapter = page.locator('[data-testid="chapter-tab"]:not([data-tab])').first();
+      await firstChapter.waitFor({ state: 'visible', timeout: 10000 });
       await firstChapter.click();
 
-      // Wait for chapter page to load
+      // Wait for the chapter editor to mount (tab clicks don't change the URL)
       await waitForCondition(
         async () => {
-          const url = page.url();
-          return url.includes('/chapters/');
+          return await page
+            .getByRole('tablist', { name: /chapter editor view/i })
+            .isVisible()
+            .catch(() => false);
         },
         {
           timeout: 10000,
-          timeoutMessage: 'Chapter page did not load'
+          timeoutMessage: 'Chapter editor did not load'
         }
       );
 
-      // Extract chapter ID from URL
-      const url = page.url();
-      const chapterIdMatch = url.match(/chapters\/([a-zA-Z0-9-]+)/);
-      const extractedChapterId = chapterIdMatch?.[1];
+      // Extract chapter ID from the tab's draggable wrapper (react-beautiful-dnd
+      // stamps the chapter id as data-rfd-draggable-id)
+      const extractedChapterId = await firstChapter.evaluate((el) =>
+        el.closest('[data-rfd-draggable-id]')?.getAttribute('data-rfd-draggable-id') ?? null
+      );
 
       expect(extractedChapterId).toBeTruthy();
       console.log(`✓ Navigated to chapter ID: ${extractedChapterId}`);
