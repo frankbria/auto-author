@@ -35,13 +35,13 @@ Issue AC offers wire OR filter OR remove. CodeRabbit chose **wire**; exploration
   - delete dead getStatusColor/getStatusText
 - [x] 4. GREEN: full frontend suite + lint + typecheck; coverage gates (page now in denominator)
 - [x] 5. Deslop scan
-- [ ] 6. Pre-PR third-party review (opencode GLM primary, codex fallback)
-- [ ] 7. PR, post-PR review posted as comment
-- [ ] 8. Demo (hard gate): real servers, branch vs main — main shows "not yet implemented" toast for EPUB/Markdown; branch downloads real .epub/.md/.zip files (verify file magic bytes)
+- [x] 6. Pre-PR third-party review (opencode GLM primary, codex fallback)
+- [x] 7. PR, post-PR review posted as comment
+- [x] 8. Demo (hard gate): real servers, branch vs main — main shows "not yet implemented" toast for EPUB/Markdown; branch downloads real .epub/.md/.zip files (verify file magic bytes)
 - [ ] 9. CI green + final triage → docs sync → merge
 
 ## Acceptance criteria (from issue)
 
-- [ ] Selecting EPUB on the legacy export page produces a working export (no "not yet implemented")
-- [ ] Selecting Markdown likewise, including multi-file (ZIP) option
-- [ ] PDF/DOCX behavior unchanged
+- [x] Selecting EPUB on the legacy export page produces a working export (no "not yet implemented")
+- [x] Selecting Markdown likewise, including multi-file (ZIP) option
+- [x] PDF/DOCX behavior unchanged
