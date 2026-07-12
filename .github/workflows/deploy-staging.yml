@@ -12,6 +12,16 @@ on:
   # Allow on-demand deploys (e.g. server bring-up, re-deploy without a code push).
   workflow_dispatch:
 
+# Two rapid pushes to main (e.g. a PR merge followed by a docs commit) trigger
+# two test runs and therefore two deploys ~1 minute apart. The overlapping SSH
+# bursts against the shared staging box are what made the second run's upload
+# time out (see the 2026-07-12 failures). Serialize: one deploy at a time, the
+# newest queued run supersedes older queued ones. Never cancel a deploy that is
+# already mid-flight.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
 env:
   NODE_VERSION: '18'
   PYTHON_VERSION: '3.9'
@@ -137,9 +147,26 @@ jobs:
 
       - name: Upload package to server
         run: |
-          scp -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new \
-            /tmp/deploy-package.tar.gz \
-            ${{ secrets.USER }}@${{ secrets.HOST }}:/tmp/
+          # This is the run's FIRST SSH contact: with accept-new and an empty
+          # known_hosts the client's host-key discovery opens several
+          # short-lived preauth connections before the real one, and on the
+          # shared staging box that burst intermittently gets the follow-up
+          # connection dropped (observed as "port 22: Connection timed out",
+          # 2026-07-12). Retry with a cool-down; ConnectTimeout keeps a dead
+          # attempt from eating the default ~2min TCP timeout. Retries reuse
+          # the now-populated known_hosts, so they connect singly.
+          for attempt in 1 2 3; do
+            if scp -i ~/.ssh/staging_key \
+                 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+                 /tmp/deploy-package.tar.gz \
+                 ${{ secrets.USER }}@${{ secrets.HOST }}:/tmp/; then
+              exit 0
+            fi
+            echo "Upload attempt $attempt failed; retrying in 60s..."
+            sleep 60
+          done
+          echo "Upload failed after 3 attempts"
+          exit 1
 
       - name: Validate security configuration
         run: |
@@ -160,7 +187,7 @@ jobs:
 
       - name: Deploy to staging
         run: |
-          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new \
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.HOST }} \
             'bash -s' << 'ENDSSH'
           set -euo pipefail

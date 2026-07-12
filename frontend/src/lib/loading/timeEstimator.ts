@@ -31,7 +31,7 @@ export interface OperationMetadata {
   /** Question count (for question generation) */
   questionCount?: number;
   /** Export format (for export operations) */
-  exportFormat?: 'pdf' | 'docx';
+  exportFormat?: 'pdf' | 'docx' | 'epub' | 'markdown';
   /** Network speed estimate in Mbps (optional) */
   networkSpeed?: number;
 }
@@ -74,6 +74,20 @@ const OPERATION_BUDGETS = {
     perChapter: 500, // 0.5 seconds per chapter
     min: 3000,
     max: 40000, // 40 seconds max
+  },
+  'export.epub': {
+    base: 5000, // XHTML conversion, comparable to DOCX
+    perThousandWords: 1000,
+    perChapter: 500,
+    min: 3000,
+    max: 40000,
+  },
+  'export.markdown': {
+    base: 3000, // plain-text conversion, lighter than DOCX
+    perThousandWords: 500,
+    perChapter: 250,
+    min: 2000,
+    max: 30000,
   },
 
   // Chapter Operations

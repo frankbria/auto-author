@@ -38,6 +38,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
   const [chapters, setChapters] = useState<ChapterStatus[]>([]);
   const [includeEmptyChapters, setIncludeEmptyChapters] = useState(false);
   const [pageSize, setPageSize] = useState<'letter' | 'A4'>('letter');
+  const [multiFile, setMultiFile] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
   const [downloadBlob, setDownloadBlob] = useState<Blob | null>(null);
@@ -47,10 +48,10 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
     if (!isExporting) return null;
     const wordCount = chapters.reduce((sum, ch) => sum + ch.word_count, 0);
     const chapterCount = includeEmptyChapters ? chapters.length : chapters.filter(ch => ch.word_count > 0).length;
-    return createProgressTracker(
-      selectedFormat === 'pdf' ? 'export.pdf' : 'export.docx',
-      { wordCount, chapterCount }
-    );
+    const operationKey = ['pdf', 'docx', 'epub', 'markdown'].includes(selectedFormat)
+      ? `export.${selectedFormat}`
+      : 'export.docx';
+    return createProgressTracker(operationKey, { wordCount, chapterCount });
   }, [isExporting, selectedFormat, chapters, includeEmptyChapters]);
 
   const exportProgress = getProgress ? getProgress() : { progress: 0, estimatedTimeRemaining: 0 };
@@ -70,7 +71,11 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
         // Add icons to formats (since API doesn't provide them)
         const formatsWithIcons = exportData.formats.map(format => ({
           ...format,
-          icon: format.format === 'pdf' ? '📄' : format.format === 'docx' ? '📝' : '📋'
+          icon:
+            format.format === 'pdf' ? '📄'
+            : format.format === 'docx' ? '📝'
+            : format.format === 'epub' ? '📖'
+            : '📋'
         }));
 
         setFormats(formatsWithIcons);
@@ -123,6 +128,15 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
         blob = await bookClient.exportDOCX(bookId, {
           includeEmptyChapters
         });
+      } else if (selectedFormat === 'epub') {
+        blob = await bookClient.exportEPUB(bookId, {
+          includeEmptyChapters
+        });
+      } else if (selectedFormat === 'markdown') {
+        blob = await bookClient.exportMarkdown(bookId, {
+          includeEmptyChapters,
+          multiFile
+        });
       } else {
         toast.error({ title: 'This export format is not yet implemented' });
         setIsExporting(false);
@@ -142,33 +156,19 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
     if (!downloadBlob || !book) return;
 
     const format = formats.find(f => f.format === selectedFormat);
+    // Multi-file Markdown returns a ZIP archive, not a .md file
+    const extension =
+      selectedFormat === 'markdown' && multiFile ? '.zip' : format?.extension || '';
     const url = window.URL.createObjectURL(downloadBlob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${book.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}${format?.extension || ''}`;
+    a.download = `${book.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}${extension}`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
 
     toast.success({ title: 'Download started!' });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return 'bg-amber-600';
-      case 'edited':
-        return 'bg-blue-600';
-      case 'final':
-        return 'bg-green-600';
-      default:
-        return 'bg-gray-600';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   if (isLoading) {
@@ -268,7 +268,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
               <h2 className="text-xl font-semibold text-gray-100 mb-4">2. Export Options</h2>
               <div className="space-y-4">
-                {selectedFormat === 'pdf' && (
+                {selectedFormat && (
                   <div className="space-y-4">
                     <div className="flex items-start">
                       <div className="mt-1">
@@ -277,6 +277,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                             <input
                               type="checkbox"
                               className="sr-only peer"
+                              aria-label="Include Empty Chapters"
                               checked={includeEmptyChapters}
                               onChange={() => setIncludeEmptyChapters(!includeEmptyChapters)}
                             />
@@ -290,55 +291,58 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                       </div>
                     </div>
 
-                    <div>
-                      <h3 className="font-medium text-gray-200 mb-2">Page Size</h3>
-                      <div className="flex gap-4">
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="pageSize"
-                            value="letter"
-                            checked={pageSize === 'letter'}
-                            onChange={() => setPageSize('letter')}
-                            className="mr-2"
-                          />
-                          <span className="text-gray-300">Letter (8.5" × 11")</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="pageSize"
-                            value="A4"
-                            checked={pageSize === 'A4'}
-                            onChange={() => setPageSize('A4')}
-                            className="mr-2"
-                          />
-                          <span className="text-gray-300">A4 (210mm × 297mm)</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedFormat === 'docx' && (
-                  <div className="flex items-start">
-                    <div className="mt-1">
-                      <label className="inline-flex items-center cursor-pointer">
-                        <div className="relative">
-                          <input
-                            type="checkbox"
-                            className="sr-only peer"
-                            checked={includeEmptyChapters}
-                            onChange={() => setIncludeEmptyChapters(!includeEmptyChapters)}
-                          />
-                          <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
+                    {selectedFormat === 'pdf' && (
+                      <div>
+                        <h3 className="font-medium text-gray-200 mb-2">Page Size</h3>
+                        <div className="flex gap-4">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="pageSize"
+                              value="letter"
+                              checked={pageSize === 'letter'}
+                              onChange={() => setPageSize('letter')}
+                              className="mr-2"
+                            />
+                            <span className="text-gray-300">Letter (8.5" × 11")</span>
+                          </label>
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="pageSize"
+                              value="A4"
+                              checked={pageSize === 'A4'}
+                              onChange={() => setPageSize('A4')}
+                              className="mr-2"
+                            />
+                            <span className="text-gray-300">A4 (210mm × 297mm)</span>
+                          </label>
                         </div>
-                      </label>
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="font-medium text-gray-200">Include Empty Chapters</h3>
-                      <p className="text-gray-400 text-sm">Export chapters that don't have content yet</p>
-                    </div>
+                      </div>
+                    )}
+
+                    {selectedFormat === 'markdown' && (
+                      <div className="flex items-start">
+                        <div className="mt-1">
+                          <label className="inline-flex items-center cursor-pointer">
+                            <div className="relative">
+                              <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                aria-label="Separate File Per Chapter"
+                                checked={multiFile}
+                                onChange={() => setMultiFile(!multiFile)}
+                              />
+                              <div className="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
+                            </div>
+                          </label>
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="font-medium text-gray-200">Separate File Per Chapter</h3>
+                          <p className="text-gray-400 text-sm">Download a ZIP archive with one Markdown file per chapter</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -401,23 +405,21 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                   <h3 className="text-gray-400 text-sm">Options</h3>
                   <div className="space-y-1 mt-1">
                     {selectedFormat === 'pdf' && (
-                      <>
-                        <div className="text-gray-300 text-sm flex items-center">
-                          <div className="w-1 h-1 rounded-full bg-indigo-500 mr-2"></div>
-                          Page size: {pageSize === 'letter' ? 'Letter' : 'A4'}
-                        </div>
-                        {includeEmptyChapters && (
-                          <div className="text-gray-300 text-sm flex items-center">
-                            <div className="w-1 h-1 rounded-full bg-indigo-500 mr-2"></div>
-                            Include empty chapters
-                          </div>
-                        )}
-                      </>
+                      <div className="text-gray-300 text-sm flex items-center">
+                        <div className="w-1 h-1 rounded-full bg-indigo-500 mr-2"></div>
+                        Page size: {pageSize === 'letter' ? 'Letter' : 'A4'}
+                      </div>
                     )}
-                    {selectedFormat === 'docx' && includeEmptyChapters && (
+                    {selectedFormat && includeEmptyChapters && (
                       <div className="text-gray-300 text-sm flex items-center">
                         <div className="w-1 h-1 rounded-full bg-indigo-500 mr-2"></div>
                         Include empty chapters
+                      </div>
+                    )}
+                    {selectedFormat === 'markdown' && multiFile && (
+                      <div className="text-gray-300 text-sm flex items-center">
+                        <div className="w-1 h-1 rounded-full bg-indigo-500 mr-2"></div>
+                        Separate file per chapter
                       </div>
                     )}
                     {!selectedFormat && (
