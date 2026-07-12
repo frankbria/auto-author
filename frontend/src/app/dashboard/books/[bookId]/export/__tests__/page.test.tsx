@@ -194,6 +194,20 @@ describe('ExportBookPage format dispatch', () => {
     );
   });
 
+  it('does not leak multiFile into an EPUB export after switching from Markdown', async () => {
+    renderPage();
+    await selectFormat('Markdown Document');
+    fireEvent.click(screen.getByLabelText('Separate File Per Chapter'));
+    await selectFormat('EPUB Ebook');
+    fireEvent.click(screen.getByRole('button', { name: 'Export Book' }));
+    await waitFor(() =>
+      expect(mockBookClient.exportEPUB).toHaveBeenCalledWith('book-1', {
+        includeEmptyChapters: false,
+      })
+    );
+    expect(mockBookClient.exportMarkdown).not.toHaveBeenCalled();
+  });
+
   it('still rejects an unknown format with an error toast', async () => {
     mockBookClient.getExportFormats = jest.fn().mockResolvedValue({
       formats: [
