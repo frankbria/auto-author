@@ -13,15 +13,15 @@
 
 ## Steps
 
-- [ ] 1. Delete `frontend/src/app/dashboard/books/[bookId]/chapters/page.tsx`
-- [ ] 2. Rewrite journey spec step 4 (navigate via real tabbed interface, id from draggable attr)
-- [ ] 3. Frontend suite + lint + typecheck green (deleting the untested page only shrinks the uncovered denominator)
-- [ ] 4. Deslop scan; opencode (GLM) pre-PR review (codex fallback per hang memory)
-- [ ] 5. PR; post-PR review posted as comment
-- [ ] 6. Demo: branch 404s the route while main serves fake ML questions for an arbitrary book; real Q&A tab flow intact on branch
-- [ ] 7. CI green + final triage; docs sync; merge
+- [x] 1. Delete `frontend/src/app/dashboard/books/[bookId]/chapters/page.tsx`
+- [x] 2. Rewrite journey spec step 4 (navigate via real tabbed interface, id from draggable attr)
+- [x] 3. Frontend suite + lint + typecheck green — 115 suites, 2096 passed / 8 skipped, coverage gates green
+- [x] 4. Deslop scan clean; opencode (GLM) pre-PR review: "clean to merge"
+- [x] 5. PR #278; post-PR fresh-session review "clean to merge", posted as comment
+- [x] 6. Demo (`docs/demos/2026-07-12-issue-193-remove-mock-chapters.md`, showboat verify green): main 200 + fake ML questions for real gardening book vs branch 404, same session; real Interview Questions tab shown working on branch
+- [x] 7. CI green + final triage; docs sync; merge
 
 ## Acceptance criteria
 
-- [ ] The abandoned page is deleted (AC "delete" branch); `/dashboard/books/<id>/chapters` no longer resolves
-- [ ] Real Q&A flow (ChapterEditor "Interview Questions" tab) unaffected
+- [x] The abandoned page is deleted (AC "delete" branch); `/dashboard/books/<id>/chapters` no longer resolves (404 demoed)
+- [x] Real Q&A flow (ChapterEditor "Interview Questions" tab) unaffected (demoed)
