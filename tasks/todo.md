@@ -11,11 +11,11 @@
 4. **Docs**: historical snapshots (docs/analysis/*, code-review/*, STAGING_VERIFICATION_RESULTS.md, BACKEND_TEST_FAILURE_ANALYSIS.md, claudedocs/*) kept as-is per #120/#186 precedent. Live docs edited: CLAUDE.md (Production Ready bullet + API endpoints line 473), delete docs/SESSION_MANAGEMENT.md, prune docs/production-readiness-gaps.md session-gap entries, fix docs/better-auth-migration-guide.md:403 stale "kept file" line. docs/session-management.md is better-auth-generic → keep (no legacy endpoint refs).
 
 ## Todo
-- [ ] Branch `fix/196-remove-dead-session-subsystem`
-- [ ] RED: regression test (sessions routes unregistered) fails on main-state code
-- [ ] Backend: unregister middleware+router; delete 5 modules + middleware pkg; clean database.py/base.py/conftest re-exports
-- [ ] Backend: delete 5 session test files; full suite green ≥85% cov
-- [ ] Frontend: delete useSession.ts, SessionWarning.tsx, useSession.test.tsx; suite green
-- [ ] Docs: CLAUDE.md, SESSION_MANAGEMENT.md, production-readiness-gaps.md, better-auth-migration-guide.md
-- [ ] Deslop scan, quality gate (lint, tests, opencode/codex review pre-PR)
+- [x] Branch `fix/196-remove-dead-session-subsystem`
+- [x] RED: regression test (sessions routes unregistered) fails on main-state code
+- [x] Backend: unregister middleware+router; delete 5 modules + middleware pkg; clean database.py/base.py/conftest re-exports
+- [x] Backend: delete 5 session test files; full suite green ≥85% cov
+- [x] Frontend: delete useSession.ts, SessionWarning.tsx, useSession.test.tsx; suite green
+- [x] Docs: CLAUDE.md, SESSION_MANAGEMENT.md, production-readiness-gaps.md, better-auth-migration-guide.md
+- [x] Deslop scan, quality gate (lint, tests, opencode/codex review pre-PR)
 - [ ] PR, post-PR review, demo (main-vs-branch route differential), CI gate, merge
