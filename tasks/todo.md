@@ -10,19 +10,19 @@
 
 ## Todo
 
-- [ ] 1. Extend `SignInPage.test.tsx`:
+- [x] 1. Extend `SignInPage.test.tsx`:
   - error → alert renders the mapped user-friendly credential message (not the raw provider text), no nav
   - `data.twoFactorRedirect: true` → no `router.push`, no error alert (2FA race guard)
-- [ ] 2. `git mv src/__tests__/SignUp.test.tsx src/__tests__/HomePage.test.tsx` (it tests the home page's auth-state rendering; content kept)
-- [ ] 3. New `src/__tests__/SignUpPage.test.tsx` for `@/app/auth/sign-up/page`:
+- [x] 2. `git mv src/__tests__/SignUp.test.tsx src/__tests__/HomePage.test.tsx` (it tests the home page's auth-state rendering; content kept)
+- [x] 3. New `src/__tests__/SignUpPage.test.tsx` for `@/app/auth/sign-up/page`:
   - success → `authClient.signUp.email` called with the form's email/credential/name values, push('/dashboard')
   - server error (account exists) → mapped message rendered, no nav
   - mismatched confirm password → inline error + submit disabled (button gates on `passwordsMatch`)
   - weak password → submit disabled (gates on `isPasswordValid`)
-- [ ] 4. RED-verify behavior pins by mutation (remove 2FA early-return → test fails; break error mapping → test fails)
-- [ ] 5. Full frontend suite + lint + typecheck green; coverage gates green
-- [ ] 6. Deslop scan, quality gate (opencode primary / codex fallback pre-PR review)
-- [ ] 7. PR, post-PR review, demo (hard gate), CI (hard gate), docs sync, merge
+- [x] 4. RED-verify behavior pins by mutation (remove 2FA early-return → test fails; break error mapping → test fails)
+- [x] 5. Full frontend suite + lint + typecheck green; coverage gates green
+- [x] 6. Deslop scan, quality gate (opencode primary / codex fallback pre-PR review)
+- [x] 7. PR, post-PR review, demo (hard gate), CI (hard gate), docs sync, merge
 
 ## Notes
 - `better-auth/react` is moduleNameMapper'd to `src/__mocks__/better-auth-react.ts`; import the real `@/lib/auth-client` — same pattern as SignInPage.test.tsx.
