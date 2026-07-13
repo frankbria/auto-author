@@ -1,663 +1,245 @@
 /**
- * Error Recovery Flow E2E Test
+ * Error Recovery Flow E2E (issue #201)
  *
- * Task 8: Comprehensive E2E test validating automatic retry logic with exponential backoff
+ * Pins the error-recovery behavior that actually ships:
  *
- * This test validates the error handler implementation from Task 4, which provides:
- * - Automatic retry for transient errors (network, 503, 429)
- * - Exponential backoff timing (1s, 2s, 4s)
- * - Maximum of 3 retry attempts
- * - Immediate failure for non-retryable errors (400, 401, etc.)
+ * 1. Book creation has NO automatic retry (`bookClient.createBook` is a plain
+ *    fetch): a failure surfaces a classified error notification with a manual
+ *    Retry action, the user stays on the form with input intact, and exactly
+ *    one request is sent. Manual Retry succeeds once the network recovers.
+ *    (The previous, always-skipped version of this suite asserted exponential
+ *    backoff on this path — behavior that never existed.)
  *
- * Test Coverage:
- * 1. Successful recovery after transient error (503 → success)
- * 2. Exponential backoff timing validation (1s, 2s, 4s delays)
- * 3. Non-retryable errors fail immediately (400 → no retry)
- * 4. Max retry limit respected (3 failures → final error)
- * 5. Toast notifications appear correctly
- * 6. User experience during retries (loading states)
+ * 2. Question-response saves DO retry with exponential backoff: the internal
+ *    ErrorHandler makes exactly 3 attempts (1s/2s backoff) before surfacing a
+ *    persistent error with a Retry button (#197). Manual Retry recovers.
  *
- * Critical Requirements:
- * - Uses page.route() to intercept and simulate failures
- * - Tracks retry attempts and timing precisely
- * - Validates exponential backoff with ±200ms tolerance
- * - Tests both success and failure scenarios
- * - Verifies toast notifications at appropriate times
+ * Runs in CI against the real backend (BYPASS_AUTH, no AI key); failures are
+ * injected with page.route().
  */
 
-import { test, expect, Page, Route } from '@playwright/test';
-import { waitForCondition } from '../__tests__/helpers/conditionWaiting';
+import { test, expect, Page } from '@playwright/test';
+import { createTestBookWithTOC, deleteTestBook } from './helpers/testData';
 
-// Test configuration
-const TEST_TIMEOUT = 60000; // 1 minute for tests with multiple retries
-const BACKOFF_TOLERANCE_MS = 200; // Allow ±200ms variance in timing
-
-// Expected backoff delays from errorHandler.ts
-const EXPECTED_BACKOFFS = {
-  attempt0: 1000, // baseDelay * 2^0
-  attempt1: 2000, // baseDelay * 2^1
-  attempt2: 4000, // baseDelay * 2^2
+const QUESTION = {
+  id: 'e2e-err-q-1',
+  chapter_id: 'e2e-chapter',
+  question_text: 'What single idea should this chapter leave with the reader?',
+  question_type: 'research',
+  difficulty: 'medium',
+  category: 'content',
+  order: 0,
+  generated_at: '2026-07-13T00:00:00Z',
+  metadata: { suggested_response_length: '1-2 paragraphs' },
 };
 
-/**
- * Helper to track API call timing and count
- */
-interface ApiCallTracker {
-  attempts: number;
-  timestamps: number[];
-  responses: Array<{ status: number; attempt: number }>;
-}
-
-/**
- * Setup API route interception with tracking
- */
-function setupApiInterception(
-  page: Page,
-  pattern: string,
-  handler: (route: Route, tracker: ApiCallTracker) => Promise<void>
-): ApiCallTracker {
-  const tracker: ApiCallTracker = {
-    attempts: 0,
-    timestamps: [],
-    responses: [],
-  };
-
-  page.route(pattern, async (route) => {
-    tracker.attempts++;
-    tracker.timestamps.push(Date.now());
-    await handler(route, tracker);
-  });
-
-  return tracker;
-}
-
-/**
- * Trigger an API call by creating a book (most reliable test operation)
- */
-async function triggerBookCreation(page: Page): Promise<void> {
-  await page.goto('/dashboard');
-  await page.waitForLoadState('networkidle');
-
-  // Click create book button
-  const createButton = page.getByRole('button', {
-    name: /create.*book|new book|add book/i,
-  });
-  await createButton.click();
-
-  // Wait for form to appear
-  await waitForCondition(
-    async () => {
-      return await page.getByLabel(/title/i).isVisible();
-    },
-    { timeout: 5000, timeoutMessage: 'Book creation form did not appear' }
-  );
-
-  // Fill in minimal book data
-  await page.getByLabel(/title/i).fill('Test Book for Error Recovery');
-
-  // Select genre
-  const genreField = page.getByLabel(/genre/i);
-  await genreField.click();
-  await page.getByRole('option', { name: /fiction/i }).first().click();
-
-  // Submit form (this triggers API call)
-  const submitButton = page.getByRole('button', {
-    name: /create book|save|submit/i,
-  });
-  await submitButton.click();
-}
-
-/**
- * Calculate the delay between two timestamps
- */
-function calculateDelay(timestamps: number[], index: number): number {
-  if (index === 0) return 0;
-  return timestamps[index] - timestamps[index - 1];
-}
-
-/**
- * Verify delay is within expected range with tolerance
- */
-function expectDelayInRange(
-  actual: number,
-  expected: number,
-  tolerance: number = BACKOFF_TOLERANCE_MS
-): void {
-  const min = expected - tolerance;
-  const max = expected + tolerance;
-  expect(actual).toBeGreaterThanOrEqual(min);
-  expect(actual).toBeLessThanOrEqual(max);
-}
-
-/**
- * ⚠️ TESTS CURRENTLY SKIPPED - NEEDS VERIFICATION ⚠️
- * Error recovery system may be implemented but needs test IDs added to components.
- * Re-enable these tests after adding necessary data-testid attributes.
- */
-test.describe.skip('Error Recovery Flow - Automatic Retry with Exponential Backoff (NEEDS TEST IDS)', () => {
-  test.setTimeout(TEST_TIMEOUT);
-
-  // =================================================================
-  // Test 1: Successful recovery on transient error
-  // =================================================================
-  test('automatically retries transient 503 error and succeeds on second attempt', async ({
-    page,
-  }) => {
-    // Setup: First request fails with 503, second succeeds
-    const tracker = setupApiInterception(page, '**/api/books**', async (route, tracker) => {
-      if (tracker.attempts === 1) {
-        // First attempt: Service Unavailable
-        tracker.responses.push({ status: 503, attempt: tracker.attempts });
-        await route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: 'Service temporarily unavailable' }),
-        });
-      } else {
-        // Second attempt: Success
-        tracker.responses.push({ status: 201, attempt: tracker.attempts });
-        await route.fulfill({
-          status: 201,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            id: 'test-book-123',
-            title: 'Test Book for Error Recovery',
-            genre: 'Fiction',
-          }),
-        });
-      }
-    });
-
-    // Execute: Trigger book creation
-    await triggerBookCreation(page);
-
-    // Wait for success (should happen after automatic retry)
-    await waitForCondition(
-      async () => {
-        const url = page.url();
-        return url.includes('/books/') || (await page.getByText(/test book/i).isVisible());
-      },
-      {
-        timeout: 10000,
-        timeoutMessage: 'Book creation did not complete after retry',
-      }
-    );
-
-    // Assert: Should have retried exactly once
-    expect(tracker.attempts).toBe(2);
-
-    // Assert: First attempt failed, second succeeded
-    expect(tracker.responses[0].status).toBe(503);
-    expect(tracker.responses[1].status).toBe(201);
-
-    // Assert: Should have waited ~1 second between attempts
-    const delay = calculateDelay(tracker.timestamps, 1);
-    expectDelayInRange(delay, EXPECTED_BACKOFFS.attempt0);
-
-    // Assert: No error toast should be shown (success on retry)
-    const errorToast = page.locator('[role="alert"]').filter({ hasText: /error/i });
-    const hasErrorToast = await errorToast.isVisible().catch(() => false);
-    expect(hasErrorToast).toBe(false);
-
-    console.log('✓ Test 1 passed: Automatic retry successful');
-    console.log(`  Attempts: ${tracker.attempts}`);
-    console.log(`  Retry delay: ${delay}ms (expected ~${EXPECTED_BACKOFFS.attempt0}ms)`);
-  });
-
-  // =================================================================
-  // Test 2: Exponential backoff timing validation
-  // =================================================================
-  test('respects exponential backoff timing across multiple retries', async ({ page }) => {
-    // Setup: Fail twice, succeed on third attempt
-    const tracker = setupApiInterception(page, '**/api/books**', async (route, tracker) => {
-      if (tracker.attempts <= 2) {
-        // First two attempts: Service Unavailable
-        tracker.responses.push({ status: 503, attempt: tracker.attempts });
-        await route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: 'Service temporarily unavailable' }),
-        });
-      } else {
-        // Third attempt: Success
-        tracker.responses.push({ status: 201, attempt: tracker.attempts });
-        await route.fulfill({
-          status: 201,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            id: 'test-book-123',
-            title: 'Test Book for Error Recovery',
-            genre: 'Fiction',
-          }),
-        });
-      }
-    });
-
-    // Execute: Trigger book creation
-    await triggerBookCreation(page);
-
-    // Wait for success (should happen after 2 retries)
-    await waitForCondition(
-      async () => {
-        const url = page.url();
-        return url.includes('/books/') || (await page.getByText(/test book/i).isVisible());
-      },
-      {
-        timeout: 15000,
-        timeoutMessage: 'Book creation did not complete after multiple retries',
-      }
-    );
-
-    // Assert: Should have attempted 3 times (initial + 2 retries)
-    expect(tracker.attempts).toBe(3);
-
-    // Assert: All responses tracked correctly
-    expect(tracker.responses).toHaveLength(3);
-    expect(tracker.responses[0].status).toBe(503);
-    expect(tracker.responses[1].status).toBe(503);
-    expect(tracker.responses[2].status).toBe(201);
-
-    // Assert: Exponential backoff timing
-    const delay1 = calculateDelay(tracker.timestamps, 1);
-    const delay2 = calculateDelay(tracker.timestamps, 2);
-
-    expectDelayInRange(delay1, EXPECTED_BACKOFFS.attempt0); // ~1000ms
-    expectDelayInRange(delay2, EXPECTED_BACKOFFS.attempt1); // ~2000ms
-
-    // Assert: Second delay should be approximately double the first
-    expect(delay2).toBeGreaterThan(delay1);
-
-    console.log('✓ Test 2 passed: Exponential backoff timing validated');
-    console.log(`  Attempts: ${tracker.attempts}`);
-    console.log(
-      `  First retry delay: ${delay1}ms (expected ~${EXPECTED_BACKOFFS.attempt0}ms)`
-    );
-    console.log(
-      `  Second retry delay: ${delay2}ms (expected ~${EXPECTED_BACKOFFS.attempt1}ms)`
-    );
-    console.log(`  Backoff ratio: ${(delay2 / delay1).toFixed(2)}x (expected ~2x)`);
-  });
-
-  // =================================================================
-  // Test 3: Non-retryable errors fail immediately
-  // =================================================================
-  test('does not retry validation errors (400 Bad Request)', async ({ page }) => {
-    // Setup: Return 400 validation error
-    const tracker = setupApiInterception(page, '**/api/books**', async (route, tracker) => {
-      tracker.responses.push({ status: 400, attempt: tracker.attempts });
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          error: 'Validation failed',
-          detail: 'Title is required',
-        }),
-      });
-    });
-
-    // Execute: Trigger book creation
-    await triggerBookCreation(page);
-
-    // Wait for error toast to appear
-    await waitForCondition(
-      async () => {
-        const errorToast = page.locator('[role="alert"]').filter({ hasText: /error/i });
-        return await errorToast.isVisible();
-      },
-      {
-        timeout: 5000,
-        timeoutMessage: 'Error toast did not appear',
-      }
-    );
-
-    // Assert: Should have attempted only once (no retry)
-    expect(tracker.attempts).toBe(1);
-
-    // Assert: Single 400 response
-    expect(tracker.responses).toHaveLength(1);
-    expect(tracker.responses[0].status).toBe(400);
-
-    // Assert: Error toast should show validation error
-    const errorToast = page.locator('[role="alert"]').filter({ hasText: /validation/i });
-    const hasValidationToast = await errorToast.isVisible();
-    expect(hasValidationToast).toBe(true);
-
-    // Assert: User should still be on form page (not redirected)
-    const url = page.url();
-    expect(url).not.toContain('/books/test-book');
-
-    console.log('✓ Test 3 passed: Non-retryable error failed immediately');
-    console.log(`  Attempts: ${tracker.attempts} (no retry)`);
-    console.log(`  Error type: 400 Validation Error`);
-  });
-
-  // =================================================================
-  // Test 4: Max retry limit respected (3 attempts total)
-  // =================================================================
-  test('respects maximum retry limit of 3 attempts and shows final error', async ({
-    page,
-  }) => {
-    // Setup: Always fail with 503
-    const tracker = setupApiInterception(page, '**/api/books**', async (route, tracker) => {
-      tracker.responses.push({ status: 503, attempt: tracker.attempts });
-      await route.fulfill({
-        status: 503,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Service temporarily unavailable' }),
-      });
-    });
-
-    // Execute: Trigger book creation
-    await triggerBookCreation(page);
-
-    // Wait for final error toast after all retries exhausted
-    await waitForCondition(
-      async () => {
-        const errorToast = page.locator('[role="alert"]').filter({ hasText: /error/i });
-        return await errorToast.isVisible();
-      },
-      {
-        timeout: 10000,
-        timeoutMessage: 'Error toast did not appear after retries exhausted',
-      }
-    );
-
-    // Assert: Should have attempted exactly 3 times (initial + 2 retries)
-    expect(tracker.attempts).toBe(3);
-
-    // Assert: All attempts failed with 503
-    expect(tracker.responses).toHaveLength(3);
-    expect(tracker.responses.every((r) => r.status === 503)).toBe(true);
-
-    // Assert: Exponential backoff timing for all retries
-    const delay1 = calculateDelay(tracker.timestamps, 1);
-    const delay2 = calculateDelay(tracker.timestamps, 2);
-
-    expectDelayInRange(delay1, EXPECTED_BACKOFFS.attempt0); // ~1000ms
-    expectDelayInRange(delay2, EXPECTED_BACKOFFS.attempt1); // ~2000ms
-
-    // Assert: Error toast should show server error
-    const errorToast = page
-      .locator('[role="alert"]')
-      .filter({ hasText: /server error|service.*unavailable/i });
-    const hasServerErrorToast = await errorToast.isVisible();
-    expect(hasServerErrorToast).toBe(true);
-
-    // Assert: User should still be on form page (not redirected)
-    const url = page.url();
-    expect(url).not.toContain('/books/test-book');
-
-    console.log('✓ Test 4 passed: Max retry limit respected');
-    console.log(`  Attempts: ${tracker.attempts} (max reached)`);
-    console.log(`  Retry delays: ${delay1}ms, ${delay2}ms`);
-    console.log(`  Final error shown to user`);
-  });
-
-  // =================================================================
-  // Test 5: Network errors retry automatically
-  // =================================================================
-  test('retries network errors and eventually succeeds', async ({ page }) => {
-    // Setup: First request fails with network error, second succeeds
-    const tracker = setupApiInterception(page, '**/api/books**', async (route, tracker) => {
-      if (tracker.attempts === 1) {
-        // First attempt: Simulate network failure
-        tracker.responses.push({ status: 0, attempt: tracker.attempts });
-        await route.abort('failed');
-      } else {
-        // Second attempt: Success
-        tracker.responses.push({ status: 201, attempt: tracker.attempts });
-        await route.fulfill({
-          status: 201,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            id: 'test-book-123',
-            title: 'Test Book for Error Recovery',
-            genre: 'Fiction',
-          }),
-        });
-      }
-    });
-
-    // Execute: Trigger book creation
-    await triggerBookCreation(page);
-
-    // Wait for success (should happen after automatic retry)
-    await waitForCondition(
-      async () => {
-        const url = page.url();
-        return url.includes('/books/') || (await page.getByText(/test book/i).isVisible());
-      },
-      {
-        timeout: 10000,
-        timeoutMessage: 'Book creation did not complete after network error retry',
-      }
-    );
-
-    // Assert: Should have retried after network failure
-    expect(tracker.attempts).toBe(2);
-
-    // Assert: No error toast (success on retry)
-    const errorToast = page.locator('[role="alert"]').filter({ hasText: /error/i });
-    const hasErrorToast = await errorToast.isVisible().catch(() => false);
-    expect(hasErrorToast).toBe(false);
-
-    console.log('✓ Test 5 passed: Network error retry successful');
-    console.log(`  Attempts: ${tracker.attempts}`);
-  });
-
-  // =================================================================
-  // Test 6: Rate limiting (429) triggers retry
-  // =================================================================
-  test('retries rate limit errors (429) with exponential backoff', async ({ page }) => {
-    // Setup: First request hits rate limit, second succeeds
-    const tracker = setupApiInterception(page, '**/api/books**', async (route, tracker) => {
-      if (tracker.attempts === 1) {
-        // First attempt: Rate limited
-        tracker.responses.push({ status: 429, attempt: tracker.attempts });
-        await route.fulfill({
-          status: 429,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            error: 'Rate limit exceeded',
-            detail: 'Too many requests',
-          }),
-        });
-      } else {
-        // Second attempt: Success
-        tracker.responses.push({ status: 201, attempt: tracker.attempts });
-        await route.fulfill({
-          status: 201,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            id: 'test-book-123',
-            title: 'Test Book for Error Recovery',
-            genre: 'Fiction',
-          }),
-        });
-      }
-    });
-
-    // Execute: Trigger book creation
-    await triggerBookCreation(page);
-
-    // Wait for success (should happen after automatic retry)
-    await waitForCondition(
-      async () => {
-        const url = page.url();
-        return url.includes('/books/') || (await page.getByText(/test book/i).isVisible());
-      },
-      {
-        timeout: 10000,
-        timeoutMessage: 'Book creation did not complete after rate limit retry',
-      }
-    );
-
-    // Assert: Should have retried after rate limit
-    expect(tracker.attempts).toBe(2);
-
-    // Assert: First attempt was rate limited, second succeeded
-    expect(tracker.responses[0].status).toBe(429);
-    expect(tracker.responses[1].status).toBe(201);
-
-    // Assert: Retry delay applied
-    const delay = calculateDelay(tracker.timestamps, 1);
-    expectDelayInRange(delay, EXPECTED_BACKOFFS.attempt0);
-
-    console.log('✓ Test 6 passed: Rate limit retry successful');
-    console.log(`  Attempts: ${tracker.attempts}`);
-    console.log(`  Retry delay: ${delay}ms`);
-  });
-
-  // =================================================================
-  // Test 7: Auth errors (401) do NOT retry
-  // =================================================================
-  test('does not retry authentication errors (401 Unauthorized)', async ({ page }) => {
-    // Setup: Return 401 auth error
-    const tracker = setupApiInterception(page, '**/api/books**', async (route, tracker) => {
-      tracker.responses.push({ status: 401, attempt: tracker.attempts });
-      await route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          error: 'Unauthorized',
-          detail: 'Authentication required',
-        }),
-      });
-    });
-
-    // Execute: Trigger book creation
-    await triggerBookCreation(page);
-
-    // Wait for error toast to appear
-    await waitForCondition(
-      async () => {
-        const errorToast = page.locator('[role="alert"]').filter({ hasText: /error/i });
-        return await errorToast.isVisible();
-      },
-      {
-        timeout: 5000,
-        timeoutMessage: 'Error toast did not appear',
-      }
-    );
-
-    // Assert: Should have attempted only once (no retry)
-    expect(tracker.attempts).toBe(1);
-
-    // Assert: Single 401 response
-    expect(tracker.responses).toHaveLength(1);
-    expect(tracker.responses[0].status).toBe(401);
-
-    // Assert: Error toast should show auth error
-    const errorToast = page
-      .locator('[role="alert"]')
-      .filter({ hasText: /authentication|unauthorized/i });
-    const hasAuthToast = await errorToast.isVisible();
-    expect(hasAuthToast).toBe(true);
-
-    console.log('✓ Test 7 passed: Auth error did not retry');
-    console.log(`  Attempts: ${tracker.attempts} (no retry)`);
-  });
-
-  // =================================================================
-  // Test 8: User experience during retries (loading states)
-  // =================================================================
-  test('shows appropriate loading states during retry attempts', async ({ page }) => {
-    // Setup: Fail once, then succeed
-    const tracker = setupApiInterception(page, '**/api/books**', async (route, tracker) => {
-      if (tracker.attempts === 1) {
-        tracker.responses.push({ status: 503, attempt: tracker.attempts });
-        await route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: 'Service temporarily unavailable' }),
-        });
-      } else {
-        tracker.responses.push({ status: 201, attempt: tracker.attempts });
-        await route.fulfill({
-          status: 201,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            id: 'test-book-123',
-            title: 'Test Book for Error Recovery',
-            genre: 'Fiction',
-          }),
-        });
-      }
-    });
-
-    // Execute: Trigger book creation
-    await triggerBookCreation(page);
-
-    // Assert: Submit button should show loading state
-    const submitButton = page.getByRole('button', {
-      name: /create book|save|submit/i,
-    });
-
-    // Button should be disabled during retry
-    const isDisabled = await submitButton.isDisabled().catch(() => false);
-
-    // Note: Loading state validation is best-effort
-    // Some implementations may not show loading during retries
-    console.log(`  Loading state detected: ${isDisabled ? 'Yes' : 'No'}`);
-
-    // Wait for success
-    await waitForCondition(
-      async () => {
-        const url = page.url();
-        return url.includes('/books/') || (await page.getByText(/test book/i).isVisible());
-      },
-      {
-        timeout: 10000,
-        timeoutMessage: 'Book creation did not complete',
-      }
-    );
-
-    // Assert: Operation completed successfully
-    expect(tracker.attempts).toBe(2);
-
-    console.log('✓ Test 8 passed: User experience validated');
-    console.log(`  Retries transparent to user (automatic)`);
-  });
+const json = (body: unknown) => ({
+  status: 200,
+  contentType: 'application/json',
+  body: JSON.stringify(body),
 });
 
-/**
- * Test Coverage Summary
- *
- * ✅ Test 1: Successful recovery on transient error (503 → success)
- * ✅ Test 2: Exponential backoff timing validation (1s, 2s, 4s)
- * ✅ Test 3: Non-retryable validation errors (400 → immediate fail)
- * ✅ Test 4: Max retry limit (3 attempts → final error)
- * ✅ Test 5: Network errors retry automatically
- * ✅ Test 6: Rate limiting (429) triggers retry
- * ✅ Test 7: Auth errors (401) do NOT retry
- * ✅ Test 8: User experience during retries
- *
- * Testing Approach:
- * - Uses Playwright's page.route() for API interception
- * - Tracks precise timing with millisecond accuracy
- * - Validates exponential backoff with ±200ms tolerance
- * - Tests both success and failure scenarios
- * - Verifies toast notifications appear correctly
- * - Ensures user experience remains smooth during retries
- *
- * Key Validation Points:
- * 1. Retry count matches expected behavior
- * 2. Timing follows exponential backoff formula (baseDelay * 2^attempt)
- * 3. Error classification determines retry behavior
- * 4. Toast notifications appear only on final failure
- * 5. User stays on form when operation fails
- * 6. User redirects when operation succeeds
- *
- * Reliability Considerations:
- * - ±200ms tolerance for timing (accounts for execution overhead)
- * - Condition-based waiting (no arbitrary timeouts)
- * - Multiple assertion points per test
- * - Detailed console logging for debugging
- * - Handles both successful and failed scenarios
- *
- * Limitations:
- * - Requires real browser environment (not unit test)
- * - Timing validation may vary on slow CI/CD systems
- * - Toast detection depends on aria-role implementation
- * - Loading state detection is best-effort (UI-dependent)
- */
+async function fillNewBookForm(page: Page, title: string) {
+  await page.goto('/dashboard/new-book');
+  await page.getByLabel(/book title/i).fill(title);
+  await page.getByLabel(/genre/i).selectOption('other');
+  await page.getByLabel(/target audience/i).fill('E2E testers');
+}
+
+test.describe('Error Recovery Flow', () => {
+  test.describe('book creation (no auto-retry, manual recovery)', () => {
+    let bookId: string | undefined;
+
+    test.afterEach(async ({ page }) => {
+      if (bookId) await deleteTestBook(page, bookId);
+      bookId = undefined;
+    });
+
+    test('server error shows a notification, keeps the form, sends exactly one request; resubmit recovers', async ({ page }) => {
+      const title = `Error Recovery Book ${Date.now()}`;
+      let postCount = 0;
+      await page.route('**/books/', (route) => {
+        if (route.request().method() !== 'POST') return route.fallback();
+        postCount++;
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Injected create failure (e2e)' }),
+        });
+      });
+
+      await fillNewBookForm(page, title);
+      await page.getByRole('button', { name: 'Create Book' }).click();
+
+      // Classified error notification; no navigation, no automatic retry.
+      await expect(page.locator('[data-sonner-toast]')).toBeVisible();
+      expect(page.url()).toContain('/dashboard/new-book');
+      expect(postCount).toBe(1);
+      // Form input survives the failure, so the user can just resubmit.
+      await expect(page.getByLabel(/book title/i)).toHaveValue(title);
+
+      // Network restored → resubmitting the intact form succeeds for real.
+      await page.unroute('**/books/');
+      await page.getByRole('button', { name: 'Create Book' }).click();
+      await page.waitForURL(/\/dashboard\/books\/[^/]+$/);
+      bookId = page.url().match(/books\/([a-zA-Z0-9-]+)/)![1];
+      expect(bookId).toBeTruthy();
+    });
+
+    test('network failure surfaces a retryable notification; the Retry action recovers', async ({ page }) => {
+      const title = `Network Failure Book ${Date.now()}`;
+      let postCount = 0;
+      let failCreates = true;
+      await page.route('**/books/', (route) => {
+        if (route.request().method() !== 'POST') return route.fallback();
+        if (failCreates) {
+          postCount++;
+          // Network-level failure → classified TRANSIENT → retryable toast.
+          return route.abort('failed');
+        }
+        return route.fallback();
+      });
+
+      await fillNewBookForm(page, title);
+      await page.getByRole('button', { name: 'Create Book' }).click();
+
+      const toast = page.locator('[data-sonner-toast]');
+      await expect(toast).toBeVisible();
+      const retryButton = toast.getByRole('button', { name: /retry/i });
+      await expect(retryButton).toBeVisible();
+      expect(page.url()).toContain('/dashboard/new-book');
+      // No automatic retry storm — one user action, one request.
+      expect(postCount).toBe(1);
+
+      // Network restored → the toast's Retry action re-submits and succeeds.
+      failCreates = false;
+      await retryButton.click();
+      await page.waitForURL(/\/dashboard\/books\/[^/]+$/);
+      bookId = page.url().match(/books\/([a-zA-Z0-9-]+)/)![1];
+      expect(bookId).toBeTruthy();
+    });
+  });
+
+  test.describe('question-response save (retry with backoff)', () => {
+    let bookId: string;
+
+    test.beforeEach(async ({ page }) => {
+      const { book } = await createTestBookWithTOC(page, {
+        title: `Retry Backoff Book ${Date.now()}`,
+      });
+      bookId = book.id;
+    });
+
+    test.afterEach(async ({ page }) => {
+      if (bookId) await deleteTestBook(page, bookId);
+    });
+
+    test('failed save retries exactly 3 times with backoff, then manual Retry recovers', async ({ page }) => {
+      // Minimal stateful question store: one mocked question; saves fail
+      // until the "network" is restored.
+      let generated = false;
+      let failSaves = true;
+      let putCount = 0;
+      let savedText: string | null = null;
+
+      const storedResponse = () => ({
+        id: 'resp-1',
+        question_id: QUESTION.id,
+        response_text: savedText,
+        word_count: 10,
+        status: 'draft',
+        created_at: '2026-07-13T00:00:00Z',
+        updated_at: '2026-07-13T00:00:00Z',
+        last_edited_at: '2026-07-13T00:00:00Z',
+        metadata: { edit_history: [] },
+      });
+
+      await page.route('**/books/*/chapters/*/generate-questions', (route) => {
+        generated = true;
+        return route.fulfill(json({ questions: [QUESTION], generation_id: 'e2e-gen', total: 1 }));
+      });
+      await page.route(
+        (url) => url.pathname.endsWith('/questions') && url.pathname.includes('/chapters/'),
+        (route) =>
+          route.fulfill(
+            json({
+              questions: generated ? [{ ...QUESTION, has_response: !!savedText }] : [],
+              total: generated ? 1 : 0,
+              page: 1,
+              pages: 1,
+            })
+          )
+      );
+      await page.route('**/books/*/chapters/*/question-progress', (route) =>
+        route.fulfill(
+          json({
+            total: generated ? 1 : 0,
+            completed: 0,
+            in_progress: savedText ? 1 : 0,
+            progress: 0,
+            status: savedText ? 'in-progress' : 'not-started',
+          })
+        )
+      );
+      await page.route(
+        (url) => /\/questions\/[^/]+\/response$/.test(url.pathname),
+        (route) => {
+          if (route.request().method() === 'PUT') {
+            putCount++;
+            if (failSaves) {
+              // A network-level failure (aborted request), not an HTTP 500:
+              // bookClient throws plain Errors without a .status, which
+              // classify as UNKNOWN (not retryable). Only NETWORK errors
+              // exercise the ErrorHandler backoff — same failure mode as
+              // the #197 demo (backend killed mid-session).
+              return route.abort('failed');
+            }
+            savedText = (route.request().postDataJSON() as { response_text: string }).response_text;
+            return route.fulfill(
+              json({ response: storedResponse(), success: true, message: 'Response saved' })
+            );
+          }
+          // GET: serve back what was stored (the save-verification read).
+          return route.fulfill(
+            json(
+              savedText
+                ? { response: storedResponse(), has_response: true, success: true }
+                : { response: null, has_response: false, success: true }
+            )
+          );
+        }
+      );
+
+      // Open the chapter's questions tab and mint the mocked question.
+      await page.goto(`/dashboard/books/${bookId}`);
+      await page.locator('[data-testid="chapter-tab"]:not([data-tab])').first().click();
+      await expect(page.getByRole('tablist', { name: /chapter editor view/i })).toBeVisible();
+      await page.locator('[data-testid="chapter-tab"][data-tab="questions"]').click();
+      await page.getByRole('button', { name: 'Generate Interview Questions' }).click();
+      await expect(page.getByText(QUESTION.question_text)).toBeVisible();
+
+      // Save while the endpoint is down.
+      await page
+        .getByPlaceholder('Type your response here or use voice input...')
+        .fill('An answer written during the outage.');
+      await page.getByRole('button', { name: 'Save Draft' }).click();
+
+      // Settled error state: persistent message + Retry button. The internal
+      // ErrorHandler backs off 1s/2s between attempts (~7s to settle).
+      const retryButton = page.getByRole('button', { name: 'Retry', exact: true });
+      await expect(retryButton).toBeVisible({ timeout: 20000 });
+      const errorMessage = page.getByText(/network error\. please check your connection/i);
+      await expect(errorMessage).toBeVisible();
+
+      // Retry-with-backoff evidence: exactly 3 automatic attempts, no more.
+      expect(putCount).toBe(3);
+
+      // Network restored → manual Retry saves and clears the error.
+      failSaves = false;
+      await retryButton.click();
+      await expect(retryButton).toBeHidden({ timeout: 15000 });
+      await expect(errorMessage).toBeHidden();
+      expect(savedText).toBe('An answer written during the outage.');
+    });
+  });
+});

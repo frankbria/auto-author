@@ -795,7 +795,11 @@ export function ChapterEditor({
           <span className="text-sm text-foreground">
             {editor?.storage.characterCount.characters() ?? 0} characters
           </span>
-          <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2"
+            data-testid="save-status-indicator"
+            data-save-status={isSaving ? 'saving' : lastSaved ? 'saved' : 'idle'}
+          >
             {isSaving && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" />
