@@ -194,7 +194,6 @@ export default function SettingsPage() {
               <NotificationSettingsForm
                 preferences={preferences}
                 onChange={handlePreferencesChange}
-                disabled={!isLoaded}
               />
             </TabsContent>
             <TabsContent value="billing">

@@ -1,5 +1,6 @@
 'use client';
 
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -54,23 +55,31 @@ const NOTIFICATION_TOGGLES: Array<{
 interface NotificationSettingsFormProps {
   preferences: Partial<UserPreferences>;
   onChange: (partial: Partial<UserPreferences>) => void;
-  disabled?: boolean;
 }
 
 /**
  * Notification Settings tab: per-type email/notification toggles.
  * Controlled component — state lives in the settings page.
+ *
+ * Gated "coming soon" (#195): no notification-delivery infrastructure exists
+ * yet, so every switch is hard-disabled. Stored preference values still render
+ * and round-trip unchanged through the shared save flow.
  */
 export default function NotificationSettingsForm({
   preferences,
   onChange,
-  disabled = false,
 }: NotificationSettingsFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Notification Settings</CardTitle>
-        <CardDescription>Choose which updates you want to receive</CardDescription>
+        <div className="flex items-center gap-2">
+          <CardTitle>Notification Settings</CardTitle>
+          <Badge variant="secondary">Coming soon</Badge>
+        </div>
+        <CardDescription>
+          Notification delivery isn&apos;t available yet. Your saved choices will apply
+          once notifications launch.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {NOTIFICATION_TOGGLES.map((toggle, index) => (
@@ -85,7 +94,7 @@ export default function NotificationSettingsForm({
                 id={`notification-${toggle.key}`}
                 checked={preferences[toggle.key] ?? toggle.defaultValue}
                 onCheckedChange={(checked) => onChange({ [toggle.key]: checked })}
-                disabled={disabled}
+                disabled
               />
             </div>
           </div>
