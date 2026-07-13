@@ -70,8 +70,8 @@ export default function UserProfile() {
 
   // Seed from the session immediately, then hydrate full profile (bio, prefs,
   // display_name) from the backend when available. getUserProfile can be absent
-  // in tests. The async hydration skips reset if the user has already started
-  // editing, so a slow fetch never clobbers in-progress input.
+  // in tests. The async hydration keeps any fields the user has already edited
+  // (keepDirtyValues), so a slow fetch never clobbers in-progress input.
   useEffect(() => {
     const [firstName = '', ...rest] = (user?.name ?? '').trim().split(' ');
     const lastName = rest.join(' ');
@@ -97,25 +97,27 @@ export default function UserProfile() {
       try {
         const p = await getUserProfile();
         if (cancelled) return;
-        // Capture the full preferences before the dirty check — server prefs
-        // never clobber user input, and skipping this would let a save wipe
-        // them whenever the user starts typing before the fetch resolves.
         setPreferences(p.preferences ?? {});
         setLoadState('loaded');
-        if (form.formState.isDirty) return;
-        form.reset({
-          firstName: p.first_name ?? firstName,
-          lastName: p.last_name ?? lastName,
-          // Fall back to the full name — exports prefer display_name, so
-          // seeding only first_name would truncate the author name on save.
-          displayName:
-            p.display_name ??
-            [p.first_name ?? firstName, p.last_name ?? lastName].filter(Boolean).join(' '),
-          bio: p.bio ?? '',
-          theme: p.preferences?.theme ?? 'system',
-          emailNotifications: p.preferences?.email_notifications ?? true,
-          marketingEmails: p.preferences?.marketing_emails ?? false,
-        });
+        // keepDirtyValues: hydrate only untouched fields — a slow fetch can
+        // neither clobber in-progress edits nor leave unhydrated defaults
+        // (e.g. bio: '') that a save would then write over stored data.
+        form.reset(
+          {
+            firstName: p.first_name ?? firstName,
+            lastName: p.last_name ?? lastName,
+            // Fall back to the full name — exports prefer display_name, so
+            // seeding only first_name would truncate the author name on save.
+            displayName:
+              p.display_name ??
+              [p.first_name ?? firstName, p.last_name ?? lastName].filter(Boolean).join(' '),
+            bio: p.bio ?? '',
+            theme: p.preferences?.theme ?? 'system',
+            emailNotifications: p.preferences?.email_notifications ?? true,
+            marketingEmails: p.preferences?.marketing_emails ?? false,
+          },
+          { keepDirtyValues: true }
+        );
         if (p.avatar_url) setAvatarUrl(p.avatar_url);
       } catch {
         // Keep session-seeded defaults, but block saving — with no loaded
@@ -174,11 +176,11 @@ export default function UserProfile() {
 
   // Read validation errors off the public react-hook-form state.
   const errors = form.formState.errors;
-  // RHF's formState is a lazy Proxy: isDirty is only computed for fields read
-  // during render. The hydration effect's dirty-guard reads it in an async
-  // callback, so subscribe here or the guard would always see false and a
-  // slow fetch would clobber in-progress edits.
+  // RHF's formState is a lazy Proxy: dirty tracking is only computed when read
+  // during render. The hydration reset's keepDirtyValues needs it live, so
+  // subscribe here or a slow fetch would clobber in-progress edits.
   void form.formState.isDirty;
+  void form.formState.dirtyFields;
   const bioValue = (form.watch('bio') as string) ?? '';
 
   return (

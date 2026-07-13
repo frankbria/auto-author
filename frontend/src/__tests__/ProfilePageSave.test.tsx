@@ -135,8 +135,9 @@ describe('ProfilePage save preserves preferences (#204)', () => {
 
     render(<UserProfile />);
 
-    // User starts typing before the profile fetch resolves (dirty form skips
-    // the form.reset, but the preferences capture must still happen).
+    // User starts typing before the profile fetch resolves. Hydration must
+    // keep the edit (keepDirtyValues) while still filling untouched fields
+    // and capturing the full preferences object.
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Zed' } });
 
     await act(async () => {
@@ -156,6 +157,11 @@ describe('ProfilePage save preserves preferences (#204)', () => {
       auto_save_interval: 10,
       future_flag: true,
     });
+    // The user's in-flight edit survives hydration…
     expect(body.first_name).toBe('Zed');
+    // …and untouched backend-only fields still hydrate, so the save can't
+    // overwrite them with session-seeded defaults (e.g. bio: '').
+    expect(body.bio).toBe('hi');
+    expect(body.display_name).toBe('Ann Author');
   });
 });
