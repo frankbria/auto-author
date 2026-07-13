@@ -128,10 +128,14 @@ export class BookFormPage {
   }
 
   /**
-   * Verify form background is NOT transparent
+   * Verify the form surface is NOT transparent. The creation form lives in
+   * the wizard dialog whose DialogContent carries the opaque background (the
+   * inner <form> has no background class), so check the dialog when open.
    */
   async verifyFormNotTransparent(): Promise<void> {
-    const formBg = await this.form().evaluate(el =>
+    const dialog = this.page.getByRole('dialog');
+    const target = (await dialog.count()) > 0 ? dialog : this.form();
+    const formBg = await target.evaluate(el =>
       window.getComputedStyle(el).backgroundColor
     );
 
