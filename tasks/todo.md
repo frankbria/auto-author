@@ -38,10 +38,16 @@ Issue AC offers wire OR filter OR remove. CodeRabbit chose **wire**; exploration
 - [x] 6. Pre-PR third-party review (opencode GLM primary, codex fallback)
 - [x] 7. PR, post-PR review posted as comment
 - [x] 8. Demo (hard gate): real servers, branch vs main — main shows "not yet implemented" toast for EPUB/Markdown; branch downloads real .epub/.md/.zip files (verify file magic bytes)
-- [ ] 9. CI green + final triage → docs sync → merge
+- [x] 9. CI green + final triage → docs sync → merge
 
 ## Acceptance criteria (from issue)
 
 - [x] Selecting EPUB on the legacy export page produces a working export (no "not yet implemented")
 - [x] Selecting Markdown likewise, including multi-file (ZIP) option
 - [x] PDF/DOCX behavior unchanged
+
+## Rider (user request, same PR)
+
+- [x] Diagnosed Deploy-to-Staging failures on main: first-contact SSH timeout when two deploys race (not fail2ban — zero bans logged); staging was one commit stale (#278 never deployed)
+- [x] Fix in deploy-staging.yml: concurrency group (serialize, no mid-flight cancel) + upload retried 3x/60s + ConnectTimeout=30; actionlint clean
+- [x] Post-merge deploy run 29214388329 SUCCESS; release 20260713-000155 live; #194 marker present in deployed bundle; api+frontend health green
