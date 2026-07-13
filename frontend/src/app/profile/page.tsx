@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSession } from '@/lib/auth-client';
-import useProfileApi from '@/hooks/useProfileApi';
+import useProfileApi, { type UserPreferences } from '@/hooks/useProfileApi';
+import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
 import { FormField } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,12 @@ export default function UserProfile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.image ?? null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Full preferences object from the server, merged with the three editable
+  // fields before every save — the backend $set-replaces the whole
+  // subdocument, so a partial payload wipes the Settings-page fields (#204).
+  const [preferences, setPreferences] = useState<Partial<UserPreferences>>({});
+  // Saving is disabled until preferences load, so a failed load can't wipe them.
+  const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading');
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -63,9 +70,14 @@ export default function UserProfile() {
 
   // Seed from the session immediately, then hydrate full profile (bio, prefs,
   // display_name) from the backend when available. getUserProfile can be absent
-  // in tests. The async hydration skips reset if the user has already started
-  // editing, so a slow fetch never clobbers in-progress input.
+  // in tests. The async hydration keeps any fields the user has already edited
+  // (keepDirtyValues), so a slow fetch never clobbers in-progress input.
   useEffect(() => {
+    // Re-arm the guard on a user switch: the previous account's retained
+    // preferences must not be saveable into the new one while its load is
+    // still in flight.
+    setLoadState('loading');
+    setPreferences({});
     const [firstName = '', ...rest] = (user?.name ?? '').trim().split(' ');
     const lastName = rest.join(' ');
     form.reset({
@@ -81,26 +93,41 @@ export default function UserProfile() {
 
     let cancelled = false;
     const loadProfile = async () => {
-      if (!getUserProfile) return;
+      if (!getUserProfile) {
+        // Test-only path (the hook is always present in production): treat as
+        // loaded so the form stays usable in suites that don't mock it.
+        setLoadState('loaded');
+        return;
+      }
       try {
         const p = await getUserProfile();
-        if (cancelled || form.formState.isDirty) return;
-        form.reset({
-          firstName: p.first_name ?? firstName,
-          lastName: p.last_name ?? lastName,
-          // Fall back to the full name — exports prefer display_name, so
-          // seeding only first_name would truncate the author name on save.
-          displayName:
-            p.display_name ??
-            [p.first_name ?? firstName, p.last_name ?? lastName].filter(Boolean).join(' '),
-          bio: p.bio ?? '',
-          theme: p.preferences?.theme ?? 'system',
-          emailNotifications: p.preferences?.email_notifications ?? true,
-          marketingEmails: p.preferences?.marketing_emails ?? false,
-        });
+        if (cancelled) return;
+        setPreferences(p.preferences ?? {});
+        setLoadState('loaded');
+        // keepDirtyValues: hydrate only untouched fields — a slow fetch can
+        // neither clobber in-progress edits nor leave unhydrated defaults
+        // (e.g. bio: '') that a save would then write over stored data.
+        form.reset(
+          {
+            firstName: p.first_name ?? firstName,
+            lastName: p.last_name ?? lastName,
+            // Fall back to the full name — exports prefer display_name, so
+            // seeding only first_name would truncate the author name on save.
+            displayName:
+              p.display_name ??
+              [p.first_name ?? firstName, p.last_name ?? lastName].filter(Boolean).join(' '),
+            bio: p.bio ?? '',
+            theme: p.preferences?.theme ?? 'system',
+            emailNotifications: p.preferences?.email_notifications ?? true,
+            marketingEmails: p.preferences?.marketing_emails ?? false,
+          },
+          { keepDirtyValues: true }
+        );
         if (p.avatar_url) setAvatarUrl(p.avatar_url);
       } catch {
-        /* keep session-seeded defaults */
+        // Keep session-seeded defaults, but block saving — with no loaded
+        // preferences a save would $set-replace the stored subdocument.
+        if (!cancelled) setLoadState('error');
       }
     };
     loadProfile();
@@ -112,17 +139,20 @@ export default function UserProfile() {
 
   const onSubmit = async (values: ProfileFormValues) => {
     try {
-      await updateUserProfile({
+      const updated = await updateUserProfile({
         first_name: values.firstName,
         last_name: values.lastName,
         display_name: values.displayName,
         bio: values.bio,
         preferences: {
+          ...preferences,
           theme: values.theme,
           email_notifications: values.emailNotifications,
           marketing_emails: values.marketingEmails,
         },
       });
+      if (updated?.preferences) setPreferences(updated.preferences);
+      invalidateUserPreferencesCache(updated?.preferences ?? null);
       toast.success({ title: 'Profile updated', description: 'Your changes have been saved.' });
     } catch (err) {
       toast.error({
@@ -151,6 +181,11 @@ export default function UserProfile() {
 
   // Read validation errors off the public react-hook-form state.
   const errors = form.formState.errors;
+  // RHF's formState is a lazy Proxy: dirty tracking is only computed when read
+  // during render. The hydration reset's keepDirtyValues needs it live, so
+  // subscribe here or a slow fetch would clobber in-progress edits.
+  void form.formState.isDirty;
+  void form.formState.dirtyFields;
   const bioValue = (form.watch('bio') as string) ?? '';
 
   return (
@@ -300,11 +335,20 @@ export default function UserProfile() {
             />
           </section>
 
+          {loadState === 'error' && (
+            <p role="alert" className="text-destructive text-sm">
+              Couldn&apos;t load your current preferences. Saving is disabled to avoid
+              overwriting them.
+            </p>
+          )}
+
           <div className="flex items-center justify-between">
             <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
               Delete Account
             </Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" disabled={loadState !== 'loaded'}>
+              {loadState === 'loading' ? 'Loading…' : 'Save Changes'}
+            </Button>
           </div>
         </form>
 

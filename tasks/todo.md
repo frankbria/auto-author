@@ -1,35 +1,33 @@
-# Issue #201 — [P2.9] Core authoring journey has no CI-runnable E2E (all skipped)
+# Issue #204 — [P2.12] Profile-page save silently wipes all Settings-page preferences
 
-**Plan source**: self-authored (issue had no plan comment, only CodeRabbit boilerplate).
-**Branch**: feature/issue-201-ci-runnable-e2e
+**Plan source**: CodeRabbit plan on the issue (2026-07-04), design choice 1 pre-resolved → Option 2 (merge + load-state guard). Verified against current code 2026-07-13 — no drift; `profile/page.tsx:120-124` still sends a 3-field `preferences` object.
+**Branch**: fix/204-profile-save-preserves-preferences
 
-## Facts established (verified in code)
+**Scope**: frontend-only. Backend `$set`-replace semantics intentional and unchanged.
 
-- CI `e2e-tests` job runs a **real backend + Mongo** (`BYPASS_AUTH=true`, DB `auto_author_e2e_test`), chromium only, **no OpenAI key** (`.github/workflows/tests.yml:116-215`). So deterministic endpoints are live in CI; only AI endpoints need `page.route` mocks.
-- `TocGenerationWizard.handleAcceptToc` persists via deterministic `PUT /books/{id}/toc` (`TocGenerationWizard.tsx:183`) — browser-mocking `generate-toc` still yields **real persisted TOC** after Accept.
-- `editing-autosave-flow.spec.ts` route globs are broken: `**/api/books/...` never matches `/api/v1/books/...`, and it checks `PUT||POST` while the real save is **PATCH** `/books/{id}/chapters/{id}/content` (`bookClient.ts:988`). Its `text=/saved.*✓/i` assertion can never match (icon is SVG, no ✓ glyph, `ChapterEditor.tsx:807-808`).
-- `error-recovery-flow.spec.ts` pins **nonexistent behavior**: `bookClient.createBook` is a plain fetch with zero retry (`bookClient.ts:340-350`). Real create-book error UX = classified error notification + no redirect (#46). Real retry-with-backoff = QuestionDisplay save path (internal ErrorHandler, exactly 3 attempts, then persistent error + Retry — #197).
-- `interview-prompts.spec.ts` "NOT IMPLEMENTED" premise is stale — the feature shipped (`QuestionContainer` in `ChapterEditor.tsx:515`); its ~15 aspirational testids don't exist; real coverage lives in `chapter-questions-tabs.spec.ts` + the new journey spec.
-- Save-status footer (`ChapterEditor.tsx:793-816`) is text-only: "Saving...", "Saved {time}", "Not saved yet"; backup banner/buttons/error text all exist with stable text.
+## Adaptations to the plan (verified in code)
+- `ProfilePage.test.tsx` mocks `useProfileApi` WITHOUT `getUserProfile` and mocks react-hook-form entirely. The page already guards `if (!getUserProfile) return;`. → The absent-hook path must set `loadState='loaded'` (test-only path; production always has the hook), else every legacy submit test breaks.
+- Hydration effect currently early-returns on `form.formState.isDirty` BEFORE anything else. Preferences capture + loadState must happen BEFORE the dirty check — capturing server prefs never clobbers user input, and skipping it would leave the wipe bug alive whenever the user starts typing before the fetch resolves.
+- `useUserPreferences` is globally jest-mocked (jest.setup.ts:507) → importing `invalidateUserPreferencesCache` in page.tsx is safe for the legacy suite.
+- New test goes in a new file `ProfilePageSave.test.tsx` (real react-hook-form + real components, mock `useAuthFetch`) modeled on `SettingsPageSave.test.tsx` — the legacy `ProfilePage.test.tsx` mocks react-hook-form so it can't express the merge contract.
 
-## Steps
-
-- [x] 1. **ChapterEditor testids** (only app-code change): add `data-testid="save-status-indicator"` + `data-save-status={saveStatus}` to the save-status footer. Everything else already has stable text/roles — YAGNI on further testids.
-- [x] 2. **Rewrite + un-skip `complete-authoring-journey.spec.ts`** (AC1): real backend for book create → summary → TOC accept (real PUT /toc) → chapter content autosave; `page.route` mocks ONLY for AI + question-store endpoints (`analyze-summary`, book-level `generate-questions`, `generate-toc`, chapter `generate-questions` + `GET questions` + `PUT response` + `question-progress`, `generate-draft`) using the proven `**/books/...` globs (draft-generation.spec.ts pattern). Assert outcome evidence: TOC persisted (chapter tabs render from backend), content persisted (re-GET via API), draft in `.tiptap`. Remove `waitForTimeout`s, silent `if(isVisible)` guards, and the two self-skipping stub tests. Cleanup book in afterEach.
-- [x] 3. **Rewrite + un-skip `editing-autosave-flow.spec.ts`** (AC2a): seed via `createTestBookWithTOC`, drive the real tabbed book page (openFirstChapter idiom). Tests: typing → Saving… → Saved (via `waitForResponse` on PATCH); debounce collapses N keystrokes → 1 PATCH; PATCH failure (route abort) → error text + localStorage backup written; reload → recovery banner → Restore restores content / Dismiss clears; recovery after failure → Saved again. Fix globs/method; drop the ✓ assertion for the new testid.
-- [x] 4. **Rewrite + un-skip `error-recovery-flow.spec.ts`** (AC2b): pin behavior that actually ships — (a) create-book 5xx → error notification, no redirect, form input retained; route restored + resubmit succeeds; (b) question-response save failure → exactly 3 automatic attempts (retry-with-backoff evidence via request count) then persistent error + Retry button; (c) non-retryable 4xx → no auto-retry storm on create. Deviation: the old suite's exponential-backoff-on-createBook premise is false (no retry code on that path).
-- [x] 5. **Delete `interview-prompts.spec.ts`** (AC3 "update/remove" → remove): stale premise, aspirational selectors, cross-browser rationale moot (CI is chromium-only); questions coverage = chapter-questions-tabs.spec.ts + journey step. Precedent: #200.
-- [x] 6. **Verify**: run the three specs locally against real backend+Mongo (chromium); mutation-check at least one behavior pin per spec (e.g. break debounce/save-status → spec fails); full frontend unit suite + lint + typecheck; confirm CI e2e job now executes the un-skipped suites.
-
-## Acceptance criteria
-
-- [x] AC1: route/service-mocked full-journey spec runs in CI without a live key (journey spec un-skipped, chromium, no OPENAI env).
-- [x] AC2: missing data-testids added; autosave + error-recovery suites un-skipped and executing.
-- [x] AC3: stale "NOT IMPLEMENTED" suite removed.
-
-## Key decisions (autonomous, safe defaults)
-
-- Hybrid mocking (real deterministic backend + AI-only route mocks) over full route-mock: matches CI reality, proves real persistence; precedent chapter-questions-tabs + draft-generation.
-- Error-recovery retargeted to shipped behavior instead of un-skipping a spec that pins fiction.
-- Remove (not rewrite) interview-prompts: duplicate coverage, dead selectors.
-- Drive autosave tests through the real tabbed book page, not the legacy `/chapters/[chapterId]` redirect shim (#193 calls it legacy; pinning tests to it invites churn).
+## Todo
+- [x] Branch `fix/204-profile-save-preserves-preferences`
+- [x] RED: `frontend/src/__tests__/ProfilePageSave.test.tsx` (4 tests, all RED on old code)
+  - preservation: GET returns prefs incl. `default_writing_style`, `auto_save_interval`, `future_flag`; change theme; save; PATCH body `preferences` contains ALL fields + edit
+  - `invalidateUserPreferencesCache` called after successful save
+  - load failure (GET rejects) → Save disabled (wipe-on-failure path closed)
+  - dirty-before-fetch-resolves: user edits before hydration completes → save still sends full merged prefs
+- [x] GREEN: `frontend/src/app/profile/page.tsx` (+ fixed pre-existing broken dirty-guard: RHF lazy proxy never computed isDirty — subscribe during render)
+  - `preferences` state (`Partial<UserPreferences>`) + `loadState` `'loading'|'loaded'|'error'`
+  - hydrate: capture `p.preferences ?? {}` + `setLoadState('loaded')` before dirty check; catch → `'error'`; absent hook → `'loaded'`
+  - `onSubmit`: spread retained prefs, override the 3 editable fields; on success update state from response + `invalidateUserPreferencesCache(updated?.preferences ?? null)`
+  - Save button disabled unless `loaded`; error notice when `'error'` (Settings copy pattern)
+- [x] Legacy `ProfilePage.test.tsx` stays green (10/10)
+- [x] Deslop scan, lint (0 errors), typecheck clean, full suite 117 suites / 2122 passed / 5 skipped, coverage gates green
+- [x] Mutation checks: merge-spread removal → 2 preservation tests RED; isDirty-subscription removal → dirty-path test RED
+- [x] Pre-PR third-party review: opencode occupied by foreign-cwd delegation → codex fallback; 1 P2 fixed (keepDirtyValues hydration for backend-only fields on the dirty path)
+- [x] PR #288; post-PR fresh codex session: 1 P2 fixed (re-arm save guard on user switch) — both posted as PR comment
+- [x] Demo (hard gate): `docs/demos/2026-07-13-issue-204-profile-save-preserves-prefs.md` — real backend + local Mongo + real better-auth signup; main wipes 11→3 pref fields on a bio-only save, branch preserves 11/11 + bio; dead-backend load → alert + disabled Save
+- [ ] CI green + final feedback triage
+- [ ] Docs sync (CLAUDE.md changelog), merge, close issue
