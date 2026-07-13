@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,6 +42,9 @@ type BookCreationWizardProps = {
 export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCreationWizardProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // The toast Retry action bypasses the disabled submit button, so re-entry
+  // must be guarded here or a double-click POSTs a duplicate book.
+  const submitInFlight = useRef(false);
 
   const form = useForm<BookFormData>({
     resolver: zodResolver(bookCreationSchema),
@@ -56,6 +59,8 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
   });
 
   const onSubmit = async (data: BookFormData) => {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
     try {
       setIsSubmitting(true);
       const book = await bookClient.createBook({
@@ -79,6 +84,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
       showErrorNotification(classified, { onRetry: () => onSubmit(data) });
     } finally {
       setIsSubmitting(false);
+      submitInFlight.current = false;
     }
   };
   return (

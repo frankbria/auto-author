@@ -154,6 +154,33 @@ describe('BookCreationWizard', () => {
       expect(screen.getByLabelText(/Book Title/i)).toHaveValue(minimalBookData.title);
     });
 
+    it('the retry action is single-flight — a double-click cannot create a duplicate book', async () => {
+      const user = userEvent.setup();
+      let resolveRetry!: (v: unknown) => void;
+      mockBookClient.createBook
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockImplementationOnce(() => new Promise((resolve) => { resolveRetry = resolve; }));
+
+      render(<BookCreationWizard {...defaultProps} />);
+
+      await user.type(screen.getByLabelText(/Book Title/i), minimalBookData.title);
+      await selectOption(user, /Genre/i, 'Non-Fiction');
+      await selectOption(user, /Target Audience/i, 'General');
+      await user.click(screen.getByRole('button', { name: /Create Book/i }));
+
+      await waitFor(() => expect(mockShowErrorNotification).toHaveBeenCalled());
+      const { onRetry } = mockShowErrorNotification.mock.calls[0][1];
+
+      // Double-click: second invocation lands while the first retry is in flight.
+      onRetry();
+      onRetry();
+
+      // Initial submit + exactly ONE retry — no duplicate POST /books/.
+      expect(mockBookClient.createBook).toHaveBeenCalledTimes(2);
+      resolveRetry({ id: 'book-single-flight' });
+      await waitFor(() => expect(defaultProps.onSuccess).toHaveBeenCalledWith('book-single-flight'));
+    });
+
     it('the notification retry action resubmits the same payload and completes the success flow', async () => {
       const user = userEvent.setup();
       mockBookClient.createBook
