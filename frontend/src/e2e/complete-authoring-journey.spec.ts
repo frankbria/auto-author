@@ -107,8 +107,23 @@ async function mockAiEndpoints(page: Page) {
   );
 
   // TOC generation (AI). The wizard's Accept persists this via the real PUT /toc.
-  await page.route('**/books/*/generate-toc', (route) =>
-    route.fulfill(
+  // Contract pin (#105 bug class): the wizard must send the clarifying
+  // answers in the request body — the real backend 400s without them.
+  await page.route('**/books/*/generate-toc', (route) => {
+    const body = route.request().postDataJSON() as {
+      question_responses?: Array<{ question: string; answer: string }>;
+    };
+    const answers = (body.question_responses ?? []).map((r) => r.answer);
+    if (!CLARIFYING_ANSWERS.every((a) => answers.includes(a))) {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: 'e2e contract violation: generate-toc missing clarifying answers',
+        }),
+      });
+    }
+    return route.fulfill(
       json({
         toc: {
           chapters: TOC_CHAPTERS,
@@ -120,8 +135,8 @@ async function mockAiEndpoints(page: Page) {
         chapters_count: TOC_CHAPTERS.length,
         has_subchapters: false,
       })
-    )
-  );
+    );
+  });
 
   // --- Stateful chapter-question store -----------------------------------
   let questionsGenerated = false;
@@ -214,9 +229,26 @@ async function mockAiEndpoints(page: Page) {
     route.fulfill(json(progressBody()))
   );
 
-  // Draft generation (AI).
-  await page.route('**/books/*/chapters/*/generate-draft', (route) =>
-    route.fulfill(
+  // Draft generation (AI). Contract pin: the button must send the three
+  // completed {question, answer} pairs — the real backend 400s otherwise.
+  await page.route('**/books/*/chapters/*/generate-draft', (route) => {
+    const body = route.request().postDataJSON() as {
+      question_responses?: Array<{ question: string; answer: string }>;
+    };
+    const answers = (body.question_responses ?? []).map((r) => r.answer);
+    if (
+      (body.question_responses ?? []).length !== CHAPTER_QUESTIONS.length ||
+      !CHAPTER_ANSWERS.every((a) => answers.includes(a))
+    ) {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: 'e2e contract violation: generate-draft missing completed responses',
+        }),
+      });
+    }
+    return route.fulfill(
       json({
         success: true,
         draft: DRAFT_HTML,
@@ -232,8 +264,8 @@ async function mockAiEndpoints(page: Page) {
         suggestions: ['Add a concrete example of a balcony garden.'],
         message: 'Draft generated',
       })
-    )
-  );
+    );
+  });
 }
 
 test.describe('Complete Authoring Journey E2E', () => {
