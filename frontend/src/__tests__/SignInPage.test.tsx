@@ -81,3 +81,36 @@ describe("SignInPage redirect handling", () => {
     expect(push).not.toHaveBeenCalled();
   });
 });
+
+describe("SignInPage error and 2FA handling (#198)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("renders the mapped user-friendly message when credentials are rejected", async () => {
+    mockSignInEmail.mockResolvedValue({
+      data: null,
+      error: { message: "Invalid credentials" },
+    });
+    setup(null);
+    await signIn();
+    expect(
+      await screen.findByText("Email or password is incorrect")
+    ).toBeInTheDocument();
+  });
+
+  it("returns early on twoFactorRedirect: no navigation, no error (2FA race guard, #64)", async () => {
+    // A 2FA-enabled account resolves with a twoFactorRedirect flag instead of
+    // a session; the twoFactorClient plugin owns the /auth/verify-2fa
+    // navigation, so the page must NOT race it with router.push(redirect).
+    mockSignInEmail.mockResolvedValue({
+      data: { twoFactorRedirect: true },
+      error: null,
+    });
+    const { push } = setup("/dashboard/books/1");
+    await signIn();
+    expect(mockSignInEmail).toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
