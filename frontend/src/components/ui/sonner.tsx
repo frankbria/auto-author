@@ -31,6 +31,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          // Radix modal dialogs set pointer-events: none on <body>, which the
+          // toaster inherits — without this override every toast action
+          // (Retry, Upgrade CTA) is unclickable while a dialog is open (#205).
+          pointerEvents: "auto",
         } as React.CSSProperties
       }
       {...props}

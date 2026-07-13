@@ -39,11 +39,19 @@ const json = (body: unknown) => ({
   body: JSON.stringify(body),
 });
 
+// Opens the BookCreationWizard modal from the dashboard (the canonical create
+// flow — the orphaned /dashboard/new-book page was removed in #205) and fills
+// the form. Genre/target audience are Radix selects: click trigger, pick option.
 async function fillNewBookForm(page: Page, title: string) {
-  await page.goto('/dashboard/new-book');
-  await page.getByLabel(/book title/i).fill(title);
-  await page.getByLabel(/genre/i).selectOption('other');
-  await page.getByLabel(/target audience/i).fill('E2E testers');
+  await page.goto('/dashboard');
+  await page.getByRole('button', { name: 'Create New Book' }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel(/book title/i).fill(title);
+  await dialog.getByLabel(/genre/i).click();
+  await page.getByRole('option', { name: 'Other' }).click();
+  await dialog.getByLabel(/target audience/i).click();
+  await page.getByRole('option', { name: 'General' }).click();
 }
 
 test.describe('Error Recovery Flow', () => {
@@ -73,10 +81,12 @@ test.describe('Error Recovery Flow', () => {
 
       // Classified error notification; no navigation, no automatic retry.
       await expect(page.locator('[data-sonner-toast]')).toBeVisible();
-      expect(page.url()).toContain('/dashboard/new-book');
+      expect(page.url()).not.toMatch(/\/dashboard\/books\//);
       expect(postCount).toBe(1);
-      // Form input survives the failure, so the user can just resubmit.
-      await expect(page.getByLabel(/book title/i)).toHaveValue(title);
+      // The dialog stays open with input intact, so the user can just resubmit.
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByLabel(/book title/i)).toHaveValue(title);
 
       // Network restored → resubmitting the intact form succeeds for real.
       await page.unroute('**/books/');
@@ -107,7 +117,8 @@ test.describe('Error Recovery Flow', () => {
       await expect(toast).toBeVisible();
       const retryButton = toast.getByRole('button', { name: /retry/i });
       await expect(retryButton).toBeVisible();
-      expect(page.url()).toContain('/dashboard/new-book');
+      expect(page.url()).not.toMatch(/\/dashboard\/books\//);
+      await expect(page.getByRole('dialog')).toBeVisible();
       // No automatic retry storm — one user action, one request.
       expect(postCount).toBe(1);
 

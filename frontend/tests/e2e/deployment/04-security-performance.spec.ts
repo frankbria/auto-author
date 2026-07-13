@@ -185,18 +185,19 @@ test.describe('Security & Performance', () => {
       console.log(`📊 Dashboard navigation: ${duration.toFixed(0)}ms`);
       expect(withinBudget).toBeTruthy();
 
-      // Measure book form navigation
+      // Measure create-book modal open (the /dashboard/new-book page was
+      // removed in #205; creation happens in the BookCreationWizard modal)
       const { duration: formDuration, withinBudget: formBudget } = await measureOperation(
         page,
         async () => {
-          await page.goto('/dashboard/new-book');
-          await page.waitForLoadState('networkidle');
+          await page.getByRole('button', { name: 'Create New Book' }).first().click();
+          await page.getByRole('dialog').waitFor();
         },
         PERFORMANCE_BUDGETS.PAGE_NAVIGATION,
-        'Book Form Navigation'
+        'Create Book Modal Open'
       );
 
-      console.log(`📊 Book form navigation: ${formDuration.toFixed(0)}ms`);
+      console.log(`📊 Create-book modal open: ${formDuration.toFixed(0)}ms`);
       expect(formBudget).toBeTruthy();
 
       console.log('✅ Page navigation within budget (<500ms)');

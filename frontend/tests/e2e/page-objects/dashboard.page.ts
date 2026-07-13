@@ -25,14 +25,6 @@ export class DashboardPage {
   }
 
   /**
-   * Click "New Book" button
-   */
-  async clickNewBook(): Promise<void> {
-    await this.page.click('button:has-text("New Book")');
-    await this.page.waitForURL('**/dashboard/new-book');
-  }
-
-  /**
    * Wait for books API call to complete
    */
   async waitForBooksAPI(): Promise<void> {

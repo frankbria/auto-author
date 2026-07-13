@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '@/lib/toast';
 import { bookCreationSchema, BookFormData } from '@/lib/schemas/bookSchema';
 import bookClient from '@/lib/api/bookClient';
+import { classifyError } from '@/lib/errors';
+import { showErrorNotification } from '@/components/errors';
+import { GENRE_OPTIONS, TARGET_AUDIENCE_OPTIONS } from '@/lib/constants/book-metadata';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -36,32 +39,12 @@ type BookCreationWizardProps = {
   onSuccess?: (bookId: string) => void;
 };
 
-const genreOptions = [
-  { label: 'Fiction', value: 'fiction' },
-  { label: 'Non-Fiction', value: 'non-fiction' },
-  { label: 'Science Fiction', value: 'sci-fi' },
-  { label: 'Fantasy', value: 'fantasy' },
-  { label: 'Mystery', value: 'mystery' },
-  { label: 'Romance', value: 'romance' },
-  { label: 'Historical', value: 'historical' },
-  { label: 'Biography', value: 'biography' },
-  { label: 'Self-Help', value: 'self-help' },
-  { label: 'Business', value: 'business' },
-  { label: 'Other', value: 'other' },
-];
-
-const targetAudienceOptions = [
-  { label: 'Children', value: 'children' },
-  { label: 'Young Adult', value: 'young-adult' },
-  { label: 'Adult', value: 'adult' },
-  { label: 'General', value: 'general' },
-  { label: 'Academic', value: 'academic' },
-  { label: 'Professional', value: 'professional' },
-];
-
 export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCreationWizardProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // The toast Retry action bypasses the disabled submit button, so re-entry
+  // must be guarded here or a double-click POSTs a duplicate book.
+  const submitInFlight = useRef(false);
 
   const form = useForm<BookFormData>({
     resolver: zodResolver(bookCreationSchema),
@@ -76,6 +59,8 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
   });
 
   const onSubmit = async (data: BookFormData) => {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
     try {
       setIsSubmitting(true);
       const book = await bookClient.createBook({
@@ -95,10 +80,11 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
         router.push(`/dashboard/books/${book.id}`);
       }
     } catch (error) {
-      console.error('Error creating book:', error);
-      toast.error({ title: 'Failed to create book. Please try again.' });
+      const classified = classifyError(error, 'Creating book');
+      showErrorNotification(classified, { onRetry: () => onSubmit(data) });
     } finally {
       setIsSubmitting(false);
+      submitInFlight.current = false;
     }
   };
   return (
@@ -212,7 +198,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
-                        {genreOptions.map((option) => (
+                        {GENRE_OPTIONS.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -241,7 +227,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
-                        {targetAudienceOptions.map((option) => (
+                        {TARGET_AUDIENCE_OPTIONS.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>

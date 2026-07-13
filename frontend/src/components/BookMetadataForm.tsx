@@ -6,26 +6,7 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from './ui/form';
-
-// These options should match those used in the main BookPage
-const genreOptions = [
-  { label: 'Fiction', value: 'fiction' },
-  { label: 'Non-Fiction', value: 'non-fiction' },
-  { label: 'Fantasy', value: 'fantasy' },
-  { label: 'Science Fiction', value: 'sci-fi' },
-  { label: 'Mystery', value: 'mystery' },
-  { label: 'Romance', value: 'romance' },
-  { label: 'Other', value: 'other' },
-];
-
-const targetAudienceOptions = [
-  { label: 'Children', value: 'children' },
-  { label: 'Young Adult', value: 'young-adult' },
-  { label: 'Adult', value: 'adult' },
-  { label: 'General', value: 'general' },
-  { label: 'Academic', value: 'academic' },
-  { label: 'Professional', value: 'professional' },
-];
+import { GENRE_OPTIONS, TARGET_AUDIENCE_OPTIONS } from '@/lib/constants/book-metadata';
 
 export interface BookMetadataFormProps {
   book: BookFormData;
@@ -141,7 +122,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {genreOptions.map((option) => (
+                    {GENRE_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -165,7 +146,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {targetAudienceOptions.map((option) => (
+                    {TARGET_AUDIENCE_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>

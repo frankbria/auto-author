@@ -29,8 +29,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/a
 
 const TEST_BOOK = {
   title: 'Sustainable Urban Gardening: A Practical Guide',
-  genre: 'other',
-  targetAudience: 'Urban dwellers interested in growing their own food',
+  // Wizard option labels (Radix selects offer the canonical fixed lists).
+  genreLabel: 'Other',
+  targetAudienceLabel: 'General',
   description: 'A practical guide to productive gardens in small urban spaces.',
   // ≥30 words and ≥150 chars so the deterministic TOC-readiness check passes.
   summary:
@@ -282,12 +283,19 @@ test.describe('Complete Authoring Journey E2E', () => {
 
     // ----- Step 1: create the book (real backend) -----
     await test.step('Create book with metadata', async () => {
-      await page.goto('/dashboard/new-book');
-      await page.getByLabel(/book title/i).fill(TEST_BOOK.title);
-      await page.getByLabel(/description/i).fill(TEST_BOOK.description);
-      await page.getByLabel(/genre/i).selectOption(TEST_BOOK.genre);
-      await page.getByLabel(/target audience/i).fill(TEST_BOOK.targetAudience);
-      await page.getByRole('button', { name: 'Create Book' }).click();
+      // The canonical create flow is the BookCreationWizard modal on the
+      // dashboard (the orphaned /dashboard/new-book page was removed in #205).
+      await page.goto('/dashboard');
+      await page.getByRole('button', { name: 'Create New Book' }).first().click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+      await dialog.getByLabel(/book title/i).fill(TEST_BOOK.title);
+      await dialog.getByLabel(/description/i).fill(TEST_BOOK.description);
+      await dialog.getByLabel(/genre/i).click();
+      await page.getByRole('option', { name: TEST_BOOK.genreLabel }).click();
+      await dialog.getByLabel(/target audience/i).click();
+      await page.getByRole('option', { name: TEST_BOOK.targetAudienceLabel }).click();
+      await dialog.getByRole('button', { name: 'Create Book' }).click();
 
       await page.waitForURL(/\/dashboard\/books\/[^/]+$/);
       bookId = page.url().match(/books\/([a-zA-Z0-9-]+)/)![1];
