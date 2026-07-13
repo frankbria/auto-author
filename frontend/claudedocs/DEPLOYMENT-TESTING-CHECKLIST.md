@@ -140,7 +140,7 @@ This section walks through the complete authoring workflow from creating a book 
 
 ### Step 3: Create New Book
 
-- [x] Click "New Book" button or navigate to `/dashboard/new-book` **✅ 🤖 Automated**
+- [x] Click "Create New Book" button on the dashboard (opens the BookCreationWizard modal; the `/dashboard/new-book` page was removed in #205) **✅ 🤖 Automated**
 - [x] Form displays correctly **✅ 🤖 Automated**
 - [x] Form background is **NOT transparent** (should be visible and readable) **✅ 🤖 Automated**
 

@@ -1,33 +1,40 @@
-# Issue #204 — [P2.12] Profile-page save silently wipes all Settings-page preferences
+# Issue #205 — Remove orphaned /dashboard/new-book route (P2.13)
 
-**Plan source**: CodeRabbit plan on the issue (2026-07-04), design choice 1 pre-resolved → Option 2 (merge + load-state guard). Verified against current code 2026-07-13 — no drift; `profile/page.tsx:120-124` still sends a 3-field `preferences` object.
-**Branch**: fix/204-profile-save-preserves-preferences
+## Decision (plan's Design Choice 1, kept): DELETE the page
+Unreachable in-app, drops required genre/target_audience (data loss), duplicate taxonomy.
+Canonical flow = BookCreationWizard modal.
 
-**Scope**: frontend-only. Backend `$set`-replace semantics intentional and unchanged.
+## Plan drift found (CodeRabbit plan is 2026-07-04, pre-#201)
+1. **PR #287 (#201, merged 2026-07-13) pointed CI-run E2E at the orphaned page**:
+   `src/e2e/error-recovery-flow.spec.ts` (create-book error tests) and
+   `src/e2e/complete-authoring-journey.spec.ts` step 1 both `goto('/dashboard/new-book')`.
+   Deleting the page without retargeting breaks CI.
+2. **The wizard's error path is WEAKER than the orphaned page's**: generic
+   `toast.error('Failed to create book...')`, no classification, no Retry action.
+   #201's E2E pins classified toast + Retry recovery (currently only the orphaned
+   page has that, via #46's classifyError + showErrorNotification). The delete
+   branch must port that handling into the wizard or the E2E pins are unsatisfiable.
+3. Wizard `target_audience` is a fixed-option Radix select; journey spec filled
+   free text — spec adapts to select 'general'.
 
-## Adaptations to the plan (verified in code)
-- `ProfilePage.test.tsx` mocks `useProfileApi` WITHOUT `getUserProfile` and mocks react-hook-form entirely. The page already guards `if (!getUserProfile) return;`. → The absent-hook path must set `loadState='loaded'` (test-only path; production always has the hook), else every legacy submit test breaks.
-- Hydration effect currently early-returns on `form.formState.isDirty` BEFORE anything else. Preferences capture + loadState must happen BEFORE the dirty check — capturing server prefs never clobbers user input, and skipping it would leave the wipe bug alive whenever the user starts typing before the fetch resolves.
-- `useUserPreferences` is globally jest-mocked (jest.setup.ts:507) → importing `invalidateUserPreferencesCache` in page.tsx is safe for the legacy suite.
-- New test goes in a new file `ProfilePageSave.test.tsx` (real react-hook-form + real components, mock `useAuthFetch`) modeled on `SettingsPageSave.test.tsx` — the legacy `ProfilePage.test.tsx` mocks react-hook-form so it can't express the merge contract.
-
-## Todo
-- [x] Branch `fix/204-profile-save-preserves-preferences`
-- [x] RED: `frontend/src/__tests__/ProfilePageSave.test.tsx` (4 tests, all RED on old code)
-  - preservation: GET returns prefs incl. `default_writing_style`, `auto_save_interval`, `future_flag`; change theme; save; PATCH body `preferences` contains ALL fields + edit
-  - `invalidateUserPreferencesCache` called after successful save
-  - load failure (GET rejects) → Save disabled (wipe-on-failure path closed)
-  - dirty-before-fetch-resolves: user edits before hydration completes → save still sends full merged prefs
-- [x] GREEN: `frontend/src/app/profile/page.tsx` (+ fixed pre-existing broken dirty-guard: RHF lazy proxy never computed isDirty — subscribe during render)
-  - `preferences` state (`Partial<UserPreferences>`) + `loadState` `'loading'|'loaded'|'error'`
-  - hydrate: capture `p.preferences ?? {}` + `setLoadState('loaded')` before dirty check; catch → `'error'`; absent hook → `'loaded'`
-  - `onSubmit`: spread retained prefs, override the 3 editable fields; on success update state from response + `invalidateUserPreferencesCache(updated?.preferences ?? null)`
-  - Save button disabled unless `loaded`; error notice when `'error'` (Settings copy pattern)
-- [x] Legacy `ProfilePage.test.tsx` stays green (10/10)
-- [x] Deslop scan, lint (0 errors), typecheck clean, full suite 117 suites / 2122 passed / 5 skipped, coverage gates green
-- [x] Mutation checks: merge-spread removal → 2 preservation tests RED; isDirty-subscription removal → dirty-path test RED
-- [x] Pre-PR third-party review: opencode occupied by foreign-cwd delegation → codex fallback; 1 P2 fixed (keepDirtyValues hydration for backend-only fields on the dirty path)
-- [x] PR #288; post-PR fresh codex session: 1 P2 fixed (re-arm save guard on user switch) — both posted as PR comment
-- [x] Demo (hard gate): `docs/demos/2026-07-13-issue-204-profile-save-preserves-prefs.md` — real backend + local Mongo + real better-auth signup; main wipes 11→3 pref fields on a bio-only save, branch preserves 11/11 + bio; dead-backend load → alert + disabled Save
-- [ ] CI green + final feedback triage
-- [ ] Docs sync (CLAUDE.md changelog), merge, close issue
+## Tasks
+- [x] Branch `fix/issue-205-orphaned-new-book`
+- [x] RED: BookCreationWizard.test.tsx error-path tests → expect classified
+      showErrorNotification (not generic toast.error)
+- [x] GREEN: wizard catch → classifyError + showErrorNotification(classified, {onRetry});
+      dialog stays open, form intact (already true)
+- [x] RED: pin canonical taxonomy — BookMetadataForm renders 'Historical' (absent
+      from its old 7-item list, present in canonical 11-item list)
+- [x] GREEN: `src/lib/constants/book-metadata.ts` (GENRE_OPTIONS = wizard's list,
+      TARGET_AUDIENCE_OPTIONS); refactor BookCreationWizard + BookMetadataForm onto it
+- [x] Delete `src/app/dashboard/new-book/` + `src/__tests__/NewBookPage.test.tsx`
+      (its 2 assertions now live in the wizard suite)
+- [x] Retarget CI E2E: error-recovery-flow fillNewBookForm → open wizard from
+      /dashboard; URL assertions → dialog-still-open; journey step 1 → modal
+- [x] Page objects: book-form gotoNewBook → open modal from dashboard; Radix
+      select helpers; dashboard.page.ts drop unused clickNewBook; 04-security-
+      performance perf block → measure modal open
+- [x] DEPLOYMENT-TESTING-CHECKLIST.md line 143 route mention
+- [x] Verify: jest suite, lint, typecheck, chromium E2E (both retargeted specs)
+      against real backend; mutation-check RED evidence
+- [ ] opencode/codex pre-PR review → PR → post-PR review → demo → CI → merge

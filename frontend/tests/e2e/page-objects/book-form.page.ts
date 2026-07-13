@@ -6,16 +6,20 @@
 
 import { Page, expect, Locator } from '@playwright/test';
 import { BookData } from '../fixtures/test-data.fixture';
+import { GENRE_OPTIONS, TARGET_AUDIENCE_OPTIONS } from '../../../src/lib/constants/book-metadata';
 
 export class BookFormPage {
   constructor(private page: Page) {}
 
   /**
-   * Navigate to new book form
+   * Open the BookCreationWizard modal from the dashboard — the canonical
+   * create flow (the /dashboard/new-book page was removed in #205).
    */
   async gotoNewBook(): Promise<void> {
-    await this.page.goto('/dashboard/new-book');
+    await this.page.goto('/dashboard');
     await this.page.waitForLoadState('networkidle');
+    await this.page.getByRole('button', { name: 'Create New Book' }).first().click();
+    await expect(this.page.getByRole('dialog')).toBeVisible();
   }
 
   /**
@@ -48,17 +52,26 @@ export class BookFormPage {
   }
 
   /**
-   * Select genre from dropdown
+   * Select genre from the wizard's Radix select (accepts a canonical value
+   * slug or label; unknown values fall back to 'Other').
    */
   async selectGenre(genre: string): Promise<void> {
-    await this.page.selectOption('[name="genre"]', genre);
+    const label =
+      GENRE_OPTIONS.find(o => o.value === genre || o.label === genre)?.label ?? 'Other';
+    await this.page.getByRole('dialog').getByLabel(/genre/i).click();
+    await this.page.getByRole('option', { name: label }).click();
   }
 
   /**
-   * Fill target audience field
+   * Select target audience from the wizard's Radix select (fixed options —
+   * free-text audiences fall back to 'General').
    */
   async fillTargetAudience(targetAudience: string): Promise<void> {
-    await this.page.fill('[name="targetAudience"]', targetAudience);
+    const label =
+      TARGET_AUDIENCE_OPTIONS.find(o => o.value === targetAudience || o.label === targetAudience)
+        ?.label ?? 'General';
+    await this.page.getByRole('dialog').getByLabel(/target audience/i).click();
+    await this.page.getByRole('option', { name: label }).click();
   }
 
   /**
@@ -98,8 +111,9 @@ export class BookFormPage {
     const responseBody = await response.json();
     const bookId = responseBody.id;
 
-    // Wait for redirect to book detail page
-    await this.page.waitForURL(`/dashboard/books/${bookId}`, { timeout: 5000 });
+    // Wait for redirect to book detail page (the dashboard's onSuccess
+    // handler pushes after a 1.5s success-toast delay)
+    await this.page.waitForURL(`/dashboard/books/${bookId}`, { timeout: 10000 });
 
     console.log(`✅ Book created with ID: ${bookId}, status: ${status}`);
 

@@ -22,6 +22,12 @@ jest.mock('@/lib/toast', () => ({
     info: jest.fn(),
   }),
 }));
+jest.mock('@/components/errors', () => ({
+  showErrorNotification: jest.fn(),
+}));
+
+import { showErrorNotification } from '@/components/errors';
+const mockShowErrorNotification = showErrorNotification as jest.Mock;
 
 const mockBookClient = bookClient as jest.Mocked<typeof bookClient>;
 const mockRouter = {
@@ -123,7 +129,7 @@ describe('BookCreationWizard', () => {
       resolveCreate({ id: 'book-123' });
     });
 
-    it('shows error states appropriately', async () => {
+    it('shows a classified error notification with a retry action and keeps the dialog open', async () => {
       const user = userEvent.setup();
       mockBookClient.createBook.mockRejectedValue(new Error('Network error'));
 
@@ -137,8 +143,39 @@ describe('BookCreationWizard', () => {
       await user.click(screen.getByRole('button', { name: /Create Book/i }));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith({ title: 'Failed to create book. Please try again.' });
+        expect(mockShowErrorNotification).toHaveBeenCalledWith(
+          expect.objectContaining({ type: expect.any(String), message: expect.any(String) }),
+          expect.objectContaining({ onRetry: expect.any(Function) })
+        );
       });
+      // No generic unclassified toast, dialog stays open, form input survives.
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(defaultProps.onOpenChange).not.toHaveBeenCalled();
+      expect(screen.getByLabelText(/Book Title/i)).toHaveValue(minimalBookData.title);
+    });
+
+    it('the notification retry action resubmits the same payload and completes the success flow', async () => {
+      const user = userEvent.setup();
+      mockBookClient.createBook
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({ id: 'book-retry-1' } as any);
+
+      render(<BookCreationWizard {...defaultProps} />);
+
+      await user.type(screen.getByLabelText(/Book Title/i), minimalBookData.title);
+      await selectOption(user, /Genre/i, 'Non-Fiction');
+      await selectOption(user, /Target Audience/i, 'General');
+      await user.click(screen.getByRole('button', { name: /Create Book/i }));
+
+      await waitFor(() => expect(mockShowErrorNotification).toHaveBeenCalled());
+      const { onRetry } = mockShowErrorNotification.mock.calls[0][1];
+      const firstPayload = mockBookClient.createBook.mock.calls[0][0];
+
+      await onRetry();
+
+      expect(mockBookClient.createBook).toHaveBeenCalledTimes(2);
+      expect(mockBookClient.createBook.mock.calls[1][0]).toEqual(firstPayload);
+      await waitFor(() => expect(defaultProps.onSuccess).toHaveBeenCalledWith('book-retry-1'));
     });
   });
 
@@ -367,8 +404,10 @@ describe('BookCreationWizard', () => {
       await user.click(screen.getByRole('button', { name: /Create Book/i }));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith({ title: 'Failed to create book. Please try again.' });
+        expect(mockShowErrorNotification).toHaveBeenCalled();
       });
+      expect(defaultProps.onSuccess).not.toHaveBeenCalled();
+      expect(mockRouter.push).not.toHaveBeenCalled();
     });
 
     it('disables form during submission', async () => {
@@ -466,7 +505,7 @@ describe('BookCreationWizard', () => {
       await user.click(screen.getByRole('button', { name: /Create Book/i }));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalled();
+        expect(mockShowErrorNotification).toHaveBeenCalled();
       });
     });
 

@@ -7,6 +7,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '@/lib/toast';
 import { bookCreationSchema, BookFormData } from '@/lib/schemas/bookSchema';
 import bookClient from '@/lib/api/bookClient';
+import { classifyError } from '@/lib/errors';
+import { showErrorNotification } from '@/components/errors';
+import { GENRE_OPTIONS, TARGET_AUDIENCE_OPTIONS } from '@/lib/constants/book-metadata';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -35,29 +38,6 @@ type BookCreationWizardProps = {
   onOpenChange: (open: boolean) => void;
   onSuccess?: (bookId: string) => void;
 };
-
-const genreOptions = [
-  { label: 'Fiction', value: 'fiction' },
-  { label: 'Non-Fiction', value: 'non-fiction' },
-  { label: 'Science Fiction', value: 'sci-fi' },
-  { label: 'Fantasy', value: 'fantasy' },
-  { label: 'Mystery', value: 'mystery' },
-  { label: 'Romance', value: 'romance' },
-  { label: 'Historical', value: 'historical' },
-  { label: 'Biography', value: 'biography' },
-  { label: 'Self-Help', value: 'self-help' },
-  { label: 'Business', value: 'business' },
-  { label: 'Other', value: 'other' },
-];
-
-const targetAudienceOptions = [
-  { label: 'Children', value: 'children' },
-  { label: 'Young Adult', value: 'young-adult' },
-  { label: 'Adult', value: 'adult' },
-  { label: 'General', value: 'general' },
-  { label: 'Academic', value: 'academic' },
-  { label: 'Professional', value: 'professional' },
-];
 
 export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCreationWizardProps) {
   const router = useRouter();
@@ -95,8 +75,8 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
         router.push(`/dashboard/books/${book.id}`);
       }
     } catch (error) {
-      console.error('Error creating book:', error);
-      toast.error({ title: 'Failed to create book. Please try again.' });
+      const classified = classifyError(error, 'Creating book');
+      showErrorNotification(classified, { onRetry: () => onSubmit(data) });
     } finally {
       setIsSubmitting(false);
     }
@@ -212,7 +192,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
-                        {genreOptions.map((option) => (
+                        {GENRE_OPTIONS.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -241,7 +221,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
-                        {targetAudienceOptions.map((option) => (
+                        {TARGET_AUDIENCE_OPTIONS.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
