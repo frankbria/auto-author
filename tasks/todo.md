@@ -30,6 +30,6 @@
 
 ## Acceptance criteria
 
-- [ ] ≥1 un-skipped integration test per protected endpoint class (AI generate, TOC, export, avatar upload) using the real limiter with a small cap, asserting the Nth+1 request → 429
-- [ ] No remaining skipped rate-limit endpoint test
-- [ ] Full backend suite green, coverage ≥85%
+- [x] ≥1 un-skipped integration test per protected endpoint class (AI generate, TOC, export, avatar upload) using the real limiter with a small cap, asserting the Nth+1 request → 429
+- [x] No remaining skipped rate-limit endpoint test
+- [x] Full backend suite green, coverage ≥85%
