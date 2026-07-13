@@ -34,16 +34,21 @@ _sync_books = _sync_db.get_collection("books")
 _sync_logs = _sync_db.get_collection("audit_logs")
 _sync_sessions = _sync_db.get_collection("sessions")
 
+async def noop_rate_limiter(request: Request):
+    """Shared no-op limiter dependency. Deliberately ONE module-level function
+    (not a fresh closure per factory call) so every production route captures
+    the same callable — letting a test re-arm the REAL limiter on any route via
+    a single app.dependency_overrides[noop_rate_limiter] entry
+    (see arm_real_rate_limiter)."""
+    return {"limit": float("inf"), "remaining": float("inf"), "reset": None}
+
+
 def fake_get_rate_limiter(limit: int = 10, window: int = 60):
     """
-    Fake rate limiter that does nothing.
-    This is used to bypass rate limiting in tests.
+    Fake rate limiter factory that bypasses rate limiting in tests.
+    Returns the shared noop_rate_limiter regardless of limit/window.
     """
-
-    async def _always_allow(request: Request):
-        return {"limit": float("inf"), "remaining": float("inf"), "reset": None}
-
-    return _always_allow
+    return noop_rate_limiter
 
 
 # Preserve the real limiter so tests that need to exercise the actual
@@ -100,8 +105,41 @@ from app.core.security import get_current_user_from_session
 from app.api.endpoints import users as users_endpoint
 from app.api.endpoints import books as books_endpoint
 from bson import ObjectId
+from unittest.mock import patch as _mock_patch
 
 pytest_plugins = ["pytest_asyncio"]
+
+
+@pytest.fixture
+def arm_real_rate_limiter():
+    """Re-arm the REAL rate limiter on production routes for one test.
+
+    Every route captured the shared noop_rate_limiter at import time, so one
+    dependency_overrides entry swaps in a genuine limiter closure with a small
+    test cap. BYPASS_AUTH is forced off so the limiter actually counts.
+    Yields arm(limit, window=3600); if the target route no longer declares
+    Depends(get_rate_limiter(...)), the override never fires and the test's
+    expected 429 fails RED — the #199 test-trust guarantee.
+    """
+    _bypass_off = _mock_patch.object(deps.settings, "BYPASS_AUTH", False)
+    _bypass_off.start()
+    # Freeze the limiter's clock 1s past a bucket start so an epoch-aligned
+    # window can never roll over mid-test (same seam test_rate_limiter_window_reset
+    # patches). Without this, a test straddling a real window boundary would
+    # see its count reset and flake.
+    _frozen_now = (int(deps.time.time() // 3600) * 3600) + 1
+    _clock = _mock_patch.object(deps.time, "time", return_value=_frozen_now)
+    _clock.start()
+
+    def arm(limit: int, window: int = 3600):
+        app.dependency_overrides[noop_rate_limiter] = real_get_rate_limiter(
+            limit=limit, window=window
+        )
+
+    yield arm
+    _clock.stop()
+    _bypass_off.stop()
+    app.dependency_overrides.pop(noop_rate_limiter, None)
 
 @pytest_asyncio.fixture(scope="function")
 def event_loop():

@@ -460,23 +460,6 @@ class TestExportEndpoints:
         # Should get validation error
         assert response.status_code == 422
 
-    @pytest.mark.skip(reason="Rate limiting tests require proper test setup with time delays")
-    @pytest.mark.asyncio
-    async def test_export_rate_limiting(self, test_book_with_content):
-        """Test that export endpoints are rate limited."""
-        client, book_id = test_book_with_content
-
-        # Make multiple requests quickly
-        # Rate limit is 10 per hour, so 11 should trigger limit
-        for i in range(11):
-            response = await client.get(f"/api/v1/books/{book_id}/export/pdf")
-            if i < 10:
-                assert response.status_code == 200
-            else:
-                # 11th request should be rate limited
-                assert response.status_code == 429
-                assert "rate limit" in response.json()["detail"].lower()
-
     @pytest.mark.asyncio
     async def test_export_special_characters_filename(self, auth_client_factory):
         """Test export with special characters in book title."""

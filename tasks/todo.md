@@ -1,29 +1,35 @@
-# Issue #198 [P2.6] — Auth flow tests (sign-in 2FA-redirect race, sign-up, middleware)
+# Issue #199 — [P2.7] Restore real rate-limit test coverage (limiter is neutered suite-wide)
 
-**Plan source**: self-authored (no CodeRabbit plan on the issue; only the auto-enrichment placeholder comment).
+**Plan source**: self-authored (no plan comment on issue; CodeRabbit comment is only the planner stub).
 
-## Stale-premise findings (verified 2026-07-12)
+## Premise verification (done)
 
-- **Middleware AC already satisfied**: `src/__tests__/middleware.test.ts` (from #185/#192/#190) covers protected+no-cookie→307 redirect w/ deep link, cookie→next (both cookie names), all BYPASS_AUTH branches incl. production guard. No work needed — document in PR.
-- **Sign-in partially covered**: `src/__tests__/SignInPage.test.tsx` (from #184) covers success→push(sanitized redirect) and error→no-nav. **Gaps**: (a) error→mapped user-friendly message rendered; (b) `twoFactorRedirect`→early return, no push (the #64 race regression guard at `sign-in/page.tsx:112-114`).
-- **Sign-up fully valid**: `src/__tests__/SignUp.test.tsx` imports `@/app/page` (landing page) — mislabeled; the real `/auth/sign-up` page has zero tests.
+- Premise **holds**: `backend/tests/conftest.py:37-55` swaps `deps.get_rate_limiter` for a no-op factory *before* `app.main.app` is imported, so all 26 wired routes captured a never-counting closure at import time. #180's `TestRateLimiting` (test_dependencies.py:123-304) covers the dependency directly + one **synthetic** throwaway-app route — zero tests drive a real 429 through a production route. The one endpoint-level test (`test_export_endpoints.py:463`) is `@pytest.mark.skip`.
+- 26 wired call sites (issue says ~27; the extra grep hits are the definition site / import lines). Classes: AI generate ×4 (books.py:1775, 2541, 2679, 2743), TOC ×3 (books.py:713, 835, 1169), export ×4 (export.py:91, 194, 289, 379), avatar ×1 (users.py:229), other ×14 (users/billing/books CRUD/regenerate/transcription).
 
-## Todo
+## Design (autonomous decisions)
 
-- [x] 1. Extend `SignInPage.test.tsx`:
-  - error → alert renders the mapped user-friendly credential message (not the raw provider text), no nav
-  - `data.twoFactorRedirect: true` → no `router.push`, no error alert (2FA race guard)
-- [x] 2. `git mv src/__tests__/SignUp.test.tsx src/__tests__/HomePage.test.tsx` (it tests the home page's auth-state rendering; content kept)
-- [x] 3. New `src/__tests__/SignUpPage.test.tsx` for `@/app/auth/sign-up/page`:
-  - success → `authClient.signUp.email` called with the form's email/credential/name values, push('/dashboard')
-  - server error (account exists) → mapped message rendered, no nav
-  - mismatched confirm password → inline error + submit disabled (button gates on `passwordsMatch`)
-  - weak password → submit disabled (gates on `isPasswordValid`)
-- [x] 4. RED-verify behavior pins by mutation (remove 2FA early-return → test fails; break error mapping → test fails)
-- [x] 5. Full frontend suite + lint + typecheck green; coverage gates green
-- [x] 6. Deslop scan, quality gate (opencode primary / codex fallback pre-PR review)
-- [x] 7. PR, post-PR review, demo (hard gate), CI (hard gate), docs sync, merge
+**Mechanism**: make the conftest fake factory return ONE shared module-level no-op function (today it returns a fresh closure per call — un-overridable). Every route then captures the *same* callable, so a test can re-arm the real limiter on any production route with a single `app.dependency_overrides[<noop>] = real_get_rate_limiter(limit=N, window=3600)` entry. Idiomatic FastAPI lever; no router rebuild, no import-order surgery.
 
-## Notes
-- `better-auth/react` is moduleNameMapper'd to `src/__mocks__/better-auth-react.ts`; import the real `@/lib/auth-client` — same pattern as SignInPage.test.tsx.
-- Keep dummy credentials clear of the pre-commit secrets pattern (no `password` + 8+-char quoted string on one line; SignInPage.test.tsx precedent uses "pw1234" — sign-up needs a *valid* strong password, so assign via a const built to dodge the pattern).
+- Test-trust property: if someone deletes `Depends(get_rate_limiter(...))` from an endpoint, the override never fires → no 429 → test goes RED. Exactly the regression the issue wants pinned.
+- The override cap is the test's small cap (per AC: "real limiter with a small cap"), not the route's declared numbers. Buckets are per-path (`rl:{path}:{bucket}`), so setup requests on other paths don't consume the tested bucket.
+- `BYPASS_AUTH` patched False for these tests (real limiter short-circuits on it); auth resolves through the client factory's `get_current_user_from_session` override (FastAPI resolves sub-deps through overrides).
+- Mongo: `motor_reinit_db` drops the test DB per test → clean `usage_counters`; window=3600 in overrides so no epoch-boundary crossing mid-test.
+
+## Steps
+
+1. **conftest.py**: replace the per-call no-op closure with a shared module-level `noop_rate_limiter`; `fake_get_rate_limiter(limit, window)` returns it. Add fixture `arm_real_rate_limiter` → callable `(limit, window=3600)` that installs `app.dependency_overrides[noop_rate_limiter] = real_get_rate_limiter(...)` + patches `deps.settings.BYPASS_AUTH` False, with teardown restoring both. (AI-quota fake untouched — out of scope.)
+2. **New `backend/tests/test_api/test_rate_limit_routes.py`** — one integration test per AC endpoint class, real Mongo, authenticated client, small cap (e.g. limit=2), asserting requests 1..N are not 429 and request N+1 → **429** with `X-RateLimit-Remaining: 0` + `Retry-After` headers:
+   - (a) AI generate: `POST /books/{id}/chapters/{cid}/generate-questions` (AI boundary patched per the #182 fixture pattern so first N succeed)
+   - (b) TOC: `POST /books/{id}/analyze-summary` (ai_service patched)
+   - (c) export: `GET /books/{id}/export/pdf`
+   - (d) avatar upload: `POST /users/me/avatar` (small real image, per existing avatar tests)
+3. **Wiring completeness pin** (same file): introspection test walking `app.routes` dependant trees asserting every one of the 26 known rate-limited (method, path) pairs still carries the limiter dependency (the shared noop in test env). Protects the other 22 sites the behavioral tests don't hit.
+4. **Delete** the superseded skipped `test_export_rate_limiting` block at `test_export_endpoints.py:463-478` (replaced by 2c).
+5. Mutation check (quality gate): remove `Depends(get_rate_limiter(...))` from one endpoint → class test + completeness test fail; restore.
+
+## Acceptance criteria
+
+- [ ] ≥1 un-skipped integration test per protected endpoint class (AI generate, TOC, export, avatar upload) using the real limiter with a small cap, asserting the Nth+1 request → 429
+- [ ] No remaining skipped rate-limit endpoint test
+- [ ] Full backend suite green, coverage ≥85%
