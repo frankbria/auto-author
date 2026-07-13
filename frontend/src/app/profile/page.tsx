@@ -73,6 +73,11 @@ export default function UserProfile() {
   // in tests. The async hydration keeps any fields the user has already edited
   // (keepDirtyValues), so a slow fetch never clobbers in-progress input.
   useEffect(() => {
+    // Re-arm the guard on a user switch: the previous account's retained
+    // preferences must not be saveable into the new one while its load is
+    // still in flight.
+    setLoadState('loading');
+    setPreferences({});
     const [firstName = '', ...rest] = (user?.name ?? '').trim().split(' ');
     const lastName = rest.join(' ');
     form.reset({

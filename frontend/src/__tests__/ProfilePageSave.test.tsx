@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import UserProfile from '@/app/profile/page';
 import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
+import { useSession } from '@/lib/auth-client';
 
 // Merge-contract tests for the Profile page (issue #204): a save must send the
 // FULL preferences object, not a 3-field reconstruction that wipes the
@@ -163,5 +164,29 @@ describe('ProfilePage save preserves preferences (#204)', () => {
     // overwrite them with session-seeded defaults (e.g. bio: '').
     expect(body.bio).toBe('hi');
     expect(body.display_name).toBe('Ann Author');
+  });
+
+  it('re-arms the save guard when the signed-in user changes', async () => {
+    mockAuthFetch.mockResolvedValue(profile(fullPreferences));
+    const { rerender } = render(<UserProfile />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled()
+    );
+
+    // Session switches to a different account; its profile load never
+    // resolves. The previous user's retained preferences must not be
+    // saveable into the new account during that window.
+    mockAuthFetch.mockImplementation(() => new Promise(() => {}));
+    (useSession as jest.Mock).mockReturnValue({
+      data: {
+        user: { id: 'user-2', email: 'b@c.com', name: 'Bob Other', image: null },
+        session: { token: 'tok2', id: 'sess-2' },
+      },
+    });
+    rerender(<UserProfile />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /loading/i })).toBeDisabled()
+    );
   });
 });
