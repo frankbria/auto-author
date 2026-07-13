@@ -255,7 +255,7 @@ export default function QuestionDisplay({
               setLastAction(null); // Clear last action on queued success
               onResponseSaved();
               // Auto-clear saved status after 3 seconds
-              setTimeout(() => setSaveStatus('idle'), 3000);
+              setTimeout(() => setSaveStatus(prev => (prev === 'saved' ? 'idle' : prev)), 3000);
             },
             onError: (error) => {
               setSaveStatus('error');
@@ -284,7 +284,7 @@ export default function QuestionDisplay({
       onResponseSaved();
 
       // Auto-clear saved status after 3 seconds
-      setTimeout(() => setSaveStatus('idle'), 3000);
+      setTimeout(() => setSaveStatus(prev => (prev === 'saved' ? 'idle' : prev)), 3000);
     } catch (error) {
       console.error('Error saving draft:', error);
       const errorType = classifyError(error);
@@ -310,11 +310,12 @@ export default function QuestionDisplay({
     }
   }, [responseText, bookId, chapterId, question.id, onResponseSaved, isOnline, saveOperation]);
 
-  // Auto-save functionality
+  // Auto-save functionality — suppressed after a failed save so the error
+  // stays visible until the user acts (retry or edit) (#197)
   useEffect(() => {
     let autoSaveTimer: NodeJS.Timeout;
 
-    if (responseText.trim() && !isSaving) {
+    if (responseText.trim() && !isSaving && saveStatus !== 'error') {
       autoSaveTimer = setTimeout(() => {
         handleSaveDraft();
       }, 3000); // Auto-save after 3 seconds of inactivity
@@ -325,7 +326,18 @@ export default function QuestionDisplay({
         clearTimeout(autoSaveTimer);
       }
     };
-  }, [responseText, isSaving, handleSaveDraft]);
+  }, [responseText, isSaving, saveStatus, handleSaveDraft]);
+
+  // A new edit is the user acting on a failed save: clear the error and
+  // return to idle so auto-save resumes for the new input (#197)
+  const handleResponseChange = (value: string) => {
+    setResponseText(value);
+    if (saveStatus === 'error') {
+      setSaveStatus('idle');
+      setSaveError('');
+      setRetryCount(0); // new input starts a fresh attempt cycle
+    }
+  };
 
   // Handle mark as completed with enhanced error handling
   const handleMarkCompleted = async () => {
@@ -357,7 +369,7 @@ export default function QuestionDisplay({
               setSaveError('');
               setLastAction(null); // Clear last action on queued success
               onResponseSaved();
-              setTimeout(() => setSaveStatus('idle'), 3000);
+              setTimeout(() => setSaveStatus(prev => (prev === 'saved' ? 'idle' : prev)), 3000);
             },
             onError: (error) => {
               setSaveStatus('error');
@@ -387,7 +399,7 @@ export default function QuestionDisplay({
       onResponseSaved();
 
       // Auto-clear saved status after 3 seconds
-      setTimeout(() => setSaveStatus('idle'), 3000);
+      setTimeout(() => setSaveStatus(prev => (prev === 'saved' ? 'idle' : prev)), 3000);
     } catch (error) {
       console.error('Error marking as completed:', error);
       const errorType = classifyError(error);
@@ -505,7 +517,7 @@ export default function QuestionDisplay({
           <VoiceTextInput
             id="response"
             value={responseText}
-            onChange={setResponseText}
+            onChange={handleResponseChange}
             placeholder="Type your response here or use voice input..."
             className="min-h-[200px] min-w-[44px]"
             disabled={isSaving || isCompleted}
