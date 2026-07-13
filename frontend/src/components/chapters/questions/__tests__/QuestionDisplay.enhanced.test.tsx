@@ -192,9 +192,7 @@ describe('QuestionDisplay - Enhanced Error Handling', () => {
   });
 
   describe('Error messages', () => {
-    // TODO: Fix auto-save interference - auto-save useEffect triggers 3s after error,
-    // clearing the error state. Component should not auto-save after failed save.
-    it.skip('should show network error message with actionable suggestion', async () => {
+    it('should show network error message with actionable suggestion', async () => {
       // Create error with name property explicitly set
       const networkError = new Error('Network error');
       Object.defineProperty(networkError, 'name', {
@@ -204,7 +202,7 @@ describe('QuestionDisplay - Enhanced Error Handling', () => {
         configurable: true
       });
 
-      // Mock all 3 retry attempts to fail
+      // Mock all 3 internal ErrorHandler attempts to fail
       (bookClient.saveQuestionResponse as jest.Mock)
         .mockRejectedValueOnce(networkError)
         .mockRejectedValueOnce(networkError)
@@ -218,17 +216,11 @@ describe('QuestionDisplay - Enhanced Error Handling', () => {
       const saveButton = screen.getByText(/save draft/i);
       fireEvent.click(saveButton);
 
-      // Wait for error handler to complete all retries (3 attempts with exponential backoff)
-      // Retry delays: 0ms + 1000ms + 2000ms = ~3000ms, plus operation time
+      // ErrorHandler retries internally with backoff 1s + 2s + 4s ≈ 7s before throwing
       await waitFor(() => {
-        // Debug: check what's actually displayed
-        const container = screen.getByTestId('question-scroll-container');
-        console.log('Save status elements:', screen.queryAllByText(/saving|saved|error|failed/i).map(el => el.textContent));
-        console.log('All container text:', container.textContent?.substring(0, 500));
-
         expect(screen.getByText(/check your connection/i)).toBeInTheDocument();
-      }, { timeout: 5000 }); // Allow time for 3 retry attempts
-    }, 10000); // Increase Jest timeout to 10s for retry logic
+      }, { timeout: 10000 });
+    }, 15000);
 
     it('should show authentication error message', async () => {
       const authError = new Error('Unauthorized');
@@ -249,7 +241,7 @@ describe('QuestionDisplay - Enhanced Error Handling', () => {
       });
     });
 
-    it.skip('should show server error message', async () => {
+    it('should show server error message', async () => {
       // Create error with status property for server error classification
       const serverError = new Error('Internal server error') as Error & { status: number };
       serverError.status = 500;
@@ -264,16 +256,141 @@ describe('QuestionDisplay - Enhanced Error Handling', () => {
       const saveButton = screen.getByText(/save draft/i);
       fireEvent.click(saveButton);
 
-      // Wait for error handler to complete all retries (server errors are retryable)
+      // ErrorHandler retries server errors internally with backoff 1s + 2s + 4s ≈ 7s
       await waitFor(() => {
         expect(screen.getByText(/server error/i)).toBeInTheDocument();
-      }, { timeout: 5000 }); // Allow time for 3 retry attempts
-    }, 10000); // Increase Jest timeout to 10s for retry logic
+      }, { timeout: 10000 });
+    }, 15000);
+  });
+
+  describe('Auto-save suppression after failed save (#197)', () => {
+    it('does not auto-save again after a failed save; error persists until the user acts', async () => {
+      // Plain Error classifies as UNKNOWN → not retryable → fails on the first attempt
+      (bookClient.saveQuestionResponse as jest.Mock).mockRejectedValue(new Error('boom'));
+
+      render(<QuestionDisplay {...mockProps} />);
+
+      const textarea = screen.getByLabelText(/your response/i);
+      fireEvent.change(textarea, { target: { value: 'Test response' } });
+
+      const saveButton = screen.getByText(/save draft/i);
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/save failed/i)).toBeInTheDocument();
+      });
+      expect(bookClient.saveQuestionResponse).toHaveBeenCalledTimes(1);
+
+      // Sit past the 3s auto-save debounce — no further save may fire
+      await new Promise(resolve => setTimeout(resolve, 3500));
+
+      expect(bookClient.saveQuestionResponse).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/save failed/i)).toBeInTheDocument();
+      expect(screen.getByText(/failed to save draft/i)).toBeInTheDocument();
+    }, 10000);
+
+    it('clears the error when the user edits, and auto-save resumes', async () => {
+      (bookClient.saveQuestionResponse as jest.Mock)
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValue({});
+
+      render(<QuestionDisplay {...mockProps} />);
+
+      const textarea = screen.getByLabelText(/your response/i);
+      fireEvent.change(textarea, { target: { value: 'Test response' } });
+
+      const saveButton = screen.getByText(/save draft/i);
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/save failed/i)).toBeInTheDocument();
+      });
+
+      // Typing is the user acting on the error: banner clears immediately
+      fireEvent.change(textarea, { target: { value: 'Test response, edited' } });
+
+      expect(screen.queryByText(/save failed/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/failed to save draft/i)).not.toBeInTheDocument();
+
+      // ...and the 3s auto-save debounce re-arms and saves the new text
+      await waitFor(() => {
+        expect(screen.getByText(/saved successfully/i)).toBeInTheDocument();
+      }, { timeout: 6000 });
+      expect(bookClient.saveQuestionResponse).toHaveBeenCalledTimes(2);
+      expect((bookClient.saveQuestionResponse as jest.Mock).mock.calls[1][3]).toMatchObject({
+        response_text: 'Test response, edited',
+      });
+    }, 10000);
+
+    it('does not let a stale saved→idle timer clear a later error state', async () => {
+      // First save succeeds (arming the 3s "clear saved status" timer),
+      // the second save fails before that timer fires
+      (bookClient.saveQuestionResponse as jest.Mock)
+        .mockResolvedValueOnce({})
+        .mockRejectedValue(new Error('boom'));
+
+      render(<QuestionDisplay {...mockProps} />);
+
+      const textarea = screen.getByLabelText(/your response/i);
+      fireEvent.change(textarea, { target: { value: 'Test response' } });
+
+      const saveButton = screen.getByText(/save draft/i);
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/saved successfully/i)).toBeInTheDocument();
+      });
+
+      fireEvent.change(textarea, { target: { value: 'Test response, edited' } });
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/save failed/i)).toBeInTheDocument();
+      });
+      const callsAfterFailure = (bookClient.saveQuestionResponse as jest.Mock).mock.calls.length;
+
+      // Sit past the first save's 3s saved→idle timer: it must not flip the
+      // error state back to idle (which would re-arm auto-save)
+      await new Promise(resolve => setTimeout(resolve, 3500));
+
+      expect(screen.getByText(/save failed/i)).toBeInTheDocument();
+      expect(bookClient.saveQuestionResponse).toHaveBeenCalledTimes(callsAfterFailure);
+    }, 12000);
+
+    it('resets the retry allowance when the user edits after exhausting retries', async () => {
+      (bookClient.saveQuestionResponse as jest.Mock).mockRejectedValue(new Error('boom'));
+
+      render(<QuestionDisplay {...mockProps} />);
+
+      const textarea = screen.getByLabelText(/your response/i);
+      fireEvent.change(textarea, { target: { value: 'Test response' } });
+
+      fireEvent.click(screen.getByText(/save draft/i));
+      await waitFor(() => expect(screen.getByText(/retry/i)).toBeInTheDocument());
+
+      // Burn through the manual retry allowance (retryCount reaches 3)
+      fireEvent.click(screen.getByText(/retry/i));
+      await waitFor(() => expect(screen.getByText(/retry/i)).toBeInTheDocument());
+      fireEvent.click(screen.getByText(/retry/i));
+      // Wait for the settled error state: banner back, retry allowance exhausted
+      await waitFor(() => {
+        expect(screen.getByText(/failed to save draft/i)).toBeInTheDocument();
+        expect(screen.queryByText(/retry/i)).not.toBeInTheDocument();
+      });
+
+      // Editing starts a fresh attempt cycle; when the resumed auto-save
+      // fails again the Retry button must be offered again
+      fireEvent.change(textarea, { target: { value: 'Test response, edited' } });
+
+      await waitFor(() => {
+        expect(screen.getByText(/save failed/i)).toBeInTheDocument();
+        expect(screen.getByText(/retry/i)).toBeInTheDocument();
+      }, { timeout: 6000 });
+    }, 12000);
   });
 
   describe('Complete response with error handling', () => {
-    // TODO: Same auto-save interference issue as network error test above
-    it.skip('should handle completion errors with retry', async () => {
+    it('should handle completion errors with retry', async () => {
       // Create error with name property explicitly set
       const networkError = new Error('Network error');
       Object.defineProperty(networkError, 'name', {
@@ -283,7 +400,11 @@ describe('QuestionDisplay - Enhanced Error Handling', () => {
         configurable: true
       });
 
+      // Fail all 3 internal ErrorHandler attempts so the error surfaces,
+      // then succeed on the manual Retry click (a fresh execute call)
       (bookClient.saveQuestionResponse as jest.Mock)
+        .mockRejectedValueOnce(networkError)
+        .mockRejectedValueOnce(networkError)
         .mockRejectedValueOnce(networkError)
         .mockResolvedValueOnce({});
 
@@ -295,19 +416,19 @@ describe('QuestionDisplay - Enhanced Error Handling', () => {
       const completeButton = screen.getByRole('button', { name: /complete response/i });
       fireEvent.click(completeButton);
 
-      // Wait for error handler to complete all retries
+      // ErrorHandler retries internally with backoff 1s + 2s + 4s ≈ 7s before throwing
       await waitFor(() => {
         expect(screen.getByText(/check your connection/i)).toBeInTheDocument();
-      }, { timeout: 5000 }); // Allow time for 3 retry attempts
+      }, { timeout: 10000 });
 
       const retryButton = screen.getByText(/retry/i);
       fireEvent.click(retryButton);
 
-      // Second attempt should succeed (mockResolvedValueOnce)
+      // Manual retry succeeds (mockResolvedValueOnce)
       await waitFor(() => {
         expect(screen.getByText(/saved successfully/i)).toBeInTheDocument();
-      }, { timeout: 5000 }); // Allow time for potential retries
-    }, 15000); // Increase Jest timeout to 15s for retry logic + second attempt
+      }, { timeout: 5000 });
+    }, 20000);
 
     it('should queue completion when offline', async () => {
       const useOnlineStatus = require('@/hooks/useOnlineStatus').useOnlineStatus;

@@ -1,21 +1,18 @@
-# Issue #196 [P2.4]: Remove dead 'Session Management' subsystem
+# Issue #197 [P2.5]: Fix auto-save-clears-error bug in QuestionDisplay
 
-**Plan source**: CodeRabbit comment (2026-07-04), AC "remove" branch. Fork pre-resolved: better-auth `ActiveSessionsList` already serves real session UX; legacy subsystem is a duplicative parallel session store with zero live consumers (verified: `SessionMiddleware` gates on `request.state.user`, which nothing sets).
+**Plan source**: CodeRabbit comment (2026-07-04). Design choice pre-resolved (option 2): gate auto-save on `saveStatus !== 'error'` AND clear error state on genuine user edit so auto-save resumes naturally. Manual Retry button untouched.
 
-**Plan verification (2026-07-12)**: all 16 referenced files exist; no consumers of the session DAOs outside the subsystem itself; frontend `useSession` hook imported only by `SessionWarning.tsx` + its test (never mounted); `middleware/` package contains ONLY session middleware.
+**Plan verification (2026-07-12)**: all targets confirmed — auto-save effect `QuestionDisplay.tsx:314-328` guards only `responseText.trim() && !isSaving`; bare `onChange={setResponseText}` at :508; three `it.skip`s at test lines 197/252/276 with TODOs + console.logs.
 
 ## Adaptations to the CodeRabbit plan
-1. **Delete the whole `backend/app/api/middleware/` package** — after removing session_middleware it holds only an empty `__init__.py`; sole importer is `main.py`.
-2. **Also remove `sessions_collection`** from `backend/app/db/base.py` (def + `__all__`) and the rebind in `backend/tests/conftest.py:139` — dead after removal (plan missed these).
-3. **TDD/regression test** (#186 removal pattern): new test pinning the `/sessions/*` routes are gone — authenticated `GET /api/v1/sessions/list` returns 404 (RED on main: returns 200 empty list); no route path starts with `/api/v1/sessions`.
-4. **Docs**: historical snapshots (docs/analysis/*, code-review/*, STAGING_VERIFICATION_RESULTS.md, BACKEND_TEST_FAILURE_ANALYSIS.md, claudedocs/*) kept as-is per #120/#186 precedent. Live docs edited: CLAUDE.md (Production Ready bullet + API endpoints line 473), delete docs/SESSION_MANAGEMENT.md, prune docs/production-readiness-gaps.md session-gap entries, fix docs/better-auth-migration-guide.md:403 stale "kept file" line. docs/session-management.md is better-auth-generic → keep (no legacy endpoint refs).
+1. **Mock/timing corrections (authorized by plan Phase 2 Task 2)**: `ErrorHandler.execute` internally retries NETWORK/SERVER errors 3 attempts with backoff 1s+2s+**4s** (incl. a wasted sleep after the final attempt) ≈ 7s before throwing — the tests' 5s `waitFor` timeouts are too short (their "~3000ms" comment miscounted); bump to 10s waitFor / 15s jest. The completion test's `.mockRejectedValueOnce().mockResolvedValueOnce()` would be absorbed by the *internal* retry and succeed without ever showing the error — change to 3 rejections (exhaust internal retries) then resolve for the manual Retry click.
+2. **Extra regression pins** (cheap, direct AC evidence): (a) after a failed save with a non-retryable error, wait >3s real time → error banner still visible and `saveQuestionResponse` called exactly once (pins "auto-save suppressed after failure"); (b) typing after an error clears the banner and resets status (pins the resume path).
 
 ## Todo
-- [x] Branch `fix/196-remove-dead-session-subsystem`
-- [x] RED: regression test (sessions routes unregistered) fails on main-state code
-- [x] Backend: unregister middleware+router; delete 5 modules + middleware pkg; clean database.py/base.py/conftest re-exports
-- [x] Backend: delete 5 session test files; full suite green ≥85% cov
-- [x] Frontend: delete useSession.ts, SessionWarning.tsx, useSession.test.tsx; suite green
-- [x] Docs: CLAUDE.md, SESSION_MANAGEMENT.md, production-readiness-gaps.md, better-auth-migration-guide.md
-- [x] Deslop scan, quality gate (lint, tests, opencode/codex review pre-PR)
-- [ ] PR, post-PR review, demo (main-vs-branch route differential), CI gate, merge
+- [x] Branch `fix/197-autosave-clears-error`
+- [x] RED: un-skip the 3 tests (with corrected mocks/timeouts); 2 new pins fail on current code (the 3 un-skips pass once timeouts corrected — their blocker was the miscounted backoff; the pins carry the RED evidence)
+- [x] Fix: gate auto-save effect on `saveStatus !== 'error'` (+ dep), wrap onChange to clear error state on edit
+- [x] GREEN: 3 un-skipped + 4 pins pass (2 extra from codex pre-PR P2s: stale saved→idle timer clobber; retryCount reset on edit); TODOs + console.logs removed
+- [x] Full frontend suite (115 suites, 2116 passed / 5 skipped) + lint + typecheck; coverage gates green
+- [x] Deslop scan, quality gate (codex pre-PR review — opencode occupied/hung both rounds)
+- [x] PR #283, post-PR codex review clean, demo (main-vs-branch fetch-counter differential + Mongo persistence), CI green, merge
