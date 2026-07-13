@@ -1,26 +1,21 @@
-# Issue #195 — [P2.3] Notification preference toggles persist but drive no notifications
+# Issue #196 [P2.4]: Remove dead 'Session Management' subsystem
 
-**Branch**: `fix/195-gate-notification-toggles`
-**Plan source**: CodeRabbit comment (2026-07-04), verified against codebase 2026-07-12. Approved autonomously — no architectural fork (both design choices already resolved with rationale: gate all 5 toggles; disable-in-place with "Coming soon" badge, tab stays visible).
+**Plan source**: CodeRabbit comment (2026-07-04), AC "remove" branch. Fork pre-resolved: better-auth `ActiveSessionsList` already serves real session UX; legacy subsystem is a duplicative parallel session store with zero live consumers (verified: `SessionMiddleware` gates on `request.state.user`, which nothing sets).
 
-## Problem
-The Notifications settings tab renders 5 toggles promising delivery (email, marketing, writing reminders, progress updates, backup notifications). They persist to `UserPreferences` but no delivery infrastructure exists — nothing reads the flags. Beta users are promised alerts that never arrive.
+**Plan verification (2026-07-12)**: all 16 referenced files exist; no consumers of the session DAOs outside the subsystem itself; frontend `useSession` hook imported only by `SessionWarning.tsx` + its test (never mounted); `middleware/` package contains ONLY session middleware.
 
-## Approach (frontend-only)
-Gate the whole Notifications section as disabled "coming soon": switches render current stored values but are hard-disabled; a `Badge` next to the CardTitle says "Coming soon"; the description states delivery isn't available yet and preferences will apply once notifications launch. Stored contract preserved — values still round-trip unchanged through the shared save flow.
+## Adaptations to the CodeRabbit plan
+1. **Delete the whole `backend/app/api/middleware/` package** — after removing session_middleware it holds only an empty `__init__.py`; sole importer is `main.py`.
+2. **Also remove `sessions_collection`** from `backend/app/db/base.py` (def + `__all__`) and the rebind in `backend/tests/conftest.py:139` — dead after removal (plan missed these).
+3. **TDD/regression test** (#186 removal pattern): new test pinning the `/sessions/*` routes are gone — authenticated `GET /api/v1/sessions/list` returns 404 (RED on main: returns 200 empty list); no route path starts with `/api/v1/sessions`.
+4. **Docs**: historical snapshots (docs/analysis/*, code-review/*, STAGING_VERIFICATION_RESULTS.md, BACKEND_TEST_FAILURE_ANALYSIS.md, claudedocs/*) kept as-is per #120/#186 precedent. Live docs edited: CLAUDE.md (Production Ready bullet + API endpoints line 473), delete docs/SESSION_MANAGEMENT.md, prune docs/production-readiness-gaps.md session-gap entries, fix docs/better-auth-migration-guide.md:403 stale "kept file" line. docs/session-management.md is better-auth-generic → keep (no legacy endpoint refs).
 
-### Adaptations from the CodeRabbit plan
-- **Skip the optional Tooltip** — Radix tooltips don't fire pointer events on disabled elements without wrapper hacks; the CardDescription copy communicates the same thing. (YAGNI)
-- **Remove the `disabled` prop** from `NotificationSettingsForm` instead of keeping it as dead API — the switches are unconditionally disabled now, so the prop is meaningless; page callsite updated (one line).
-
-## Tasks
-- [x] RED: update `frontend/src/__tests__/SettingsPageSave.test.tsx` "shows all five notification toggles" — keep checked-state assertions (disabled switches still show stored state), add: all 5 switches disabled + "Coming soon" badge + delivery-unavailable copy. Verify failures against current code.
-- [x] RED: update `frontend/src/e2e/settings.spec.ts` first test — remove the `#notification-writing_reminders` click; assert the Notifications tab shows disabled switches + "Coming soon"; assert `writing_reminders` round-trips **unchanged** (false) in the merged PATCH payload (untouched-values-survive already asserted for export/marketing).
-- [x] GREEN: `NotificationSettingsForm.tsx` — hard-disable all switches, add Badge + copy, drop `disabled` prop; `page.tsx` — drop `disabled={!isLoaded}` from this form.
-- [x] Round-trip persistence unchanged: existing "preserves unexposed preference fields" unit test still passes (notification flags in merged payload).
-- [x] Quality gate: jest suite + coverage, lint, typecheck; e2e settings spec.
-- [x] Third-party review (opencode GLM primary, codex fallback) pre-PR + post-PR.
-- [x] PR, demo (branch vs main: main shows interactive false-promise toggles; branch shows disabled + Coming soon; values still persist when saving other tabs), CI, merge.
-
-## Acceptance criteria mapping
-- "Gate the undeliverable toggles behind a coming-soon/disabled state" → all 5 switches disabled + visible "Coming soon" badge + honest copy; stored values preserved and round-trip unchanged.
+## Todo
+- [ ] Branch `fix/196-remove-dead-session-subsystem`
+- [ ] RED: regression test (sessions routes unregistered) fails on main-state code
+- [ ] Backend: unregister middleware+router; delete 5 modules + middleware pkg; clean database.py/base.py/conftest re-exports
+- [ ] Backend: delete 5 session test files; full suite green ≥85% cov
+- [ ] Frontend: delete useSession.ts, SessionWarning.tsx, useSession.test.tsx; suite green
+- [ ] Docs: CLAUDE.md, SESSION_MANAGEMENT.md, production-readiness-gaps.md, better-auth-migration-guide.md
+- [ ] Deslop scan, quality gate (lint, tests, opencode/codex review pre-PR)
+- [ ] PR, post-PR review, demo (main-vs-branch route differential), CI gate, merge

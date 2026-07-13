@@ -609,8 +609,7 @@ npm run test:e2e:staging
 ## Key Features
 
 ### ✅ Production Ready
-- User authentication (better-auth with HS256 JWT verification)
-- **Session Management** (Activity tracking, security features, timeout handling)
+- User authentication (better-auth with HS256 JWT verification; session list/revoke via better-auth native APIs in Settings → Security)
 - Book CRUD operations with metadata
 - **Book Deletion UI** (Type-to-confirm with data loss warnings)
 - TOC generation with AI wizard

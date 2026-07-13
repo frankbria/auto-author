@@ -376,13 +376,13 @@ curl -I -X OPTIONS \
 
 #### GAP-HIGH-011: No Unique Constraints on Critical Fields
 - **Category:** Database / Data Integrity
-- **Current State:** No unique indexes on `users.clerk_id`, `users.email`, `sessions.session_id`
+- **Current State:** No unique indexes on `users.clerk_id`, `users.email`
 - **Required State:** Unique constraints enforced at database level
-- **Impact:** Duplicate users/sessions possible → data corruption
+- **Impact:** Duplicate users possible → data corruption
 - **Source Reports:** Database Review (CRITICAL-2)
 - **File References:**
   - `backend/app/db/user.py` (users collection)
-  - `backend/app/db/session.py` (sessions collection)
+- **Note:** the legacy sessions collection (`sessions.session_id`) was removed with the dead session subsystem (#196)
 - **Effort Estimate:** 2 hours (add unique indexes)
 - **Dependencies:** GAP-HIGH-010 (index creation infrastructure)
 - **Fix Priority:** Week 1
@@ -396,7 +396,6 @@ curl -I -X OPTIONS \
 - **Impact:**
   - Key features untested end-to-end:
     - Draft writing styles (0% coverage)
-    - Session management (0% coverage)
     - Keyboard accessibility (0% coverage)
     - Custom questions (0% coverage)
 - **Source Reports:** Testing Coverage (P1), Frontend Components (Gaps)
@@ -409,9 +408,8 @@ curl -I -X OPTIONS \
 **Missing E2E Tests:**
 1. Draft generation with different writing styles (4 hours)
 2. Custom question workflow (3 hours)
-3. Session timeout warnings (12 hours)
-4. Keyboard-only navigation (21 hours)
-5. Profile management (8 hours)
+3. Keyboard-only navigation (21 hours)
+4. Profile management (8 hours)
 
 ---
 
@@ -453,8 +451,7 @@ curl -I -X OPTIONS \
 - **Current State:** ~45 endpoints documented, ~65 actual endpoints
 - **Required State:** 100% endpoint documentation + OpenAPI spec
 - **Impact:**
-  - 20 undocumented endpoints:
-    - Session management (6 endpoints)
+  - Undocumented endpoints:
     - Export (3 endpoints)
     - Transcription (4 endpoints)
     - Book cover upload (2 endpoints)
@@ -583,17 +580,8 @@ curl -I -X OPTIONS \
 
 ---
 
-#### GAP-MED-012: Session Cleanup Not Automated
-- **Category:** Database
-- **Current State:** `cleanup_expired_sessions()` exists but never called
-- **Required State:** TTL index or scheduled cleanup
-- **Impact:** Database bloat
-- **Source Reports:** Database Review (MEDIUM-10)
-- **File References:**
-  - `backend/app/db/session.py:249-261`
-- **Effort Estimate:** 1 hour (TTL index)
-- **Dependencies:** GAP-HIGH-010 (index creation)
-- **Fix Priority:** Week 2
+#### GAP-MED-012: Session Cleanup Not Automated — RESOLVED by removal (#196)
+- The legacy session subsystem (middleware, `/sessions/*` endpoints, `app/db/session.py`) was dead code and has been deleted; there is no sessions collection to clean up. Real session management is better-auth's.
 
 ---
 
@@ -656,7 +644,7 @@ curl -I -X OPTIONS \
 | Feature | Specified | Implemented | Completeness | Gaps | Effort to Complete |
 |---------|-----------|-------------|--------------|------|-------------------|
 | **Authentication (Clerk)** | ✅ | ✅ | 100% | None | 0 hours |
-| **Session Management** | ✅ | ✅ | 95% | E2E tests missing | 12 hours |
+| **Session Management** | ✅ | ✅ | 100% | Legacy dead subsystem removed (#196); better-auth native | 0 hours |
 | **Book CRUD** | ✅ | ✅ | 100% | None | 0 hours |
 | **Book Deletion UI** | ✅ | ✅ | 100% | None | 0 hours |
 | **TOC Generation** | ✅ | ✅ | 100% | None | 0 hours |
@@ -688,7 +676,7 @@ curl -I -X OPTIONS \
 |-----------|---------|--------|-----|------------------|--------------|--------|
 | **Backend** | 41% | 85% | -44% | security.py (18%), book_cover_upload.py (0%), transcription.py (0%) | 207-252 | 4-5 weeks |
 | **Frontend** | Unknown | 85% | TBD | Need to measure | 55-80 (est.) | 3 weeks |
-| **E2E** | 70% | 95% | -25% | Draft styles, sessions, keyboard nav | 11 tests | 1 week |
+| **E2E** | 70% | 95% | -25% | Draft styles, keyboard nav | 11 tests | 1 week |
 | **Integration** | 60% (est.) | 85% | -25% | Cloud services, Redis, OpenAI | TBD | 2 weeks |
 
 **Total Testing Effort:** 10-11 weeks (can be parallelized)
@@ -704,7 +692,6 @@ curl -I -X OPTIONS \
 | No CSRF Protection | Backend | HIGH | A01 - Broken Access Control | 3-4 hours |
 | JWT Debug Logging | Backend | HIGH | A09 - Logging Failures | 15 mins |
 | NoSQL Injection Risk | Backend + Database | HIGH | A03 - Injection | 2 hours |
-| Weak Session Fingerprinting | Backend | MEDIUM | A07 - Auth Failures | 2-3 hours |
 | No MFA Support | Backend + Frontend | MEDIUM | A07 - Auth Failures | 2-3 days |
 | Missing Security Headers | Backend | MEDIUM | A05 - Security Misconfiguration | 1 hour |
 
