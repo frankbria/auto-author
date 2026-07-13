@@ -1,511 +1,385 @@
 /**
- * Complete Authoring Journey E2E Test
+ * Complete Authoring Journey E2E (issues #201 / #110 / #193)
  *
- * Task 6: End-to-End test validating the complete user workflow from book creation
- * through draft generation, addressing the #1 missing test identified in the E2E assessment.
+ * The core value-proposition flow, runnable in CI without an OpenAI key:
+ *   create book → write summary → TOC wizard (clarifying questions → generate
+ *   → review → accept) → open chapter → interview questions → answer & complete
+ *   → generate draft → draft lands in the editor → autosaved to the backend.
  *
- * Test Flow:
- * 1. User creates new book with metadata (title, genre, summary)
- * 2. System generates TOC using AI wizard
- * 3. User adds chapters from TOC
- * 4. User answers questions for a chapter
- * 5. System generates draft content from Q&A
- * 6. User sees generated content in editor
+ * Hybrid mocking, mirroring what CI actually provides (real backend + Mongo,
+ * BYPASS_AUTH, no AI key):
+ *   - Deterministic endpoints are REAL: book create, summary save, TOC
+ *     readiness, TOC persistence (PUT /toc via wizard Accept), clarifying
+ *     question-response autosave, chapter content autosave.
+ *   - AI endpoints are route-mocked: analyze-summary, book-level
+ *     generate-questions, generate-toc, chapter generate-questions,
+ *     generate-draft.
+ *   - The chapter question store (questions list / responses / progress) is
+ *     served by a stateful in-test mock, because real chapter questions can
+ *     only be minted by the AI generation endpoint.
  *
- * This test validates the core value proposition of Auto-Author: transforming ideas
- * into structured content through an AI-assisted authoring workflow.
+ * Outcome evidence at each stage: the accepted TOC and the final draft are
+ * re-read from the backend API, not just observed in the DOM.
  */
 
-import { test, expect, Page } from '@playwright/test';
-import { waitForCondition } from '../__tests__/helpers/conditionWaiting';
+import { test, expect, Page, Route } from '@playwright/test';
+import { deleteTestBook } from './helpers/testData';
 
-// Test configuration
-const TEST_TIMEOUT = 180000; // 3 minutes for full E2E with AI calls
-const AI_OPERATION_TIMEOUT = 60000; // 1 minute for individual AI operations
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-// Test data - realistic book concept
-const TEST_BOOK_DATA = {
+const TEST_BOOK = {
   title: 'Sustainable Urban Gardening: A Practical Guide',
-  genre: 'Non-Fiction',
+  genre: 'other',
   targetAudience: 'Urban dwellers interested in growing their own food',
-  summary: 'A comprehensive guide to creating and maintaining productive gardens in urban environments, covering container gardening, vertical growing techniques, composting, and seasonal planning for city residents with limited space.'
+  description: 'A practical guide to productive gardens in small urban spaces.',
+  // ≥30 words and ≥150 chars so the deterministic TOC-readiness check passes.
+  summary:
+    'A comprehensive guide to creating and maintaining productive gardens in urban environments, ' +
+    'covering container gardening, vertical growing techniques, composting, and seasonal planning ' +
+    'for city residents with limited space. Readers learn to plan, plant, and harvest year-round.',
 };
 
-// Sample Q&A data for chapter questions
-const CHAPTER_QA_RESPONSES = {
-  mainTopics: 'This chapter will introduce the benefits of urban gardening, explain space-efficient growing methods, and provide an overview of what readers will learn throughout the book.',
-  targetReaders: 'Beginners with no gardening experience who live in apartments or homes with limited outdoor space, interested in growing fresh herbs, vegetables, and fruits.',
-  keyTakeaways: 'Readers will understand that productive gardening is possible in small urban spaces, learn about container and vertical gardening basics, and feel motivated to start their own urban garden.'
-};
-
-/**
- * ✅ COMPLETE AUTHORING JOURNEY E2E TEST
- * This test suite validates the complete user workflow from book creation through
- * draft generation. All features are now implemented and tests are enabled.
- *
- * Note: Runs with BYPASS_AUTH=true for CI/CD compatibility.
- */
-test.describe('Complete Authoring Journey E2E', () => {
-  test.setTimeout(TEST_TIMEOUT);
-
-  // SKIP: the Interview Questions / Chapter Editor tabs and their data-tab
-  // selectors are now wired into the live editor (#110). This full journey still
-  // requires real AI (generate-questions + generate-draft), which the CI E2E job
-  // cannot run (no OpenAI key), and the step waits below use fixed timeouts.
-  // Un-skip once the AI calls are keyed or route-mocked. Deterministic tab
-  // coverage lives in chapter-questions-tabs.spec.ts.
-  test.skip('user can create book, generate TOC, add chapters, answer questions, and generate draft', async ({ page }) => {
-    let bookId: string;
-    let chapterId: string;
-
-    // =================================================================
-    // Step 1: Navigate to application and authenticate
-    // =================================================================
-    await test.step('Navigate and authenticate', async () => {
-      // Navigate to the application root
-      await page.goto('/');
-
-      // Wait for better-auth authentication to complete
-      // In development mode with BYPASS_AUTH, authentication is skipped
-      await page.waitForLoadState('networkidle');
-
-      // Verify we're on the dashboard or login page
-      const currentUrl = page.url();
-      console.log(`✓ Loaded application: ${currentUrl}`);
-    });
-
-    // =================================================================
-    // Step 2: Create a new book with metadata
-    // =================================================================
-    bookId = await test.step('Create new book with metadata', async () => {
-      // Navigate to dashboard if not already there
-      await page.goto('/dashboard');
-      await page.waitForLoadState('networkidle');
-
-      // Click "Create New Book" button (various possible button texts)
-      const createButton = page.getByRole('button', {
-        name: /create.*book|new book|add book/i
-      });
-      await createButton.click();
-
-      // Wait for book creation form/modal to appear
-      await waitForCondition(
-        async () => {
-          const titleField = await page.getByLabel(/title/i).isVisible();
-          return titleField;
-        },
-        {
-          timeout: 10000,
-          timeoutMessage: 'Book creation form did not appear'
-        }
-      );
-
-      // Fill in book metadata
-      await page.getByLabel(/title/i).fill(TEST_BOOK_DATA.title);
-
-      // Select genre from dropdown
-      const genreField = page.getByLabel(/genre/i);
-      await genreField.click();
-      await page.getByRole('option', { name: TEST_BOOK_DATA.genre }).click();
-
-      // Fill target audience
-      await page.getByLabel(/target audience|audience/i).fill(TEST_BOOK_DATA.targetAudience);
-
-      // Fill summary/description
-      const summaryField = page.getByLabel(/summary|description/i);
-      await summaryField.fill(TEST_BOOK_DATA.summary);
-
-      // Submit the book creation form
-      const submitButton = page.getByRole('button', {
-        name: /create book|save|submit/i
-      });
-      await submitButton.click();
-
-      // Wait for navigation to book detail page or dashboard with new book
-      await waitForCondition(
-        async () => {
-          const url = page.url();
-          // Should contain book ID in URL or show success message
-          return url.includes('/books/') ||
-                 await page.getByText(TEST_BOOK_DATA.title).isVisible();
-        },
-        {
-          timeout: 15000,
-          timeoutMessage: 'Book creation did not complete'
-        }
-      );
-
-      // Extract book ID from URL
-      const url = page.url();
-      const bookIdMatch = url.match(/books\/([a-zA-Z0-9-]+)/);
-      const extractedBookId = bookIdMatch?.[1];
-
-      expect(extractedBookId).toBeTruthy();
-      console.log(`✓ Book created with ID: ${extractedBookId}`);
-
-      return extractedBookId!;
-    });
-
-    // =================================================================
-    // Step 3: Generate Table of Contents using AI wizard
-    // =================================================================
-    await test.step('Generate TOC with AI wizard', async () => {
-      // Navigate to TOC generation page
-      await page.goto(`/dashboard/books/${bookId}/generate-toc`);
-      await page.waitForLoadState('networkidle');
-
-      // Look for "Generate TOC" or similar button
-      const generateTocButton = page.getByRole('button', {
-        name: /generate.*toc|generate.*table|create chapters/i
-      });
-
-      // Click to start AI generation
-      await generateTocButton.click();
-
-      // Wait for AI to generate TOC
-      // This may show a loading state, then results
-      await waitForCondition(
-        async () => {
-          // Look for chapter list or success message
-          const chapterList = await page.locator('[data-testid="chapter-list"]').isVisible();
-          const tocGenerated = await page.getByText(/chapter.*:/i).first().isVisible();
-          return chapterList || tocGenerated;
-        },
-        {
-          timeout: AI_OPERATION_TIMEOUT,
-          timeoutMessage: 'AI TOC generation did not complete'
-        }
-      );
-
-      // Verify chapters were generated
-      const chapterElements = await page.locator('text=/chapter \\d+/i').count();
-      expect(chapterElements).toBeGreaterThan(0);
-
-      console.log(`✓ TOC generated with ${chapterElements} chapters`);
-
-      // Save/confirm the TOC
-      const saveTocButton = page.getByRole('button', {
-        name: /save.*toc|confirm|accept|continue/i
-      });
-      await saveTocButton.click();
-
-      // Wait for navigation or success message
-      await page.waitForLoadState('networkidle');
-    });
-
-    // =================================================================
-    // Step 4: Add/navigate to first chapter from TOC
-    // =================================================================
-    chapterId = await test.step('Navigate to first chapter', async () => {
-      // Navigate to the tabbed book page (the real chapter interface; the old
-      // standalone /chapters mock route was removed in #193)
-      await page.goto(`/dashboard/books/${bookId}`);
-      await page.waitForLoadState('networkidle');
-
-      // Open the first chapter from the sidebar tab list. The inner editor tab
-      // triggers also carry data-testid="chapter-tab", so scope to the sidebar
-      // tabs (no data-tab) — same pattern as chapter-questions-tabs.spec.ts.
-      const firstChapter = page.locator('[data-testid="chapter-tab"]:not([data-tab])').first();
-      await firstChapter.waitFor({ state: 'visible', timeout: 10000 });
-      await firstChapter.click();
-
-      // Wait for the chapter editor to mount (tab clicks don't change the URL)
-      await waitForCondition(
-        async () => {
-          return await page
-            .getByRole('tablist', { name: /chapter editor view/i })
-            .isVisible()
-            .catch(() => false);
-        },
-        {
-          timeout: 10000,
-          timeoutMessage: 'Chapter editor did not load'
-        }
-      );
-
-      // Extract chapter ID from the tab's draggable wrapper (react-beautiful-dnd
-      // stamps the chapter id as data-rfd-draggable-id)
-      const extractedChapterId = await firstChapter.evaluate((el) =>
-        el.closest('[data-rfd-draggable-id]')?.getAttribute('data-rfd-draggable-id') ?? null
-      );
-
-      expect(extractedChapterId).toBeTruthy();
-      console.log(`✓ Navigated to chapter ID: ${extractedChapterId}`);
-
-      return extractedChapterId!;
-    });
-
-    // =================================================================
-    // Step 5: Generate and answer questions for chapter
-    // =================================================================
-    await test.step('Generate and answer chapter questions', async () => {
-      // Look for "Questions" tab or "Generate Questions" button
-      const questionsTab = page.locator('[data-testid="chapter-tab"][data-tab="questions"]');
-      const questionsTabExists = await questionsTab.count() > 0;
-
-      if (questionsTabExists) {
-        await questionsTab.click();
-      }
-
-      // Look for button to generate questions
-      const generateQuestionsButton = page.getByRole('button', {
-        name: /generate.*questions|interview questions/i
-      });
-
-      // If questions not yet generated, generate them
-      const needsGeneration = await generateQuestionsButton.isVisible().catch(() => false);
-
-      if (needsGeneration) {
-        await generateQuestionsButton.click();
-
-        // Wait for AI to generate questions
-        await waitForCondition(
-          async () => {
-            const questionText = await page.locator('text=/what|who|how|describe/i').first().isVisible();
-            return questionText;
-          },
-          {
-            timeout: AI_OPERATION_TIMEOUT,
-            timeoutMessage: 'Question generation did not complete'
-          }
-        );
-
-        console.log('✓ Questions generated');
-      }
-
-      // Wait for question interface to be ready
-      await page.waitForSelector('[role="textbox"]', { timeout: 10000 });
-
-      // Answer first question
-      const firstQuestionField = page.locator('[role="textbox"]').first();
-      await firstQuestionField.click();
-      await firstQuestionField.fill(CHAPTER_QA_RESPONSES.mainTopics);
-
-      console.log('✓ Answered first question');
-
-      // Move to next question if "Next" button exists
-      const nextButton = page.getByRole('button', { name: /next/i });
-      const hasNextButton = await nextButton.isVisible().catch(() => false);
-
-      if (hasNextButton) {
-        await nextButton.click();
-
-        // Wait for next question to appear
-        await page.waitForTimeout(1000);
-
-        // Answer second question
-        const secondQuestionField = page.locator('[role="textbox"]').first();
-        await secondQuestionField.click();
-        await secondQuestionField.fill(CHAPTER_QA_RESPONSES.targetReaders);
-
-        console.log('✓ Answered second question');
-
-        // Move to third question if available
-        const hasAnotherNext = await nextButton.isVisible().catch(() => false);
-        if (hasAnotherNext) {
-          await nextButton.click();
-          await page.waitForTimeout(1000);
-
-          // Answer third question
-          const thirdQuestionField = page.locator('[role="textbox"]').first();
-          await thirdQuestionField.click();
-          await thirdQuestionField.fill(CHAPTER_QA_RESPONSES.keyTakeaways);
-
-          console.log('✓ Answered third question');
-        }
-      }
-
-      // Wait for auto-save (3 seconds debounce + network time)
-      await page.waitForTimeout(5000);
-
-      // Look for saved indicator
-      const savedIndicator = page.locator('text=/saved|✓/i').first();
-      const isSaved = await savedIndicator.isVisible().catch(() => false);
-
-      if (isSaved) {
-        console.log('✓ Responses auto-saved');
-      }
-    });
-
-    // =================================================================
-    // Step 6: Generate draft content from Q&A
-    // =================================================================
-    await test.step('Generate draft from Q&A responses', async () => {
-      // Look for "Generate Draft" or similar button
-      const generateDraftButton = page.getByRole('button', {
-        name: /generate.*draft|create draft|ai draft/i
-      });
-
-      // Wait for button to be available (may need to scroll or wait for completion indicator)
-      await waitForCondition(
-        async () => {
-          return await generateDraftButton.isVisible();
-        },
-        {
-          timeout: 10000,
-          timeoutMessage: 'Generate Draft button not found'
-        }
-      );
-
-      await generateDraftButton.click();
-
-      // Wait for AI to generate draft content
-      // This is the longest operation - may take 30-60 seconds
-      await waitForCondition(
-        async () => {
-          // Look for draft content in editor
-          const draftContent = await page.locator('[data-testid="draft-content"]').isVisible();
-          const editorContent = await page.locator('.tiptap').isVisible();
-          const contentArea = await page.locator('[role="textbox"]').first().textContent();
-
-          return draftContent || editorContent || (contentArea && contentArea.length > 100);
-        },
-        {
-          timeout: AI_OPERATION_TIMEOUT,
-          timeoutMessage: 'Draft generation did not complete'
-        }
-      );
-
-      console.log('✓ Draft content generated');
-    });
-
-    // =================================================================
-    // Step 7: Verify draft appears in editor
-    // =================================================================
-    await test.step('Verify draft content in editor', async () => {
-      // Switch to Draft tab if not already there
-      const draftTab = page.locator('[data-testid="chapter-tab"][data-tab="draft"]');
-      const draftTabExists = await draftTab.count() > 0;
-
-      if (draftTabExists) {
-        await draftTab.click();
-        await page.waitForTimeout(1000);
-      }
-
-      // Verify editor has content
-      const editorContent = await page.locator('.tiptap').first();
-      const contentExists = await editorContent.isVisible();
-
-      expect(contentExists).toBeTruthy();
-
-      // Get the actual draft text
-      const draftText = await editorContent.textContent();
-
-      // Verify draft has substantial content
-      expect(draftText).toBeTruthy();
-      expect(draftText!.length).toBeGreaterThan(200);
-
-      console.log(`✓ Draft verified - ${draftText!.length} characters`);
-
-      // Verify draft relates to our book topic (should mention gardening or urban)
-      const isRelevant =
-        draftText!.toLowerCase().includes('garden') ||
-        draftText!.toLowerCase().includes('urban') ||
-        draftText!.toLowerCase().includes('grow') ||
-        draftText!.toLowerCase().includes('space');
-
-      expect(isRelevant).toBeTruthy();
-
-      console.log('✓ Draft content is relevant to book topic');
-    });
-
-    // =================================================================
-    // Step 8: Complete workflow verification
-    // =================================================================
-    await test.step('Verify complete authoring journey', async () => {
-      // Navigate back to book overview
-      await page.goto(`/dashboard/books/${bookId}`);
-      await page.waitForLoadState('networkidle');
-
-      // Verify book exists with correct title
-      const bookTitle = await page.getByText(TEST_BOOK_DATA.title).isVisible();
-      expect(bookTitle).toBeTruthy();
-
-      console.log('✅ COMPLETE AUTHORING JOURNEY TEST PASSED');
-      console.log('='.repeat(60));
-      console.log(`📚 Book Created: ${TEST_BOOK_DATA.title}`);
-      console.log(`🆔 Book ID: ${bookId}`);
-      console.log(`📑 Chapter ID: ${chapterId}`);
-      console.log(`✍️  Questions Answered: 3+`);
-      console.log(`📝 Draft Generated: Yes`);
-      console.log('='.repeat(60));
-    });
-
-    // =================================================================
-    // Optional: Cleanup (commented out by default to preserve test data)
-    // =================================================================
-    // await test.step('Cleanup test data', async () => {
-    //   // Delete the test book to keep the system clean
-    //   await page.goto(`/dashboard/books/${bookId}`);
-    //   const deleteButton = page.getByRole('button', { name: /delete/i });
-    //   await deleteButton.click();
-    //
-    //   // Type exact title to confirm deletion
-    //   const confirmInput = page.getByPlaceholder(/type.*title/i);
-    //   await confirmInput.fill(TEST_BOOK_DATA.title);
-    //
-    //   // Confirm deletion
-    //   const confirmButton = page.getByRole('button', { name: /delete.*book/i });
-    //   await confirmButton.click();
-    //
-    //   console.log('✓ Test data cleaned up');
-    // });
-  });
-
-  // =================================================================
-  // Additional edge case tests
-  // =================================================================
-
-  test('handles errors gracefully during AI operations', async ({ page }) => {
-    // This test would validate error recovery mechanisms
-    // Skipped for now as it requires mocking AI service failures
-    test.skip();
-  });
-
-  test('preserves progress across browser refresh', async ({ page, context }) => {
-    // This test would validate session recovery and auto-save
-    // Skipped for now as it requires more complex multi-page setup
-    test.skip();
-  });
+const CLARIFYING_QUESTIONS = [
+  'Who is the primary audience for this book?',
+  'What are the three most important topics to cover?',
+  'What should readers be able to do after finishing the book?',
+];
+
+const CLARIFYING_ANSWERS = [
+  'Beginners with no gardening experience living in apartments with limited outdoor space.',
+  'Container gardening, vertical growing techniques, and seasonal planning for small spaces.',
+  'Plan, plant, and maintain a productive garden in any small urban space.',
+];
+
+const TOC_CHAPTERS = [
+  { id: 'toc-ch-1', title: 'Why Urban Gardening Matters', description: 'The case for growing food in cities.', level: 1, order: 0, subchapters: [] },
+  { id: 'toc-ch-2', title: 'Container Gardening Fundamentals', description: 'Soil, drainage, and choosing containers.', level: 1, order: 1, subchapters: [] },
+  { id: 'toc-ch-3', title: 'Vertical Growing Techniques', description: 'Trellises, towers, and wall planters.', level: 1, order: 2, subchapters: [] },
+];
+
+const CHAPTER_QUESTIONS = [
+  'What are the main topics this chapter will introduce?',
+  'Who are the target readers for this chapter?',
+  'What key takeaways should readers leave with?',
+].map((text, i) => ({
+  id: `e2e-q-${i + 1}`,
+  chapter_id: 'e2e-chapter',
+  question_text: text,
+  question_type: 'research',
+  difficulty: 'medium',
+  category: 'content',
+  order: i,
+  generated_at: '2026-07-13T00:00:00Z',
+  metadata: { suggested_response_length: '2-3 paragraphs' },
+}));
+
+const CHAPTER_ANSWERS = [
+  'This chapter introduces the benefits of urban gardening and space-efficient growing methods.',
+  'Beginners in apartments who want to grow fresh herbs, vegetables, and fruits at home.',
+  'Productive gardening is possible in small urban spaces with the right containers and planning.',
+];
+
+const DRAFT_HTML =
+  '<p>Urban gardening transforms even the smallest city space into a productive source of fresh food. ' +
+  'This chapter explores how container gardening and vertical growing let apartment dwellers grow herbs, ' +
+  'vegetables, and fruits year-round, and why the movement matters for sustainable city living.</p>';
+
+const json = (body: unknown) => ({
+  status: 200,
+  contentType: 'application/json',
+  body: JSON.stringify(body),
 });
 
 /**
- * Test Coverage Summary:
- *
- * ✅ User Authentication (better-auth integration with BYPASS_AUTH support)
- * ✅ Book Creation (metadata input and validation)
- * ✅ AI TOC Generation (OpenAI integration)
- * ✅ Chapter Navigation (UI routing)
- * ✅ Question Generation (AI-powered Q&A)
- * ✅ Question Answering (user input and auto-save)
- * ✅ Draft Generation (AI content creation from Q&A)
- * ✅ Draft Display (rich text editor integration)
- * ✅ End-to-End Workflow (complete user journey)
- *
- * Test Characteristics:
- * - Uses condition-based waiting (no fixed timeouts)
- * - Realistic test data (actual book concept)
- * - Comprehensive assertions at each step
- * - Detailed logging for debugging
- * - Follows Playwright best practices
- * - Integrates with existing E2E structure
- *
- * Assumptions & Limitations:
- * 1. Authentication: Assumes BYPASS_AUTH=true for E2E testing or better-auth test account
- * 2. AI Services: Requires real OpenAI API access (not mocked)
- * 3. Execution Time: Full test takes 2-3 minutes due to AI operations
- * 4. Data-TestIDs: Some selectors use role/text as data-testid may not be available
- * 5. Browser Setup: Requires Playwright browsers to be installed
- *
- * Verification Approach:
- * - Can be run locally with `NEXT_PUBLIC_BYPASS_AUTH=true npx playwright test complete-authoring-journey`
- * - Requires backend server running at http://localhost:3000
- * - Test will create real data (optional cleanup step provided)
- * - Visual verification available via Playwright trace viewer
- *
- * Next Steps:
- * - Add data-testid attributes to components for more reliable selectors
- * - Implement error recovery tests with mocked failures
- * - Add session persistence test with page reload
- * - Create mobile-specific test variant
+ * Mock every AI endpoint plus a stateful chapter-question store.
+ * Everything else goes to the real backend.
  */
+async function mockAiEndpoints(page: Page) {
+  // Summary analysis (AI): the wizard ignores the payload; a 200 keeps the
+  // readiness path on the deterministic word/char check without console noise.
+  await page.route('**/books/*/analyze-summary', (route) =>
+    route.fulfill(json({ success: true }))
+  );
+
+  // Book-level clarifying questions (AI).
+  await page.route('**/books/*/generate-questions', (route) =>
+    route.fulfill(json({ questions: CLARIFYING_QUESTIONS }))
+  );
+
+  // TOC generation (AI). The wizard's Accept persists this via the real PUT /toc.
+  await page.route('**/books/*/generate-toc', (route) =>
+    route.fulfill(
+      json({
+        toc: {
+          chapters: TOC_CHAPTERS,
+          total_chapters: TOC_CHAPTERS.length,
+          estimated_pages: 120,
+          structure_notes: 'Deterministic e2e TOC',
+        },
+        success: true,
+        chapters_count: TOC_CHAPTERS.length,
+        has_subchapters: false,
+      })
+    )
+  );
+
+  // --- Stateful chapter-question store -----------------------------------
+  let questionsGenerated = false;
+  const savedResponses = new Map<string, { response_text: string; status: string }>();
+
+  const questionWithStatus = (q: (typeof CHAPTER_QUESTIONS)[number]) => ({
+    ...q,
+    has_response: savedResponses.has(q.id),
+    response_status: savedResponses.get(q.id)?.status,
+  });
+
+  const progressBody = () => {
+    const completed = [...savedResponses.values()].filter((r) => r.status === 'completed').length;
+    const inProgress = [...savedResponses.values()].filter((r) => r.status === 'draft').length;
+    const total = questionsGenerated ? CHAPTER_QUESTIONS.length : 0;
+    return {
+      total,
+      completed,
+      in_progress: inProgress,
+      progress: total > 0 ? completed / total : 0,
+      status: completed === 0 ? 'not-started' : completed === total ? 'completed' : 'in-progress',
+    };
+  };
+
+  const responseBody = (questionId: string) => {
+    const saved = savedResponses.get(questionId);
+    if (!saved) return { response: null, has_response: false, success: true };
+    return {
+      response: {
+        id: `resp-${questionId}`,
+        question_id: questionId,
+        response_text: saved.response_text,
+        word_count: saved.response_text.split(/\s+/).length,
+        status: saved.status,
+        created_at: '2026-07-13T00:00:00Z',
+        updated_at: '2026-07-13T00:00:00Z',
+        last_edited_at: '2026-07-13T00:00:00Z',
+        metadata: { edit_history: [] },
+      },
+      has_response: true,
+      success: true,
+    };
+  };
+
+  // Chapter question generation (AI).
+  await page.route('**/books/*/chapters/*/generate-questions', (route) => {
+    questionsGenerated = true;
+    return route.fulfill(
+      json({
+        questions: CHAPTER_QUESTIONS.map(questionWithStatus),
+        generation_id: 'e2e-generation-1',
+        total: CHAPTER_QUESTIONS.length,
+      })
+    );
+  });
+
+  // Question list (query string → URL predicate instead of a glob).
+  await page.route(
+    (url) => url.pathname.endsWith('/questions') && url.pathname.includes('/chapters/'),
+    (route) =>
+      route.fulfill(
+        json({
+          questions: questionsGenerated ? CHAPTER_QUESTIONS.map(questionWithStatus) : [],
+          total: questionsGenerated ? CHAPTER_QUESTIONS.length : 0,
+          page: 1,
+          pages: 1,
+        })
+      )
+  );
+
+  // Per-question response save/load (PUT stores, GET serves what was stored —
+  // QuestionDisplay's save verification reads it back).
+  await page.route(
+    (url) => /\/questions\/[^/]+\/response$/.test(url.pathname),
+    (route: Route) => {
+      const questionId = route.request().url().match(/\/questions\/([^/]+)\/response/)![1];
+      if (route.request().method() === 'PUT') {
+        const body = route.request().postDataJSON() as { response_text: string; status: string };
+        savedResponses.set(questionId, body);
+        return route.fulfill(
+          json({ ...responseBody(questionId), message: 'Response saved' })
+        );
+      }
+      return route.fulfill(json(responseBody(questionId)));
+    }
+  );
+
+  // Progress summary.
+  await page.route('**/books/*/chapters/*/question-progress', (route) =>
+    route.fulfill(json(progressBody()))
+  );
+
+  // Draft generation (AI).
+  await page.route('**/books/*/chapters/*/generate-draft', (route) =>
+    route.fulfill(
+      json({
+        success: true,
+        draft: DRAFT_HTML,
+        metadata: {
+          word_count: 52,
+          estimated_reading_time: 1,
+          generated_at: '2026-07-13 00:00:00',
+          model_used: 'gpt-4',
+          writing_style: 'conversational',
+          target_length: 2000,
+          actual_length: 52,
+        },
+        suggestions: ['Add a concrete example of a balcony garden.'],
+        message: 'Draft generated',
+      })
+    )
+  );
+}
+
+test.describe('Complete Authoring Journey E2E', () => {
+  test.setTimeout(120000);
+
+  let bookId: string | undefined;
+
+  test.afterEach(async ({ page }) => {
+    if (bookId) await deleteTestBook(page, bookId);
+  });
+
+  test('user can create a book, generate a TOC, answer chapter questions, and land an AI draft in the editor', async ({ page }) => {
+    await mockAiEndpoints(page);
+
+    // ----- Step 1: create the book (real backend) -----
+    await test.step('Create book with metadata', async () => {
+      await page.goto('/dashboard/new-book');
+      await page.getByLabel(/book title/i).fill(TEST_BOOK.title);
+      await page.getByLabel(/description/i).fill(TEST_BOOK.description);
+      await page.getByLabel(/genre/i).selectOption(TEST_BOOK.genre);
+      await page.getByLabel(/target audience/i).fill(TEST_BOOK.targetAudience);
+      await page.getByRole('button', { name: 'Create Book' }).click();
+
+      await page.waitForURL(/\/dashboard\/books\/[^/]+$/);
+      bookId = page.url().match(/books\/([a-zA-Z0-9-]+)/)![1];
+      expect(bookId).toBeTruthy();
+    });
+
+    // ----- Step 2: write the summary (real backend) -----
+    await test.step('Write and save the book summary', async () => {
+      await page.goto(`/dashboard/books/${bookId}/summary`);
+
+      // The page's mount fetch overwrites the field when it resolves, so a
+      // single fill() can be clobbered — re-fill until the submit enables
+      // (the #105 fill-race idiom from the staging helpers).
+      const continueButton = page.getByRole('button', { name: 'Continue to TOC Generation' });
+      await expect(async () => {
+        await page.getByLabel('Book Summary').fill(TEST_BOOK.summary);
+        await continueButton.click({ timeout: 2000 });
+        await page.waitForURL('**/generate-toc', { timeout: 5000 });
+      }).toPass({ timeout: 30000 });
+    });
+
+    // ----- Step 3: TOC wizard (mocked AI, real persistence on Accept) -----
+    await test.step('Answer clarifying questions and generate the TOC', async () => {
+      // Wizard auto-runs readiness (real, deterministic) then loads the
+      // mocked clarifying questions.
+      await expect(page.getByText(CLARIFYING_QUESTIONS[0])).toBeVisible({ timeout: 15000 });
+
+      for (let i = 0; i < CLARIFYING_QUESTIONS.length; i++) {
+        await expect(page.getByText(CLARIFYING_QUESTIONS[i])).toBeVisible();
+        await page.getByPlaceholder('Type your answer here...').fill(CLARIFYING_ANSWERS[i]);
+        if (i < CLARIFYING_QUESTIONS.length - 1) {
+          await page.getByRole('button', { name: 'Next', exact: true }).click();
+        }
+      }
+
+      await page.getByRole('button', { name: 'Generate Table of Contents' }).click();
+
+      // Review step shows the mocked chapters.
+      await expect(page.getByText(TOC_CHAPTERS[0].title)).toBeVisible({ timeout: 15000 });
+      await expect(page.getByText(TOC_CHAPTERS[2].title)).toBeVisible();
+
+      // Accept persists via the real PUT /books/{id}/toc, then navigates.
+      await page.getByRole('button', { name: /accept & continue/i }).click();
+      await page.waitForURL('**/edit-toc');
+    });
+
+    // ----- Step 4: TOC really persisted (backend evidence) -----
+    let chapterCount = 0;
+    await test.step('Verify the TOC persisted on the backend', async () => {
+      const response = await page.request.get(`${API_BASE_URL}/books/${bookId}/toc`);
+      expect(response.ok()).toBe(true);
+      const body = await response.json();
+      const titles = (body.toc?.chapters ?? []).map((c: { title: string }) => c.title);
+      expect(titles).toEqual(TOC_CHAPTERS.map((c) => c.title));
+      chapterCount = titles.length;
+    });
+
+    // ----- Step 5: open the first chapter's Interview Questions tab -----
+    await test.step('Open the first chapter and its questions tab', async () => {
+      await page.goto(`/dashboard/books/${bookId}`);
+
+      const sidebarTabs = page.locator('[data-testid="chapter-tab"]:not([data-tab])');
+      await expect(sidebarTabs).toHaveCount(chapterCount);
+      await sidebarTabs.first().click();
+      await expect(page.getByRole('tablist', { name: /chapter editor view/i })).toBeVisible();
+
+      await page.locator('[data-testid="chapter-tab"][data-tab="questions"]').click();
+      // No questions exist yet, so the tab shows the generator empty state.
+      await expect(
+        page.getByRole('button', { name: 'Generate Interview Questions' })
+      ).toBeVisible();
+    });
+
+    // ----- Step 6: generate questions (mocked AI), answer and complete all 3 -----
+    await test.step('Generate and answer interview questions', async () => {
+      await page.getByRole('button', { name: 'Generate Interview Questions' }).click();
+      await expect(page.getByText(CHAPTER_QUESTIONS[0].question_text)).toBeVisible();
+
+      for (let i = 0; i < CHAPTER_QUESTIONS.length; i++) {
+        await expect(page.getByText(CHAPTER_QUESTIONS[i].question_text)).toBeVisible();
+        await page
+          .getByPlaceholder('Type your response here or use voice input...')
+          .fill(CHAPTER_ANSWERS[i]);
+        await page.getByRole('button', { name: 'Complete Response' }).click();
+        // Completed state replaces the action buttons.
+        await expect(page.getByRole('button', { name: 'Edit Response' })).toBeVisible();
+
+        if (i < CHAPTER_QUESTIONS.length - 1) {
+          await page.getByRole('button', { name: /^next$/i }).click();
+        }
+      }
+
+      await expect(page.getByText(/ready to generate draft/i)).toBeVisible();
+    });
+
+    // ----- Step 7: generate the draft (mocked AI) and apply it -----
+    await test.step('Generate a draft from the answers and use it', async () => {
+      await page.getByRole('button', { name: 'Generate Draft from Answers' }).click();
+      await page.getByRole('button', { name: 'Generate Draft', exact: true }).click();
+
+      await expect(page.getByText(/urban gardening transforms/i)).toBeVisible({ timeout: 15000 });
+      await page.getByRole('button', { name: 'Use This Draft' }).click();
+
+      // "Use This Draft" switches to the editor view with the draft inserted.
+      await expect(page.locator('.tiptap')).toContainText(
+        'Urban gardening transforms even the smallest city space'
+      );
+    });
+
+    // ----- Step 8: the inserted draft autosaves to the real backend -----
+    await test.step('Verify the draft autosaved to the backend', async () => {
+      await page.waitForResponse(
+        (r) => r.request().method() === 'PATCH' && r.url().includes('/content') && r.ok(),
+        { timeout: 15000 }
+      );
+
+      const chapters = (await (await page.request.get(`${API_BASE_URL}/books/${bookId}/toc`)).json())
+        .toc.chapters as Array<{ id: string }>;
+      const contentResponse = await page.request.get(
+        `${API_BASE_URL}/books/${bookId}/chapters/${chapters[0].id}/content`
+      );
+      expect(contentResponse.ok()).toBe(true);
+      const content = await contentResponse.json();
+      expect(content.content).toContain('Urban gardening transforms even the smallest city space');
+    });
+  });
+});
