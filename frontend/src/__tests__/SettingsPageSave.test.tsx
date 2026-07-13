@@ -213,7 +213,7 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('shows all five notification toggles on the Notifications tab', async () => {
+  it('shows all five notification toggles disabled as "coming soon" (#195)', async () => {
     const user = userEvent.setup();
     mockAuthFetch.mockResolvedValue(
       loadedProfile({ email_notifications: false, writing_reminders: true })
@@ -225,11 +225,27 @@ describe('SettingsPage', () => {
     );
     await user.click(screen.getByRole('tab', { name: /notifications/i }));
 
+    // No delivery infrastructure exists — the section is gated (#195)
+    expect(screen.getByText('Coming soon')).toBeInTheDocument();
+    expect(screen.getByText(/delivery isn't available yet/i)).toBeInTheDocument();
+
+    // Stored values still render (the stored contract is preserved)…
     expect(screen.getByLabelText('Email Notifications')).not.toBeChecked();
     expect(screen.getByLabelText('Marketing Emails')).not.toBeChecked();
     expect(screen.getByLabelText('Writing Reminders')).toBeChecked();
     expect(screen.getByLabelText('Progress Updates')).toBeChecked();
     expect(screen.getByLabelText('Backup Notifications')).toBeChecked();
+
+    // …but every switch is inert.
+    for (const label of [
+      'Email Notifications',
+      'Marketing Emails',
+      'Writing Reminders',
+      'Progress Updates',
+      'Backup Notifications',
+    ]) {
+      expect(screen.getByLabelText(label)).toBeDisabled();
+    }
   });
 
   it('renders security sections without the shared Save button', async () => {

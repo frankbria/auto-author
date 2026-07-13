@@ -93,9 +93,11 @@ test.describe('Account settings (issue #64)', () => {
     await styleSelect.selectOption('technical');
     await page.locator('#auto-save-interval').fill('15');
 
-    // Notification toggle on another tab is part of the same save payload
+    // Notifications tab is gated "coming soon" — no delivery infra exists (#195)
     await page.getByRole('tab', { name: /notifications/i }).click();
-    await page.locator('#notification-writing_reminders').click();
+    await expect(page.getByText('Coming soon')).toBeVisible();
+    await expect(page.locator('#notification-writing_reminders')).toBeDisabled();
+    await expect(page.locator('#notification-email_notifications')).toBeDisabled();
 
     await page.getByRole('button', { name: /save settings/i }).click();
 
@@ -103,8 +105,8 @@ test.describe('Account settings (issue #64)', () => {
     const prefs = (patched! as { preferences: Record<string, unknown> }).preferences;
     expect(prefs.default_writing_style).toBe('technical');
     expect(prefs.auto_save_interval).toBe(15);
-    expect(prefs.writing_reminders).toBe(true);
-    // Untouched stored values survive the merge
+    // Untouched stored values survive the merge — incl. the gated notification flags
+    expect(prefs.writing_reminders).toBe(false);
     expect(prefs.default_export_format).toBe('epub');
     expect(prefs.marketing_emails).toBe(false);
     await expect(page.getByText('Settings saved')).toBeVisible();
