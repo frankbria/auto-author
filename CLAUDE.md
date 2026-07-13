@@ -465,7 +465,7 @@
 - **Documentation Automation**: Pre-commit hooks auto-sync CURRENT_SPRINT.md and IMPLEMENTATION_PLAN.md from bd tracker (local only - .beads/ is gitignored)
 
 ### 2025-11-01
-- **Session Management (NEW)**
+- **Session Management (NEW)** — ⚠️ removed as dead code in #196 (2026-07-12): the middleware gated on `request.state.user`, which nothing ever set, so none of the below ever functioned; session list/revoke is better-auth native
 - **Session Tracking**: Automatic session creation and activity monitoring
 - **Security Features**: Session fingerprinting, suspicious activity detection, concurrent session limits
 - **Session Timeouts**: 30-minute idle timeout, 12-hour absolute timeout
