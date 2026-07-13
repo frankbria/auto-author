@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSession } from '@/lib/auth-client';
-import useProfileApi from '@/hooks/useProfileApi';
+import useProfileApi, { type UserPreferences } from '@/hooks/useProfileApi';
+import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
 import { FormField } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,12 @@ export default function UserProfile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.image ?? null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Full preferences object from the server, merged with the three editable
+  // fields before every save — the backend $set-replaces the whole
+  // subdocument, so a partial payload wipes the Settings-page fields (#204).
+  const [preferences, setPreferences] = useState<Partial<UserPreferences>>({});
+  // Saving is disabled until preferences load, so a failed load can't wipe them.
+  const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading');
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -81,10 +88,21 @@ export default function UserProfile() {
 
     let cancelled = false;
     const loadProfile = async () => {
-      if (!getUserProfile) return;
+      if (!getUserProfile) {
+        // Test-only path (the hook is always present in production): treat as
+        // loaded so the form stays usable in suites that don't mock it.
+        setLoadState('loaded');
+        return;
+      }
       try {
         const p = await getUserProfile();
-        if (cancelled || form.formState.isDirty) return;
+        if (cancelled) return;
+        // Capture the full preferences before the dirty check — server prefs
+        // never clobber user input, and skipping this would let a save wipe
+        // them whenever the user starts typing before the fetch resolves.
+        setPreferences(p.preferences ?? {});
+        setLoadState('loaded');
+        if (form.formState.isDirty) return;
         form.reset({
           firstName: p.first_name ?? firstName,
           lastName: p.last_name ?? lastName,
@@ -100,7 +118,9 @@ export default function UserProfile() {
         });
         if (p.avatar_url) setAvatarUrl(p.avatar_url);
       } catch {
-        /* keep session-seeded defaults */
+        // Keep session-seeded defaults, but block saving — with no loaded
+        // preferences a save would $set-replace the stored subdocument.
+        if (!cancelled) setLoadState('error');
       }
     };
     loadProfile();
@@ -112,17 +132,20 @@ export default function UserProfile() {
 
   const onSubmit = async (values: ProfileFormValues) => {
     try {
-      await updateUserProfile({
+      const updated = await updateUserProfile({
         first_name: values.firstName,
         last_name: values.lastName,
         display_name: values.displayName,
         bio: values.bio,
         preferences: {
+          ...preferences,
           theme: values.theme,
           email_notifications: values.emailNotifications,
           marketing_emails: values.marketingEmails,
         },
       });
+      if (updated?.preferences) setPreferences(updated.preferences);
+      invalidateUserPreferencesCache(updated?.preferences ?? null);
       toast.success({ title: 'Profile updated', description: 'Your changes have been saved.' });
     } catch (err) {
       toast.error({
@@ -151,6 +174,11 @@ export default function UserProfile() {
 
   // Read validation errors off the public react-hook-form state.
   const errors = form.formState.errors;
+  // RHF's formState is a lazy Proxy: isDirty is only computed for fields read
+  // during render. The hydration effect's dirty-guard reads it in an async
+  // callback, so subscribe here or the guard would always see false and a
+  // slow fetch would clobber in-progress edits.
+  void form.formState.isDirty;
   const bioValue = (form.watch('bio') as string) ?? '';
 
   return (
@@ -300,11 +328,20 @@ export default function UserProfile() {
             />
           </section>
 
+          {loadState === 'error' && (
+            <p role="alert" className="text-destructive text-sm">
+              Couldn&apos;t load your current preferences. Saving is disabled to avoid
+              overwriting them.
+            </p>
+          )}
+
           <div className="flex items-center justify-between">
             <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
               Delete Account
             </Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" disabled={loadState !== 'loaded'}>
+              {loadState === 'loading' ? 'Loading…' : 'Save Changes'}
+            </Button>
           </div>
         </form>
 
