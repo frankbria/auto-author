@@ -31,6 +31,9 @@
 ## Recent Changes
 
 ### 2026-07-12 (latest)
+- **Dead 'Session Management' subsystem removed (#196, P2.4, security/reliability)**: full-stack deletion, PR #282. The advertised feature (idle/absolute timeouts, expiry warnings, suspicious-activity detection — listed Production Ready) never worked: `SessionMiddleware` gated on `request.state.user`, which nothing ever set (auth is a FastAPI dependency), so `/api/v1/sessions/*` was dead (`current` 404'd for authenticated users, `list` always `[]`) and the frontend `useSession` hook polled it for nothing. Took the AC's **remove** branch per the CodeRabbit plan (real session list/revoke is better-auth native via `ActiveSessionsList`): deleted the whole `app/api/middleware/` package, `/sessions` router, `session_service`, `db/session`, `models/session`, their 5 test files, and the never-mounted `hooks/useSession.ts` + `SessionWarning.tsx`; plan adaptations — also removed the dead `sessions_collection` from `db/base.py` + the conftest rebind (plan missed both). Regression test `test_sessions_removed.py` RED-verified (main served `/sessions/list` 200). Reviews: opencode (GLM) occupied both rounds (foreign-cwd delegation, the documented hang condition) → **codex fallback pre-PR ("no remaining live code paths") + post-PR fresh session (1 Minor: stale CLAUDE.md changelog advertisement — fixed by annotation)**. Demo (`docs/demos/2026-07-12-issue-196-remove-dead-sessions.md`, showboat verify green exit 0): two real uvicorn servers + real Mongo + one genuinely seeded better-auth session — main answers the authenticated user "No active session found" while advertising 6 OpenAPI session paths vs branch route-level 404 + zero paths; middleware stack diff shown live. Backend **1111 passed / 13 skipped, 91.81% cov**; frontend **115 suites, 2109 passed / 8 skipped**. NB the Mongo `sessions` collection on existing deployments is orphaned, not dropped (no migration needed).
+  - **Status**: ✅ Complete
+
 - **Notification toggles gated as disabled "Coming soon" (#195, P2.3, ux)**: frontend-only, PR #281. The Notifications settings tab rendered five interactive switches promising alerts (email, marketing, writing reminders, progress updates, backup) that persist to `UserPreferences` but nothing reads — the backend has zero delivery code (demo pins it: the only `writing_reminders` hits in `backend/app` are the model/schema field definitions; 0 smtp/send_email/notification_service hits). Fix per the CodeRabbit plan (both design choices pre-resolved: gate **all five** toggles; disable-in-place with the tab still visible): every `Switch` hard-disabled at the Radix root (blocks pointer/label/keyboard), "Coming soon" `Badge` beside the CardTitle, description now reads "Notification delivery isn't available yet. Your saved choices will apply once notifications launch." Stored contract preserved — checked values still render and round-trip unchanged through the shared save flow. **Plan adaptations**: skipped the optional Tooltip (Radix tooltips don't fire on disabled elements); removed the now-meaningless `disabled` prop from the component + its only callsite instead of keeping dead API. Reviews: opencode (GLM) hung twice (once occupied by a foreign-cwd delegation, once a 9-min silent timeout) → **codex fallback pre-PR + post-PR fresh sessions, both APPROVE with zero findings** (verified root-level disable semantics, other-tab saves can't drop the flags, tests strengthened not weakened). Demo (`docs/demos/2026-07-12-issue-195-notifications-coming-soon.md`, **showboat verify green, exit 0**): real backend + local Mongo + genuine better-auth signup, branch :3000 vs pristine main worktree :3001, same user — main lets the user flip+save Writing Reminders (false promise persisted to Mongo), branch shows the same stored `true` rendering on a disabled switch, a programmatic `.click()` leaves state `unchecked/disabled`, and an unrelated Writing-tab save round-trips every notification flag untouched. Tests: unit five-toggles test now pins badge + copy + all-disabled + stored-state rendering (RED-verified on old code); e2e merged-save flow asserts the gate and unchanged `writing_reminders` in the PATCH payload. Frontend **116 suites, 2120 passed / 8 skipped**.
   - **Status**: ✅ Complete
 
@@ -465,7 +468,7 @@
 - **Documentation Automation**: Pre-commit hooks auto-sync CURRENT_SPRINT.md and IMPLEMENTATION_PLAN.md from bd tracker (local only - .beads/ is gitignored)
 
 ### 2025-11-01
-- **Session Management (NEW)**
+- **Session Management (NEW)** — ⚠️ removed as dead code in #196 (2026-07-12): the middleware gated on `request.state.user`, which nothing ever set, so none of the below ever functioned; session list/revoke is better-auth native
 - **Session Tracking**: Automatic session creation and activity monitoring
 - **Security Features**: Session fingerprinting, suspicious activity detection, concurrent session limits
 - **Session Timeouts**: 30-minute idle timeout, 12-hour absolute timeout
@@ -609,8 +612,7 @@ npm run test:e2e:staging
 ## Key Features
 
 ### ✅ Production Ready
-- User authentication (better-auth with HS256 JWT verification)
-- **Session Management** (Activity tracking, security features, timeout handling)
+- User authentication (better-auth with HS256 JWT verification; session list/revoke via better-auth native APIs in Settings → Security)
 - Book CRUD operations with metadata
 - **Book Deletion UI** (Type-to-confirm with data loss warnings)
 - TOC generation with AI wizard

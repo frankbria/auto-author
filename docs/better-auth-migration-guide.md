@@ -400,7 +400,7 @@ The following Clerk-specific variables are no longer needed:
 **API Endpoints**:
 - ✅ `app/api/dependencies.py` - Authentication dependencies
 - ✅ `app/api/request_validation.py` - Removed Clerk CSP headers
-- ✅ `app/api/middleware/session_middleware.py` - Session handling
+- ✅ `app/api/middleware/session_middleware.py` - Session handling (later removed as dead code in #196)
 
 **Tests**:
 - ✅ `tests/test_core/test_security.py` - Updated for better-auth (21 tests passing)

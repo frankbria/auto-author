@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import users, webhooks, books, chapters, export, sessions, billing
+from app.api.endpoints import users, webhooks, books, chapters, export, billing
 
 # Main router
 router = APIRouter()
@@ -10,7 +10,6 @@ router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 router.include_router(books.router, prefix="/books", tags=["books"])
 router.include_router(chapters.router, prefix="/books", tags=["chapters"])
 router.include_router(export.router, tags=["export"])
-router.include_router(sessions.router, tags=["sessions"])
 router.include_router(billing.router, prefix="/billing", tags=["billing"])
 
 
