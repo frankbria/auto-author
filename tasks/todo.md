@@ -9,10 +9,10 @@
 2. **Extra regression pins** (cheap, direct AC evidence): (a) after a failed save with a non-retryable error, wait >3s real time → error banner still visible and `saveQuestionResponse` called exactly once (pins "auto-save suppressed after failure"); (b) typing after an error clears the banner and resets status (pins the resume path).
 
 ## Todo
-- [ ] Branch `fix/197-autosave-clears-error`
-- [ ] RED: un-skip the 3 tests (with corrected mocks/timeouts) → fail on current code
-- [ ] Fix: gate auto-save effect on `saveStatus !== 'error'` (+ dep), wrap onChange to clear error state on edit
-- [ ] GREEN: 3 un-skipped + 2 new pins pass; remove TODOs + console.logs; full QuestionDisplay suites green
-- [ ] Full frontend suite + lint + typecheck; coverage gates green
-- [ ] Deslop scan, quality gate (opencode/codex review pre-PR)
-- [ ] PR, post-PR review, demo (error persists >3s in real browser), CI gate, merge
+- [x] Branch `fix/197-autosave-clears-error`
+- [x] RED: un-skip the 3 tests (with corrected mocks/timeouts); 2 new pins fail on current code (the 3 un-skips pass once timeouts corrected — their blocker was the miscounted backoff; the pins carry the RED evidence)
+- [x] Fix: gate auto-save effect on `saveStatus !== 'error'` (+ dep), wrap onChange to clear error state on edit
+- [x] GREEN: 3 un-skipped + 4 pins pass (2 extra from codex pre-PR P2s: stale saved→idle timer clobber; retryCount reset on edit); TODOs + console.logs removed
+- [x] Full frontend suite (115 suites, 2116 passed / 5 skipped) + lint + typecheck; coverage gates green
+- [x] Deslop scan, quality gate (codex pre-PR review — opencode occupied/hung both rounds)
+- [x] PR #283, post-PR codex review clean, demo (main-vs-branch fetch-counter differential + Mongo persistence), CI green, merge
