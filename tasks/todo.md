@@ -14,13 +14,13 @@ Gate the whole Notifications section as disabled "coming soon": switches render 
 - **Remove the `disabled` prop** from `NotificationSettingsForm` instead of keeping it as dead API — the switches are unconditionally disabled now, so the prop is meaningless; page callsite updated (one line).
 
 ## Tasks
-- [ ] RED: update `frontend/src/__tests__/SettingsPageSave.test.tsx` "shows all five notification toggles" — keep checked-state assertions (disabled switches still show stored state), add: all 5 switches disabled + "Coming soon" badge + delivery-unavailable copy. Verify failures against current code.
-- [ ] RED: update `frontend/src/e2e/settings.spec.ts` first test — remove the `#notification-writing_reminders` click; assert the Notifications tab shows disabled switches + "Coming soon"; assert `writing_reminders` round-trips **unchanged** (false) in the merged PATCH payload (untouched-values-survive already asserted for export/marketing).
-- [ ] GREEN: `NotificationSettingsForm.tsx` — hard-disable all switches, add Badge + copy, drop `disabled` prop; `page.tsx` — drop `disabled={!isLoaded}` from this form.
-- [ ] Round-trip persistence unchanged: existing "preserves unexposed preference fields" unit test still passes (notification flags in merged payload).
-- [ ] Quality gate: jest suite + coverage, lint, typecheck; e2e settings spec.
-- [ ] Third-party review (opencode GLM primary, codex fallback) pre-PR + post-PR.
-- [ ] PR, demo (branch vs main: main shows interactive false-promise toggles; branch shows disabled + Coming soon; values still persist when saving other tabs), CI, merge.
+- [x] RED: update `frontend/src/__tests__/SettingsPageSave.test.tsx` "shows all five notification toggles" — keep checked-state assertions (disabled switches still show stored state), add: all 5 switches disabled + "Coming soon" badge + delivery-unavailable copy. Verify failures against current code.
+- [x] RED: update `frontend/src/e2e/settings.spec.ts` first test — remove the `#notification-writing_reminders` click; assert the Notifications tab shows disabled switches + "Coming soon"; assert `writing_reminders` round-trips **unchanged** (false) in the merged PATCH payload (untouched-values-survive already asserted for export/marketing).
+- [x] GREEN: `NotificationSettingsForm.tsx` — hard-disable all switches, add Badge + copy, drop `disabled` prop; `page.tsx` — drop `disabled={!isLoaded}` from this form.
+- [x] Round-trip persistence unchanged: existing "preserves unexposed preference fields" unit test still passes (notification flags in merged payload).
+- [x] Quality gate: jest suite + coverage, lint, typecheck; e2e settings spec.
+- [x] Third-party review (opencode GLM primary, codex fallback) pre-PR + post-PR.
+- [x] PR, demo (branch vs main: main shows interactive false-promise toggles; branch shows disabled + Coming soon; values still persist when saving other tabs), CI, merge.
 
 ## Acceptance criteria mapping
 - "Gate the undeliverable toggles behind a coming-soon/disabled state" → all 5 switches disabled + visible "Coming soon" badge + honest copy; stored values preserved and round-trip unchanged.
