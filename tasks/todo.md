@@ -1,40 +1,41 @@
-# Issue #205 — Remove orphaned /dashboard/new-book route (P2.13)
+# Issue #206 — BookCard + EmptyBookState hardcode dark theme (P2.14)
 
-## Decision (plan's Design Choice 1, kept): DELETE the page
-Unreachable in-app, drops required genre/target_audience (data loss), duplicate taxonomy.
-Canonical flow = BookCreationWizard modal.
+## Plan (CodeRabbit 2026-07-04, design choice pre-resolved: migrate gray-* AND dark-tinted indigo)
+Verified against live code — no drift. Both files unchanged since the plan.
+- `primary`/`destructive` are fixed RGB in tailwind.config.js (brand, theme-independent) ✓
+- `card/muted/secondary/border/foreground` are CSS-var tokens with :root + .dark values ✓
+- `ui/card.tsx` Card base already applies `bg-card text-card-foreground border` — BookCard overrides it with grays ✓
+- **Adaptation**: no global `* { @apply border-border }` rule exists in globals.css, so bare
+  `border` = Tailwind default gray-200 → use explicit `border-border`.
 
-## Plan drift found (CodeRabbit plan is 2026-07-04, pre-#201)
-1. **PR #287 (#201, merged 2026-07-13) pointed CI-run E2E at the orphaned page**:
-   `src/e2e/error-recovery-flow.spec.ts` (create-book error tests) and
-   `src/e2e/complete-authoring-journey.spec.ts` step 1 both `goto('/dashboard/new-book')`.
-   Deleting the page without retargeting breaks CI.
-2. **The wizard's error path is WEAKER than the orphaned page's**: generic
-   `toast.error('Failed to create book...')`, no classification, no Retry action.
-   #201's E2E pins classified toast + Retry recovery (currently only the orphaned
-   page has that, via #46's classifyError + showErrorNotification). The delete
-   branch must port that handling into the wizard or the E2E pins are unsatisfiable.
-3. Wizard `target_audience` is a fixed-option Radix select; journey spec filled
-   free text — spec adapts to select 'general'.
+## Mapping
+BookCard: container `bg-card border-border hover:border-primary`; title `text-card-foreground`;
+muted text `text-muted-foreground`; "New" + callout `text-primary bg-primary/10 border-primary/50`;
+progress track `bg-muted`, fill `bg-primary`; Open Project `bg-secondary text-secondary-foreground
+hover:bg-primary hover:text-primary-foreground`; delete `bg-secondary text-secondary-foreground
+hover:bg-destructive hover:text-destructive-foreground` (ChapterTab precedent).
+EmptyBookState: container `bg-card/50 border-border`; heading/labels `text-foreground`;
+body `text-muted-foreground`; step cards `bg-muted/40`; CTA `bg-primary hover:bg-primary/90
+text-primary-foreground`.
+
+## Review outcome (pre-PR)
+opencode (GLM) hung 10 min with zero output (documented condition) → codex fallback.
+**codex Major (real, fixed)**: `text-primary` on the "New" label + callout text was a
+dark-mode contrast regression (~2.3:1) because `primary` is FIXED indigo-600 in this
+repo (not a .dark CSS var). Fixed with the repo's two-tone precedent
+(`text-indigo-600 dark:text-indigo-400/300`, per PasswordRequirements/sign-in/TwoFactorSetup);
+fills/borders keep `primary` tokens. Literal-sweep tests refined: a literal is allowed
+only on elements carrying a `dark:` variant (theme-responsive pair). Mutation-verified:
+dropping the dark: variant fails exactly the 2 intended tests.
 
 ## Tasks
-- [x] Branch `fix/issue-205-orphaned-new-book`
-- [x] RED: BookCreationWizard.test.tsx error-path tests → expect classified
-      showErrorNotification (not generic toast.error)
-- [x] GREEN: wizard catch → classifyError + showErrorNotification(classified, {onRetry});
-      dialog stays open, form intact (already true)
-- [x] RED: pin canonical taxonomy — BookMetadataForm renders 'Historical' (absent
-      from its old 7-item list, present in canonical 11-item list)
-- [x] GREEN: `src/lib/constants/book-metadata.ts` (GENRE_OPTIONS = wizard's list,
-      TARGET_AUDIENCE_OPTIONS); refactor BookCreationWizard + BookMetadataForm onto it
-- [x] Delete `src/app/dashboard/new-book/` + `src/__tests__/NewBookPage.test.tsx`
-      (its 2 assertions now live in the wizard suite)
-- [x] Retarget CI E2E: error-recovery-flow fillNewBookForm → open wizard from
-      /dashboard; URL assertions → dialog-still-open; journey step 1 → modal
-- [x] Page objects: book-form gotoNewBook → open modal from dashboard; Radix
-      select helpers; dashboard.page.ts drop unused clickNewBook; 04-security-
-      performance perf block → measure modal open
-- [x] DEPLOYMENT-TESTING-CHECKLIST.md line 143 route mention
-- [x] Verify: jest suite, lint, typecheck, chromium E2E (both retargeted specs)
-      against real backend; mutation-check RED evidence
-- [ ] opencode/codex pre-PR review → PR → post-PR review → demo → CI → merge
+- [x] Branch `fix/issue-206-theme-tokens`
+- [x] RED: BookCard.test.tsx token-class pins (10 new tests RED on old code);
+      new EmptyBookState.test.tsx token pins
+- [x] GREEN: migrate both components per mapping
+- [x] Quality gate: jest 117 suites / 2134 passed, lint 0 errors, typecheck clean;
+      codex pre-PR review (1 Major fixed, 1 Minor noted)
+- [ ] PR
+- [ ] Demo: light + dark dashboard with books + empty state, branch vs main differential
+- [ ] Post-PR review + CI green
+- [ ] Docs sync + merge

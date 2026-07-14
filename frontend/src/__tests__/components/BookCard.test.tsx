@@ -294,4 +294,94 @@ describe('BookCard', () => {
     expect(screen.getByText('Minimal Book')).toBeInTheDocument();
     expect(screen.queryByText(/Last edited/)).toBeInTheDocument();
   });
+
+  describe('theme tokens (#206)', () => {
+    const emptyBook: BookProject = {
+      id: 'book-789',
+      title: 'New Book',
+      chapters: 0,
+      progress: 0,
+    };
+
+    it('uses theme tokens on the card container', () => {
+      render(<BookCard book={mockBook} onDelete={jest.fn()} />);
+
+      // The file-local Card mock doesn't forward data-testid; it renders role="article".
+      const card = screen.getByRole('article');
+      expect(card).toHaveClass('bg-card', 'border-border', 'hover:border-primary');
+    });
+
+    it('uses foreground/muted tokens for text', () => {
+      render(<BookCard book={mockBook} />);
+
+      expect(screen.getByText('Test Book Title')).toHaveClass('text-card-foreground');
+      expect(screen.getByText('This is a test book description')).toHaveClass(
+        'text-muted-foreground'
+      );
+    });
+
+    it('uses muted track and primary fill for the progress bar', () => {
+      const { container } = render(<BookCard book={mockBook} />);
+
+      expect(container.querySelector('.bg-muted')).toBeInTheDocument();
+      expect(container.querySelector('.bg-primary')).toBeInTheDocument();
+    });
+
+    it('uses theme-aware classes for the new-book callout', () => {
+      render(<BookCard book={emptyBook} />);
+
+      // Brand text needs a two-tone pair: fixed `primary` (indigo-600) is ~2.3:1
+      // on dark surfaces, so text follows the app's X-600 dark:X-400 precedent.
+      expect(screen.getByText('New')).toHaveClass('text-indigo-600', 'dark:text-indigo-400');
+      expect(screen.getByText(/Ready to start writing/)).toHaveClass(
+        'text-indigo-600',
+        'dark:text-indigo-300'
+      );
+      const callout = screen.getByText(/Ready to start writing/).parentElement;
+      expect(callout).toHaveClass('bg-primary/10', 'border-primary/50');
+    });
+
+    it('uses secondary/primary tokens for Open Project and destructive hover for delete', () => {
+      render(<BookCard book={mockBook} onDelete={jest.fn()} />);
+
+      const openButton = screen.getByText('Open Project');
+      expect(openButton).toHaveClass(
+        'bg-secondary',
+        'text-secondary-foreground',
+        'hover:bg-primary',
+        'hover:text-primary-foreground'
+      );
+      // The file-local Button mock doesn't forward aria-label; locate via the icon.
+      const deleteButton = screen.getByTestId('trash-icon').closest('button');
+      expect(deleteButton).toHaveClass(
+        'bg-secondary',
+        'text-secondary-foreground',
+        'hover:bg-destructive',
+        'hover:text-destructive-foreground'
+      );
+    });
+
+    it('contains no theme-independent gray/indigo color literals', () => {
+      const { container: withProgress } = render(
+        <BookCard book={mockBook} onDelete={jest.fn()} />
+      );
+      const { container: withCallout } = render(<BookCard book={emptyBook} />);
+
+      for (const container of [withProgress, withCallout]) {
+        for (const el of Array.from(container.querySelectorAll('[class]'))) {
+          // Gray literals are banned outright (the #206 bug class). An indigo
+          // literal is only allowed as part of a theme-responsive two-tone
+          // pair (e.g. text-indigo-600 dark:text-indigo-300) on the element.
+          const classes = (el.getAttribute('class') ?? '').split(/\s+/);
+          const hasDarkVariant = classes.some((cls) => cls.startsWith('dark:'));
+          for (const cls of classes) {
+            expect(cls).not.toMatch(/gray-\d/);
+            if (!hasDarkVariant) {
+              expect(cls).not.toMatch(/indigo-\d/);
+            }
+          }
+        }
+      }
+    });
+  });
 });

@@ -120,7 +120,7 @@ export default function Dashboard() {
       <div className="container mx-auto flex-1 p-6 flex items-center justify-center">
         <div className="bg-red-900/20 border border-red-700 rounded-lg p-6 max-w-md">
           <h2 className="text-red-400 text-xl font-medium mb-2">Error</h2>
-          <p className="text-gray-300 mb-4">{error}</p>
+          <p className="text-muted-foreground mb-4">{error}</p>
           <Button
             onClick={() => fetchBooks()}
             className="bg-red-600 hover:bg-red-700 text-white"
@@ -138,7 +138,7 @@ export default function Dashboard() {
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-2">
             <HugeiconsIcon icon={Book02Icon} size={32} className="text-indigo-400" />
-            <h2 className="text-3xl font-bold text-gray-100">My Books</h2>
+            <h2 className="text-3xl font-bold text-foreground">My Books</h2>
           </div>
           <Button
             onClick={handleCreateNewBook}
