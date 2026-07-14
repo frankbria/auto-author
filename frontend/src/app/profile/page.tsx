@@ -48,6 +48,10 @@ export default function UserProfile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.image ?? null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  // Session email is the confirmation phrase; the hydrated profile email is
+  // the fallback for sessions without one (e.g. route-mocked E2E).
+  const [profileEmail, setProfileEmail] = useState<string | null>(null);
   // Full preferences object from the server, merged with the three editable
   // fields before every save — the backend $set-replaces the whole
   // subdocument, so a partial payload wipes the Settings-page fields (#204).
@@ -103,6 +107,7 @@ export default function UserProfile() {
         const p = await getUserProfile();
         if (cancelled) return;
         setPreferences(p.preferences ?? {});
+        setProfileEmail(p.email ?? null);
         setLoadState('loaded');
         // keepDirtyValues: hydrate only untouched fields — a slow fetch can
         // neither clobber in-progress edits nor leave unhydrated defaults
@@ -162,7 +167,19 @@ export default function UserProfile() {
     }
   };
 
+  // Type-to-confirm safeguard (#216), mirroring DeleteBookModal: the most
+  // destructive action must not be one click past a plain confirm.
+  const accountEmail = user?.email ?? profileEmail ?? '';
+  const deleteConfirmed = accountEmail !== '' && deleteConfirmText === accountEmail;
+
+  const handleDeleteOpenChange = (open: boolean) => {
+    if (!open && deleting) return; // no closing mid-delete
+    setDeleteConfirmText('');
+    setDeleteOpen(open);
+  };
+
   const handleDeleteAccount = async () => {
+    if (!deleteConfirmed || deleting) return;
     setDeleting(true);
     try {
       await deleteUserAccount();
@@ -175,6 +192,7 @@ export default function UserProfile() {
       });
     } finally {
       setDeleting(false);
+      setDeleteConfirmText('');
       setDeleteOpen(false);
     }
   };
@@ -352,7 +370,7 @@ export default function UserProfile() {
           </div>
         </form>
 
-        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <Dialog open={deleteOpen} onOpenChange={handleDeleteOpenChange}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Delete account</DialogTitle>
@@ -360,19 +378,68 @@ export default function UserProfile() {
                 This permanently deletes your account and all your books. This cannot be undone.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleDeleteAccount}
-                disabled={deleting}
-              >
-                {deleting ? 'Deleting…' : 'Delete account'}
-              </Button>
-            </DialogFooter>
+            {/* Form wrapper so Enter submits once the confirmation matches
+                (DeleteBookModal precedent). Sibling of the profile form, not
+                nested — the dialog renders in a portal anyway. */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (deleteConfirmed && !deleting) {
+                  handleDeleteAccount().catch((err) =>
+                    console.error('Account delete failed:', err)
+                  );
+                }
+              }}
+            >
+              <div className="space-y-2 py-2">
+                <Label htmlFor="confirm-delete-account">
+                  Type <span className="font-mono font-bold">{accountEmail}</span> to confirm
+                </Label>
+                <Input
+                  id="confirm-delete-account"
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Enter your account email exactly"
+                  disabled={deleting}
+                  className="font-mono"
+                  autoComplete="off"
+                  autoFocus
+                  aria-invalid={deleteConfirmText !== '' && !deleteConfirmed ? true : undefined}
+                  aria-describedby={
+                    deleteConfirmText !== '' && !deleteConfirmed
+                      ? 'confirm-delete-account-error'
+                      : undefined
+                  }
+                />
+                {deleteConfirmText !== '' && !deleteConfirmed && (
+                  <p
+                    id="confirm-delete-account-error"
+                    role="alert"
+                    className="text-destructive text-xs"
+                  >
+                    Email must match exactly (case-sensitive)
+                  </p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleDeleteOpenChange(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={!deleteConfirmed || deleting}
+                >
+                  {deleting ? 'Deleting…' : 'Delete account permanently'}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
