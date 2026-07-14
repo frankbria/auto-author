@@ -35,7 +35,13 @@ dropping the dark: variant fails exactly the 2 intended tests.
 - [x] GREEN: migrate both components per mapping
 - [x] Quality gate: jest 117 suites / 2134 passed, lint 0 errors, typecheck clean;
       codex pre-PR review (1 Major fixed, 1 Minor noted)
-- [ ] PR
-- [ ] Demo: light + dark dashboard with books + empty state, branch vs main differential
-- [ ] Post-PR review + CI green
-- [ ] Docs sync + merge
+- [x] PR #290
+- [x] Demo: `docs/demos/2026-07-13-issue-206-theme-tokens.md`, showboat verify exit 0 —
+      branch :3000 vs pristine main worktree :3001, real backend+Mongo+better-auth signup;
+      main's half-dark empty state + card captured live; branch light+dark both correct.
+      Demo-found: dashboard "My Books" text-gray-100 invisible in light → fixed in-PR;
+      pre-existing "undefined chapters"/dead New-callout branch → filed #291 [P2.23]
+- [x] Post-PR review (codex fresh session: no Critical/Major; 1 Minor adopted — gray-*
+      banned unconditionally in sweep) posted to PR
+- [x] CI green (Frontend/Backend/E2E/review/security) + final triage: GLM CI review ×2 "no defects found", nothing new to address
+- [x] Docs sync (CLAUDE.md changelog) + squash-merged as f3b5ba6; follow-up #291 [P2.23] filed
