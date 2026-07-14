@@ -1,47 +1,50 @@
-# Issue #206 — BookCard + EmptyBookState hardcode dark theme (P2.14)
+# Issue #216 — [P2.15] Type-to-confirm safeguard for account deletion
 
-## Plan (CodeRabbit 2026-07-04, design choice pre-resolved: migrate gray-* AND dark-tinted indigo)
-Verified against live code — no drift. Both files unchanged since the plan.
-- `primary`/`destructive` are fixed RGB in tailwind.config.js (brand, theme-independent) ✓
-- `card/muted/secondary/border/foreground` are CSS-var tokens with :root + .dark values ✓
-- `ui/card.tsx` Card base already applies `bg-card text-card-foreground border` — BookCard overrides it with grays ✓
-- **Adaptation**: no global `* { @apply border-border }` rule exists in globals.css, so bare
-  `border` = Tailwind default gray-200 → use explicit `border-border`.
+**Plan source**: self-authored (no plan comment on the issue).
+**Approval**: autonomous — no architectural fork. AC allows "account email or a literal
+confirmation phrase"; email is chosen for consistency with `DeleteBookModal`'s
+type-the-specific-thing pattern and is available from both the session and the
+hydrated profile.
 
-## Mapping
-BookCard: container `bg-card border-border hover:border-primary`; title `text-card-foreground`;
-muted text `text-muted-foreground`; "New" + callout `text-primary bg-primary/10 border-primary/50`;
-progress track `bg-muted`, fill `bg-primary`; Open Project `bg-secondary text-secondary-foreground
-hover:bg-primary hover:text-primary-foreground`; delete `bg-secondary text-secondary-foreground
-hover:bg-destructive hover:text-destructive-foreground` (ChapterTab precedent).
-EmptyBookState: container `bg-card/50 border-border`; heading/labels `text-foreground`;
-body `text-muted-foreground`; step cards `bg-muted/40`; CTA `bg-primary hover:bg-primary/90
-text-primary-foreground`.
+## Problem
+`frontend/src/app/profile/page.tsx` guards the irreversible account deletion (account +
+all books) with a plain Cancel/Delete dialog, while the less destructive single-book
+delete requires typing the exact book title (`DeleteBookModal`).
 
-## Review outcome (pre-PR)
-opencode (GLM) hung 10 min with zero output (documented condition) → codex fallback.
-**codex Major (real, fixed)**: `text-primary` on the "New" label + callout text was a
-dark-mode contrast regression (~2.3:1) because `primary` is FIXED indigo-600 in this
-repo (not a .dark CSS var). Fixed with the repo's two-tone precedent
-(`text-indigo-600 dark:text-indigo-400/300`, per PasswordRequirements/sign-in/TwoFactorSetup);
-fills/borders keep `primary` tokens. Literal-sweep tests refined: a literal is allowed
-only on elements carrying a `dark:` variant (theme-responsive pair). Mutation-verified:
-dropping the dark: variant fails exactly the 2 intended tests.
+## Design decisions (resolved, no fork)
+- **Confirmation phrase = the account email**, sourced `session.user.email ?? profile.email`
+  (profile email captured during the existing `getUserProfile` hydration — needed because
+  route-mocked E2E has no real session). If neither is available the button stays
+  disabled (fail-closed; unreachable in production where the session always has email).
+- **Inline in the existing profile-page dialog** — no new shared component. Extracting a
+  generic TypeToConfirmModal is YAGNI for two call sites with different copy/props.
+- Mirror `DeleteBookModal` semantics: exact case-sensitive match, mismatch hint with
+  `role="alert"` + `aria-invalid`, form wrapper so Enter submits when confirmed,
+  input reset when the dialog opens/closes, guard in the handler
+  (`if (!confirmed) return`).
 
-## Tasks
-- [x] Branch `fix/issue-206-theme-tokens`
-- [x] RED: BookCard.test.tsx token-class pins (10 new tests RED on old code);
-      new EmptyBookState.test.tsx token pins
-- [x] GREEN: migrate both components per mapping
-- [x] Quality gate: jest 117 suites / 2134 passed, lint 0 errors, typecheck clean;
-      codex pre-PR review (1 Major fixed, 1 Minor noted)
-- [x] PR #290
-- [x] Demo: `docs/demos/2026-07-13-issue-206-theme-tokens.md`, showboat verify exit 0 —
-      branch :3000 vs pristine main worktree :3001, real backend+Mongo+better-auth signup;
-      main's half-dark empty state + card captured live; branch light+dark both correct.
-      Demo-found: dashboard "My Books" text-gray-100 invisible in light → fixed in-PR;
-      pre-existing "undefined chapters"/dead New-callout branch → filed #291 [P2.23]
-- [x] Post-PR review (codex fresh session: no Critical/Major; 1 Minor adopted — gray-*
-      banned unconditionally in sweep) posted to PR
-- [x] CI green (Frontend/Backend/E2E/review/security) + final triage: GLM CI review ×2 "no defects found", nothing new to address
-- [x] Docs sync (CLAUDE.md changelog) + squash-merged as f3b5ba6; follow-up #291 [P2.23] filed
+## Steps (TDD)
+1. **RED**: new `frontend/src/__tests__/ProfilePageDelete.test.tsx` (ProfilePageSave idiom:
+   real RHF + real UI components incl. Radix Dialog + real `useProfileApi` over mocked
+   `useAuthFetch`, mocked `useSession`):
+   - dialog opens with Delete disabled; wrong text keeps it disabled + shows the
+     mismatch alert; DELETE never sent
+   - typing the exact email enables the button; click sends `DELETE /users/me` and
+     `router.push('/')`
+   - cancel + reopen resets the input (disabled again)
+   - Enter in the input submits when confirmed
+2. **GREEN**: implement in `profile/page.tsx` (state `deleteConfirmText`, `profileEmail`;
+   Input + Label + hint inside the dialog; disable Delete until match; reset on
+   open-change; form wrapper; handler guard).
+3. E2E: extend `frontend/src/e2e/profile-editing.spec.ts` with a delete-guard test
+   (route-mocked): disabled → wrong text disabled → exact email enabled → click →
+   DELETE observed.
+4. Verify legacy `ProfilePage.test.tsx` still green (it mocks Dialog/Input crudely but
+   doesn't index inputs or assert dialog internals).
+5. Deslop, lint, typecheck, full frontend suite, third-party review (opencode → codex
+   fallback), PR, demo (branch vs pristine main worktree), CI, docs sync, merge.
+
+## Acceptance criteria mapping
+- "Require typing the account email … before enabling the Delete-account button,
+  consistent with the book-deletion safeguard" → unit tests (disabled/enabled + alert),
+  E2E pin, live demo differential vs main.

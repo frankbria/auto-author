@@ -111,4 +111,44 @@ test.describe('Profile editing (issue #63)', () => {
       /new-avatar\.png/
     );
   });
+
+  test('account deletion requires typing the account email (#216)', async ({ page }) => {
+    let deleteRequested = false;
+
+    await page.route('**/users/me', (route) => {
+      if (route.request().method() === 'DELETE') {
+        deleteRequested = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(PROFILE),
+      });
+    });
+
+    await page.goto('/profile');
+    await expect(page.locator('#firstName')).toHaveValue('Ada');
+
+    await page.getByRole('button', { name: /^delete account$/i }).click();
+
+    const confirmButton = page.getByRole('button', { name: /delete account permanently/i });
+    const confirmInput = page.locator('#confirm-delete-account');
+
+    // Disabled with no input, and stays disabled on a wrong phrase.
+    await expect(confirmButton).toBeDisabled();
+    await confirmInput.fill('wrong@example.com');
+    await expect(confirmButton).toBeDisabled();
+    await expect(page.getByText(/must match exactly/i)).toBeVisible();
+    expect(deleteRequested).toBe(false);
+
+    // Exact account email enables deletion; confirming issues the DELETE.
+    // NB: this harness has no real session, so the confirmation phrase
+    // resolves via the profile-email fallback (hydrated from GET /users/me),
+    // not the session-email path (unit-covered in ProfilePageDelete.test.tsx).
+    await confirmInput.fill(PROFILE.email);
+    await expect(confirmButton).toBeEnabled();
+    await confirmButton.click();
+    await expect.poll(() => deleteRequested).toBe(true);
+  });
 });
