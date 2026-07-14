@@ -21,6 +21,7 @@ const mockChangePassword = authClient.changePassword as jest.Mock;
 const mockTwoFactorEnable = authClient.twoFactor.enable as jest.Mock;
 const mockTwoFactorDisable = authClient.twoFactor.disable as jest.Mock;
 const mockVerifyTotp = authClient.twoFactor.verifyTotp as jest.Mock;
+const mockGenerateBackupCodes = authClient.twoFactor.generateBackupCodes as jest.Mock;
 const mockListSessions = authClient.listSessions as jest.Mock;
 const mockRevokeSession = authClient.revokeSession as jest.Mock;
 const mockRevokeOtherSessions = authClient.revokeOtherSessions as jest.Mock;
@@ -136,6 +137,7 @@ describe('TwoFactorSetup', () => {
     fireEvent.change(screen.getByLabelText('Verification Code'), {
       target: { value: '123456' },
     });
+    fireEvent.click(screen.getByLabelText(/i.ve saved my backup codes/i));
     fireEvent.click(screen.getByRole('button', { name: /verify & enable/i }));
 
     await waitFor(() =>
@@ -161,6 +163,94 @@ describe('TwoFactorSetup', () => {
         expect.objectContaining({ title: 'Could not start 2FA setup', variant: 'destructive' })
       )
     );
+  });
+
+  it('blocks Verify & Enable until the backup-codes acknowledgment is checked', async () => {
+    render(<TwoFactorSetup />);
+    fireEvent.click(screen.getByRole('button', { name: /enable 2fa/i }));
+    fireEvent.change(screen.getByLabelText('Confirm your password'), {
+      target: { value: 'my-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+    await waitFor(() => expect(screen.getByTestId('two-factor-qr')).toBeInTheDocument());
+
+    // One-time-only warning is explicit before enable
+    expect(screen.getByText(/won.t be shown again/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Verification Code'), {
+      target: { value: '123456' },
+    });
+    const verifyButton = screen.getByRole('button', { name: /verify & enable/i });
+    expect(verifyButton).toBeDisabled();
+    fireEvent.click(verifyButton);
+    expect(mockVerifyTotp).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText(/i.ve saved my backup codes/i));
+    expect(verifyButton).not.toBeDisabled();
+    fireEvent.click(verifyButton);
+    await waitFor(() => expect(mockVerifyTotp).toHaveBeenCalledWith({ code: '123456' }));
+  });
+
+  it('regenerates backup codes from the enabled state', async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: true },
+        session: { token: 'tok' },
+      },
+    });
+    mockGenerateBackupCodes.mockResolvedValue({
+      data: { backupCodes: ['CCCC-3333', 'DDDD-4444'] },
+      error: null,
+    });
+    render(<TwoFactorSetup />);
+
+    fireEvent.click(screen.getByRole('button', { name: /regenerate backup codes/i }));
+    fireEvent.change(screen.getByLabelText('Confirm your password'), {
+      target: { value: 'pw-1234' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /generate new codes/i }));
+
+    await waitFor(() =>
+      expect(mockGenerateBackupCodes).toHaveBeenCalledWith({ password: 'pw-1234' })
+    );
+    expect(screen.getByText('CCCC-3333')).toBeInTheDocument();
+    expect(screen.getByText('DDDD-4444')).toBeInTheDocument();
+    // Old codes are invalidated by regeneration — the UI must say so
+    expect(screen.getByText(/old backup codes no longer work/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^done$/i }));
+    expect(screen.getByText('Enabled')).toBeInTheDocument();
+    expect(screen.queryByText('CCCC-3333')).not.toBeInTheDocument();
+  });
+
+  it('shows a destructive toast when the regenerate password is wrong', async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: true },
+        session: { token: 'tok' },
+      },
+    });
+    mockGenerateBackupCodes.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid password' },
+    });
+    render(<TwoFactorSetup />);
+
+    fireEvent.click(screen.getByRole('button', { name: /regenerate backup codes/i }));
+    fireEvent.change(screen.getByLabelText('Confirm your password'), {
+      target: { value: 'bad' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /generate new codes/i }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Could not regenerate backup codes',
+          variant: 'destructive',
+        })
+      )
+    );
+    expect(screen.queryByText('CCCC-3333')).not.toBeInTheDocument();
   });
 
   it('disables 2FA after password confirmation', async () => {

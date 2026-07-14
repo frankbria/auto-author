@@ -84,4 +84,15 @@ describe('VerifyTwoFactorPage', () => {
     );
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/dashboard'));
   });
+
+  it('offers a recovery path for users who lost both factors', () => {
+    render(<VerifyTwoFactorPage />);
+
+    expect(
+      screen.getByText(/lost access to your authenticator and backup codes\?/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /support@autoauthor\.com/i })
+    ).toHaveAttribute('href', 'mailto:support@autoauthor.com');
+  });
 });
