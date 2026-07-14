@@ -62,6 +62,15 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     mockAuthFetch.mockReset();
     mockPush.mockClear();
     mockAuthFetch.mockResolvedValue(profile());
+    // Re-seed the session explicitly: a per-test mockReturnValue override
+    // (the fallback test below) must not leak into other tests via ordering.
+    (useSession as jest.Mock).mockReturnValue({
+      data: {
+        user: { id: 'test-user-id', email: SESSION_EMAIL, name: 'Test User', image: null },
+        session: { token: 't', id: 's' },
+      },
+      isPending: false,
+    });
   });
 
   it('disables the confirm button until the exact account email is typed', async () => {

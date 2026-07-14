@@ -371,7 +371,10 @@ export default function UserProfile() {
         </form>
 
         <Dialog open={deleteOpen} onOpenChange={handleDeleteOpenChange}>
-          <DialogContent>
+          <DialogContent
+            onPointerDownOutside={(e) => deleting && e.preventDefault()}
+            onEscapeKeyDown={(e) => deleting && e.preventDefault()}
+          >
             <DialogHeader>
               <DialogTitle>Delete account</DialogTitle>
               <DialogDescription>

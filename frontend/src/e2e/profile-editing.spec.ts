@@ -143,6 +143,9 @@ test.describe('Profile editing (issue #63)', () => {
     expect(deleteRequested).toBe(false);
 
     // Exact account email enables deletion; confirming issues the DELETE.
+    // NB: this harness has no real session, so the confirmation phrase
+    // resolves via the profile-email fallback (hydrated from GET /users/me),
+    // not the session-email path (unit-covered in ProfilePageDelete.test.tsx).
     await confirmInput.fill(PROFILE.email);
     await expect(confirmButton).toBeEnabled();
     await confirmButton.click();
