@@ -218,7 +218,16 @@ describe('TwoFactorSetup', () => {
     // Old codes are invalidated by regeneration — the UI must say so
     expect(screen.getByText(/old backup codes no longer work/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /^done$/i }));
+    // The old codes are already dead, so dismissal requires the same forced
+    // acknowledgment as the enable flow — Done stays disabled until checked.
+    const doneButton = screen.getByRole('button', { name: /^done$/i });
+    expect(doneButton).toBeDisabled();
+    fireEvent.click(doneButton);
+    expect(screen.getByText('CCCC-3333')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/i.ve saved my backup codes/i));
+    expect(doneButton).not.toBeDisabled();
+    fireEvent.click(doneButton);
     expect(screen.getByText('Enabled')).toBeInTheDocument();
     expect(screen.queryByText('CCCC-3333')).not.toBeInTheDocument();
   });

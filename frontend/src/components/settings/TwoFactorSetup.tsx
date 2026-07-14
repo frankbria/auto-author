@@ -87,6 +87,7 @@ export default function TwoFactorSetup() {
           return;
         }
         setBackupCodes(data.backupCodes ?? []);
+        setCodesAcknowledged(false);
         setStep('codes');
       } else {
         const { error } = await authClient.twoFactor.disable({ password });
@@ -300,9 +301,20 @@ export default function TwoFactorSetup() {
                   <li key={code}>{code}</li>
                 ))}
               </ul>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="regenerated-codes-ack"
+                  checked={codesAcknowledged}
+                  onCheckedChange={(checked) => setCodesAcknowledged(checked === true)}
+                />
+                <Label htmlFor="regenerated-codes-ack" className="text-sm font-normal">
+                  I&apos;ve saved my backup codes
+                </Label>
+              </div>
             </div>
             <Button
               type="button"
+              disabled={!codesAcknowledged}
               onClick={() => {
                 setBackupCodes([]);
                 setStep('idle');
