@@ -191,6 +191,23 @@ describe('TwoFactorSetup', () => {
     await waitFor(() => expect(mockVerifyTotp).toHaveBeenCalledWith({ code: '123456' }));
   });
 
+  it('blocks a direct form submit (Enter key) while the acknowledgment is unchecked', async () => {
+    render(<TwoFactorSetup />);
+    fireEvent.click(screen.getByRole('button', { name: /enable 2fa/i }));
+    fireEvent.change(screen.getByLabelText('Confirm your password'), {
+      target: { value: 'my-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+    await waitFor(() => expect(screen.getByTestId('two-factor-qr')).toBeInTheDocument());
+
+    const codeInput = screen.getByLabelText('Verification Code');
+    fireEvent.change(codeInput, { target: { value: '123456' } });
+    // Enter in the input submits the form directly, bypassing the disabled
+    // button — the handler itself must enforce the acknowledgment.
+    fireEvent.submit(codeInput.closest('form') as HTMLFormElement);
+    expect(mockVerifyTotp).not.toHaveBeenCalled();
+  });
+
   it('regenerates backup codes from the enabled state', async () => {
     mockUseSession.mockReturnValue({
       data: {

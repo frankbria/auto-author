@@ -111,6 +111,9 @@ export default function TwoFactorSetup() {
 
   const handleVerifySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Enter in the code input submits the form directly, bypassing the
+    // disabled button — the handler is the acknowledgment's source of truth.
+    if (!codesAcknowledged) return;
     setIsSubmitting(true);
     try {
       const { error } = await authClient.twoFactor.verifyTotp({ code: verifyCode });
