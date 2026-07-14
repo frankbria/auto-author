@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import UserProfile from '@/app/profile/page';
 import { useSession } from '@/lib/auth-client';
 
@@ -42,8 +42,9 @@ const profile = () => ({
   preferences: { theme: 'light', email_notifications: true, marketing_emails: false },
 });
 
-const deleteCall = () =>
-  mockAuthFetch.mock.calls.find(([, opts]) => opts?.method === 'DELETE');
+const deleteCalls = () =>
+  mockAuthFetch.mock.calls.filter(([, opts]) => opts?.method === 'DELETE');
+const deleteCall = () => deleteCalls()[0];
 
 const openDeleteDialog = async () => {
   render(<UserProfile />);
@@ -128,6 +129,77 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
       screen.getByRole('button', { name: /delete account permanently/i })
     ).toBeDisabled();
     expect(deleteCall()).toBeUndefined();
+  });
+
+  it('sends exactly one DELETE on a rapid double-submit', async () => {
+    // Hold the DELETE unresolved so the second click lands while deleting=true.
+    let resolveDelete: (v: unknown) => void;
+    mockAuthFetch.mockImplementation(async (_path: string, opts?: { method?: string }) => {
+      if (opts?.method === 'DELETE') {
+        return new Promise((resolve) => (resolveDelete = resolve));
+      }
+      return profile();
+    });
+
+    const { input, confirmButton } = await openDeleteDialog();
+    fireEvent.change(input, { target: { value: SESSION_EMAIL } });
+
+    fireEvent.click(confirmButton);
+    fireEvent.click(confirmButton);
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    await act(async () => {
+      resolveDelete!({});
+    });
+    expect(deleteCalls()).toHaveLength(1);
+  });
+
+  it('keeps the dialog open while deleting: Escape and outside clicks are blocked', async () => {
+    let resolveDelete: (v: unknown) => void;
+    mockAuthFetch.mockImplementation(async (_path: string, opts?: { method?: string }) => {
+      if (opts?.method === 'DELETE') {
+        return new Promise((resolve) => (resolveDelete = resolve));
+      }
+      return profile();
+    });
+
+    const { input, confirmButton } = await openDeleteDialog();
+    fireEvent.change(input, { target: { value: SESSION_EMAIL } });
+    fireEvent.click(confirmButton);
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+
+    // Mid-delete: Escape must not dismiss the dialog.
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveDelete!({});
+    });
+    // Success path closes it.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('closes the dialog and clears the confirmation when the DELETE fails', async () => {
+    mockAuthFetch.mockImplementation(async (_path: string, opts?: { method?: string }) => {
+      if (opts?.method === 'DELETE') {
+        throw new Error('backend down');
+      }
+      return profile();
+    });
+
+    const { input, confirmButton } = await openDeleteDialog();
+    fireEvent.change(input, { target: { value: SESSION_EMAIL } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    // finally-block contract: dialog closed, no redirect.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mockPush).not.toHaveBeenCalled();
+
+    // Reopening starts clean.
+    fireEvent.click(screen.getByRole('button', { name: /^delete account$/i }));
+    expect(await screen.findByLabelText(/to confirm/i)).toHaveValue('');
   });
 
   it('falls back to the hydrated profile email when the session has none', async () => {

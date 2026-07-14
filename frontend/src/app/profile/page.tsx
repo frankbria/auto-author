@@ -361,7 +361,11 @@ export default function UserProfile() {
           )}
 
           <div className="flex items-center justify-between">
-            <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => handleDeleteOpenChange(true)}
+            >
               Delete Account
             </Button>
             <Button type="submit" disabled={loadState !== 'loaded'}>
