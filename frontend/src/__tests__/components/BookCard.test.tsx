@@ -369,14 +369,15 @@ describe('BookCard', () => {
 
       for (const container of [withProgress, withCallout]) {
         for (const el of Array.from(container.querySelectorAll('[class]'))) {
-          // A color literal is only allowed as part of a theme-responsive
-          // two-tone pair (e.g. text-indigo-600 dark:text-indigo-300); an
-          // element with a literal and no dark: variant is the #206 bug.
+          // Gray literals are banned outright (the #206 bug class). An indigo
+          // literal is only allowed as part of a theme-responsive two-tone
+          // pair (e.g. text-indigo-600 dark:text-indigo-300) on the element.
           const classes = (el.getAttribute('class') ?? '').split(/\s+/);
           const hasDarkVariant = classes.some((cls) => cls.startsWith('dark:'));
-          if (!hasDarkVariant) {
-            for (const cls of classes) {
-              expect(cls).not.toMatch(/(?:gray|indigo)-\d/);
+          for (const cls of classes) {
+            expect(cls).not.toMatch(/gray-\d/);
+            if (!hasDarkVariant) {
+              expect(cls).not.toMatch(/indigo-\d/);
             }
           }
         }

@@ -51,11 +51,13 @@ describe('EmptyBookState theme tokens (#206)', () => {
     const { container } = render(<EmptyBookState onCreateNew={jest.fn()} />);
 
     for (const el of Array.from(container.querySelectorAll('[class]'))) {
-      const themeIndependent = (el.getAttribute('class') ?? '')
-        .split(/\s+/)
-        .filter((cls) => !cls.startsWith('dark:'));
-      for (const cls of themeIndependent) {
-        expect(cls).not.toMatch(/(?:gray|indigo)-\d/);
+      const classes = (el.getAttribute('class') ?? '').split(/\s+/);
+      const hasDarkVariant = classes.some((cls) => cls.startsWith('dark:'));
+      for (const cls of classes) {
+        expect(cls).not.toMatch(/gray-\d/);
+        if (!hasDarkVariant) {
+          expect(cls).not.toMatch(/indigo-\d/);
+        }
       }
     }
   });
