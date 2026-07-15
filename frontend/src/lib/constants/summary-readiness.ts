@@ -46,8 +46,19 @@ export function countSummaryWords(text: string): number {
 }
 
 /**
+ * Character count matching Python's `len(summary)` — i.e. Unicode code points.
+ *
+ * JS `String.length` counts UTF-16 code units, so every non-BMP character (emoji,
+ * rarer CJK) counts twice: a mostly-emoji summary reads as 200 chars here but 100
+ * to the backend, passing the client gate and then failing the real one — the #218
+ * dead-end again. Untrimmed, matching `len(summary)`.
+ */
+export function countSummaryCharacters(text: string): number {
+  return Array.from(text).length;
+}
+
+/**
  * Returns a user-facing error for a summary, or '' when it is ready for TOC generation.
- * Character count is untrimmed to match the backend's `len(summary)`.
  */
 export function getSummaryReadinessError(text: string): string {
   if (!text.trim()) return 'Please provide a summary of your book.';
@@ -56,10 +67,11 @@ export function getSummaryReadinessError(text: string): string {
   if (words < SUMMARY_MIN_WORDS) {
     return `Summary must be at least ${SUMMARY_MIN_WORDS} words (currently ${words}).`;
   }
-  if (text.length < SUMMARY_MIN_CHARACTERS) {
-    return `Summary must be at least ${SUMMARY_MIN_CHARACTERS} characters (currently ${text.length}).`;
+  const characters = countSummaryCharacters(text);
+  if (characters < SUMMARY_MIN_CHARACTERS) {
+    return `Summary must be at least ${SUMMARY_MIN_CHARACTERS} characters (currently ${characters}).`;
   }
-  if (text.length > SUMMARY_MAX_CHARACTERS) {
+  if (characters > SUMMARY_MAX_CHARACTERS) {
     return `Summary must be at most ${SUMMARY_MAX_CHARACTERS} characters.`;
   }
   if (OFFENSIVE_REGEX.test(text)) return 'Summary contains inappropriate language.';

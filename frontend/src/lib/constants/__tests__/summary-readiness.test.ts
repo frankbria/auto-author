@@ -3,6 +3,7 @@ import {
   SUMMARY_MIN_CHARACTERS,
   SUMMARY_MAX_CHARACTERS,
   countSummaryWords,
+  countSummaryCharacters,
   getSummaryReadinessError,
 } from '../summary-readiness';
 
@@ -67,6 +68,30 @@ describe('countSummaryWords — parity with Python str.split()', () => {
     expect(countSummaryWords('one　two')).toBe(2); // ideographic space
     expect(countSummaryWords('one two')).toBe(2); // line separator
     expect(countSummaryWords('one two')).toBe(2); // four-per-em space
+  });
+});
+
+describe('countSummaryCharacters — parity with Python len()', () => {
+  it('counts a plain ASCII string like len()', () => {
+    expect(countSummaryCharacters('hello')).toBe(5);
+  });
+
+  it('counts non-BMP characters once, as Python does (not as 2 UTF-16 units)', () => {
+    // Verified against the real runtime: len('👍' * 100) == 100, while
+    // '👍'.repeat(100).length === 200 in JS.
+    expect(countSummaryCharacters('👍'.repeat(100))).toBe(100);
+    expect('👍'.repeat(100).length).toBe(200); // documents the trap being avoided
+  });
+
+  it('does not let an emoji summary pass a gate the backend would fail', () => {
+    // 100 emoji reads as 200 chars to String.length -> would clear the 150 gate
+    // client-side and then be rejected by the backend's len() == 100.
+    const text = `${summaryOf(SUMMARY_MIN_WORDS, 1)} ${'👍'.repeat(60)}`;
+    const backendChars = countSummaryCharacters(text);
+    if (backendChars < SUMMARY_MIN_CHARACTERS) {
+      expect(getSummaryReadinessError(text)).toMatch(/at least 150 characters/);
+    }
+    expect(backendChars).toBeLessThan(text.length);
   });
 });
 

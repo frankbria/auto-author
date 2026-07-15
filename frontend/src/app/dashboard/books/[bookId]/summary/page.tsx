@@ -8,6 +8,7 @@ import {
   SUMMARY_MIN_WORDS,
   SUMMARY_MIN_CHARACTERS,
   countSummaryWords,
+  countSummaryCharacters,
   getSummaryReadinessError,
 } from '@/lib/constants/summary-readiness';
 
@@ -203,7 +204,7 @@ export default function BookSummaryPage() {
             ></textarea>
             <div className="flex justify-between text-xs text-gray-500 mt-1">
               <span>{countSummaryWords(summary)} / {SUMMARY_MIN_WORDS} words</span>
-              <span>{summary.length} / {SUMMARY_MIN_CHARACTERS} characters</span>
+              <span>{countSummaryCharacters(summary)} / {SUMMARY_MIN_CHARACTERS} characters</span>
             </div>
             {inputError && (
               <div className="text-red-400 text-xs mt-1">{inputError}</div>
