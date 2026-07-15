@@ -1,41 +1,75 @@
-# Issue #217 — 2FA lockout risk: backup codes shown once, no regenerate, no sign-in recovery path
+# [P2.17] #218 — Summary readiness gate: contradictory word/char copy + threshold mismatch
 
 **Plan source**: self-authored (no plan comment on the issue).
-**Approval**: autonomous — no architectural fork. Minor decisions: recovery link = inline
-instructions + existing support@autoauthor.com address; forced acknowledgment = checkbox
-gating "Verify & Enable".
-**Scope**: frontend-only. better-auth 1.4.9 client exposes
-`authClient.twoFactor.generateBackupCodes({ password })` → `{ backupCodes }`
-(POST /two-factor/generate-backup-codes, password-gated, verified in installed .d.mts).
-Types are inferred via the twoFactorClient plugin — no cast changes needed in auth-client.ts.
+**Approval**: autonomous — no architectural fork.
 
-## Steps (TDD: tests first)
+## The real gate (verified, not assumed)
 
-1. **Tests (RED)** — extend `frontend/src/components/settings/__tests__/SecuritySettings.test.tsx`:
-   - T1: enable flow — "Verify & Enable" stays disabled until the "I've saved my backup codes" acknowledgment is checked; warning text ("won't be shown again") rendered; verifyTotp not callable before ack.
-   - T2: enabled state shows "Regenerate backup codes"; click → password step → submit calls the regenerate client method → new codes rendered with old-codes-invalidated warning + Copy; Done returns to idle.
-   - T3: regenerate with wrong password → destructive toast, no codes shown.
-   Extend `frontend/src/__tests__/VerifyTwoFactorPage.test.tsx`:
-   - T4: "Lost access to your authenticator and backup codes?" disclosure present; expanding reveals recovery instructions with support email.
-   Add `generateBackupCodes` mock to `frontend/src/__mocks__/better-auth-react.ts` twoFactor object.
+Both backend paths enforce the **identical** minimum — there is no AI-decided threshold:
 
-2. **Implement** `frontend/src/components/settings/TwoFactorSetup.tsx`:
-   - `mode: 'enable' | 'disable' | 'regenerate'`; new step `'codes'` for regenerated codes.
-   - Idle+enabled: "Regenerate backup codes" button beside "Disable 2FA".
-   - Password step regenerate branch → `generateBackupCodes` → step 'codes' (warning + codes grid + Copy + Done). Error → destructive toast (same idiom as enable).
-   - Verify step: explicit warning "these codes won't be shown again — save them now" + acknowledgment Checkbox gating the "Verify & Enable" button (forced acknowledgment before enable). Reset ack state on entry.
+| Location | Rule |
+|---|---|
+| `backend/app/api/endpoints/books.py:1150` (deterministic fallback, no analysis) | `word_count >= 30 and char_count >= 150` |
+| `backend/app/services/ai_service.py:483` (AI-analysis path) | `word_count >= 30 and char_count >= 150` |
 
-3. **Implement** `frontend/src/app/auth/verify-2fa/page.tsx`:
-   - Below the backup-code toggle: native `<details>` "Lost access to your authenticator and backup codes?" → instructions to contact support@autoauthor.com (address already published on /dashboard/help) from the account email to verify identity and reset 2FA.
+The frontend wizard gates on `meets_minimum_requirements` (`TocGenerationWizard.tsx:97`) and ignores
+`is_ready_for_toc` entirely. So **30 words AND 150 characters** is the one true gate.
 
-4. **Gates**: jest (affected suites + coverage), lint, typecheck. Deslop scan. Cross-family review pre-PR. Mutation check (remove ack gating → T1 red; point regenerate at enable → T2 red).
+Four numbers currently describe "long enough"; only one is enforced:
 
-## Acceptance criteria mapping
-- AC1 "Regenerate backup codes action in enabled state" → Step 2, T2/T3.
-- AC1 "one-time-only warning (forced acknowledgment) before enable" → Step 2 verify-step checkbox, T1.
-- AC2 "Lost access link with support/recovery instructions on verify-2fa" → Step 3, T4.
+| Location | Claim | Enforced? |
+|---|---|---|
+| backend (both paths) | 30 words + 150 chars | **YES** |
+| `summary/page.tsx:9` `MIN_SUMMARY_LENGTH = 30` | 30 **characters** | client-side only, far too weak |
+| `summary/page.tsx:225` guideline copy | "Minimum 30 **words** recommended" | no (and contradicts the counter 2 lines above) |
+| `NotReadyMessage.tsx:128` | "at least 500-1000 words" | no — fiction |
+| `bookClient.ts:512` doc comment | "Need: 100+ words." | no — fiction |
 
-## Assumptions / deviations
-- No support/recovery page exists → inline `<details>` instructions + existing support email (a new /support route would be YAGNI).
-- "View backup codes" not added: better-auth stores codes encrypted server-side; regenerate is the client-exposed, password-gated path and satisfies the AC as written.
-- Backend untouched (better-auth handles the endpoint natively).
+The `30` on the summary page and the `30` in the backend are the same digits in **different units**
+(chars vs words) — a coincidence that invites a wrong "fix".
+
+## Design decisions (autonomous — no architectural fork)
+
+1. **Hard client gate == the exact backend gate** (30 words AND 150 chars), not a soft warning. The AC
+   allows either; a hard gate at the real threshold is what "consistent with the real AI readiness
+   threshold before the user invests time" literally asks for. A soft warning would still let the user
+   walk into the dead-end.
+2. **Word counting must match Python's `str.split()` exactly**, or client and server disagree at the
+   boundary — which is the very bug class being fixed. `text.trim().split(/\s+/).filter(Boolean).length`.
+3. **Char count stays untrimmed** (`text.length`) to match backend `len(summary)`.
+4. Constants live in `frontend/src/lib/constants/summary-readiness.ts`, following the established
+   pattern (`auto-save.ts`, `writing-styles.ts`, `book-metadata.ts`): documented SSOT + issue ref.
+5. **No data loss from raising the gate**: the debounced auto-save (`page.tsx:55-73`) persists
+   independently of validation, so a user under the threshold keeps their work — they just can't proceed.
+6. `NotReadyMessage`'s "500-1000 words" is replaced by the real requirement stated as a requirement,
+   keeping any aspiration separate from the threshold. No invented numbers.
+
+## Steps
+
+1. **Create `frontend/src/lib/constants/summary-readiness.ts`** — `SUMMARY_MIN_WORDS = 30`,
+   `SUMMARY_MIN_CHARACTERS = 150`, `SUMMARY_MAX_CHARACTERS = 2000`, `countSummaryWords()`,
+   `getSummaryReadinessError()`. Docstring cites the backend file:line it mirrors.
+   Tests: `frontend/src/lib/constants/__tests__/summary-readiness.test.ts`.
+2. **`summary/page.tsx`** — drop `MIN_SUMMARY_LENGTH`, delegate to `getSummaryReadinessError()`;
+   counter shows words **and** characters against both minimums; fix the contradictory guideline copy.
+   Tests: new `frontend/src/app/dashboard/books/[bookId]/summary/__tests__/page.test.tsx` (none exist today).
+3. **`NotReadyMessage.tsx:128`** — replace the "500-1000 words" fiction with the real threshold.
+   Tests: extend/create a copy pin.
+4. **`bookClient.ts:512`** — correct the "100+ words" doc comment.
+
+## Acceptance criteria
+
+- [ ] AC1: words/characters copy mismatch fixed (counter, guideline text, NotReadyMessage tips all agree)
+- [ ] AC2: client gate raised to be consistent with the real AI readiness threshold (30 words AND 150 chars)
+- [ ] AC3: the dead-end is gone — a summary that passes the client gate is accepted by the wizard
+
+## Test strategy
+
+- Constants unit tests: boundary cases (29/30 words, 149/150 chars), Python-`split()` parity
+  (multiple spaces, newlines, tabs, leading/trailing whitespace, empty).
+- Summary page tests: submit blocked under each threshold, enabled at exactly the threshold,
+  counter copy, guideline copy, no contradictory strings.
+- NotReadyMessage: pin that the fictional "500-1000" copy is gone and the real threshold is shown.
+- **RED-verify every behavior pin at birth** + mutation-check per repo convention.
+- Demo (Phase 11, hard gate): real backend + Mongo, main-vs-branch differential proving the dead-end
+  on main and its absence on the branch.

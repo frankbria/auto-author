@@ -4,25 +4,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import bookClient from '@/lib/api/bookClient';
-
-// Validation helpers
-const MIN_SUMMARY_LENGTH = 30;
-const MAX_SUMMARY_LENGTH = 2000;
-const OFFENSIVE_REGEX = /\b(fuck|shit|bitch|asshole|bastard|dick|cunt|nigger|faggot|slut|whore)\b/i;
-const NON_ENGLISH_REGEX = /[\u0400-\u04FF\u0600-\u06FF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/; // Cyrillic, Arabic, CJK, Japanese, Korean
-
-const validateSummary = (text: string) => {
-  if (!text.trim()) return 'Please provide a summary of your book.';
-  if (text.length < MIN_SUMMARY_LENGTH)
-    return `Summary must be at least ${MIN_SUMMARY_LENGTH} characters.`;
-  if (text.length > MAX_SUMMARY_LENGTH)
-    return `Summary must be at most ${MAX_SUMMARY_LENGTH} characters.`;
-  if (OFFENSIVE_REGEX.test(text))
-    return 'Summary contains inappropriate language.';
-  if (NON_ENGLISH_REGEX.test(text))
-    return 'Please write your summary in English.';
-  return '';
-};
+import {
+  SUMMARY_MIN_WORDS,
+  SUMMARY_MIN_CHARACTERS,
+  countSummaryWords,
+  getSummaryReadinessError,
+} from '@/lib/constants/summary-readiness';
 
 export default function BookSummaryPage() {
   const router = useRouter();
@@ -82,7 +69,7 @@ export default function BookSummaryPage() {
 
   // Real-time validation
   useEffect(() => {
-    setInputError(validateSummary(summary));
+    setInputError(getSummaryReadinessError(summary));
   }, [summary]);
 
   // Speech recognition setup
@@ -145,7 +132,7 @@ export default function BookSummaryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validation = validateSummary(summary);
+    const validation = getSummaryReadinessError(summary);
     if (validation) {
       setError(validation);
       return;
@@ -215,14 +202,14 @@ export default function BookSummaryPage() {
               required
             ></textarea>
             <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>{summary.length} characters</span>
-              <span>Minimum: {MIN_SUMMARY_LENGTH} characters</span>
+              <span>{countSummaryWords(summary)} / {SUMMARY_MIN_WORDS} words</span>
+              <span>{summary.length} / {SUMMARY_MIN_CHARACTERS} characters</span>
             </div>
             {inputError && (
               <div className="text-red-400 text-xs mt-1">{inputError}</div>
             )}
             <div id="summary-help" className="text-xs text-gray-400 mt-2">
-              <div>Guidelines: Aim for 1-3 paragraphs. Include the main idea, genre, and any key themes or characters. Minimum 30 words recommended.</div>
+              <div>Guidelines: Aim for 1-3 paragraphs. Include the main idea, genre, and any key themes or characters. At least {SUMMARY_MIN_WORDS} words and {SUMMARY_MIN_CHARACTERS} characters are required to generate a table of contents — the more detail you give, the better the result.</div>
               <div className="italic text-gray-500 mt-1">
                 &quot;A young orphan discovers a hidden world of magic and must stop a dark sorcerer from conquering both realms. The story explores friendship, courage, and the power of believing in oneself.&quot;
               </div>

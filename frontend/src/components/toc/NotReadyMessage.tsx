@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TocReadiness } from '@/types/toc';
 import { bookClient } from '@/lib/api/bookClient';
+import { SUMMARY_MIN_WORDS, SUMMARY_MIN_CHARACTERS } from '@/lib/constants/summary-readiness';
 
 interface NotReadyMessageProps {
   readiness: TocReadiness;
@@ -125,7 +126,10 @@ export default function NotReadyMessage({ readiness, onRetry, bookId }: NotReady
           <li>Describe the target audience and book&apos;s purpose</li>
           <li>Outline major concepts or storylines</li>
           <li>Add details about structure and approach</li>
-          <li>Aim for at least 500-1000 words for comprehensive coverage</li>
+          <li>
+            At least {SUMMARY_MIN_WORDS} words and {SUMMARY_MIN_CHARACTERS} characters are
+            required; more detail produces a richer table of contents
+          </li>
         </ul>
       </div>
     </div>
