@@ -140,6 +140,18 @@ export default function VerifyTwoFactorPage() {
               {useBackupCode ? 'Use authenticator code instead' : 'Use a backup code instead'}
             </button>
           </form>
+          <details className="mt-4 text-sm text-muted-foreground">
+            <summary className="cursor-pointer underline-offset-4 hover:underline">
+              Lost access to your authenticator and backup codes?
+            </summary>
+            <p className="mt-2">
+              We can verify your identity and reset two-factor authentication manually. Email{' '}
+              <a href="mailto:support@autoauthor.com" className="underline underline-offset-4">
+                support@autoauthor.com
+              </a>{' '}
+              from the email address on your account and we&apos;ll help you regain access.
+            </p>
+          </details>
         </CardContent>
       </Card>
     </div>

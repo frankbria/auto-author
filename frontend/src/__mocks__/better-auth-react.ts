@@ -115,6 +115,10 @@ export const createAuthClient = jest.fn(() => ({
     disable: jest.fn().mockResolvedValue({ data: {}, error: null }),
     verifyTotp: jest.fn().mockResolvedValue({ data: {}, error: null }),
     verifyBackupCode: jest.fn().mockResolvedValue({ data: {}, error: null }),
+    generateBackupCodes: jest.fn().mockResolvedValue({
+      data: { backupCodes: ['CCCC-3333', 'DDDD-4444'] },
+      error: null,
+    }),
   },
   useSession,
 }));
