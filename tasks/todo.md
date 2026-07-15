@@ -44,30 +44,30 @@ The dedup fix corrects **both** states, which is why it's the right branch.
 
 ## Steps
 
-- [ ] 1. `backend/app/db/questions.py::save_question_responses_batch` — collapse
+- [x] 1. `backend/app/db/questions.py::save_question_responses_batch` — collapse
       repeated `question_id`s to one write, last-write-wins: after validation, if an op
       already exists for that id, overwrite its payload fields (text/status/word_count/
       timestamps) in place, record the earlier index as an alias, skip the redundant
       `find_one`. At execute time, emit the write's result (success *or* error) for
       every collapsed index.
-- [ ] 2. Tests in `backend/tests/test_batch_question_responses.py` (the fixture drops the
+- [x] 2. Tests in `backend/tests/test_batch_question_responses.py` (the fixture drops the
       DB and creates **no** indexes, so the suite today only ever sees the no-index path):
-  - [ ] duplicate in batch → exactly **1** document stored (RED today: 2)
-  - [ ] **production shape** — `ensure_question_indexes()` first → last answer wins,
+  - [x] duplicate in batch → exactly **1** document stored (RED today: 2)
+  - [x] **production shape** — `ensure_question_indexes()` first → last answer wins,
         `success: true`, no `E11000` anywhere in the response (RED today: first answer
         persists, `success: false`, raw E11000 leaked)
-  - [ ] per-item results: both indices report success with the **same** `response_id`;
+  - [x] per-item results: both indices report success with the **same** `response_id`;
         `total == saved + failed`
-  - [ ] duplicate over an **existing** response → single update, last wins
-  - [ ] validation independence: `[{q1,"text"}, {q1,""}]` → item 1 fails honestly,
+  - [x] duplicate over an **existing** response → single update, last wins
+  - [x] validation independence: `[{q1,"text"}, {q1,""}]` → item 1 fails honestly,
         "text" saved
-- [ ] 3. Mutation-verify each new test (strip the dedup → the intended test fails).
-- [ ] 4. Full backend suite + coverage gate green; pre-commit clean (no `--no-verify`).
+- [x] 3. Mutation-verify each new test (strip the dedup → the intended test fails).
+- [x] 4. Full backend suite + coverage gate green; pre-commit clean (no `--no-verify`).
 
 ## Acceptance criteria (from issue)
 
-- [ ] A batch containing the same `question_id` twice writes **one** response document,
+- [x] A batch containing the same `question_id` twice writes **one** response document,
       not two.
-- [ ] Result is last-write-wins within the batch — matching what two sequential saves
+- [x] Result is last-write-wins within the batch — matching what two sequential saves
       would produce.
-- [ ] Subsequent reads/updates keyed on `(question_id, user_id)` are deterministic.
+- [x] Subsequent reads/updates keyed on `(question_id, user_id)` are deterministic.
