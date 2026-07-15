@@ -20,14 +20,29 @@ const OFFENSIVE_REGEX = /\b(fuck|shit|bitch|asshole|bastard|dick|cunt|nigger|fag
 const NON_ENGLISH_REGEX = /[Ѐ-ӿ؀-ۿ一-鿿぀-ヿ가-힯]/;
 
 /**
- * Word count matching Python's `str.split()` — splits on runs of any whitespace and
- * ignores leading/trailing whitespace. The backend counts with `len(summary.split())`;
- * counting differently here would reintroduce client/server disagreement at the boundary.
+ * Python's `str.split()` whitespace set (every char where `str.isspace()` is true).
+ *
+ * Spelled out because JS `/\s/` is NOT the same set, and both divergences move the
+ * word count away from the backend's `len(summary.split())`:
+ *   - Python-only: \x1c-\x1f, \x85 — JS would not split, under-counting words and
+ *     falsely rejecting a summary the backend accepts.
+ *   - JS-only: ﻿ (BOM/ZWNBSP, common in pasted text) — JS would split, over-counting
+ *     words and accepting a summary the backend rejects, recreating the #218 dead-end.
+ */
+const PY_WHITESPACE =
+  '\\t\\n\\v\\f\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000';
+const PY_SPLIT_RE = new RegExp(`[${PY_WHITESPACE}]+`);
+const PY_TRIM_RE = new RegExp(`^[${PY_WHITESPACE}]+|[${PY_WHITESPACE}]+$`, 'g');
+
+/**
+ * Word count matching Python's `str.split()` — splits on runs of whitespace and ignores
+ * leading/trailing whitespace. The backend counts with `len(summary.split())`; counting
+ * differently here would reintroduce the client/server disagreement at the boundary.
  */
 export function countSummaryWords(text: string): number {
-  const trimmed = text.trim();
+  const trimmed = text.replace(PY_TRIM_RE, '');
   if (!trimmed) return 0;
-  return trimmed.split(/\s+/).length;
+  return trimmed.split(PY_SPLIT_RE).length;
 }
 
 /**

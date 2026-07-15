@@ -24,6 +24,11 @@ describe('countSummaryWords — parity with Python str.split()', () => {
   });
 
   it('collapses runs of whitespace like str.split()', () => {
+    // Each of these is 2 words to Python's split(); a naive split(' ') miscounts
+    // the double-space case as 3, which is why this asserts per-case.
+    expect(countSummaryWords('one  two')).toBe(2);
+    expect(countSummaryWords('one\ttwo')).toBe(2);
+    expect(countSummaryWords('one\ntwo')).toBe(2);
     expect(countSummaryWords('one   two\t\tthree\n\nfour')).toBe(4);
   });
 
@@ -34,6 +39,34 @@ describe('countSummaryWords — parity with Python str.split()', () => {
   it('returns 0 for empty and whitespace-only input', () => {
     expect(countSummaryWords('')).toBe(0);
     expect(countSummaryWords('   \n\t ')).toBe(0);
+  });
+
+  // JS /\s/ and Python str.split() disagree on two sets of characters. Both
+  // divergences shift the count away from the backend's len(summary.split()).
+  // Expected values below were produced by running the real Python:
+  //   len("word1\x85word2".split()) == 2 ; len("word1﻿word2".split()) == 1
+
+  it.each([
+    ['\\x1c', '\x1c'],
+    ['\\x1d', '\x1d'],
+    ['\\x1e', '\x1e'],
+    ['\\x1f', '\x1f'],
+    ['\\x85 (NEL)', '\x85'],
+  ])('splits on %s like Python (JS /\\s/ does not)', (_label, ch) => {
+    expect(countSummaryWords(`word1${ch}word2`)).toBe(2);
+  });
+
+  it('does not split on \\ufeff (BOM) — Python does not treat it as whitespace', () => {
+    // The regression that would recreate the #218 dead-end: counting this as 2
+    // words client-side while the backend counts 1.
+    expect(countSummaryWords('word1﻿word2')).toBe(1);
+  });
+
+  it('agrees with Python on the exotic whitespace it does share', () => {
+    expect(countSummaryWords('one two')).toBe(2); // NBSP
+    expect(countSummaryWords('one　two')).toBe(2); // ideographic space
+    expect(countSummaryWords('one two')).toBe(2); // line separator
+    expect(countSummaryWords('one two')).toBe(2); // four-per-em space
   });
 });
 
