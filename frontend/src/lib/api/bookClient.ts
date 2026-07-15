@@ -509,7 +509,7 @@ export class BookClient {
    *
    * // Check minimum requirements
    * if (!readiness.meets_minimum_requirements) {
-   *   alert(`Summary too short. Current: ${readiness.word_count} words. Need: 100+ words.`);
+   *   alert(`Summary too short. Current: ${readiness.word_count} words. Need: 30+ words and 150+ characters.`);
    * }
    * ```
    */
