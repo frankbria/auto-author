@@ -675,6 +675,14 @@ async def save_question_responses_batch(
     given book/chapter (mirrors the single-response path's membership check);
     unknown or foreign ids are flagged per-item and nothing is written for them.
 
+    A question_id repeated within one batch collapses to a single write carrying
+    the last valid item's content, so the stored answer matches what two
+    sequential saves would leave behind (#242). The audit trail deliberately does
+    not: collapsed items add no extra `edit_history` entry, because the
+    intermediate answer was never a persisted state. Every collapsed item reports
+    that write's outcome and its shared response_id, so `total` still equals
+    `saved` + `failed`.
+
     Args:
         responses: List of dicts with keys: question_id, response_text, status
         user_id: User ID for ownership
@@ -718,6 +726,9 @@ async def save_question_responses_batch(
     results = []
     successful_ops = []
     failed_responses = []
+    # Repeated question_id within one batch collapses to a single write (#242):
+    # question_id -> the op that will carry it.
+    ops_by_question = {}
 
     # Process each response and prepare bulk operations
     for idx, response_item in enumerate(responses):
@@ -768,14 +779,35 @@ async def save_question_responses_batch(
                 })
                 continue
 
+            # Calculate word count
+            word_count = len(response_text.split()) if response_text else 0
+
+            # Same question answered twice in one batch: last write wins, exactly
+            # as two sequential saves would end up. Retarget the write already
+            # prepared for this question instead of preparing a second one — two
+            # inserts would either store a duplicate document (no unique index) or
+            # trip question_user_idx and lose the newer answer. Deduping here, after
+            # validation, keeps each item's own validation error attributable.
+            prior_op = ops_by_question.get(question_id)
+            if prior_op is not None:
+                payload = (
+                    prior_op["update"]["$set"] if prior_op["is_update"]
+                    else prior_op["insert"]
+                )
+                payload["response_text"] = response_text
+                payload["status"] = response_status
+                payload["word_count"] = word_count
+                payload["updated_at"] = datetime.now(timezone.utc)
+                payload["last_edited_at"] = datetime.now(timezone.utc)
+                # Both items report this single write's outcome.
+                prior_op["indexes"].append(idx)
+                continue
+
             # Check if response already exists
             existing_response = await responses_collection.find_one({
                 "question_id": question_id,
                 "user_id": user_id
             })
-
-            # Calculate word count
-            word_count = len(response_text.split()) if response_text else 0
 
             # Prepare response data
             response_dict = {
@@ -800,14 +832,14 @@ async def save_question_responses_batch(
                     "edit_history": edit_history
                 }
 
-                successful_ops.append({
+                op = {
                     "filter": {"_id": existing_response["_id"]},
                     "update": {"$set": response_dict},
                     "is_update": True,
                     "question_id": question_id,
                     "response_id": str(existing_response["_id"]),
-                    "index": idx
-                })
+                    "indexes": [idx]
+                }
             else:
                 # Create new response
                 response_dict.update({
@@ -816,14 +848,17 @@ async def save_question_responses_batch(
                     "metadata": {"edit_history": []}
                 })
 
-                successful_ops.append({
+                op = {
                     "filter": None,
                     "insert": response_dict,
                     "is_update": False,
                     "question_id": question_id,
                     "response_id": str(response_dict["_id"]),
-                    "index": idx
-                })
+                    "indexes": [idx]
+                }
+
+            successful_ops.append(op)
+            ops_by_question[question_id] = op
 
         except Exception as e:
             results.append({
@@ -850,26 +885,32 @@ async def save_question_responses_batch(
             else:
                 await responses_collection.insert_one(op["insert"])
 
-            results.append({
-                "index": op["index"],
-                "question_id": op["question_id"],
-                "response_id": op["response_id"],
-                "success": True,
-                "is_update": op["is_update"]
-            })
-            saved_count += 1
+            for idx in op["indexes"]:
+                results.append({
+                    "index": idx,
+                    "question_id": op["question_id"],
+                    "response_id": op["response_id"],
+                    "success": True,
+                    "is_update": op["is_update"]
+                })
+                saved_count += 1
         except Exception as e:
-            results.append({
-                "index": op["index"],
-                "question_id": op["question_id"],
-                "success": False,
-                "error": f"Database error: {str(e)}"
-            })
-            failed_responses.append({
-                "index": op["index"],
-                "question_id": op["question_id"],
-                "error": f"Database error: {str(e)}"
-            })
+            for idx in op["indexes"]:
+                results.append({
+                    "index": idx,
+                    "question_id": op["question_id"],
+                    "success": False,
+                    "error": f"Database error: {str(e)}"
+                })
+                failed_responses.append({
+                    "index": idx,
+                    "question_id": op["question_id"],
+                    "error": f"Database error: {str(e)}"
+                })
+
+    # Validation failures are appended during prep and writes during execution, so
+    # results accumulate out of order; hand them back in request order.
+    results.sort(key=lambda r: r["index"])
 
     return {
         "success": len(failed_responses) == 0,
