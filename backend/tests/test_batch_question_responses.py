@@ -596,6 +596,75 @@ async def test_duplicate_question_id_over_existing_response_updates_once(motor_r
 
 
 @pytest.mark.asyncio
+async def test_question_id_repeated_three_times_collapses_to_last_write(motor_reinit_db):
+    """Three occurrences of one id still collapse to a single write of the last answer.
+
+    Interleaves a second question so the results are also pinned to come back in
+    request order (the collapsed op carries indexes 0 and 3, the other index 1).
+    """
+    user_id = "test_user_123"
+    book_id = "book_123"
+    chapter_id = "chapter_123"
+    repeated = await _make_question(user_id, book_id, chapter_id)
+    other = await _make_question(user_id, book_id, chapter_id, order=1)
+
+    result = await save_question_responses_batch(
+        [
+            {"question_id": repeated["id"], "response_text": "Answer one", "status": "draft"},
+            {"question_id": other["id"], "response_text": "Other answer", "status": "draft"},
+            {"question_id": repeated["id"], "response_text": "Answer two", "status": "draft"},
+            {"question_id": repeated["id"], "response_text": "Answer three", "status": "completed"},
+        ],
+        user_id, book_id=book_id, chapter_id=chapter_id,
+    )
+
+    assert result["success"] is True
+    assert result["total"] == 4
+    assert result["saved"] == 4
+    assert result["total"] == result["saved"] + result["failed"]
+    assert [r["index"] for r in result["results"]] == [0, 1, 2, 3]
+
+    responses_collection = await get_collection("question_responses")
+    stored = [d async for d in responses_collection.find({"question_id": repeated["id"]})]
+    assert len(stored) == 1
+    assert stored[0]["response_text"] == "Answer three"
+    assert stored[0]["status"] == "completed"
+
+    other_stored = [d async for d in responses_collection.find({"question_id": other["id"]})]
+    assert len(other_stored) == 1
+    assert other_stored[0]["response_text"] == "Other answer"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_question_id_empty_first_then_valid_saves_valid(motor_reinit_db):
+    """The reverse order of the case below: an invalid first item must not block the valid one."""
+    user_id = "test_user_123"
+    book_id = "book_123"
+    chapter_id = "chapter_123"
+    question = await _make_question(user_id, book_id, chapter_id)
+
+    result = await save_question_responses_batch(
+        [
+            {"question_id": question["id"], "response_text": "", "status": "draft"},
+            {"question_id": question["id"], "response_text": "Real answer", "status": "completed"},
+        ],
+        user_id, book_id=book_id, chapter_id=chapter_id,
+    )
+
+    assert result["saved"] == 1
+    assert result["failed"] == 1
+    by_index = {r["index"]: r for r in result["results"]}
+    assert by_index[0]["success"] is False
+    assert by_index[0]["error"] == "Missing response_text"
+    assert by_index[1]["success"] is True
+
+    responses_collection = await get_collection("question_responses")
+    stored = [d async for d in responses_collection.find({"question_id": question["id"]})]
+    assert len(stored) == 1
+    assert stored[0]["response_text"] == "Real answer"
+
+
+@pytest.mark.asyncio
 async def test_duplicate_question_id_validates_each_item_independently(motor_reinit_db):
     """Collapsing must not swallow (or misattribute) a per-item validation error.
 

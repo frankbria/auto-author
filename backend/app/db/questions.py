@@ -675,10 +675,13 @@ async def save_question_responses_batch(
     given book/chapter (mirrors the single-response path's membership check);
     unknown or foreign ids are flagged per-item and nothing is written for them.
 
-    A question_id repeated within one batch collapses to a single write with the
-    last valid item's content, matching what two sequential saves would leave
-    behind (#242). Every collapsed item reports that write's outcome and its
-    shared response_id, so `total` still equals `saved` + `failed`.
+    A question_id repeated within one batch collapses to a single write carrying
+    the last valid item's content, so the stored answer matches what two
+    sequential saves would leave behind (#242). The audit trail deliberately does
+    not: collapsed items add no extra `edit_history` entry, because the
+    intermediate answer was never a persisted state. Every collapsed item reports
+    that write's outcome and its shared response_id, so `total` still equals
+    `saved` + `failed`.
 
     Args:
         responses: List of dicts with keys: question_id, response_text, status
@@ -904,6 +907,10 @@ async def save_question_responses_batch(
                     "question_id": op["question_id"],
                     "error": f"Database error: {str(e)}"
                 })
+
+    # Validation failures are appended during prep and writes during execution, so
+    # results accumulate out of order; hand them back in request order.
+    results.sort(key=lambda r: r["index"])
 
     return {
         "success": len(failed_responses) == 0,
