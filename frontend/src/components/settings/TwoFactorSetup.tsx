@@ -59,6 +59,10 @@ export default function TwoFactorSetup() {
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Single-flight: Enter can re-submit before the in-flight re-render lands,
+    // and generateBackupCodes REPLACES the code set — a double call desyncs
+    // the saved codes from the valid ones.
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       if (mode === 'enable') {

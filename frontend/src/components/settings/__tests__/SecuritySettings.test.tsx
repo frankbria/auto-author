@@ -249,6 +249,35 @@ describe('TwoFactorSetup', () => {
     expect(screen.queryByText('CCCC-3333')).not.toBeInTheDocument();
   });
 
+  it('fires generateBackupCodes exactly once on a double-submit of the password form', async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: true },
+        session: { token: 'tok' },
+      },
+    });
+    // Hold the first call in flight so the second submit lands before it resolves
+    let resolveFirst: (value: unknown) => void = () => {};
+    mockGenerateBackupCodes.mockImplementation(
+      () => new Promise((resolve) => (resolveFirst = resolve))
+    );
+    render(<TwoFactorSetup />);
+
+    fireEvent.click(screen.getByRole('button', { name: /regenerate backup codes/i }));
+    const pwField = screen.getByLabelText('Confirm your password');
+    fireEvent.change(pwField, { target: { value: 'pw-1234' } });
+    const form = pwField.closest('form') as HTMLFormElement;
+    // Double-Enter / keyboard auto-repeat submits the form twice before the
+    // in-flight state re-renders — each call REPLACES the server code set,
+    // so a second call desyncs saved codes from valid codes (lockout risk).
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(mockGenerateBackupCodes).toHaveBeenCalledTimes(1);
+
+    resolveFirst({ data: { backupCodes: ['EEEE-5555'] }, error: null });
+    await waitFor(() => expect(screen.getByText('EEEE-5555')).toBeInTheDocument());
+  });
+
   it('shows a destructive toast when the regenerate password is wrong', async () => {
     mockUseSession.mockReturnValue({
       data: {
