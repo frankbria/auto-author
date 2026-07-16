@@ -1,6 +1,6 @@
 # backend/app/db/questions.py
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Iterable
 from datetime import datetime, timezone
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -530,15 +530,54 @@ async def delete_questions_for_book(
     return result.deleted_count
 
 
+async def count_questions_without_responses(
+    book_id: str,
+    chapter_id: str,
+    user_id: str,
+) -> int:
+    """Count the chapter's questions that have no saved response.
+
+    This is the number of questions a preserve-responses bulk regeneration will
+    replace. Generate-then-swap needs it computed up front (before the new batch
+    exists), so it can't be derived from a delete's return value (#234).
+    """
+    questions_collection = await get_collection("questions")
+    responses_collection = await get_collection("question_responses")
+
+    question_ids = [
+        str(q["_id"])
+        for q in await questions_collection.find(
+            {"book_id": book_id, "chapter_id": chapter_id, "user_id": user_id},
+            {"_id": 1},
+        ).to_list(length=None)
+    ]
+    if not question_ids:
+        return 0
+
+    answered = await responses_collection.distinct(
+        "question_id",
+        {"question_id": {"$in": question_ids}, "user_id": user_id},
+    )
+    return len(question_ids) - len(set(answered))
+
+
 async def delete_questions_for_chapter(
     book_id: str,
     chapter_id: str,
     user_id: str,
-    preserve_with_responses: bool = True
+    preserve_with_responses: bool = True,
+    exclude_ids: Optional[Iterable[str]] = None,
 ) -> int:
-    """Delete questions for a chapter, optionally preserving those with responses."""
+    """Delete questions for a chapter, optionally preserving those with responses.
+
+    ``exclude_ids`` are never deleted — used by generate-then-swap so the newly
+    created replacement questions (which have no responses yet) survive the
+    delete of the old set (#234).
+    """
     questions_collection = await get_collection("questions")
     responses_collection = await get_collection("question_responses")
+
+    exclude = set(exclude_ids or ())
 
     # Get all questions for the chapter
     questions = await questions_collection.find({
@@ -551,6 +590,9 @@ async def delete_questions_for_chapter(
 
     for question in questions:
         question_id = str(question["_id"])
+
+        if question_id in exclude:
+            continue
 
         # Check if question has responses
         has_response = await responses_collection.find_one({

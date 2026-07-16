@@ -25,6 +25,7 @@ from app.schemas.book import (
     QuestionResponseCreate,
     QuestionRating,
     QuestionCreate,
+    Question,
     QuestionListResponse,
     QuestionProgressResponse,
     GenerateQuestionsResponse,
@@ -209,6 +210,23 @@ class TestProcessGeneratedQuestions:
         assert len(result) == 5  # fallback questions (line 528)
         assert all(isinstance(q, QuestionCreate) for q in result)
         assert all(q.is_fallback is True for q in result)  # tagged templates (#182)
+
+    def test_fallback_renders_real_chapter_title(self, service):
+        # N5 (#234): the PLOT template must interpolate the actual chapter title,
+        # not the hardcoded "Chapter" placeholder.
+        # Force the PLOT template (the only one that interpolates the title) so the
+        # assertion is deterministic regardless of the default type-cycling order.
+        result = service._process_generated_questions(
+            raw_questions=[],
+            book_id="book-1",
+            chapter_id="ch-1",
+            count=5,
+            chapter_title="The Great Escape",
+            requested_focus_types=[QuestionType.PLOT],
+        )
+        texts = [q.question_text for q in result]
+        assert any("The Great Escape" in t for t in texts)
+        assert not any("conflict in Chapter?" in t for t in texts)
 
     def test_mixed_ai_and_fallback_tagging(self, service):
         # One valid AI question + count=3 -> template fill; only the fill is
@@ -470,12 +488,33 @@ class TestGenerateQuestionsForChapter:
 # regenerate_chapter_questions
 # --------------------------------------------------------------------------- #
 class TestRegenerate:
-    async def test_regenerates_when_questions_deleted(self, service):
-        gen_result = GenerateQuestionsResponse(questions=[], generation_id="g", total=2)
+    async def test_generates_and_persists_before_deleting(self, service):
+        """Generate-then-swap: the new batch is generated + persisted FIRST, then the
+        old questions are deleted, excluding the just-created ids. new_count is the
+        up-front count of unanswered questions, not the delete's return value (#234)."""
+        gen_result = GenerateQuestionsResponse(
+            questions=[
+                Question(**_saved_question_dict("new1", order=1)),
+                Question(**_saved_question_dict("new2", order=2)),
+            ],
+            generation_id="g",
+            total=2,
+        )
         ctx = {"previous_questions": ["old q"], "feedback_guidance": None}
-        with patch(f"{MODULE}.delete_questions_for_chapter", AsyncMock(return_value=2)), \
+        call_order = []
+
+        async def fake_gen(*a, **k):
+            call_order.append("generate")
+            return gen_result
+
+        async def fake_delete(*a, **k):
+            call_order.append("delete")
+            return 2
+
+        with patch(f"{MODULE}.count_questions_without_responses", AsyncMock(return_value=2)), \
              patch.object(service, "_gather_regeneration_context", AsyncMock(return_value=ctx)), \
-             patch.object(service, "generate_questions_for_chapter", AsyncMock(return_value=gen_result)) as mock_gen:
+             patch.object(service, "generate_questions_for_chapter", side_effect=fake_gen) as mock_gen, \
+             patch(f"{MODULE}.delete_questions_for_chapter", side_effect=fake_delete) as mock_delete:
             result = await service.regenerate_chapter_questions(
                 book_id="book-1",
                 chapter_id="ch-1",
@@ -483,17 +522,44 @@ class TestRegenerate:
                 user_id="u1",
                 preserve_responses=True,
             )
-        mock_gen.assert_awaited_once()
-        # previous questions + feedback guidance are threaded into generation
+
+        # Generation completed before the destructive delete -> no empty-chapter window.
+        assert call_order == ["generate", "delete"]
+        # The freshly-created question ids are excluded from the delete.
+        assert set(mock_delete.await_args.kwargs["exclude_ids"]) == {"new1", "new2"}
+        # new_count is the up-front unanswered count; prior context still threaded in.
+        assert mock_gen.await_args.kwargs["count"] == 2
         assert mock_gen.await_args.kwargs["previous_questions"] == ["old q"]
         assert result.new_count == 2
         assert result.preserved_count == 5 - 2
 
-    async def test_nothing_deleted_returns_empty(self, service):
-        # preserve_responses True, deleted 0 -> new_count 0 -> empty result (338)
+    async def test_ai_outage_leaves_existing_questions_intact(self, service):
+        """The core reliability guarantee (#234): an AI outage during bulk regenerate
+        must NOT reach the delete, so the chapter keeps its questions until retry."""
         ctx = {"previous_questions": [], "feedback_guidance": None}
-        with patch(f"{MODULE}.delete_questions_for_chapter", AsyncMock(return_value=0)), \
-             patch.object(service, "_gather_regeneration_context", AsyncMock(return_value=ctx)):
+        with patch(f"{MODULE}.count_questions_without_responses", AsyncMock(return_value=3)), \
+             patch.object(service, "_gather_regeneration_context", AsyncMock(return_value=ctx)), \
+             patch.object(service, "generate_questions_for_chapter",
+                          AsyncMock(side_effect=AIServiceError("outage", error_code="AI_UNAVAILABLE", retryable=True))), \
+             patch(f"{MODULE}.delete_questions_for_chapter", AsyncMock(return_value=0)) as mock_delete:
+            with pytest.raises(AIServiceError):
+                await service.regenerate_chapter_questions(
+                    book_id="book-1",
+                    chapter_id="ch-1",
+                    count=5,
+                    user_id="u1",
+                    preserve_responses=True,
+                )
+        mock_delete.assert_not_awaited()
+
+    async def test_nothing_to_replace_returns_empty_without_side_effects(self, service):
+        """preserve_responses True with zero unanswered questions -> neither generate
+        nor delete runs, empty result returned."""
+        ctx = {"previous_questions": [], "feedback_guidance": None}
+        with patch(f"{MODULE}.count_questions_without_responses", AsyncMock(return_value=0)), \
+             patch.object(service, "_gather_regeneration_context", AsyncMock(return_value=ctx)), \
+             patch.object(service, "generate_questions_for_chapter", AsyncMock()) as mock_gen, \
+             patch(f"{MODULE}.delete_questions_for_chapter", AsyncMock()) as mock_delete:
             result = await service.regenerate_chapter_questions(
                 book_id="book-1",
                 chapter_id="ch-1",
@@ -504,6 +570,34 @@ class TestRegenerate:
         assert isinstance(result, GenerateQuestionsResponse)
         assert result.total == 0
         assert result.questions == []
+        mock_gen.assert_not_awaited()
+        mock_delete.assert_not_awaited()
+
+    async def test_preserve_false_replaces_full_set(self, service):
+        """preserve_responses False regenerates `count` questions and deletes the whole
+        old set (excluding new ids); the unanswered count is irrelevant on this path."""
+        gen_result = GenerateQuestionsResponse(
+            questions=[Question(**_saved_question_dict("n1", order=1))],
+            generation_id="g",
+            total=1,
+        )
+        ctx = {"previous_questions": [], "feedback_guidance": None}
+        with patch(f"{MODULE}.count_questions_without_responses", AsyncMock(return_value=99)) as mock_count, \
+             patch.object(service, "_gather_regeneration_context", AsyncMock(return_value=ctx)), \
+             patch.object(service, "generate_questions_for_chapter", AsyncMock(return_value=gen_result)) as mock_gen, \
+             patch(f"{MODULE}.delete_questions_for_chapter", AsyncMock(return_value=4)) as mock_delete:
+            result = await service.regenerate_chapter_questions(
+                book_id="book-1",
+                chapter_id="ch-1",
+                count=7,
+                user_id="u1",
+                preserve_responses=False,
+            )
+        mock_count.assert_not_awaited()  # unanswered count not consulted when discarding all
+        assert mock_gen.await_args.kwargs["count"] == 7
+        assert mock_delete.await_args.kwargs["preserve_with_responses"] is False
+        assert set(mock_delete.await_args.kwargs["exclude_ids"]) == {"n1"}
+        assert result.preserved_count == 0
 
 
 # --------------------------------------------------------------------------- #
