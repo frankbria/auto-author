@@ -30,6 +30,7 @@ from app.db.database import (
     get_ratings_for_chapter as db_get_ratings_for_chapter,
     get_chapter_question_progress as db_get_chapter_question_progress,
     delete_questions_for_chapter,
+    count_questions_without_responses,
     replace_question_in_place,
     get_question_by_id,
     get_book_by_id,
@@ -389,46 +390,59 @@ class QuestionGenerationService:
 
         user_id = user_id or current_user.get("auth_id")
 
-        # Capture existing questions + prior feedback BEFORE deleting, so the new
+        # Capture existing questions + prior feedback BEFORE regenerating, so the new
         # questions can avoid duplicating them and can act on the author's feedback.
         regen_context = await self._gather_regeneration_context(book_id, chapter_id, user_id)
 
-        # Delete existing questions (preserving those with responses if requested)
-        deleted_count = await delete_questions_for_chapter(
-            book_id=book_id,
-            chapter_id=chapter_id,
-            user_id=user_id,
-            preserve_with_responses=preserve_responses
-        )
-
-        # Generate new questions to replace deleted ones
-        new_count = count if not preserve_responses else deleted_count
-        if new_count > 0:
-            result = await self.generate_questions_for_chapter(
-                book_id=book_id,
-                chapter_id=chapter_id,
-                count=new_count,
-                difficulty=difficulty,
-                focus=focus,
-                user_id=user_id,
-                current_user=current_user,
-                previous_questions=regen_context["previous_questions"],
-                feedback_guidance=regen_context["feedback_guidance"]
-            )
-
-            # Add metadata about the regeneration
-            result.preserved_count = count - deleted_count if preserve_responses else 0
-            result.new_count = new_count
-            result.total = result.preserved_count + result.new_count
-
-            return result
+        # How many replacements to generate. Computed up front (not from a delete's
+        # return value) because generate-then-swap deletes AFTER generating (#234):
+        # preserve -> replace only the unanswered questions; discard -> the full set.
+        if preserve_responses:
+            new_count = await count_questions_without_responses(book_id, chapter_id, user_id)
         else:
-            # No questions were deleted, return empty result
+            new_count = count
+
+        if new_count <= 0:
+            # Nothing to replace (e.g. every question already answered) — no-op.
             return GenerateQuestionsResponse(
                 questions=[],
                 generation_id=str(uuid.uuid4()),
                 total=0
             )
+
+        # Generate AND persist the new batch FIRST. On an AI outage this raises before
+        # any delete, so the chapter keeps its existing questions until the user retries
+        # (no empty-chapter window). User-authored answers are untouched either way.
+        result = await self.generate_questions_for_chapter(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            count=new_count,
+            difficulty=difficulty,
+            focus=focus,
+            user_id=user_id,
+            current_user=current_user,
+            previous_questions=regen_context["previous_questions"],
+            feedback_guidance=regen_context["feedback_guidance"]
+        )
+
+        # Swap out the old questions now that the replacements are safely persisted,
+        # excluding the ids we just created (they have no responses, so a preserve
+        # delete would otherwise sweep them up).
+        new_ids = {q.id for q in result.questions}
+        deleted_count = await delete_questions_for_chapter(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            user_id=user_id,
+            preserve_with_responses=preserve_responses,
+            exclude_ids=new_ids,
+        )
+
+        # Add metadata about the regeneration
+        result.preserved_count = count - deleted_count if preserve_responses else 0
+        result.new_count = new_count
+        result.total = result.preserved_count + result.new_count
+
+        return result
 
     async def regenerate_single_question(
         self,
@@ -585,6 +599,7 @@ class QuestionGenerationService:
                 book_id=book_id,
                 chapter_id=chapter_id,
                 count=count,
+                chapter_title=chapter_title,
                 requested_difficulty=difficulty,
                 requested_focus_types=focus_types
             )
@@ -728,6 +743,7 @@ class QuestionGenerationService:
         book_id: str,
         chapter_id: str,
         count: int,
+        chapter_title: str = "Chapter",
         requested_difficulty: Optional[QuestionDifficulty] = None,
         requested_focus_types: Optional[List[QuestionType]] = None
     ) -> List[QuestionCreate]:
@@ -740,7 +756,7 @@ class QuestionGenerationService:
             return self._generate_fallback_questions(
                 book_id=book_id,
                 chapter_id=chapter_id,
-                chapter_title="Chapter",
+                chapter_title=chapter_title,
                 count=count,
                 difficulty=requested_difficulty,
                 focus_types=requested_focus_types
@@ -827,7 +843,7 @@ class QuestionGenerationService:
             fallback_questions = self._generate_fallback_questions(
                 book_id=book_id,
                 chapter_id=chapter_id,
-                chapter_title="Chapter",
+                chapter_title=chapter_title,
                 count=max(3, count - len(processed_questions)),
                 difficulty=requested_difficulty,
                 focus_types=requested_focus_types

@@ -60,6 +60,7 @@ from .questions import (
     get_ratings_for_chapter,
     get_chapter_question_progress,
     delete_questions_for_chapter,
+    count_questions_without_responses,
     replace_question_in_place,
     get_question_by_id,
 )
@@ -102,6 +103,7 @@ __all__ += [
     "get_ratings_for_chapter",
     "get_chapter_question_progress",
     "delete_questions_for_chapter",
+    "count_questions_without_responses",
     "replace_question_in_place",
     "get_question_by_id",
     # TOC transaction DAOs
