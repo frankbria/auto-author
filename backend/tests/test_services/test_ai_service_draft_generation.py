@@ -75,7 +75,9 @@ class TestAIServiceDraftGeneration:
         # Verify OpenAI was called correctly
         ai_service.client.chat.completions.create.assert_called_once()
         call_args = ai_service.client.chat.completions.create.call_args
-        assert call_args[1]["model"] == "gpt-4"
+        # Drafts use the larger-output model so the UI's top length options are
+        # serviceable (#232); other AI flows stay on gpt-4.
+        assert call_args[1]["model"] == "gpt-4o"
         assert call_args[1]["temperature"] == 0.8
 
     @pytest.mark.asyncio
@@ -188,7 +190,7 @@ class TestAIServiceDraftGeneration:
 
     @pytest.mark.asyncio
     async def test_max_tokens_clamped_to_model_cap(self, ai_service):
-        """A huge target_length must not exceed the gpt-4 output cap."""
+        """A huge target_length must not exceed the draft output ceiling."""
         await ai_service.generate_chapter_draft(
             chapter_title="Test",
             chapter_description="Test",
@@ -197,7 +199,40 @@ class TestAIServiceDraftGeneration:
             target_length=10000,
         )
         call_args = ai_service.client.chat.completions.create.call_args
-        assert call_args[1]["max_tokens"] == 4000
+        assert call_args[1]["max_tokens"] == 8000
+
+    @pytest.mark.asyncio
+    async def test_5000_word_target_is_fully_serviceable(self, ai_service):
+        """The UI's top '5,000 words (Extended)' option must get its full
+        budget, not the old ~2500-3000-word gpt-4 cap (#232)."""
+        await ai_service.generate_chapter_draft(
+            chapter_title="Test",
+            chapter_description="Test",
+            question_responses=[],
+            book_metadata={},
+            target_length=5000,
+        )
+        call_args = ai_service.client.chat.completions.create.call_args
+        assert call_args[1]["max_tokens"] == 8000  # 5000 words * 1.6
+        assert call_args[1]["model"] == "gpt-4o"
+
+    @pytest.mark.asyncio
+    async def test_draft_model_reported_in_metadata(self, ai_service):
+        """Metadata must reflect the actual model used, not the service default."""
+        result = await ai_service.generate_chapter_draft(
+            chapter_title="Test",
+            chapter_description="Test",
+            question_responses=[],
+            book_metadata={},
+        )
+        assert result["metadata"]["model_used"] == "gpt-4o"
+
+    @pytest.mark.asyncio
+    async def test_non_draft_flow_still_uses_default_model(self, ai_service):
+        """Draft model scoping must not leak into other AI flows (#232)."""
+        await ai_service.analyze_summary_for_toc("A" * 200)
+        call_args = ai_service.client.chat.completions.create.call_args
+        assert call_args[1]["model"] == "gpt-4"
 
     @pytest.mark.asyncio
     async def test_max_tokens_has_headroom_floor_for_small_targets(self, ai_service):

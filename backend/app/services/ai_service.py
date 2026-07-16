@@ -38,11 +38,19 @@ from app.services.ai_cache_service import (
 
 logger = logging.getLogger(__name__)
 
-# Draft-generation token budget (#181): ~1.6 tokens per English word, clamped
-# to a conservative gpt-4 output cap that leaves prompt headroom in the 8192
-# context window (matches the fixed max_tokens=4000 the sibling methods use).
+# Draft generation runs on a larger-output model so the UI's top length options
+# stay serviceable (#232). gpt-4's 8192-token shared context capped completions
+# at ~4000 tokens (~2500-3000 words), below the UI's "5,000 words (Extended)"
+# option; gpt-4o (128k context / 16k max output) has the headroom. Scoped to
+# drafts only — other AI flows stay on gpt-4 (self.model) to avoid unvetted
+# cost/behavior changes. ponytail: module constants beside the sibling DRAFT_
+# knobs; promote to config only if ops need per-env tuning.
+DRAFT_GENERATION_MODEL = "gpt-4o"
+# Draft-generation token budget (#181): ~1.6 tokens per English word, clamped to
+# a ceiling that covers 5,000 words (5000 * 1.6 = 8000) with headroom under
+# gpt-4o's 16,384-token output limit.
 DRAFT_WORDS_TO_TOKENS_FACTOR = 1.6
-DRAFT_MAX_COMPLETION_TOKENS = 4000
+DRAFT_MAX_COMPLETION_TOKENS = 8000
 
 
 class AIService:
@@ -194,6 +202,7 @@ class AIService:
         temperature: float = 0.3,
         max_tokens: int = 1000,
         correlation_id: Optional[str] = None,
+        model: Optional[str] = None,
     ):
         """
         Make an OpenAI API request with retry logic.
@@ -208,6 +217,8 @@ class AIService:
             max_tokens: Maximum tokens for the response
             correlation_id: Optional correlation ID so retry logs stay
                 correlated with the calling request
+            model: Optional per-call model override; defaults to self.model so
+                non-draft callers are unaffected (#232)
 
         Returns:
             OpenAI response object
@@ -215,7 +226,7 @@ class AIService:
 
         def _sync_request():
             return self.client.chat.completions.create(
-                model=self.model,
+                model=model or self.model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -970,7 +981,10 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 DRAFT_MAX_COMPLETION_TOKENS,
             )
             response = await self._make_openai_request(
-                messages, temperature=0.8, max_tokens=max_tokens
+                messages,
+                temperature=0.8,
+                max_tokens=max_tokens,
+                model=DRAFT_GENERATION_MODEL,
             )
 
             choice = response.choices[0]
@@ -1000,7 +1014,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     "word_count": word_count,
                     "estimated_reading_time": estimated_reading_time,
                     "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "model_used": self.model,
+                    "model_used": DRAFT_GENERATION_MODEL,
                     "writing_style": writing_style or "default",
                     "target_length": target_length,
                     "actual_length": word_count
