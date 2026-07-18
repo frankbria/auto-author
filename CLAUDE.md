@@ -966,7 +966,7 @@ bd create "Add tests for emergency hotfix" -p 0 -t bug
 - `archive/*.md` - Historical planning documents (read-only)
 
 **Environment Variables**:
-- `BYPASS_AUTH=true` - Disable authentication for E2E testing; only takes effect together with `E2E_ALLOW_BYPASS=1` in every environment (#272)
+- `BYPASS_AUTH=true` - Disable authentication for E2E testing; only takes effect together with `E2E_ALLOW_BYPASS=1` in every environment (frontend middleware #272, backend FastAPI #307 — backend production stays hard-blocked regardless)
 - Standard Next.js and FastAPI environment variables (see `.env.example`)
 
 ---

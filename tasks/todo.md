@@ -1,53 +1,65 @@
-# [P2.22] #272 — Require E2E_ALLOW_BYPASS for auth bypass in ALL environments
+# #307 — Require E2E_ALLOW_BYPASS for backend (FastAPI) BYPASS_AUTH in all environments
 
-**Plan source**: self-authored (issue has acceptance criteria but no step plan; no comments).
+**Plan source**: self-authored (issue body has scope bullets, no step plan; no comments).
 **Approval**: autonomous — no architectural fork.
 
 ## Design decisions (autonomous — safe defaults)
 
-1. **Non-prod, `BYPASS_AUTH=true` without the flag** → bypass is *ignored* (fall through to
-   normal auth) + `console.warn` explaining `E2E_ALLOW_BYPASS=1` is required. No FATAL outside
-   production — the prod FATAL (`middleware.ts:42-48`) stays exactly as-is as the loud layer.
-2. **Backend (FastAPI) `BYPASS_AUTH` system is OUT of scope** — parallel guard with its own
-   semantics, untouched by #271; the issue and all AC items are about the Next.js middleware.
-3. **`NEXT_PUBLIC_BYPASS_AUTH` (client var) is OUT of scope** — used by
-   `ProtectedRoute.tsx`/`dashboard/page.tsx`, not the middleware path; issue doesn't mention it.
-4. **`.env.test`** is gitignored and absent on disk (dotenv load is a silent no-op). Tracked
-   counterpart updated instead: `frontend/.env.example` documents the both-required rule.
-   `playwright.config.ts:103` already hardcodes `E2E_ALLOW_BYPASS: '1'` in webServer env — no change.
-5. **Pre-commit hook** (`.pre-commit-config.yaml:75`) unchanged — it invokes Playwright, which
-   supplies the flag via webServer env.
+1. **Reuse `E2E_ALLOW_BYPASS=1`** (issue offered a backend-specific flag as an option) —
+   one flag, same semantics as the frontend middleware (#272), already documented. Exact
+   value `'1'` required, mirroring the frontend.
+2. **Gate lives in the `Settings` field_validator (`backend/app/core/config.py`) as a
+   coercion**: prod + `BYPASS_AUTH=true` + no flag → raise (FATAL, unchanged); non-prod +
+   `BYPASS_AUTH=true` + no flag → **coerce to `False`** + warn ("ignored — set
+   E2E_ALLOW_BYPASS=1"); flag `'1'` present → allowed. Chosen over a computed property or
+   call-site helper because ~15 existing tests monkeypatch the `settings.BYPASS_AUTH`
+   attribute at the object level — coercion at construction keeps every one of them green
+   with zero call-site changes (`security.py`, `dependencies.py` untouched).
+3. **`main.py validate_production_security()`** prod branch unchanged (validator raises at
+   construction first; main.py stays defense-in-depth). Its non-prod warn remains accurate:
+   after coercion it only fires when bypass is genuinely active (flag set).
+4. **Backend pytest suite needs no new fixtures** — env-gate pins construct real `Settings`
+   with monkeypatched env (existing `TestProductionSecurityValidation` pattern).
+5. Demo = Showboat only (API-only backend; HTTP 401-vs-200 + startup log lines as evidence).
 
 ## Steps
 
-- [x] 1. **TDD pins** — `frontend/src/__tests__/middleware.test.ts`:
-  - [x] invert `'still bypasses outside production without the flag'` (:115-120) → now must NOT bypass
-  - [x] new pins: `BYPASS_AUTH=true` alone with `NODE_ENV` = test / development / unset → no bypass
-  - [x] `BYPASS_AUTH=true` + `E2E_ALLOW_BYPASS=1` in non-prod → bypass works
-  - [x] prod FATAL without flag unchanged; prod + flag bypasses (existing pins)
-  - [x] flag alone (no `BYPASS_AUTH`) → no bypass (existing pins :108-131, adjust if needed)
-  - [x] CSP describe (:168-173) sets the flag too (it exercises the bypass early-return)
-- [x] 2. **Implement** — `frontend/src/middleware.ts`: gate the bypass early-return on
-      `e2eAllowBypass` in every environment; add the non-prod warn-and-enforce path.
-- [x] 3. **CI** — `.github/workflows/tests.yml`: add `E2E_ALLOW_BYPASS: '1'` to the Run-E2E step env (:196-207).
-- [x] 4. **Env template** — `frontend/.env.example`: document `E2E_ALLOW_BYPASS` + both-required rule.
-- [x] 5. **Docs** — `README.md` (:71, :146-147, :162-163, :361-362),
-      `frontend/tests/e2e/E2E_TEST_STATUS.md` (:163-165), `frontend/docs/E2E_TEST_STATUS.md` (:197-198),
-      `CLAUDE.md` (:644, :963): add `E2E_ALLOW_BYPASS=1` to documented bypass commands + state the rule.
-- [x] 6. **Verify** — `cd frontend && npx jest src/__tests__/middleware.test.ts` green, then full
-      `npm test -- --watchAll=false`, `npm run lint`, `npm run typecheck`.
+- [ ] 1. **TDD pins** — `backend/tests/test_core/test_security.py`
+      (`TestProductionSecurityValidation`):
+  - [ ] invert the 5 "allowed without flag" pins (:432-478 dev/test/staging/unset,
+        :529-538 ENVIRONMENT=staging) → without flag, `Settings().BYPASS_AUTH is False`
+  - [ ] new pins: same 5 env combos **with** `E2E_ALLOW_BYPASS=1` → `is True`
+  - [ ] loose flag value (`'true'`) → `is False`; prod + flag → construction OK, `is True`
+  - [ ] coercion emits a warning naming `E2E_ALLOW_BYPASS` (caplog)
+  - [ ] keep all prod-blocked pins (:414-430, :480-492, :494-508) unchanged
+  - [ ] `test_main.py`: update the 4 "allows bypass" docstrings to note the flag gate
+        (mock-based function tests still valid)
+- [ ] 2. **Implement** — `backend/app/core/config.py`: extend the `BYPASS_AUTH` validator
+      per decision 2 (add module logger for the coercion warning).
+- [ ] 3. **CI** — `.github/workflows/tests.yml`: add `E2E_ALLOW_BYPASS: '1'` to the
+      Start-backend step env (:166-173) — without it the E2E job loses its backend bypass.
+- [ ] 4. **Docs** — `backend/.env.example` (:34-43, flag + rule),
+      `frontend/tests/e2e/E2E_TEST_STATUS.md` (:167-169 backend uvicorn command),
+      `README.md` backend env block (:162-165), `backend/ENV_VAR_CHANGELOG.md` (:48-54
+      behavior table), `CLAUDE.md` (:969 — rule now covers backend too), check
+      `docs/GITHUB_SECRETS_SETUP.md` for the backend-start env mention.
+- [ ] 5. **Verify** — `cd backend && uv run pytest tests/` full suite + coverage gate
+      (`--cov-fail-under=85` as CI does), lint per repo hooks.
 
-## Acceptance criteria (from issue)
+## Acceptance criteria (from issue scope bullets)
 
-- [x] `BYPASS_AUTH=true` only takes effect when `E2E_ALLOW_BYPASS=1` is also set, in every environment.
-- [x] Local/E2E workflows updated: `.env.test` (→ tracked `.env.example`; file itself is gitignored),
-      `playwright.config.ts` webServer env (already sets it), documented `npm run dev` bypass
-      instructions, and the CI E2E job.
-- [x] Tests pin: `BYPASS_AUTH=true` alone (any `NODE_ENV`) does not bypass.
+- [ ] Backend `BYPASS_AUTH` gated on the purpose-built flag in every environment
+      (mirroring the frontend middleware).
+- [ ] Test pins updated (the ~5 env-gate pins inverted + new flag pins; suite green).
+- [ ] Backend bypass docs/scripts (`BYPASS_AUTH=true uv run uvicorn …`) and the CI
+      backend-start step updated.
 
-## Known limitations / noted but out of scope
+## Known limitations / out of scope
 
-- Backend FastAPI bypass guard unchanged (see decision 2).
-- Client-side `NEXT_PUBLIC_BYPASS_AUTH` unchanged (see decision 3).
-- Residual: a leaked `BYPASS_AUTH=true` **plus** leaked `E2E_ALLOW_BYPASS=1` still bypasses —
-  inherent to the design; the flag is purpose-built and never set by deploys.
+- Frontend untouched (done in #272). `NEXT_PUBLIC_BYPASS_AUTH` remains frontend-only.
+- Residual by design: leaked `BYPASS_AUTH=true` **plus** leaked `E2E_ALLOW_BYPASS=1` still
+  bypasses — purpose-built flag, never set by real deploys; deploy-staging secret gate
+  unchanged as backstop.
+- Object-level `monkeypatch.setattr(settings, "BYPASS_AUTH", True)` in unit tests still
+  forces bypass at call sites — that's the test seam for call-site behavior, not an
+  env-gate hole.
