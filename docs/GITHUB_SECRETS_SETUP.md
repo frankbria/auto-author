@@ -61,6 +61,7 @@ env:
   BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
   BETTER_AUTH_URL: http://localhost:3000
   BYPASS_AUTH: true
+  E2E_ALLOW_BYPASS: '1'  # required alongside BYPASS_AUTH since #272
   OPENAI_AUTOAUTHOR_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 

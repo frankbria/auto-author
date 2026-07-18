@@ -68,7 +68,7 @@ We keep a local user record in MongoDB keyed by the better-auth user id (`auth_i
 
 - Backend: `BETTER_AUTH_SECRET` (≥32 chars; ≥64 in production), `BETTER_AUTH_URL` — see `backend/.env.example`.
 - Frontend: `BETTER_AUTH_SECRET` (must match the backend) and `NEXT_PUBLIC_BETTER_AUTH_URL` — see `frontend/.env.example`.
-- `BYPASS_AUTH=true` enables auth bypass for local development and E2E tests only. It is rejected at startup in production.
+- `BYPASS_AUTH=true` enables auth bypass for local development and E2E tests only — and only when `E2E_ALLOW_BYPASS=1` is also set (required in every environment since #272; Playwright's webServer config sets it automatically). In production the middleware rejects it at request time unless the flag is set.
 
 > Migration note: this project previously used Clerk. See `CLAUDE.md` (2025-12-17 and 2025-12-24) for migration details.
 
@@ -144,7 +144,9 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 BETTER_AUTH_SECRET=your-secure-secret-key-here-replace-with-generated-value
 NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 # Development only - NEVER use in production
+# Requires E2E_ALLOW_BYPASS=1 alongside it in every environment (#272)
 # BYPASS_AUTH=true
+# E2E_ALLOW_BYPASS=1
 ```
 
 **`.env` (backend)**
@@ -359,6 +361,8 @@ npx playwright test --ui    # Run with UI mode (recommended)
 npx playwright test         # Run headless
 
 # With auth bypass (for testing without real authentication)
+# E2E_ALLOW_BYPASS=1 is set automatically by Playwright's webServer config
+# (required alongside BYPASS_AUTH in every environment since #272).
 BYPASS_AUTH=true npx playwright test
 ```
 
@@ -495,7 +499,7 @@ auto-author/
 
 ### Security & Authentication
 - **JWT Verification Enhancement**: Migrated from hardcoded public key to Clerk's JWKS endpoint for improved security and automatic key rotation (later replaced by better-auth — see CLAUDE.md 2025-12-17)
-- **E2E Testing Support**: Added `BYPASS_AUTH=true` environment variable for authentication bypass during testing (development only)
+- **E2E Testing Support**: Added `BYPASS_AUTH=true` environment variable for authentication bypass during testing (now requires `E2E_ALLOW_BYPASS=1` alongside it in every environment — #272)
 - **Security Audit**: Completed comprehensive authentication middleware review
 
 ### Testing Infrastructure

@@ -195,6 +195,9 @@ cd frontend
 cat > .env.test << 'EOF'
 # E2E Test Environment Configuration
 BYPASS_AUTH=true
+# Required alongside BYPASS_AUTH in every environment since #272 —
+# BYPASS_AUTH=true alone never bypasses auth.
+E2E_ALLOW_BYPASS=1
 NEXT_PUBLIC_BYPASS_AUTH=true
 
 # Clerk Configuration (test keys)
