@@ -154,6 +154,7 @@ cp frontend/tests/e2e/.env.deployment.example frontend/tests/e2e/.env.deployment
 # 2. Edit .env.deployment
 DEPLOYMENT_URL=http://localhost:3000
 BYPASS_AUTH=true
+E2E_ALLOW_BYPASS=1
 NEXT_PUBLIC_BYPASS_AUTH=true
 
 # 3. Start backend (Terminal 1)
@@ -162,7 +163,7 @@ BYPASS_AUTH=true uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # 4. Start frontend (Terminal 2)
 cd frontend
-BYPASS_AUTH=true NEXT_PUBLIC_BYPASS_AUTH=true npm run dev
+BYPASS_AUTH=true E2E_ALLOW_BYPASS=1 NEXT_PUBLIC_BYPASS_AUTH=true npm run dev
 
 # 5. Run tests (Terminal 3)
 cd frontend

@@ -641,6 +641,8 @@ cd frontend
 npx playwright test --ui    # Run with UI mode (recommended)
 
 # With auth bypass (for testing without real auth)
+# Playwright's webServer config sets E2E_ALLOW_BYPASS=1 automatically;
+# since #272 it is required alongside BYPASS_AUTH in every environment.
 BYPASS_AUTH=true npx playwright test
 ```
 
@@ -960,7 +962,7 @@ bd create "Add tests for emergency hotfix" -p 0 -t bug
 - `archive/*.md` - Historical planning documents (read-only)
 
 **Environment Variables**:
-- `BYPASS_AUTH=true` - Disable authentication for E2E testing (development only)
+- `BYPASS_AUTH=true` - Disable authentication for E2E testing; only takes effect together with `E2E_ALLOW_BYPASS=1` in every environment (#272)
 - Standard Next.js and FastAPI environment variables (see `.env.example`)
 
 ---

@@ -1,73 +1,53 @@
-# [P2.18] #242 — Batch question-response save writes duplicate documents for a repeated question_id
+# [P2.22] #272 — Require E2E_ALLOW_BYPASS for auth bypass in ALL environments
 
-**Plan source**: self-authored (CodeRabbit posted only its issue-planner stub, no plan).
+**Plan source**: self-authored (issue has acceptance criteria but no step plan; no comments).
 **Approval**: autonomous — no architectural fork.
 
-## Verified premise (before building) — issue is PARTIALLY STALE
+## Design decisions (autonomous — safe defaults)
 
-Probed the real DAO against real Mongo with the same `question_id` twice in one batch,
-no pre-existing response. Behavior depends on whether the `question_user_idx`
-**unique** index on `(question_id, user_id)` (`questions.py:86-91`) is present:
-
-| unique index | actual outcome |
-|---|---|
-| **absent** | 2 docs stored — exactly as the issue describes |
-| **present** (production: `main.py:71` `ensure_question_indexes()` at startup) | 1 doc, but the **FIRST** answer persists and the user's newer **SECOND** answer is **lost**; item 1 returns `success: false` with a raw `E11000 duplicate key error ...` Mongo string leaked into the API response |
-
-So in a correctly-started deployment the symptom is **not** duplicate documents — it is
-**silent last-write-loss + a leaked internal DB error**. The issue's data-integrity
-concern is real; the mechanism differs. The unique index is the reason, and it can
-still be absent: `ensure_question_indexes` wraps every index in a single try/except, so
-if `create_index(unique=True)` fails on a collection that *already* holds duplicates,
-that index — and every index after it — is skipped and merely logged.
-
-The dedup fix corrects **both** states, which is why it's the right branch.
-
-## Design decisions (autonomous — no architectural fork)
-
-1. **Dedup, not upsert** (the issue offered both). Dedup fixes the no-index state too;
-   upsert alone cannot collapse two items inside one batch without relying on the
-   unique index existing. Dedup is also the smaller diff.
-2. **Dedup happens *after* per-item validation**, not before. Keeps each item's own
-   honest validation error: `[{q1,"text"}, {q1,""}]` → item 1 fails "Missing
-   response_text" and "text" still saves — exactly what two sequential saves do.
-   Deduping the payload up front would mis-attribute the winner's error to item 0.
-3. **Both collapsed items report the single write's outcome** (same `response_id`).
-   A client that debounces a double-send must not get `success: false` for a benign
-   payload. Preserves the existing `total == saved + failed` per-item invariant.
-4. **Not chasing `edit_history` parity**: two sequential saves leave 1 history entry;
-   one collapsed write leaves 0. The intermediate value was never a persisted state,
-   so recording it as an "edit" would be fiction.
-5. **Out of scope**: the generic `f"Database error: {str(e)}"` leak (pre-existing class,
-   applies to any DB error) and the concurrent-request E11000 race. Dedup makes both
-   unreachable *from a duplicate batch*; the residual race is a Known Limitation.
+1. **Non-prod, `BYPASS_AUTH=true` without the flag** → bypass is *ignored* (fall through to
+   normal auth) + `console.warn` explaining `E2E_ALLOW_BYPASS=1` is required. No FATAL outside
+   production — the prod FATAL (`middleware.ts:42-48`) stays exactly as-is as the loud layer.
+2. **Backend (FastAPI) `BYPASS_AUTH` system is OUT of scope** — parallel guard with its own
+   semantics, untouched by #271; the issue and all AC items are about the Next.js middleware.
+3. **`NEXT_PUBLIC_BYPASS_AUTH` (client var) is OUT of scope** — used by
+   `ProtectedRoute.tsx`/`dashboard/page.tsx`, not the middleware path; issue doesn't mention it.
+4. **`.env.test`** is gitignored and absent on disk (dotenv load is a silent no-op). Tracked
+   counterpart updated instead: `frontend/.env.example` documents the both-required rule.
+   `playwright.config.ts:103` already hardcodes `E2E_ALLOW_BYPASS: '1'` in webServer env — no change.
+5. **Pre-commit hook** (`.pre-commit-config.yaml:75`) unchanged — it invokes Playwright, which
+   supplies the flag via webServer env.
 
 ## Steps
 
-- [x] 1. `backend/app/db/questions.py::save_question_responses_batch` — collapse
-      repeated `question_id`s to one write, last-write-wins: after validation, if an op
-      already exists for that id, overwrite its payload fields (text/status/word_count/
-      timestamps) in place, record the earlier index as an alias, skip the redundant
-      `find_one`. At execute time, emit the write's result (success *or* error) for
-      every collapsed index.
-- [x] 2. Tests in `backend/tests/test_batch_question_responses.py` (the fixture drops the
-      DB and creates **no** indexes, so the suite today only ever sees the no-index path):
-  - [x] duplicate in batch → exactly **1** document stored (RED today: 2)
-  - [x] **production shape** — `ensure_question_indexes()` first → last answer wins,
-        `success: true`, no `E11000` anywhere in the response (RED today: first answer
-        persists, `success: false`, raw E11000 leaked)
-  - [x] per-item results: both indices report success with the **same** `response_id`;
-        `total == saved + failed`
-  - [x] duplicate over an **existing** response → single update, last wins
-  - [x] validation independence: `[{q1,"text"}, {q1,""}]` → item 1 fails honestly,
-        "text" saved
-- [x] 3. Mutation-verify each new test (strip the dedup → the intended test fails).
-- [x] 4. Full backend suite + coverage gate green; pre-commit clean (no `--no-verify`).
+- [ ] 1. **TDD pins** — `frontend/src/__tests__/middleware.test.ts`:
+  - [ ] invert `'still bypasses outside production without the flag'` (:115-120) → now must NOT bypass
+  - [ ] new pins: `BYPASS_AUTH=true` alone with `NODE_ENV` = test / development / unset → no bypass
+  - [ ] `BYPASS_AUTH=true` + `E2E_ALLOW_BYPASS=1` in non-prod → bypass works
+  - [ ] prod FATAL without flag unchanged; prod + flag bypasses (existing pins)
+  - [ ] flag alone (no `BYPASS_AUTH`) → no bypass (existing pins :108-131, adjust if needed)
+  - [ ] CSP describe (:168-173) sets the flag too (it exercises the bypass early-return)
+- [ ] 2. **Implement** — `frontend/src/middleware.ts`: gate the bypass early-return on
+      `e2eAllowBypass` in every environment; add the non-prod warn-and-enforce path.
+- [ ] 3. **CI** — `.github/workflows/tests.yml`: add `E2E_ALLOW_BYPASS: '1'` to the Run-E2E step env (:196-207).
+- [ ] 4. **Env template** — `frontend/.env.example`: document `E2E_ALLOW_BYPASS` + both-required rule.
+- [ ] 5. **Docs** — `README.md` (:71, :146-147, :162-163, :361-362),
+      `frontend/tests/e2e/E2E_TEST_STATUS.md` (:163-165), `frontend/docs/E2E_TEST_STATUS.md` (:197-198),
+      `CLAUDE.md` (:644, :963): add `E2E_ALLOW_BYPASS=1` to documented bypass commands + state the rule.
+- [ ] 6. **Verify** — `cd frontend && npx jest src/__tests__/middleware.test.ts` green, then full
+      `npm test -- --watchAll=false`, `npm run lint`, `npm run typecheck`.
 
 ## Acceptance criteria (from issue)
 
-- [x] A batch containing the same `question_id` twice writes **one** response document,
-      not two.
-- [x] Result is last-write-wins within the batch — matching what two sequential saves
-      would produce.
-- [x] Subsequent reads/updates keyed on `(question_id, user_id)` are deterministic.
+- [ ] `BYPASS_AUTH=true` only takes effect when `E2E_ALLOW_BYPASS=1` is also set, in every environment.
+- [ ] Local/E2E workflows updated: `.env.test` (→ tracked `.env.example`; file itself is gitignored),
+      `playwright.config.ts` webServer env (already sets it), documented `npm run dev` bypass
+      instructions, and the CI E2E job.
+- [ ] Tests pin: `BYPASS_AUTH=true` alone (any `NODE_ENV`) does not bypass.
+
+## Known limitations / noted but out of scope
+
+- Backend FastAPI bypass guard unchanged (see decision 2).
+- Client-side `NEXT_PUBLIC_BYPASS_AUTH` unchanged (see decision 3).
+- Residual: a leaked `BYPASS_AUTH=true` **plus** leaked `E2E_ALLOW_BYPASS=1` still bypasses —
+  inherent to the design; the flag is purpose-built and never set by deploys.
