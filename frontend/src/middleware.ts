@@ -10,7 +10,9 @@ import { buildCsp } from '@/lib/csp';
 // 3. Keep middleware Edge Runtime compatible (no better-auth imports)
 // 4. Set a per-request nonce-based CSP (#190) — see lib/csp.ts
 //
-// For E2E testing: Set BYPASS_AUTH=true (server-only) to skip authentication
+// For E2E testing: Set BYPASS_AUTH=true (server-only) together with
+// E2E_ALLOW_BYPASS=1 to skip authentication — both are required in every
+// environment (#272).
 
 // Forward the nonce'd CSP on both the request (Next.js reads it to stamp its
 // inline scripts; layout reads x-nonce for next-themes) and the response.
@@ -47,10 +49,18 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  // Allow bypass for E2E tests (development/test environments only)
-  if (bypassAuth) {
+  // Allow bypass for E2E tests only when the purpose-built E2E_ALLOW_BYPASS=1
+  // flag is also set (#272) — in EVERY environment, not just production.
+  // NODE_ENV is itself a general-purpose var, so it must not discriminate
+  // whether a leaked BYPASS_AUTH=true takes effect (the #192 defect class).
+  if (bypassAuth && e2eAllowBypass) {
     console.warn('⚠️  BYPASS_AUTH enabled - authentication is disabled for testing');
     return withCsp(request);
+  }
+  if (bypassAuth) {
+    console.warn(
+      '⚠️  BYPASS_AUTH ignored - set E2E_ALLOW_BYPASS=1 alongside it to bypass auth (#272)'
+    );
   }
 
   const { pathname } = request.nextUrl;

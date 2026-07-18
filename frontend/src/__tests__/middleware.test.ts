@@ -112,13 +112,6 @@ describe('production bypass guard (#192)', () => {
     expect(res.headers.get('location')).toBeNull();
   });
 
-  it('still bypasses outside production without the flag', async () => {
-    env.NODE_ENV = 'test';
-    const res = await middleware(requestFor('/dashboard'));
-    expect(res.status).toBe(200);
-    expect(res.headers.get('location')).toBeNull();
-  });
-
   it('E2E_ALLOW_BYPASS alone is not a bypass — auth still enforced', async () => {
     env.BYPASS_AUTH = 'false';
     env.E2E_ALLOW_BYPASS = '1';
@@ -135,17 +128,75 @@ describe('production bypass guard (#192)', () => {
   });
 });
 
+describe('bypass requires E2E_ALLOW_BYPASS in every environment (#272)', () => {
+  const env = process.env as Record<string, string | undefined>;
+  const original = {
+    BYPASS_AUTH: env.BYPASS_AUTH,
+    NODE_ENV: env.NODE_ENV,
+    E2E_ALLOW_BYPASS: env.E2E_ALLOW_BYPASS,
+  };
+
+  beforeEach(() => {
+    env.BYPASS_AUTH = 'true';
+    delete env.E2E_ALLOW_BYPASS;
+  });
+
+  afterAll(() => {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) delete env[key];
+      else env[key] = value;
+    }
+  });
+
+  it.each(['test', 'development'])(
+    'does not bypass with BYPASS_AUTH=true alone and NODE_ENV=%s',
+    async (nodeEnv) => {
+      env.NODE_ENV = nodeEnv;
+      const res = await middleware(requestFor('/dashboard'));
+      expect(res.status).toBe(307);
+      expect(new URL(res.headers.get('location')!).pathname).toBe('/auth/sign-in');
+    }
+  );
+
+  it('does not bypass with BYPASS_AUTH=true alone and NODE_ENV unset', async () => {
+    delete env.NODE_ENV;
+    const res = await middleware(requestFor('/dashboard'));
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get('location')!).pathname).toBe('/auth/sign-in');
+  });
+
+  it('bypasses outside production when the flag is also set', async () => {
+    env.NODE_ENV = 'test';
+    env.E2E_ALLOW_BYPASS = '1';
+    const res = await middleware(requestFor('/dashboard'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('only the exact value "1" enables the non-production bypass', async () => {
+    env.NODE_ENV = 'test';
+    env.E2E_ALLOW_BYPASS = 'true';
+    const res = await middleware(requestFor('/dashboard'));
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get('location')!).pathname).toBe('/auth/sign-in');
+  });
+});
+
 describe('CSP header (#190)', () => {
   const env = process.env as Record<string, string | undefined>;
   const originalBypass = env.BYPASS_AUTH;
+  const originalFlag = env.E2E_ALLOW_BYPASS;
 
   beforeEach(() => {
     env.BYPASS_AUTH = 'false';
+    delete env.E2E_ALLOW_BYPASS;
   });
 
   afterAll(() => {
     if (originalBypass === undefined) delete env.BYPASS_AUTH;
     else env.BYPASS_AUTH = originalBypass;
+    if (originalFlag === undefined) delete env.E2E_ALLOW_BYPASS;
+    else env.E2E_ALLOW_BYPASS = originalFlag;
   });
 
   it('sets a nonce-based CSP with no unsafe-inline/unsafe-eval and no Clerk origins', async () => {
@@ -167,6 +218,7 @@ describe('CSP header (#190)', () => {
 
   it('sets the CSP on the BYPASS_AUTH early-return path', async () => {
     env.BYPASS_AUTH = 'true';
+    env.E2E_ALLOW_BYPASS = '1'; // required in every environment since #272
     const res = await middleware(requestFor('/dashboard'));
     expect(res.status).toBe(200);
     expect(res.headers.get('content-security-policy')).toMatch(/'nonce-/);
