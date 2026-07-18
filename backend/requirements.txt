@@ -40,7 +40,7 @@ click==8.2.1
     # via
     #   flask
     #   uvicorn
-cloudinary==1.44.1
+cloudinary==1.45.0
     # via -r requirements.in
 configargparse==1.7.1
     # via

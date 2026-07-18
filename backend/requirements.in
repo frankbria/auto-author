@@ -19,7 +19,7 @@ stripe>=15.3.0
 boto3>=1.26.0
 
 # Image processing and storage
-cloudinary>=1.36.0
+cloudinary>=1.45.0
 Pillow>=10.0.1
 
 # Export functionality
