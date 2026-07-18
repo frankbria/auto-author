@@ -24,35 +24,35 @@
 
 ## Steps
 
-- [ ] 1. **TDD pins** — `backend/tests/test_core/test_security.py`
+- [x] 1. **TDD pins** — `backend/tests/test_core/test_security.py`
       (`TestProductionSecurityValidation`):
-  - [ ] invert the 5 "allowed without flag" pins (:432-478 dev/test/staging/unset,
+  - [x] invert the 5 "allowed without flag" pins (:432-478 dev/test/staging/unset,
         :529-538 ENVIRONMENT=staging) → without flag, `Settings().BYPASS_AUTH is False`
-  - [ ] new pins: same 5 env combos **with** `E2E_ALLOW_BYPASS=1` → `is True`
-  - [ ] loose flag value (`'true'`) → `is False`; prod + flag → still blocked
+  - [x] new pins: same 5 env combos **with** `E2E_ALLOW_BYPASS=1` → `is True`
+  - [x] loose flag value (`'true'`) → `is False`; prod + flag → still blocked
         (no exemption — backend has no production-marked E2E path)
-  - [ ] coercion emits a warning naming `E2E_ALLOW_BYPASS` (caplog)
-  - [ ] keep all prod-blocked pins (:414-430, :480-492, :494-508) unchanged
-  - [ ] `test_main.py`: update the 4 "allows bypass" docstrings to note the flag gate
+  - [x] coercion emits a warning naming `E2E_ALLOW_BYPASS` (caplog)
+  - [x] keep all prod-blocked pins (:414-430, :480-492, :494-508) unchanged
+  - [x] `test_main.py`: update the 4 "allows bypass" docstrings to note the flag gate
         (mock-based function tests still valid)
-- [ ] 2. **Implement** — `backend/app/core/config.py`: extend the `BYPASS_AUTH` validator
+- [x] 2. **Implement** — `backend/app/core/config.py`: extend the `BYPASS_AUTH` validator
       per decision 2 (add module logger for the coercion warning).
-- [ ] 3. **CI** — `.github/workflows/tests.yml`: add `E2E_ALLOW_BYPASS: '1'` to the
+- [x] 3. **CI** — `.github/workflows/tests.yml`: add `E2E_ALLOW_BYPASS: '1'` to the
       Start-backend step env (:166-173) — without it the E2E job loses its backend bypass.
-- [ ] 4. **Docs** — `backend/.env.example` (:34-43, flag + rule),
+- [x] 4. **Docs** — `backend/.env.example` (:34-43, flag + rule),
       `frontend/tests/e2e/E2E_TEST_STATUS.md` (:167-169 backend uvicorn command),
       `README.md` backend env block (:162-165), `backend/ENV_VAR_CHANGELOG.md` (:48-54
       behavior table), `CLAUDE.md` (:969 — rule now covers backend too), check
       `docs/GITHUB_SECRETS_SETUP.md` for the backend-start env mention.
-- [ ] 5. **Verify** — `cd backend && uv run pytest tests/` full suite + coverage gate
+- [x] 5. **Verify** — `cd backend && uv run pytest tests/` full suite + coverage gate
       (`--cov-fail-under=85` as CI does), lint per repo hooks.
 
 ## Acceptance criteria (from issue scope bullets)
 
-- [ ] Backend `BYPASS_AUTH` gated on the purpose-built flag in every environment
+- [x] Backend `BYPASS_AUTH` gated on the purpose-built flag in every environment
       (mirroring the frontend middleware).
-- [ ] Test pins updated (the ~5 env-gate pins inverted + new flag pins; suite green).
-- [ ] Backend bypass docs/scripts (`BYPASS_AUTH=true uv run uvicorn …`) and the CI
+- [x] Test pins updated (the ~5 env-gate pins inverted + new flag pins; suite green).
+- [x] Backend bypass docs/scripts (`BYPASS_AUTH=true uv run uvicorn …`) and the CI
       backend-start step updated.
 
 ## Known limitations / out of scope
