@@ -51,7 +51,7 @@ Since #307, `BYPASS_AUTH=true` takes effect only together with
 | Environment | BYPASS_AUTH=true | BYPASS_AUTH=true + E2E_ALLOW_BYPASS=1 | BYPASS_AUTH=false |
 |-------------|------------------|----------------------------------------|-------------------|
 | `production` | ❌ Startup blocked | ❌ Startup blocked (no exemption) | ✅ Normal operation |
-| `staging` | ⚠️ Ignored (coerced off + warning) | ✅ Allowed (for E2E tests) | ✅ Normal operation |
+| `staging` | ⚠️ Ignored (coerced off + warning) | ✅ Allowed (manual runs; the deploy workflow rejects the BYPASS_AUTH secret regardless) | ✅ Normal operation |
 | `development` | ⚠️ Ignored (coerced off + warning) | ✅ Allowed | ✅ Normal operation |
 | `test` | ⚠️ Ignored (coerced off + warning) | ✅ Allowed | ✅ Normal operation |
 | (not set) | ⚠️ Ignored (coerced off + warning) | ✅ Allowed | ✅ Normal operation |

@@ -29,7 +29,8 @@
   - [ ] invert the 5 "allowed without flag" pins (:432-478 dev/test/staging/unset,
         :529-538 ENVIRONMENT=staging) → without flag, `Settings().BYPASS_AUTH is False`
   - [ ] new pins: same 5 env combos **with** `E2E_ALLOW_BYPASS=1` → `is True`
-  - [ ] loose flag value (`'true'`) → `is False`; prod + flag → construction OK, `is True`
+  - [ ] loose flag value (`'true'`) → `is False`; prod + flag → still blocked
+        (no exemption — backend has no production-marked E2E path)
   - [ ] coercion emits a warning naming `E2E_ALLOW_BYPASS` (caplog)
   - [ ] keep all prod-blocked pins (:414-430, :480-492, :494-508) unchanged
   - [ ] `test_main.py`: update the 4 "allows bypass" docstrings to note the flag gate

@@ -612,3 +612,33 @@ class TestProductionSecurityValidation:
 
         settings = Settings()
         assert settings.BYPASS_AUTH is False
+
+    def test_bypass_auth_blocked_when_environment_is_production_even_with_flag(self, monkeypatch):
+        """PM2 sets ENVIRONMENT (not NODE_ENV) on the real deployment (#176) —
+        the no-exemption rule must hold on that marker too (#307)."""
+        from pydantic import ValidationError as PydanticValidationError
+        from app.core.config import Settings
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "production-secret-that-is-at-least-32-characters-long")
+
+        with pytest.raises(PydanticValidationError) as exc_info:
+            Settings()
+
+        assert "BYPASS_AUTH" in str(exc_info.value)
+
+    def test_e2e_allow_bypass_alone_is_not_a_bypass(self, monkeypatch):
+        """The flag by itself does nothing — BYPASS_AUTH stays off (#307,
+        mirroring the frontend's defense-in-depth pin from #272)."""
+        from app.core.config import Settings
+
+        monkeypatch.setenv("NODE_ENV", "test")
+        # explicit 'false', not delenv: a local .env may carry BYPASS_AUTH=true
+        monkeypatch.setenv("BYPASS_AUTH", "false")
+        monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
+
+        settings = Settings()
+        assert settings.BYPASS_AUTH is False
