@@ -429,53 +429,127 @@ class TestProductionSecurityValidation:
         error_str = str(exc_info.value)
         assert "BYPASS_AUTH" in error_str
 
-    def test_bypass_auth_allowed_in_development(self, monkeypatch):
-        """Test that BYPASS_AUTH=true is allowed when NODE_ENV=development"""
+    def test_bypass_auth_ignored_in_development_without_flag(self, monkeypatch):
+        """BYPASS_AUTH=true alone no longer bypasses when NODE_ENV=development —
+        coerced off unless E2E_ALLOW_BYPASS=1 is also set (#307)."""
         from app.core.config import Settings
 
-        # Set development environment
         monkeypatch.setenv("NODE_ENV", "development")
         monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.delenv("E2E_ALLOW_BYPASS", raising=False)
 
-        # Should not raise - just verify it doesn't error
         settings = Settings()
-        assert settings.BYPASS_AUTH is True
+        assert settings.BYPASS_AUTH is False
 
-    def test_bypass_auth_allowed_in_test(self, monkeypatch):
-        """Test that BYPASS_AUTH=true is allowed when NODE_ENV=test"""
+    def test_bypass_auth_ignored_in_test_without_flag(self, monkeypatch):
+        """BYPASS_AUTH=true alone no longer bypasses when NODE_ENV=test —
+        coerced off unless E2E_ALLOW_BYPASS=1 is also set (#307)."""
         from app.core.config import Settings
 
-        # Set test environment
         monkeypatch.setenv("NODE_ENV", "test")
         monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.delenv("E2E_ALLOW_BYPASS", raising=False)
 
-        # Should not raise - just verify it doesn't error
         settings = Settings()
-        assert settings.BYPASS_AUTH is True
+        assert settings.BYPASS_AUTH is False
 
-    def test_bypass_auth_allowed_in_staging(self, monkeypatch):
-        """Test that BYPASS_AUTH=true is allowed when NODE_ENV=staging (for E2E tests)"""
+    def test_bypass_auth_ignored_in_staging_without_flag(self, monkeypatch):
+        """BYPASS_AUTH=true alone no longer bypasses when NODE_ENV=staging —
+        coerced off unless E2E_ALLOW_BYPASS=1 is also set (#307)."""
         from app.core.config import Settings
 
-        # Set staging environment
         monkeypatch.setenv("NODE_ENV", "staging")
         monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.delenv("E2E_ALLOW_BYPASS", raising=False)
 
-        # Should not raise - staging may need E2E testing capability
         settings = Settings()
-        assert settings.BYPASS_AUTH is True
+        assert settings.BYPASS_AUTH is False
 
-    def test_bypass_auth_allowed_when_env_not_set(self, monkeypatch):
-        """Test that BYPASS_AUTH=true is allowed when NODE_ENV is not set (backward compatibility)"""
+    def test_bypass_auth_ignored_when_env_not_set_without_flag(self, monkeypatch):
+        """BYPASS_AUTH=true alone no longer bypasses when NODE_ENV is unset —
+        coerced off unless E2E_ALLOW_BYPASS=1 is also set (#307)."""
         from app.core.config import Settings
 
-        # Ensure NODE_ENV is not set
         monkeypatch.delenv("NODE_ENV", raising=False)
         monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.delenv("E2E_ALLOW_BYPASS", raising=False)
 
-        # Should not raise - default/unset environment should allow testing
+        settings = Settings()
+        assert settings.BYPASS_AUTH is False
+
+    def test_bypass_auth_ignored_warns_about_missing_flag(self, monkeypatch, caplog):
+        """The coercion logs a warning naming E2E_ALLOW_BYPASS (#307)."""
+        import logging
+        from app.core.config import Settings
+
+        monkeypatch.setenv("NODE_ENV", "development")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.delenv("E2E_ALLOW_BYPASS", raising=False)
+
+        with caplog.at_level(logging.WARNING, logger="app.core.config"):
+            settings = Settings()
+
+        assert settings.BYPASS_AUTH is False
+        assert any("E2E_ALLOW_BYPASS" in r.message for r in caplog.records)
+
+    @pytest.mark.parametrize("env_var,env_value", [
+        ("NODE_ENV", "development"),
+        ("NODE_ENV", "test"),
+        ("NODE_ENV", "staging"),
+        ("ENVIRONMENT", "staging"),
+    ])
+    def test_bypass_auth_allowed_with_e2e_flag(self, monkeypatch, env_var, env_value):
+        """With E2E_ALLOW_BYPASS=1 the bypass stays allowed outside production (#307)."""
+        from app.core.config import Settings
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv(env_var, env_value)
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
+
         settings = Settings()
         assert settings.BYPASS_AUTH is True
+
+    def test_bypass_auth_allowed_with_e2e_flag_when_env_not_set(self, monkeypatch):
+        """With E2E_ALLOW_BYPASS=1 the bypass stays allowed when no env marker is set (#307)."""
+        from app.core.config import Settings
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
+
+        settings = Settings()
+        assert settings.BYPASS_AUTH is True
+
+    def test_bypass_auth_loose_flag_value_does_not_allow(self, monkeypatch):
+        """Only the exact value '1' enables the bypass — 'true' is inert (#307)."""
+        from app.core.config import Settings
+
+        monkeypatch.setenv("NODE_ENV", "development")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.setenv("E2E_ALLOW_BYPASS", "true")
+
+        settings = Settings()
+        assert settings.BYPASS_AUTH is False
+
+    def test_bypass_auth_blocked_in_production_even_with_flag(self, monkeypatch):
+        """Production stays hard-blocked even with E2E_ALLOW_BYPASS=1 (#307) —
+        deliberately stricter than the frontend: no backend E2E path runs
+        production-marked (staging E2E uses real auth), so no flag exemption."""
+        from pydantic import ValidationError as PydanticValidationError
+        from app.core.config import Settings
+
+        monkeypatch.setenv("NODE_ENV", "production")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "production-secret-that-is-at-least-32-characters-long")
+
+        with pytest.raises(PydanticValidationError) as exc_info:
+            Settings()
+
+        assert "BYPASS_AUTH" in str(exc_info.value)
 
     def test_bypass_auth_false_allowed_in_production(self, monkeypatch):
         """Test that BYPASS_AUTH=false is allowed in production (normal secure operation)"""
@@ -526,13 +600,45 @@ class TestProductionSecurityValidation:
 
         assert "test secret" in str(exc_info.value).lower()
 
-    def test_bypass_auth_allowed_when_environment_is_staging(self, monkeypatch):
-        """ENVIRONMENT=staging must still allow BYPASS_AUTH for E2E (issue #176)."""
+    def test_bypass_auth_ignored_when_environment_is_staging_without_flag(self, monkeypatch):
+        """ENVIRONMENT=staging no longer allows a bare BYPASS_AUTH — coerced off
+        unless E2E_ALLOW_BYPASS=1 is also set (#307)."""
         from app.core.config import Settings
 
         monkeypatch.delenv("NODE_ENV", raising=False)
         monkeypatch.setenv("ENVIRONMENT", "staging")
         monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.delenv("E2E_ALLOW_BYPASS", raising=False)
 
         settings = Settings()
-        assert settings.BYPASS_AUTH is True
+        assert settings.BYPASS_AUTH is False
+
+    def test_bypass_auth_blocked_when_environment_is_production_even_with_flag(self, monkeypatch):
+        """PM2 sets ENVIRONMENT (not NODE_ENV) on the real deployment (#176) —
+        the no-exemption rule must hold on that marker too (#307)."""
+        from pydantic import ValidationError as PydanticValidationError
+        from app.core.config import Settings
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "production-secret-that-is-at-least-32-characters-long")
+
+        with pytest.raises(PydanticValidationError) as exc_info:
+            Settings()
+
+        assert "BYPASS_AUTH" in str(exc_info.value)
+
+    def test_e2e_allow_bypass_alone_is_not_a_bypass(self, monkeypatch):
+        """The flag by itself does nothing — BYPASS_AUTH stays off (#307,
+        mirroring the frontend's defense-in-depth pin from #272)."""
+        from app.core.config import Settings
+
+        monkeypatch.setenv("NODE_ENV", "test")
+        # explicit 'false', not delenv: a local .env may carry BYPASS_AUTH=true
+        monkeypatch.setenv("BYPASS_AUTH", "false")
+        monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
+
+        settings = Settings()
+        assert settings.BYPASS_AUTH is False

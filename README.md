@@ -162,7 +162,10 @@ AI_CACHE_TTL=86400
 AI_CACHE_ENABLED=true
 AI_MAX_RETRIES=3
 # Development only - NEVER use in production
+# Backend: requires E2E_ALLOW_BYPASS=1 alongside it in every non-production
+# environment (#307); production stays hard-blocked regardless
 # BYPASS_AUTH=true
+# E2E_ALLOW_BYPASS=1
 ```
 
 #### 5. Install and Run Redis (for AI Caching)

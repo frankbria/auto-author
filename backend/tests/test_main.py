@@ -54,7 +54,9 @@ class TestStartupSecurityValidation:
             validate_production_security()
 
     def test_startup_validation_allows_dev_bypass(self, monkeypatch):
-        """Test that validate_production_security() allows BYPASS_AUTH in development"""
+        """validate_production_security() allows BYPASS_AUTH in development when the
+        settings object carries it — the env-level gate (E2E_ALLOW_BYPASS=1 required)
+        is applied at Settings construction, upstream of this function (#307)."""
         monkeypatch.setenv("NODE_ENV", "development")
 
         # Create a mock settings object with BYPASS_AUTH=True
@@ -67,7 +69,9 @@ class TestStartupSecurityValidation:
             validate_production_security()
 
     def test_startup_validation_allows_test_bypass(self, monkeypatch):
-        """Test that validate_production_security() allows BYPASS_AUTH in test environment"""
+        """validate_production_security() allows BYPASS_AUTH in test environment when
+        the settings object carries it — env-level flag gate is at Settings
+        construction (#307)."""
         monkeypatch.setenv("NODE_ENV", "test")
 
         # Create a mock settings object with BYPASS_AUTH=True
@@ -80,7 +84,9 @@ class TestStartupSecurityValidation:
             validate_production_security()
 
     def test_startup_validation_allows_unset_env_bypass(self, monkeypatch):
-        """Test that validate_production_security() allows BYPASS_AUTH when NODE_ENV is unset"""
+        """validate_production_security() allows BYPASS_AUTH when NODE_ENV is unset
+        and the settings object carries it — env-level flag gate is at Settings
+        construction (#307)."""
         # Ensure NODE_ENV is not set
         monkeypatch.delenv("NODE_ENV", raising=False)
 
@@ -90,7 +96,7 @@ class TestStartupSecurityValidation:
 
         with patch("app.main.settings", mock_settings):
             from app.main import validate_production_security
-            # Should not raise - backward compatibility
+            # Should not raise
             validate_production_security()
 
     def test_startup_validation_blocks_bypass_when_environment_is_production(self, monkeypatch):
@@ -111,7 +117,8 @@ class TestStartupSecurityValidation:
             assert "production" in str(exc_info.value).lower()
 
     def test_startup_validation_allows_bypass_when_environment_is_staging(self, monkeypatch):
-        """ENVIRONMENT=staging must still allow BYPASS_AUTH for E2E (issue #176)."""
+        """ENVIRONMENT=staging allows BYPASS_AUTH when the settings object carries it —
+        env-level flag gate (E2E_ALLOW_BYPASS=1) is at Settings construction (#307)."""
         monkeypatch.delenv("NODE_ENV", raising=False)
         monkeypatch.setenv("ENVIRONMENT", "staging")
 

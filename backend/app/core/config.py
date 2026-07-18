@@ -1,7 +1,10 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator, Field
+from pydantic import field_validator, Field, ValidationInfo
 from typing import List, Union
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 
 def is_production_env() -> bool:
@@ -57,6 +60,11 @@ class Settings(BaseSettings):
     )
 
     # E2E Testing Settings
+    # Purpose-built opt-in flag (#307): BYPASS_AUTH takes effect only when this
+    # is exactly "1". Read as a Settings field (str, not bool) so it works from
+    # .env like BYPASS_AUTH does, while loose values ("true", "01", ...) stay
+    # inert — pydantic would parse those as truthy on a bool field.
+    E2E_ALLOW_BYPASS: str = ""
     BYPASS_AUTH: bool = False  # Set to True for E2E tests to bypass authentication
 
     # Redis Cache Settings
@@ -178,11 +186,19 @@ class Settings(BaseSettings):
 
     @field_validator('BYPASS_AUTH')
     @classmethod
-    def validate_bypass_auth(cls, v: bool) -> bool:
-        """Validate BYPASS_AUTH is not enabled in production environment.
+    def validate_bypass_auth(cls, v: bool, info: ValidationInfo) -> bool:
+        """Validate BYPASS_AUTH against the deployment environment.
 
-        BYPASS_AUTH allows skipping authentication for E2E testing but must
-        NEVER be enabled in production as it would expose all user data.
+        BYPASS_AUTH allows skipping authentication for E2E testing but:
+        - In production it is ALWAYS rejected (startup blocked) — no flag
+          exemption; no backend E2E path runs production-marked (unlike the
+          frontend, whose CI webServer forces NODE_ENV=production, #272).
+        - In every other environment it takes effect only together with the
+          purpose-built E2E_ALLOW_BYPASS=1 flag (#307). A bare BYPASS_AUTH=true
+          is coerced off with a warning — NODE_ENV/ENVIRONMENT are
+          general-purpose vars and must not discriminate the bypass (the #192
+          defect class). The flag is a str Settings field (same env/.env
+          sources as BYPASS_AUTH) compared with exact '1' semantics.
         """
         if v is True and is_production_env():
             raise ValueError(
@@ -190,6 +206,12 @@ class Settings(BaseSettings):
                 "This would allow unauthorized access to all user data and features. "
                 "Remove BYPASS_AUTH=true from your production configuration."
             )
+        if v is True and info.data.get("E2E_ALLOW_BYPASS", "") != "1":
+            logger.warning(
+                "BYPASS_AUTH ignored - set E2E_ALLOW_BYPASS=1 alongside it to "
+                "bypass auth outside production (#307)"
+            )
+            return False
         return v
 
     model_config = SettingsConfigDict(

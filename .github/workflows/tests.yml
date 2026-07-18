@@ -169,6 +169,9 @@ jobs:
           MONGODB_URI: mongodb://localhost:27017
           DATABASE_NAME: auto_author_e2e_test
           BYPASS_AUTH: 'true'
+          # Required alongside BYPASS_AUTH in every environment since #307 —
+          # without it the backend coerces the bypass off and E2E gets 401s.
+          E2E_ALLOW_BYPASS: '1'
           BETTER_AUTH_SECRET: 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
           BETTER_AUTH_URL: 'http://localhost:3000'
         run: |

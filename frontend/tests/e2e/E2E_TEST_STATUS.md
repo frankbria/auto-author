@@ -166,7 +166,7 @@ NEXT_PUBLIC_BYPASS_AUTH=true
 
 # 3. Start backend (Terminal 1)
 cd backend
-BYPASS_AUTH=true uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+BYPASS_AUTH=true E2E_ALLOW_BYPASS=1 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # 4. Start frontend (Terminal 2)
 cd frontend
