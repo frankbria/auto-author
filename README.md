@@ -499,7 +499,7 @@ auto-author/
 
 ### Security & Authentication
 - **JWT Verification Enhancement**: Migrated from hardcoded public key to Clerk's JWKS endpoint for improved security and automatic key rotation (later replaced by better-auth — see CLAUDE.md 2025-12-17)
-- **E2E Testing Support**: Added `BYPASS_AUTH=true` environment variable for authentication bypass during testing (development only)
+- **E2E Testing Support**: Added `BYPASS_AUTH=true` environment variable for authentication bypass during testing (now requires `E2E_ALLOW_BYPASS=1` alongside it in every environment — #272)
 - **Security Audit**: Completed comprehensive authentication middleware review
 
 ### Testing Infrastructure
