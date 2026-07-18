@@ -71,7 +71,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Deploy the exact commit that passed "Tests and Quality Checks",
           # not whatever HEAD happens to be when this workflow_run fires.
