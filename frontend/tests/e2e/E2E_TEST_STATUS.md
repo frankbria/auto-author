@@ -147,6 +147,13 @@ await page.click('[data-testid="new-book-button"]');
 ## Environment Setup
 
 ### Local Testing (with BYPASS_AUTH)
+
+> **Note (#272):** the bypass now requires `E2E_ALLOW_BYPASS=1` alongside
+> `BYPASS_AUTH=true`. Playwright's `webServer` env sets it automatically, but
+> with `reuseExistingServer` Playwright will reuse a dev server you already
+> have running — if one was started the old way (`BYPASS_AUTH=true npm run dev`,
+> no flag), restart it with the flag or tests will fail with 307 redirects.
+
 ```bash
 # 1. Create .env.deployment (already done)
 cp frontend/tests/e2e/.env.deployment.example frontend/tests/e2e/.env.deployment

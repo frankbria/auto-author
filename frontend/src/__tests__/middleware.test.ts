@@ -148,7 +148,7 @@ describe('bypass requires E2E_ALLOW_BYPASS in every environment (#272)', () => {
     }
   });
 
-  it.each(['test', 'development'])(
+  it.each(['test', 'development', 'staging'])(
     'does not bypass with BYPASS_AUTH=true alone and NODE_ENV=%s',
     async (nodeEnv) => {
       env.NODE_ENV = nodeEnv;
@@ -180,12 +180,22 @@ describe('bypass requires E2E_ALLOW_BYPASS in every environment (#272)', () => {
     expect(res.status).toBe(307);
     expect(new URL(res.headers.get('location')!).pathname).toBe('/auth/sign-in');
   });
+
+  it('only the exact value "true" arms BYPASS_AUTH — case variants do not bypass', async () => {
+    env.NODE_ENV = 'test';
+    env.E2E_ALLOW_BYPASS = '1';
+    env.BYPASS_AUTH = 'TRUE';
+    const res = await middleware(requestFor('/dashboard'));
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get('location')!).pathname).toBe('/auth/sign-in');
+  });
 });
 
 describe('CSP header (#190)', () => {
   const env = process.env as Record<string, string | undefined>;
   const originalBypass = env.BYPASS_AUTH;
   const originalFlag = env.E2E_ALLOW_BYPASS;
+  const originalNodeEnv = env.NODE_ENV;
 
   beforeEach(() => {
     env.BYPASS_AUTH = 'false';
@@ -197,6 +207,8 @@ describe('CSP header (#190)', () => {
     else env.BYPASS_AUTH = originalBypass;
     if (originalFlag === undefined) delete env.E2E_ALLOW_BYPASS;
     else env.E2E_ALLOW_BYPASS = originalFlag;
+    if (originalNodeEnv === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = originalNodeEnv;
   });
 
   it('sets a nonce-based CSP with no unsafe-inline/unsafe-eval and no Clerk origins', async () => {
@@ -219,6 +231,7 @@ describe('CSP header (#190)', () => {
   it('sets the CSP on the BYPASS_AUTH early-return path', async () => {
     env.BYPASS_AUTH = 'true';
     env.E2E_ALLOW_BYPASS = '1'; // required in every environment since #272
+    env.NODE_ENV = 'test'; // explicit — must not be production for this path
     const res = await middleware(requestFor('/dashboard'));
     expect(res.status).toBe(200);
     expect(res.headers.get('content-security-policy')).toMatch(/'nonce-/);

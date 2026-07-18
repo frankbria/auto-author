@@ -68,7 +68,7 @@ We keep a local user record in MongoDB keyed by the better-auth user id (`auth_i
 
 - Backend: `BETTER_AUTH_SECRET` (≥32 chars; ≥64 in production), `BETTER_AUTH_URL` — see `backend/.env.example`.
 - Frontend: `BETTER_AUTH_SECRET` (must match the backend) and `NEXT_PUBLIC_BETTER_AUTH_URL` — see `frontend/.env.example`.
-- `BYPASS_AUTH=true` enables auth bypass for local development and E2E tests only — and only when `E2E_ALLOW_BYPASS=1` is also set (required in every environment since #272; Playwright's webServer config sets it automatically). It is rejected at startup in production.
+- `BYPASS_AUTH=true` enables auth bypass for local development and E2E tests only — and only when `E2E_ALLOW_BYPASS=1` is also set (required in every environment since #272; Playwright's webServer config sets it automatically). In production the middleware rejects it at request time unless the flag is set.
 
 > Migration note: this project previously used Clerk. See `CLAUDE.md` (2025-12-17 and 2025-12-24) for migration details.
 
