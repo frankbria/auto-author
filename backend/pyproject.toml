@@ -23,7 +23,7 @@ dependencies = [
     "python-jose[cryptography]==3.5.0",
     "passlib[bcrypt]==1.7.4",
     # AWS SDK for transcription and S3
-    "boto3==1.39.14",
+    "boto3==1.43.40",
     # Image processing and storage
     "cloudinary==1.45.0",
     "pillow==11.3.0",
