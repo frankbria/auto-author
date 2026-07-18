@@ -16,7 +16,7 @@ passlib[bcrypt]
 stripe>=15.3.0
 
 # AWS SDK for transcription and S3
-boto3>=1.26.0
+boto3>=1.43.40
 
 # Image processing and storage
 cloudinary>=1.45.0
