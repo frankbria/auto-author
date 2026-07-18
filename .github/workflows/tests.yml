@@ -197,6 +197,9 @@ jobs:
         working-directory: frontend
         env:
           BYPASS_AUTH: 'true'
+          # Required alongside BYPASS_AUTH in every environment since #272.
+          # Playwright's webServer env also sets this; pinned here for clarity.
+          E2E_ALLOW_BYPASS: '1'
           BASE_URL: 'http://localhost:3000'
           # Must include the /api/v1 prefix the backend mounts (settings.API_V1_PREFIX);
           # the frontend app and the E2E test helpers both read this for API calls.
