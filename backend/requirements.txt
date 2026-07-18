@@ -64,7 +64,7 @@ email-validator==2.2.0
     # via pydantic
 faker==40.23.0
     # via -r requirements.in
-fastapi==0.138.1
+fastapi==0.139.0
     # via -r requirements.in
 flask==3.1.1
     # via
