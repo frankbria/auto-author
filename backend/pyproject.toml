@@ -51,7 +51,7 @@ test = [
 ]
 load = [
     "locust==2.37.14",
-    "locust-cloud==1.26.3",
+    "locust-cloud==1.30.0",
 ]
 dev = [
     "auto-author-backend[test,load]",
