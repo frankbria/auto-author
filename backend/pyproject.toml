@@ -25,7 +25,7 @@ dependencies = [
     # AWS SDK for transcription and S3
     "boto3==1.39.14",
     # Image processing and storage
-    "cloudinary==1.44.1",
+    "cloudinary==1.45.0",
     "pillow==11.3.0",
     # Export functionality
     "reportlab==5.0.0",
