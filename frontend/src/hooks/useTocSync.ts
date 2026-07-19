@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useEffect, useRef, useCallback } from 'react';
 import bookClient from '@/lib/api/bookClient';
 
@@ -53,7 +54,7 @@ export function useTocSync({ bookId, onTocChanged, pollInterval = 0 }: UseTocSyn
     const currentHash = await generateTocHash();
 
     if (currentHash && lastTocHashRef.current && currentHash !== lastTocHashRef.current) {
-      console.log('TOC change detected, triggering sync');
+      logger.debug('TOC change detected, triggering sync');
       onTocChanged();
     }
 
@@ -64,7 +65,7 @@ export function useTocSync({ bookId, onTocChanged, pollInterval = 0 }: UseTocSyn
   useEffect(() => {
     const handleTocUpdate = (event: CustomEvent) => {
       if (event.detail.bookId === bookId) {
-        console.log('TOC update event received, triggering sync');
+        logger.debug('TOC update event received, triggering sync');
         onTocChanged();
       }
     };
@@ -80,7 +81,7 @@ export function useTocSync({ bookId, onTocChanged, pollInterval = 0 }: UseTocSyn
   useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === `toc-updated-${bookId}` && event.newValue) {
-        console.log('TOC update detected via localStorage, triggering sync');
+        logger.debug('TOC update detected via localStorage, triggering sync');
         onTocChanged();
         // Clear the flag after handling
         localStorage.removeItem(`toc-updated-${bookId}`);
@@ -142,5 +143,5 @@ export function triggerTocUpdateEvent(bookId: string) {
   // Set localStorage flag for cross-tab communication
   localStorage.setItem(`toc-updated-${bookId}`, Date.now().toString());
 
-  console.log('TOC update event triggered for book:', bookId);
+  logger.debug('TOC update event triggered for book:', bookId);
 }

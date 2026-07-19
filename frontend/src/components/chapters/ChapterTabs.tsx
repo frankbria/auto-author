@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import { useEffect, useCallback } from 'react';
 import { useChapterTabs } from '@/hooks/useChapterTabs';
 import { useTocSync } from '@/hooks/useTocSync';
@@ -255,11 +257,11 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
             chapters={state.chapters}
             onContentChange={(chapterId, contentValue) => {
               // Handle real-time content changes for auto-save
-              console.log(`Content changed for chapter ${chapterId}: ${contentValue.length} characters`);
+              logger.debug(`Content changed for chapter ${chapterId}: ${contentValue.length} characters`);
             }}
             onChapterSave={(chapterId) => {
               // Handle chapter save completion
-              console.log(`Chapter ${chapterId} saved successfully`);
+              logger.debug(`Chapter ${chapterId} saved successfully`);
               saveTabState(); // Update tab state when content is saved
             }}
             data-testid="tab-content"

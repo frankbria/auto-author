@@ -1,6 +1,8 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/auth-client';
@@ -410,7 +412,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
 
       // Convert local Chapter format to API TocData format
       const tocData = convertChaptersToTocData(toc);
-      console.log('TOC to save:', tocData);
+      logger.debug('TOC to save:', tocData);
 
       // Save TOC using the real API
       await bookClient.updateToc(bookId, tocData);

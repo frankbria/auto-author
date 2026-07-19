@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/auth-client';
@@ -74,11 +76,11 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
 
       // First, analyze the summary using AI to get readiness assessment
       try {
-        console.log('Analyzing summary with AI...');
+        logger.debug('Analyzing summary with AI...');
         await trackOperation('analyze-summary', async () => {
           return await bookClient.analyzeSummary(bookId);
         }, { bookId });
-        console.log('Summary analysis completed');
+        logger.debug('Summary analysis completed');
       } catch (analysisError) {
         // An entitlement denial is a paywall, not a transient analysis
         // failure — surface the upgrade path instead of swallowing it (#247).
