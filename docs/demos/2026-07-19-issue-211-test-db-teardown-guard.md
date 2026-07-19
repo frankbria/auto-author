@@ -6,7 +6,7 @@
 
 **The dangerous input (both sides):**
 ```
-TEST_MONGO_URI="mongodb+srv://appuser:s3cret@cluster0.abcde.mongodb.net/auto-author"
+TEST_MONGO_URI="mongodb+srv://USER:REDACTED@cluster0.abcde.mongodb.net/auto-author"
 ```
 An accidental Atlas URI with the real, non-test DB name `auto-author`.
 
