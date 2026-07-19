@@ -199,24 +199,28 @@ describe('BookClient', () => {
 
   describe('Book Management Methods', () => {
     it('should get user books', async () => {
+      // BookResponse carries toc_items, not chapters/progress; the client
+      // computes those (issue #291). One book with a half-completed TOC, one
+      // TOC-less (fresh) book.
       const mockBooks = [
         {
           id: 'book1',
           title: 'Test Book 1',
           description: 'Test description 1',
-          progress: 25,
-          chapters: [],
           created_at: '2025-01-01T00:00:00Z',
           updated_at: '2025-01-01T00:00:00Z',
+          toc_items: [
+            { id: 'c1', title: 'One', level: 1, order: 0, status: 'completed', word_count: 100 },
+            { id: 'c2', title: 'Two', level: 1, order: 1, status: 'draft', word_count: 0 },
+          ],
         },
         {
           id: 'book2',
           title: 'Test Book 2',
           description: 'Test description 2',
-          progress: 50,
-          chapters: [],
           created_at: '2025-01-01T00:00:00Z',
           updated_at: '2025-01-01T00:00:00Z',
+          toc_items: [],
         },
       ];
 
@@ -238,7 +242,9 @@ describe('BookClient', () => {
         }
       );
 
-      expect(result).toEqual(mockBooks);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({ id: 'book1', chapters: 2, progress: 50 });
+      expect(result[1]).toMatchObject({ id: 'book2', chapters: 0, progress: 0 });
     });
 
     it('should get a specific book', async () => {
