@@ -27,6 +27,14 @@ TEST_MONGO_URI = os.environ.get(
     "TEST_MONGO_URI", "mongodb://localhost:27017/auto-author-test"
 )
 _TEST_DB_NAME = TEST_MONGO_URI.rsplit("/", 1)[-1].split("?")[0]
+
+# Data-loss guard (#211): the fixtures below DROP _TEST_DB_NAME in setup/teardown.
+# Abort collection now if the resolved target isn't clearly a local/test database,
+# so an accidental Atlas URI can't wipe real data.
+from tests.db_guard import assert_safe_test_db
+
+assert_safe_test_db(TEST_MONGO_URI, _TEST_DB_NAME)
+
 _sync_client = pymongo.MongoClient(TEST_MONGO_URI)
 _sync_db = _sync_client.get_default_database()
 _sync_users = _sync_db.get_collection("users")
