@@ -71,14 +71,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Deploy the exact commit that passed "Tests and Quality Checks",
           # not whatever HEAD happens to be when this workflow_run fires.
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
