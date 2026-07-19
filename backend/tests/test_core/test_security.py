@@ -642,3 +642,61 @@ class TestProductionSecurityValidation:
 
         settings = Settings()
         assert settings.BYPASS_AUTH is False
+
+    @pytest.mark.parametrize("marker", ["ENVIRONMENT", "NODE_ENV"])
+    @pytest.mark.parametrize("value", ["PRODUCTION", "Production", "pRoDuCtIoN"])
+    def test_is_production_env_case_insensitive(self, monkeypatch, marker, value):
+        """is_production_env() must match production case-insensitively so a
+        marker set as PRODUCTION/Production doesn't fail open (#309)."""
+        from app.core.config import is_production_env
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv(marker, value)
+
+        assert is_production_env() is True
+
+    def test_is_production_env_false_for_non_production(self, monkeypatch):
+        """Non-production markers (and unset) still return False (#309)."""
+        from app.core.config import is_production_env
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        assert is_production_env() is False
+
+        monkeypatch.setenv("ENVIRONMENT", "Staging")
+        assert is_production_env() is False
+
+    def test_bypass_auth_blocked_when_environment_is_uppercase_production(self, monkeypatch):
+        """The BYPASS_AUTH guard fires on ENVIRONMENT=PRODUCTION, not just the
+        exact-case 'production' (#309 — was fail-open)."""
+        from pydantic import ValidationError as PydanticValidationError
+        from app.core.config import Settings
+
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "PRODUCTION")
+        monkeypatch.setenv("BYPASS_AUTH", "true")
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "production-secret-that-is-at-least-32-characters-long")
+
+        with pytest.raises(PydanticValidationError) as exc_info:
+            Settings()
+
+        assert "BYPASS_AUTH" in str(exc_info.value)
+
+    def test_ci_test_secret_rejected_when_node_env_is_titlecase_production(self, monkeypatch):
+        """The weak-secret fail-safe fires on NODE_ENV=Production too (#309)."""
+        from pydantic import ValidationError as PydanticValidationError
+        from app.core.config import Settings
+
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv("NODE_ENV", "Production")
+        monkeypatch.setenv("BYPASS_AUTH", "false")
+        monkeypatch.setenv(
+            "BETTER_AUTH_SECRET",
+            "test-secret-for-ci-minimum-32-characters-long-safe-for-testing",
+        )
+
+        with pytest.raises(PydanticValidationError) as exc_info:
+            Settings()
+
+        assert "test secret" in str(exc_info.value).lower()

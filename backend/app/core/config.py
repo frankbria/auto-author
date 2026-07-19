@@ -14,8 +14,16 @@ def is_production_env() -> bool:
     frontend/legacy path sets NODE_ENV — check both so the production
     fail-safes fire on the real deployment (issue #176). Staging
     (ENVIRONMENT=staging) intentionally does not match.
+
+    Case-normalized so a marker set as PRODUCTION/Production still trips the
+    fail-safes (issue #309 — an exact-match check failed open, and the deploy
+    workflow already lowercases its own marker).
     """
-    return "production" in (os.getenv("ENVIRONMENT"), os.getenv("NODE_ENV"))
+    markers = {
+        (os.getenv("ENVIRONMENT") or "").lower(),
+        (os.getenv("NODE_ENV") or "").lower(),
+    }
+    return "production" in markers
 
 
 class Settings(BaseSettings):
