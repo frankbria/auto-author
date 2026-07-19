@@ -18,6 +18,7 @@ import {
   QuestionType
 } from '@/types/chapter-questions';
 import { handleAIServiceError, AIServiceResult } from '@/lib/api/aiErrorHandler';
+import { BookResponse, toBookProject } from '@/types/book';
 import { ExportTemplate, TemplateCustomization } from '@/types/export';
 
 /**
@@ -228,7 +229,15 @@ export class BookClient {
     if (!response.ok) {
       throw new Error(`Failed to fetch books: ${response.status}`);
     }
-    return response.json();
+    // BookResponse carries no chapters/progress; compute them from toc_items so
+    // BookCard never renders "undefined chapters" or a fabricated progress bar
+    // (issue #291). toc_items ?? [] guards a legacy/partial payload from throwing.
+    const books = (await response.json()) as BookResponse[];
+    // Cast via unknown: BookCard's legacy BookProject and types/book's BookProject
+    // are structurally compatible but nominally divergent (collaborators typing).
+    return books.map((book) =>
+      toBookProject({ ...book, toc_items: book.toc_items ?? [] })
+    ) as unknown as BookProject[];
   }
 
   /**

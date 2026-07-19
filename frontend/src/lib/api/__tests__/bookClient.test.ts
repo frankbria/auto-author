@@ -1365,7 +1365,7 @@ describe('BookClient core CRUD – success paths', () => {
 
   // getUserBooks
   it('getUserBooks returns an array of books', async () => {
-    const books = [{ id: BOOK_ID, title: 'Book A' }];
+    const books = [{ id: BOOK_ID, title: 'Book A', toc_items: [] }];
     (global.fetch as jest.Mock).mockResolvedValueOnce(okJson(books));
 
     const result = await bookClient.getUserBooks();
@@ -1374,7 +1374,51 @@ describe('BookClient core CRUD – success paths', () => {
       expect.stringContaining('/books/'),
       expect.objectContaining({ credentials: 'include' })
     );
-    expect(result).toEqual(books);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: BOOK_ID, title: 'Book A' });
+  });
+
+  // Issue #291: BookResponse has no chapters/progress fields; the client must
+  // compute them from toc_items so BookCard never renders "undefined chapters".
+  it('getUserBooks computes chapters/progress from toc_items', async () => {
+    const books = [
+      {
+        id: BOOK_ID,
+        title: 'Half done',
+        toc_items: [
+          { id: 'c1', title: 'One', level: 1, order: 0, status: 'completed', word_count: 100 },
+          { id: 'c2', title: 'Two', level: 1, order: 1, status: 'draft', word_count: 50 },
+        ],
+      },
+    ];
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson(books));
+
+    const result = await bookClient.getUserBooks();
+
+    expect(result[0].chapters).toBe(2);
+    expect(result[0].progress).toBe(50);
+    expect(result[0].word_count).toBe(150);
+  });
+
+  it('getUserBooks maps a TOC-less book to 0 chapters / 0 progress (New state)', async () => {
+    const books = [{ id: BOOK_ID, title: 'Fresh', toc_items: [] }];
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson(books));
+
+    const result = await bookClient.getUserBooks();
+
+    expect(result[0].chapters).toBe(0);
+    expect(result[0].progress).toBe(0);
+  });
+
+  it('getUserBooks is resilient to a book payload missing toc_items', async () => {
+    // A malformed/legacy payload must not throw and blank the whole dashboard.
+    const books = [{ id: BOOK_ID, title: 'Legacy' }];
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson(books));
+
+    const result = await bookClient.getUserBooks();
+
+    expect(result[0].chapters).toBe(0);
+    expect(result[0].progress).toBe(0);
   });
 
   it('getUserBooks throws on non-ok response', async () => {
