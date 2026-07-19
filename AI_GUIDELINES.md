@@ -18,8 +18,8 @@ This project is a monorepo called `auto-author`. It contains:
 ## File Header Convention
 
 Each file should begin with a full path comment:
-- TypeScript: `// frontend/app/components/Sidebar.tsx`
-- Python: `# backend/app/api/routers/email.py`
+- TypeScript: `// frontend/src/components/Sidebar.tsx`
+- Python: `# backend/app/api/endpoints/email.py`
 
 This helps the AI contextually understand the file's location and purpose.
 
@@ -27,9 +27,9 @@ This helps the AI contextually understand the file's location and purpose.
 
 ## Naming Conventions
 
-- Backend routes go in `backend/app/api/routers/`
-- Data models (MongoDB/Beanie) go in `backend/app/models/`
-- Frontend UI components go in `frontend/app/components/`
+- Backend routes go in `backend/app/api/endpoints/`
+- Data models (Pydantic) go in `backend/app/models/`
+- Frontend UI components go in `frontend/src/components/`
 - Pages are under `frontend/app/` using Next.js file routing
 
 Use lowercase_with_underscores for Python files.
@@ -37,17 +37,16 @@ Use PascalCase for React components.
 
 ## MongoDB Guidelines
 
-- We use Beanie ODM for MongoDB in the backend
-- All models extend `Document`
+- We use the async `motor` driver (with `pymongo`) for MongoDB in the backend — no ODM
+- Models are plain Pydantic `BaseModel`s; persistence uses motor collections under `backend/app/db/`
 - Use Pydantic `Field()` to define default values and metadata
 - Models live in `backend/app/models/`
 
 ```python
 # backend/app/models/email_message.py
-from beanie import Document
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-class EmailMessage(Document):
+class EmailMessage(BaseModel):
     subject: str = Field(...)
     sender: str
     body: str
@@ -112,7 +111,7 @@ const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/api/v1/email`,
 
 ## Frontend Testing Strategy
 
-- Use `Vitest` for unit and integration tests
+- Use `Jest` for unit and integration tests
 - Use `@testing-library/react` for UI and interaction
 - **Coverage Requirement**: Minimum 85% code coverage for all new code (target: 80% overall project coverage)
 - Each new component should be accompanied by at least one test
@@ -153,7 +152,7 @@ const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/api/v1/email`,
 
 - `test_main.py`: health check or root route tests
 - `test_routes/`: individual API endpoint tests
-- `test_models/`: Pydantic/Beanie model behavior tests
+- `test_models/`: Pydantic model behavior tests
 - `test_services/`: logic layers (e.g., email parsing, classification)
 - `test_utils/`: helpers or reusable utility functions
 
