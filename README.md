@@ -26,13 +26,13 @@
 * 🎯 **Touch target compliance** (100% WCAG 2.1 Level AAA - 44x44px minimum)
 
 ### Production Features
-* 📤 **Export functionality** (PDF/DOCX with customizable options)
+* 📤 **Export functionality** (PDF/DOCX/EPUB/Markdown with customizable options)
 * 🔄 **Unified error handling** with automatic retry logic and user notifications
 * ⚠️ **Book deletion protection** with type-to-confirm and data loss warnings
 * 📈 **Performance monitoring** with Core Web Vitals tracking
 * ⏳ **Loading state indicators** with progress bars and time estimates
 * 🛡️ **Data preservation** with validation, TTL-based cleanup, and recovery UI
-* 🧪 **Comprehensive test coverage** (86.2% overall, 100% pass rate)
+* 🧪 **Comprehensive test coverage** (CI-enforced ≥85% gate on both frontend and backend; ~92% backend, 100% pass rate)
 
 ---
 
@@ -337,10 +337,8 @@ npm run test:watch        # Run in watch mode
 ```
 
 **Current Status:**
-- **Pass Rate:** 88.7% (613/691 tests passing)
-- **Known Issues:** 75 failures are environmental (missing mocks, not code bugs)
-- **Fix Timeline:** 3.5-5.5 hours across 4 phases
-- See [Frontend Test Failure Analysis](frontend/docs/TEST_FAILURE_ANALYSIS.md) for details
+- **Pass Rate:** 100% (~2,180 tests across ~120 suites)
+- **Coverage:** clears the CI-enforced 85% gate (statements/lines/functions ≥85%, branches ≥75%)
 
 ### Backend Tests
 
@@ -351,10 +349,8 @@ uv run pytest --cov=app tests/ --cov-report=term-missing  # With coverage
 ```
 
 **Current Status:**
-- **Pass Rate:** 98.9% (187/189 tests passing)
-- **Coverage:** 41% (target: 85%)
-- **Improvement Plan:** 4-5 weeks, 207-252 new tests needed
-- See [Backend Test Coverage Report](backend/TEST_COVERAGE_REPORT.md) for details
+- **Pass Rate:** 100% (~1,160 tests passing)
+- **Coverage:** ~92% (CI-enforced ≥85% gate)
 
 ### E2E Tests (Playwright)
 
@@ -459,7 +455,7 @@ auto-author/
 * Auto-save with localStorage backup on network failure
 * Save status indicators with visual feedback
 * Chapter status workflow (draft → in-progress → completed → published)
-* Export to PDF/DOCX with customizable options
+* Export to PDF/DOCX/EPUB/Markdown with customizable options
 * Progress tracking for long-running operations
 
 ### Quality & Accessibility
@@ -477,7 +473,7 @@ auto-author/
 ## 📦 Roadmap
 
 ### Current Sprint (Sprint 3-4 - Week 6)
-* ✅ Export functionality (PDF/DOCX) - **COMPLETE**
+* ✅ Export functionality (PDF/DOCX/EPUB/Markdown) - **COMPLETE**
 * ✅ Unified error handling - **COMPLETE**
 * ✅ API contract formalization - **COMPLETE**
 * ✅ Book deletion UI - **COMPLETE**
@@ -490,7 +486,6 @@ auto-author/
 
 ### Sprint 5-6 (Planned)
 * Collaborative editing with real-time sync
-* Additional export formats (EPUB, Markdown)
 * Analytics dashboard for writing insights
 * AI research assistant for content development
 * Chapter-level image generation
@@ -498,39 +493,20 @@ auto-author/
 
 ---
 
-## 🔧 What's New (Updated: 2025-10-29)
+## 🔧 What's New
+
+For the full, dated change history see [`CLAUDE.md`](CLAUDE.md). Recent highlights:
 
 ### Security & Authentication
-- **JWT Verification Enhancement**: Migrated from hardcoded public key to Clerk's JWKS endpoint for improved security and automatic key rotation (later replaced by better-auth — see CLAUDE.md 2025-12-17)
-- **E2E Testing Support**: Added `BYPASS_AUTH=true` environment variable for authentication bypass during testing (now requires `E2E_ALLOW_BYPASS=1` alongside it in every environment — #272)
-- **Security Audit**: Completed comprehensive authentication middleware review
+- **better-auth**: Cookie-based session authentication (migrated from Clerk in 2025-12). httpOnly session cookies are validated on each backend request, with TOTP two-factor + backup codes and native session list/revoke.
+- **Production fail-safes**: Auth bypass is hard-blocked in production and requires `E2E_ALLOW_BYPASS=1` alongside `BYPASS_AUTH` in every environment (#272/#307). Per-user AI quotas, rate limiting, and entitlement gating are enforced.
 
 ### Testing Infrastructure
-- **E2E Test Suite**: Complete Playwright test coverage with auth bypass support
-- **Test Helpers**: Comprehensive fixtures for books, chapters, and TOC data
-- **Condition-based Waiting**: Replaced arbitrary timeouts with state polling for more reliable tests
-- **Page Objects**: Full coverage for all major user workflows
+- **Quality gates enforced**: CI fails builds below the 85% coverage gate, and `main` is branch-protected on the Frontend/Backend test checks (#118). Backend coverage is ~92%; frontend clears the 85% gate.
+- **E2E**: Playwright suite with condition-based waiting and page objects across all major workflows.
 
-### Test Analysis & Documentation
-- **Post-Deployment Analysis**: Added comprehensive test status report
-  - Frontend: 88.7% pass rate (75 failures are environmental, not code bugs)
-  - Backend: 98.9% pass rate, 41% coverage vs 85% target
-- **Coverage Improvement Plan**: Detailed 4-week plan to reach 85% backend coverage
-- **Test Categorization**: Frontend failures analyzed and prioritized by fix complexity
-
-### Known Issues
-- **Frontend Tests**: 75 environmental failures (missing mocks for Next.js router, ResizeObserver, module imports)
-  - Estimated fix time: 3.5-5.5 hours
-  - All failures are test setup issues, not application bugs
-- **Backend Coverage Gap**: 41% vs 85% target
-  - Critical modules need coverage: `security.py` (18%), `book_cover_upload.py` (0%), `transcription.py` (0%)
-  - Path to 85%: 207-252 new tests over 4-5 weeks
-- **Backend Asyncio**: 2 test failures related to event loop lifecycle
-
-### Package Updates
-- Upgraded `lucide-react` to 0.468.0
-- Resolved 5 npm audit vulnerabilities
-- Updated `.gitignore` to exclude test artifacts
+### Export
+- Four formats shipped: **PDF, DOCX, EPUB, Markdown** (single-file, plus per-chapter for EPUB/Markdown).
 
 ---
 

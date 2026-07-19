@@ -9,7 +9,7 @@ Modern Next.js application for AI-powered book authoring with comprehensive prod
 - **Styling**: TailwindCSS
 - **UI Components**: Radix UI primitives
 - **Rich Text Editor**: TipTap
-- **Authentication**: Clerk
+- **Authentication**: better-auth (cookie-based sessions)
 - **State Management**: React Context + hooks
 - **API Client**: Custom fetch wrapper with retry logic
 - **Testing**: Jest + React Testing Library + Playwright
@@ -24,7 +24,7 @@ Modern Next.js application for AI-powered book authoring with comprehensive prod
 - ✅ Rich text chapter editing with TipTap
 - ✅ Q&A-based content development
 - ✅ AI draft generation from responses
-- ✅ Export to PDF/DOCX
+- ✅ Export to PDF/DOCX/EPUB/Markdown
 - ✅ Voice input via Web Speech API
 
 ### Production Features
@@ -93,8 +93,9 @@ cp .env.example .env.local
 
 # Configure .env.local:
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_****
-CLERK_SECRET_KEY=sk_****
+# Must match the backend BETTER_AUTH_SECRET exactly
+BETTER_AUTH_SECRET=your-secure-secret-key-here-replace-with-generated-value
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 ```
 
 ### Development Commands
@@ -130,7 +131,7 @@ npm run format
 ## 🧪 Testing
 
 ### Test Coverage Standards
-- **Overall**: 86.2% (exceeds 85% requirement)
+- **Overall**: clears the CI-enforced 85% gate (statements/lines/functions ≥85%, branches ≥75%); ~2,180 tests passing across ~120 suites
 - **Critical Components**: 100% pass rate required
 - **Test Types**:
   - Unit tests (Jest + RTL)
@@ -250,11 +251,11 @@ const result = await trackOperation(
 
 ## 🔐 Authentication
 
-### Clerk Integration
-- Social login (Google, GitHub)
-- Email/password authentication
-- Multi-factor authentication
-- Session management
+### better-auth Integration
+- Email/password authentication with verification and password reset
+- Two-factor authentication (TOTP) with backup codes
+- httpOnly cookie-based session management (no JWT sent to the backend)
+- Session list/revoke via better-auth native APIs (Settings → Security)
 - Profile management
 
 ### Protected Routes
@@ -308,8 +309,9 @@ npm run start
 ### Environment Variables (Production)
 ```
 NEXT_PUBLIC_API_URL=https://api.auto-author.com
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_****
-CLERK_SECRET_KEY=sk_****
+# Must match the backend BETTER_AUTH_SECRET exactly (≥64 chars in production)
+BETTER_AUTH_SECRET=****
+NEXT_PUBLIC_BETTER_AUTH_URL=https://auto-author.com
 ```
 
 ### Deployment Checklist
