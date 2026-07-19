@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import { Question, QuestionType, QuestionDifficulty, ResponseStatus, MAX_REGENERATION_COUNT } from '@/types/chapter-questions';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -209,7 +211,7 @@ export default function QuestionDisplay({
         }
 
         // Log successful verification
-        console.log(
+        logger.debug(
           `Verification successful: Response confirmed in database (question_id=${question.id}, status=${savedResponse.status})`
         );
       } catch (verifyError) {

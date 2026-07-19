@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger';
 import { useState, useEffect, useCallback } from 'react';
 import { ChapterTabsState, ChapterStatus, ChapterTabMetadata } from '../types/chapter-tabs';
 import bookClient from '../lib/api/bookClient';
@@ -40,7 +41,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
             // Convert TOC data to chapter tab metadata format
             chapterTabsMetadata = convertTocToChapterTabs(processedTocData);
 
-            console.log('Successfully loaded TOC structure and converted to chapter tabs');
+            logger.debug('Successfully loaded TOC structure and converted to chapter tabs');
           }
         } catch (tocError) {
           console.warn('Failed to load TOC structure:', tocError);          // If TOC fails, fall back to direct chapter tabs API
@@ -53,7 +54,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
             }));
             lastActiveChapter = metadata.last_active_chapter;
 
-            console.log('Loaded chapter data from chapter-tabs API');
+            logger.debug('Loaded chapter data from chapter-tabs API');
           } catch (apiError) {
             console.error('Failed to load chapter metadata:', apiError);
             // If both methods fail, we'll end up with an empty array
@@ -66,7 +67,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
           const savedState = localStorage.getItem(`tabState_${bookId}`);
           if (savedState) {
             localTabState = JSON.parse(savedState);
-            console.log('Loaded tab state from localStorage:', localTabState);
+            logger.debug('Loaded tab state from localStorage:', localTabState);
           }
         } catch (e) {
           console.warn('Failed to load tab state from localStorage:', e);
@@ -78,7 +79,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
 
         try {
           backendTabState = await bookClient.getTabState(bookId);
-          console.log('Loaded tab state from backend:', backendTabState);
+          logger.debug('Loaded tab state from backend:', backendTabState);
 
           // Get the actual state object (the API might return different formats)
           // @ts-expect-error - Handle different response formats for backwards compatibility
@@ -91,10 +92,10 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
 
             // Use the newer state
             if (backendDate > localDate) {
-              console.log('Backend state is newer, using backend state');
+              logger.debug('Backend state is newer, using backend state');
               tabState = backendStateData;
             } else {
-              console.log('Local state is newer, using local state');
+              logger.debug('Local state is newer, using local state');
               tabState = localTabState;
             }
           } else {
@@ -104,7 +105,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
         } catch (error) {
           // If backend fails, fall back to local state
           console.error('Error loading backend state:', error);
-          console.log('Failed to load backend state, falling back to local state');
+          logger.debug('Failed to load backend state, falling back to local state');
           tabState = localTabState;
         }
 
@@ -270,7 +271,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
           };
 
           chapterTabsMetadata = convertTocToChapterTabs(processedTocData);
-          console.log('Successfully refreshed TOC structure and converted to chapter tabs');
+          logger.debug('Successfully refreshed TOC structure and converted to chapter tabs');
         }
       } catch (tocError) {        console.warn('Failed to refresh TOC structure:', tocError);
         // Fall back to direct chapter tabs API
@@ -281,7 +282,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
             status: ch.status as ChapterStatus,
             has_content: false // We'll need to check this separately if needed
           }));
-          console.log('Refreshed chapter data from chapter-tabs API');
+          logger.debug('Refreshed chapter data from chapter-tabs API');
         } catch (apiError) {
           console.error('Failed to refresh chapter metadata:', apiError);
           throw new Error('Unable to refresh chapter data');
@@ -321,7 +322,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
         is_loading: false,
       }));
 
-      console.log('Successfully refreshed chapter tabs state');
+      logger.debug('Successfully refreshed chapter tabs state');
     } catch (error) {
       setState(prev => ({
         ...prev,

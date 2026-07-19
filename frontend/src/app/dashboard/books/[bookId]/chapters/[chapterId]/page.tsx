@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import { use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -88,10 +90,10 @@ export default function ChapterContentPage({ params }: ChapterContentPageProps) 
           bookId={bookId}
           chapterId={chapterId}
           onSave={(content: string) => {
-            console.log('Chapter saved from individual page:', content.length, 'characters');
+            logger.debug('Chapter saved from individual page:', content.length, 'characters');
           }}
           onContentChange={(content: string) => {
-            console.log('Content changed:', content.length, 'characters');
+            logger.debug('Content changed:', content.length, 'characters');
           }}
         />
       </div>

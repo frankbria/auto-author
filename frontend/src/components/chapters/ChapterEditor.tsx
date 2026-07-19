@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -317,7 +319,7 @@ export function ChapterEditor({
         onSave(content);
       }
       if (!isAutoSave) {
-        console.log('Chapter content saved successfully');
+        logger.debug('Chapter content saved successfully');
       }
     } catch (err) {
       console.error('Failed to save chapter:', err);

@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TocReadiness } from '@/types/toc';
@@ -21,9 +22,9 @@ export default function NotReadyMessage({ readiness, onRetry, bookId }: NotReady
   const handleAnalyzeSummary = async () => {
     try {
       setIsAnalyzing(true);
-      console.log('Running fresh analysis on summary...');
+      logger.debug('Running fresh analysis on summary...');
       await bookClient.analyzeSummary(bookId);
-      console.log('Analysis completed, refreshing readiness check...');
+      logger.debug('Analysis completed, refreshing readiness check...');
       onRetry(); // This will trigger a fresh readiness check
     } catch (error) {
       console.error('Error analyzing summary:', error);
