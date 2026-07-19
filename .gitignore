@@ -110,3 +110,8 @@ ecosystem.config.js
 
 # Playwright generated test artifacts (regenerated each run)
 frontend/tests/e2e/artifacts/
+
+# User-uploaded files (cover images, profile pictures — PII). Dir kept via .gitkeep;
+# app self-creates the subdirs at runtime (file_upload_service.py).
+backend/uploads/*
+!backend/uploads/.gitkeep
