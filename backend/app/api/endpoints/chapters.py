@@ -88,16 +88,21 @@ async def create_chapter(
             "message": "Chapter created successfully",
         }
     except ValueError as e:
-        if "not found" in str(e).lower():
-            raise HTTPException(status_code=404, detail="Book not found")
+        # Check the specific parent-chapter message first: "Parent chapter not
+        # found" also matches the generic "not found" substring, so the generic
+        # branch would otherwise shadow this one (#158).
+        if "Parent chapter not found" in str(e):
+            raise HTTPException(
+                status_code=400, detail="Parent chapter not found"
+            ) from e
+        elif "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Book not found") from e
         elif "not authorized" in str(e).lower():
             raise HTTPException(
                 status_code=403, detail="Not authorized to modify this book's chapters"
-            )
-        elif "Parent chapter not found" in str(e):
-            raise HTTPException(status_code=400, detail="Parent chapter not found")
+            ) from e
         else:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception:
         logger.error("Failed to create chapter", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create chapter")
