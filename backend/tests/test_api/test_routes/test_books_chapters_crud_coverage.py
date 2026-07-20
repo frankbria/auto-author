@@ -23,9 +23,9 @@ Behavioral notes captured from the (now-fixed) implementation:
   "missing" and surfaces as **404 "Book not found"**, not 403. (The
   non-transactional read endpoints -- get/list/metadata -- use a separate
   ownership check and *do* return 403.)
-* ``create_chapter``'s ``except`` clause tests ``"not found"`` before the
-  parent-specific branch, so a bad ``parent_id`` ("Parent chapter not found")
-  also surfaces as **404 "Book not found"** rather than 400.
+* ``create_chapter``'s ``except`` clause tests the parent-specific branch
+  before the generic ``"not found"`` check, so a bad ``parent_id`` surfaces as
+  **400 "Parent chapter not found"** (fixed in #158; previously masked as 404).
 """
 
 import pytest
@@ -126,8 +126,8 @@ async def test_create_subchapter_happy_path(auth_client_factory):
 
 
 @pytest.mark.asyncio
-async def test_create_chapter_bad_parent_returns_404(auth_client_factory):
-    """A level>1 chapter with an unknown parent_id -> 404 (see module docstring)."""
+async def test_create_chapter_bad_parent_returns_400(auth_client_factory):
+    """A level>1 chapter with an unknown parent_id -> 400 "Parent chapter not found"."""
     api = await auth_client_factory()
     book_id = await create_book(api)
 
@@ -136,8 +136,8 @@ async def test_create_chapter_bad_parent_returns_404(auth_client_factory):
         json={"title": "X", "level": 2, "order": 1, "parent_id": "does-not-exist"},
     )
 
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "Book not found"
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Parent chapter not found"
 
 
 @pytest.mark.asyncio
