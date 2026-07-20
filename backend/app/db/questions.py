@@ -239,18 +239,23 @@ async def get_questions_for_chapter(
     # Get total count
     total = await questions_collection.count_documents(query)
 
-    # Convert ObjectIds to strings and add response status
-    processed_questions = []
+    # Convert ObjectIds to strings and add response status.
+    # One batched lookup keyed by question_id instead of a find_one per question (N+1).
     for question in questions:
         question["id"] = str(question.pop("_id"))
 
-        # Check if question has a response
-        responses_collection = await get_collection("question_responses")
-        response = await responses_collection.find_one({
-            "question_id": question["id"],
-            "user_id": user_id
+    responses_collection = await get_collection("question_responses")
+    responses_by_qid = {
+        r["question_id"]: r
+        async for r in responses_collection.find({
+            "question_id": {"$in": [q["id"] for q in questions]},
+            "user_id": user_id,
         })
+    }
 
+    processed_questions = []
+    for question in questions:
+        response = responses_by_qid.get(question["id"])
         if response:
             question["response_status"] = response.get("status", "draft")
             question["has_response"] = True
@@ -424,13 +429,18 @@ async def get_ratings_for_chapter(
         "user_id": user_id
     }).to_list(length=None)
 
+    # One batched lookup keyed by question_id instead of a find_one per question (N+1).
+    ratings_by_qid = {
+        r["question_id"]: r
+        async for r in ratings_collection.find({
+            "question_id": {"$in": [str(q["_id"]) for q in questions]},
+            "user_id": user_id,
+        })
+    }
+
     results: List[Dict[str, Any]] = []
     for question in questions:
-        question_id = str(question["_id"])
-        rating = await ratings_collection.find_one({
-            "question_id": question_id,
-            "user_id": user_id
-        })
+        rating = ratings_by_qid.get(str(question["_id"]))
         if rating:
             results.append({
                 "question_text": question.get("question_text", ""),
@@ -461,14 +471,18 @@ async def get_chapter_question_progress(
     completed = 0
     in_progress = 0
 
-    # Check response status for each question
-    for question in questions:
-        question_id = str(question["_id"])
-        response = await responses_collection.find_one({
-            "question_id": question_id,
-            "user_id": user_id
+    # One batched lookup keyed by question_id instead of a find_one per question (N+1).
+    responses_by_qid = {
+        r["question_id"]: r
+        async for r in responses_collection.find({
+            "question_id": {"$in": [str(q["_id"]) for q in questions]},
+            "user_id": user_id,
         })
+    }
 
+    # Tally response status for each question
+    for question in questions:
+        response = responses_by_qid.get(str(question["_id"]))
         if response:
             if response.get("status") == "completed":
                 completed += 1

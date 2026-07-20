@@ -1,8 +1,17 @@
 # AI Service Caching and Error Handling Architecture
 
 **Last Updated:** 2025-12-22
-**Status:** Production-Ready
+**Status:** ⚠️ Caching REMOVED in #214 — error-handling sections still current
 **Owner:** Auto Author Engineering Team
+
+> **Note (#214):** The Redis AI response cache described in the *Caching System*
+> sections below was never provisioned (`redis` was never a declared dependency,
+> so the cache was a permanent no-op) and the `ai_cache_service` module was
+> removed in #214. Disregard the caching architecture, the `REDIS_URL` /
+> `AI_CACHE_*` configuration, and the cached-fallback behavior. The **Error
+> Handling** / retry sections remain accurate (retry ownership consolidated to a
+> single layer in #188; failures surface as structured 429/503/500 rather than
+> silent cached fallbacks).
 
 ---
 

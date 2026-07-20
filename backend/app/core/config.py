@@ -75,10 +75,6 @@ class Settings(BaseSettings):
     E2E_ALLOW_BYPASS: str = ""
     BYPASS_AUTH: bool = False  # Set to True for E2E tests to bypass authentication
 
-    # Redis Cache Settings
-    REDIS_URL: str = "redis://localhost:6379/0"
-    AI_CACHE_TTL: int = 86400  # 24 hours in seconds
-    AI_CACHE_ENABLED: bool = True
     AI_MAX_RETRIES: int = 3
 
     # Max times a single question may be regenerated (per-question abuse cap,

@@ -28,14 +28,6 @@ from app.services.transcription_enhancement import (
     TRANSCRIPTION_ENHANCEMENT_LABEL,
     get_transcription_enhancement_prompt,
 )
-from app.services.ai_cache_service import (
-    AICacheService,
-    get_toc_generation_cache,
-    set_toc_generation_cache,
-    get_questions_cache,
-    set_questions_cache
-)
-
 logger = logging.getLogger(__name__)
 
 # Draft generation runs on a larger-output model so the UI's top length options
@@ -59,8 +51,8 @@ class AIService:
     Includes retry mechanism for failed requests and response caching.
     """
 
-    def __init__(self, cache_service: Optional[AICacheService] = None):
-        """Initialize the AI service with OpenAI client and cache."""
+    def __init__(self):
+        """Initialize the AI service with OpenAI client."""
         # max_retries=0: the SDK silently retries each request (default 2) on
         # top of _retry_with_backoff, multiplying real API calls per failure
         # (observed 3x3=9 on the wire). Retry ownership lives in
@@ -70,7 +62,6 @@ class AIService:
         self.max_retries = settings.AI_MAX_RETRIES
         self.base_delay = 1.0  # Base delay for exponential backoff
         self.max_delay = 60.0  # Maximum delay between retries
-        self.cache_service = cache_service or AICacheService()
 
     async def _retry_with_backoff(
         self,
@@ -310,21 +301,6 @@ class AIService:
         correlation_id = str(uuid.uuid4())
 
         try:
-            # Try cache first
-            cached_questions = await get_questions_cache(
-                self.cache_service,
-                summary=summary,
-                book_metadata=book_metadata,
-                num_questions=num_questions
-            )
-
-            if cached_questions:
-                logger.info(
-                    f"Retrieved {len(cached_questions)} questions from cache "
-                    f"[correlation_id={correlation_id}]"
-                )
-                return cached_questions
-
             # Generate new questions
             prompt = self._build_questions_prompt(summary, book_metadata, num_questions)
 
@@ -346,41 +322,16 @@ class AIService:
             questions_text = response.choices[0].message.content
             questions = self._parse_questions_response(questions_text)
 
-            # Cache the result
-            await set_questions_cache(
-                self.cache_service,
-                summary=summary,
-                questions=questions,
-                book_metadata=book_metadata,
-                num_questions=num_questions
-            )
-
             logger.info(
-                f"Generated and cached {len(questions)} clarifying questions "
+                f"Generated {len(questions)} clarifying questions "
                 f"[correlation_id={correlation_id}]"
             )
             return questions
 
         except AIServiceError as e:
-            # Try to get cached content as fallback
             e.cached_content_available = False
-            cached_questions = await get_questions_cache(
-                self.cache_service,
-                summary=summary,
-                book_metadata=book_metadata,
-                num_questions=num_questions
-            )
-
-            if cached_questions:
-                e.cached_content_available = True
-                logger.warning(
-                    f"AI service error, returning cached questions "
-                    f"[correlation_id={correlation_id}]"
-                )
-                return cached_questions
-
             logger.error(
-                f"Error generating clarifying questions and no cache available "
+                f"Error generating clarifying questions "
                 f"[correlation_id={correlation_id}]: {str(e)}"
             )
             raise
@@ -557,20 +508,6 @@ Make questions specific, actionable, and focused on content structure rather tha
         correlation_id = str(uuid.uuid4())
 
         try:
-            # Try cache first
-            cached_toc = await get_toc_generation_cache(
-                self.cache_service,
-                summary=summary,
-                question_responses=question_responses,
-                book_metadata=book_metadata
-            )
-
-            if cached_toc:
-                logger.info(
-                    f"Retrieved TOC from cache [correlation_id={correlation_id}]"
-                )
-                return cached_toc
-
             # Generate new TOC
             prompt = self._build_toc_generation_prompt(
                 summary, question_responses, book_metadata
@@ -594,39 +531,15 @@ Make questions specific, actionable, and focused on content structure rather tha
             toc_text = response.choices[0].message.content
             toc_result = self._parse_toc_response(toc_text)
 
-            # Cache the result
-            await set_toc_generation_cache(
-                self.cache_service,
-                summary=summary,
-                question_responses=question_responses,
-                response=toc_result,
-                book_metadata=book_metadata
-            )
-
             logger.info(
-                f"Generated and cached TOC [correlation_id={correlation_id}]"
+                f"Generated TOC [correlation_id={correlation_id}]"
             )
             return toc_result
 
         except AIServiceError as e:
-            # Try to get cached content as fallback
             e.cached_content_available = False
-            cached_toc = await get_toc_generation_cache(
-                self.cache_service,
-                summary=summary,
-                question_responses=question_responses,
-                book_metadata=book_metadata
-            )
-
-            if cached_toc:
-                e.cached_content_available = True
-                logger.warning(
-                    f"AI service error, returning cached TOC [correlation_id={correlation_id}]"
-                )
-                return cached_toc
-
             logger.error(
-                f"Error generating TOC and no cache available "
+                f"Error generating TOC "
                 f"[correlation_id={correlation_id}]: {str(e)}"
             )
             raise

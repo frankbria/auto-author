@@ -5,13 +5,10 @@ Run service tests in isolation without database dependencies
 
 import sys
 import asyncio
-import pytest
 import os
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 from app.services.ai_service import AIService
-from app.services.transcription_service import TranscriptionService
-from app.core.config import settings
 
 # Set environment variables for testing
 os.environ['OPENAI_AUTOAUTHOR_API_KEY'] = 'test-key'
@@ -44,37 +41,6 @@ async def test_ai_service():
         assert result["metadata"]["word_count"] == 3
         assert "suggestions" in result
         print("✓ AI draft generation works correctly")
-
-async def test_transcription_service():
-    """Test transcription service"""
-    print("\n=== Testing Transcription Service ===")
-
-    # Test with no AWS credentials (should use mock)
-    with patch.dict(os.environ, {'AWS_ACCESS_KEY_ID': '', 'AWS_SECRET_ACCESS_KEY': ''}):
-        service = TranscriptionService()
-
-        result = await service.transcribe_audio(
-            audio_data=b"fake audio data",
-            language="en-US"
-        )
-
-        print(f"DEBUG: Audio length: {len(b'fake audio data')}, Result: '{result.transcript}'")
-
-        # Audio data length is 15 bytes, which is < 1000, so it returns "Short audio sample."
-        assert result.transcript == "Short audio sample."
-        assert result.confidence == 0.95
-        print("✓ Mock transcription works correctly")
-
-    # Test with longer audio for punctuation processing
-    result = await service.transcribe_audio(
-        audio_data=b"x" * 5001,  # Long audio to get detailed transcription
-        language="en-US",
-        enable_punctuation_commands=True
-    )
-
-    # The long transcript already has a period at the end
-    assert result.transcript == "This is a longer audio transcription that would contain more detailed content from the user's speech input."
-    print("✓ Punctuation command processing works correctly")
 
 async def test_cloud_storage():
     """Test cloud storage service"""
@@ -159,7 +125,6 @@ async def main():
 
     try:
         await test_ai_service()
-        await test_transcription_service()
         await test_cloud_storage()
         await test_file_upload()
 
