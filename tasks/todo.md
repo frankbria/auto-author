@@ -21,7 +21,9 @@
 5. Full backend suite + coverage ≥85%; deslop; review; demo (outcome evidence per criterion); PR.
 
 ## Acceptance criteria
-- [ ] Remove the dead transcription + cache modules (chosen over wiring)
-- [ ] Mock-transcript fallback gone (router removed entirely — no mock text served)
-- [ ] Replace per-question loops with `$in`/bulk queries
-- [ ] Project out `chapters.content` on the list endpoint
+- [x] Remove the dead transcription + cache modules (chosen over wiring)
+- [x] Mock-transcript fallback gone (router removed entirely — no mock text served)
+- [x] Replace per-question loops with `$in`/bulk queries
+- [x] Project out `chapters.content` on the list endpoint
+
+## Status: PR #320 open; demo `docs/demos/2026-07-19-issue-214-remove-dead-code-perf.md` (all 4 ACs, outcome evidence); pre-PR codex review clean (opencode hung).
