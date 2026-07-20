@@ -13,8 +13,7 @@ from app.services.ai_errors import (
     AINetworkError,
     AIServiceUnavailableError,
     AIInvalidRequestError,
-    AIResponseParsingError,
-    AICacheError
+    AIResponseParsingError
 )
 
 
@@ -226,29 +225,6 @@ class TestAIResponseParsingError:
         assert error.cached_content_available is True
 
 
-class TestAICacheError:
-    """Test the AICacheError class."""
-
-    def test_cache_error_defaults(self):
-        """Test cache error defaults."""
-        error = AICacheError()
-
-        assert error.error_code == "AI_CACHE_ERROR"
-        assert error.retryable is False
-        assert error.retry_after is None
-        assert "cache" in error.message.lower()
-
-    def test_cache_error_not_critical(self):
-        """Test that cache errors are not retryable."""
-        error = AICacheError(
-            message="Redis connection failed",
-            correlation_id="cache-123"
-        )
-
-        assert error.retryable is False
-        assert error.message == "Redis connection failed"
-
-
 class TestErrorInteroperability:
     """Test error classes working together."""
 
@@ -259,8 +235,7 @@ class TestErrorInteroperability:
             AINetworkError(),
             AIServiceUnavailableError(),
             AIInvalidRequestError(),
-            AIResponseParsingError(),
-            AICacheError()
+            AIResponseParsingError()
         ]
 
         for error in errors:
@@ -274,8 +249,7 @@ class TestErrorInteroperability:
             AINetworkError(),
             AIServiceUnavailableError(),
             AIInvalidRequestError(),
-            AIResponseParsingError(),
-            AICacheError()
+            AIResponseParsingError()
         ]
 
         error_codes = [error.error_code for error in errors]
@@ -296,8 +270,7 @@ class TestErrorInteroperability:
     def test_non_retryable_errors(self):
         """Test that non-retryable errors are marked correctly."""
         non_retryable_errors = [
-            AIInvalidRequestError(),
-            AICacheError()
+            AIInvalidRequestError()
         ]
 
         for error in non_retryable_errors:

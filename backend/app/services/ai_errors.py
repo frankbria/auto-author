@@ -200,28 +200,3 @@ class AIResponseParsingError(AIServiceError):
             original_exception=original_exception,
             correlation_id=correlation_id
         )
-
-
-class AICacheError(AIServiceError):
-    """
-    Raised when cache operations fail.
-
-    This error is not critical and should not prevent the main operation.
-    It's logged but typically handled gracefully.
-    """
-
-    def __init__(
-        self,
-        message: str = "Cache operation failed",
-        original_exception: Optional[Exception] = None,
-        correlation_id: Optional[str] = None
-    ):
-        super().__init__(
-            message=message,
-            error_code="AI_CACHE_ERROR",
-            retryable=False,
-            retry_after=None,
-            cached_content_available=False,
-            original_exception=original_exception,
-            correlation_id=correlation_id
-        )

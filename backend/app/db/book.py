@@ -63,8 +63,24 @@ async def get_book_by_id(book_id: str) -> Optional[Dict]:
 async def get_books_by_user(
     user_auth_id: str, skip: int = 0, limit: int = 100
 ) -> List[Dict]:
-    """Get all books owned by a user"""
-    cursor = books_collection.find({"owner_id": user_auth_id}).skip(skip).limit(limit)
+    """Get all books owned by a user.
+
+    Projects out the heavy per-chapter ``content`` HTML from ``table_of_contents``
+    (top-level chapters and one level of subchapters). The dashboard list endpoint
+    returns ``BookResponse``, which exposes ``toc_items`` but never the full
+    ``table_of_contents`` body — so fetching every chapter's draft here is pure
+    overfetch (a book with long chapters sends KBs of unused HTML per row).
+    Titles/structure/``toc_items`` are untouched.
+    """
+    projection = {
+        "table_of_contents.chapters.content": 0,
+        "table_of_contents.chapters.subchapters.content": 0,
+    }
+    cursor = (
+        books_collection.find({"owner_id": user_auth_id}, projection)
+        .skip(skip)
+        .limit(limit)
+    )
     books = await cursor.to_list(length=limit)
     return books
 

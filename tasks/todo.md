@@ -1,66 +1,27 @@
-# #307 — Require E2E_ALLOW_BYPASS for backend (FastAPI) BYPASS_AUTH in all environments
+# Issue #214 — [P3.8] Remove dead code: transcription stack + AI cache; fold in N+1 perf cleanups
 
-**Plan source**: self-authored (issue body has scope bullets, no step plan; no comments).
-**Approval**: autonomous — no architectural fork.
+**Plan source:** self-authored (CodeRabbit only offered to generate a plan; none existed).
+**Decision (autonomous, AC-endorsed):** REMOVE both dead subsystems, not wire.
 
-## Design decisions (autonomous — safe defaults)
+## Why remove (not wire)
+- **Transcription `/transcribe` stack**: router never mounted (`router.py` has no transcription include), service falls back to hardcoded mock transcripts, zero production importers. Standalone dead code (#93 only ever tested it on a bare app).
+- **`ai_cache_service`**: `redis` is absent from `pyproject.toml`/`uv.lock`, so the import guard is permanently False and every cache op is a no-op. Wiring means provisioning redis on the shared VPS for a cache with zero real dependents — contradicts the project's YAGNI/dead-code ethos. Removal is **behavior-preserving**: cache always misses → always generates fresh; the error-fallback lookup always returns None today. Git preserves history if redis is ever provisioned.
 
-1. **Reuse `E2E_ALLOW_BYPASS=1`** (issue offered a backend-specific flag as an option) —
-   one flag, same semantics as the frontend middleware (#272), already documented. Exact
-   value `'1'` required, mirroring the frontend.
-2. **Gate lives in the `Settings` field_validator (`backend/app/core/config.py`) as a
-   coercion**: prod + `BYPASS_AUTH=true` + no flag → raise (FATAL, unchanged); non-prod +
-   `BYPASS_AUTH=true` + no flag → **coerce to `False`** + warn ("ignored — set
-   E2E_ALLOW_BYPASS=1"); flag `'1'` present → allowed. Chosen over a computed property or
-   call-site helper because ~15 existing tests monkeypatch the `settings.BYPASS_AUTH`
-   attribute at the object level — coercion at construction keeps every one of them green
-   with zero call-site changes (`security.py`, `dependencies.py` untouched).
-3. **`main.py validate_production_security()`** prod branch unchanged (validator raises at
-   construction first; main.py stays defense-in-depth). Its non-prod warn remains accurate:
-   after coercion it only fires when bypass is genuinely active (flag set).
-4. **Backend pytest suite needs no new fixtures** — env-gate pins construct real `Settings`
-   with monkeypatched env (existing `TestProductionSecurityValidation` pattern).
-5. Demo = Showboat only (API-only backend; HTTP 401-vs-200 + startup log lines as evidence).
+## Verified scope (file:line evidence)
+- Transcribe stack (DELETE): `app/api/endpoints/transcription.py`, `app/services/transcription_service.py`, `app/services/transcription_service_aws.py`, `app/schemas/transcription.py`. NOT the live `transcription_enhancement.py` / `enhance-transcription` (books.py) feature.
+- Cache: `app/services/ai_cache_service.py` (DELETE) + strip 6 call sites in `ai_service.py` (314/350/367 in `generate_clarifying_questions`, 561/598/614 in `generate_toc_from_summary_and_responses`) + import (33-36). `AICacheError` in `ai_errors.py` (only-defined, unused → remove). Dead config: `REDIS_URL`, `AI_CACHE_TTL`, `AI_CACHE_ENABLED` (keep `AI_MAX_RETRIES` — used by retry logic).
+- N+1 (real, fix): `questions.py` `get_questions` (243), `get_ratings_for_chapter` (427), `get_chapter_question_progress` (464). Lines 551/664 already batched (`$in`/`distinct`) — NOT touched.
+- Projection: `book.py::get_books_by_user` (63-69) — sole caller is `GET /books/` returning `BookResponse` (uses `toc_items`, never `table_of_contents`). Exclude the heavy `table_of_contents.chapters.content` + `.subchapters.content` HTML blobs.
 
 ## Steps
+1. Delete dead transcribe files + their tests; clean `__init__`/exports. Tests to delete: `test_api/test_transcription.py`, `test_api/test_transcription_endpoint.py`, `test_services/test_transcription_service.py`, `test_services/test_transcription_service_aws.py`, `test_services_isolated.py` (transcription-only scratch script). KEEP `test_services/test_transcription_enhancement.py`.
+2. Delete `ai_cache_service.py`; strip the 2 cached AI methods to generate-only (preserve `cached_content_available = False` + re-raise on error). Remove `AICacheError` + dead cache config. Update `test_services/test_ai_service_errors.py` (drop mock-cache fixture + cache-fallback test; keep error-raising tests on `AIService()`). Delete `test_services/test_ai_cache_service.py`.
+3. N+1: replace per-question `find_one` loops with one `$in` lookup + dict map in the 3 functions. TDD: pin correctness (+ query behavior).
+4. Projection: add exclusion projection to `get_books_by_user`. TDD: pin content excluded, titles/toc_items/structure intact.
+5. Full backend suite + coverage ≥85%; deslop; review; demo (outcome evidence per criterion); PR.
 
-- [x] 1. **TDD pins** — `backend/tests/test_core/test_security.py`
-      (`TestProductionSecurityValidation`):
-  - [x] invert the 5 "allowed without flag" pins (:432-478 dev/test/staging/unset,
-        :529-538 ENVIRONMENT=staging) → without flag, `Settings().BYPASS_AUTH is False`
-  - [x] new pins: same 5 env combos **with** `E2E_ALLOW_BYPASS=1` → `is True`
-  - [x] loose flag value (`'true'`) → `is False`; prod + flag → still blocked
-        (no exemption — backend has no production-marked E2E path)
-  - [x] coercion emits a warning naming `E2E_ALLOW_BYPASS` (caplog)
-  - [x] keep all prod-blocked pins (:414-430, :480-492, :494-508) unchanged
-  - [x] `test_main.py`: update the 4 "allows bypass" docstrings to note the flag gate
-        (mock-based function tests still valid)
-- [x] 2. **Implement** — `backend/app/core/config.py`: extend the `BYPASS_AUTH` validator
-      per decision 2 (add module logger for the coercion warning).
-- [x] 3. **CI** — `.github/workflows/tests.yml`: add `E2E_ALLOW_BYPASS: '1'` to the
-      Start-backend step env (:166-173) — without it the E2E job loses its backend bypass.
-- [x] 4. **Docs** — `backend/.env.example` (:34-43, flag + rule),
-      `frontend/tests/e2e/E2E_TEST_STATUS.md` (:167-169 backend uvicorn command),
-      `README.md` backend env block (:162-165), `backend/ENV_VAR_CHANGELOG.md` (:48-54
-      behavior table), `CLAUDE.md` (:969 — rule now covers backend too), check
-      `docs/GITHUB_SECRETS_SETUP.md` for the backend-start env mention.
-- [x] 5. **Verify** — `cd backend && uv run pytest tests/` full suite + coverage gate
-      (`--cov-fail-under=85` as CI does), lint per repo hooks.
-
-## Acceptance criteria (from issue scope bullets)
-
-- [x] Backend `BYPASS_AUTH` gated on the purpose-built flag in every environment
-      (mirroring the frontend middleware).
-- [x] Test pins updated (the ~5 env-gate pins inverted + new flag pins; suite green).
-- [x] Backend bypass docs/scripts (`BYPASS_AUTH=true uv run uvicorn …`) and the CI
-      backend-start step updated.
-
-## Known limitations / out of scope
-
-- Frontend untouched (done in #272). `NEXT_PUBLIC_BYPASS_AUTH` remains frontend-only.
-- Residual by design: leaked `BYPASS_AUTH=true` **plus** leaked `E2E_ALLOW_BYPASS=1` still
-  bypasses — purpose-built flag, never set by real deploys; deploy-staging secret gate
-  unchanged as backstop.
-- Object-level `monkeypatch.setattr(settings, "BYPASS_AUTH", True)` in unit tests still
-  forces bypass at call sites — that's the test seam for call-site behavior, not an
-  env-gate hole.
+## Acceptance criteria
+- [ ] Remove the dead transcription + cache modules (chosen over wiring)
+- [ ] Mock-transcript fallback gone (router removed entirely — no mock text served)
+- [ ] Replace per-question loops with `$in`/bulk queries
+- [ ] Project out `chapters.content` on the list endpoint
