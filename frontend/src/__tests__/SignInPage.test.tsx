@@ -99,6 +99,19 @@ describe("SignInPage error and 2FA handling (#198)", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a generic message (never the raw backend text) for an unmatched error (#215)", async () => {
+    mockSignInEmail.mockResolvedValue({
+      data: null,
+      error: { message: "Backend raised an unexpected 500 at layer xyz" },
+    });
+    setup(null);
+    await signIn();
+    expect(
+      await screen.findByText("Failed to sign in. Please try again")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Backend raised|layer xyz/i)).not.toBeInTheDocument();
+  });
+
   it("returns early on twoFactorRedirect: no navigation, no error (2FA race guard, #64)", async () => {
     // A 2FA-enabled account resolves with a twoFactorRedirect flag instead of
     // a session; the twoFactorClient plugin owns the /auth/verify-2fa

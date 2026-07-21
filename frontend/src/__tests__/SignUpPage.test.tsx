@@ -72,6 +72,22 @@ describe("SignUpPage (#198)", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("shows a generic message (never the raw backend text) for an unmatched error (#215)", async () => {
+    mockSignUpEmail.mockResolvedValue({
+      data: null,
+      error: { message: "Backend raised an unexpected 500 at layer xyz" },
+    });
+    const { push } = setup();
+    const user = await fillForm();
+    await user.click(submitButton());
+
+    expect(
+      await screen.findByText("Unable to create account. Please try again later")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Backend raised|layer xyz/i)).not.toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("blocks submission with inline error when passwords do not match", async () => {
     const { push } = setup();
     await fillForm("Different1");

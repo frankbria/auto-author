@@ -98,8 +98,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);
 
-  useEffect(() => {
-    const fetchBookData = async () => {
+  const fetchBookData = React.useCallback(async () => {
       setIsLoading(true);
       try {
 
@@ -147,10 +146,11 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       } finally {
         setIsLoading(false);
       }
-    };
-
-    fetchBookData();
   }, [bookId, session]);
+
+  useEffect(() => {
+    fetchBookData();
+  }, [fetchBookData]);
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -371,7 +371,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           <p className="text-gray-300 mb-4">{error}</p>
           <div className="flex space-x-4">
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => fetchBookData()}
               className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md"
             >
               Try Again

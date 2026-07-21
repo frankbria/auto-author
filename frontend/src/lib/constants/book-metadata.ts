@@ -4,20 +4,21 @@
  * BookCreationWizard and BookMetadataForm — the two previously carried
  * divergent hardcoded lists.
  *
- * Values are persisted as free-text strings (bookCreationSchema / backend
- * accept ≤100-char free text); consistency is enforced here at the UI layer.
+ * Nonfiction-only (#215): Auto Author positions itself for nonfiction books
+ * (landing page), so the fiction-only genres (Fiction/Sci-Fi/Fantasy/Mystery/
+ * Romance) were removed. Values are persisted as free-text strings
+ * (bookCreationSchema / backend accept ≤100-char free text); consistency is
+ * enforced here at the UI layer.
  */
 export const GENRE_OPTIONS = [
-  { label: 'Fiction', value: 'fiction' },
   { label: 'Non-Fiction', value: 'non-fiction' },
-  { label: 'Science Fiction', value: 'sci-fi' },
-  { label: 'Fantasy', value: 'fantasy' },
-  { label: 'Mystery', value: 'mystery' },
-  { label: 'Romance', value: 'romance' },
+  { label: 'Business', value: 'business' },
+  { label: 'Self-Help', value: 'self-help' },
+  { label: 'Personal Development', value: 'personal-development' },
+  { label: 'Health & Wellness', value: 'health-wellness' },
+  { label: 'How-To / Guide', value: 'how-to' },
   { label: 'Historical', value: 'historical' },
   { label: 'Biography', value: 'biography' },
-  { label: 'Self-Help', value: 'self-help' },
-  { label: 'Business', value: 'business' },
   { label: 'Other', value: 'other' },
 ] as const;
 

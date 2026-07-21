@@ -213,6 +213,20 @@ describe('SettingsPage', () => {
     });
   });
 
+  it('hints why Save is disabled when an off-tab (Writing) validation fails (#215)', async () => {
+    const user = userEvent.setup();
+    // An out-of-range auto-save interval lives on the Writing tab; from the
+    // Export tab the disabled Save button would otherwise be unexplained.
+    mockAuthFetch.mockResolvedValue(loadedProfile({ auto_save_interval: 999 }));
+    render(<SettingsPage />);
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: /export/i })).toBeInTheDocument());
+    await user.click(screen.getByRole('tab', { name: /export/i }));
+
+    expect(screen.getByRole('button', { name: /save settings/i })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/auto-save interval on the Writing tab/i);
+  });
+
   it('shows all five notification toggles disabled as "coming soon" (#195)', async () => {
     const user = userEvent.setup();
     mockAuthFetch.mockResolvedValue(

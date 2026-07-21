@@ -308,4 +308,19 @@ describe('TocGenerationWizard step flow', () => {
     expect(await screen.findByRole('link', { name: /upgrade/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
   });
+
+  it('offers a Cancel affordance on the long-running readiness step → back to the book (#215)', async () => {
+    const push = jest.fn();
+    (useRouter as jest.Mock).mockReturnValue({ push });
+    // analyze-summary never resolves → the wizard stays on CHECKING_READINESS,
+    // where a user would otherwise be stranded on the spinner.
+    mockedBookClient.analyzeSummary.mockReturnValue(new Promise(() => {}) as never);
+
+    const user = userEvent.setup();
+    render(<TocGenerationWizard bookId="book-1" />);
+
+    const cancel = await screen.findByRole('button', { name: /cancel/i });
+    await user.click(cancel);
+    expect(push).toHaveBeenCalledWith('/dashboard/books/book-1');
+  });
 });

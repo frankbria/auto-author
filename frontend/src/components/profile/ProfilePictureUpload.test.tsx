@@ -81,4 +81,21 @@ describe('ProfilePictureUpload', () => {
     });
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
   });
+
+  it('renders a readable message for a FastAPI 422 array detail, not [object Object] (#215)', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      json: async () => ({
+        detail: [{ loc: ['body', 'file'], msg: 'file too large', type: 'value_error' }],
+      }),
+    });
+    render(<ProfilePictureUpload currentAvatarUrl={null} onUploaded={jest.fn()} />);
+    fireEvent.change(screen.getByTestId('avatar-input'), {
+      target: { files: [makeFile('image/jpeg', 1000)] },
+    });
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    const arg = (toast.error as jest.Mock).mock.calls.at(-1)![0];
+    expect(arg.description).toBe('file too large');
+    expect(arg.description).not.toContain('[object Object]');
+  });
 });

@@ -27,6 +27,13 @@ describe('BookMetadataForm genre taxonomy (shared with BookCreationWizard, #205)
     expect(screen.getByRole('option', { name: 'Self-Help' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Business' })).toBeInTheDocument();
   });
+
+  it('offers no fiction-only genres — Auto Author is nonfiction (#215)', () => {
+    render(<BookMetadataForm book={book} onUpdate={jest.fn()} isSaving={false} />);
+    for (const fiction of ['Fiction', 'Science Fiction', 'Fantasy', 'Mystery', 'Romance']) {
+      expect(screen.queryByRole('option', { name: fiction })).not.toBeInTheDocument();
+    }
+  });
 });
 
 describe('BookMetadataForm saving state', () => {

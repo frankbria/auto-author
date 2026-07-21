@@ -10,6 +10,21 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/a
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB — matches backend
 
+/**
+ * FastAPI's `detail` is polymorphic: a string for HTTPException, but an array
+ * of {loc, msg, type} for 422 validation errors. Interpolating the array gives
+ * "[object Object]" (#215), so pull out the msg fields.
+ */
+function extractDetail(detail: unknown): string | null {
+  if (typeof detail === 'string') return detail || null;
+  if (Array.isArray(detail)) {
+    const msgs = detail.map((d) => (d && typeof d === 'object' && 'msg' in d ? String((d as { msg: unknown }).msg) : null)).filter(Boolean);
+    return msgs.length ? msgs.join('; ') : null;
+  }
+  if (detail && typeof detail === 'object' && 'msg' in detail) return String((detail as { msg: unknown }).msg);
+  return null;
+}
+
 interface ProfilePictureUploadProps {
   currentAvatarUrl: string | null;
   onUploaded: (url: string) => void;
@@ -49,7 +64,7 @@ export function ProfilePictureUpload({ currentAvatarUrl, onUploaded }: ProfilePi
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(body?.detail || 'Upload failed');
+        throw new Error(extractDetail(body?.detail) || 'Upload failed');
       }
       const data = await res.json();
       onUploaded(data.avatar_url);

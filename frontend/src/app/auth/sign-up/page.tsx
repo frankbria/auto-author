@@ -75,8 +75,8 @@ function getErrorMessage(error: { message?: string; code?: string } | null): str
     return "Connection error. Please check your internet";
   }
 
-  // Return original message if no pattern matched
-  return error.message || "Unable to create account. Please try again later";
+  // Unmatched: show a safe generic message, never the raw backend text (#215).
+  return "Unable to create account. Please try again later";
 }
 
 export default function SignUpPage() {
@@ -141,7 +141,7 @@ export default function SignUpPage() {
         if (err.message.includes("network") || err.message.includes("fetch")) {
           setError("Connection error. Please check your internet");
         } else {
-          setError(err.message);
+          setError("Unable to create account. Please try again later");
         }
       } else {
         setError("An unexpected error occurred");

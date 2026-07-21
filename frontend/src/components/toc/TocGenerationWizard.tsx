@@ -331,6 +331,22 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       </div>
 
       {renderCurrentStep()}
+
+      {/* Cancel affordance on the long-running (10-60s) AI steps so the user
+          isn't stranded on a spinner (#215). Returns to the book overview; the
+          in-flight request is abandoned, not aborted. */}
+      {(wizardState.step === WizardStep.CHECKING_READINESS ||
+        wizardState.step === WizardStep.GENERATING) && (
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={() => router.push(`/dashboard/books/${bookId}`)}
+            className="px-4 py-2 text-gray-300 hover:text-white border border-gray-600 hover:border-gray-500 rounded-md transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 }

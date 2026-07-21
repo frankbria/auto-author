@@ -222,7 +222,14 @@ export default function SettingsPage() {
 
       {/* Security and Billing actions save/self-serve themselves; the shared button covers preference tabs */}
       {activeTab !== 'security' && activeTab !== 'billing' && (
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex flex-col items-end gap-2">
+          {/* The auto-save interval lives on the Writing tab, so an invalid value
+              there would otherwise disable Save with no hint on the current tab (#215). */}
+          {isLoaded && !intervalValid && activeTab !== 'writing' && (
+            <p role="alert" className="text-sm text-destructive">
+              Fix the auto-save interval on the Writing tab before saving.
+            </p>
+          )}
           <Button
             onClick={handleSaveSettings}
             size="lg"
