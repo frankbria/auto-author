@@ -38,7 +38,13 @@ export default function HelpPage() {
         <section>
           <h2 className="text-2xl font-semibold mb-3">Need More Help?</h2>
           <p className="text-muted-foreground">
-            If you need additional assistance, please contact our support team at support@autoauthor.com
+            If you need additional assistance, please contact our support team at{' '}
+            <a
+              href="mailto:support@autoauthor.com"
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              support@autoauthor.com
+            </a>
           </p>
         </section>
       </div>

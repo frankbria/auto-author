@@ -74,8 +74,8 @@ function getErrorMessage(error: { message?: string; code?: string } | null): str
     return "Connection error. Please check your internet";
   }
 
-  // Return original message if no pattern matched
-  return error.message || "Failed to sign in. Please try again";
+  // Unmatched: show a safe generic message, never the raw backend text (#215).
+  return "Failed to sign in. Please try again";
 }
 
 function SignInForm() {
@@ -120,7 +120,7 @@ function SignInForm() {
         if (err.message.includes("network") || err.message.includes("fetch")) {
           setError("Connection error. Please check your internet");
         } else {
-          setError(err.message);
+          setError("Failed to sign in. Please try again");
         }
       } else {
         setError("An unexpected error occurred");

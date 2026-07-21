@@ -32,7 +32,6 @@ const profileSchema = z.object({
   lastName: z.string().trim().max(50, 'Max 50 characters'),
   displayName: z.string().trim().max(100, 'Max 100 characters'),
   bio: z.string().max(BIO_MAX, `Max ${BIO_MAX} characters`).optional(),
-  theme: z.enum(['light', 'dark', 'system']),
   emailNotifications: z.boolean(),
   marketingEmails: z.boolean(),
 });
@@ -66,7 +65,6 @@ export default function UserProfile() {
       lastName: '',
       displayName: '',
       bio: '',
-      theme: 'system',
       emailNotifications: true,
       marketingEmails: false,
     },
@@ -89,7 +87,6 @@ export default function UserProfile() {
       lastName,
       displayName: user?.name ?? '',
       bio: '',
-      theme: 'system',
       emailNotifications: true,
       marketingEmails: false,
     });
@@ -122,7 +119,6 @@ export default function UserProfile() {
               p.display_name ??
               [p.first_name ?? firstName, p.last_name ?? lastName].filter(Boolean).join(' '),
             bio: p.bio ?? '',
-            theme: p.preferences?.theme ?? 'system',
             emailNotifications: p.preferences?.email_notifications ?? true,
             marketingEmails: p.preferences?.marketing_emails ?? false,
           },
@@ -150,8 +146,9 @@ export default function UserProfile() {
         display_name: values.displayName,
         bio: values.bio,
         preferences: {
+          // Theme is owned by the Settings page (next-themes); the profile
+          // form no longer exposes it (#215). The loaded value is preserved.
           ...preferences,
-          theme: values.theme,
           email_notifications: values.emailNotifications,
           marketing_emails: values.marketingEmails,
         },
@@ -301,26 +298,6 @@ export default function UserProfile() {
           {/* Preferences */}
           <section className="space-y-4">
             <h2 className="text-lg font-semibold">Preferences</h2>
-
-            <FormField
-              control={form.control}
-              name="theme"
-              render={({ field }) => (
-                <div className="space-y-2">
-                  <Label htmlFor="theme">Theme</Label>
-                  <select
-                    id="theme"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={field.value}
-                    onChange={field.onChange}
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="system">System</option>
-                  </select>
-                </div>
-              )}
-            />
 
             <FormField
               control={form.control}

@@ -62,31 +62,29 @@ describe('ProfilePage save preserves preferences (#204)', () => {
   });
 
   it('sends the full merged preferences object on save, preserving unexposed fields', async () => {
-    mockAuthFetch.mockImplementation(async (_path: string, opts?: { method?: string }) => {
-      if (opts?.method === 'PATCH') {
-        return profile({ ...fullPreferences, theme: 'dark' });
-      }
-      return profile(fullPreferences);
-    });
+    mockAuthFetch.mockResolvedValue(profile(fullPreferences));
 
     render(<UserProfile />);
 
-    await waitFor(() => expect(screen.getByLabelText('Theme')).toHaveValue('light'));
+    // The profile page no longer exposes a Theme control (#215 — Settings owns
+    // theme). Editing an exposed field (bio) must still round-trip the full
+    // loaded preferences, including the theme it can no longer edit.
+    await waitFor(() => expect(screen.getByLabelText('Bio')).toHaveValue('hi'));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled()
     );
+    expect(screen.queryByLabelText('Theme')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'dark' } });
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'updated bio' } });
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => expect(patchCall()).toBeDefined());
     const [path, options] = patchCall()!;
     expect(path).toBe('/users/me');
     const body = JSON.parse(options.body);
-    expect(body.preferences).toMatchObject({
-      ...fullPreferences,
-      theme: 'dark',
-    });
+    expect(body.bio).toBe('updated bio');
+    // Every preference — including the theme the form can't edit — survives.
+    expect(body.preferences).toMatchObject(fullPreferences);
   });
 
   it('invalidates the shared preferences cache after a successful save', async () => {

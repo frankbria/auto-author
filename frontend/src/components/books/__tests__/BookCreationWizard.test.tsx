@@ -45,7 +45,7 @@ describe('BookCreationWizard', () => {
     title: 'My Test Book',
     subtitle: 'A subtitle',
     description: 'A description of my test book',
-    genre: 'fiction',
+    genre: 'business',
     target_audience: 'adult',
     cover_image_url: 'https://example.com/cover.jpg',
   };
@@ -241,7 +241,7 @@ describe('BookCreationWizard', () => {
 
       // Fill all required fields
       await user.type(screen.getByLabelText(/Book Title/i), validBookData.title);
-      await selectOption(user, /Genre/i, 'Fiction');
+      await selectOption(user, /Genre/i, 'Business');
       await selectOption(user, /Target Audience/i, 'Adult');
 
       // Submit button should be enabled
@@ -316,7 +316,7 @@ describe('BookCreationWizard', () => {
       await user.type(screen.getByLabelText(/Book Title/i), 'Test Book');
 
       // For this test, we're verifying genre field exists and accepts input
-      await selectOption(user, /Genre/i, 'Fiction');
+      await selectOption(user, /Genre/i, 'Business');
 
       const genreButton = screen.getByLabelText(/Genre/i);
       expect(genreButton).toBeInTheDocument();
@@ -380,7 +380,7 @@ describe('BookCreationWizard', () => {
 
       // Fill all required fields
       await user.type(screen.getByLabelText(/Book Title/i), validBookData.title);
-      await selectOption(user, /Genre/i, 'Fiction');
+      await selectOption(user, /Genre/i, 'Business');
       await selectOption(user, /Target Audience/i, 'Adult');
 
       await user.click(screen.getByRole('button', { name: /Create Book/i }));
@@ -399,7 +399,7 @@ describe('BookCreationWizard', () => {
       await user.type(screen.getByLabelText(/Subtitle/i), validBookData.subtitle!);
       await user.type(screen.getByLabelText(/Description/i), validBookData.description!);
       await user.type(screen.getByLabelText(/Cover Image URL/i), validBookData.cover_image_url!);
-      await selectOption(user, /Genre/i, 'Fiction');
+      await selectOption(user, /Genre/i, 'Business');
       await selectOption(user, /Target Audience/i, 'Adult');
 
       await user.click(screen.getByRole('button', { name: /Create Book/i }));
@@ -493,7 +493,7 @@ describe('BookCreationWizard', () => {
       await user.click(screen.getByLabelText(/Book Title/i));
       await user.paste('Book: "Test" & More! <Special>'); // Input with special chars
 
-      await selectOption(user, /Genre/i, 'Fiction');
+      await selectOption(user, /Genre/i, 'Business');
       await selectOption(user, /Target Audience/i, 'Adult');
 
       await user.click(screen.getByRole('button', { name: /Create Book/i }));
@@ -512,7 +512,7 @@ describe('BookCreationWizard', () => {
 
       // Rapid typing and selection
       await user.type(screen.getByLabelText(/Book Title/i), 'Quick Book');
-      await selectOption(user, /Genre/i, 'Fiction');
+      await selectOption(user, /Genre/i, 'Business');
       await selectOption(user, /Target Audience/i, 'Adult');
 
       // Form should handle rapid interactions

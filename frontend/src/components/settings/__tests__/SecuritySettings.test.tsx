@@ -337,6 +337,7 @@ describe('ActiveSessionsList', () => {
     {
       token: 'tok',
       userAgent: 'Mozilla/5.0 Chrome/120',
+      ipAddress: '203.0.113.7',
       updatedAt: '2026-07-01T10:00:00Z',
     },
     {
@@ -363,6 +364,13 @@ describe('ActiveSessionsList', () => {
     expect(screen.getByText('Mobile device')).toBeInTheDocument();
     // Only the other session is revocable
     expect(screen.getAllByRole('button', { name: /^revoke$/i })).toHaveLength(1);
+  });
+
+  it('renders the session IP address when present (#215)', async () => {
+    render(<ActiveSessionsList />);
+    await waitFor(() => expect(screen.getByText('This device')).toBeInTheDocument());
+    // The IP is the most useful datum for spotting a rogue session.
+    expect(screen.getByText(/203\.0\.113\.7/)).toBeInTheDocument();
   });
 
   it('revokes another session and removes it from the list', async () => {

@@ -142,6 +142,9 @@ export default function ActiveSessionsList() {
                         <p className="text-sm text-muted-foreground">
                           Last active: {formatLastActive(s.updatedAt ?? s.createdAt)}
                         </p>
+                        {s.ipAddress && (
+                          <p className="text-sm text-muted-foreground">IP: {s.ipAddress}</p>
+                        )}
                       </div>
                       {!isCurrent && (
                         <Button
