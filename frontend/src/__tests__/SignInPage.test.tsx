@@ -143,15 +143,17 @@ describe("SignInPage error and 2FA handling (#198)", () => {
     );
   });
 
-  it("does not stash a redirect for the default /dashboard target (#237)", async () => {
-    // No deep-link → nothing to preserve; keep sessionStorage clean.
-    sessionStorage.clear();
+  it("overwrites a stale stash when a fresh 2FA sign-in has no deep-link (#237)", async () => {
+    // A prior abandoned 2FA attempt in the same tab may have left a stale
+    // deep-link. A new sign-in with no ?redirect must not inherit it — the
+    // default /dashboard target overwrites the stash rather than skipping it.
+    sessionStorage.setItem("auth:postVerifyRedirect", "/dashboard/books/1");
     mockSignInEmail.mockResolvedValue({
       data: { twoFactorRedirect: true },
       error: null,
     });
     setup(null);
     await signIn();
-    expect(sessionStorage.getItem("auth:postVerifyRedirect")).toBeNull();
+    expect(sessionStorage.getItem("auth:postVerifyRedirect")).toBe("/dashboard");
   });
 });
