@@ -126,4 +126,32 @@ describe("SignInPage error and 2FA handling (#198)", () => {
     expect(push).not.toHaveBeenCalled();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("stashes the sanitized redirect for the verify-2fa page on twoFactorRedirect (#237)", async () => {
+    // The 2FA flow navigates away via the twoFactorClient plugin, losing the
+    // ?redirect deep-link. The sign-in page persists it to sessionStorage so
+    // the verify-2fa page can honor it after verification.
+    sessionStorage.clear();
+    mockSignInEmail.mockResolvedValue({
+      data: { twoFactorRedirect: true },
+      error: null,
+    });
+    setup("/dashboard/books/1");
+    await signIn();
+    expect(sessionStorage.getItem("auth:postVerifyRedirect")).toBe(
+      "/dashboard/books/1"
+    );
+  });
+
+  it("does not stash a redirect for the default /dashboard target (#237)", async () => {
+    // No deep-link → nothing to preserve; keep sessionStorage clean.
+    sessionStorage.clear();
+    mockSignInEmail.mockResolvedValue({
+      data: { twoFactorRedirect: true },
+      error: null,
+    });
+    setup(null);
+    await signIn();
+    expect(sessionStorage.getItem("auth:postVerifyRedirect")).toBeNull();
+  });
 });
