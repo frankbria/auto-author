@@ -335,6 +335,9 @@ class TestGetQuestionResponses:
     async def test_returns_saved_responses(self, auth_client_factory):
         api = await auth_client_factory()
         book_id = await _create_book(api)
+        # Generate one question, then answer it fully so the set is complete.
+        with _patch_questions(return_value=["Q1?"]):
+            await api.post(f"/api/v1/books/{book_id}/generate-questions", json={})
         responses = [{"question": "Q1?", "answer": "A1"}]
         rp = await api.put(
             f"/api/v1/books/{book_id}/question-responses", json={"responses": responses}
@@ -465,6 +468,97 @@ class TestSaveQuestionResponses:
 
 
 # --------------------------------------------------------------------------- #
+# PUT question-responses — completion status is derived, not hardcoded (#276)
+# --------------------------------------------------------------------------- #
+class TestQuestionResponseCompletionStatus:
+    """The stored status must reflect whether the answer set covers every
+    clarifying question — the #203 auto-save persists partial sets mid-typing,
+    so a hardcoded 'completed' is a trap for any consumer of the field."""
+
+    @pytest.mark.asyncio
+    async def test_partial_set_is_draft(self, auth_client_factory):
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        with _patch_questions(return_value=["Q1?", "Q2?", "Q3?"]):
+            await api.post(f"/api/v1/books/{book_id}/generate-questions", json={})
+
+        # Answer only 1 of 3 — the mid-typing auto-save shape.
+        r = await api.put(
+            f"/api/v1/books/{book_id}/question-responses",
+            json={"responses": [{"question": "Q1?", "answer": "A1"}]},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["ready_for_toc_generation"] is False
+
+        g = await api.get(f"/api/v1/books/{book_id}/question-responses")
+        assert g.json()["status"] == "draft"
+
+    @pytest.mark.asyncio
+    async def test_complete_set_is_completed(self, auth_client_factory):
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        with _patch_questions(return_value=["Q1?", "Q2?"]):
+            await api.post(f"/api/v1/books/{book_id}/generate-questions", json={})
+
+        r = await api.put(
+            f"/api/v1/books/{book_id}/question-responses",
+            json={
+                "responses": [
+                    {"question": "Q1?", "answer": "A1"},
+                    {"question": "Q2?", "answer": "A2"},
+                ]
+            },
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["ready_for_toc_generation"] is True
+
+        g = await api.get(f"/api/v1/books/{book_id}/question-responses")
+        assert g.json()["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_duplicate_responses_do_not_fake_completion(self, auth_client_factory):
+        """Count alone is foolable: two responses that both answer Q1 (and omit
+        Q2) reach the question count while leaving a current question unanswered.
+        Completion is coverage of every current question, not a headcount."""
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        with _patch_questions(return_value=["Q1?", "Q2?"]):
+            await api.post(f"/api/v1/books/{book_id}/generate-questions", json={})
+
+        r = await api.put(
+            f"/api/v1/books/{book_id}/question-responses",
+            json={
+                "responses": [
+                    {"question": "Q1?", "answer": "A1"},
+                    {"question": "Q1?", "answer": "A1 again"},
+                ]
+            },
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["ready_for_toc_generation"] is False
+
+        g = await api.get(f"/api/v1/books/{book_id}/question-responses")
+        assert g.json()["status"] == "draft"
+
+    @pytest.mark.asyncio
+    async def test_no_clarifying_questions_stays_draft(self, auth_client_factory):
+        """Without a question set to compare against, completeness is unknowable —
+        never claim 'completed' (fail toward draft, not toward the trap)."""
+        api = await auth_client_factory()
+        book_id = await _create_book(api)  # no generate-questions call
+
+        r = await api.put(
+            f"/api/v1/books/{book_id}/question-responses",
+            json={"responses": [{"question": "Q?", "answer": "A"}]},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["ready_for_toc_generation"] is False
+
+        g = await api.get(f"/api/v1/books/{book_id}/question-responses")
+        assert g.json()["status"] == "draft"
+
+
+# --------------------------------------------------------------------------- #
 # toc-readiness
 # --------------------------------------------------------------------------- #
 class TestTocReadiness:
@@ -537,6 +631,25 @@ class TestTocReadiness:
         assert body["is_ready_for_toc"] is False
         assert body["confidence_score"] == 0.3
         assert body["suggestions"] == ["Add more structure"]
+
+    @pytest.mark.asyncio
+    async def test_readiness_driven_by_analysis_not_responses(self, auth_client_factory):
+        """Readiness reflects the summary analysis alone. The old composite that
+        also required questions + 'completed' responses was computed then
+        discarded by both return branches — deleted as dead code (#276), so an
+        analysis-ready book with zero questions/responses still reads ready."""
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        with _patch_analyze(return_value=dict(ANALYSIS_OK)):
+            await api.post(f"/api/v1/books/{book_id}/analyze-summary")
+
+        # No generate-questions, no question-responses saved.
+        r = await api.get(f"/api/v1/books/{book_id}/toc-readiness")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["is_ready_for_toc"] is True
+        # The discarded composite fields must not appear in the response.
+        assert "next_steps" not in body
 
     @pytest.mark.asyncio
     async def test_full_pipeline_ready_with_questions_and_responses(self, auth_client_factory):

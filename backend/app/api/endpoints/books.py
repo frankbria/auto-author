@@ -1033,17 +1033,27 @@ async def save_question_responses(
                 status_code=400, detail=f"Answer for question {i} cannot be empty"
             )
 
-    # Store responses in book record
+    # Derive completion status honestly (#276). All answers are validated
+    # non-empty above, so a set is "completed" only when every clarifying
+    # question on the book is covered by a response. Coverage (by question text),
+    # not a count — duplicate or stale responses could otherwise reach the count
+    # while leaving a current question unanswered. The #203 auto-save persists
+    # partial sets mid-typing; without a question set to compare against we can't
+    # assert completeness, so we fail toward "draft" — never a false "completed".
+    clarifying_questions = book.get("clarifying_questions", {})
+    question_texts = clarifying_questions.get("questions", [])
+    answered = {r.get("question") for r in responses}
+    is_complete = bool(question_texts) and all(q in answered for q in question_texts)
+
     responses_data = {
         "responses": responses,
         "answered_at": datetime.now(timezone.utc).isoformat(),
-        "status": "completed",
+        "status": "completed" if is_complete else "draft",
     }
 
-    # Update clarifying_questions status if it exists
-    clarifying_questions = book.get("clarifying_questions", {})
+    # Keep clarifying_questions status in step with completeness if it exists.
     if clarifying_questions:
-        clarifying_questions["status"] = "answered"
+        clarifying_questions["status"] = "answered" if is_complete else "pending"
 
     update_data = {
         "question_responses": responses_data,
@@ -1056,7 +1066,7 @@ async def save_question_responses(
         "book_id": book_id,
         "responses_saved": len(responses),
         "answered_at": responses_data["answered_at"],
-        "ready_for_toc_generation": True,
+        "ready_for_toc_generation": is_complete,
     }
 
 
@@ -1078,52 +1088,13 @@ async def check_toc_generation_readiness(
             status_code=403, detail="Not authorized to check readiness for this book"
         )
 
-    # Check summary existence and quality
+    # Readiness is driven by the summary + its AI analysis. A composite that
+    # also required questions and "completed" responses used to be computed
+    # here, but both return branches below discard it (they return only
+    # summary-analysis fields), so it was dead — removed (#276).
     summary = book.get("summary", "")
-    has_summary = bool(summary and len(summary) >= 30)
-
-    # Check if summary has been analyzed
     summary_analysis = book.get("summary_analysis", {})
     has_analysis = bool(summary_analysis)
-    is_summary_ready = (
-        summary_analysis.get("is_ready_for_toc", False) if has_analysis else False
-    )
-
-    # Check clarifying questions status
-    clarifying_questions = book.get("clarifying_questions", {})
-    has_questions = bool(clarifying_questions.get("questions", []))
-    questions_status = clarifying_questions.get("status", "not_generated")
-
-    # Check question responses
-    question_responses = book.get("question_responses", {})
-    has_responses = bool(question_responses.get("responses", []))
-    responses_status = question_responses.get("status", "not_provided")
-
-    # Determine overall readiness
-    is_ready_for_toc = (
-        has_summary
-        and has_analysis
-        and is_summary_ready
-        and has_questions
-        and has_responses
-        and responses_status == "completed"
-    )  # Determine next steps
-    next_steps = []
-    if not has_summary:
-        next_steps.append("Provide a book summary (minimum 30 characters)")
-    elif not has_analysis:
-        next_steps.append("Analyze summary for TOC readiness")
-    elif not is_summary_ready:
-        next_steps.append("Improve summary based on analysis suggestions")
-    elif not has_questions:
-        next_steps.append("Generate clarifying questions")
-    elif not has_responses:
-        next_steps.append("Answer clarifying questions")
-    elif responses_status != "completed":
-        next_steps.append("Complete all question responses")
-
-    if is_ready_for_toc:
-        next_steps.append("Ready to generate Table of Contents")
 
     # If we have analysis data, return it in the format expected by the frontend
     if has_analysis:
