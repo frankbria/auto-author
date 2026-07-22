@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from '@/lib/auth-client';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 
 interface ProtectedRouteProps {
@@ -17,6 +17,7 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { data: session, isPending } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
 
   // Check if auth bypass is enabled for E2E testing
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
@@ -28,11 +29,15 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     // Wait for session to load before making decisions
     if (isPending) return;
 
-    // If not signed in, redirect to sign-in page
+    // If not signed in, redirect to sign-in page, preserving a deep-link back to
+    // the current path (#239). The middleware sets ?redirect on full navigations;
+    // this client guard fires on a session expiry with no navigation, so it must
+    // set it too or the user loses their place. The sign-in page validates the
+    // param via sanitizeRedirectPath (#184) before honoring it.
     if (!session) {
-      router.push('/auth/sign-in');
+      router.push(`/auth/sign-in?redirect=${encodeURIComponent(pathname)}`);
     }
-  }, [bypassAuth, isPending, session, router]);
+  }, [bypassAuth, isPending, session, router, pathname]);
 
   // If auth bypass is enabled, render children immediately
   if (bypassAuth) {

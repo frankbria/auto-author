@@ -12,6 +12,7 @@ import { useSession } from '@/lib/auth-client';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
+  usePathname: () => '/profile',
 }));
 
 jest.mock('@/lib/toast', () => ({

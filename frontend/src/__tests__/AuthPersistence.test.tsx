@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 // Mock Next.js navigation
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: jest.fn(() => '/dashboard'),
 }));
 
 // Mock better-auth's useSession hook
@@ -44,9 +45,9 @@ describe('Authentication State Persistence', () => {
       </ProtectedRoute>
     );
 
-    // Expect router.push to be called with the sign-in route (better-auth uses /auth/sign-in)
+    // Expect router.push to the sign-in route with a ?redirect deep-link (#239)
     await waitFor(() => {
-      expect(mockRouter.push).toHaveBeenCalledWith('/auth/sign-in');
+      expect(mockRouter.push).toHaveBeenCalledWith('/auth/sign-in?redirect=%2Fdashboard');
     });
 
     // Should not render protected content
