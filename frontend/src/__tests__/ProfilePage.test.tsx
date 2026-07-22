@@ -10,6 +10,7 @@ import { toast } from '../lib/toast';
 // Mock Next.js hooks
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: jest.fn(() => '/profile'),
 }));
 
 // Mock better-auth
@@ -493,7 +494,7 @@ describe('UserProfile page authentication guard (#185)', () => {
     render(<UserProfile />);
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/auth/sign-in');
+      expect(mockPush).toHaveBeenCalledWith('/auth/sign-in?redirect=%2Fprofile');
     });
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(screen.queryByText('Save Changes')).not.toBeInTheDocument();

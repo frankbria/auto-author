@@ -1,11 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { useSession } from '@/lib/auth-client';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 // Mock Next.js navigation
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: jest.fn(),
 }));
 
 // Mock better-auth's useSession hook
@@ -26,6 +27,7 @@ describe('ProtectedRoute Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
+    (usePathname as jest.Mock).mockReturnValue('/dashboard');
     // Ensure auth bypass is disabled for these tests
     delete process.env.NEXT_PUBLIC_BYPASS_AUTH;
   });
@@ -51,7 +53,8 @@ describe('ProtectedRoute Component', () => {
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 
-  test('redirects to sign-in page when user is not authenticated', async () => {
+  test('redirects to sign-in with a ?redirect deep-link back to the current path (#239)', async () => {
+    (usePathname as jest.Mock).mockReturnValue('/dashboard');
     // Mock unauthenticated state
     (useSession as jest.Mock).mockReturnValue({
       data: null,
@@ -65,11 +68,35 @@ describe('ProtectedRoute Component', () => {
       </ProtectedRoute>
     );
 
-    // Should redirect to sign-in (better-auth uses /auth/sign-in)
+    // On a client-side session expiry the user must land back where they were,
+    // not at a bare sign-in page (matches the middleware's ?redirect behavior).
     await waitFor(() => {
-      expect(mockRouter.push).toHaveBeenCalledWith('/auth/sign-in');
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        '/auth/sign-in?redirect=%2Fdashboard'
+      );
     });
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
+  });
+
+  test('encodes the current path (incl. nested/query) into the ?redirect param (#239)', async () => {
+    (usePathname as jest.Mock).mockReturnValue('/dashboard/books/abc123');
+    (useSession as jest.Mock).mockReturnValue({
+      data: null,
+      isPending: false,
+      error: null,
+    });
+
+    render(
+      <ProtectedRoute>
+        <div>Protected Content</div>
+      </ProtectedRoute>
+    );
+
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        '/auth/sign-in?redirect=%2Fdashboard%2Fbooks%2Fabc123'
+      );
+    });
   });
 
   test('renders children when user is authenticated', () => {
@@ -160,7 +187,7 @@ describe('ProtectedRoute Component', () => {
       </ProtectedRoute>
     );
 
-    // Should redirect to sign-in (better-auth uses /auth/sign-in)
-    expect(mockRouter.push).toHaveBeenCalledWith('/auth/sign-in');
+    // Should redirect to sign-in with the ?redirect deep-link (#239)
+    expect(mockRouter.push).toHaveBeenCalledWith('/auth/sign-in?redirect=%2Fdashboard');
   });
 });
