@@ -109,7 +109,12 @@ function SignInForm() {
 
       // A 2FA-enabled account returns a twoFactorRedirect flag instead of a
       // session; the twoFactorClient handler navigates to /auth/verify-2fa.
+      // That navigation drops the ?redirect deep-link (#237), so stash the
+      // already-sanitized target for the verify page to pick up. Always write
+      // (never skip) so a fresh attempt overwrites any stale value left by an
+      // abandoned earlier 2FA sign-in in the same tab.
       if (data && 'twoFactorRedirect' in data && (data as { twoFactorRedirect?: boolean }).twoFactorRedirect) {
+        sessionStorage.setItem('auth:postVerifyRedirect', redirect);
         return;
       }
 

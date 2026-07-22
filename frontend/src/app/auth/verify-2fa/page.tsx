@@ -9,9 +9,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authClient } from '@/lib/auth-client';
+import { sanitizeRedirectPath } from '@/lib/security';
 import { toast } from '@/lib/toast';
 
 const TOTP_LENGTH = 6;
+
+// One-shot key the sign-in page writes the sanitized deep-link to before the
+// 2FA hop; consumed (and cleared) here after verification succeeds (#237).
+const POST_VERIFY_REDIRECT_KEY = 'auth:postVerifyRedirect';
 
 /**
  * Second-factor verification during sign-in. Users land here via the
@@ -56,7 +61,11 @@ export default function VerifyTwoFactorPage() {
         resetForRetry();
         return;
       }
-      router.push('/dashboard');
+      // Honor the deep-link the sign-in page stashed, re-sanitizing at the
+      // point of use (defense in depth); fall back to /dashboard otherwise.
+      const stashed = sessionStorage.getItem(POST_VERIFY_REDIRECT_KEY);
+      sessionStorage.removeItem(POST_VERIFY_REDIRECT_KEY);
+      router.push(sanitizeRedirectPath(stashed));
     } catch {
       // Network/transport failure (the client throws instead of returning error)
       toast({
