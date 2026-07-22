@@ -1040,10 +1040,17 @@ async def save_question_responses(
     # while leaving a current question unanswered. The #203 auto-save persists
     # partial sets mid-typing; without a question set to compare against we can't
     # assert completeness, so we fail toward "draft" — never a false "completed".
+    # Stored questions may be plain strings or `{"question"/"question_text": ...}`
+    # dicts depending on the generation path, so normalize before comparing.
+    def _q_text(q):
+        if isinstance(q, dict):
+            return q.get("question", q.get("question_text", ""))
+        return q
+
     clarifying_questions = book.get("clarifying_questions", {})
-    question_texts = clarifying_questions.get("questions", [])
-    answered = {r.get("question") for r in responses}
-    is_complete = bool(question_texts) and all(q in answered for q in question_texts)
+    question_texts = [_q_text(q) for q in clarifying_questions.get("questions", [])]
+    answered = {_q_text(r.get("question")) for r in responses}
+    is_complete = bool(question_texts) and all(t in answered for t in question_texts)
 
     responses_data = {
         "responses": responses,

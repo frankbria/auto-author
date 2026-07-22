@@ -541,6 +541,42 @@ class TestQuestionResponseCompletionStatus:
         assert g.json()["status"] == "draft"
 
     @pytest.mark.asyncio
+    async def test_dict_shaped_questions_are_normalized(self, auth_client_factory):
+        """Some generation paths store questions as {"question": ...} dicts, not
+        plain strings. Completion must normalize both shapes (dicts are unhashable
+        — a naive set/`in` comparison crashes)."""
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        with _patch_questions(
+            return_value=[
+                {"question": "Q1?", "category": "a"},
+                {"question": "Q2?", "category": "b"},
+            ]
+        ):
+            await api.post(f"/api/v1/books/{book_id}/generate-questions", json={})
+
+        # Partial → draft (and, crucially, no 500 from unhashable dicts).
+        r = await api.put(
+            f"/api/v1/books/{book_id}/question-responses",
+            json={"responses": [{"question": "Q1?", "answer": "A1"}]},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["ready_for_toc_generation"] is False
+
+        # Complete → completed.
+        r = await api.put(
+            f"/api/v1/books/{book_id}/question-responses",
+            json={
+                "responses": [
+                    {"question": "Q1?", "answer": "A1"},
+                    {"question": "Q2?", "answer": "A2"},
+                ]
+            },
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["ready_for_toc_generation"] is True
+
+    @pytest.mark.asyncio
     async def test_no_clarifying_questions_stays_draft(self, auth_client_factory):
         """Without a question set to compare against, completeness is unknowable —
         never claim 'completed' (fail toward draft, not toward the trap)."""
