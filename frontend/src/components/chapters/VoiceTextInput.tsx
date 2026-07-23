@@ -69,6 +69,15 @@ export function VoiceTextInput({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // Mirror the latest `value` prop so the long-lived onresult handler reads the
+  // current text instead of the value captured when recording started. With
+  // continuous recognition, reading the stale closure made each finalized
+  // segment overwrite the previous one instead of appending (#330).
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
   // Check for speech recognition support
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -116,12 +125,15 @@ export function VoiceTextInput({
       }
 
       if (finalTranscript) {
+        // Read the latest value via the ref, not the closure-captured prop, so
+        // successive segments append instead of clobbering each other (#330).
+        const currentValue = valueRef.current;
         // Insert at cursor position or append
         const textarea = textareaRef.current;
         if (textarea) {
           const start = textarea.selectionStart;
           const end = textarea.selectionEnd;
-          const newValue = value.slice(0, start) + finalTranscript + ' ' + value.slice(end);
+          const newValue = currentValue.slice(0, start) + finalTranscript + ' ' + currentValue.slice(end);
           onChange(newValue);
 
           // Move cursor to end of inserted text
@@ -131,7 +143,7 @@ export function VoiceTextInput({
             textarea.focus();
           }, 10);
         } else {
-          onChange(value + finalTranscript + ' ');
+          onChange(currentValue + finalTranscript + ' ');
         }
       }
 
@@ -150,7 +162,7 @@ export function VoiceTextInput({
     };
 
     return recognition;
-  }, [isSupported, value, onChange]);
+  }, [isSupported, onChange]);
 
   const toggleMode = () => {
     const newMode = currentMode === 'text' ? 'voice' : 'text';

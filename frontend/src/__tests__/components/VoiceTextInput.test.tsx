@@ -1,7 +1,20 @@
+import { useState } from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { VoiceTextInput } from '@/components/chapters/VoiceTextInput';
 import { setupSpeechRecognitionMock } from '../mocks/speechRecognition';
+
+// Controlled host: feeds onChange back as value, the way real consumers
+// (QuestionDisplay) do. Exposes the accumulated value for assertions.
+function ControlledVoiceInput() {
+  const [value, setValue] = useState('');
+  return (
+    <>
+      <VoiceTextInput value={value} onChange={setValue} mode="voice" />
+      <span data-testid="accumulated-value">{value}</span>
+    </>
+  );
+}
 
 describe('VoiceTextInput Component', () => {
   const mockOnChange = jest.fn();
@@ -126,6 +139,64 @@ describe('VoiceTextInput Component', () => {
       await waitFor(() => {
         expect(screen.getByText('Error recording audio: network')).toBeInTheDocument();
       }, { timeout: 2000 });
+    });
+  });
+
+  describe('Continuous dictation (accumulation)', () => {
+    it('appends every finalized segment instead of overwriting the previous one (#330)', async () => {
+      const user = userEvent.setup();
+      const mockRecognition = setupSpeechRecognitionMock({ delay: 100 });
+
+      render(<ControlledVoiceInput />);
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /start voice recording/i }));
+      });
+      expect(mockRecognition.start).toHaveBeenCalled();
+
+      // Two separate finalized segments, as continuous recognition delivers them.
+      act(() => {
+        mockRecognition.emitResult({ transcript: 'First sentence.', isFinal: true });
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('accumulated-value')).toHaveTextContent('First sentence.');
+      });
+
+      act(() => {
+        mockRecognition.emitResult({ transcript: 'Second sentence.', isFinal: true });
+      });
+
+      // Both segments must survive — the stale-closure bug kept only the last.
+      await waitFor(() => {
+        expect(screen.getByTestId('accumulated-value')).toHaveTextContent(
+          'First sentence. Second sentence.'
+        );
+      });
+    });
+
+    it('covers interim + multiple final results via the mock sequence', async () => {
+      const user = userEvent.setup();
+      const mockRecognition = setupSpeechRecognitionMock({
+        delay: 10,
+        sequence: [
+          { transcript: 'Interim words', isFinal: false },
+          { transcript: 'First final.', isFinal: true },
+          { transcript: 'Second final.', isFinal: true },
+        ],
+      });
+
+      render(<ControlledVoiceInput />);
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /start voice recording/i }));
+      });
+      expect(mockRecognition.start).toHaveBeenCalled();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('accumulated-value')).toHaveTextContent(
+          'First final. Second final.'
+        );
+      });
     });
   });
 
