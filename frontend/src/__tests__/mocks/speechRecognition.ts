@@ -3,6 +3,11 @@ export interface MockSpeechRecognitionEvent {
   results: Array<Array<{ transcript: string; confidence: number; isFinal?: boolean }>>;
 }
 
+export interface MockSpeechSegment {
+  transcript: string;
+  isFinal: boolean;
+}
+
 export class MockSpeechRecognition {
   public onresult: ((event: MockSpeechRecognitionEvent) => void) | null = null;
   public onerror: ((event: Event) => void) | null = null;
@@ -17,15 +22,35 @@ export class MockSpeechRecognition {
   private delay: number;
   private transcript: string;
   private shouldError: boolean;
+  private sequence?: MockSpeechSegment[];
 
   constructor(config: {
     delay?: number;
     transcript?: string;
     shouldError?: boolean;
+    // A sequence of interim/final segments emitted on successive timers, mirroring
+    // continuous recognition. Recognition stays open (no onend) until stop().
+    sequence?: MockSpeechSegment[];
   } = {}) {
     this.delay = config.delay || 600;
     this.transcript = config.transcript || 'Default test transcription.';
     this.shouldError = config.shouldError || false;
+    this.sequence = config.sequence;
+  }
+
+  // Deterministically fire a single recognition result. Call inside act() to
+  // drive multi-segment scenarios without relying on timers.
+  emitResult(segment: MockSpeechSegment) {
+    if (this.onresult) {
+      this.onresult({
+        resultIndex: 0,
+        results: [[{
+          transcript: segment.transcript,
+          confidence: 0.95,
+          isFinal: segment.isFinal,
+        }]],
+      });
+    }
   }
 
   start = jest.fn(() => {
@@ -38,18 +63,19 @@ export class MockSpeechRecognition {
           errorEvent.error = 'network';
           this.onerror(errorEvent);
         }
-      } else {
-        if (this.onresult) {
-          this.onresult({
-            resultIndex: 0,
-            results: [[{
-              transcript: this.transcript,
-              confidence: 0.95,
-              isFinal: true
-            }]],
-          });
-        }
+        if (this.onend) this.onend();
+        return;
       }
+
+      if (this.sequence) {
+        this.sequence.forEach((segment, i) => {
+          setTimeout(() => this.emitResult(segment), i * this.delay);
+        });
+        // Continuous recognition keeps listening until stop(); no onend here.
+        return;
+      }
+
+      this.emitResult({ transcript: this.transcript, isFinal: true });
       if (this.onend) this.onend();
     }, this.delay);
   });
