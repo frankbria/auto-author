@@ -147,7 +147,16 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
       setExportComplete(true);
     } catch (error) {
       console.error('Error exporting book:', error);
-      toast.error({ title: 'Failed to export book. Please try again.' });
+      // bookClient.exportError attaches the backend's `detail` as `userMessage`
+      // (e.g. 504 timeout / 503 exporter-unavailable text) — surface it when
+      // present instead of the generic copy.
+      const userMessage =
+        typeof (error as { userMessage?: unknown })?.userMessage === 'string'
+          ? (error as { userMessage: string }).userMessage
+          : undefined;
+      toast.error({
+        title: userMessage || 'Failed to export book. Please try again.',
+      });
       setIsExporting(false);
     }
   };

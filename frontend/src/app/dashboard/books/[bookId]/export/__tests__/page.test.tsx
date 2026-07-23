@@ -231,7 +231,23 @@ describe('ExportBookPage format dispatch', () => {
     );
   });
 
-  it('shows an error toast when export fails', async () => {
+  it("surfaces the backend's userMessage when the export fails", async () => {
+    const err = Object.assign(new Error('Export failed: 504'), {
+      statusCode: 504,
+      userMessage: 'The export timed out. Please try again shortly.',
+    });
+    mockBookClient.exportEPUB = jest.fn().mockRejectedValue(err);
+    renderPage();
+    await selectFormat('EPUB Ebook');
+    fireEvent.click(screen.getByRole('button', { name: 'Export Book' }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith({
+        title: 'The export timed out. Please try again shortly.',
+      })
+    );
+  });
+
+  it('falls back to the generic message when no userMessage is present', async () => {
     mockBookClient.exportEPUB = jest
       .fn()
       .mockRejectedValue(new Error('boom'));
