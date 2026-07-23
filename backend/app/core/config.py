@@ -75,6 +75,15 @@ class Settings(BaseSettings):
     E2E_ALLOW_BYPASS: str = ""
     BYPASS_AUTH: bool = False  # Set to True for E2E tests to bypass authentication
 
+    # Designated staging E2E test account(s), comma-separated emails. The staging
+    # suite signs in as ONE real user (BYPASS_AUTH is off — it tests real auth),
+    # so it legitimately exceeds human per-user limits (many book creates + AI
+    # generations, 4 runs/day x 3 retries) and the rate limiter (#180) + AI quota
+    # (#173) throttled it into perpetual red. These accounts skip the limiter /
+    # quota / entitlement gate — FENCED to non-production so it can never loosen
+    # limits on the real product (see _is_exempt_e2e_user in dependencies.py).
+    E2E_EXEMPT_EMAILS: str = ""
+
     AI_MAX_RETRIES: int = 3
 
     # Max times a single question may be regenerated (per-question abuse cap,
