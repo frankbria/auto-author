@@ -48,6 +48,10 @@ jobs:
         working-directory: frontend
         run: npm test -- --coverage --coverageThreshold='{"global":{"lines":85,"statements":85,"branches":75,"functions":85}}'
         # Enforced (#118): gate is green at baseline, so a coverage regression must fail CI.
+        # #328: global functions had drifted to ~84.6% (main failed its own gate, forcing
+        # --admin overrides on every frontend PR). Fixed by dropping test-infra files from the
+        # coverage denominator (jest.config.cjs coveragePathIgnorePatterns) + covering a few
+        # genuinely-untested pure helpers, landing functions ~85.6% with headroom.
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v7

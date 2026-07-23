@@ -1,29 +1,28 @@
-# Issue #214 — [P3.8] Remove dead code: transcription stack + AI cache; fold in N+1 perf cleanups
+# Issue #328 — frontend global functions coverage gate chronically red
 
-**Plan source:** self-authored (CodeRabbit only offered to generate a plan; none existed).
-**Decision (autonomous, AC-endorsed):** REMOVE both dead subsystems, not wire.
+## Root cause
+Frontend `global.functions` coverage gate = 85%, but main sits at 84.64% (954/1127).
+The gap is ~4 covered functions. Two files in the denominator are TEST INFRASTRUCTURE,
+not shippable code, only counted because jest was never told to exclude them:
+- src/__tests__/fixtures/chapterTabsFixtures.ts (9/14 fns)
+- src/__tests__/mocks/speechRecognition.ts (7/10 fns)
 
-## Why remove (not wire)
-- **Transcription `/transcribe` stack**: router never mounted (`router.py` has no transcription include), service falls back to hardcoded mock transcripts, zero production importers. Standalone dead code (#93 only ever tested it on a bare app).
-- **`ai_cache_service`**: `redis` is absent from `pyproject.toml`/`uv.lock`, so the import guard is permanently False and every cache op is a no-op. Wiring means provisioning redis on the shared VPS for a cache with zero real dependents — contradicts the project's YAGNI/dead-code ethos. Removal is **behavior-preserving**: cache always misses → always generates fresh; the error-fallback lookup always returns None today. Git preserves history if redis is ever provisioned.
+## Plan (Option 1 — raise coverage honestly, keep the 85 bar)
+1. jest.config.cjs: add `coveragePathIgnorePatterns` excluding test-infra dirs
+   (src/__tests__/fixtures/, src/__tests__/mocks/, src/__mocks__/). Root-cause
+   denominator fix. -> functions 84.64% -> 85.04%. Applies to both local & CI (both run jest).
+2. Add genuine unit tests for currently-untested PURE functions (durable, not UI theater):
+   - src/components/export/exportHelpers.ts: formatFileSize, estimateExportTime, downloadBlob
+   - src/lib/api/bookClient.ts: 3 uncovered methods (if cheap) for extra buffer
+3. Re-measure; target functions >= ~85.7% for jitter/erosion headroom.
+4. Verify full suite still green.
 
-## Verified scope (file:line evidence)
-- Transcribe stack (DELETE): `app/api/endpoints/transcription.py`, `app/services/transcription_service.py`, `app/services/transcription_service_aws.py`, `app/schemas/transcription.py`. NOT the live `transcription_enhancement.py` / `enhance-transcription` (books.py) feature.
-- Cache: `app/services/ai_cache_service.py` (DELETE) + strip 6 call sites in `ai_service.py` (314/350/367 in `generate_clarifying_questions`, 561/598/614 in `generate_toc_from_summary_and_responses`) + import (33-36). `AICacheError` in `ai_errors.py` (only-defined, unused → remove). Dead config: `REDIS_URL`, `AI_CACHE_TTL`, `AI_CACHE_ENABLED` (keep `AI_MAX_RETRIES` — used by retry logic).
-- N+1 (real, fix): `questions.py` `get_questions` (243), `get_ratings_for_chapter` (427), `get_chapter_question_progress` (464). Lines 551/664 already batched (`$in`/`distinct`) — NOT touched.
-- Projection: `book.py::get_books_by_user` (63-69) — sole caller is `GET /books/` returning `BookResponse` (uses `toc_items`, never `table_of_contents`). Exclude the heavy `table_of_contents.chapters.content` + `.subchapters.content` HTML blobs.
+## NOT chosen (documented for the PR)
+- Lowering the threshold (weakens the gate) — unnecessary for a 4-function gap.
+- Per-directory thresholds — more config to maintain for the same effect.
+- Fallback if this recurs: pin an honest no-regression floor + ratchet.
 
-## Steps
-1. Delete dead transcribe files + their tests; clean `__init__`/exports. Tests to delete: `test_api/test_transcription.py`, `test_api/test_transcription_endpoint.py`, `test_services/test_transcription_service.py`, `test_services/test_transcription_service_aws.py`, `test_services_isolated.py` (transcription-only scratch script). KEEP `test_services/test_transcription_enhancement.py`.
-2. Delete `ai_cache_service.py`; strip the 2 cached AI methods to generate-only (preserve `cached_content_available = False` + re-raise on error). Remove `AICacheError` + dead cache config. Update `test_services/test_ai_service_errors.py` (drop mock-cache fixture + cache-fallback test; keep error-raising tests on `AIService()`). Delete `test_services/test_ai_cache_service.py`.
-3. N+1: replace per-question `find_one` loops with one `$in` lookup + dict map in the 3 functions. TDD: pin correctness (+ query behavior).
-4. Projection: add exclusion projection to `get_books_by_user`. TDD: pin content excluded, titles/toc_items/structure intact.
-5. Full backend suite + coverage ≥85%; deslop; review; demo (outcome evidence per criterion); PR.
-
-## Acceptance criteria
-- [x] Remove the dead transcription + cache modules (chosen over wiring)
-- [x] Mock-transcript fallback gone (router removed entirely — no mock text served)
-- [x] Replace per-question loops with `$in`/bulk queries
-- [x] Project out `chapters.content` on the list endpoint
-
-## Status: PR #320 open; demo `docs/demos/2026-07-19-issue-214-remove-dead-code-perf.md` (all 4 ACs, outcome evidence); pre-PR codex review clean (opencode hung).
+## Acceptance criteria (from #328)
+- [ ] Frontend PRs with all tests passing no longer require --admin to merge
+      (i.e. main functions coverage >= 85%, gate green)
+- [ ] Chosen approach documented in CLAUDE.md / CI config
