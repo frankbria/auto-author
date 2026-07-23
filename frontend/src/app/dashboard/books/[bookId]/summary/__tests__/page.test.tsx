@@ -132,3 +132,24 @@ describe('BookSummaryPage — readiness gate (#218)', () => {
     }
   });
 });
+
+// #331: the page heading hardcoded `text-gray-100` on the theme-aware
+// background, so it was invisible (~1.1:1) in the shipped light theme. Pin that
+// it now renders with the theme foreground token.
+describe('BookSummaryPage — light-theme heading token (#331)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    mockClient.getBookSummary.mockResolvedValue({ summary: '', summary_history: [] } as never);
+    mockClient.saveBookSummary.mockResolvedValue({ summary: '' } as never);
+  });
+
+  it('renders the page heading with the theme foreground token, not near-white gray', async () => {
+    render(<BookSummaryPage />);
+    await waitFor(() => expect(mockClient.getBookSummary).toHaveBeenCalled());
+
+    const heading = screen.getByRole('heading', { level: 1, name: /provide a summary/i });
+    expect(heading).toHaveClass('text-foreground');
+    expect(heading.className).not.toMatch(/text-gray-\d/);
+  });
+});

@@ -310,19 +310,19 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-100 mb-3">Generate Table of Contents</h1>
-        <p className="text-gray-400">
+        <h1 className="text-3xl font-bold text-foreground mb-3">Generate Table of Contents</h1>
+        <p className="text-muted-foreground">
           Our AI will analyze your summary and guide you through creating a structured table of contents for your book.
         </p>
       </div>
 
       {/* Progress indicator */}
       <div className="mb-8">
-        <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
+        <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
           <span>Step {getStepNumber(wizardState.step)} of 4</span>
           <span>{getStepTitle(wizardState.step)}</span>
         </div>
-        <div className="w-full bg-gray-700 rounded-full h-2">
+        <div className="w-full bg-muted rounded-full h-2">
           <div
             className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${getProgressPercentage(wizardState.step)}%` }}
@@ -341,7 +341,7 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
           <button
             type="button"
             onClick={() => router.push(`/dashboard/books/${bookId}`)}
-            className="px-4 py-2 text-gray-300 hover:text-white border border-gray-600 hover:border-gray-500 rounded-md transition-colors"
+            className="px-4 py-2 text-muted-foreground hover:text-foreground border border-border hover:border-foreground/50 rounded-md transition-colors"
           >
             Cancel
           </button>
