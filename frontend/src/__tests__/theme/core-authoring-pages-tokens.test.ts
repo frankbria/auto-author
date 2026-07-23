@@ -24,9 +24,10 @@ const PAGES = [
   'src/components/toc/TocGenerationWizard.tsx',
 ];
 
-// Matches theme-independent neutral literals like `text-gray-100`,
-// `bg-gray-800/50`, `border-gray-700`.
-const GRAY_LITERAL = /\b(?:text|bg|border)-gray-\d+/g;
+// Matches any theme-independent gray utility — `text-gray-100`,
+// `bg-gray-800/50`, `border-gray-700`, and also `ring-gray-*`/`placeholder-gray-*`
+// so a future reintroduction through a different utility can't slip past.
+const GRAY_LITERAL = /\b[a-z-]*gray-\d+/g;
 
 describe('core authoring pages use theme tokens, not hardcoded grays (#331)', () => {
   it.each(PAGES)('%s contains no text/bg/border-gray literals', (relPath) => {
