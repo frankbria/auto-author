@@ -1991,3 +1991,78 @@ describe('BookClient core CRUD – success paths', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Preview enhancement + export-template endpoints (#328 coverage)
+// ---------------------------------------------------------------------------
+
+describe('BookClient – enhancement & template endpoints', () => {
+  const BOOK_ID = 'book-abc';
+  const CHAPTER_ID = 'ch-xyz';
+
+  it('enhanceChapterText POSTs to the enhance-text route and returns the parsed body', async () => {
+    const body = { success: true, enhanced: 'cleaner prose' };
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson(body));
+
+    const result = await bookClient.enhanceChapterText(BOOK_ID, CHAPTER_ID, {
+      content: 'rough',
+      enhancement_type: 'clarity',
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/books/${BOOK_ID}/chapters/${CHAPTER_ID}/enhance-text`),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ content: 'rough', enhancement_type: 'clarity' }),
+      })
+    );
+    expect(result).toEqual(body);
+  });
+
+  it('enhanceChapterText throws with status on a non-ok response', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(503, 'AI down'));
+    await expect(
+      bookClient.enhanceChapterText(BOOK_ID, CHAPTER_ID, { content: 'x', enhancement_type: 'clarity' })
+    ).rejects.toThrow('Failed to enhance text: 503 AI down');
+  });
+
+  it('enhanceVoiceTranscription POSTs to the enhance-transcription route', async () => {
+    const body = { success: true, enhanced: 'readable prose' };
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson(body));
+
+    const result = await bookClient.enhanceVoiceTranscription(BOOK_ID, CHAPTER_ID, {
+      content: 'um so like',
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/books/${BOOK_ID}/chapters/${CHAPTER_ID}/enhance-transcription`),
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(result).toEqual(body);
+  });
+
+  it('getExportTemplates returns the templates array', async () => {
+    const templates = [{ id: 'classic', name: 'Classic' }];
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson({ templates }));
+
+    const result = await bookClient.getExportTemplates(BOOK_ID);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/books/${BOOK_ID}/export/templates`),
+      expect.any(Object)
+    );
+    expect(result).toEqual(templates);
+  });
+
+  it('getExportTemplates falls back to an empty array when templates is absent', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson({}));
+    await expect(bookClient.getExportTemplates(BOOK_ID)).resolves.toEqual([]);
+  });
+
+  it('getExportTemplates throws on a non-ok response', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(500, 'boom'));
+    await expect(bookClient.getExportTemplates(BOOK_ID)).rejects.toThrow(
+      'Failed to get export templates: 500 boom'
+    );
+  });
+});

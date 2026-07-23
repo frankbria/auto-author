@@ -25,6 +25,16 @@ const customJestConfig = {
     '.spec.ts',                          // Exclude Playwright spec files
     'responsive.spec.ts',                // Exclude Playwright E2E specs
   ],
+  // Keep test infrastructure out of the coverage denominator (#328): these are
+  // fixtures/mocks that support tests, not shippable product code, and only ever
+  // appeared in coverage because they get imported during the run. Excluding them
+  // does not force-collect any new file (unlike collectCoverageFrom).
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '<rootDir>/src/__tests__/fixtures/',
+    '<rootDir>/src/__tests__/mocks/',
+    '<rootDir>/src/__mocks__/',
+  ],
   testMatch: [
     '**/__tests__/**/*.(test|spec).[jt]s?(x)',
     '**/*.(test|spec).[jt]s?(x)',
