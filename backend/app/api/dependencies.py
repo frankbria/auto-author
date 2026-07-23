@@ -9,8 +9,29 @@ from datetime import datetime, timezone
 from app.db.database import get_collection
 from app.db.database import create_audit_log
 from app.db.usage import increment_usage
-from app.core.config import settings
+from app.core.config import settings, is_production_env
 from app.core.security import get_current_user_from_session
+
+
+def _is_exempt_e2e_user(current_user: Dict) -> bool:
+    """True for a designated staging E2E test account.
+
+    The staging E2E suite signs in as ONE real user (BYPASS_AUTH off — it tests
+    real auth end-to-end) and legitimately blows past human per-user limits, so
+    the rate limiter (#180) and AI quota (#173) throttled it into perpetual red.
+    Exempt that specific account — same idea as the existing ``BYPASS_AUTH``
+    skip, keyed on email and FENCED to non-production so it can never loosen
+    limits on the real product.
+    """
+    if is_production_env():
+        return False
+    exempt = settings.E2E_EXEMPT_EMAILS
+    if not exempt:
+        return False
+    email = (current_user.get("email") or "").strip().lower()
+    if not email:
+        return False
+    return email in {e.strip().lower() for e in exempt.split(",") if e.strip()}
 
 
 # MongoDB collection dependency
@@ -90,7 +111,7 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
         # Skip rate limiting in auth-bypass mode (E2E/test only; BYPASS_AUTH is
         # rejected in production by Settings validation), so test suites can
         # create many resources without tripping the limiter.
-        if settings.BYPASS_AUTH:
+        if settings.BYPASS_AUTH or _is_exempt_e2e_user(current_user):
             return {"limit": limit, "remaining": limit, "reset": 0}
 
         # Key per authenticated user; client IP only as a defense-in-depth
@@ -152,6 +173,8 @@ def get_ai_usage_quota():
         # rate limiter so test suites can generate freely.
         if settings.BYPASS_AUTH or not settings.AI_QUOTA_ENABLED:
             return
+        if _is_exempt_e2e_user(current_user):
+            return
 
         user_id = (
             current_user.get("auth_id")
@@ -208,6 +231,8 @@ def get_entitlement_checker(feature: str):
         from app.utils.error_handlers import handle_entitlement_denied
 
         if settings.BYPASS_AUTH or not settings.PLAN_ENFORCEMENT_ENABLED:
+            return
+        if _is_exempt_e2e_user(current_user):
             return
 
         plan = current_user.get("plan")
