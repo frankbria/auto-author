@@ -154,8 +154,8 @@ export default function BookSummaryPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-100 mb-3">Provide a Summary</h1>
-        <p className="text-gray-400">
+        <h1 className="text-3xl font-bold text-foreground mb-3">Provide a Summary</h1>
+        <p className="text-muted-foreground">
           Describe your book's main concepts and structure. This summary will be used to generate a Table of Contents.
         </p>
       </div>
@@ -164,11 +164,11 @@ export default function BookSummaryPage() {
           {error}
         </div>
       )}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+      <div className="bg-card border border-border rounded-lg p-6">
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
-              <label className="text-gray-400" htmlFor="summary">Book Summary</label>
+              <label className="text-muted-foreground" htmlFor="summary">Book Summary</label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -177,7 +177,7 @@ export default function BookSummaryPage() {
                   className={`px-3 py-1 rounded-md text-sm ${
                     isListening
                       ? 'bg-red-600 text-white'
-                      : 'bg-gray-700 hover:bg-gray-600 text-gray-100'
+                      : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
                   }`}
                 >
                   {isListening ? 'Listening...' : '🎤 Voice Input'}
@@ -186,7 +186,7 @@ export default function BookSummaryPage() {
                   <button
                     type="button"
                     onClick={stopListening}
-                    className="px-3 py-1 rounded-md text-sm bg-gray-700 hover:bg-gray-600 text-gray-100 border border-gray-500"
+                    className="px-3 py-1 rounded-md text-sm bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border"
                   >
                     Stop
                   </button>
@@ -198,20 +198,20 @@ export default function BookSummaryPage() {
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               rows={10}
-              className="w-full bg-gray-900 border border-gray-700 rounded-md py-2 px-3 text-gray-100"
+              className="w-full bg-background border border-border rounded-md py-2 px-3 text-foreground"
               placeholder="Describe your book's main concepts, structure, and key points that should be organized into chapters..."
               required
             ></textarea>
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
               <span>{countSummaryWords(summary)} / {SUMMARY_MIN_WORDS} words</span>
               <span>{countSummaryCharacters(summary)} / {SUMMARY_MIN_CHARACTERS} characters</span>
             </div>
             {inputError && (
               <div className="text-red-400 text-xs mt-1">{inputError}</div>
             )}
-            <div id="summary-help" className="text-xs text-gray-400 mt-2">
+            <div id="summary-help" className="text-xs text-muted-foreground mt-2">
               <div>Guidelines: Aim for 1-3 paragraphs. Include the main idea, genre, and any key themes or characters. At least {SUMMARY_MIN_WORDS} words and {SUMMARY_MIN_CHARACTERS} characters are required to generate a table of contents — the more detail you give, the better the result.</div>
-              <div className="italic text-gray-500 mt-1">
+              <div className="italic text-muted-foreground mt-1">
                 &quot;A young orphan discovers a hidden world of magic and must stop a dark sorcerer from conquering both realms. The story explores friendship, courage, and the power of believing in oneself.&quot;
               </div>
             </div>
@@ -220,7 +220,7 @@ export default function BookSummaryPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-100 rounded-md"
+              className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md"
             >
               Back
             </button>
@@ -234,18 +234,18 @@ export default function BookSummaryPage() {
           </div>
         </form>
       </div>
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 mt-8">
-        <h2 className="text-lg font-semibold text-gray-100 mb-2">Revision History</h2>
+      <div className="bg-card border border-border rounded-lg p-6 mt-8">
+        <h2 className="text-lg font-semibold text-foreground mb-2">Revision History</h2>
         {summaryHistory.length === 0 ? (
-          <div className="text-gray-400 text-sm">No previous revisions yet.</div>
+          <div className="text-muted-foreground text-sm">No previous revisions yet.</div>
         ) : (
           <ul className="space-y-3">
             {summaryHistory.slice().reverse().map((rev, idx) => {
               const revision = rev as Revision;
               return (
-                <li key={idx} className="border-b border-gray-700 pb-2">
+                <li key={idx} className="border-b border-border pb-2">
                   <div className="flex justify-between items-center">
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-muted-foreground">
                       {revision.timestamp
                         ? new Date(revision.timestamp).toLocaleString()
                         : 'Unknown time'}
@@ -257,7 +257,7 @@ export default function BookSummaryPage() {
                       Revert
                     </button>
                   </div>
-                  <div className="text-gray-200 text-sm mt-1 whitespace-pre-line">
+                  <div className="text-foreground text-sm mt-1 whitespace-pre-line">
                     {revision.summary}
                   </div>
                 </li>
@@ -266,9 +266,9 @@ export default function BookSummaryPage() {
           </ul>
         )}
       </div>
-      <div className="mt-8 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-        <h3 className="text-gray-300 font-medium mb-2">💡 Tips for a good summary:</h3>
-        <ul className="text-gray-400 text-sm list-disc list-inside space-y-1">
+      <div className="mt-8 bg-card/50 border border-border rounded-lg p-4">
+        <h3 className="text-foreground font-medium mb-2">💡 Tips for a good summary:</h3>
+        <ul className="text-muted-foreground text-sm list-disc list-inside space-y-1">
           <li>Include the main topics you want to cover in your book</li>
           <li>Mention specific sections or chapters you have in mind</li>
           <li>Include your target audience and their needs</li>

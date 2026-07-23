@@ -324,3 +324,18 @@ describe('TocGenerationWizard step flow', () => {
     expect(push).toHaveBeenCalledWith('/dashboard/books/book-1');
   });
 });
+
+// #331: the wizard heading hardcoded `text-gray-100` on the theme-aware
+// background, so it was invisible in the shipped light theme. The header
+// renders on every step, so mount is enough to pin the token.
+describe('TocGenerationWizard — light-theme heading token (#331)', () => {
+  it('renders the wizard heading with the theme foreground token, not near-white gray', async () => {
+    render(<TocGenerationWizard bookId="book-1" />);
+    const heading = await screen.findByRole('heading', {
+      level: 1,
+      name: /generate table of contents/i,
+    });
+    expect(heading).toHaveClass('text-foreground');
+    expect(heading.className).not.toMatch(/text-gray-\d/);
+  });
+});

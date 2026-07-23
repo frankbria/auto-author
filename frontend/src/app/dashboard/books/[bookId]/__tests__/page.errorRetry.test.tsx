@@ -81,3 +81,33 @@ describe('BookPage error → in-place refetch (#215)', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 });
+
+// #331: the book title hardcoded `text-gray-100` on the theme-aware background,
+// so it was invisible (~1.1:1) in the shipped light theme. Pin that the title
+// renders with the theme foreground token.
+describe('BookPage — light-theme title token (#331)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useSession as jest.Mock).mockReturnValue({ data: { user: { id: 'u1' } } });
+    mockBookClient.getToc.mockResolvedValue({ toc: null } as never);
+    mockBookClient.getBookSummary.mockResolvedValue({ summary: '' } as never);
+  });
+
+  it('renders the book title with the theme foreground token, not near-white gray', async () => {
+    mockBookClient.getBook.mockResolvedValue({
+      id: 'book-1',
+      title: 'My Nonfiction Book',
+      description: 'desc',
+      progress: 0,
+    } as never);
+
+    renderPage();
+
+    const title = await screen.findByRole('heading', {
+      level: 1,
+      name: 'My Nonfiction Book',
+    });
+    expect(title).toHaveClass('text-foreground');
+    expect(title.className).not.toMatch(/text-gray-\d/);
+  });
+});
