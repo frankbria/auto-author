@@ -134,7 +134,7 @@ motor==3.7.1
     # via -r requirements.in
 msgpack==1.1.1
     # via locust
-openai==1.97.1
+openai==2.45.0
     # via -r requirements.in
 packaging==25.0
     # via pytest
