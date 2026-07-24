@@ -43,9 +43,7 @@ click==8.2.1
 cloudinary==1.45.0
     # via -r requirements.in
 configargparse==1.7.1
-    # via
-    #   locust
-    #   locust-cloud
+    # via locust
 coverage==7.10.0
     # via pytest-cov
 cryptography==45.0.5
@@ -80,7 +78,6 @@ gevent==25.5.1
     #   -r requirements.in
     #   geventhttpclient
     #   locust
-    #   locust-cloud
 geventhttpclient==2.3.4
     # via locust
 greenlet==3.2.3
@@ -117,10 +114,8 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
-locust==2.37.14
+locust==2.45.0
     # via -r requirements.in
-locust-cloud==1.30.0
-    # via locust
 lxml==6.0.0
     # via
     #   ebooklib
@@ -144,8 +139,6 @@ pillow==11.3.0
     # via
     #   -r requirements.in
     #   reportlab
-platformdirs==4.3.8
-    # via locust-cloud
 pluggy==1.6.0
     # via
     #   pytest
@@ -177,6 +170,7 @@ pymongo==4.13.2
 pytest==8.4.1
     # via
     #   -r requirements.in
+    #   locust
     #   pytest-asyncio
     #   pytest-cov
     #   pytest-mock
@@ -196,14 +190,14 @@ python-dotenv==1.1.1
     #   pydantic-settings
 python-engineio==4.12.2
     # via
-    #   locust-cloud
+    #   locust
     #   python-socketio
 python-jose==3.5.0
     # via -r requirements.in
 python-multipart==0.0.20
     # via -r requirements.in
 python-socketio==5.16.1
-    # via locust-cloud
+    # via locust
 pyzmq==27.0.0
     # via locust
 redis==8.0.1
@@ -222,7 +216,6 @@ s3transfer==0.19.1
     # via boto3
 setuptools==82.0.1
     # via
-    #   locust
     #   zope-event
     #   zope-interface
 simple-websocket==1.1.0

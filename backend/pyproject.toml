@@ -52,7 +52,7 @@ test = [
     "httpx==0.28.1",  # used only by tests; not imported by app/
 ]
 load = [
-    "locust==2.37.14",
+    "locust==2.45.0",
     "locust-cloud==1.30.0",
 ]
 dev = [

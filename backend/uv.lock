@@ -98,7 +98,7 @@ requires-dist = [
     { name = "fastapi", specifier = "==0.139.0" },
     { name = "html2text", specifier = "==2025.4.15" },
     { name = "httpx", marker = "extra == 'test'", specifier = "==0.28.1" },
-    { name = "locust", marker = "extra == 'load'", specifier = "==2.37.14" },
+    { name = "locust", marker = "extra == 'load'", specifier = "==2.45.0" },
     { name = "locust-cloud", marker = "extra == 'load'", specifier = "==1.30.0" },
     { name = "motor", specifier = "==3.7.1" },
     { name = "openai", specifier = "==1.97.1" },
@@ -778,7 +778,7 @@ wheels = [
 
 [[package]]
 name = "locust"
-version = "2.37.14"
+version = "2.45.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "configargparse" },
@@ -787,18 +787,19 @@ dependencies = [
     { name = "flask-login" },
     { name = "gevent" },
     { name = "geventhttpclient" },
-    { name = "locust-cloud" },
     { name = "msgpack" },
     { name = "psutil" },
+    { name = "pytest" },
+    { name = "python-engineio" },
+    { name = "python-socketio", extra = ["client"] },
     { name = "pywin32", marker = "sys_platform == 'win32'" },
     { name = "pyzmq" },
     { name = "requests" },
-    { name = "setuptools" },
     { name = "werkzeug" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/77/27/362b73f5d481a82a7891e9fdfcc253016c418358a1af8d597efb234571f7/locust-2.37.14.tar.gz", hash = "sha256:1d6d9e49d335216d456c3be77c04cc79674581c0f8860c910cd3152d0b9bb26b", size = 1403749, upload-time = "2025-07-16T13:52:43.024Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/03/4e/62c3fee4af4720aceac2c102a6a1d69707b7b28e83fc44b82581e86155d7/locust-2.45.0.tar.gz", hash = "sha256:9fa840a4ef8c2624d7719f6e642bce3e19079aa4eea755c99c5282087903e13a", size = 1477628, upload-time = "2026-07-09T08:20:46.931Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/d5/6148d7a8f63435a5f17b9e3ae30db2ca758107214c7a0257ebcc0aeab384/locust-2.37.14-py3-none-any.whl", hash = "sha256:f3cc7a32673b54b3b1b9aa2214a665b3c6a0b0c90c2cc75b0f3bf49d27e07abf", size = 1420570, upload-time = "2025-07-16T13:52:41.823Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/a5/c138eda829a34f00d1dbaa90bffdf2b31defcc55a722978e1d5774500d78/locust-2.45.0-py3-none-any.whl", hash = "sha256:a8b4d059296a38fa79432be60fb6904f70367e7d6fb824da64b744c45d8073ae", size = 1497273, upload-time = "2026-07-09T08:20:45.423Z" },
 ]
 
 [[package]]
