@@ -47,7 +47,7 @@ test = [
     "pytest-asyncio==1.1.0",
     "pytest-cov==6.2.1",
     "pytest-mock==3.14.1",
-    "faker==40.23.0",
+    "faker==40.28.1",
     "coverage[toml]==7.10.0",
     "httpx==0.28.1",  # used only by tests; not imported by app/
 ]
