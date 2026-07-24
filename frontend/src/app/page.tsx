@@ -4,6 +4,7 @@
 import { useSession, authClient } from '@/lib/auth-client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import SiteFooter from '@/components/SiteFooter';
 
 export default function Home() {
   const { data: session, isPending } = useSession();
@@ -46,7 +47,8 @@ export default function Home() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex flex-col items-center justify-center text-center p-6 min-h-screen">
+    <>
+      <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col items-center justify-center text-center p-6">
       {!session ? (
         <div className="space-y-6">
           <h1 className="text-4xl font-extrabold text-white tracking-tight sm:text-5xl">
@@ -89,6 +91,8 @@ export default function Home() {
           </div>
         </div>
       )}
-    </main>
+      </main>
+      <SiteFooter />
+    </>
   );
 }

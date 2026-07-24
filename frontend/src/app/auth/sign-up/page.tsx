@@ -286,6 +286,24 @@ export default function SignUpPage() {
                 Sign in
               </Link>
             </p>
+            {/* #335: legal docs must be reachable from the sign-up flow. */}
+            <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+              By creating an account, you agree to our{" "}
+              <Link
+                href="/terms"
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </p>
           </CardFooter>
         </form>
       </Card>
