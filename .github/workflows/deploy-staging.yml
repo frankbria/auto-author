@@ -100,6 +100,8 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
           NEXT_PUBLIC_BETTER_AUTH_URL: ${{ secrets.FRONTEND_URL }}
           NEXT_PUBLIC_ENVIRONMENT: staging
+          # Error tracking (#334) — inlined at build; empty secret = Sentry off.
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.SENTRY_DSN_FRONTEND }}
         run: |
           npm ci
           npm run build
@@ -246,6 +248,9 @@ jobs:
             echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}"
             echo "OPENAI_AUTOAUTHOR_API_KEY=${{ secrets.OPENAI_API_KEY }}"
             echo ""
+            echo "# Error tracking (#334) — empty secret => Sentry off"
+            echo "SENTRY_DSN=${{ secrets.SENTRY_DSN_BACKEND }}"
+            echo ""
             echo "# Better Auth Authentication"
             echo "BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}"
             echo "BETTER_AUTH_URL=$FRONTEND_URL"
@@ -299,6 +304,8 @@ jobs:
             echo "EMAIL_SERVICE_PROVIDER=${{ secrets.EMAIL_SERVICE_PROVIDER }}"
             echo "EMAIL_SERVICE_API_KEY=${{ secrets.EMAIL_SERVICE_API_KEY }}"
             echo "EMAIL_FROM_ADDRESS=${{ secrets.EMAIL_FROM_ADDRESS }}"
+            # Error tracking (#334) — inlined at build below; empty = off.
+            echo "NEXT_PUBLIC_SENTRY_DSN=${{ secrets.SENTRY_DSN_FRONTEND }}"
           } > .env.production
 
           # Export environment variables for build process
@@ -309,6 +316,9 @@ jobs:
           export DATABASE_URL=${{ secrets.MONGODB_URI }}
           export DATABASE_NAME=${{ secrets.DATABASE_NAME }}
           export NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT
+          # NEXT_PUBLIC_SENTRY_DSN must be present for the server-side build to
+          # inline it into the client bundle (#334); empty secret = Sentry off.
+          export NEXT_PUBLIC_SENTRY_DSN=${{ secrets.SENTRY_DSN_FRONTEND }}
 
           # Install dependencies and build
           # Remove old .next cache to prevent stale builds

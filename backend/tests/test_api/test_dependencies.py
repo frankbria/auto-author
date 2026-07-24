@@ -188,6 +188,28 @@ class TestRateLimiting:
         assert "X-RateLimit-Reset" in headers
         assert 0 < int(headers["Retry-After"]) <= 60
 
+    async def test_logs_warning_before_429(
+        self, motor_reinit_db, real_rate_limiter, caplog
+    ):
+        """A rate-limit 429 emits a warning naming subject/path/limit (#334) —
+        an abuse storm must not die silently in PM2 stdout."""
+        import logging
+
+        limiter = real_rate_limiter(limit=1, window=60)
+        request = _mock_request("/api/observed-endpoint")
+
+        with patch.object(deps.settings, "BYPASS_AUTH", False):
+            await limiter(request, current_user=USER_A)
+            with caplog.at_level(logging.WARNING, logger="app.api.dependencies"):
+                with pytest.raises(HTTPException):
+                    await limiter(request, current_user=USER_A)
+
+        msg = "\n".join(r.getMessage() for r in caplog.records)
+        assert "Rate limit exceeded" in msg
+        assert USER_A["auth_id"] in msg          # subject
+        assert "/api/observed-endpoint" in msg   # path
+        assert "limit=1" in msg                  # limit
+
     async def test_bypass_auth_short_circuits(self, real_rate_limiter):
         """With BYPASS_AUTH on, the limiter returns full quota without counting."""
         limiter = real_rate_limiter(limit=2, window=60)

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Alert02Icon, RefreshIcon } from '@hugeicons/core-free-icons';
+import * as Sentry from '@sentry/nextjs';
 
 export default function Error({
   error,
@@ -14,7 +15,9 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
+    // Route to Sentry (#334) — error-boundary errors don't reach window.onerror,
+    // so the boundary must capture explicitly. No-op when Sentry has no DSN.
+    Sentry.captureException(error);
     console.error('Application error:', error);
   }, [error]);
 

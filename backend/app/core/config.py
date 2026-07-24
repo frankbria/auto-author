@@ -128,6 +128,11 @@ class Settings(BaseSettings):
     STRIPE_PRICE_ID_PRO: str = ""
     STRIPE_SECRET_KEY: str = ""
 
+    # Error tracking (issue #334). Unset => Sentry is inert (no events sent), so
+    # CI/local/tests get no new behavior. Set the DSN secret in staging/prod to
+    # route unhandled 500s (and frontend errors) to Sentry instead of PM2 stdout.
+    SENTRY_DSN: str = ""
+
     @field_validator(
         "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID_PRO", "STRIPE_SECRET_KEY", mode="before"
     )
@@ -135,6 +140,12 @@ class Settings(BaseSettings):
     def strip_stripe_values(cls, v):
         # A trailing newline from `.env`/`$(cat secret)` would make every
         # webhook fail signature verification with no obvious cause.
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("SENTRY_DSN", mode="before")
+    @classmethod
+    def strip_sentry_dsn(cls, v):
+        # A trailing newline would make sentry_sdk.init reject the DSN silently.
         return v.strip() if isinstance(v, str) else v
 
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')

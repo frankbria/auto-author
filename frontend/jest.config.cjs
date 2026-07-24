@@ -14,6 +14,8 @@ const customJestConfig = {
     '^better-auth/client$': '<rootDir>/src/__mocks__/better-auth-client.ts',
     '^better-auth/client/plugins$': '<rootDir>/src/__mocks__/better-auth-client-plugins.ts',
     '^better-auth/react$': '<rootDir>/src/__mocks__/better-auth-react.ts',
+    // Mock the Sentry SDK (#334) so tests stay deterministic and off the wire.
+    '^@sentry/nextjs$': '<rootDir>/src/__mocks__/sentry-nextjs.ts',
   },
   transformIgnorePatterns: [
     // Transform better-auth and @clerk packages (they use ES modules)
