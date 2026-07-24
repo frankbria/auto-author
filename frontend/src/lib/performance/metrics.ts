@@ -15,6 +15,7 @@
  */
 
 import { onCLS, onLCP, onTTFB, onINP, onFCP, type Metric } from 'web-vitals';
+import * as Sentry from '@sentry/nextjs';
 
 /**
  * Performance metric rating categories based on Google's Web Vitals thresholds
@@ -99,16 +100,16 @@ function rateOperation(duration: number, budget?: number): MetricRating {
 }
 
 /**
- * Send analytics event (placeholder for future analytics integration)
+ * Send a performance metric to the appropriate sink.
  *
- * In production, this should send to your analytics service
- * (e.g., Google Analytics, Mixpanel, custom endpoint)
+ * Development: color-coded console output.
+ * Production: report `poor`-rated metrics to Sentry (#334) so a real-user perf
+ * regression is visible in the error tracker instead of a write-only
+ * localStorage cache nothing shipped. Only `poor` is sent to keep noise low;
+ * inert (no-op) when Sentry has no DSN.
  */
 function sendToAnalytics(event: AnalyticsEvent): void {
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
-  if (isDevelopment) {
-    // Development: log to console with color-coded output
+  if (process.env.NODE_ENV === 'development') {
     const color = event.rating === 'good' ? '✅' : event.rating === 'poor' ? '❌' : '⚠️';
     console.log(
       `${color} [Performance] ${event.metric_name}:`,
@@ -116,28 +117,15 @@ function sendToAnalytics(event: AnalyticsEvent): void {
       `(${event.rating})`,
       event.metadata || ''
     );
-  } else {
-    // Production: send to analytics endpoint
-    // TODO: Replace with actual analytics implementation
-    // Example: window.gtag?.('event', event.event_name, event);
-    // Example: window.analytics?.track(event.event_name, event);
+    return;
+  }
 
-    // For now, store in localStorage for offline scenarios
-    try {
-      const key = 'performance-metrics';
-      const existing = localStorage.getItem(key);
-      const metrics = existing ? JSON.parse(existing) : [];
-      metrics.push({ ...event, timestamp: Date.now() });
-
-      // Keep only last 100 metrics
-      if (metrics.length > 100) {
-        metrics.splice(0, metrics.length - 100);
-      }
-
-      localStorage.setItem(key, JSON.stringify(metrics));
-    } catch (error) {
-      console.error('Failed to cache performance metric:', error);
-    }
+  if (event.rating === 'poor') {
+    Sentry.captureMessage(`Performance regression: ${event.metric_name}`, {
+      level: 'warning',
+      tags: { metric: event.metric_name, rating: event.rating },
+      extra: { value: event.value, ...event.metadata },
+    });
   }
 }
 
@@ -283,32 +271,4 @@ export function initializeWebVitals(): void {
       rating,
     });
   });
-}
-
-/**
- * Get cached performance metrics from localStorage
- * Useful for debugging or displaying recent performance data
- *
- * @returns Array of cached metrics or empty array
- */
-export function getCachedMetrics(): AnalyticsEvent[] {
-  try {
-    const key = 'performance-metrics';
-    const existing = localStorage.getItem(key);
-    return existing ? JSON.parse(existing) : [];
-  } catch (error) {
-    console.error('Failed to retrieve cached metrics:', error);
-    return [];
-  }
-}
-
-/**
- * Clear cached performance metrics from localStorage
- */
-export function clearCachedMetrics(): void {
-  try {
-    localStorage.removeItem('performance-metrics');
-  } catch (error) {
-    console.error('Failed to clear cached metrics:', error);
-  }
 }

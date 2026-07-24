@@ -19,6 +19,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _init_sentry() -> None:
+    """Initialize Sentry error tracking (issue #334).
+
+    Inert when SENTRY_DSN is unset — no events are sent, so CI/local/tests are
+    unaffected. When set (staging/prod), unhandled 500s reach Sentry via the
+    global exception handler below (our handler catches every exception, so the
+    ASGI integration alone would never see them).
+    """
+    if not settings.SENTRY_DSN:
+        return
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=os.getenv("ENVIRONMENT") or os.getenv("NODE_ENV") or "unknown",
+        # Errors-only by default; enable tracing later via config if needed.
+        traces_sample_rate=0.0,
+        send_default_pii=False,
+    )
+    logger.info("Sentry error tracking initialized")
+
+
+_init_sentry()
+
+
 def validate_production_security() -> None:
     """Validate critical security settings before application startup.
 
@@ -161,6 +186,11 @@ async def pydantic_validation_exception_handler(request: Request, exc: Validatio
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    # Route to Sentry (#334). No-op when Sentry isn't initialized (no DSN).
+    if settings.SENTRY_DSN:
+        import sentry_sdk
+
+        sentry_sdk.capture_exception(exc)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={

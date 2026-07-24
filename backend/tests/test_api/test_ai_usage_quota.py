@@ -63,6 +63,69 @@ async def test_quota_rejects_n_plus_one_in_window(motor_reinit_db, real_ai_quota
 
 
 @pytest.mark.asyncio
+async def test_quota_logs_warning_before_429(motor_reinit_db, real_ai_quota, caplog):
+    """A quota 429 emits a warning naming subject/path/period/limit (#334)."""
+    import logging
+    from unittest.mock import Mock
+    from fastapi import Request
+
+    req = Mock(spec=Request)
+    req.url = Mock()
+    req.url.path = "/api/v1/books/x/generate-toc"
+    user = {"auth_id": "quota-log-user"}
+
+    with patch.object(deps.settings, "BYPASS_AUTH", False), \
+         patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
+         patch.object(deps.settings, "AI_QUOTA_DAILY_LIMIT", 1), \
+         patch.object(deps.settings, "AI_QUOTA_MONTHLY_LIMIT", 0):
+        checker = real_ai_quota()
+        await checker(current_user=user, request=req)  # 1
+        with caplog.at_level(logging.WARNING, logger="app.api.dependencies"):
+            with pytest.raises(HTTPException):
+                await checker(current_user=user, request=req)  # 2 → 429
+
+    msg = "\n".join(r.getMessage() for r in caplog.records)
+    assert "AI quota exceeded" in msg
+    assert "quota-log-user" in msg                     # subject
+    assert "/api/v1/books/x/generate-toc" in msg       # path
+    assert "period=day" in msg and "limit=1" in msg    # period + limit
+
+
+@pytest.mark.asyncio
+async def test_quota_dep_registers_and_injects_request_via_http(
+    motor_reinit_db, real_ai_quota
+):
+    """Mounting the REAL quota dep on a route must register cleanly and inject
+    the request (the 429 path reads request.url.path). Regression pin: a
+    non-bare-`Request` annotation (e.g. Optional[Request]) raises FastAPIError
+    at route registration → the app can't start. The suite-wide conftest fake
+    quota dep hides this, so this test uses the real dep on its own app."""
+    from fastapi import Depends, FastAPI
+    from httpx import ASGITransport, AsyncClient
+
+    from app.core.security import get_current_user_from_session
+
+    test_app = FastAPI()
+
+    @test_app.get("/ai")
+    async def ai_route(_=Depends(real_ai_quota())):
+        return {"ok": True}
+
+    test_app.dependency_overrides[get_current_user_from_session] = (
+        lambda: {"auth_id": "quota-http-user"}
+    )
+
+    transport = ASGITransport(app=test_app)
+    with patch.object(deps.settings, "BYPASS_AUTH", False), \
+         patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
+         patch.object(deps.settings, "AI_QUOTA_DAILY_LIMIT", 1), \
+         patch.object(deps.settings, "AI_QUOTA_MONTHLY_LIMIT", 0):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            assert (await client.get("/ai")).status_code == 200
+            assert (await client.get("/ai")).status_code == 429
+
+
+@pytest.mark.asyncio
 async def test_quota_isolated_per_user(motor_reinit_db, real_ai_quota):
     """One user hitting the cap doesn't block a different user."""
     with patch.object(deps.settings, "BYPASS_AUTH", False), \

@@ -11,9 +11,10 @@ const FALLBACK_API_URL = 'http://localhost:8000/api/v1'; // same fallback as boo
 export interface CspOptions {
   isDev: boolean;
   apiUrl?: string;
+  sentryDsn?: string;
 }
 
-export function buildCsp(nonce: string, { isDev, apiUrl }: CspOptions): string {
+export function buildCsp(nonce: string, { isDev, apiUrl, sentryDsn }: CspOptions): string {
   // connect-src derives from the configured API origin: prod deploys ship
   // only the real API host, while dev/CI (NEXT_PUBLIC_API_URL=localhost:8000)
   // keep localhost automatically — no generic-env keying (#192).
@@ -22,6 +23,19 @@ export function buildCsp(nonce: string, { isDev, apiUrl }: CspOptions): string {
     apiOrigin = new URL(apiUrl ?? process.env.NEXT_PUBLIC_API_URL ?? FALLBACK_API_URL).origin;
   } catch {
     // Unparseable API URL: fail closed to same-origin only.
+  }
+
+  // Sentry (#334) sends events to its ingest host; add it to connect-src only
+  // when a DSN is configured (else the browser CSP blocks event delivery). No
+  // DSN => no extra origin, so nothing changes for local/CI.
+  let sentryOrigin = '';
+  const dsn = sentryDsn ?? process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (dsn) {
+    try {
+      sentryOrigin = new URL(dsn).origin;
+    } catch {
+      // Unparseable DSN: skip it (no origin added).
+    }
   }
 
   const directives = [
@@ -35,7 +49,7 @@ export function buildCsp(nonce: string, { isDev, apiUrl }: CspOptions): string {
     "font-src 'self' data:",
     "img-src 'self' data: https: blob:",
     "media-src 'self'",
-    `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''}${isDev ? ' ws://localhost:*' : ''}`,
+    `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''}${sentryOrigin ? ` ${sentryOrigin}` : ''}${isDev ? ' ws://localhost:*' : ''}`,
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",

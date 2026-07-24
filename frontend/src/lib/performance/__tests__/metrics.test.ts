@@ -15,10 +15,9 @@ jest.mock('web-vitals', () => ({
 }), { virtual: true });
 
 import { onCLS, onINP, onFCP, onLCP, onTTFB } from 'web-vitals';
+import * as Sentry from '@sentry/nextjs';
 import {
   PerformanceTracker,
-  getCachedMetrics,
-  clearCachedMetrics,
   initializeWebVitals,
 } from '../metrics';
 import { getBudget, checkBudget, getBudgetStatus } from '../budgets';
@@ -67,11 +66,12 @@ describe('PerformanceTracker', () => {
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'warn').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
+
+    (Sentry.captureMessage as jest.Mock).mockClear();
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
-    clearCachedMetrics();
   });
 
   describe('Basic Tracking', () => {
@@ -242,126 +242,49 @@ describe('PerformanceTracker', () => {
     });
   });
 
-  describe('LocalStorage Caching', () => {
-    it('should cache metrics in production mode', () => {
+  describe('Production Sentry sink (#334)', () => {
+    it('reports a poor operation metric to Sentry as a warning', () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
 
-      const tracker = new PerformanceTracker('test-operation', 1000);
-      performanceMock.advance(500);
+      const tracker = new PerformanceTracker('slow-export', 1000, { bookId: 'abc' });
+      performanceMock.advance(1500); // 150% of budget → poor
       tracker.end();
 
-      const cached = getCachedMetrics();
-      expect(cached.length).toBeGreaterThan(0);
-      expect(cached[0].metric_name).toBe('test-operation');
+      expect(Sentry.captureMessage).toHaveBeenCalledTimes(1);
+      const [message, context] = (Sentry.captureMessage as jest.Mock).mock.calls[0];
+      expect(message).toContain('slow-export');
+      expect(context.level).toBe('warning');
+      expect(context.tags).toMatchObject({ metric: 'slow-export', rating: 'poor' });
+      expect(context.extra).toMatchObject({ value: 1500, bookId: 'abc' });
 
       process.env.NODE_ENV = originalEnv;
     });
 
-    it('should clear cached metrics', () => {
+    it('does NOT report a good metric to Sentry (keeps noise low)', () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
 
-      const tracker = new PerformanceTracker('test-operation');
-      performanceMock.advance(500);
+      const tracker = new PerformanceTracker('fast-op', 1000);
+      performanceMock.advance(500); // 50% of budget → good
       tracker.end();
 
-      expect(getCachedMetrics().length).toBeGreaterThan(0);
-
-      clearCachedMetrics();
-      expect(getCachedMetrics().length).toBe(0);
+      expect(Sentry.captureMessage).not.toHaveBeenCalled();
 
       process.env.NODE_ENV = originalEnv;
     });
 
-    it('should limit cached metrics to 100 entries', () => {
+    it('does NOT report to Sentry in development mode', () => {
       const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
+      process.env.NODE_ENV = 'development';
 
-      // Generate 150 metrics
-      for (let i = 0; i < 150; i++) {
-        const tracker = new PerformanceTracker(`operation-${i}`);
-        performanceMock.advance(100);
-        tracker.end();
-      }
-
-      const cached = getCachedMetrics();
-      expect(cached.length).toBe(100);
-
-      process.env.NODE_ENV = originalEnv;
-    });
-
-    it('should return empty array when no metrics are cached', () => {
-      clearCachedMetrics();
-      expect(getCachedMetrics()).toEqual([]);
-    });
-
-    it('should return empty array when cached data is invalid JSON', () => {
-      // Directly write invalid JSON into the mock store
-      localStorage.setItem('performance-metrics', 'not-valid-json{{{');
-      const metrics = getCachedMetrics();
-      expect(metrics).toEqual([]);
-      expect(console.error).toHaveBeenCalled();
-    });
-
-    it('should include a timestamp in each cached entry', () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
-
-      const tracker = new PerformanceTracker('ts-test');
-      performanceMock.advance(100);
+      const tracker = new PerformanceTracker('slow-op', 1000);
+      performanceMock.advance(1500); // poor
       tracker.end();
 
-      const cached = getCachedMetrics();
-      expect(cached[0]).toHaveProperty('timestamp');
+      expect(Sentry.captureMessage).not.toHaveBeenCalled();
 
       process.env.NODE_ENV = originalEnv;
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle localStorage errors gracefully', () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
-
-      // Spy on the local mock object so the throw reaches sendToAnalytics.
-      jest.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
-        throw new Error('Storage quota exceeded');
-      });
-
-      const tracker = new PerformanceTracker('test-operation');
-      performanceMock.advance(500);
-
-      // Should not throw and should log the error
-      expect(() => tracker.end()).not.toThrow();
-      expect(console.error).toHaveBeenCalledWith(
-        'Failed to cache performance metric:',
-        expect.any(Error)
-      );
-
-      process.env.NODE_ENV = originalEnv;
-    });
-
-    it('should handle getCachedMetrics errors', () => {
-      jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-        throw new Error('Storage error');
-      });
-
-      const metrics = getCachedMetrics();
-      expect(metrics).toEqual([]);
-    });
-
-    it('should handle clearCachedMetrics errors gracefully', () => {
-      // Spy on the local mock object (Storage.prototype spy doesn't reach it).
-      jest.spyOn(window.localStorage, 'removeItem').mockImplementation(() => {
-        throw new Error('Storage error');
-      });
-
-      expect(() => clearCachedMetrics()).not.toThrow();
-      expect(console.error).toHaveBeenCalledWith(
-        'Failed to clear cached metrics:',
-        expect.any(Error)
-      );
     });
   });
 
@@ -457,11 +380,12 @@ describe('initializeWebVitals', () => {
 
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
+
+    (Sentry.captureMessage as jest.Mock).mockClear();
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
-    clearCachedMetrics();
   });
 
   it('registers a callback with onCLS', () => {
@@ -620,29 +544,31 @@ describe('initializeWebVitals', () => {
     });
   });
 
-  it('stores web vitals in localStorage in production mode', () => {
+  it('reports a poor web vital to Sentry in production mode (#334)', () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
 
-    // Set up a writable localStorage mock
-    const store: Record<string, string> = {};
-    Object.defineProperty(window, 'localStorage', {
-      writable: true,
-      value: {
-        getItem: (k: string) => store[k] ?? null,
-        setItem: (k: string, v: string) => { store[k] = v; },
-        removeItem: (k: string) => { delete store[k]; },
-        clear: () => { Object.keys(store).forEach(k => delete store[k]); },
-      },
-    });
+    initializeWebVitals();
+    const clsCb = (onCLS as jest.Mock).mock.calls[0][0];
+    clsCb({ name: 'CLS', value: 0.3 }); // ≥ 0.25 → poor
+
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1);
+    const [message, context] = (Sentry.captureMessage as jest.Mock).mock.calls[0];
+    expect(message).toContain('CLS');
+    expect(context.tags).toMatchObject({ metric: 'CLS', rating: 'poor' });
+
+    process.env.NODE_ENV = originalEnv;
+  });
+
+  it('does NOT report a good web vital to Sentry in production mode', () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
 
     initializeWebVitals();
     const clsCb = (onCLS as jest.Mock).mock.calls[0][0];
-    clsCb({ name: 'CLS', value: 0.05 });
+    clsCb({ name: 'CLS', value: 0.05 }); // good
 
-    const cached = getCachedMetrics();
-    expect(cached.length).toBeGreaterThan(0);
-    expect(cached[0].metric_name).toBe('CLS');
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
 
     process.env.NODE_ENV = originalEnv;
   });

@@ -209,7 +209,7 @@ Operation budgets defined for:
 ### Custom Metrics
 - Operation timing tracking
 - Budget validation with warnings
-- localStorage caching for offline scenarios
+- `poor`-rated metrics reported to Sentry in production (#334); console output in development
 
 ### Usage
 
@@ -312,6 +312,8 @@ NEXT_PUBLIC_API_URL=https://api.auto-author.com
 # Must match the backend BETTER_AUTH_SECRET exactly (≥64 chars in production)
 BETTER_AUTH_SECRET=****
 NEXT_PUBLIC_BETTER_AUTH_URL=https://auto-author.com
+# Optional error tracking (#334) — leave empty to disable Sentry
+NEXT_PUBLIC_SENTRY_DSN=
 ```
 
 ### Deployment Checklist

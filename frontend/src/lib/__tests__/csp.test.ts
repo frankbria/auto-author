@@ -87,6 +87,28 @@ describe('buildCsp — production', () => {
   });
 });
 
+describe('buildCsp — Sentry connect-src (#334)', () => {
+  const DSN = 'https://abc123@o456.ingest.sentry.io/789';
+
+  it('adds the Sentry ingest origin to connect-src when a DSN is configured', () => {
+    const csp = buildCsp(NONCE, { ...PROD, sentryDsn: DSN });
+    const connectSrc = directive(csp, 'connect-src')!;
+    expect(connectSrc).toContain('https://o456.ingest.sentry.io');
+    // API origin still present alongside it
+    expect(connectSrc).toContain('https://api.dev.autoauthor.app');
+  });
+
+  it('adds no Sentry origin when no DSN is configured', () => {
+    const csp = buildCsp(NONCE, PROD);
+    expect(csp).not.toContain('ingest.sentry.io');
+  });
+
+  it('ignores an unparseable DSN (no origin added, no throw)', () => {
+    const csp = buildCsp(NONCE, { ...PROD, sentryDsn: 'not a dsn' });
+    expect(directive(csp, 'connect-src')).toBe("connect-src 'self' https://api.dev.autoauthor.app");
+  });
+});
+
 describe('buildCsp — development', () => {
   const csp = buildCsp(NONCE, DEV);
 

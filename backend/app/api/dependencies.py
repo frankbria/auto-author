@@ -1,5 +1,6 @@
 from fastapi import Depends, Header, HTTPException, status, Request
 from typing import Dict, Optional, Any
+import logging
 import time
 import re
 from pydantic import BaseModel
@@ -11,6 +12,8 @@ from app.db.database import create_audit_log
 from app.db.usage import increment_usage
 from app.core.config import settings, is_production_env
 from app.core.security import get_current_user_from_session
+
+logger = logging.getLogger(__name__)
 
 
 def _is_exempt_e2e_user(current_user: Dict) -> bool:
@@ -134,6 +137,10 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
 
         if count > limit:
             retry_after = max(1, int(reset_at - now) + 1)
+            logger.warning(
+                "Rate limit exceeded: subject=%s path=%s limit=%s window=%ss count=%s",
+                subject, request.url.path, limit, window, count,
+            )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Rate limit exceeded. Try again in {retry_after} seconds.",
@@ -168,7 +175,13 @@ def get_ai_usage_quota():
 
     async def check_quota(
         current_user: Dict = Depends(get_current_user_from_session),
+        request: Request = None,  # noqa: RUF013 (FastAPI injects; None only for direct-call tests)
     ):
+        # Bare `Request` annotation so FastAPI injects the real request in
+        # production; the None default keeps the direct-call unit tests working
+        # without a stub. NB: Optional[Request] would NOT be injected — FastAPI
+        # only special-cases the bare Request type, and a Union raises
+        # FastAPIError at route registration (would block startup).
         # Skip in auth-bypass mode (E2E/test) and when disabled, mirroring the
         # rate limiter so test suites can generate freely.
         if settings.BYPASS_AUTH or not settings.AI_QUOTA_ENABLED:
@@ -199,6 +212,11 @@ def get_ai_usage_quota():
                 continue
             count = await increment_usage(user_id, f"{period}:{bucket}", ttl)
             if count > limit:
+                path = getattr(getattr(request, "url", None), "path", "unknown")
+                logger.warning(
+                    "AI quota exceeded: subject=%s path=%s period=%s limit=%s count=%s",
+                    user_id, path, period, limit, count,
+                )
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=(
