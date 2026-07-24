@@ -106,4 +106,15 @@ describe("SignUpPage (#198)", () => {
     expect(submitButton()).toBeDisabled();
     expect(mockSignUpEmail).not.toHaveBeenCalled();
   });
+
+  // #335: taking payments requires the sign-up flow to surface the legal docs.
+  it("links to the Terms of Service and Privacy Policy", () => {
+    setup();
+    expect(
+      screen.getByRole("link", { name: /terms of service/i })
+    ).toHaveAttribute("href", "/terms");
+    expect(
+      screen.getByRole("link", { name: /privacy policy/i })
+    ).toHaveAttribute("href", "/privacy");
+  });
 });
