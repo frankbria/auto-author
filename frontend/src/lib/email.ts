@@ -104,12 +104,14 @@ async function fetchWithRetry(
 /**
  * Sends a password reset email to the user.
  *
- * This function supports multiple email providers configured via environment variables:
- * - Resend (recommended for Next.js)
- * - SendGrid
- * - SMTP (Nodemailer)
+ * Providers are selected via `EMAIL_SERVICE_PROVIDER`:
+ * - `resend` (recommended for Next.js) — needs `EMAIL_SERVICE_API_KEY`
+ * - `sendgrid` — needs `EMAIL_SERVICE_API_KEY`
  *
- * If no email provider is configured, it logs to console (development mode).
+ * In development with no provider (or `console`), the email is dumped to the
+ * console instead of sent. In every other environment an unset/unknown provider
+ * logs a loud `[email]` error and throws — the reset must never silently no-op
+ * and report fake success (#332).
  */
 export async function sendPasswordResetEmail({
   to,
@@ -202,15 +204,20 @@ export async function sendPasswordResetEmail({
     return;
   }
 
-  // Unknown provider
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      `Unknown email provider: ${provider}. Configure EMAIL_SERVICE_PROVIDER to 'resend' or 'sendgrid'.`
-    );
-  }
-
-  // In development, log a warning and return silently for convenience
-  console.warn(`Unknown email provider: ${provider}. Email not sent.`);
+  // No provider configured, or an unrecognized one → the email dead-ends here.
+  // Make it LOUD and observable in EVERY environment (not just production) so the
+  // "provider unconfigured" failure never masquerades as a silent success (#332).
+  // The caller (auth.ts sendResetPassword) swallows this so the user-facing flow
+  // still shows a generic success — that anti-enumeration behavior is deliberate;
+  // the failure must be observable in server logs, not in the HTTP response.
+  const reason = provider
+    ? `unknown EMAIL_SERVICE_PROVIDER "${provider}" (expected 'resend' or 'sendgrid')`
+    : "EMAIL_SERVICE_PROVIDER is not configured";
+  console.error(
+    `[email] Password reset email NOT sent — ${reason}. ` +
+      `Set EMAIL_SERVICE_PROVIDER, EMAIL_SERVICE_API_KEY, and EMAIL_FROM_ADDRESS to enable delivery.`
+  );
+  throw new Error(`Password reset email not sent: ${reason}`);
 }
 
 function generatePasswordResetHtml({

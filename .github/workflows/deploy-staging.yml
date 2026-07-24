@@ -293,6 +293,12 @@ jobs:
             echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}"
             echo "NEXT_PUBLIC_ENVIRONMENT=$ENVIRONMENT"
             echo "PORT=3002"
+            # Transactional email for password reset (#332). Without these the
+            # reset flow silently no-ops in production. next start loads
+            # .env.production at runtime, so these reach the server-side sender.
+            echo "EMAIL_SERVICE_PROVIDER=${{ secrets.EMAIL_SERVICE_PROVIDER }}"
+            echo "EMAIL_SERVICE_API_KEY=${{ secrets.EMAIL_SERVICE_API_KEY }}"
+            echo "EMAIL_FROM_ADDRESS=${{ secrets.EMAIL_FROM_ADDRESS }}"
           } > .env.production
 
           # Export environment variables for build process
