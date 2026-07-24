@@ -1,7 +1,14 @@
+import asyncio
+
 from fastapi import APIRouter, Response, status
 from app.api.endpoints import users, webhooks, books, chapters, export, billing
 from app.core.config import settings, is_production_env
 from app.db.base import get_database
+
+# Bound the readiness ping so a broken/unreachable Mongo fails the probe fast
+# instead of hanging on the app client's 30s serverSelectionTimeoutMS — the
+# deploy gate retries with short sleeps and must get a prompt 503.
+HEALTH_PING_TIMEOUT_SECONDS = 5.0
 
 # Main router
 router = APIRouter()
@@ -51,7 +58,9 @@ async def health_check(response: Response):
 
     # MongoDB connectivity — catches a wrong URI or an un-allowlisted Atlas IP.
     try:
-        await get_database().command("ping")
+        await asyncio.wait_for(
+            get_database().command("ping"), timeout=HEALTH_PING_TIMEOUT_SECONDS
+        )
         checks["mongodb"] = "ok"
     except Exception as e:  # report any failure; the probe must never itself crash
         checks["mongodb"] = f"error: {type(e).__name__}"

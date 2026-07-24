@@ -51,6 +51,24 @@ class TestHealthCheckDependencies:
         assert data["status"] == "unhealthy"
         assert data["checks"]["mongodb"].startswith("error")
 
+    def test_health_ping_fails_fast_when_mongo_slow(self, client: TestClient, monkeypatch):
+        """A slow/unreachable Mongo must fail the probe quickly (bounded ping),
+        not hang on the app client's 30s server-selection timeout."""
+        import app.api.endpoints.router as router_mod
+
+        monkeypatch.setattr(router_mod, "HEALTH_PING_TIMEOUT_SECONDS", 0.05)
+
+        async def _never_returns(*args, **kwargs):
+            import asyncio as _a
+            await _a.sleep(30)
+
+        mock_db = MagicMock()
+        mock_db.command = _never_returns
+        with patch("app.api.endpoints.router.get_database", return_value=mock_db):
+            response = client.get("/api/v1/health")
+        assert response.status_code == 503
+        assert response.json()["checks"]["mongodb"].startswith("error")
+
     def test_health_503_when_required_secret_absent(self, client: TestClient, monkeypatch):
         """A required env key missing entirely → 503 naming the key, even when
         Mongo is fine."""
