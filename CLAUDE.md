@@ -32,7 +32,7 @@
 
 The detailed per-issue changelog lives in [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — read it when you need history on a specific issue/PR. When completing work, append the new entry **there**, not here.
 
-Latest state (2026-07-23): P0/P1 launch-review items through #335 complete (ToS/Privacy pages, Sentry error tracking, real `/health` dependency checks, loud password-reset failure). CI gates green and enforced; merge via PR with no `--admin`/`--no-verify`.
+Latest state (2026-07-24): P0/P1 launch-review items through #336 complete (ToS/Privacy pages, Sentry error tracking, real `/health` dependency checks, loud password-reset failure, chapter-question status filter applied before pagination). CI gates green and enforced; merge via PR with no `--admin`/`--no-verify`.
 
 ---
 
