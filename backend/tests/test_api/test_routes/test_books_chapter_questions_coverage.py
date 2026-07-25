@@ -294,10 +294,11 @@ async def test_list_questions_status_filter_pages_completely(auth_client_factory
     """#336: a status filter must be applied before pagination.
 
     Answers questions 0, 2 and 4 of six so the completed rows are interleaved,
-    then pages the filtered list at limit=2 the way a client does — following
-    ``pages``. Before the fix, ``skip``/``limit`` walked the raw ordering, so the
-    completed question at index 4 was unreachable and each page reported its own
-    post-filter length as ``total``.
+    then reads the two pages a correct API reports for 3 matches at limit=2.
+    Before the fix, ``skip``/``limit`` walked the raw ordering: those two pages
+    held one completed question each (so index 4 fell outside them), ``pages``
+    described the unfiltered six, and each page reported its own post-filter
+    length as ``total``.
     """
     api = await auth_client_factory()
     book_id, chapter_id, qids = await _setup_with_questions(api, count=6)

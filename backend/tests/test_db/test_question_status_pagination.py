@@ -104,9 +104,12 @@ async def test_completed_filter_across_multiple_pages_is_complete_and_disjoint(
 ):
     """4 completed questions at limit=2 => exactly 2 full pages covering all 4.
 
-    Under filter-after-paginate the same walk yields only the completed rows that
-    happened to land in the first pages of the RAW ordering — orders 5 and 7 are
-    unreachable — and every page reports ``total`` as its own post-filter length.
+    Under filter-after-paginate this walk instead visits FOUR half-empty pages
+    (``pages`` described the unfiltered set) and every one of them reports
+    ``total`` as its own post-filter length, i.e. 1. The union happens to come
+    out right only because sweeping the unfiltered set incidentally visits every
+    document — which is why the ``totals`` assertion, not the membership one, is
+    what pins the fix here.
     """
     ids = await _seed_chapter()
     expected = [ids[o] for o in COMPLETED_ORDERS]
