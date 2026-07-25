@@ -471,3 +471,158 @@ async def test_bulk_status_helper_wrong_owner_not_authorized(seed_book):
             book_id=book_id, chapter_ids=["c1"], new_status="in-progress",
             user_auth_id="intruder", expected_version=1,
         )
+
+
+# ---------------------------------------------------------------------------
+# Interleaved-writer / lost-update guard  (issue #337)
+#
+# add/update/delete/reorder each read the whole TOC, mutate it in memory, and
+# $set it back. Without a version guard on the write filter that is plain
+# last-write-wins on standalone Mongo (session=None), so a concurrent autosave
+# is silently clobbered. These tests fire a competing write in the window
+# between the read and the write and assert the second writer LOSES loudly
+# rather than overwriting.
+# ---------------------------------------------------------------------------
+
+
+def _interleave_competing_write(monkeypatch, book_id, competing_toc):
+    """Run a competing whole-TOC write in the read -> write window.
+
+    Wraps ``books_collection.find_one`` so that the first call (the operation's
+    own read) is followed immediately by another writer committing
+    ``competing_toc``. The operation under test then attempts its write against
+    a TOC whose version has already moved on.
+    """
+    real_find_one = tx.books_collection.find_one
+    state = {"fired": False}
+
+    async def find_one_then_interleave(*args, **kwargs):
+        doc = await real_find_one(*args, **kwargs)
+        if not state["fired"]:
+            state["fired"] = True
+            await tx.books_collection.update_one(
+                {"_id": ObjectId(book_id)},
+                {"$set": {"table_of_contents": competing_toc}},
+            )
+        return doc
+
+    monkeypatch.setattr(tx.books_collection, "find_one", find_one_then_interleave)
+    return state
+
+
+_INTERLEAVED_OPS = [
+    lambda bid, owner: tx.add_chapter_with_transaction(bid, {"title": "New"}, owner),
+    lambda bid, owner: tx.update_chapter_with_transaction(
+        bid, "c1", {"title": "Renamed"}, owner
+    ),
+    lambda bid, owner: tx.delete_chapter_with_transaction(bid, "c1", owner),
+    lambda bid, owner: tx.reorder_chapters_with_transaction(
+        bid, [{"id": "c1", "order": 1}], owner
+    ),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call", _INTERLEAVED_OPS, ids=["add", "update", "delete", "reorder"]
+)
+async def test_interleaved_writer_does_not_lose_update(seed_book, monkeypatch, call):
+    """A concurrent TOC write must not be clobbered — it must raise instead."""
+    book_id, owner = await seed_book(
+        toc=_toc(version=1, chapters=[{"id": "c1", "title": "Original"}])
+    )
+
+    # The other writer (e.g. the autosave path) commits first and bumps to v2.
+    competing = _toc(
+        version=2, chapters=[{"id": "c1", "title": "Original", "content": "autosaved"}]
+    )
+    state = _interleave_competing_write(monkeypatch, book_id, competing)
+
+    with pytest.raises(ValueError, match="Version conflict"):
+        await call(book_id, owner)
+
+    assert state["fired"], "competing write never ran — test is not interleaving"
+
+    # The competing writer's data survived completely intact.
+    stored = await tx.books_collection.find_one({"_id": ObjectId(book_id)})
+    assert stored["table_of_contents"] == competing
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call", _INTERLEAVED_OPS, ids=["add", "update", "delete", "reorder"]
+)
+async def test_versionless_toc_no_false_conflict(seed_book, call):
+    """A legacy TOC with no `version` field must still write on first attempt."""
+    book_id, owner = await seed_book(
+        toc={"chapters": [{"id": "c1", "title": "Original"}]}  # no version field
+    )
+
+    await call(book_id, owner)  # must not raise
+
+    stored = await _get_toc(book_id)
+    assert stored["version"] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call", _INTERLEAVED_OPS, ids=["add", "update", "delete", "reorder"]
+)
+async def test_guarded_write_scoped_to_owner(seed_book, monkeypatch, call):
+    """The write filter is owner-scoped, not just _id-scoped.
+
+    A filter miss caused by an ownership change must report *not authorized*,
+    not a misleading "someone else edited the TOC" conflict.
+    """
+    book_id, owner = await seed_book(
+        toc=_toc(version=1, chapters=[{"id": "c1", "title": "Original"}])
+    )
+
+    # Ownership changes between the read and the write.
+    real_find_one = tx.books_collection.find_one
+    state = {"fired": False}
+
+    async def find_one_then_reassign(*args, **kwargs):
+        doc = await real_find_one(*args, **kwargs)
+        if not state["fired"]:
+            state["fired"] = True
+            await tx.books_collection.update_one(
+                {"_id": ObjectId(book_id)}, {"$set": {"owner_id": "someone-else"}}
+            )
+        return doc
+
+    monkeypatch.setattr(tx.books_collection, "find_one", find_one_then_reassign)
+
+    with pytest.raises(ValueError, match=r"[Nn]ot authorized"):
+        await call(book_id, owner)
+
+    stored = await _get_toc(book_id)
+    assert stored["version"] == 1  # untouched
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call", _INTERLEAVED_OPS, ids=["add", "update", "delete", "reorder"]
+)
+async def test_book_deleted_mid_operation_reports_not_found(
+    seed_book, monkeypatch, call
+):
+    """A book deleted in the read -> write window is 'not found', not a conflict."""
+    book_id, owner = await seed_book(
+        toc=_toc(version=1, chapters=[{"id": "c1", "title": "Original"}])
+    )
+
+    real_find_one = tx.books_collection.find_one
+    state = {"fired": False}
+
+    async def find_one_then_delete(*args, **kwargs):
+        doc = await real_find_one(*args, **kwargs)
+        if not state["fired"]:
+            state["fired"] = True
+            await tx.books_collection.delete_one({"_id": ObjectId(book_id)})
+        return doc
+
+    monkeypatch.setattr(tx.books_collection, "find_one", find_one_then_delete)
+
+    with pytest.raises(ValueError, match="Book not found"):
+        await call(book_id, owner)

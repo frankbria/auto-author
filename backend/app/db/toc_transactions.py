@@ -13,6 +13,74 @@ from .base import _client, _db, books_collection, ObjectId
 from .audit_log import create_audit_log
 
 
+def _version_guard(current_toc: Dict[str, Any]) -> Any:
+    """Snapshot the read-time TOC version as an ``update_one`` filter value.
+
+    MUST be called *before* the TOC dict is mutated — callers mutate the dict
+    they read in place, so reading the version after mutation would guard on
+    the value we are about to write and never detect a conflict.
+
+    A legacy TOC with no ``version`` field is matched on its *absence* rather
+    than on a defaulted 1, otherwise its first guarded write would always look
+    like a conflict.
+    """
+    return current_toc["version"] if "version" in current_toc else {"$exists": False}
+
+
+async def _set_toc_guarded(
+    book_oid: ObjectId,
+    user_auth_id: str,
+    updated_toc: Dict[str, Any],
+    version_guard: Any,
+    session: Optional[AsyncIOMotorClientSession] = None,
+) -> None:
+    """Compare-and-swap the whole ``table_of_contents`` under an optimistic lock.
+
+    Every caller here reads the TOC, mutates it in memory, and writes it back
+    whole. Filtering that write on the version we read makes it a no-op if
+    another writer (e.g. the autosave path) committed in between, so concurrent
+    edits raise instead of silently clobbering each other. This holds on
+    standalone Mongo too, where ``session`` is ``None`` and there is no
+    transaction to abort (#337).
+
+    ``version_guard`` comes from :func:`_version_guard`, captured before the
+    caller mutated the TOC.
+
+    ``modified_count`` (rather than ``matched_count``) is a sufficient conflict
+    signal only because every caller increments ``version`` — the document can
+    never be written identically, so a matched-but-unmodified result is
+    impossible. An idempotent write added here later would need
+    ``matched_count``.
+    """
+    result = await books_collection.update_one(
+        {
+            "_id": book_oid,
+            "owner_id": user_auth_id,
+            "table_of_contents.version": version_guard,
+        },
+        {
+            "$set": {
+                "table_of_contents": updated_toc,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
+        session=session,
+    )
+
+    if result.modified_count == 0:
+        # The filter missed — but "someone bumped the version" is only one of
+        # three reasons. Re-read to distinguish, so the API can answer 404/403
+        # instead of a misleading "modified by another user" 409. This mirrors
+        # the re-read `_update_toc_internal` already does, and only costs a read
+        # on the failure path.
+        current = await books_collection.find_one({"_id": book_oid}, session=session)
+        if not current:
+            raise ValueError("Book not found")
+        if current.get("owner_id") != user_auth_id:
+            raise ValueError("Not authorized to modify this book")
+        raise ValueError("Version conflict: TOC was updated by another process")
+
+
 async def update_toc_with_transaction(
     book_id: str,
     toc_data: Dict[str, Any],
@@ -193,6 +261,7 @@ async def _add_chapter_internal(
         raise ValueError("Book not found or not authorized")
 
     toc = book.get("table_of_contents", {})
+    version_guard = _version_guard(toc)  # snapshot before mutating `toc`
     chapters = toc.get("chapters", [])
 
     # Generate chapter ID if not provided
@@ -227,15 +296,8 @@ async def _add_chapter_internal(
     toc["updated_at"] = now
 
     # Update the book
-    await books_collection.update_one(
-        {"_id": ObjectId(book_id)},
-        {
-            "$set": {
-                "table_of_contents": toc,
-                "updated_at": datetime.now(timezone.utc)
-            }
-        },
-        session=session
+    await _set_toc_guarded(
+        ObjectId(book_id), user_auth_id, toc, version_guard, session
     )
 
     return chapter_data
@@ -283,6 +345,7 @@ async def _update_chapter_internal(
         raise ValueError("Book not found or not authorized")
 
     toc = book.get("table_of_contents", {})
+    version_guard = _version_guard(toc)  # snapshot before mutating `toc`
     chapters = toc.get("chapters", [])
 
     # Find and update the chapter
@@ -314,15 +377,8 @@ async def _update_chapter_internal(
     toc["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     # Update the book
-    await books_collection.update_one(
-        {"_id": ObjectId(book_id)},
-        {
-            "$set": {
-                "table_of_contents": toc,
-                "updated_at": datetime.now(timezone.utc)
-            }
-        },
-        session=session
+    await _set_toc_guarded(
+        ObjectId(book_id), user_auth_id, toc, version_guard, session
     )
 
     return updated_chapter
@@ -368,6 +424,7 @@ async def _delete_chapter_internal(
         raise ValueError("Book not found or not authorized")
 
     toc = book.get("table_of_contents", {})
+    version_guard = _version_guard(toc)  # snapshot before mutating `toc`
     chapters = toc.get("chapters", [])
 
     # Find and delete the chapter
@@ -395,15 +452,8 @@ async def _delete_chapter_internal(
     toc["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     # Update the book
-    await books_collection.update_one(
-        {"_id": ObjectId(book_id)},
-        {
-            "$set": {
-                "table_of_contents": toc,
-                "updated_at": datetime.now(timezone.utc)
-            }
-        },
-        session=session
+    await _set_toc_guarded(
+        ObjectId(book_id), user_auth_id, toc, version_guard, session
     )
 
     return True
@@ -473,28 +523,10 @@ async def update_chapter_statuses_with_version_guard(
     }
 
     # Compare-and-swap: the version filter makes this a no-op if another writer
-    # bumped the TOC since we read it, so concurrent edits can't clobber. A
-    # legacy TOC with no version field is matched on its absence (not on the
-    # defaulted 1) so it doesn't produce a false conflict on first write.
-    version_guard = (
-        current_version if "version" in current_toc else {"$exists": False}
+    # bumped the TOC since we read it, so concurrent edits can't clobber.
+    await _set_toc_guarded(
+        book_oid, user_auth_id, updated_toc, _version_guard(current_toc)
     )
-    update_result = await books_collection.update_one(
-        {
-            "_id": book_oid,
-            "owner_id": user_auth_id,
-            "table_of_contents.version": version_guard,
-        },
-        {
-            "$set": {
-                "table_of_contents": updated_toc,
-                "updated_at": datetime.now(timezone.utc),
-            }
-        },
-    )
-
-    if update_result.modified_count == 0:
-        raise ValueError("Version conflict: TOC was updated by another process")
 
     # Preserve the book-level audit entry the previous update_book() path emitted.
     await create_audit_log(
@@ -549,6 +581,7 @@ async def _reorder_chapters_internal(
         raise ValueError("Book not found or not authorized")
 
     toc = book.get("table_of_contents", {})
+    version_guard = _version_guard(toc)  # snapshot before mutating `toc`
     chapters = toc.get("chapters", [])
 
     # Create a map of chapter IDs to chapters
@@ -576,15 +609,8 @@ async def _reorder_chapters_internal(
     toc["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     # Update the book
-    await books_collection.update_one(
-        {"_id": ObjectId(book_id)},
-        {
-            "$set": {
-                "table_of_contents": toc,
-                "updated_at": datetime.now(timezone.utc)
-            }
-        },
-        session=session
+    await _set_toc_guarded(
+        ObjectId(book_id), user_auth_id, toc, version_guard, session
     )
 
     return toc

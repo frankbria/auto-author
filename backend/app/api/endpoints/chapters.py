@@ -91,7 +91,12 @@ async def create_chapter(
         # Check the specific parent-chapter message first: "Parent chapter not
         # found" also matches the generic "not found" substring, so the generic
         # branch would otherwise shadow this one (#158).
-        if "Parent chapter not found" in str(e):
+        if "Version conflict" in str(e):
+            raise HTTPException(
+                status_code=409,
+                detail="The TOC has been modified by another user. Please refresh and try again.",
+            ) from e
+        elif "Parent chapter not found" in str(e):
             raise HTTPException(
                 status_code=400, detail="Parent chapter not found"
             ) from e
@@ -354,7 +359,7 @@ async def update_chapter(
             raise HTTPException(
                 status_code=403, detail="Not authorized to modify this book's chapters"
             )
-        elif "Concurrent modification" in str(e):
+        elif "Concurrent modification" in str(e) or "Version conflict" in str(e):
             raise HTTPException(
                 status_code=409,
                 detail="The chapter has been modified by another user. Please refresh and try again."
@@ -403,7 +408,7 @@ async def delete_chapter(
             raise HTTPException(
                 status_code=403, detail="Not authorized to modify this book's chapters"
             )
-        elif "Concurrent modification" in str(e):
+        elif "Concurrent modification" in str(e) or "Version conflict" in str(e):
             raise HTTPException(
                 status_code=409,
                 detail="The TOC has been modified by another user. Please refresh and try again."

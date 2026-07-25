@@ -737,3 +737,92 @@ async def test_bulk_status_invalid_status_value_returns_422(auth_client_factory)
     )
 
     assert resp.status_code == 422
+
+
+# --------------------------------------------------------------------------- #
+# Optimistic-concurrency conflicts surface as 409, not 400 (issue #337)
+# --------------------------------------------------------------------------- #
+
+
+def _bump_version_before_write(monkeypatch, book_id):
+    """Bump the stored TOC version in the read -> write window of an operation.
+
+    Hooks ``update_one`` rather than ``find_one`` so the competing write lands
+    immediately before the guarded TOC write, regardless of how many reads the
+    endpoint performed first.
+    """
+    import app.db.toc_transactions as tx
+
+    real_update_one = tx.books_collection.update_one
+    state = {"fired": False}
+
+    async def update_one_with_interleave(*args, **kwargs):
+        if not state["fired"]:
+            state["fired"] = True
+            await real_update_one(
+                {"_id": ObjectId(book_id)},
+                {"$set": {"table_of_contents.version": 999}},
+            )
+        return await real_update_one(*args, **kwargs)
+
+    monkeypatch.setattr(tx.books_collection, "update_one", update_one_with_interleave)
+    return state
+
+
+@pytest.mark.asyncio
+async def test_create_chapter_version_conflict_returns_409(
+    auth_client_factory, monkeypatch
+):
+    api = await auth_client_factory()
+    book_id = await create_book(api)
+    await add_chapter(api, book_id, title="Existing", order=1)
+
+    state = _bump_version_before_write(monkeypatch, book_id)
+    resp = await api.post(
+        f"/api/v1/books/{book_id}/chapters",
+        json={"title": "Racy", "description": "d", "level": 1, "order": 2},
+    )
+
+    assert state["fired"]
+    assert resp.status_code == 409, resp.text
+    assert "modified by another user" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_update_chapter_version_conflict_returns_409(
+    auth_client_factory, monkeypatch
+):
+    api = await auth_client_factory()
+    book_id = await create_book(api)
+    chapter_id = await add_chapter(api, book_id, title="Old", order=1)
+
+    state = _bump_version_before_write(monkeypatch, book_id)
+    resp = await api.put(
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}",
+        json={"title": "New Title"},
+    )
+
+    assert state["fired"]
+    assert resp.status_code == 409, resp.text
+    assert "modified by another user" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_delete_chapter_version_conflict_returns_409(
+    auth_client_factory, monkeypatch
+):
+    api = await auth_client_factory()
+    book_id = await create_book(api)
+    chapter_id = await add_chapter(api, book_id, title="Doomed", order=1)
+
+    state = _bump_version_before_write(monkeypatch, book_id)
+    resp = await api.delete(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
+
+    assert state["fired"]
+    assert resp.status_code == 409, resp.text
+    assert "modified by another user" in resp.json()["detail"]
+
+    # The chapter was NOT deleted — the losing write was rejected wholesale.
+    monkeypatch.undo()
+    remaining = await api.get(f"/api/v1/books/{book_id}/chapters")
+    assert [c["id"] for c in remaining.json()["chapters"]] == [chapter_id]
