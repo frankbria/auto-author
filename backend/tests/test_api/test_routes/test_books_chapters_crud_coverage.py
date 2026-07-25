@@ -826,3 +826,93 @@ async def test_delete_chapter_version_conflict_returns_409(
     monkeypatch.undo()
     remaining = await api.get(f"/api/v1/books/{book_id}/chapters")
     assert [c["id"] for c in remaining.json()["chapters"]] == [chapter_id]
+
+
+def _mutate_book_before_write(monkeypatch, book_id, mutation):
+    """Apply ``mutation`` (a books_collection coroutine fn) in the read -> write window."""
+    import app.db.toc_transactions as tx
+
+    real_update_one = tx.books_collection.update_one
+    state = {"fired": False}
+
+    async def update_one_with_interleave(*args, **kwargs):
+        if not state["fired"]:
+            state["fired"] = True
+            await mutation(tx.books_collection)
+        return await real_update_one(*args, **kwargs)
+
+    monkeypatch.setattr(tx.books_collection, "update_one", update_one_with_interleave)
+    return state
+
+
+async def _reassign_owner(book_id, collection):
+    await collection.update_one(
+        {"_id": ObjectId(book_id)}, {"$set": {"owner_id": "somebody-else"}}
+    )
+
+
+async def _delete_book(book_id, collection):
+    await collection.delete_one({"_id": ObjectId(book_id)})
+
+
+async def _create_req(api, book_id, chapter_id):
+    return await api.post(
+        f"/api/v1/books/{book_id}/chapters",
+        json={"title": "Racy", "description": "d", "level": 1, "order": 2},
+    )
+
+
+async def _update_req(api, book_id, chapter_id):
+    return await api.put(
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}", json={"title": "New"}
+    )
+
+
+async def _delete_req(api, book_id, chapter_id):
+    return await api.delete(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
+
+
+_ENDPOINT_REQS = [_create_req, _update_req, _delete_req]
+_ENDPOINT_IDS = ["create", "update", "delete"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("request_fn", _ENDPOINT_REQS, ids=_ENDPOINT_IDS)
+async def test_ownership_change_mid_write_returns_403_not_409(
+    auth_client_factory, monkeypatch, request_fn
+):
+    """A filter miss from an ownership change must be 403, not a bogus 409.
+
+    Guards the substring-dispatch chain: "Not authorized to modify this book"
+    must not be shadowed by the "not found" branch.
+    """
+    api = await auth_client_factory()
+    book_id = await create_book(api)
+    chapter_id = await add_chapter(api, book_id, title="C", order=1)
+
+    state = _mutate_book_before_write(
+        monkeypatch, book_id, lambda coll: _reassign_owner(book_id, coll)
+    )
+    resp = await request_fn(api, book_id, chapter_id)
+
+    assert state["fired"]
+    assert resp.status_code == 403, resp.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("request_fn", _ENDPOINT_REQS, ids=_ENDPOINT_IDS)
+async def test_book_deleted_mid_write_returns_404_not_409(
+    auth_client_factory, monkeypatch, request_fn
+):
+    """A filter miss from the book being deleted must be 404, not a bogus 409."""
+    api = await auth_client_factory()
+    book_id = await create_book(api)
+    chapter_id = await add_chapter(api, book_id, title="C", order=1)
+
+    state = _mutate_book_before_write(
+        monkeypatch, book_id, lambda coll: _delete_book(book_id, coll)
+    )
+    resp = await request_fn(api, book_id, chapter_id)
+
+    assert state["fired"]
+    assert resp.status_code == 404, resp.text
