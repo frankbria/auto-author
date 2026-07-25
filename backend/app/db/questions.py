@@ -21,6 +21,12 @@ from app.schemas.book import (
 
 logger = logging.getLogger(__name__)
 
+# Response-status values the chapter-question list can filter on. A value outside
+# this set is ignored rather than treated as "matches nothing" — the endpoint has
+# never validated `status`, and an unrecognised value has always fallen through to
+# an unfiltered result.
+RESPONSE_STATUS_FILTERS = frozenset({"completed", "draft", "not_answered"})
+
 
 def serialize_datetime(obj: Any) -> Any:
     """Convert datetime objects to ISO format strings for JSON serialization."""
@@ -214,8 +220,13 @@ async def get_questions_for_chapter(
     page: int = 1,
     limit: int = 10
 ) -> QuestionListResponse:
-    """Get questions for a specific chapter with optional filtering."""
+    """Get questions for a specific chapter with optional filtering.
+
+    ``total``/``pages``/``has_more`` describe the **filtered** result set, so a
+    client can page a filtered list to completion.
+    """
     questions_collection = await get_collection("questions")
+    responses_collection = await get_collection("question_responses")
 
     # Build query
     query = {
@@ -229,6 +240,32 @@ async def get_questions_for_chapter(
     if question_type:
         query["question_type"] = question_type
 
+    # A question's response status lives in a separate collection, so `status`
+    # cannot be expressed in the query above. Resolve the matching ids FIRST and
+    # fold them into the query, so skip/limit/count all operate on the filtered
+    # set (#336). Filtering the page afterwards let pagination walk documents
+    # that don't match, which made matches on later pages unreachable, returned
+    # short (sometimes empty) pages, and left every count field describing a
+    # different set. The id list is bounded by the chapter's question count.
+    statuses_by_qid: Optional[Dict[str, str]] = None
+    if status in RESPONSE_STATUS_FILTERS:
+        chapter_qids = [
+            str(doc["_id"])
+            async for doc in questions_collection.find(query, {"_id": 1})
+        ]
+        statuses_by_qid = {
+            r["question_id"]: r.get("status", "draft")
+            async for r in responses_collection.find({
+                "question_id": {"$in": chapter_qids},
+                "user_id": user_id,
+            })
+        }
+        if status == "not_answered":
+            matching = [q for q in chapter_qids if q not in statuses_by_qid]
+        else:
+            matching = [q for q in chapter_qids if statuses_by_qid.get(q) == status]
+        query["_id"] = {"$in": [ObjectId(q) for q in matching]}
+
     # Calculate pagination
     skip = (page - 1) * limit
 
@@ -239,40 +276,29 @@ async def get_questions_for_chapter(
     # Get total count
     total = await questions_collection.count_documents(query)
 
-    # Convert ObjectIds to strings and add response status.
-    # One batched lookup keyed by question_id instead of a find_one per question (N+1).
     for question in questions:
         question["id"] = str(question.pop("_id"))
 
-    responses_collection = await get_collection("question_responses")
-    responses_by_qid = {
-        r["question_id"]: r
-        async for r in responses_collection.find({
-            "question_id": {"$in": [q["id"] for q in questions]},
-            "user_id": user_id,
-        })
-    }
+    # Attach response status. A status filter already resolved the map for the
+    # whole chapter; otherwise do one batched lookup for the page, keyed by
+    # question_id instead of a find_one per question (N+1).
+    if statuses_by_qid is None:
+        statuses_by_qid = {
+            r["question_id"]: r.get("status", "draft")
+            async for r in responses_collection.find({
+                "question_id": {"$in": [q["id"] for q in questions]},
+                "user_id": user_id,
+            })
+        }
 
     processed_questions = []
     for question in questions:
-        response = responses_by_qid.get(question["id"])
-        if response:
-            question["response_status"] = response.get("status", "draft")
-            question["has_response"] = True
-        else:
-            question["response_status"] = "not_answered"
-            question["has_response"] = False
-
+        has_response = question["id"] in statuses_by_qid
+        question["has_response"] = has_response
+        question["response_status"] = (
+            statuses_by_qid[question["id"]] if has_response else "not_answered"
+        )
         processed_questions.append(question)
-
-    # Apply status filter after getting response status
-    if status:
-        if status == "completed":
-            processed_questions = [q for q in processed_questions if q["response_status"] == "completed"]
-        elif status == "draft":
-            processed_questions = [q for q in processed_questions if q["response_status"] == "draft"]
-        elif status == "not_answered":
-            processed_questions = [q for q in processed_questions if q["response_status"] == "not_answered"]
 
     # Calculate total pages
     pages = math.ceil(total / limit) if limit > 0 else 1
@@ -280,7 +306,7 @@ async def get_questions_for_chapter(
 
     return QuestionListResponse(
         questions=processed_questions,
-        total=len(processed_questions),
+        total=total,
         page=page,
         pages=pages,
         has_more=has_more

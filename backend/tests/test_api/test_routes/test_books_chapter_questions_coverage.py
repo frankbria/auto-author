@@ -290,6 +290,45 @@ async def test_list_questions_pagination(auth_client_factory):
 
 
 @pytest.mark.asyncio
+async def test_list_questions_status_filter_pages_completely(auth_client_factory):
+    """#336: a status filter must be applied before pagination.
+
+    Answers questions 0, 2 and 4 of six so the completed rows are interleaved,
+    then pages the filtered list at limit=2 the way a client does — following
+    ``pages``. Before the fix, ``skip``/``limit`` walked the raw ordering, so the
+    completed question at index 4 was unreachable and each page reported its own
+    post-filter length as ``total``.
+    """
+    api = await auth_client_factory()
+    book_id, chapter_id, qids = await _setup_with_questions(api, count=6)
+    completed = [qids[0], qids[2], qids[4]]
+
+    for qid in completed:
+        resp = await api.put(
+            f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qid}/response",
+            json={"response_text": "A complete answer to this one.", "status": "completed"},
+        )
+        assert resp.status_code == 200, resp.text
+
+    base = f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions"
+    page1 = (await api.get(f"{base}?status=completed&page=1&limit=2")).json()
+    page2 = (await api.get(f"{base}?status=completed&page=2&limit=2")).json()
+
+    assert page1["total"] == 3 and page2["total"] == 3
+    assert page1["pages"] == 2  # ceil(3 completed / 2), not ceil(6 / 2)
+    assert page1["has_more"] is True and page2["has_more"] is False
+    assert len(page1["questions"]) == 2 and len(page2["questions"]) == 1
+
+    seen = [q["id"] for q in page1["questions"] + page2["questions"]]
+    assert sorted(seen) == sorted(completed)  # complete
+    assert len(seen) == len(set(seen))  # non-overlapping
+    assert all(
+        q["response_status"] == "completed"
+        for q in page1["questions"] + page2["questions"]
+    )
+
+
+@pytest.mark.asyncio
 async def test_list_questions_invalid_pagination_422(auth_client_factory):
     api = await auth_client_factory()
     book_id, chapter_id, _ = await _setup_with_questions(api, count=3)
