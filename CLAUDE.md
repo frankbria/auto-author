@@ -10,7 +10,7 @@ AI-assisted long-form non-fiction writing. Next.js frontend + FastAPI backend, M
 
 Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append new entries **there**, not here.
 
-**Latest state (2026-07-24):** P0/P1 launch-review items through #336 complete (ToS/Privacy pages, Sentry, real `/health` dependency checks, loud password-reset failure, chapter-question status filter before pagination). CI gates green and enforced.
+**Latest state (2026-07-25):** P0/P1 launch-review items through #338 complete (ToS/Privacy pages, Sentry, real `/health` dependency checks, loud password-reset failure, chapter-question status filter before pagination, TOC optimistic lock, per-index error handling on question index creation). CI gates green and enforced.
 
 ---
 
