@@ -21,6 +21,34 @@
 - **Test Quality**: Tests must validate behavior, not just achieve coverage metrics
 - **Test Documentation**: Complex test scenarios must include comments explaining the test strategy
 
+### Test Quality Rules
+
+Tests MUST be **isolated** (no external service dependencies), **repeatable** (same result every run),
+**fast** (unit <1s, E2E <30s), and **meaningful** (behavior, not implementation).
+
+Tests MUST NOT use arbitrary timeouts (`await page.waitForTimeout(5000)` ❌ — use condition-based
+waiting, see `testing-infrastructure.md`), depend on execution order, leave side effects, or assert
+on internal implementation details.
+
+### E2E Coverage Requirements
+
+EVERY user-facing feature needs an E2E test covering all five:
+
+1. **Happy path** — complete user journey start to finish
+2. **Error handling** — how the system behaves on failure
+3. **Performance** — operation completes within its budget (see `performance-monitoring.md`)
+4. **Accessibility** — keyboard navigation works
+5. **Data integrity** — data actually persists
+
+```typescript
+// frontend/tests/e2e/toc-generation.spec.ts
+test('user can generate TOC from book summary', async ({ page }) => {
+  // create book with summary → open TOC wizard → answer clarifying questions
+  // → assert generation completes within the 3000ms budget
+  // → assert TOC persisted and renders in the book view
+});
+```
+
 ## Git Workflow Requirements
 
 Before moving to the next feature, ALL changes must be:
@@ -47,11 +75,12 @@ Before moving to the next feature, ALL changes must be:
    - Branch naming convention: `feature/<feature-name>`, `fix/<issue-name>`, `docs/<doc-update>`
    - Create pull requests for all significant changes
 
-4. **Backlog Integration**:
-   - Create or update tasks in Backlog.md before starting work
-   - Move tasks to "in-progress" when beginning implementation
-   - Update task status upon completion
-   - Reference task IDs in commit messages
+4. **Task Tracking (bd)**:
+   - Create or update the bd issue before starting work (`bd ready`, `bd create`)
+   - Move to in-progress when beginning implementation
+   - Close on completion: `bd close <id> --reason "Completed in PR #123"`
+   - Reference issue IDs in commit messages
+   - `CURRENT_SPRINT.md` / `IMPLEMENTATION_PLAN.md` are generated snapshots — edit bd, not the markdown
 
 ## Documentation Requirements
 
@@ -82,11 +111,10 @@ Before moving to the next feature, ALL changes must be:
    - Maintain accurate command examples
    - Update version compatibility information
 
-5. **Backlog Documentation**:
+5. **Decision Records**:
    - Create architecture decision records for significant changes
    - Document technical choices and trade-offs
-   - Update task descriptions with implementation notes
-   - Export board status for sprint reviews
+   - Update bd issue descriptions with implementation notes
 
 ## Feature Completion Checklist
 
@@ -99,7 +127,8 @@ Before marking ANY feature as complete, verify:
 - [ ] Type checking passes (mypy for Python, tsc for TypeScript)
 - [ ] All changes committed with conventional commit messages
 - [ ] All commits pushed to remote repository
-- [ ] Backlog task status updated to completed
+- [ ] E2E test added for user-facing changes (all five coverage requirements above)
+- [ ] bd issue closed with the PR number
 - [ ] API documentation updated (if applicable)
 - [ ] Implementation documentation updated
 - [ ] Inline code comments updated or added
