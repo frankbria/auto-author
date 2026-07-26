@@ -39,91 +39,65 @@ def serialize_datetime(obj: Any) -> Any:
     return obj
 
 
+# (collection, keys, name, unique) for every question-related index.
+_QUESTION_INDEXES = [
+    # Chapter question queries: get_questions_for_chapter,
+    # get_chapter_question_progress, delete_questions_for_chapter.
+    ("questions", [("book_id", 1), ("chapter_id", 1), ("user_id", 1)],
+     "book_chapter_user_idx", False),
+    # User question history (chronological) — analytics, activity tracking.
+    ("questions", [("user_id", 1), ("created_at", -1)], "user_created_idx", False),
+    # Sorting by order within a chapter.
+    ("questions", [("book_id", 1), ("chapter_id", 1), ("order", 1)],
+     "chapter_order_idx", False),
+    # Response lookups: get_question_response, save_question_response. Unique
+    # because save_question_response's find-then-insert isn't atomic — the index
+    # is what actually enforces one response per (question, user) (#242).
+    ("question_responses", [("question_id", 1), ("user_id", 1)],
+     "question_user_idx", True),
+    ("question_responses", [("user_id", 1), ("created_at", -1)],
+     "user_created_idx", False),
+    # Rating lookups: save_question_rating. Unique for the same reason.
+    ("question_ratings", [("question_id", 1), ("user_id", 1)],
+     "question_user_idx", True),
+]
+
+
 async def ensure_question_indexes() -> None:
     """
     Create database indexes for question collections.
 
-    This function creates indexes for optimal query performance across:
-    - questions collection: compound index on (book_id, chapter_id, user_id)
-    - question_responses collection: compound index on (question_id, user_id)
-    - question_ratings collection: compound index on (question_id, user_id)
-    - questions collection: index on (user_id, created_at) for history queries
-
     All indexes are created idempotently (safe to run multiple times).
     MongoDB will skip creation if the index already exists.
+
+    Each index gets its own try/except so one failure can't skip the rest (#338)
+    — a single wrapper meant a unique-index build failing over pre-existing
+    duplicates silently dropped every index after it. Failures are logged, never
+    raised: index creation shouldn't block app startup.
+
+    ponytail: if a collection ALREADY holds duplicates, the unique build fails
+    here and is logged — an operator must dedupe first (one-time cleanup); until
+    then the app runs with the uniqueness guarantee missing.
     """
     logger.info("Creating indexes for question collections...")
 
-    try:
-        # Questions collection indexes
-        questions_collection = await get_collection("questions")
-
-        # Compound index for efficient chapter question queries
-        # Used in: get_questions_for_chapter, get_chapter_question_progress, delete_questions_for_chapter
-        await questions_collection.create_index(
-            [("book_id", 1), ("chapter_id", 1), ("user_id", 1)],
-            name="book_chapter_user_idx",
-            background=True
-        )
-        logger.info("Created index: questions.book_chapter_user_idx")
-
-        # Index for user question history (chronological order)
-        # Useful for analytics and user activity tracking
-        await questions_collection.create_index(
-            [("user_id", 1), ("created_at", -1)],
-            name="user_created_idx",
-            background=True
-        )
-        logger.info("Created index: questions.user_created_idx")
-
-        # Index for sorting by order within a chapter
-        await questions_collection.create_index(
-            [("book_id", 1), ("chapter_id", 1), ("order", 1)],
-            name="chapter_order_idx",
-            background=True
-        )
-        logger.info("Created index: questions.chapter_order_idx")
-
-        # Question responses collection indexes
-        responses_collection = await get_collection("question_responses")
-
-        # Compound index for efficient response lookups
-        # Used in: get_question_response, save_question_response
-        await responses_collection.create_index(
-            [("question_id", 1), ("user_id", 1)],
-            name="question_user_idx",
-            background=True,
-            unique=True  # Each user can only have one response per question
-        )
-        logger.info("Created index: question_responses.question_user_idx")
-
-        # Index for user response history
-        await responses_collection.create_index(
-            [("user_id", 1), ("created_at", -1)],
-            name="user_created_idx",
-            background=True
-        )
-        logger.info("Created index: question_responses.user_created_idx")
-
-        # Question ratings collection indexes
-        ratings_collection = await get_collection("question_ratings")
-
-        # Compound index for efficient rating lookups
-        # Used in: save_question_rating
-        await ratings_collection.create_index(
-            [("question_id", 1), ("user_id", 1)],
-            name="question_user_idx",
-            background=True,
-            unique=True  # Each user can only have one rating per question
-        )
-        logger.info("Created index: question_ratings.question_user_idx")
-
-        logger.info("All question collection indexes created successfully")
-
-    except Exception as e:
-        logger.error(f"Error creating question indexes: {e}", exc_info=True)
-        # Don't raise - index creation failures shouldn't prevent app startup
-        # Queries will still work, just potentially slower
+    for collection_name, keys, index_name, unique in _QUESTION_INDEXES:
+        try:
+            collection = await get_collection(collection_name)
+            await collection.create_index(
+                keys, name=index_name, background=True, unique=unique
+            )
+            logger.info("Created index: %s.%s", collection_name, index_name)
+        except Exception:
+            logger.error(
+                "Failed to create %sindex %s.%s — %s",
+                "UNIQUE " if unique else "",
+                collection_name,
+                index_name,
+                "uniqueness is NOT enforced; dedupe the collection and restart"
+                if unique else "queries will still work, just slower",
+                exc_info=True,
+            )
 
 
 async def create_question(question_data: QuestionCreate, user_id: str) -> Dict[str, Any]:
