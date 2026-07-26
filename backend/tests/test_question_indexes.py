@@ -54,6 +54,42 @@ async def test_indexes_are_idempotent(motor_reinit_db):
 
 
 @pytest.mark.asyncio
+async def test_failing_index_does_not_skip_later_indexes(motor_reinit_db):
+    """A mid-list index build failure must not skip the remaining indexes (#338).
+
+    Pre-existing duplicate responses make the unique question_user_idx build
+    genuinely fail — no mocking. Every index after it must still be created.
+    """
+    responses_collection = await get_collection("question_responses")
+    await responses_collection.insert_many([
+        {"question_id": "q1", "user_id": "u1", "response_text": "first"},
+        {"question_id": "q1", "user_id": "u1", "response_text": "duplicate"},
+    ])
+
+    await ensure_question_indexes()
+
+    response_indexes = [
+        idx['name']
+        for idx in await responses_collection.list_indexes().to_list(length=None)
+    ]
+    assert 'question_user_idx' not in response_indexes, (
+        "unique index should have failed to build over duplicate docs"
+    )
+    assert 'user_created_idx' in response_indexes, (
+        "index after the failing one was skipped"
+    )
+
+    ratings_collection = await get_collection("question_ratings")
+    rating_indexes = [
+        idx['name']
+        for idx in await ratings_collection.list_indexes().to_list(length=None)
+    ]
+    assert 'question_user_idx' in rating_indexes, (
+        "later collection's index was skipped"
+    )
+
+
+@pytest.mark.asyncio
 async def test_question_query_uses_index(motor_reinit_db):
     """Test that question queries can use the compound index."""
     questions_collection = await get_collection("questions")
