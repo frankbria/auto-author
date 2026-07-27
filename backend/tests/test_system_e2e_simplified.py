@@ -132,11 +132,19 @@ class SimplifiedSystemTest:
         book_response.raise_for_status()
         book = book_response.json()
 
-        # Verify TOC exists
-        has_toc = bool(book.get("table_of_contents", {}).get("chapters"))
+        # Verify the TOC persisted, reading it from the endpoint that actually
+        # serves it. The old check looked for `table_of_contents` on the book
+        # response — that is the Mongo document's field name and BookResponse
+        # does not carry it, so the check was structurally always False (#341).
+        # Paired with a discarded return value, the whole verification was a
+        # no-op: the test printed "Has TOC: False" and reported PASSED.
+        toc_response = await self.client.get(f"/api/v1/books/{self.book_id}/toc")
+        toc_response.raise_for_status()
+        chapters = toc_response.json().get("toc", {}).get("chapters", [])
+        has_toc = bool(chapters)
 
         self.log_success(f"Book: {book['title']}")
-        self.log_success(f"Has TOC: {has_toc}")
+        self.log_success(f"Has TOC: {has_toc} ({len(chapters)} chapters)")
 
         return has_toc
 
@@ -161,8 +169,14 @@ class SimplifiedSystemTest:
             await self.create_book()
             book_questions = await self.generate_book_questions()
             await self.answer_book_questions(book_questions)
-            toc = await self.generate_toc()
-            await self.verify_system()
+            await self.generate_toc()
+
+            # #341: this result used to be computed, printed and thrown away, so
+            # the test reported PASSED while printing "Has TOC: False". The
+            # workflow's whole point is that the book ends up with a TOC.
+            assert await self.verify_system(), (
+                "Workflow completed but the book has no persisted table of contents"
+            )
 
             duration = time.time() - start_time
             print(f"\n✅ SIMPLIFIED SYSTEM TEST PASSED in {duration:.2f} seconds!\n")
