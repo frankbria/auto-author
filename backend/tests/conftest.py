@@ -68,14 +68,19 @@ deps._real_get_rate_limiter = real_get_rate_limiter
 deps.get_rate_limiter = fake_get_rate_limiter
 
 
+async def noop_ai_quota():
+    """Shared no-op AI quota dependency. Like `noop_rate_limiter`, deliberately
+    ONE module-level function (not a fresh closure per factory call) so every AI
+    route captures the same callable — letting a test re-arm the REAL quota on
+    all of them via a single app.dependency_overrides entry
+    (see arm_real_ai_quota, issue #340)."""
+
+
 def fake_get_ai_usage_quota():
-    """No-op AI quota dependency, so test suites can generate freely.
-    Mirrors fake_get_rate_limiter; enforcement is exercised via `real_ai_quota`."""
-
-    async def _always_allow():
-        return None
-
-    return _always_allow
+    """No-op AI quota factory, so test suites can generate freely.
+    Mirrors fake_get_rate_limiter; enforcement is exercised via `real_ai_quota`
+    (direct invocation) or `arm_real_ai_quota` (through a real route)."""
+    return noop_ai_quota
 
 
 # Same idempotent stash-the-real / install-the-fake dance as the rate limiter.
@@ -148,6 +153,69 @@ def arm_real_rate_limiter():
     _clock.stop()
     _bypass_off.stop()
     app.dependency_overrides.pop(noop_rate_limiter, None)
+
+
+@pytest.fixture
+def arm_real_ai_quota():
+    """Re-arm the REAL AI usage quota on production routes for one test (#340).
+
+    Every AI route captured the shared `noop_ai_quota` at import time, so one
+    dependency_overrides entry swaps in a genuine quota closure with a small
+    test cap. BYPASS_AUTH is forced off and AI_QUOTA_ENABLED on so it counts.
+    Yields arm(limit); if the target route no longer declares
+    Depends(get_ai_usage_quota()), the override never fires and the test's
+    expected 429 fails RED — the same test-trust guarantee #199 gave the limiter.
+
+    The monthly window is disabled so the daily cap alone drives the 429 and the
+    asserted X-AI-Quota-Period header is deterministic. E2E_EXEMPT_EMAILS is
+    forced empty so an exemption configured in the ambient env can't silently
+    un-meter the test user (`_is_exempt_e2e_user`).
+
+    Unlike arm_real_rate_limiter this does NOT freeze the clock: the quota keys
+    off `datetime.now(...)` day/month buckets, not the `deps.time.time` seam, and
+    the only exposure is the sub-10ms window between a test's two requests
+    straddling midnight UTC. Not worth patching the module-wide `datetime`.
+    """
+    patches = [
+        _mock_patch.object(deps.settings, "BYPASS_AUTH", False),
+        _mock_patch.object(deps.settings, "AI_QUOTA_ENABLED", True),
+        _mock_patch.object(deps.settings, "AI_QUOTA_MONTHLY_LIMIT", 0),
+        _mock_patch.object(deps.settings, "E2E_EXEMPT_EMAILS", ""),
+    ]
+    for p in patches:
+        p.start()
+    armed_keys = []
+
+    def arm(limit: int):
+        # Override the callable the ROUTES actually captured, derived by name
+        # from the live app rather than by referencing this module's
+        # `noop_ai_quota`. If conftest ever re-executes under the second module
+        # identity `tests.conftest`, this module's global is a different object
+        # than the one the routes hold, and a direct reference would install an
+        # override that never fires (see route_introspection.shared_dependency_call).
+        from tests.route_introspection import (
+            route_dependency_calls,
+            shared_dependency_call,
+        )
+
+        captured = shared_dependency_call(route_dependency_calls(), "noop_ai_quota")
+        assert len(captured) == 1, (
+            f"Expected exactly one route-captured noop_ai_quota; found {captured}. "
+            "The conftest quota swap must return ONE shared module-level function."
+        )
+        key = next(iter(captured))
+
+        p = _mock_patch.object(deps.settings, "AI_QUOTA_DAILY_LIMIT", limit)
+        p.start()
+        patches.append(p)
+        app.dependency_overrides[key] = real_get_ai_usage_quota()
+        armed_keys.append(key)
+
+    yield arm
+    for p in reversed(patches):
+        p.stop()
+    for key in armed_keys:
+        app.dependency_overrides.pop(key, None)
 
 @pytest_asyncio.fixture(scope="function")
 def event_loop():

@@ -1,52 +1,51 @@
-# Issue #339 — Session cookie `sameSite:"none"` removes CSRF protection
+# Issue #340 — AI quota + entitlement route-wiring guard
 
-Branch: `feature/339-samesite-lax-csrf`
-
-## Finding (verified, not assumed)
-
-- `backend/app/core/better_auth_session.py:48` authenticates from `request.cookies` →
-  the backend is a genuine CSRF target.
-- Multipart POSTs (`/users/me/avatar`, book cover) are CORS-"simple" → no preflight →
-  a cross-site form POST executes server-side; CORS only blocks reading the response.
-- Topology is **same-site everywhere**, so `lax` costs nothing:
-  - `localhost:3000` → `localhost:8000` (same host; port is irrelevant to same-site)
-  - `dev.autoauthor.app` → `api.dev.autoauthor.app` (registrable domain `autoauthor.app`)
-- No social providers / webhooks (`auth.ts` is email+password + `twoFactor()` only),
-  so there is no cross-site POST-back that `lax` would break. AC #2 is therefore N/A.
-- Starlette 0.47.2 `CORSMiddleware` reflects the requested origin when
-  `allow_all_origins and has_cookie` → `BACKEND_CORS_ORIGINS="*"` + `allow_credentials`
-  would reflect arbitrary origins. Justifies AC #3 as a runtime guard, not just a test.
-
-## Steps
-
-1. **Frontend cookie attributes (TDD)**
-   - New `frontend/src/lib/auth-cookies.ts`: move `getCookieDomain()` out of `auth.ts`
-     and add `getDefaultCookieAttributes()` returning `sameSite:"lax"`.
-     Rationale: `auth.ts` imports `server-only` + `mongodb`, so it is not unit-testable
-     under jsdom. A small pure module is the smallest change that makes the security
-     attribute assertable — no jest config changes, no mongo, no mocking.
-   - `auth.ts` imports it (behavioral change: `none` → `lax`; `secure`/`httpOnly`/`domain` unchanged).
-   - Tests: `frontend/src/lib/__tests__/auth-cookies.test.ts`
-
-2. **Backend wildcard-CORS guard (TDD)**
-   - Extend the existing `validate_production_security()` in `backend/app/main.py`
-     (reuses the established fail-fast pattern) to reject `*` in `BACKEND_CORS_ORIGINS`:
-     fatal `RuntimeError` in production, loud warning elsewhere.
-   - Tests: `backend/tests/test_main.py`
-
-3. **Docs**
-   - `docs/session-management.md:166` already documents `sameSite:"lax"` — the code had
-     drifted from the doc. Verify and add the CSRF rationale.
-   - Append entry to `docs/CHANGELOG.md`.
+Branch: `feature/issue-340-ai-gate-route-guard`
+**Plan source:** self-authored (issue had no plan comment).
 
 ## Acceptance criteria
+- [ ] Extend the `_walk_effective_routes` completeness pin to assert every AI endpoint declares BOTH deps.
+- [ ] Add restricted-user→402 and real-quota→429 route-level tests parameterized across all 10 AI endpoints.
 
-- [ ] Change `sameSite` to `"lax"` (topology is same-site).
-- [ ] N/A — no genuinely cross-site case exists; documented above. (If one appears
-      later, the fallback is `none` + double-submit token or Origin allowlist.)
-- [ ] Verify CORS does not reflect arbitrary origins.
+## Findings from exploration (verified, not assumed)
+- 10 AI endpoints in `app/api/endpoints/books.py` declare
+  `dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker(<feature>))]`.
+- `tests/conftest.py::fake_get_ai_usage_quota` returns a **fresh** `_always_allow`
+  closure per call → no single override key, which is why there is no HTTP-level
+  quota test. The rate limiter uses ONE shared `noop_rate_limiter`, which is what
+  makes `arm_real_rate_limiter` work.
+- Entitlement is not faked; it short-circuits on `BYPASS_AUTH` /
+  `PLAN_ENFORCEMENT_ENABLED`, so route tests just monkeypatch settings.
+- Route-level `dependencies=[...]` are solved before body validation, so a dummy
+  book id + `json={}` reaches the gate (proven by the existing #174 route test at
+  `tests/test_api/test_entitlement_gate.py:63`).
 
-## Known limitations
+## Steps
+1. `tests/conftest.py`: make the quota fake return a shared module-level
+   `noop_ai_quota` (mirrors `noop_rate_limiter`); add an `arm_real_ai_quota`
+   fixture mirroring `arm_real_rate_limiter`.
+2. `tests/route_introspection.py` (new): move `_walk_effective_routes` /
+   `_route_dependency_calls` out of `test_api/test_rate_limit_routes.py` so two
+   test modules can share them. Precedent: `tests/db_guard.py` is already
+   imported as `tests.db_guard` from conftest.
+3. `tests/test_api/test_rate_limit_routes.py`: import the helpers, drop the
+   local copies (behavior unchanged).
+4. `tests/test_api/test_ai_gate_routes.py` (new):
+   - `EXPECTED_AI_GATED_ROUTES` — the 10 (method, path) pairs, with a length pin.
+   - Completeness pin: every one declares BOTH a quota dep and an entitlement dep,
+     naming exactly which route lost which.
+   - Parameterized restricted-plan → 402 across all 10.
+   - Parameterized real-quota-at-cap → 429 across all 10.
 
-- `lax` does not defend against a same-site attacker (XSS on a sibling subdomain of
-  `autoauthor.app`). Out of scope for this issue.
+## Autonomous decisions (no architectural fork)
+- Derive the shared callable by name from the live routes (the #199 approach)
+  rather than importing conftest — that import double-executes conftest, a
+  documented landmine.
+- New test module rather than growing `test_rate_limit_routes.py`: different
+  subject, and that file is already long.
+- Do NOT assert the entitlement *feature string* per route — out of scope for the
+  stated AC.
+
+## Red proof (Phase 11 demo)
+Temporarily delete each dep from one route; the pin + the 402/429 tests must fail
+and name the route.

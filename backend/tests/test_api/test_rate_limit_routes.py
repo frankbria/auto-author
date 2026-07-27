@@ -29,7 +29,7 @@ from PIL import Image
 from bson import ObjectId
 
 from app.db import base
-from app.main import app
+from tests.route_introspection import route_dependency_calls, shared_dependency_call
 
 
 # A summary comfortably above the PUT /summary 30-char minimum (mirrors
@@ -299,84 +299,6 @@ EXPECTED_RATE_LIMITED_ROUTES = {
 assert len(EXPECTED_RATE_LIMITED_ROUTES) == 26
 
 
-def _walk_effective_routes(node):
-    """Recursively resolve the app's route tree to (method, full_path,
-    dependant) triples.
-
-    Newer FastAPI (0.138+) doesn't flatten `include_router` calls into
-    `app.routes` directly -- each `include_router` call is represented by an
-    opaque `fastapi.routing._IncludedRouter` wrapper, and the real,
-    prefix-resolved routes only materialize via its
-    `effective_candidates()` / `effective_low_priority_routes()` methods as
-    `fastapi.routing._EffectiveRouteContext` objects (which carry the final
-    `path_format` and `dependant`). This walks that structure so the test
-    reflects the actual live route table rather than a hardcoded guess.
-    """
-    from fastapi.routing import _IncludedRouter, _EffectiveRouteContext
-
-    if isinstance(node, _IncludedRouter):
-        for child in node.effective_candidates():
-            yield from _walk_effective_routes(child)
-        for child in node.effective_low_priority_routes():
-            yield from _walk_effective_routes(child)
-    elif isinstance(node, _EffectiveRouteContext):
-        yield node
-    # else: not a route-bearing node (e.g. a plain starlette Mount) -- skip.
-
-
-def _route_dependency_calls():
-    """Map every (method, path) on the live `app` to the SET of dependency
-    callables declared directly on that route's dependant.
-
-    Deliberately does NOT identify "the rate limiter" via
-    `deps.get_rate_limiter()`'s *current* value (see
-    `_shared_rate_limiter_call` below for why that's unsafe here) -- it just
-    returns the raw per-route dependency sets so the caller can derive the
-    shared limiter empirically.
-    """
-    calls_by_route = {}
-    for top_level_route in app.routes:
-        for ctx in _walk_effective_routes(top_level_route):
-            if not ctx.dependant:
-                continue
-            calls = {dep.call for dep in ctx.dependant.dependencies}
-            for method in ctx.methods:
-                if method == "HEAD":
-                    continue
-                calls_by_route[(method, ctx.path_format)] = calls
-    return calls_by_route
-
-
-def _shared_rate_limiter_call(calls_by_route):
-    """Derive the shared `noop_rate_limiter` callable from the routes
-    themselves: the union of every route's dependency callables, narrowed by
-    name. Routes capture the shared noop exactly once at import time, so this
-    yields exactly one function object; using the union (not an intersection
-    over the expected routes) keeps the derivation working even when a route
-    has LOST the dependency, so the missing-route assertion can name it.
-
-    This intentionally avoids reading `deps.get_rate_limiter()` directly:
-    some unrelated test modules (`test_billing_checkout.py`,
-    `test_billing_portal.py`) do `from tests.conftest import _sync_users`,
-    which -- because `tests/` has no `__init__.py` while pytest itself loads
-    `conftest.py` under the bare module name `conftest` -- causes conftest.py
-    to execute a SECOND time under the distinct module identity
-    `tests.conftest`. That second execution rebinds
-    `app.api.dependencies.get_rate_limiter` to a brand-new `noop_rate_limiter`
-    function object that no route was ever built against, so
-    `deps.get_rate_limiter()` is not a reliable identity source once those
-    modules have been collected in the same pytest session. Deriving the
-    identity from the routes themselves (by name, not by importing conftest)
-    sidesteps that landmine entirely.
-    """
-    return {
-        c
-        for calls in calls_by_route.values()
-        for c in calls
-        if getattr(c, "__name__", "") == "noop_rate_limiter"
-    }
-
-
 class TestRateLimiterWiringCompleteness:
     def test_every_expected_route_still_declares_the_rate_limiter(self):
         """Regression guard for issue #199: walks the live app and confirms
@@ -385,8 +307,8 @@ class TestRateLimiterWiringCompleteness:
         dependency from any one of these 26 routes, this test names exactly
         which (method, path) lost it.
         """
-        calls_by_route = _route_dependency_calls()
-        shared = _shared_rate_limiter_call(calls_by_route)
+        calls_by_route = route_dependency_calls()
+        shared = shared_dependency_call(calls_by_route, "noop_rate_limiter")
         assert len(shared) == 1, (
             "Expected exactly one noop_rate_limiter callable across the live "
             f"app's routes; found {shared}. The conftest limiter swap may "
@@ -409,8 +331,8 @@ class TestRateLimiterWiringCompleteness:
         list (and its docstring provenance note) should be updated
         deliberately rather than silently drifting.
         """
-        calls_by_route = _route_dependency_calls()
-        limiter = next(iter(_shared_rate_limiter_call(calls_by_route)))
+        calls_by_route = route_dependency_calls()
+        limiter = next(iter(shared_dependency_call(calls_by_route, "noop_rate_limiter")))
 
         actual = {
             pair
