@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
@@ -240,3 +242,81 @@ class TestStartupSecurityValidation:
             from app.main import validate_production_security
             # Should not raise
             validate_production_security()
+
+
+class TestCorsWildcardValidation:
+    """CORS must never reflect arbitrary origins (issue #339).
+
+    Starlette's CORSMiddleware reflects the *requested* origin back in
+    Access-Control-Allow-Origin when `"*" in allow_origins` and the request
+    carries a cookie — so a wildcard combined with allow_credentials=True hands
+    any site a credentialed, readable cross-origin response.
+    """
+
+    def _settings(self, origins, bypass_auth=False):
+        mock_settings = MagicMock()
+        mock_settings.BYPASS_AUTH = bypass_auth
+        mock_settings.BACKEND_CORS_ORIGINS = origins
+        return mock_settings
+
+    def test_wildcard_origin_blocks_production_startup(self, monkeypatch):
+        monkeypatch.setenv("NODE_ENV", "production")
+
+        with patch("app.main.settings", self._settings(["*"])):
+            from app.main import validate_production_security
+
+            with pytest.raises(RuntimeError) as exc_info:
+                validate_production_security()
+
+            assert "BACKEND_CORS_ORIGINS" in str(exc_info.value)
+
+    def test_wildcard_among_real_origins_still_blocks_production(self, monkeypatch):
+        """A wildcard is fatal even when explicit origins are listed alongside it —
+        Starlette only checks membership, so the explicit entries buy nothing."""
+        monkeypatch.setenv("NODE_ENV", "production")
+        origins = ["https://dev.autoauthor.app", "*"]
+
+        with patch("app.main.settings", self._settings(origins)):
+            from app.main import validate_production_security
+
+            with pytest.raises(RuntimeError):
+                validate_production_security()
+
+    def test_wildcard_as_comma_string_blocks_production(self, monkeypatch):
+        """Deployments set this env var as a comma-separated string; the guard must
+        see through that form too, not just the parsed list."""
+        monkeypatch.setenv("NODE_ENV", "production")
+
+        with patch("app.main.settings", self._settings("https://dev.autoauthor.app, *")):
+            from app.main import validate_production_security
+
+            with pytest.raises(RuntimeError):
+                validate_production_security()
+
+    def test_wildcard_blocks_outside_production_too(self, monkeypatch, caplog):
+        """Fatal in every environment, not just production — staging is
+        internet-reachable, and no deploy path legitimately sets a wildcard."""
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "development")
+
+        with patch("app.main.settings", self._settings(["*"])):
+            from app.main import validate_production_security
+
+            with caplog.at_level(logging.CRITICAL, logger="app.main"):
+                with pytest.raises(RuntimeError):
+                    validate_production_security()
+
+            assert any(
+                "BACKEND_CORS_ORIGINS" in record.message for record in caplog.records
+            ), "wildcard CORS must name the offending setting in the log"
+
+    def test_explicit_origins_pass_in_production(self, monkeypatch):
+        monkeypatch.setenv("NODE_ENV", "production")
+        # Frontend origins only — allow_origins lists who may call the API,
+        # not the API's own origin.
+        origins = ["https://dev.autoauthor.app", "http://localhost:3000"]
+
+        with patch("app.main.settings", self._settings(origins)):
+            from app.main import validate_production_security
+
+            validate_production_security()  # must not raise

@@ -1,28 +1,52 @@
-# Issue #328 — frontend global functions coverage gate chronically red
+# Issue #339 — Session cookie `sameSite:"none"` removes CSRF protection
 
-## Root cause
-Frontend `global.functions` coverage gate = 85%, but main sits at 84.64% (954/1127).
-The gap is ~4 covered functions. Two files in the denominator are TEST INFRASTRUCTURE,
-not shippable code, only counted because jest was never told to exclude them:
-- src/__tests__/fixtures/chapterTabsFixtures.ts (9/14 fns)
-- src/__tests__/mocks/speechRecognition.ts (7/10 fns)
+Branch: `feature/339-samesite-lax-csrf`
 
-## Plan (Option 1 — raise coverage honestly, keep the 85 bar)
-1. jest.config.cjs: add `coveragePathIgnorePatterns` excluding test-infra dirs
-   (src/__tests__/fixtures/, src/__tests__/mocks/, src/__mocks__/). Root-cause
-   denominator fix. -> functions 84.64% -> 85.04%. Applies to both local & CI (both run jest).
-2. Add genuine unit tests for currently-untested PURE functions (durable, not UI theater):
-   - src/components/export/exportHelpers.ts: formatFileSize, estimateExportTime, downloadBlob
-   - src/lib/api/bookClient.ts: 3 uncovered methods (if cheap) for extra buffer
-3. Re-measure; target functions >= ~85.7% for jitter/erosion headroom.
-4. Verify full suite still green.
+## Finding (verified, not assumed)
 
-## NOT chosen (documented for the PR)
-- Lowering the threshold (weakens the gate) — unnecessary for a 4-function gap.
-- Per-directory thresholds — more config to maintain for the same effect.
-- Fallback if this recurs: pin an honest no-regression floor + ratchet.
+- `backend/app/core/better_auth_session.py:48` authenticates from `request.cookies` →
+  the backend is a genuine CSRF target.
+- Multipart POSTs (`/users/me/avatar`, book cover) are CORS-"simple" → no preflight →
+  a cross-site form POST executes server-side; CORS only blocks reading the response.
+- Topology is **same-site everywhere**, so `lax` costs nothing:
+  - `localhost:3000` → `localhost:8000` (same host; port is irrelevant to same-site)
+  - `dev.autoauthor.app` → `api.dev.autoauthor.app` (registrable domain `autoauthor.app`)
+- No social providers / webhooks (`auth.ts` is email+password + `twoFactor()` only),
+  so there is no cross-site POST-back that `lax` would break. AC #2 is therefore N/A.
+- Starlette 0.47.2 `CORSMiddleware` reflects the requested origin when
+  `allow_all_origins and has_cookie` → `BACKEND_CORS_ORIGINS="*"` + `allow_credentials`
+  would reflect arbitrary origins. Justifies AC #3 as a runtime guard, not just a test.
 
-## Acceptance criteria (from #328)
-- [ ] Frontend PRs with all tests passing no longer require --admin to merge
-      (i.e. main functions coverage >= 85%, gate green)
-- [ ] Chosen approach documented in CLAUDE.md / CI config
+## Steps
+
+1. **Frontend cookie attributes (TDD)**
+   - New `frontend/src/lib/auth-cookies.ts`: move `getCookieDomain()` out of `auth.ts`
+     and add `getDefaultCookieAttributes()` returning `sameSite:"lax"`.
+     Rationale: `auth.ts` imports `server-only` + `mongodb`, so it is not unit-testable
+     under jsdom. A small pure module is the smallest change that makes the security
+     attribute assertable — no jest config changes, no mongo, no mocking.
+   - `auth.ts` imports it (behavioral change: `none` → `lax`; `secure`/`httpOnly`/`domain` unchanged).
+   - Tests: `frontend/src/lib/__tests__/auth-cookies.test.ts`
+
+2. **Backend wildcard-CORS guard (TDD)**
+   - Extend the existing `validate_production_security()` in `backend/app/main.py`
+     (reuses the established fail-fast pattern) to reject `*` in `BACKEND_CORS_ORIGINS`:
+     fatal `RuntimeError` in production, loud warning elsewhere.
+   - Tests: `backend/tests/test_main.py`
+
+3. **Docs**
+   - `docs/session-management.md:166` already documents `sameSite:"lax"` — the code had
+     drifted from the doc. Verify and add the CSRF rationale.
+   - Append entry to `docs/CHANGELOG.md`.
+
+## Acceptance criteria
+
+- [ ] Change `sameSite` to `"lax"` (topology is same-site).
+- [ ] N/A — no genuinely cross-site case exists; documented above. (If one appears
+      later, the fallback is `none` + double-submit token or Origin allowlist.)
+- [ ] Verify CORS does not reflect arbitrary origins.
+
+## Known limitations
+
+- `lax` does not defend against a same-site attacker (XSS on a sibling subdomain of
+  `autoauthor.app`). Out of scope for this issue.
