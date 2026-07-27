@@ -167,26 +167,55 @@ def arm_real_ai_quota():
     expected 429 fails RED — the same test-trust guarantee #199 gave the limiter.
 
     The monthly window is disabled so the daily cap alone drives the 429 and the
-    asserted X-AI-Quota-Period header is deterministic.
+    asserted X-AI-Quota-Period header is deterministic. E2E_EXEMPT_EMAILS is
+    forced empty so an exemption configured in the ambient env can't silently
+    un-meter the test user (`_is_exempt_e2e_user`).
+
+    Unlike arm_real_rate_limiter this does NOT freeze the clock: the quota keys
+    off `datetime.now(...)` day/month buckets, not the `deps.time.time` seam, and
+    the only exposure is the sub-10ms window between a test's two requests
+    straddling midnight UTC. Not worth patching the module-wide `datetime`.
     """
     patches = [
         _mock_patch.object(deps.settings, "BYPASS_AUTH", False),
         _mock_patch.object(deps.settings, "AI_QUOTA_ENABLED", True),
         _mock_patch.object(deps.settings, "AI_QUOTA_MONTHLY_LIMIT", 0),
+        _mock_patch.object(deps.settings, "E2E_EXEMPT_EMAILS", ""),
     ]
     for p in patches:
         p.start()
+    armed_keys = []
 
     def arm(limit: int):
+        # Override the callable the ROUTES actually captured, derived by name
+        # from the live app rather than by referencing this module's
+        # `noop_ai_quota`. If conftest ever re-executes under the second module
+        # identity `tests.conftest`, this module's global is a different object
+        # than the one the routes hold, and a direct reference would install an
+        # override that never fires (see route_introspection.shared_dependency_call).
+        from tests.route_introspection import (
+            route_dependency_calls,
+            shared_dependency_call,
+        )
+
+        captured = shared_dependency_call(route_dependency_calls(), "noop_ai_quota")
+        assert len(captured) == 1, (
+            f"Expected exactly one route-captured noop_ai_quota; found {captured}. "
+            "The conftest quota swap must return ONE shared module-level function."
+        )
+        key = next(iter(captured))
+
         p = _mock_patch.object(deps.settings, "AI_QUOTA_DAILY_LIMIT", limit)
         p.start()
         patches.append(p)
-        app.dependency_overrides[noop_ai_quota] = real_get_ai_usage_quota()
+        app.dependency_overrides[key] = real_get_ai_usage_quota()
+        armed_keys.append(key)
 
     yield arm
     for p in reversed(patches):
         p.stop()
-    app.dependency_overrides.pop(noop_ai_quota, None)
+    for key in armed_keys:
+        app.dependency_overrides.pop(key, None)
 
 @pytest_asyncio.fixture(scope="function")
 def event_loop():
