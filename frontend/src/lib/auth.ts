@@ -5,34 +5,10 @@ import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { twoFactor } from "better-auth/plugins";
 import { MongoClient, Db } from "mongodb";
 
+import { getDefaultCookieAttributes } from "./auth-cookies";
+
 const mongoUrl = process.env.DATABASE_URL || "mongodb://localhost:27017/auto_author";
 const dbName = process.env.DATABASE_NAME || "auto_author";
-
-/**
- * Extract cookie domain from BETTER_AUTH_URL
- * - localhost → undefined (browser handles it)
- * - dev.autoauthor.app → .dev.autoauthor.app (subdomain sharing)
- * - autoauthor.app → .autoauthor.app (subdomain sharing)
- */
-function getCookieDomain(): string | undefined {
-  const authUrl = process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_BETTER_AUTH_URL || "";
-
-  if (!authUrl || authUrl.includes("localhost")) {
-    return undefined; // Localhost - browser handles domain
-  }
-
-  try {
-    const url = new URL(authUrl);
-    const hostname = url.hostname;
-
-    // Extract base domain (e.g., dev.autoauthor.app → .dev.autoauthor.app)
-    // Leading dot makes cookie available to all subdomains
-    return `.${hostname}`;
-  } catch (error) {
-    console.error("Failed to parse BETTER_AUTH_URL for cookie domain:", error);
-    return undefined;
-  }
-}
 
 // Retry configuration
 const MAX_RETRY_ATTEMPTS = parseInt(process.env.MONGO_MAX_RETRY_ATTEMPTS || '3', 10);
@@ -169,19 +145,7 @@ export async function getAuth() {
         },
       },
       advanced: {
-        defaultCookieAttributes: {
-          // Use "none" to allow cross-origin/cross-subdomain cookie transmission
-          // This works for both:
-          // - Development: localhost:3000 -> localhost:8000
-          // - Staging/Prod: dev.autoauthor.app -> api.dev.autoauthor.app
-          sameSite: "none",
-          // Must be true when sameSite is "none"
-          secure: true,
-          httpOnly: true,
-          // Share cookies across subdomains by setting domain to base domain
-          // Automatically extracted from BETTER_AUTH_URL environment variable
-          domain: getCookieDomain(),
-        },
+        defaultCookieAttributes: getDefaultCookieAttributes(),
       },
     });
   } catch (error) {

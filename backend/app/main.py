@@ -51,8 +51,29 @@ def validate_production_security() -> None:
     configuration errors that could expose user data.
 
     Raises:
-        RuntimeError: If BYPASS_AUTH is enabled in production environment
+        RuntimeError: If BYPASS_AUTH is enabled in production environment, or if
+            BACKEND_CORS_ORIGINS contains a wildcard in production.
     """
+    # CORS must never reflect arbitrary origins (issue #339). Starlette echoes the
+    # *requested* origin back in Access-Control-Allow-Origin whenever "*" is in
+    # allow_origins AND the request carries a cookie — note the trigger is the
+    # cookie, not allow_credentials, so flipping allow_credentials off does not
+    # disable the reflection. A wildcard is never correct for this app (every
+    # deploy path sets explicit origins), so this is fatal in every environment
+    # rather than only in production: staging is internet-reachable too, and the
+    # fix is simply to list the origins.
+    origins = settings.BACKEND_CORS_ORIGINS
+    if isinstance(origins, str):
+        origins = [o.strip() for o in origins.split(",")]
+    if "*" in origins:
+        message = (
+            "BACKEND_CORS_ORIGINS contains a wildcard ('*'). Combined with cookie "
+            "authentication this reflects arbitrary origins back on credentialed "
+            "requests. List explicit origins instead."
+        )
+        logger.critical(f"FATAL SECURITY ERROR: {message}")
+        raise RuntimeError(f"Application startup blocked: {message}")
+
     # PM2 sets ENVIRONMENT (not NODE_ENV) on the backend, so resolve production
     # from whichever marker the deployment sets (issue #176).
     if is_production_env():

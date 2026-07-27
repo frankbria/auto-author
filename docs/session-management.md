@@ -158,17 +158,33 @@ session: {
 
 ### Cookie Settings
 
-Session cookie configuration in `src/lib/auth.ts`:
+Session cookie configuration lives in `src/lib/auth-cookies.ts` (kept out of
+`src/lib/auth.ts` so the attributes stay unit-testable — `auth.ts` imports
+`server-only` and the MongoDB driver):
 
 ```typescript
 advanced: {
   defaultCookieAttributes: {
-    sameSite: "lax",                              // CSRF protection
-    secure: process.env.NODE_ENV === "production", // HTTPS only in production
-    httpOnly: true,                               // Prevent XSS attacks
+    sameSite: "lax",         // CSRF protection (issue #339)
+    secure: true,            // HTTPS only; localhost is a trustworthy origin
+    httpOnly: true,          // Not readable from JS
+    domain: getCookieDomain(), // ".dev.autoauthor.app" in staging/prod, undefined on localhost
   },
 }
 ```
+
+**Why `lax` and not `none`:** the backend authenticates from `request.cookies`,
+and multipart uploads (avatar, book cover) are CORS-"simple" requests that trigger
+no preflight — under `"none"` a cross-site form POST would carry the victim's
+session cookie and execute server-side, because CORS blocks *reading* the response
+but not the write. `"lax"` costs nothing because every frontend→backend hop is
+same-site (same-site is computed on the registrable domain and ignores
+port/subdomain): `localhost:3000 → localhost:8000` and
+`dev.autoauthor.app → api.dev.autoauthor.app` (both `autoauthor.app`).
+
+Returning to `"none"` would require a genuinely cross-site topology *and* a
+compensating control — a double-submit CSRF token or an explicit Origin allowlist
+check on state-changing methods.
 
 ### Rate Limiting
 
