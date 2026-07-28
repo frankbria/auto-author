@@ -53,9 +53,30 @@ test = [
     "httpx==0.28.1",  # used only by tests; not imported by app/
 ]
 load = [
-    "locust==2.37.14",
-    "locust-cloud==1.30.0",
+    # locust <2.46 caps gevent below 26, which collides with the gevent floor in
+    # [tool.uv] below. 2.46.2 dropped that upper bound.
+    "locust==2.46.2",
+    # locust-cloud removed: nothing imported or invoked it (it appeared only on
+    # this line), and every published version requires gevent<26.0.0 — so it, not
+    # locust, was what pinned uv.lock to the gevent 25.5.1 that Snyk flagged.
 ]
 dev = [
     "auto-author-backend[test,load]",
+]
+
+# Floors for packages nothing here depends on directly, carried over from the
+# retired requirements.in. They are advisory dodges (Snyk), so they must be
+# constraints rather than dependencies — listing them under [project] would
+# claim a direct dependency we do not have, and dropping them lets the resolver
+# pick a vulnerable version (a plain resolve selects gevent 25.5.1).
+# requirements.txt is now generated from uv.lock, so this file is the only
+# place a version floor can be stated.
+[tool.uv]
+constraint-dependencies = [
+    # Held at == rather than >=: a bare floor floats to the newest release, which
+    # would silently adopt versions that have not served the 14-day cooldown in
+    # .github/dependabot.yml (a floor picked up gevent 26.7.0, six days old).
+    # 26.5.0 is what deploys already run. Dependabot bumps this like any other pin.
+    "gevent==26.5.0",
+    "h11>=0.16.0",
 ]
