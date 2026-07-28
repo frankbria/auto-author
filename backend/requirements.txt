@@ -52,7 +52,7 @@ ebooklib==0.20
     # via -r requirements.in
 email-validator==2.2.0
     # via pydantic
-faker==40.23.0
+faker==40.28.1
     # via -r requirements.in
 fastapi==0.139.0
     # via -r requirements.in
