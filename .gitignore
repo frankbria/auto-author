@@ -4,6 +4,12 @@ Thumbs.db
 .env
 node_modules
 
+# Python bytecode/caches anywhere in the tree — the backend/-scoped rules below
+# missed scripts/ once it gained Python (#342).
+__pycache__/
+*.pyc
+.pytest_cache/
+
 # IDE-specific files
 .vscode/
 .idea/

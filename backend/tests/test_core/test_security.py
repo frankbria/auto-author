@@ -1,8 +1,10 @@
 """
 Comprehensive tests for core security module
 
-Tests password hashing, session-based authentication, and authorization.
+Tests session-based authentication and authorization.
 JWT-based authentication has been removed - all auth is now cookie/session-based.
+Password hashing is better-auth's job (TypeScript); the passlib-backed helpers
+that used to live here had no production callers and were removed with #342.
 """
 
 import pytest
@@ -10,56 +12,10 @@ from unittest.mock import Mock, patch, PropertyMock
 from fastapi import HTTPException, Request
 
 from app.core.security import (
-    hash_password,
-    verify_password,
     SessionRoleChecker,
     get_current_user_from_session,
     optional_session_security,
 )
-
-
-class TestPasswordHashing:
-    """Test password hashing and verification"""
-
-    def test_hash_password_creates_hash(self):
-        """Test that hash_password creates a bcrypt hash"""
-        password = "test_password_123"
-        hashed = hash_password(password)
-
-        assert hashed is not None
-        assert hashed != password
-        assert hashed.startswith("$2b$")  # bcrypt prefix
-        assert len(hashed) == 60  # standard bcrypt hash length
-
-    def test_hash_password_different_each_time(self):
-        """Test that hashing the same password twice gives different hashes (salt)"""
-        password = "test_password_123"
-        hash1 = hash_password(password)
-        hash2 = hash_password(password)
-
-        assert hash1 != hash2  # Different salts
-
-    def test_verify_password_correct(self):
-        """Test that verify_password accepts correct password"""
-        password = "test_password_123"
-        hashed = hash_password(password)
-
-        assert verify_password(password, hashed) is True
-
-    def test_verify_password_incorrect(self):
-        """Test that verify_password rejects incorrect password"""
-        password = "test_password_123"
-        wrong_password = "wrong_password"
-        hashed = hash_password(password)
-
-        assert verify_password(wrong_password, hashed) is False
-
-    def test_verify_password_empty(self):
-        """Test verify_password with empty password"""
-        password = "test_password_123"
-        hashed = hash_password(password)
-
-        assert verify_password("", hashed) is False
 
 
 @pytest.mark.asyncio

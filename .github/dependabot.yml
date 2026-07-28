@@ -3,8 +3,11 @@
 # Security-advisory updates bypass cooldown (GitHub behavior).
 version: 2
 updates:
+  # /frontend, not /: the root package.json is a PM2 shell with zero deps and no
+  # lockfile, so an npm ecosystem aimed at "/" watched nothing (#342). The real
+  # tree is frontend/package-lock.json.
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/frontend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

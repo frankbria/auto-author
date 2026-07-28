@@ -1,4 +1,3 @@
-from passlib.context import CryptContext
 from pymongo.errors import DuplicateKeyError
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException, status, Request
@@ -10,18 +9,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Create a password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def hash_password(password: str) -> str:
-    """Hash a password for storing."""
-    return pwd_context.hash(password)
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a stored password against one provided by user."""
-    return pwd_context.verify(plain_password, hashed_password)
+# Password hashing lives in better-auth (TypeScript), not here. The former
+# passlib-backed hash_password/verify_password/pwd_context had no production
+# callers — only their own tests — so they and the passlib dep went with #342.
 
 
 class SessionRoleChecker:
