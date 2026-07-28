@@ -8,9 +8,9 @@ pydantic
 pydantic-settings
 pydantic[email]
 requests
-python-jose[cryptography]
 python-multipart
-passlib[bcrypt]
+# python-jose / passlib removed in #342 — auth is better-auth (TypeScript) end to
+# end, so the backend needs no JWT or password-hashing library.
 
 # Billing (Stripe webhook, issue #220)
 stripe>=15.3.0

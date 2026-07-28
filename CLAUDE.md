@@ -10,7 +10,7 @@ AI-assisted long-form non-fiction writing. Next.js frontend + FastAPI backend, M
 
 Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append new entries **there**, not here.
 
-**Latest state (2026-07-25):** P0/P1 launch-review items through #338 complete (ToS/Privacy pages, Sentry, real `/health` dependency checks, loud password-reset failure, chapter-question status filter before pagination, TOC optimistic lock, per-index error handling on question index creation). CI gates green and enforced.
+**Latest state (2026-07-27):** P0/P1 launch-review items through #341 complete (ToS/Privacy pages, Sentry, real `/health` dependency checks, chapter-question status filter before pagination, TOC optimistic lock, `sameSite="lax"` CSRF fix, hollow-test cleanup). First P2 fast-follow (#342) re-aims Dependabot at `/frontend` and adds a **baselined** supply-chain audit gate: `scripts/audit_gate.py` fails CI only on advisories absent from `security-baseline.json`, which ledgers the 91 pre-existing ones. Adding a dependency with a new advisory means either fixing it or adding it to that file with a reason. CI gates green and enforced.
 
 ---
 
