@@ -69,6 +69,22 @@ def parse_pip_audit(report: dict) -> list[Finding]:
     return _dedupe(findings)
 
 
+def _npm_advisory_id(via: dict, package: str) -> str:
+    """Identify an npm advisory, never returning empty.
+
+    Preference order is GHSA id, then npm's numeric `source`. An advisory we
+    cannot identify still gets an id, because the alternative — dropping it —
+    turns an unrecognised advisory into a passing build. Fail loud beats fail
+    silent for a gate whose whole job is catching the unexpected.
+    """
+    url = via.get("url") or ""
+    if "/advisories/" in url:
+        return url.rstrip("/").rsplit("/", 1)[-1]
+    if via.get("source"):
+        return f"npm-source-{via['source']}"
+    return f"npm-unidentified-{package}"
+
+
 def parse_npm_audit(report: dict, min_severity: str = "high") -> list[Finding]:
     floor = NPM_SEVERITIES.index(min_severity)
     findings = []
@@ -78,18 +94,18 @@ def parse_npm_audit(report: dict, min_severity: str = "high") -> list[Finding]:
             # itself is recorded on that package, so skip it here.
             if not isinstance(via, dict):
                 continue
-            url = via.get("url", "")
-            if "/advisories/" not in url:
-                continue
-            severity = via.get("severity", "info")
-            if severity not in NPM_SEVERITIES or NPM_SEVERITIES.index(severity) < floor:
+            severity = via.get("severity", "")
+            # Only a severity we recognise AND that sits below the floor is
+            # skippable. Missing or unfamiliar severities are reported, so a
+            # schema change cannot quietly filter advisories out of the gate.
+            if severity in NPM_SEVERITIES and NPM_SEVERITIES.index(severity) < floor:
                 continue
             findings.append(
                 Finding(
                     ecosystem="npm",
-                    id=url.rstrip("/").rsplit("/", 1)[-1],
+                    id=_npm_advisory_id(via, package),
                     package=package,
-                    severity=severity,
+                    severity=severity or "unknown",
                     fix="yes" if entry.get("fixAvailable") else "",
                 )
             )

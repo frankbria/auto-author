@@ -162,12 +162,53 @@ def test_parse_npm_audit_empty_report():
     assert parse_npm_audit(_npm_report()) == []
 
 
-def test_parse_npm_audit_skips_via_without_advisory_url():
+def test_parse_npm_audit_falls_back_to_source_id_without_a_url():
+    """An advisory object with no `url` must NOT vanish — dropping it would be a
+    false green. npm always carries a numeric `source`, so key off that."""
     report = _npm_report(
-        x={"name": "x", "severity": "high", "via": [{"title": "no url", "severity": "high"}]}
+        x={
+            "name": "x",
+            "severity": "critical",
+            "via": [{"source": 123456, "title": "RCE", "severity": "critical"}],
+        }
     )
 
-    assert parse_npm_audit(report) == []
+    findings = parse_npm_audit(report)
+
+    assert [f.id for f in findings] == ["npm-source-123456"]
+
+
+def test_parse_npm_audit_keeps_an_unidentifiable_advisory():
+    """No url and no source: still must not disappear. It surfaces with a
+    package-derived id so the gate fails loudly instead of silently passing."""
+    report = _npm_report(x={"name": "x", "severity": "high", "via": [{"severity": "high"}]})
+
+    findings = parse_npm_audit(report)
+
+    assert len(findings) == 1
+    assert "unidentified" in findings[0].id
+    assert findings[0].package == "x"
+
+
+def test_parse_npm_audit_keeps_advisories_with_missing_severity():
+    """Absent severity must fail loud, not be treated as below the floor."""
+    report = _npm_report(
+        x={"name": "x", "severity": "high", "via": [{"url": ".../advisories/GHSA-x"}]}
+    )
+
+    assert [f.id for f in parse_npm_audit(report)] == ["GHSA-x"]
+
+
+def test_parse_npm_audit_keeps_advisories_with_unrecognised_severity():
+    report = _npm_report(
+        x={
+            "name": "x",
+            "severity": "high",
+            "via": [{"url": ".../advisories/GHSA-x", "severity": "apocalyptic"}],
+        }
+    )
+
+    assert [f.id for f in parse_npm_audit(report)] == ["GHSA-x"]
 
 
 # --- evaluation --------------------------------------------------------------
