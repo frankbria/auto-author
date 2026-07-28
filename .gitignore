@@ -121,3 +121,7 @@ frontend/tests/e2e/artifacts/
 # app self-creates the subdirs at runtime (file_upload_service.py).
 backend/uploads/*
 !backend/uploads/.gitkeep
+
+# Per-work-item scratch notes, rewritten in full for each issue. Tracking it meant
+# every regeneration conflicted with main and left the checkout dirty after a merge.
+tasks/todo.md
