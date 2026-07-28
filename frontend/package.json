@@ -55,7 +55,7 @@
     "@tiptap/extension-strike": "^2.14.0",
     "@tiptap/extension-underline": "^2.14.0",
     "@tiptap/react": "^2.1.13",
-    "@tiptap/starter-kit": "^2.1.13",
+    "@tiptap/starter-kit": "^3.27.4",
     "better-auth": "^1.4.7",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
