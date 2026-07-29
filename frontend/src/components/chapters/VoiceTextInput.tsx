@@ -134,6 +134,12 @@ export function VoiceTextInput({
           const start = textarea.selectionStart;
           const end = textarea.selectionEnd;
           const newValue = currentValue.slice(0, start) + finalTranscript + ' ' + currentValue.slice(end);
+          // Publish to the ref immediately rather than waiting for the effect
+          // above. Effects run after React commits, so when continuous
+          // recognition delivers two finalized segments in the same tick the
+          // effect cannot run between them — both handlers would read the same
+          // stale value and the second would discard the first (#384).
+          valueRef.current = newValue;
           onChange(newValue);
 
           // Move cursor to end of inserted text
@@ -143,7 +149,9 @@ export function VoiceTextInput({
             textarea.focus();
           }, 10);
         } else {
-          onChange(currentValue + finalTranscript + ' ');
+          const newValue = currentValue + finalTranscript + ' ';
+          valueRef.current = newValue;
+          onChange(newValue);
         }
       }
 
