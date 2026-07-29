@@ -58,10 +58,21 @@ Generate with:
 python -c 'import secrets; print(secrets.token_urlsafe(64))'
 ```
 
-**This one is not optional.** The backend validates it at startup and refuses to
-boot on a missing, default, or weak value — a deploy without it fails the
-backend health check. The frontend must receive the identical value or every
-issued token fails verification.
+**This one is not optional — and leaving it unset does not fail loudly in
+staging.** `backend/app/core/config.py` declares `BETTER_AUTH_SECRET` with a
+*default* (the committed 58-character CI test secret), and the validator rejects
+that default **only when the environment is production**. So:
+
+| Environment | Secret unset | Result |
+|-------------|--------------|--------|
+| Production | — | Startup fails. Correct and loud. |
+| Staging | — | **Boots on a publicly-known signing key from the repo.** Health checks pass; anyone who reads the source can mint valid staging tokens. |
+
+Treat a green staging deploy as *no evidence* that this secret is configured.
+Verify it explicitly (see Troubleshooting below for a value-free check).
+
+The frontend must receive the identical value, or every issued token fails
+verification.
 
 ### OpenAI
 

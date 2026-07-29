@@ -127,7 +127,7 @@ below are orientation only.
 |----------|----------|-------|
 | `DATABASE_URL` | ✅ | MongoDB connection string (`mongodb://…` or `mongodb+srv://…`) |
 | `DATABASE_NAME` | ✅ | e.g. `auto_author` |
-| `BETTER_AUTH_SECRET` | ✅ | Shared HS256 JWT secret. **The app refuses to start without it**, and it must match the frontend value exactly. Generate: `python -c 'import secrets; print(secrets.token_urlsafe(64))'` |
+| `BETTER_AUTH_SECRET` | ✅ | Shared HS256 JWT secret; must match the frontend value exactly. **Production refuses to start without it. Staging does not** — it falls back to the committed CI test secret, so an unconfigured staging boots happily on a publicly-known signing key. Always set it explicitly. Generate: `python -c 'import secrets; print(secrets.token_urlsafe(64))'` |
 | `BETTER_AUTH_URL` | ✅ | Base URL of the frontend |
 | `BETTER_AUTH_ISSUER` | ✅ | `better-auth` |
 | `OPENAI_AUTOAUTHOR_API_KEY` | ✅ | OpenAI key |
@@ -226,7 +226,7 @@ cd /opt/auto-author/current && pm2 restart ecosystem.config.js
 
 ### Backend will not start
 
-- **`BETTER_AUTH_SECRET` missing or weak** — the app rejects default/short values at startup by design. Check `pm2 logs auto-author-backend`.
+- **`BETTER_AUTH_SECRET` missing or weak** — production rejects default/short values at startup by design; check `pm2 logs auto-author-backend`. In staging the same condition does *not* raise, so a backend that starts fine may still be running on the repo's CI default — confirm the value was actually written (see `.github/DEPLOYMENT.md` for a check that does not print it).
 - **MongoDB unreachable** — verify `DATABASE_URL`; for Atlas confirm the server's IP is on the cluster allowlist.
 - **`ModuleNotFoundError`** — the venv is stale or was built from something other than the lockfile. Rebuild: `cd backend && uv sync`.
 

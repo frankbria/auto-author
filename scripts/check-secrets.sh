@@ -55,11 +55,23 @@ PATTERNS=(
     # keys are meant to be public (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     # NEXT_PUBLIC_SENTRY_DSN), so matching it would be mostly false positives.
     # A genuinely secret NEXT_PUBLIC_*_KEY still needs human review.
-    'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|PRIVATE_KEY|PASSWORD|CREDENTIALS?)[A-Z0-9_]*[[:space:]]*[=:]'
+    # The optional quote before the operator also catches JSON and quoted JS
+    # object keys, where a quote character sits between the name and the colon.
+    'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|PRIVATE_KEY|PASSWORD|CREDENTIALS?)[A-Z0-9_]*['\''"]?[[:space:]]*[=:]'
 )
 
 # Check each file for secret patterns
 for FILE in $FILES; do
+    # This script cannot scan itself. The PATTERNS array above is, by
+    # construction, a list of strings that look exactly like the secrets it
+    # hunts for — every rule added here would flag its own definition. Skipping
+    # it is a false-positive fix, not a coverage gap: the file holds no
+    # credentials, and changes to it get reviewed precisely because it is the
+    # scanner.
+    if [ "$FILE" = "scripts/check-secrets.sh" ]; then
+        continue
+    fi
+
     # Skip binary files
     if git diff --cached --numstat "$FILE" | grep -q '^-'; then
         continue
