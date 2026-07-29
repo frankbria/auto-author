@@ -77,6 +77,15 @@ export function VoiceTextInput({
   // requested and thrown away, so the mic stayed live for the life of the page,
   // even after the user pressed Stop (#348).
   const micStreamRef = useRef<MediaStream | null>(null);
+  // getUserMedia is async, which opens two windows where a stream can be
+  // acquired with nothing left to release it (#348):
+  //   - two Start clicks before the first promise resolves: both pass the
+  //     release-then-acquire guard while micStreamRef is still null, and the
+  //     second overwrites the first, orphaning its tracks;
+  //   - unmount while the promise is pending: cleanup runs against a null ref,
+  //     then the stream arrives and is held by a component that no longer exists.
+  const startingRef = useRef(false);
+  const unmountedRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Mirror the latest `value` prop so the long-lived onresult handler reads the
@@ -103,6 +112,7 @@ export function VoiceTextInput({
   // component.
   useEffect(() => {
     return () => {
+      unmountedRef.current = true;
       const recognition = recognitionRef.current;
       if (recognition) {
         recognition.onresult = null;
@@ -269,13 +279,36 @@ export function VoiceTextInput({
       return;
     }
 
+    // Ignore a second Start while one is still in flight; the button stays
+    // enabled until onstart fires, so a double-click is easy to land.
+    if (startingRef.current || recognitionRef.current) {
+      return;
+    }
+    startingRef.current = true;
+
     try {
       // Release any stream still held from a previous attempt before acquiring
       // another; overwriting the ref would orphan the old tracks for the page's
       // lifetime with no handle left to stop them.
       releaseMicStream();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // The await above is a suspension point: this component may have unmounted
+      // while permission was pending, in which case the cleanup already ran and
+      // nothing will ever release this stream. Hand it back immediately.
+      if (unmountedRef.current) {
+        stream.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch {
+            // Already ended.
+          }
+        });
+        return;
+      }
+
       // Keep the stream so its tracks can be released again (see micStreamRef).
-      micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
 
       setError(null);
       const recognition = initializeSpeechRecognition();
@@ -286,6 +319,9 @@ export function VoiceTextInput({
     } catch (err) {
       console.error('Failed to start recording:', err);
       setError('Failed to access microphone. Please check permissions.');
+      releaseMicStream();
+    } finally {
+      startingRef.current = false;
     }
   };
 

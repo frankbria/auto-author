@@ -278,3 +278,75 @@ describe('VoiceTextInput releases the mic on every session end (#348)', () => {
     expect(secondTrack.stop).toHaveBeenCalled();
   });
 });
+
+describe('VoiceTextInput async-window leaks (#348)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    installRecognition();
+  });
+
+  /** A getUserMedia whose resolution we control, to hold the await open. */
+  function installDeferredMic(count: number) {
+    const tracks = Array.from({ length: count }, () => ({
+      kind: 'audio',
+      stop: jest.fn(),
+      enabled: true,
+    }));
+    const resolvers: Array<() => void> = [];
+    let call = 0;
+    (navigator as unknown as Record<string, unknown>).mediaDevices = {
+      getUserMedia: jest.fn().mockImplementation(() => {
+        const track = tracks[call++];
+        return new Promise((resolve) => {
+          resolvers.push(() =>
+            resolve({ getTracks: () => [track], getAudioTracks: () => [track] })
+          );
+        });
+      }),
+      enumerateDevices: jest.fn().mockResolvedValue([]),
+    };
+    return { tracks, resolvers };
+  }
+
+  it('ignores a second Start while the first is still awaiting permission', async () => {
+    // Both clicks would otherwise pass the release-then-acquire guard while
+    // micStreamRef is still null, and the second stream would overwrite the
+    // first — orphaning its tracks with no handle left to stop them.
+    const { resolvers } = installDeferredMic(2);
+    const user = userEvent.setup();
+    render(<VoiceTextInput value="" mode="voice" onChange={jest.fn()} />);
+
+    const start = screen.getByRole('button', { name: /start voice recording/i });
+    await act(async () => {
+      await user.click(start);
+      await user.click(start);
+    });
+
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolvers[0]?.();
+    });
+  });
+
+  it('releases a stream that arrives after the component unmounted', async () => {
+    // The await is a suspension point: cleanup can run against a null ref and
+    // then the stream shows up, held by a component that no longer exists.
+    const { tracks, resolvers } = installDeferredMic(1);
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <VoiceTextInput value="" mode="voice" onChange={jest.fn()} />
+    );
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /start voice recording/i }));
+    });
+
+    unmount();
+
+    await act(async () => {
+      resolvers[0]?.();
+    });
+
+    expect(tracks[0].stop).toHaveBeenCalled();
+  });
+});
