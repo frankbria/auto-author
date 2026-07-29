@@ -90,8 +90,11 @@ for FILE in $FILES; do
     # Get the content being ADDED (only '+' lines, excluding the '+++' file header).
     # Scanning added lines only — not removed/context lines — so that deleting a
     # hardcoded secret or editing nearby code doesn't falsely block the commit.
-    # (limit to first 10KB to avoid processing huge diffs)
-    CONTENT=$(git diff --cached "$FILE" | grep '^+' | grep -v '^+++' | head -c 10240)
+    # Capped at 100KB, matching the file-size guard above rather than a smaller
+    # arbitrary number: at 10KB a secret added past the first ~10KB of a file's
+    # diff was silently skipped, so whether a leak was caught depended on where
+    # in the file it landed. The two guards above already bound the work.
+    CONTENT=$(git diff --cached "$FILE" | grep '^+' | grep -v '^+++' | head -c 102400)
 
     for PATTERN in "${PATTERNS[@]}"; do
         MATCHES=$(echo "$CONTENT" | grep -E "$PATTERN" | head -5)

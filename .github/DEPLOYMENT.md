@@ -232,7 +232,12 @@ read server-side by `next start`.
 - `BETTER_AUTH_SECRET` unset or weak — the app deliberately refuses to start.
 - MongoDB unreachable — check `MONGODB_URI` and the Atlas IP allowlist.
 - `pm2 logs auto-author-backend --lines 50`
-- Inspect the generated file: `cat /opt/auto-author/current/backend/.env`
+- Check which variables the deploy actually wrote, **without printing their values**:
+  ```bash
+  cut -d= -f1 /opt/auto-author/current/backend/.env    # names only
+  grep -c '^BETTER_AUTH_SECRET=.\+' /opt/auto-author/current/backend/.env   # 1 = set and non-empty
+  ```
+  Never `cat` that file — it holds the database URI, the auth secret, the OpenAI key, and any AWS credentials, and it tends to get pasted into tickets and screen shares.
 
 ### Frontend health check fails
 
@@ -243,7 +248,12 @@ read server-side by `next start`.
 ### CORS errors
 
 - `BACKEND_CORS_ORIGINS` must contain `FRONTEND_URL` and must not be a quoted JSON array (see above).
-- `curl -I -X OPTIONS <API_URL>/books -H "Origin: <FRONTEND_URL>"`
+- A real preflight needs the request-method header, not just `Origin`:
+  ```bash
+  curl -s -D - -o /dev/null -X OPTIONS <API_URL>/books \
+    -H "Origin: <FRONTEND_URL>" \
+    -H "Access-Control-Request-Method: POST" | grep -i access-control-allow-origin
+  ```
 
 ### Password reset does nothing
 

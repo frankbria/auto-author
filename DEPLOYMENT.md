@@ -64,11 +64,14 @@ lockfile — never hand-edit it, and never install from it in preference to
 
 Start MongoDB first — most backend tests and all real API calls need it.
 
+Each server runs in the foreground, so give them **separate terminals**, both
+starting from the repository root:
+
 ```bash
-# Frontend — http://localhost:3002
+# Terminal 1 — frontend, http://localhost:3002
 cd frontend && npm run dev
 
-# Backend — http://localhost:8000, docs at /docs
+# Terminal 2 — backend, http://localhost:8000, docs at /docs
 cd backend && uv run uvicorn app.main:app --reload --port 8000
 ```
 
@@ -247,12 +250,22 @@ curl -s -D - -o /dev/null -X OPTIONS https://api.dev.autoauthor.app/api/v1/books
 
 ### Port already in use
 
+**Identify the owner before touching it.** The staging box is shared, so a
+process on 3002 is not necessarily ours:
+
 ```bash
-lsof -ti:3002 | xargs -r kill -9
+lsof -i:3002 -sTCP:LISTEN        # who holds it — command, PID, user
+pm2 list                          # is it one of our PM2 apps?
 ```
 
-Remember other applications share this VPS — confirm the port is actually ours
-before killing anything.
+If it is our app, restart it through PM2 rather than signalling the PID:
+
+```bash
+pm2 restart auto-author-frontend
+```
+
+If it belongs to something else, leave it alone and pick a different port —
+never blanket-kill by port number on a shared host.
 
 ---
 
@@ -261,18 +274,21 @@ before killing anything.
 Supply-chain advisories are gated in CI against a baseline ledger, so only *new*
 advisories fail the build:
 
+Run from the repository root — the subshells keep each `cd` from leaking into
+the next command:
+
 ```bash
-# Backend
-cd backend && uv export --no-dev --no-emit-project --format requirements-txt > /tmp/reqs.txt
-uvx pip-audit -r /tmp/reqs.txt --format=json > /tmp/pip-audit.json
+(cd backend && uv export --no-dev --no-emit-project --format requirements-txt > /tmp/reqs.txt \
+  && uvx pip-audit -r /tmp/reqs.txt --format=json > /tmp/pip-audit.json)
 
-# Frontend
-cd frontend && npm audit --json > /tmp/npm-audit.json
+(cd frontend && npm audit --json > /tmp/npm-audit.json)
 
-# Gate
 python scripts/audit_gate.py --pip-audit /tmp/pip-audit.json \
   --npm-audit /tmp/npm-audit.json --baseline security-baseline.json
 ```
+
+Both audit tools exit non-zero when they find advisories, which is the normal
+case here — `audit_gate.py` decides pass/fail against the baseline.
 
 Adding a dependency that carries a new advisory means either fixing it or
 adding it to `security-baseline.json` with a stated reason.

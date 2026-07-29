@@ -7,7 +7,7 @@
 > write a broken auth config.
 > The single deploy path is `.github/workflows/deploy-staging.yml`; re-deploy
 > manually with `gh workflow run deploy-staging.yml`. Rollback and on-server
-> inspection commands are in [`DEPLOYMENT.md`](../DEPLOYMENT.md).
+> inspection commands are in [`DEPLOYMENT.md`](../../DEPLOYMENT.md).
 > Kept only as a record of the 2025 manual-deploy process.
 
 **Last Updated**: 2025-10-24

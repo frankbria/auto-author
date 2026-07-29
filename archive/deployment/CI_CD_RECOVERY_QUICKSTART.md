@@ -3,7 +3,7 @@
 > 📜 **Historical incident record — resolved. Do not execute these steps.**
 > It describes a `develop` branch that no longer exists and recovery via
 > `scripts/deploy.sh`, deleted in #343. For how deploys work now, read
-> [`DEPLOYMENT.md`](../DEPLOYMENT.md).
+> [`DEPLOYMENT.md`](../../DEPLOYMENT.md).
 
 **Status:** ✅ Resolved — retained for history (was: 🚨 CRITICAL)
 **Time to Execute:** 30 minutes
