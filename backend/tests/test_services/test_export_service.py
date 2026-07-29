@@ -2,11 +2,16 @@
 Test Export Service functionality
 """
 import asyncio
+import logging
+import threading
 import pytest
 from io import BytesIO
 from unittest.mock import patch
+from app.core.config import settings
 from app.services.export_service import (
     export_service,
+    export_executor,
+    EXPORT_THREAD_NAME_PREFIX,
     ExportValidationError,
     ExportTimeoutError,
 )
@@ -543,3 +548,79 @@ class TestTemplatedExport:
         doc = Document(BytesIO(out))
         # Default python-docx letter section, untouched header.
         assert doc.sections[0].header.paragraphs[0].text == ""
+
+
+class TestExportExecutorIsolation:
+    """#345: exports must not be able to starve the AI path.
+
+    ``asyncio.to_thread`` dispatches to the event loop's *default*
+    ThreadPoolExecutor — the same pool ``ai_service`` uses for blocking OpenAI
+    calls. A burst of oversized exports could therefore occupy every worker and
+    queue AI generation behind builds that a 504 has already given up on.
+    Exports now run on their own bounded pool.
+    """
+
+    @pytest.mark.asyncio
+    async def test_pdf_build_runs_on_the_dedicated_export_pool(self):
+        """The build thread must belong to the export pool, not the default one.
+
+        Asserting on the returned bytes would pass either way; the thread the
+        work actually ran on is the thing that keeps AI unblocked, so that is
+        what gets pinned. Default-executor threads are named
+        ``asyncio_%d``/``ThreadPoolExecutor-*``, never ``export_*``.
+        """
+        seen = {}
+
+        def fake_build(*args, **kwargs):
+            seen["thread"] = threading.current_thread().name
+            return b"%PDF-1.4 fake"
+
+        with patch.object(export_service, "_build_pdf", side_effect=fake_build):
+            await export_service.generate_pdf(
+                {"title": "T"}, [{"id": "1", "title": "A", "content": "<p>x</p>"}]
+            )
+
+        assert seen["thread"].startswith(EXPORT_THREAD_NAME_PREFIX), (
+            f"export ran on {seen['thread']!r}; it must run on the dedicated "
+            "export pool or it can starve ai_service's OpenAI calls (#345)"
+        )
+
+    @pytest.mark.asyncio
+    async def test_export_pool_is_bounded(self):
+        """An unbounded pool would defeat the purpose — saturation is the point."""
+        assert export_executor._max_workers == settings.EXPORT_MAX_WORKERS
+        assert settings.EXPORT_MAX_WORKERS >= 1
+
+    @pytest.mark.asyncio
+    async def test_timeout_warns_that_the_thread_keeps_running(self, caplog):
+        """A 504 with no log left an invisible stuck worker (#345).
+
+        The warning is the only signal an operator gets that a slot is still
+        occupied after the client got its error.
+        """
+        book = {
+            "title": "Slow Book",
+            "table_of_contents": {
+                "chapters": [
+                    {"id": "1", "title": "A", "content": "<p>hi</p>", "order": 1}
+                ]
+            },
+        }
+
+        async def slow_pdf(*args, **kwargs):
+            await asyncio.sleep(0.2)
+            return b"%PDF-never"
+
+        with patch.object(export_service, "generate_pdf", side_effect=slow_pdf):
+            with caplog.at_level(logging.WARNING, logger="app.services.export_service"):
+                with pytest.raises(ExportTimeoutError):
+                    await export_service.export_book(
+                        book, format="pdf", timeout_seconds=0.01
+                    )
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert warnings, "a timed-out export must leave a warning behind"
+        message = warnings[0].getMessage()
+        assert "pdf" in message
+        # The message must not repeat the old claim that the export was stopped.
+        assert "not cancelled" in message.lower() or "still running" in message.lower()
