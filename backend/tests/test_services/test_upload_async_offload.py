@@ -208,3 +208,50 @@ class TestCloudStorageOffload:
 
         assert ok is True
         assert ticks > 0
+
+
+class TestCoverUploadRollback:
+    """A failed thumbnail upload must not orphan the main image.
+
+    The two uploads are sequential and not atomic. Pre-existing gap, fixed here
+    because #346 rewrote this exact block: without a rollback the main image
+    stays in the bucket forever while the caller gets a 500 and never learns
+    the URL, so nothing will ever reference or clean it up.
+    """
+
+    @pytest.mark.asyncio
+    async def test_main_image_is_deleted_when_the_thumbnail_upload_fails(self):
+        from unittest.mock import AsyncMock
+
+        service = FileUploadService()
+        cloud = Mock()
+        cloud.upload_image = AsyncMock(
+            side_effect=["https://cdn/main.jpg", RuntimeError("S3 exploded")]
+        )
+        cloud.delete_image = AsyncMock(return_value=True)
+        service.cloud_storage = cloud
+
+        with pytest.raises(Exception):
+            await service.process_and_save_cover_image(_make_upload(), "book1")
+
+        cloud.delete_image.assert_awaited_once_with("https://cdn/main.jpg")
+
+    @pytest.mark.asyncio
+    async def test_rollback_failure_does_not_mask_the_upload_failure(self):
+        """If cleanup also fails, the caller must still see the original error."""
+        from unittest.mock import AsyncMock
+
+        service = FileUploadService()
+        cloud = Mock()
+        cloud.upload_image = AsyncMock(
+            side_effect=["https://cdn/main.jpg", RuntimeError("S3 exploded")]
+        )
+        cloud.delete_image = AsyncMock(side_effect=RuntimeError("delete also failed"))
+        service.cloud_storage = cloud
+
+        with pytest.raises(Exception) as exc:
+            await service.process_and_save_cover_image(_make_upload(), "book1")
+
+        # The handler converts to a 500; what matters is that the delete failure
+        # did not replace or swallow the real cause.
+        assert "delete also failed" not in str(exc.value)

@@ -257,12 +257,28 @@ class FileUploadService:
                     folder=f"cover_images/{book_id}"
                 )
 
-                thumbnail_url = await self.cloud_storage.upload_image(
-                    file_data=thumb_bytes,
-                    filename=thumbnail_filename,
-                    content_type=content_type,
-                    folder=f"cover_images/{book_id}/thumbnails"
-                )
+                try:
+                    thumbnail_url = await self.cloud_storage.upload_image(
+                        file_data=thumb_bytes,
+                        filename=thumbnail_filename,
+                        content_type=content_type,
+                        folder=f"cover_images/{book_id}/thumbnails"
+                    )
+                except Exception:
+                    # The two uploads are not atomic. Without this the main
+                    # image stays in the bucket forever while the caller gets a
+                    # 500 and no record of the URL — an orphan nothing will ever
+                    # reference or clean up. Roll it back, but never let the
+                    # cleanup failure mask the upload failure.
+                    try:
+                        await self.cloud_storage.delete_image(image_url)
+                    except Exception:
+                        logger.error(
+                            "Failed to roll back orphaned cover image %s",
+                            image_url,
+                            exc_info=True,
+                        )
+                    raise
             else:
                 # _process_cover_sync already wrote both files.
                 image_url = f"/uploads/cover_images/{unique_filename}"
