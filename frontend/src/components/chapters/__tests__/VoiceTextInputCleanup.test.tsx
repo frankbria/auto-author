@@ -54,6 +54,23 @@ function installRecognition() {
   (window as unknown as Record<string, unknown>).webkitSpeechRecognition = TrackedRecognition;
 }
 
+/**
+ * Replace getUserMedia with a stream whose track stop() we can observe.
+ *
+ * This is the part that actually holds the microphone: recognition.stop() does
+ * not release a MediaStream, so a component that requests one and drops it keeps
+ * the mic (and the browser's recording indicator) live regardless.
+ */
+function installMicStream() {
+  const track = { kind: 'audio', stop: jest.fn(), enabled: true };
+  const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
+  (navigator as unknown as Record<string, unknown>).mediaDevices = {
+    getUserMedia: jest.fn().mockResolvedValue(stream),
+    enumerateDevices: jest.fn().mockResolvedValue([]),
+  };
+  return track;
+}
+
 async function startRecording() {
   const user = userEvent.setup();
   await act(async () => {
@@ -152,5 +169,44 @@ describe('VoiceTextInput error copy (#348)', () => {
     });
     // And never the raw code.
     expect(screen.queryByText(/not-allowed/)).not.toBeInTheDocument();
+  });
+});
+
+describe('VoiceTextInput releases the getUserMedia stream (#348)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    installRecognition();
+  });
+
+  it('stops the microphone track on unmount', async () => {
+    const track = installMicStream();
+    const { unmount } = render(
+      <VoiceTextInput value="" mode="voice" onChange={jest.fn()} />
+    );
+
+    await startRecording();
+    expect(track.stop).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(track.stop).toHaveBeenCalled();
+  });
+
+  it('stops the microphone track when the user presses Stop', async () => {
+    // The worse half of the bug: the stream outlived an explicit stop, so the
+    // recording indicator stayed lit while the user sat on the page believing
+    // dictation had ended.
+    const track = installMicStream();
+    const user = userEvent.setup();
+    render(<VoiceTextInput value="" mode="voice" onChange={jest.fn()} />);
+
+    await startRecording();
+    expect(track.stop).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /stop voice recording/i }));
+    });
+
+    expect(track.stop).toHaveBeenCalled();
   });
 });

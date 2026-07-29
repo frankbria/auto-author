@@ -86,7 +86,14 @@ export function isSpeechRecognitionSupported(): boolean {
   return Boolean(navigator?.mediaDevices?.getUserMedia);
 }
 
-/** Guidance shown in place of the dictation control when it cannot work. */
+/**
+ * Guidance shown in place of the dictation control when it cannot work.
+ *
+ * Deliberately says nothing about *which* field or where it sits: this module is
+ * shared by the chapter editor and the summary page, so copy naming one surface
+ * ("type your summary below") would be wrong on the other the moment a second
+ * caller appeared.
+ */
 export const SPEECH_UNSUPPORTED_MESSAGE =
-  'Dictation is not available in this browser. Chrome or Edge support it over ' +
-  'HTTPS; you can still type your summary below.';
+  'Dictation is not available in this browser. Chrome and Edge support it over ' +
+  'HTTPS; you can still type instead.';

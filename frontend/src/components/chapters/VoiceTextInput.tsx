@@ -71,6 +71,12 @@ export function VoiceTextInput({
   const [isSupported, setIsSupported] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // getUserMedia hands back a live MediaStream. Its tracks keep the microphone
+  // open — and the browser's recording indicator lit — until something calls
+  // stop() on each one; recognition.stop() does not do it. The stream used to be
+  // requested and thrown away, so the mic stayed live for the life of the page,
+  // even after the user pressed Stop (#348).
+  const micStreamRef = useRef<MediaStream | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Mirror the latest `value` prop so the long-lived onresult handler reads the
@@ -98,18 +104,30 @@ export function VoiceTextInput({
   useEffect(() => {
     return () => {
       const recognition = recognitionRef.current;
-      if (!recognition) {
-        return;
+      if (recognition) {
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+        try {
+          recognition.stop();
+        } catch {
+          // Already stopped/destroyed — nothing to release.
+        }
+        recognitionRef.current = null;
       }
-      recognition.onresult = null;
-      recognition.onerror = null;
-      recognition.onend = null;
-      try {
-        recognition.stop();
-      } catch {
-        // Already stopped/destroyed — nothing to release.
+      // Stopping recognition is not enough on its own — the getUserMedia tracks
+      // are what hold the microphone open.
+      const stream = micStreamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch {
+            // Already ended.
+          }
+        });
+        micStreamRef.current = null;
       }
-      recognitionRef.current = null;
     };
   }, []);
 
@@ -228,8 +246,9 @@ export function VoiceTextInput({
     }
 
     try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Request microphone permission, keeping the stream so its tracks can be
+      // released again (see micStreamRef).
+      micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       setError(null);
       const recognition = initializeSpeechRecognition();
@@ -243,11 +262,27 @@ export function VoiceTextInput({
     }
   };
 
+  const releaseMicStream = () => {
+    const stream = micStreamRef.current;
+    if (!stream) {
+      return;
+    }
+    stream.getTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch {
+        // Already ended.
+      }
+    });
+    micStreamRef.current = null;
+  };
+
   const stopRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
+    releaseMicStream();
     setIsRecording(false);
     setInterimTranscript('');
   };
