@@ -2,7 +2,8 @@
 
 import { ChapterTabMetadata } from '@/types/chapter-tabs';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
-import { ChapterEditor } from './ChapterEditor';
+// Code-split: keeps TipTap out of the book-page route's initial bundle (#347).
+import { LazyChapterEditor as ChapterEditor } from './LazyChapterEditor';
 
 interface TabContentProps {
   bookId: string;

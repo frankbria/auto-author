@@ -477,8 +477,30 @@ jest.mock('@tiptap/react', () => {
   });
   EditorContent.displayName = 'EditorContent';
 
+  // useEditorState (#347): EditorToolbar subscribes to a selector instead of
+  // reading editor.isActive() during render. The real hook re-runs the selector
+  // on every 'transaction' event, so the mock does the same — otherwise the
+  // toolbar's aria-pressed state would appear frozen under test and hide a
+  // regression rather than catch one.
+  const useEditorState = jest.fn((options: any) => {
+    const { editor, selector } = options || {};
+    const [, force] = React.useState(0);
+
+    React.useEffect(() => {
+      if (!editor?.on) {
+        return undefined;
+      }
+      const onTransaction = () => force((n: number) => n + 1);
+      editor.on('transaction', onTransaction);
+      return () => editor.off?.('transaction', onTransaction);
+    }, [editor]);
+
+    return selector ? selector({ editor, transactionNumber: 0 }) : undefined;
+  });
+
   return {
     useEditor,
+    useEditorState,
     EditorContent,
   };
 });
