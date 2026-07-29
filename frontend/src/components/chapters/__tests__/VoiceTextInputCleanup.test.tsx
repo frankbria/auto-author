@@ -210,3 +210,71 @@ describe('VoiceTextInput releases the getUserMedia stream (#348)', () => {
     expect(track.stop).toHaveBeenCalled();
   });
 });
+
+describe('VoiceTextInput releases the mic on every session end (#348)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    installRecognition();
+  });
+
+  it('releases the stream when recognition errors', async () => {
+    // A network/permission failure ends the session. Without a release here the
+    // recording indicator stays lit after the error banner appears, and the Stop
+    // button is gone because isRecording went false.
+    const track = installMicStream();
+    render(<VoiceTextInput value="" mode="voice" onChange={jest.fn()} />);
+    await startRecording();
+
+    await act(async () => {
+      TrackedRecognition.instances.at(-1)?.onerror?.({ error: 'network' });
+    });
+
+    expect(track.stop).toHaveBeenCalled();
+  });
+
+  it('releases the stream when recognition ends on its own', async () => {
+    // A service timeout or end-of-utterance fires onend without the user asking.
+    const track = installMicStream();
+    render(<VoiceTextInput value="" mode="voice" onChange={jest.fn()} />);
+    await startRecording();
+
+    await act(async () => {
+      TrackedRecognition.instances.at(-1)?.onend?.();
+    });
+
+    expect(track.stop).toHaveBeenCalled();
+  });
+
+  it('does not orphan the previous stream when recording is restarted', async () => {
+    // Overwriting micStreamRef without releasing would leave the first stream's
+    // tracks live for the page's lifetime with no handle left to stop them.
+    const firstTrack = { kind: 'audio', stop: jest.fn(), enabled: true };
+    const secondTrack = { kind: 'audio', stop: jest.fn(), enabled: true };
+    const streams = [
+      { getTracks: () => [firstTrack], getAudioTracks: () => [firstTrack] },
+      { getTracks: () => [secondTrack], getAudioTracks: () => [secondTrack] },
+    ];
+    let call = 0;
+    (navigator as unknown as Record<string, unknown>).mediaDevices = {
+      getUserMedia: jest.fn().mockImplementation(() => Promise.resolve(streams[call++])),
+      enumerateDevices: jest.fn().mockResolvedValue([]),
+    };
+
+    const user = userEvent.setup();
+    render(<VoiceTextInput value="" mode="voice" onChange={jest.fn()} />);
+
+    await startRecording();
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /stop voice recording/i }));
+    });
+    expect(firstTrack.stop).toHaveBeenCalled();
+
+    // Second session: the first stream must already be gone, and the second must
+    // be the one now held.
+    await startRecording();
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /stop voice recording/i }));
+    });
+    expect(secondTrack.stop).toHaveBeenCalled();
+  });
+});

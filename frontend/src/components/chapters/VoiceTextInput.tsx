@@ -136,6 +136,26 @@ export function VoiceTextInput({
     setCurrentMode(mode);
   }, [mode]);
 
+  // Every path that ends a dictation session must run this, not just the ones
+  // the user drives. Recognition can end on its own (onend) or fail (onerror),
+  // and neither releases the getUserMedia tracks that actually hold the
+  // microphone — so leaving either out keeps the recording indicator lit with no
+  // control left to turn it off (#348).
+  const releaseMicStream = useCallback(() => {
+    const stream = micStreamRef.current;
+    if (!stream) {
+      return;
+    }
+    stream.getTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch {
+        // Already ended.
+      }
+    });
+    micStreamRef.current = null;
+  }, []);
+
   // Initialize speech recognition
   const initializeSpeechRecognition = useCallback(() => {
     if (!isSupported) return null;
@@ -215,16 +235,20 @@ export function VoiceTextInput({
         console.error('Speech recognition error:', code);
         setError(message);
       }
+      releaseMicStream();
       setIsRecording(false);
     };
 
     recognition.onend = () => {
+      // Recognition can end without the user asking — a service timeout, or the
+      // browser deciding the utterance finished. The mic must go with it.
+      releaseMicStream();
       setIsRecording(false);
       setInterimTranscript('');
     };
 
     return recognition;
-  }, [isSupported, onChange]);
+  }, [isSupported, onChange, releaseMicStream]);
 
   const toggleMode = () => {
     const newMode = currentMode === 'text' ? 'voice' : 'text';
@@ -246,8 +270,11 @@ export function VoiceTextInput({
     }
 
     try {
-      // Request microphone permission, keeping the stream so its tracks can be
-      // released again (see micStreamRef).
+      // Release any stream still held from a previous attempt before acquiring
+      // another; overwriting the ref would orphan the old tracks for the page's
+      // lifetime with no handle left to stop them.
+      releaseMicStream();
+      // Keep the stream so its tracks can be released again (see micStreamRef).
       micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       setError(null);
@@ -260,21 +287,6 @@ export function VoiceTextInput({
       console.error('Failed to start recording:', err);
       setError('Failed to access microphone. Please check permissions.');
     }
-  };
-
-  const releaseMicStream = () => {
-    const stream = micStreamRef.current;
-    if (!stream) {
-      return;
-    }
-    stream.getTracks().forEach((track) => {
-      try {
-        track.stop();
-      } catch {
-        // Already ended.
-      }
-    });
-    micStreamRef.current = null;
   };
 
   const stopRecording = () => {
