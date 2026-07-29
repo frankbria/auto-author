@@ -26,11 +26,22 @@ function makeChain() {
 // EditorToolbar subscribes through useEditorState (#347), which registers a
 // 'transaction' listener — so the mock needs on/off. Assertions below are
 // unchanged; only the surface the component actually uses grew.
-function makeEditor(isActive: (name: string, attrs?: unknown) => boolean = () => false) {
+function makeEditor(
+  isActive: (name: string, attrs?: unknown) => boolean = () => false,
+  canRun: () => boolean = () => true,
+) {
   const listeners: Record<string, Array<() => void>> = {};
   return {
     chain: () => makeChain(),
-    can: () => ({ chain: () => makeChain() }),
+    // can().chain().focus().undo().run() must report the *capability*, so run()
+    // returns canRun() rather than the plain true of the command chain.
+    can: () => ({
+      chain: () => {
+        const c = makeChain();
+        (c as Record<string, unknown>).run = () => canRun();
+        return c;
+      },
+    }),
     isActive,
     on(event: string, fn: () => void) {
       (listeners[event] ||= []).push(fn);
@@ -132,5 +143,28 @@ describe('EditorToolbar accessibility', () => {
     expect(screen.getByRole('button', { name: /bump 1/i })).toBeInTheDocument();
 
     expect(isActiveSpy.mock.calls.length).toBe(callsAfterMount);
+  });
+
+  it('keeps undo/redo enablement live across transactions (#347)', async () => {
+    // Regression guard. memo means the component only re-renders when the
+    // selector output changes, so a capability read left OUTSIDE the selector
+    // freezes at its mount value: undo would stay greyed out forever no matter
+    // how much you typed. This failed before canUndo/canRedo joined the
+    // selector, and no existing test noticed.
+    let canRun = false;
+    const editor = makeEditor(() => false, () => canRun);
+    render(<EditorToolbar editor={editor as never} />);
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+
+    // Typing produces a transaction and makes undo possible.
+    canRun = true;
+    await act(async () => {
+      editor.emitTransaction();
+    });
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeEnabled();
   });
 });

@@ -478,24 +478,51 @@ jest.mock('@tiptap/react', () => {
   EditorContent.displayName = 'EditorContent';
 
   // useEditorState (#347): EditorToolbar subscribes to a selector instead of
-  // reading editor.isActive() during render. The real hook re-runs the selector
-  // on every 'transaction' event, so the mock does the same — otherwise the
-  // toolbar's aria-pressed state would appear frozen under test and hide a
-  // regression rather than catch one.
+  // reading editor.isActive() during render.
+  //
+  // This mock deliberately reproduces the real hook's *bail-out* semantics, not
+  // just its re-render: the real useEditorState runs on
+  // useSyncExternalStoreWithSelector, which compares the new selector output
+  // against the old and skips the re-render when they are equal. A mock that
+  // re-rendered on every transaction would make any state read left OUTSIDE the
+  // selector look live under test while being frozen in the browser — hiding
+  // exactly the staleness bug memoization introduces.
+  const shallowEqual = (a: any, b: any) => {
+    if (a === b) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+    const ka = Object.keys(a);
+    const kb = Object.keys(b);
+    return ka.length === kb.length && ka.every((k) => a[k] === b[k]);
+  };
+
   const useEditorState = jest.fn((options: any) => {
     const { editor, selector } = options || {};
-    const [, force] = React.useState(0);
+    const run = () => (selector ? selector({ editor, transactionNumber: 0 }) : undefined);
+
+    const [selected, setSelected] = React.useState(run);
+
+    // Keep the latest selector without re-subscribing: it is an inline closure,
+    // so its identity changes every render.
+    const selectorRef = React.useRef(selector);
+    selectorRef.current = selector;
 
     React.useEffect(() => {
       if (!editor?.on) {
         return undefined;
       }
-      const onTransaction = () => force((n: number) => n + 1);
+      const onTransaction = () => {
+        const next = selectorRef.current
+          ? selectorRef.current({ editor, transactionNumber: 0 })
+          : undefined;
+        // Returning the previous value makes React bail out of the re-render,
+        // which is what the real hook does on an equal snapshot.
+        setSelected((prev: any) => (shallowEqual(prev, next) ? prev : next));
+      };
       editor.on('transaction', onTransaction);
       return () => editor.off?.('transaction', onTransaction);
     }, [editor]);
 
-    return selector ? selector({ editor, transactionNumber: 0 }) : undefined;
+    return selected;
   });
 
   return {

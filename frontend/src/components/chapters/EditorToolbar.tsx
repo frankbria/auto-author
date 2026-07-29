@@ -57,6 +57,8 @@ const NO_ACTIVE_MARKS = {
   isOrderedList: false,
   isBlockquote: false,
   isCodeBlock: false,
+  canUndo: false,
+  canRedo: false,
 } as const;
 
 function EditorToolbarComponent({ editor }: EditorToolbarProps) {
@@ -86,6 +88,12 @@ function EditorToolbarComponent({ editor }: EditorToolbarProps) {
       isOrderedList: e?.isActive('orderedList') ?? false,
       isBlockquote: e?.isActive('blockquote') ?? false,
       isCodeBlock: e?.isActive('codeBlock') ?? false,
+      // Undo/redo availability is *also* a per-transaction read. Leaving it out
+      // of the selector would freeze the disabled state at mount: typing makes
+      // undo possible, but with nothing in the selector changing the memoized
+      // component would never re-render, and the button would stay greyed out.
+      canUndo: e?.can().chain().focus().undo().run() ?? false,
+      canRedo: e?.can().chain().focus().redo().run() ?? false,
     }),
   }) ?? NO_ACTIVE_MARKS;
 
@@ -287,7 +295,7 @@ function EditorToolbarComponent({ editor }: EditorToolbarProps) {
         variant="ghost"
         size="sm"
         onClick={() => editor.chain().focus().undo().run()}
-        disabled={!editor.can().chain().focus().undo().run()}
+        disabled={!state.canUndo}
         className="h-11 w-11 p-0 bg-transparent"
         title="Undo"
         aria-label="Undo"
@@ -300,7 +308,7 @@ function EditorToolbarComponent({ editor }: EditorToolbarProps) {
         variant="ghost"
         size="sm"
         onClick={() => editor.chain().focus().redo().run()}
-        disabled={!editor.can().chain().focus().redo().run()}
+        disabled={!state.canRedo}
         className="h-11 w-11 p-0 bg-transparent"
         title="Redo"
         aria-label="Redo"
