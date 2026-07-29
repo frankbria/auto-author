@@ -22,10 +22,13 @@ logger = logging.getLogger(__name__)
 # AI generation behind builds whose clients already gave up at the 504. Giving
 # exports their own bounded pool keeps that blast radius inside exports (#345).
 #
-# This bounds the damage; it does not cancel anything. A timed-out build keeps
-# running to completion and holds its slot, because Python cannot kill a
-# running thread. EXPORT_MAX_WORKERS is therefore the number of stuck exports
-# it takes to block further exports — AI stays unaffected either way.
+# This bounds the damage; it does not reliably cancel. A build that is still
+# QUEUED when the timeout fires is genuinely cancelled and never runs — the
+# executor future had not started, so cancel() takes. A build already RUNNING
+# cannot be stopped: Python cannot kill a running thread, so it continues to
+# completion holding its slot. EXPORT_MAX_WORKERS is therefore the number of
+# concurrently-stuck *running* exports it takes to block further exports — AI
+# stays unaffected either way, which is the point.
 EXPORT_THREAD_NAME_PREFIX = "export_worker"
 
 export_executor = ThreadPoolExecutor(
@@ -1021,8 +1024,8 @@ class ExportService:
             # the throughput drop that followed (#345).
             logger.warning(
                 "Export timed out after %ss (format=%s, title=%r, chapters=%d). "
-                "The worker thread is NOT cancelled and is still running; it "
-                "will hold 1 of %d export slots until the build finishes.",
+                "If the build had already started it is NOT cancelled and is "
+                "still running, holding 1 of %d export slots until it finishes.",
                 timeout_seconds,
                 fmt,
                 book_data.get("title", "<untitled>"),
