@@ -174,6 +174,36 @@ describe('VoiceTextInput Component', () => {
       });
     });
 
+    it('keeps both segments when two finals arrive before React can re-render (#384)', async () => {
+      const user = userEvent.setup();
+      // A delay far beyond the test's lifetime so the mock's own auto-emit never
+      // fires: every result here is driven explicitly, making the test immune to
+      // scheduling — which is the whole point of #384.
+      const mockRecognition = setupSpeechRecognitionMock({ delay: 1_000_000 });
+
+      render(<ControlledVoiceInput />);
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /start voice recording/i }));
+      });
+
+      // Continuous recognition can deliver two finalized segments back-to-back,
+      // faster than React commits the first onChange. Emitting both inside ONE
+      // act() reproduces that without depending on timer scheduling: the effect
+      // that syncs valueRef cannot run between them, so a handler reading only
+      // the effect-synced ref sees a stale value and drops the first segment.
+      act(() => {
+        mockRecognition.emitResult({ transcript: 'First final.', isFinal: true });
+        mockRecognition.emitResult({ transcript: 'Second final.', isFinal: true });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('accumulated-value')).toHaveTextContent(
+          'First final. Second final.'
+        );
+      });
+    });
+
     it('covers interim + multiple final results via the mock sequence', async () => {
       const user = userEvent.setup();
       const mockRecognition = setupSpeechRecognitionMock({
