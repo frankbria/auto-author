@@ -1,7 +1,17 @@
 # Manual Deployment Quickstart Guide
 
+> 🛑 **SUPERSEDED — do not follow this procedure (2025-10-24 snapshot).**
+> It targets a decommissioned server, and every step invokes
+> `scripts/deploy-fixed.sh`, which was deleted in #343 because it still
+> configured Clerk long after the migration to better-auth. Running it would
+> write a broken auth config.
+> The single deploy path is `.github/workflows/deploy-staging.yml`; re-deploy
+> manually with `gh workflow run deploy-staging.yml`. Rollback and on-server
+> inspection commands are in [`DEPLOYMENT.md`](../DEPLOYMENT.md).
+> Kept only as a record of the 2025 manual-deploy process.
+
 **Last Updated**: 2025-10-24
-**Target**: Staging Server (47.88.89.175)
+**Target**: Staging Server (47.88.89.175 — decommissioned)
 **Time Required**: 5-10 minutes
 
 ---

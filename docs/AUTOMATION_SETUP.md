@@ -108,6 +108,7 @@ The pre-commit hook scans staged files for accidentally committed credentials an
 - **Private Keys**: .pem files
 - **Base64 Auth**: Base64-encoded authentication strings
 - **JWT Tokens**: Real JWT tokens (not example tokens)
+- **`NEXT_PUBLIC_` secrets**: A secret assigned to a `NEXT_PUBLIC_*` name (#343). Next.js inlines these into the client bundle at build time, publishing the value to every visitor. Matches the variable *name* in an assignment — prose that merely names the anti-pattern does not trip it.
 
 **On detection:**
 - Commit is blocked

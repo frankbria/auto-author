@@ -45,6 +45,13 @@ PATTERNS=(
     '[aA][uU][tT][hH].*['\''"][A-Za-z0-9+/]{40,}={0,2}['\''"]'
     # JWT tokens (real tokens, not examples)
     'eyJ[A-Za-z0-9_-]{100,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'
+    # Secrets assigned to a NEXT_PUBLIC_ name (#343). Next.js inlines every
+    # NEXT_PUBLIC_* var into the client bundle at build time, so the value is
+    # published to every visitor regardless of how it is stored. Here the
+    # variable NAME is the defect, not the value. Requiring a trailing = or :
+    # limits this to actual assignments (.env, docs, workflow yaml), so prose
+    # warning against the anti-pattern does not trip the check.
+    'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|PRIVATE_KEY|PASSWORD|CREDENTIALS?)[A-Z0-9_]*[[:space:]]*[=:]'
 )
 
 # Check each file for secret patterns
