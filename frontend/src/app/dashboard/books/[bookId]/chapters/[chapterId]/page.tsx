@@ -5,7 +5,9 @@ import { logger } from '@/lib/logger';
 import { use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChapterEditor } from '@/components/chapters/ChapterEditor';
+// Code-split: this page redirects away after 2s, so eagerly bundling TipTap here
+// was pure waste (#347).
+import { LazyChapterEditor as ChapterEditor } from '@/components/chapters/LazyChapterEditor';
 import { Button } from '@/components/ui/button';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { ArrowLeft01Icon, LayoutGridIcon, LinkSquare02Icon } from '@hugeicons/core-free-icons';

@@ -10,7 +10,6 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 
 // Components under test
@@ -88,7 +87,6 @@ jest.mock('next/navigation', () => ({
 const mockBookClient = jest.requireMock('../lib/api/bookClient').default;
 
 describe('Chapter Questions End-to-End Tests', () => {
-  let queryClient: QueryClient;
   const user = userEvent.setup();
 
   const mockBook = {
@@ -174,13 +172,6 @@ describe('Chapter Questions End-to-End Tests', () => {
 
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, gcTime: 0 },
-        mutations: { retry: false },
-      },
-    });
-
     jest.clearAllMocks();
 
     // Setup default API responses
@@ -197,15 +188,16 @@ describe('Chapter Questions End-to-End Tests', () => {
   });
 
   afterEach(() => {
-    queryClient.clear();
+    jest.clearAllMocks();
   });
 
+  // No QueryClientProvider: react-query was a declared dependency with zero
+  // runtime usage, removed in #347. Nothing under test calls a react-query hook,
+  // so the provider was ceremony left over from an adoption that never happened.
   const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        {children}
-      </BrowserRouter>
-    </QueryClientProvider>
+    <BrowserRouter>
+      {children}
+    </BrowserRouter>
   );
 
   describe('Complete Question Generation Workflow', () => {

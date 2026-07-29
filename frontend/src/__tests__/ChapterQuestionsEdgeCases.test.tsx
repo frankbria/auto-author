@@ -9,7 +9,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock ChapterQuestions component
 const ChapterQuestions = ({ bookId, chapterId, chapterTitle }: any) => {
@@ -85,22 +84,11 @@ jest.mock('../lib/toast', () => ({
   toast: jest.fn(),
 }));
 
-const createTestQueryClient = () =>
-  new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const queryClient = createTestQueryClient();
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
-};
+// No QueryClientProvider — see #347: the dependency had zero runtime usage and
+// nothing under test calls a react-query hook.
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <>{children}</>
+);
 
 describe('ChapterQuestions Edge Cases', () => {
   let mockApi: any;
