@@ -38,6 +38,8 @@ get_user_by_clerk_id = get_user_by_auth_id
 from .book import (
     create_book,
     get_book_by_id,
+    get_book_owner_id,
+    get_book_metadata_by_id,
     get_books_by_user,
     update_book,
     apply_chapter_content_update,
@@ -85,6 +87,8 @@ __all__ += [
     # Book DAOs
     "create_book",
     "get_book_by_id",
+    "get_book_owner_id",
+    "get_book_metadata_by_id",
     "get_books_by_user",
     "update_book",
     "delete_book",

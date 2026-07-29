@@ -22,7 +22,7 @@ from app.schemas.book import (
     ChapterMetadata,
     ChapterStatus,
 )
-from app.db.database import get_book_by_id
+from app.db.database import get_book_by_id, get_book_owner_id
 from app.db.toc_transactions import (
     add_chapter_with_transaction,
     update_chapter_with_transaction,
@@ -208,10 +208,10 @@ async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_u
     """
     try:
         # Verify book ownership
-        book = await get_book_by_id(book_id)
-        if not book:
+        owner_id = await get_book_owner_id(book_id)
+        if owner_id is None:
             raise HTTPException(status_code=404, detail="Book not found")
-        if book.get("owner_id") != current_user.get("auth_id"):
+        if owner_id != current_user.get("auth_id"):
             raise HTTPException(
                 status_code=403, detail="Not authorized to access this book"
             )
@@ -623,10 +623,10 @@ async def save_tab_state(
     """
     try:
         # Verify book ownership
-        book = await get_book_by_id(book_id)
-        if not book:
+        owner_id = await get_book_owner_id(book_id)
+        if owner_id is None:
             raise HTTPException(status_code=404, detail="Book not found")
-        if book.get("owner_id") != current_user.get("auth_id"):
+        if owner_id != current_user.get("auth_id"):
             raise HTTPException(
                 status_code=403, detail="Not authorized to access this book"
             )

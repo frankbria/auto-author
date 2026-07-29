@@ -74,7 +74,7 @@ class TestGenerateClarifyingQuestionsErrors:
     @pytest.mark.asyncio
     async def test_rate_limit_error_returns_429(self, client, mock_user, mock_book):
         """Test that rate limit errors return 429 status code."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_clarifying_questions') as mock_generate:
                 mock_generate.side_effect = AIRateLimitError(
                     retry_after=60,
@@ -96,7 +96,7 @@ class TestGenerateClarifyingQuestionsErrors:
     @pytest.mark.asyncio
     async def test_network_error_returns_503(self, client, mock_user, mock_book):
         """Test that network errors return 503 status code."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_clarifying_questions') as mock_generate:
                 mock_generate.side_effect = AINetworkError(
                     correlation_id="test-correlation-456"
@@ -115,7 +115,7 @@ class TestGenerateClarifyingQuestionsErrors:
     @pytest.mark.asyncio
     async def test_service_unavailable_returns_503(self, client, mock_user, mock_book):
         """Test that service unavailable errors return 503 status code."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_clarifying_questions') as mock_generate:
                 mock_generate.side_effect = AIServiceUnavailableError(
                     retry_after=30,
@@ -135,7 +135,7 @@ class TestGenerateClarifyingQuestionsErrors:
     @pytest.mark.asyncio
     async def test_invalid_request_returns_400(self, client, mock_user, mock_book):
         """Test that invalid request errors return 400 status code."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_clarifying_questions') as mock_generate:
                 mock_generate.side_effect = AIInvalidRequestError(
                     message="Invalid parameters",
@@ -154,7 +154,7 @@ class TestGenerateClarifyingQuestionsErrors:
     @pytest.mark.asyncio
     async def test_generic_ai_error_returns_500(self, client, mock_user, mock_book):
         """Test that generic AI errors return 500 status code."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_clarifying_questions') as mock_generate:
                 mock_generate.side_effect = AIServiceError(
                     message="Unexpected error",
@@ -257,7 +257,7 @@ class TestAnalyzeSummaryErrors:
     @pytest.mark.asyncio
     async def test_analyze_network_error_returns_503(self, client, mock_user, mock_book):
         """Timeouts/network errors during summary analysis return 503, not 500."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.analyze_summary_for_toc') as mock_analyze:
                 mock_analyze.side_effect = AINetworkError(
                     correlation_id="analyze-correlation-456"
@@ -274,7 +274,7 @@ class TestAnalyzeSummaryErrors:
     @pytest.mark.asyncio
     async def test_analyze_rate_limit_error_returns_429(self, client, mock_user, mock_book):
         """Rate limit errors during summary analysis return 429 with retry info."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.analyze_summary_for_toc') as mock_analyze:
                 mock_analyze.side_effect = AIRateLimitError(
                     retry_after=60,
@@ -291,7 +291,7 @@ class TestAnalyzeSummaryErrors:
     @pytest.mark.asyncio
     async def test_analyze_service_unavailable_returns_503(self, client, mock_user, mock_book):
         """Service-unavailable errors during summary analysis return 503."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.analyze_summary_for_toc') as mock_analyze:
                 mock_analyze.side_effect = AIServiceUnavailableError(
                     retry_after=30,
@@ -320,7 +320,7 @@ class TestAnalyzeSummaryErrors:
             "suggestions": ["Please try again later or contact support"],
             "error": "AI_UNEXPECTED_ERROR: 401 invalid_api_key",
         }
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch(
                 'app.services.ai_service.ai_service.analyze_summary_for_toc',
                 new=AsyncMock(return_value=error_analysis),
@@ -346,7 +346,7 @@ class TestErrorResponseStructure:
     @pytest.mark.asyncio
     async def test_error_response_includes_all_fields(self, client, mock_user, mock_book):
         """Test that error responses include all expected fields."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_clarifying_questions') as mock_generate:
                 mock_generate.side_effect = AIRateLimitError(
                     message="Custom rate limit message",
@@ -384,7 +384,7 @@ class TestErrorResponseStructure:
         """Test that correlation IDs are preserved in error responses."""
         test_correlation_id = "unique-test-id-12345"
 
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_clarifying_questions') as mock_generate:
                 mock_generate.side_effect = AIServiceError(
                     message="Test error",
@@ -407,7 +407,7 @@ class TestSuccessfulResponses:
     @pytest.mark.asyncio
     async def test_successful_question_generation(self, client, mock_user, mock_book):
         """Test successful question generation still works."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.books.get_book_metadata_by_id', return_value=mock_book):
             with patch('app.api.endpoints.books.update_book', return_value=None):
                 with patch('app.services.ai_service.ai_service.generate_clarifying_questions') as mock_generate:
                     mock_generate.return_value = [

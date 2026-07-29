@@ -22,7 +22,11 @@ from app.db.questions import (
     get_ratings_for_chapter,
     get_chapter_question_progress,
 )
-from app.db.book import get_books_by_user
+from app.db.book import (
+    get_books_by_user,
+    get_book_owner_id,
+    get_book_metadata_by_id,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -174,3 +178,111 @@ async def test_get_books_by_user_projects_out_chapter_content(motor_reinit_db):
     assert chapter["subchapters"][0]["title"] == "Sub"
     assert book["toc_items"][0]["title"] == "Chapter One"
     assert book["title"] == "My Book"
+
+
+# --- #344: ownership checks must not drag chapter HTML over the wire --------
+
+
+async def _seed_book_with_heavy_chapters() -> ObjectId:
+    """A book whose chapter bodies dwarf its metadata, so overfetch is visible."""
+    books = await get_collection("books")
+    book_id = ObjectId()
+    await books.insert_one({
+        "_id": book_id,
+        "owner_id": USER,
+        "title": "Heavy Book",
+        "summary": "A summary.",
+        "genre": "nonfiction",
+        "target_audience": "engineers",
+        "toc_items": [{"id": "c1", "title": "Chapter One", "order": 1, "level": 1}],
+        "table_of_contents": {
+            "version": 1,
+            "chapters": [
+                {
+                    "id": "c1",
+                    "title": "Chapter One",
+                    "status": "in-progress",
+                    "content": "<p>" + "x" * 20000 + "</p>",
+                    "subchapters": [
+                        {
+                            "id": "c1a",
+                            "title": "Sub",
+                            "status": "draft",
+                            "content": "<p>" + "y" * 20000 + "</p>",
+                        }
+                    ],
+                }
+            ],
+        },
+    })
+    return book_id
+
+
+async def test_get_book_owner_id_returns_only_the_owner(motor_reinit_db):
+    book_id = await _seed_book_with_heavy_chapters()
+
+    owner = await get_book_owner_id(str(book_id))
+
+    assert owner == USER
+
+
+async def test_get_book_owner_id_fetches_nothing_but_the_owner(motor_reinit_db):
+    """Pins the projection itself: dropping it makes this fail.
+
+    Asserting on the return value alone would still pass if the projection were
+    removed, since the caller only reads owner_id either way. So capture what
+    Mongo actually sent back.
+    """
+    book_id = await _seed_book_with_heavy_chapters()
+
+    captured = {}
+    real_find_one = motor.motor_asyncio.AsyncIOMotorCollection.find_one
+
+    async def spy(self, filter=None, *args, **kwargs):
+        doc = await real_find_one(self, filter, *args, **kwargs)
+        captured["doc"] = doc
+        return doc
+
+    with patch.object(motor.motor_asyncio.AsyncIOMotorCollection, "find_one", spy):
+        await get_book_owner_id(str(book_id))
+
+    doc = captured["doc"]
+    # _id always comes back unless explicitly suppressed; nothing else may.
+    assert set(doc.keys()) <= {"_id", "owner_id"}
+    assert "table_of_contents" not in doc
+    assert "title" not in doc
+
+
+async def test_get_book_owner_id_returns_none_for_missing_and_malformed_ids(motor_reinit_db):
+    assert await get_book_owner_id(str(ObjectId())) is None
+    # A non-ObjectId string must not raise — callers turn None into a 404.
+    assert await get_book_owner_id("not-an-object-id") is None
+
+
+async def test_get_book_metadata_by_id_excludes_chapter_html(motor_reinit_db):
+    book_id = await _seed_book_with_heavy_chapters()
+
+    book = await get_book_metadata_by_id(str(book_id))
+
+    chapter = book["table_of_contents"]["chapters"][0]
+    # Heavy HTML gone, at both levels...
+    assert "content" not in chapter
+    assert "content" not in chapter["subchapters"][0]
+    # ...but everything the callers actually read survives. The autosave path
+    # needs ids, nesting and status to locate the chapter and compute its
+    # status transition; analyze-summary/generate-questions need the top-level
+    # metadata.
+    assert chapter["id"] == "c1"
+    assert chapter["status"] == "in-progress"
+    assert chapter["subchapters"][0]["id"] == "c1a"
+    assert chapter["subchapters"][0]["status"] == "draft"
+    assert book["owner_id"] == USER
+    assert book["title"] == "Heavy Book"
+    assert book["summary"] == "A summary."
+    assert book["genre"] == "nonfiction"
+    assert book["target_audience"] == "engineers"
+
+
+async def test_get_book_metadata_by_id_returns_none_for_missing_and_malformed_ids(motor_reinit_db):
+    assert await get_book_metadata_by_id(str(ObjectId())) is None
+    assert await get_book_metadata_by_id("not-an-object-id") is None
