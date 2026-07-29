@@ -1,9 +1,14 @@
 # Deployment Pipeline Architecture
 ## Auto-Author Next.js + FastAPI Project
 
-**Status**: Architectural Design
-**Date**: 2025-10-24
+**Status**: Architectural Design — **historical, not current state** (2025-10-24)
 **Author**: DevOps Architect
+
+> ⚠️ This is a point-in-time design proposal, kept for context. It describes a
+> `develop` branch and a standalone `scripts/deploy.sh`; neither exists. The
+> deploy is a single inlined workflow, `.github/workflows/deploy-staging.yml`,
+> and `scripts/deploy.sh` was deleted in #343 as an orphaned Clerk-era script.
+> For how deploys actually work, read [`DEPLOYMENT.md`](../DEPLOYMENT.md).
 
 ---
 

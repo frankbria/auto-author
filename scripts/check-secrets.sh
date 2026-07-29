@@ -45,10 +45,33 @@ PATTERNS=(
     '[aA][uU][tT][hH].*['\''"][A-Za-z0-9+/]{40,}={0,2}['\''"]'
     # JWT tokens (real tokens, not examples)
     'eyJ[A-Za-z0-9_-]{100,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'
+    # Secrets assigned to a NEXT_PUBLIC_ name (#343). Next.js inlines every
+    # NEXT_PUBLIC_* var into the client bundle at build time, so the value is
+    # published to every visitor regardless of how it is stored. Here the
+    # variable NAME is the defect, not the value. Requiring a trailing = or :
+    # limits this to actual assignments (.env, docs, workflow yaml), so prose
+    # warning against the anti-pattern does not trip the check.
+    # A bare _KEY suffix is deliberately NOT matched: plenty of publishable
+    # keys are meant to be public (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+    # NEXT_PUBLIC_SENTRY_DSN), so matching it would be mostly false positives.
+    # A genuinely secret NEXT_PUBLIC_*_KEY still needs human review.
+    # The optional quote before the operator also catches JSON and quoted JS
+    # object keys, where a quote character sits between the name and the colon.
+    'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|PRIVATE_KEY|PASSWORD|CREDENTIALS?)[A-Z0-9_]*['\''"]?[[:space:]]*[=:]'
 )
 
 # Check each file for secret patterns
 for FILE in $FILES; do
+    # This script cannot scan itself. The PATTERNS array above is, by
+    # construction, a list of strings that look exactly like the secrets it
+    # hunts for — every rule added here would flag its own definition. Skipping
+    # it is a false-positive fix, not a coverage gap: the file holds no
+    # credentials, and changes to it get reviewed precisely because it is the
+    # scanner.
+    if [ "$FILE" = "scripts/check-secrets.sh" ]; then
+        continue
+    fi
+
     # Skip binary files
     if git diff --cached --numstat "$FILE" | grep -q '^-'; then
         continue
@@ -79,8 +102,11 @@ for FILE in $FILES; do
     # Get the content being ADDED (only '+' lines, excluding the '+++' file header).
     # Scanning added lines only — not removed/context lines — so that deleting a
     # hardcoded secret or editing nearby code doesn't falsely block the commit.
-    # (limit to first 10KB to avoid processing huge diffs)
-    CONTENT=$(git diff --cached "$FILE" | grep '^+' | grep -v '^+++' | head -c 10240)
+    # Capped at 100KB, matching the file-size guard above rather than a smaller
+    # arbitrary number: at 10KB a secret added past the first ~10KB of a file's
+    # diff was silently skipped, so whether a leak was caught depended on where
+    # in the file it landed. The two guards above already bound the work.
+    CONTENT=$(git diff --cached "$FILE" | grep '^+' | grep -v '^+++' | head -c 102400)
 
     for PATTERN in "${PATTERNS[@]}"; do
         MATCHES=$(echo "$CONTENT" | grep -E "$PATTERN" | head -5)

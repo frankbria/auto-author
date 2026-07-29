@@ -108,6 +108,9 @@ The pre-commit hook scans staged files for accidentally committed credentials an
 - **Private Keys**: .pem files
 - **Base64 Auth**: Base64-encoded authentication strings
 - **JWT Tokens**: Real JWT tokens (not example tokens)
+- **`NEXT_PUBLIC_` secrets**: A `NEXT_PUBLIC_*` name containing `SECRET`, `PRIVATE_KEY`, `PASSWORD`, or `CREDENTIAL(S)`, in an assignment (`=` or `:`) — #343. Next.js inlines these into the client bundle at build time, publishing the value to every visitor.
+  - **Partial by design.** A bare `_KEY` or `_TOKEN` suffix is *not* matched, because plenty of such names are intentionally public (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SENTRY_DSN`) and matching them would produce mostly false positives — which is how a hook gets bypassed with `--no-verify`. A genuinely secret `NEXT_PUBLIC_*_KEY`/`_TOKEN` still needs human review. The generic secret/token rules above may catch it, but only if the *value* is a quoted 32+ character string.
+  - Requiring the assignment operator means prose warning against the anti-pattern (this bullet, for instance) does not trip the check.
 
 **On detection:**
 - Commit is blocked
