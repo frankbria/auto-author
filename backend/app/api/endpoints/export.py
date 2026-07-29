@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from app.api.dependencies import get_rate_limiter
 from app.core.security import get_current_user_from_session
-from app.db.book import get_book_by_id
+from app.db.book import get_book_by_id, get_book_owner_id
 from app.services.export_service import (
     export_service,
     ExportUnavailableError,
@@ -548,11 +548,11 @@ async def get_export_templates(
 
     The frontend renders these directly as the template preview before export.
     """
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403,
             detail="Not authorized to access this book"

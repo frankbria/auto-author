@@ -53,7 +53,8 @@ from app.schemas.book import (
     QuestionProgressResponse,
 )
 from app.db.database import (
-    create_book, get_book_by_id, get_books_by_user,
+    create_book, get_book_by_id, get_book_owner_id, get_book_metadata_by_id,
+    get_books_by_user,
     update_book, apply_chapter_content_update, update_book_summary_atomic,
     delete_book
 )
@@ -717,7 +718,7 @@ async def analyze_book_summary(
     This endpoint uses OpenAI to analyze the summary's structure and completeness.
     """
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    book = await get_book_metadata_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -839,7 +840,7 @@ async def generate_clarifying_questions(
     Uses AI to create 3-5 targeted questions that help structure the book content.
     """
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    book = await get_book_metadata_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -1507,8 +1508,13 @@ async def update_chapter_content(
     """
     Update chapter content with automatic metadata updates.
     """
-    # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    # Verify ownership and read the TOC *structure*. The projection drops every
+    # chapter's draft HTML, which this handler never reads — it only walks the
+    # tree to find the target chapter, its parent, and its current status, then
+    # writes through the scoped apply_chapter_content_update below. This is the
+    # 3s autosave path, so the whole-document read it used to do was the worst
+    # instance of the overfetch in #344.
+    book = await get_book_metadata_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -1605,10 +1611,10 @@ async def get_chapter_analytics(
     Get analytics data for a specific chapter.
     """
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's analytics"
         )
@@ -1782,11 +1788,11 @@ async def generate_chapter_questions(
         )
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise handle_book_not_found(book_id, request_id)
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise handle_unauthorized_access(
             resource_type="book",
             resource_id=book_id,
@@ -1892,11 +1898,11 @@ async def list_chapter_questions(
         )
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise handle_book_not_found(book_id, request_id)
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise handle_unauthorized_access(
             resource_type="book",
             resource_id=book_id,
@@ -1987,11 +1993,11 @@ async def save_question_response(
         )
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise handle_book_not_found(book_id, request_id)
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise handle_unauthorized_access(
             resource_type="book",
             resource_id=book_id,
@@ -2082,11 +2088,11 @@ async def get_question_response(
     request_id = generate_request_id()
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise handle_book_not_found(book_id, request_id)
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise handle_unauthorized_access(
             resource_type="book",
             resource_id=book_id,
@@ -2166,11 +2172,11 @@ async def rate_question(
         )
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise handle_book_not_found(book_id, request_id)
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise handle_unauthorized_access(
             resource_type="book",
             resource_id=book_id,
@@ -2262,11 +2268,11 @@ async def regenerate_single_question(
     request_id = generate_request_id()
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise handle_book_not_found(book_id, request_id)
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise handle_unauthorized_access(
             resource_type="book",
             resource_id=book_id,
@@ -2352,11 +2358,11 @@ async def get_chapter_question_progress(
     request_id = generate_request_id()
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise handle_book_not_found(book_id, request_id)
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise handle_unauthorized_access(
             resource_type="book",
             resource_id=book_id,
@@ -2441,11 +2447,11 @@ async def regenerate_chapter_questions(
         )
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise handle_book_not_found(book_id, request_id)
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise handle_unauthorized_access(
             resource_type="book",
             resource_id=book_id,
@@ -2665,10 +2671,10 @@ async def transform_chapter_style(
     restoring the snapshot it held before applying.
     """
     # Verify book ownership.
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403,
             detail="Not authorized to transform content for this book",
@@ -2934,11 +2940,11 @@ async def save_question_responses_batch_endpoint(
         )
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
         raise handle_book_not_found(book_id, request_id)
 
-    if book.get("owner_id") != current_user.get("auth_id"):
+    if owner_id != current_user.get("auth_id"):
         raise handle_unauthorized_access(
             resource_type="book",
             resource_id=book_id,

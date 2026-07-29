@@ -51,10 +51,57 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
         raise
 
 
+# Drops the per-chapter draft HTML (top-level chapters and one level of
+# subchapters) while leaving ids, titles, nesting, status and all top-level book
+# metadata intact. Chapter bodies are the only unbounded field on a book, so
+# excluding them turns a multi-KB→MB read into a small one (#344).
+CONTENT_EXCLUDING_PROJECTION = {
+    "table_of_contents.chapters.content": 0,
+    "table_of_contents.chapters.subchapters.content": 0,
+}
+
+
 async def get_book_by_id(book_id: str) -> Optional[Dict]:
-    """Get a book by its ID"""
+    """Get a book by its ID, including every chapter's draft HTML.
+
+    Prefer :func:`get_book_owner_id` when only ownership matters, or
+    :func:`get_book_metadata_by_id` when the chapter bodies are not read — this
+    one pulls the entire document (#344).
+    """
     try:
         book = await books_collection.find_one({"_id": ObjectId(book_id)})
+        return book
+    except Exception:
+        return None
+
+
+async def get_book_owner_id(book_id: str) -> Optional[str]:
+    """Return just the owner of a book, for an ownership check.
+
+    Most book-scoped endpoints read nothing but ``owner_id`` from the book, yet
+    an unprojected ``find_one`` hands back every chapter's HTML to answer that
+    one question. Returns ``None`` for a missing book and for a malformed id,
+    matching :func:`get_book_by_id` so callers keep turning both into a 404.
+    """
+    try:
+        book = await books_collection.find_one(
+            {"_id": ObjectId(book_id)}, {"owner_id": 1}
+        )
+        return book.get("owner_id") if book else None
+    except Exception:
+        return None
+
+
+async def get_book_metadata_by_id(book_id: str) -> Optional[Dict]:
+    """Get a book without any chapter draft HTML.
+
+    For callers that need the book's metadata or its chapter *structure* —
+    ids, nesting, titles, status — but never a chapter body.
+    """
+    try:
+        book = await books_collection.find_one(
+            {"_id": ObjectId(book_id)}, CONTENT_EXCLUDING_PROJECTION
+        )
         return book
     except Exception:
         return None
@@ -72,12 +119,8 @@ async def get_books_by_user(
     overfetch (a book with long chapters sends KBs of unused HTML per row).
     Titles/structure/``toc_items`` are untouched.
     """
-    projection = {
-        "table_of_contents.chapters.content": 0,
-        "table_of_contents.chapters.subchapters.content": 0,
-    }
     cursor = (
-        books_collection.find({"owner_id": user_auth_id}, projection)
+        books_collection.find({"owner_id": user_auth_id}, CONTENT_EXCLUDING_PROJECTION)
         .skip(skip)
         .limit(limit)
     )
