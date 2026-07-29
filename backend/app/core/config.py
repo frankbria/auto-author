@@ -106,6 +106,14 @@ class Settings(BaseSettings):
 
     # Export Settings
     EXPORT_TIMEOUT_SECONDS: int = 120  # Hard cap on a single export's generation
+    # Worker threads reserved for CPU-bound export builds (#345). Exports run on
+    # their own pool so a burst of oversized books cannot occupy the event
+    # loop's default executor, which ai_service uses for blocking OpenAI calls.
+    # A timeout does NOT free a slot — Python cannot kill a running thread — so
+    # this is the real ceiling on how many stuck exports it takes to block
+    # further exports. Tune against the box's core count; keep it below the
+    # default executor's size so AI always has headroom.
+    EXPORT_MAX_WORKERS: int = 2
 
     # AWS Settings (Optional - for transcription and storage)
     AWS_ACCESS_KEY_ID: str = ""
