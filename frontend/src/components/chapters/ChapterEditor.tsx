@@ -32,24 +32,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import bookClient from '@/lib/api/bookClient';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  TextBoldIcon,
-  TextItalicIcon,
-  TextUnderlineIcon,
-  Strikethrough,
-  Heading01Icon,
-  Heading02Icon,
-  Heading03Icon,
-  ListViewIcon,
-  MenuSquareIcon,
-  QuoteUpIcon,
-  CodeIcon,
-  Undo02Icon,
-  Redo02Icon,
-  MinusSignIcon,
   CheckmarkCircle01Icon,
   Loading03Icon
 } from '@hugeicons/core-free-icons';
-import { cn } from '@/lib/utils';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { AUTO_SAVE_DEFAULT_SECONDS, isValidAutoSaveInterval } from '@/lib/constants/auto-save';
