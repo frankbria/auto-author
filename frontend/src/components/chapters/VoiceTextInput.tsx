@@ -10,6 +10,10 @@ import {
   Square01Icon
 } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
+import {
+  describeSpeechError,
+  isSpeechRecognitionSupported,
+} from '@/lib/voice/speechRecognitionErrors';
 
 type InputMode = 'text' | 'voice';
 
@@ -80,8 +84,33 @@ export function VoiceTextInput({
 
   // Check for speech recognition support
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    setIsSupported(!!SpeechRecognition);
+    setIsSupported(isSpeechRecognitionSupported());
+  }, []);
+
+  // Release the microphone if this unmounts mid-recording (#348). Without this,
+  // navigating away while dictating left recognition running and the browser's
+  // recording indicator lit — the user has no control left to stop it.
+  //
+  // Empty deps so it runs only on unmount, and it reads the ref rather than
+  // state so it cannot capture a stale recorder. Handlers are detached first:
+  // stop() fires onend, which would otherwise call setState on an unmounted
+  // component.
+  useEffect(() => {
+    return () => {
+      const recognition = recognitionRef.current;
+      if (!recognition) {
+        return;
+      }
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      try {
+        recognition.stop();
+      } catch {
+        // Already stopped/destroyed — nothing to release.
+      }
+      recognitionRef.current = null;
+    };
   }, []);
 
   // Update mode when prop changes
@@ -159,8 +188,15 @@ export function VoiceTextInput({
     };
 
     recognition.onerror = (event: ErrorEvent) => {
-      console.error('Speech recognition error:', event.error);
-      setError(`Error recording audio: ${event.error || 'Unknown error'}`);
+      // no-speech/aborted are routine (a silent window, or the user stopping),
+      // so they end the session without an error banner. Everything else gets
+      // copy that says what to do rather than echoing the raw code (#348).
+      const code = (event as unknown as { error?: string }).error;
+      const message = describeSpeechError(code);
+      if (message) {
+        console.error('Speech recognition error:', code);
+        setError(message);
+      }
       setIsRecording(false);
     };
 

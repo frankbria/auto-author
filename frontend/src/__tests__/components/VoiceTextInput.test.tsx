@@ -135,10 +135,16 @@ describe('VoiceTextInput Component', () => {
       // Wait for recognition to start
       expect(mockRecognition.start).toHaveBeenCalled();
 
-      // Wait for error to appear
+      // A real failure still surfaces — but as actionable copy, not the raw
+      // code. #348 replaced "Error recording audio: network" because echoing the
+      // API's code tells the user nothing about what to do. getAllByText because
+      // the message renders in both the banner and the sr-only live region.
       await waitFor(() => {
-        expect(screen.getByText('Error recording audio: network')).toBeInTheDocument();
+        expect(
+          screen.getAllByText(/needs an internet connection/i).length
+        ).toBeGreaterThan(0);
       }, { timeout: 2000 });
+      expect(screen.queryByText(/Error recording audio/i)).not.toBeInTheDocument();
     });
   });
 
