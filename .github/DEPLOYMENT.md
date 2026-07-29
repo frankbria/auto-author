@@ -30,8 +30,11 @@ Configure at: `Settings` → `Secrets and variables` → `Actions`.
 | `API_URL` | Backend API URL, including the version prefix | `https://api.dev.autoauthor.app/api/v1` |
 | `FRONTEND_URL` | Frontend application URL | `https://dev.autoauthor.app` |
 
-`FRONTEND_URL` does double duty: it is also written as `BETTER_AUTH_URL` and as
-the sole entry in `BACKEND_CORS_ORIGINS`.
+`FRONTEND_URL` is reused in five places by the deploy: the build-time
+`NEXT_PUBLIC_BETTER_AUTH_URL`, the backend's `BETTER_AUTH_URL`, the backend's
+`BACKEND_CORS_ORIGINS` (as its sole entry), the frontend's
+`NEXT_PUBLIC_BETTER_AUTH_URL`, and the `__BETTER_AUTH_URL__` substitution in
+`ecosystem.config.template.js`. Getting it wrong breaks auth and CORS together.
 
 ### Database (MongoDB)
 

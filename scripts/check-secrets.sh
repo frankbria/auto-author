@@ -51,6 +51,10 @@ PATTERNS=(
     # variable NAME is the defect, not the value. Requiring a trailing = or :
     # limits this to actual assignments (.env, docs, workflow yaml), so prose
     # warning against the anti-pattern does not trip the check.
+    # A bare _KEY suffix is deliberately NOT matched: plenty of publishable
+    # keys are meant to be public (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+    # NEXT_PUBLIC_SENTRY_DSN), so matching it would be mostly false positives.
+    # A genuinely secret NEXT_PUBLIC_*_KEY still needs human review.
     'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|PRIVATE_KEY|PASSWORD|CREDENTIALS?)[A-Z0-9_]*[[:space:]]*[=:]'
 )
 
