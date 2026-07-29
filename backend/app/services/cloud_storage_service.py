@@ -3,6 +3,7 @@ Cloud storage service for handling file uploads to AWS S3 or Cloudinary.
 Provides a unified interface for cloud storage operations.
 """
 
+import asyncio
 import os
 import uuid
 from pathlib import Path
@@ -61,8 +62,11 @@ class S3StorageService:
             file_ext = Path(filename).suffix.lower()
             unique_key = f"{folder}/{uuid.uuid4().hex}{file_ext}"
 
-            # Upload to S3
-            self.s3_client.put_object(
+            # boto3 is synchronous — a multi-second S3 round-trip inside
+            # `async def` freezes the event loop for every other request on
+            # this worker (#346). Offload it.
+            await asyncio.to_thread(
+                self.s3_client.put_object,
                 Bucket=self.bucket_name,
                 Key=unique_key,
                 Body=file_data,
@@ -88,7 +92,8 @@ class S3StorageService:
             if f"{self.bucket_name}.s3" in url:
                 key = url.split(f"{self.bucket_name}.s3.{self.region}.amazonaws.com/")[-1]
 
-                self.s3_client.delete_object(
+                await asyncio.to_thread(
+                    self.s3_client.delete_object,
                     Bucket=self.bucket_name,
                     Key=key
                 )
@@ -130,8 +135,9 @@ class CloudinaryStorageService:
             file_ext = Path(filename).suffix.lower()
             public_id = f"{folder}/{uuid.uuid4().hex}"
 
-            # Upload to Cloudinary
-            result = self.cloudinary_uploader.upload(
+            # The Cloudinary SDK is synchronous — same offload as S3 (#346).
+            result = await asyncio.to_thread(
+                self.cloudinary_uploader.upload,
                 file_data,
                 public_id=public_id,
                 folder=folder,
@@ -164,7 +170,9 @@ class CloudinaryStorageService:
                 if len(parts) >= 2:
                     public_id = "/".join(parts[1:]).rsplit(".", 1)[0]  # Remove extension
 
-                    result = self.cloudinary_uploader.destroy(public_id)
+                    result = await asyncio.to_thread(
+                        self.cloudinary_uploader.destroy, public_id
+                    )
 
                     if result.get('result') == 'ok':
                         logger.info(f"Deleted image from Cloudinary: {public_id}")
