@@ -60,7 +60,7 @@ python -c 'import secrets; print(secrets.token_urlsafe(64))'
 
 **This one is not optional — and leaving it unset does not fail loudly in
 staging.** `backend/app/core/config.py` declares `BETTER_AUTH_SECRET` with a
-*default* (the committed 58-character CI test secret), and the validator rejects
+*default* (the CI test secret committed in that file), and the validator rejects
 that default **only when the environment is production**. So:
 
 | Environment | Secret unset | Result |
