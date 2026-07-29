@@ -3,6 +3,7 @@ File upload service for handling book cover images and other file uploads.
 Currently uses local storage, but designed to be easily extended for cloud storage (S3, Cloudinary, etc.)
 """
 
+import asyncio
 import uuid
 from pathlib import Path
 from typing import Optional, Tuple
@@ -65,6 +66,102 @@ def _resolve_local_profile_path(image_url: str) -> Optional[Path]:
     return _resolve_local_path(image_url, PROFILE_IMAGE_URL_PREFIX, PROFILE_PICTURES_DIR)
 
 
+# --- Blocking PIL work, isolated so it can be pushed off the event loop (#346).
+#
+# Decode, LANCZOS resize and save(optimize=True) are CPU-bound and were running
+# inline in `async def`, freezing the loop — on a 2-worker deploy a couple of
+# concurrent uploads stalled health checks and every other request on the
+# worker. Same blocking-in-async class #175 fixed for OpenAI and #345 for
+# exports. Each helper below is synchronous and must be called via
+# `asyncio.to_thread`; the caller awaits it, so the file object is never
+# touched by two threads at once.
+#
+# These go to the loop's DEFAULT executor rather than a dedicated pool like
+# exports got in #345. Uploads are mostly network wait (S3/Cloudinary) with a
+# short encode, which is what that pool is sized for; exports are long,
+# CPU-bound and bursty, which is why they needed isolating.
+
+
+def _validate_image_sync(fileobj) -> Tuple[bool, Optional[str]]:
+    """Decode-verify an upload and reject decompression bombs. Blocking."""
+    try:
+        fileobj.seek(0)
+        image = Image.open(fileobj)
+        width, height = image.size
+        image.verify()
+        fileobj.seek(0)  # Reset after verify
+    except Exception:
+        return False, "Invalid image file"
+
+    if width * height > MAX_IMAGE_PIXELS:
+        return False, "Image dimensions too large"
+
+    return True, None
+
+
+def _prepare_image(fileobj, file_ext: str):
+    """Open an upload and normalise it to RGB when the target format needs it."""
+    fileobj.seek(0)
+    image = Image.open(fileobj)
+    if image.mode in ('RGBA', 'LA', 'P'):
+        rgb_image = Image.new('RGB', image.size, (255, 255, 255))
+        rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+        image = rgb_image
+    return image
+
+
+def _process_cover_sync(fileobj, file_ext: str, image_path: Path,
+                        thumbnail_path: Path, to_cloud: bool):
+    """Build a cover image + thumbnail. Blocking; call via asyncio.to_thread.
+
+    Returns ``(main_bytes, thumb_bytes, image_format)``. For the local path the
+    files are written here and the two byte payloads come back ``None``.
+    """
+    image = _prepare_image(fileobj, file_ext)
+
+    if image.width > MAX_IMAGE_WIDTH or image.height > MAX_IMAGE_HEIGHT:
+        image.thumbnail((MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT), Image.Resampling.LANCZOS)
+
+    thumbnail = image.copy()
+    thumbnail.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
+
+    image_format = 'JPEG' if file_ext in ['.jpg', '.jpeg'] else 'PNG'
+
+    if to_cloud:
+        main_buffer = BytesIO()
+        thumb_buffer = BytesIO()
+        image.save(main_buffer, format=image_format, quality=85, optimize=True)
+        thumbnail.save(thumb_buffer, format=image_format, quality=85, optimize=True)
+        main_buffer.seek(0)
+        thumb_buffer.seek(0)
+        return main_buffer.read(), thumb_buffer.read(), image_format
+
+    image.save(image_path, quality=85, optimize=True)
+    thumbnail.save(thumbnail_path, quality=85, optimize=True)
+    return None, None, image_format
+
+
+def _process_profile_sync(fileobj, file_ext: str, image_path: Path, to_cloud: bool):
+    """Build an avatar downscaled to fit PROFILE_PICTURE_SIZE. Blocking.
+
+    Returns ``(image_bytes, image_format)``; ``image_bytes`` is ``None`` on the
+    local path, where the file is written here.
+    """
+    image = _prepare_image(fileobj, file_ext)
+    image.thumbnail(PROFILE_PICTURE_SIZE, Image.Resampling.LANCZOS)
+
+    image_format = 'JPEG' if file_ext in ['.jpg', '.jpeg'] else 'PNG'
+
+    if to_cloud:
+        buffer = BytesIO()
+        image.save(buffer, format=image_format, quality=85, optimize=True)
+        buffer.seek(0)
+        return buffer.read(), image_format
+
+    image.save(image_path, quality=85, optimize=True)
+    return None, image_format
+
+
 class FileUploadService:
     """Service for handling file uploads with validation and storage."""
 
@@ -107,20 +204,9 @@ class FileUploadService:
             return False, f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB"
 
         # Validate it's actually an image, and guard against decompression bombs
-        # (a small file that decodes to enormous dimensions).
-        try:
-            file.file.seek(0)
-            image = Image.open(file.file)
-            width, height = image.size
-            image.verify()
-            file.file.seek(0)  # Reset after verify
-        except Exception:
-            return False, "Invalid image file"
-
-        if width * height > MAX_IMAGE_PIXELS:
-            return False, "Image dimensions too large"
-
-        return True, None
+        # (a small file that decodes to enormous dimensions). PIL work is
+        # blocking, so it goes to a worker thread (#346).
+        return await asyncio.to_thread(_validate_image_sync, file.file)
 
     async def process_and_save_cover_image(
         self,
@@ -151,58 +237,34 @@ class FileUploadService:
         thumbnail_path = COVER_IMAGES_DIR / thumbnail_filename
 
         try:
-            # Save and process the main image
-            file.file.seek(0)
-            image = Image.open(file.file)
-
-            # Convert RGBA to RGB if necessary (for JPEG)
-            if image.mode in ('RGBA', 'LA', 'P'):
-                rgb_image = Image.new('RGB', image.size, (255, 255, 255))
-                rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
-                image = rgb_image
-
-            # Resize if too large
-            if image.width > MAX_IMAGE_WIDTH or image.height > MAX_IMAGE_HEIGHT:
-                image.thumbnail((MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT), Image.Resampling.LANCZOS)
-
-            # Create thumbnail
-            thumbnail = image.copy()
-            thumbnail.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
+            # All decode/resize/encode work happens on a worker thread so the
+            # event loop stays free to serve other requests (#346).
+            main_bytes, thumb_bytes, image_format = await asyncio.to_thread(
+                _process_cover_sync,
+                file.file,
+                file_ext,
+                image_path,
+                thumbnail_path,
+                bool(self.cloud_storage),
+            )
 
             if self.cloud_storage:
-                # Upload to cloud storage
-                # Convert images to bytes
-                main_buffer = BytesIO()
-                thumb_buffer = BytesIO()
-
-                image_format = 'JPEG' if file_ext in ['.jpg', '.jpeg'] else 'PNG'
-                image.save(main_buffer, format=image_format, quality=85, optimize=True)
-                thumbnail.save(thumb_buffer, format=image_format, quality=85, optimize=True)
-
-                main_buffer.seek(0)
-                thumb_buffer.seek(0)
-
-                # Upload both images
                 content_type = f"image/{image_format.lower()}"
                 image_url = await self.cloud_storage.upload_image(
-                    file_data=main_buffer.read(),
+                    file_data=main_bytes,
                     filename=unique_filename,
                     content_type=content_type,
                     folder=f"cover_images/{book_id}"
                 )
 
                 thumbnail_url = await self.cloud_storage.upload_image(
-                    file_data=thumb_buffer.read(),
+                    file_data=thumb_bytes,
                     filename=thumbnail_filename,
                     content_type=content_type,
                     folder=f"cover_images/{book_id}/thumbnails"
                 )
             else:
-                # Save to local storage
-                image.save(image_path, quality=85, optimize=True)
-                thumbnail.save(thumbnail_path, quality=85, optimize=True)
-
-                # Return local URLs
+                # _process_cover_sync already wrote both files.
                 image_url = f"/uploads/cover_images/{unique_filename}"
                 thumbnail_url = f"/uploads/cover_images/{thumbnail_filename}"
 
@@ -268,31 +330,24 @@ class FileUploadService:
         image_path = PROFILE_PICTURES_DIR / unique_filename
 
         try:
-            file.file.seek(0)
-            image = Image.open(file.file)
-
-            # Convert to RGB if necessary (for JPEG)
-            if image.mode in ('RGBA', 'LA', 'P'):
-                rgb_image = Image.new('RGB', image.size, (255, 255, 255))
-                rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
-                image = rgb_image
-
-            # Downscale to at most 400x400, preserving aspect ratio
-            image.thumbnail(PROFILE_PICTURE_SIZE, Image.Resampling.LANCZOS)
+            # Blocking PIL work goes to a worker thread (#346).
+            image_bytes, image_format = await asyncio.to_thread(
+                _process_profile_sync,
+                file.file,
+                file_ext,
+                image_path,
+                bool(self.cloud_storage),
+            )
 
             if self.cloud_storage:
-                buffer = BytesIO()
-                image_format = 'JPEG' if file_ext in ['.jpg', '.jpeg'] else 'PNG'
-                image.save(buffer, format=image_format, quality=85, optimize=True)
-                buffer.seek(0)
                 return await self.cloud_storage.upload_image(
-                    file_data=buffer.read(),
+                    file_data=image_bytes,
                     filename=unique_filename,
                     content_type=f"image/{image_format.lower()}",
                     folder=f"profile_pictures/{user_id}",
                 )
 
-            image.save(image_path, quality=85, optimize=True)
+            # _process_profile_sync already wrote the file.
             return f"{PROFILE_IMAGE_URL_PREFIX}{unique_filename}"
 
         except Exception:
