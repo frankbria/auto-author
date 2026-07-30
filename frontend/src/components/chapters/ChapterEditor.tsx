@@ -138,7 +138,14 @@ export function ChapterEditor({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      // trailingNode is new in StarterKit v3 and ON by default: it keeps an
+      // empty paragraph at the end of the document so there is always somewhere
+      // to click below the last block. Disabled deliberately — the editor's HTML
+      // is what gets persisted and exported, so leaving it on would append a
+      // <p></p> to every chapter a user saves. That is a content change, and a
+      // dependency upgrade is the wrong place to make one; enabling it is a
+      // product decision with a migration behind it (#385).
+      StarterKit.configure({ trailingNode: false }),
       Underline,
       Placeholder.configure({
         placeholder: 'Start writing your chapter content...',
