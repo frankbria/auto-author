@@ -50,7 +50,35 @@ Archived documents are:
 - Preserved for context and learning
 - Referenced in active docs where relevant
 
+
+### AUTO_AUTHOR_GAP_ANALYSIS.md
+**Archived**: 2026-07-30 (#351)
+**Reason**: Pre-launch gap analysis; no document referenced it, and its "critical
+issues preventing the application from being functional" have since been worked
+through the P0–P2 issue queue.
+**Status at Archive**: Superseded by the GitHub issue backlog.
+**Historical Value**: Records what was considered launch-blocking before the P0
+review.
+
+### application-summary.md
+**Archived**: 2026-07-30 (#351)
+**Reason**: Initial project summary. `docs/analysis/documentation-review.md`
+already recommended archiving it.
+**Status at Archive**: Describes some capabilities as available that were targets
+at the time of writing — a point-in-time snapshot, not a current feature list.
+**Historical Value**: Shows the original product framing.
+
+### KEYBOARD_NAVIGATION_REPORT.md
+**Archived**: 2026-07-30 (#351)
+**Reason**: December 2024 accessibility audit. Same documentation-review
+recommendation; its only remaining references are from other archived documents.
+**Status at Archive**: Its WCAG compliance table and code examples reflect the
+codebase as of the audit, not today — accessibility work has since moved on
+through #50, #347 and #349.
+**Historical Value**: Baseline for the accessibility work that followed.
+
 ---
 
-**Last Updated**: 2025-10-12
+**Last Updated**: 2026-07-30
 **Maintained By**: Development Team
+

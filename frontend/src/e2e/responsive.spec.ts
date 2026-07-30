@@ -15,7 +15,7 @@
 
 import { test, expect, type Page } from '@playwright/test';
 
-// Viewport presets matching responsiveHelpers.ts
+// Viewport presets (previously mirrored a test-only helper removed in #351)
 const VIEWPORTS = {
   mobileSmall: { width: 320, height: 568, name: 'iPhone SE (smallest)' },
   mobile: { width: 375, height: 667, name: 'iPhone 12 Mini' },
