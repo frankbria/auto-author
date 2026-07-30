@@ -6,6 +6,7 @@
  * mid-dictation left recognition running with the browser's recording indicator
  * lit, and the control that would have stopped it was gone.
  */
+import { StrictMode } from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { VoiceTextInput } from '@/components/chapters/VoiceTextInput';
@@ -431,5 +432,32 @@ describe('VoiceTextInput survives a failing start (#348)', () => {
     expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
 
     consoleSpy.mockRestore();
+  });
+});
+
+describe('VoiceTextInput under StrictMode (#348)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    installRecognition();
+  });
+
+  it('still records after StrictMode double-invokes the effects', async () => {
+    // StrictMode runs mount -> cleanup -> mount in development, which is exactly
+    // Next.js's default for `next dev`. A flag only ever set to true in cleanup
+    // latches on that first teardown, and the unmounted-guard in startRecording
+    // then aborts every recording — dictation broken for the whole dev session
+    // while passing every non-StrictMode test.
+    installMicStream();
+    render(
+      <StrictMode>
+        <VoiceTextInput value="" mode="voice" onChange={jest.fn()} />
+      </StrictMode>
+    );
+
+    await startRecording();
+
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalled();
+    // Reached the recognizer, not aborted at the guard.
+    expect(TrackedRecognition.instances.at(-1)?.started).toBe(true);
   });
 });

@@ -111,6 +111,13 @@ export function VoiceTextInput({
   // stop() fires onend, which would otherwise call setState on an unmounted
   // component.
   useEffect(() => {
+    // Reset on every mount, not just the first. StrictMode double-invokes
+    // effects in development (mount → cleanup → mount), so a flag only ever set
+    // to true latches after that first cleanup — and startRecording's
+    // unmounted-guard would then abort every recording for the rest of the
+    // session. The component is very much mounted here.
+    unmountedRef.current = false;
+
     return () => {
       unmountedRef.current = true;
       const recognition = recognitionRef.current;
