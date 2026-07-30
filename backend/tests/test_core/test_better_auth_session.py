@@ -102,13 +102,22 @@ class TestValidateBetterAuthSession:
             result = await bas.validate_better_auth_session(req)
         assert result["userId"] == "u1"
 
-    async def test_no_expires_at_still_valid(self):
+    async def test_no_expires_at_is_rejected(self):
+        """A session we cannot date is a session we cannot trust (#352).
+
+        This test previously asserted the opposite — `test_no_expires_at_still_valid`
+        pinned the behaviour where a document missing the field skipped the
+        expiry check and was accepted, giving an unexpirable session from a
+        malformed or partially-written record. The issue calls that out as a
+        fail-open; the assertion is inverted to the intended behaviour rather
+        than left encoding the defect.
+        """
         req = _request_with_cookies({"better-auth.session_token": "tok"})
         coll = AsyncMock()
         coll.find_one.return_value = {"_id": "s1", "userId": "u1"}
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             result = await bas.validate_better_auth_session(req)
-        assert result["userId"] == "u1"
+        assert result is None
 
     async def test_db_exception_returns_none(self):
         req = _request_with_cookies({"better-auth.session_token": "tok"})

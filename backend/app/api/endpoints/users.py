@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Query
 from fastapi.security import HTTPBearer
 from typing import List, Dict
 from datetime import datetime, timezone
@@ -349,10 +349,29 @@ async def update_user_data(
 
 
 @router.get("/admin/users", response_model=List[UserResponse])
-async def get_all_users(_: Dict = Depends(allow_admins)):
-    """Get all users (admin only)"""
+async def get_all_users(
+    _: Dict = Depends(allow_admins),
+    # skip is capped as well as limit: Mongo walks every skipped document, so an
+    # unbounded offset turns a cheap query into a full scan the caller controls.
+    # 100k is far beyond any realistic admin page and still bounds the work.
+    skip: int = Query(0, ge=0, le=100_000, description="Number of users to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum users to return"),
+):
+    """Get users (admin only), newest first.
+
+    Paginated deliberately: this was an unbounded find().to_list(length=None),
+    which loads every user document into memory and serialises them in one
+    response. That is fine at a few hundred users and a availability problem at
+    a few hundred thousand (#352). le=500 caps what a single call can cost.
+    """
     users_collection = await get_collection("users")
-    users = await users_collection.find().to_list(length=None)
+    users = (
+        await users_collection.find()
+        .sort("_id", -1)
+        .skip(skip)
+        .limit(limit)
+        .to_list(length=limit)
+    )
     return users
 
 

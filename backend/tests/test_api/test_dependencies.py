@@ -11,7 +11,6 @@ from fastapi import HTTPException, Request
 import app.api.dependencies as deps
 from app.api.dependencies import (
     sanitize_input,
-    get_api_key,
     audit_request,
     get_database_collection,
     SanitizedModel,
@@ -330,32 +329,7 @@ class TestRateLimiting:
 class TestAPIKey:
     """Test API key validation"""
 
-    async def test_get_api_key_valid(self):
-        """Test get_api_key with valid key"""
-        api_key = "valid_api_key_123"
 
-        result = await get_api_key(x_api_key=api_key)
-
-        assert result == api_key
-
-    async def test_get_api_key_missing(self):
-        """Test get_api_key with missing key"""
-        with pytest.raises(HTTPException) as exc_info:
-            await get_api_key(x_api_key=None)
-
-        assert exc_info.value.status_code == 401
-        assert "API key is missing" in exc_info.value.detail
-
-    async def test_get_api_key_empty(self):
-        """Test get_api_key with empty key"""
-        with pytest.raises(HTTPException) as exc_info:
-            await get_api_key(x_api_key="")
-
-        assert exc_info.value.status_code == 401
-        assert "API key is missing" in exc_info.value.detail
-
-
-@pytest.mark.asyncio
 class TestAuditRequest:
     """Test audit logging functionality
 

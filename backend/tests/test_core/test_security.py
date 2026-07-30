@@ -418,6 +418,7 @@ class TestProductionSecurityValidation:
         monkeypatch.setenv("BYPASS_AUTH", "true")
         monkeypatch.delenv("E2E_ALLOW_BYPASS", raising=False)
 
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "s" * 64)
         settings = Settings()
         assert settings.BYPASS_AUTH is False
 
@@ -464,6 +465,7 @@ class TestProductionSecurityValidation:
         monkeypatch.setenv("BYPASS_AUTH", "true")
         monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
 
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "s" * 64)
         settings = Settings()
         assert settings.BYPASS_AUTH is True
 
@@ -566,6 +568,7 @@ class TestProductionSecurityValidation:
         monkeypatch.setenv("BYPASS_AUTH", "true")
         monkeypatch.delenv("E2E_ALLOW_BYPASS", raising=False)
 
+        monkeypatch.setenv("BETTER_AUTH_SECRET", "s" * 64)
         settings = Settings()
         assert settings.BYPASS_AUTH is False
 

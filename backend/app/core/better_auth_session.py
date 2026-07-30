@@ -99,6 +99,18 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
 
         # Check if session has expired
         expires_at = session.get("expiresAt")
+        if not expires_at:
+            # Fail closed. `if expires_at:` meant a session document missing the
+            # field skipped the expiry check altogether and was treated as
+            # valid — an unexpirable session from a malformed or
+            # partially-written record (#352). A session we cannot date is a
+            # session we cannot trust.
+            logger.warning(
+                "Session %s has no expiresAt; rejecting as invalid",
+                session.get("_id"),
+            )
+            return None
+
         if expires_at:
             # Handle both datetime objects and ISO strings
             if isinstance(expires_at, str):
