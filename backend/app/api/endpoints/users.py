@@ -351,7 +351,10 @@ async def update_user_data(
 @router.get("/admin/users", response_model=List[UserResponse])
 async def get_all_users(
     _: Dict = Depends(allow_admins),
-    skip: int = Query(0, ge=0, description="Number of users to skip"),
+    # skip is capped as well as limit: Mongo walks every skipped document, so an
+    # unbounded offset turns a cheap query into a full scan the caller controls.
+    # 100k is far beyond any realistic admin page and still bounds the work.
+    skip: int = Query(0, ge=0, le=100_000, description="Number of users to skip"),
     limit: int = Query(100, ge=1, le=500, description="Maximum users to return"),
 ):
     """Get users (admin only), newest first.

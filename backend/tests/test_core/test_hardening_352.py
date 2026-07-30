@@ -135,3 +135,17 @@ class TestSessionWithoutExpiryFailsClosed:
         # The fail-open path fell through to refreshing last-activity on a
         # session it had never dated.
         assert coll.refreshed is False
+
+
+class TestAiMaxRetriesUpperBound:
+    """The backoff is exponential, so an oversized retry count does not fail
+    loudly — it holds the request open past any sane client timeout while
+    occupying a worker."""
+
+    @pytest.mark.parametrize("bad", [11, 100])
+    def test_retry_count_above_the_cap_is_rejected(self, bad):
+        with pytest.raises(ValidationError):
+            config.Settings(AI_MAX_RETRIES=bad)
+
+    def test_the_cap_itself_is_allowed(self):
+        assert config.Settings(AI_MAX_RETRIES=10).AI_MAX_RETRIES == 10

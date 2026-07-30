@@ -143,6 +143,15 @@ async def _apply_subscription_event(
     # only prevents the SAME event twice; this prevents an EARLIER one landing
     # last. Events without a timestamp (older payload shapes) are applied as
     # before rather than dropped.
+    #
+    # Known limit: `created` has one-second granularity, so two updates inside
+    # the same second cannot be ordered by it. The comparison is `<` rather than
+    # `<=` deliberately — dropping same-second events would discard legitimate
+    # ones, and last-write-wins within a second is the pre-existing behaviour.
+    # The complete fix is to re-fetch the subscription from Stripe on each event
+    # and apply canonical state; that trades an extra API call (and a new failure
+    # mode when Stripe is unreachable) for exactness, and is the upgrade path if
+    # same-second races ever show up in practice.
     last_applied = user.get("stripe_event_created")
     if (
         event_created is not None

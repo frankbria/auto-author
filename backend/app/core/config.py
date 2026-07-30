@@ -99,10 +99,12 @@ class Settings(BaseSettings):
     # limits on the real product (see _is_exempt_e2e_user in dependencies.py).
     E2E_EXEMPT_EMAILS: str = ""
 
-    # ge=1: range(max_retries) with 0 or a negative value never enters the
-    # loop, so _retry_with_backoff returns None implicitly and the caller
-    # AttributeErrors on the result. Fail at config load instead (#352).
-    AI_MAX_RETRIES: int = Field(default=3, ge=1)
+    # ge=1: range(max_retries) with 0 or a negative value never enters the loop,
+    # so _retry_with_backoff returns None implicitly and the caller AttributeErrors
+    # on the result. le=10: the backoff is exponential, so a large value does not
+    # fail loudly — it just holds the request open past any sane client timeout
+    # while occupying a worker. Both ends fail at config load instead (#352).
+    AI_MAX_RETRIES: int = Field(default=3, ge=1, le=10)
 
     # Max times a single question may be regenerated (per-question abuse cap,
     # complementing the endpoint rate limit)
