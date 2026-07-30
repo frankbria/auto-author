@@ -246,13 +246,20 @@ export function VoiceTextInput({
         setError(message);
       }
       releaseMicStream();
+      // Clear the handle too: startRecording's re-entrancy guard checks it, so
+      // leaving a dead recognizer here would make every later Start a silent
+      // no-op and strand voice input until unmount.
+      recognitionRef.current = null;
       setIsRecording(false);
     };
 
     recognition.onend = () => {
       // Recognition can end without the user asking — a service timeout, or the
-      // browser deciding the utterance finished. The mic must go with it.
+      // browser deciding the utterance finished. The mic must go with it, and so
+      // must the handle: startRecording's guard checks it, and onend fires
+      // routinely, so holding a dead recognizer here would brick every restart.
       releaseMicStream();
+      recognitionRef.current = null;
       setIsRecording(false);
       setInterimTranscript('');
     };

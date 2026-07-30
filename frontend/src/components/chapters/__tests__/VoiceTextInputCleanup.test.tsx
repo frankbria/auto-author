@@ -350,3 +350,46 @@ describe('VoiceTextInput async-window leaks (#348)', () => {
     expect(tracks[0].stop).toHaveBeenCalled();
   });
 });
+
+describe('VoiceTextInput can restart after a browser-driven end (#348)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    installRecognition();
+  });
+
+  it.each(['onend', 'onerror'])(
+    'allows a new recording after %s ends the session',
+    async (event) => {
+      // The re-entrancy guard checks recognitionRef, so a handler that ends the
+      // session without clearing it turns every later Start into a silent no-op
+      // — dictation dead until the component unmounts. onend fires routinely
+      // (pause, timeout), so this is the common path, not an edge case.
+      installMicStream();
+      const user = userEvent.setup();
+      render(<VoiceTextInput value="" mode="voice" onChange={jest.fn()} />);
+
+      await startRecording();
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        const recognition = TrackedRecognition.instances.at(-1);
+        if (event === 'onend') {
+          recognition?.onend?.();
+        } else {
+          recognition?.onerror?.({ error: 'no-speech' });
+        }
+      });
+
+      // The control is back...
+      const start = await screen.findByRole('button', {
+        name: /start voice recording/i,
+      });
+      await act(async () => {
+        await user.click(start);
+      });
+
+      // ...and actually does something.
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+    }
+  );
+});
