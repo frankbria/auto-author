@@ -906,6 +906,11 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             if getattr(choice, "finish_reason", None) == "length":
                 return {
                     "success": False,
+                    # Tagged so the endpoint can map this to 422 rather than 503:
+                    # the request hit a model output limit, which the user fixes
+                    # by asking for less. "Service unavailable" tells them to
+                    # wait and retry, which will fail identically (#352).
+                    "error_code": "DRAFT_TRUNCATED",
                     "error": (
                         "The generated draft was cut off before it finished. "
                         "Try a shorter target length."
@@ -935,6 +940,12 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 "suggestions": self._generate_improvement_suggestions(draft_content)
             }
 
+        except AIServiceError:
+            # Let the structured error through. Flattening it to str(e) here
+            # discarded error_code, retryable and retry_after, so the endpoint
+            # could only answer 503 — losing the rate-limit backoff hint and the
+            # distinction between "try later" and "this request is wrong" (#352).
+            raise
         except Exception as e:
             logger.error(f"Failed to generate chapter draft: {str(e)}")
             return {

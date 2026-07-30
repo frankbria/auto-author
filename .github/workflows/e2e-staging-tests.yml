@@ -34,6 +34,11 @@ on:
     types: [labeled, opened, synchronize, reopened]
 
 # A new push to a labeled PR cancels the previous in-flight staging run.
+# Least privilege: the default GITHUB_TOKEN grants write across most scopes.
+# Nothing here needs more than reading the repository (#352).
+permissions:
+  contents: read
+
 concurrency:
   group: e2e-staging-${{ github.ref }}
   cancel-in-progress: true

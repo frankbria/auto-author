@@ -2604,6 +2604,18 @@ async def generate_chapter_draft(
         )
 
         if not result.get("success"):
+            # Truncation is a user-fixable request problem, not an outage. 503
+            # invites a retry that will fail identically; 422 says what to change
+            # and carries the actionable message through (#352).
+            if result.get("error_code") == "DRAFT_TRUNCATED":
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "message": result.get("error"),
+                        "error_code": "DRAFT_TRUNCATED",
+                        "retryable": False,
+                    },
+                )
             raise HTTPException(
                 status_code=503,
                 detail=f"Failed to generate draft: {result.get('error', 'Unknown error')}"
@@ -2646,6 +2658,51 @@ async def generate_chapter_draft(
 
     except HTTPException:
         raise
+    # Same structured mapping the other AI endpoints use. Draft generation had
+    # only the generic handler below, so once ai_service stopped flattening
+    # AIServiceError into a dict, a rate limit would have surfaced as an opaque
+    # 500 with no retry_after (#352).
+    except AIRateLimitError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retry_after": e.retry_after,
+                "cached_content_available": e.cached_content_available,
+                "correlation_id": e.correlation_id,
+            },
+        )
+    except (AIServiceUnavailableError, AINetworkError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retry_after": getattr(e, "retry_after", None),
+                "retryable": getattr(e, "retryable", True),
+                "correlation_id": e.correlation_id,
+            },
+        )
+    except AIInvalidRequestError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "correlation_id": e.correlation_id,
+            },
+        )
+    except AIServiceError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": e.message,
+                "error_code": e.error_code,
+                "retryable": e.retryable,
+                "correlation_id": e.correlation_id,
+            },
+        )
     except Exception:
         logger.error("Error generating draft", exc_info=True)
         raise HTTPException(

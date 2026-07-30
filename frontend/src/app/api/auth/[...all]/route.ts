@@ -34,11 +34,15 @@ export async function POST(req: Request): Promise<Response> {
     return POST(req);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
+    // Logged server-side in full; the client gets a generic message. This
+    // endpoint answers unauthenticated callers, and internal errors here name
+    // database hosts, driver versions and config keys — free reconnaissance
+    // for anyone probing the auth surface (#352).
     console.error('POST /api/auth error:', errorMessage, { error });
     return new Response(
       JSON.stringify({
         error: 'Authentication service unavailable',
-        message: errorMessage
+        message: 'The authentication service is temporarily unavailable. Please try again.'
       }),
       {
         status: 500,
@@ -54,11 +58,13 @@ export async function GET(req: Request): Promise<Response> {
     return GET(req);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
+    // See the POST handler: full detail to the server log, generic text to the
+    // client (#352).
     console.error('GET /api/auth error:', errorMessage, { error });
     return new Response(
       JSON.stringify({
         error: 'Authentication service unavailable',
-        message: errorMessage
+        message: 'The authentication service is temporarily unavailable. Please try again.'
       }),
       {
         status: 500,

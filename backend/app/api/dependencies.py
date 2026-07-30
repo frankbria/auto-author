@@ -43,18 +43,6 @@ async def get_database_collection(collection_name: str):
     return await get_collection(collection_name)
 
 
-async def get_api_key(x_api_key: str = Header(None)):
-    """Validate API key for external services"""
-    # This would compare against a stored API key in a real application
-    if x_api_key is None or x_api_key == "":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="API key is missing"
-        )
-    # You would validate the API key against your stored value here
-    # For now, this is a placeholder
-    return x_api_key
-
-
 def sanitize_input(text: str) -> str:
     """Basic sanitization of user input"""
     if not text:

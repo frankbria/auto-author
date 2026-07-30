@@ -11,6 +11,11 @@ on:
       - develop
   workflow_dispatch:
 
+# Least privilege: the default GITHUB_TOKEN grants write across most scopes.
+# Nothing here needs more than reading the repository (#352).
+permissions:
+  contents: read
+
 jobs:
   frontend-tests:
     name: Frontend Tests

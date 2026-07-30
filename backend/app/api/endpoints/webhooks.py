@@ -76,7 +76,13 @@ async def stripe_webhook(request: Request):
 
     try:
         subscription = (event.get("data") or {}).get("object") or {}
-        return await _apply_subscription_event(event_type, subscription, event_id)
+        # Stripe guarantees delivery, not order. Pass the event's own timestamp
+        # so an older update that arrives late cannot overwrite a newer plan
+        # (#352) — idempotency above only stops the *same* event twice.
+        event_created = event.get("created")
+        return await _apply_subscription_event(
+            event_type, subscription, event_id, event_created
+        )
     except Exception:
         # Release the claim so Stripe's retry of this failure isn't treated as
         # a replay, then surface a 500 (Stripe retries non-2xx).
@@ -86,9 +92,17 @@ async def stripe_webhook(request: Request):
 
 
 async def _apply_subscription_event(
-    event_type: str, subscription: dict, event_id: str
+    event_type: str, subscription: dict, event_id: str,
+    event_created: int | None = None,
 ) -> dict:
-    """Resolve the plan for a verified customer.subscription.* event and persist it."""
+    """Resolve the plan for a verified customer.subscription.* event and persist it.
+
+    ``event_created`` is Stripe's own epoch timestamp for the event. Deliveries
+    are not ordered, so a subscription.updated from 10:00 can land after the one
+    from 10:05 — applying it would silently downgrade (or upgrade) a user to a
+    stale plan. Each applied event records its timestamp and anything older is
+    ignored.
+    """
     customer_id = subscription.get("customer")
     subscription_id = subscription.get("id")
 
@@ -123,6 +137,28 @@ async def _apply_subscription_event(
         )
         return {"status": "no_matching_user"}
 
+    # Out-of-order guard. Stripe does not order deliveries, so an older
+    # subscription.updated can arrive after a newer one and overwrite the plan
+    # with a stale value — a real downgrade for a paying user. Idempotency above
+    # only prevents the SAME event twice; this prevents an EARLIER one landing
+    # last. Events without a timestamp (older payload shapes) are applied as
+    # before rather than dropped.
+    last_applied = user.get("stripe_event_created")
+    if (
+        event_created is not None
+        and last_applied is not None
+        and event_created < last_applied
+    ):
+        logger.info(
+            "Stripe %s (created=%s) is older than the applied event (created=%s) "
+            "for user %s — ignoring",
+            event_type,
+            event_created,
+            last_applied,
+            user["auth_id"],
+        )
+        return {"status": "stale_event", "event_id": event_id}
+
     # If a concurrent request linked this stripe_customer_id to a DIFFERENT user
     # between our lookup and this write (TOCTOU — the only way to reach it, since
     # the lookup above wins otherwise), the unique index rejects the $set -> 500
@@ -138,6 +174,8 @@ async def _apply_subscription_event(
             "plan": plan,
             "stripe_customer_id": customer_id,
             "stripe_subscription_id": subscription_id,
+            # Watermark for the out-of-order guard above.
+            **({"stripe_event_created": event_created} if event_created is not None else {}),
         },
         actor_id=f"stripe:{event_id}",
     )

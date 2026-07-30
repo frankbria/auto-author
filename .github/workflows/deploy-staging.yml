@@ -18,6 +18,11 @@ on:
 # time out (see the 2026-07-12 failures). Serialize: one deploy at a time, the
 # newest queued run supersedes older queued ones. Never cancel a deploy that is
 # already mid-flight.
+# Least privilege: the default GITHUB_TOKEN grants write across most scopes.
+# Nothing here needs more than reading the repository (#352).
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-staging
   cancel-in-progress: false

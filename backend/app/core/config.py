@@ -26,6 +26,21 @@ def is_production_env() -> bool:
     return "production" in markers
 
 
+def is_deployed_env() -> bool:
+    """True for any environment a real user could reach — staging included.
+
+    is_production_env() deliberately excludes staging, which is right for the
+    fail-safes it guards. But "may this environment fall back to the CI test
+    secret?" is a different question with a different answer: staging is a
+    deployed environment serving real sessions, so it must not (#352).
+    """
+    markers = {
+        (os.getenv("ENVIRONMENT") or "").lower(),
+        (os.getenv("NODE_ENV") or "").lower(),
+    }
+    return bool(markers & {"production", "staging", "prod"})
+
+
 class Settings(BaseSettings):
     # MongoDB connection - MONGODB_URI takes precedence over DATABASE_URL
     MONGODB_URI: str = ""  # Standard env var name (e.g., for Atlas)
@@ -84,7 +99,10 @@ class Settings(BaseSettings):
     # limits on the real product (see _is_exempt_e2e_user in dependencies.py).
     E2E_EXEMPT_EMAILS: str = ""
 
-    AI_MAX_RETRIES: int = 3
+    # ge=1: range(max_retries) with 0 or a negative value never enters the
+    # loop, so _retry_with_backoff returns None implicitly and the caller
+    # AttributeErrors on the result. Fail at config load instead (#352).
+    AI_MAX_RETRIES: int = Field(default=3, ge=1)
 
     # Max times a single question may be regenerated (per-question abuse cap,
     # complementing the endpoint rate limit)
@@ -182,13 +200,19 @@ class Settings(BaseSettings):
         # Allow specific test secret for CI/testing environments
         ci_test_secret = "test-secret-for-ci-minimum-32-characters-long-safe-for-testing"
         if v == ci_test_secret:
-            # Only allow in test/CI environments, not production
-            if is_production_env():
+            # Rejected on every DEPLOYED environment, staging included (#352).
+            # Previously this only checked is_production_env(), so a staging
+            # deploy that forgot the secret booted happily and signed every JWT
+            # with a key committed to this repository in plaintext — anyone who
+            # could read the source could mint tokens for any staging user. The
+            # deploy passed its health check, so nothing surfaced the problem.
+            if is_deployed_env():
                 raise ValueError(
-                    "FATAL: Cannot use test secret in production environment. "
-                    "Generate a strong secret with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+                    "FATAL: BETTER_AUTH_SECRET is the committed CI test secret on a "
+                    "deployed environment. This key is public — set a real secret. "
+                    "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
                 )
-            return v  # Allow in test/CI
+            return v  # Allow in local development and test/CI only
 
         # Reject known weak/test secrets (except our specific CI secret)
         weak_secrets = [

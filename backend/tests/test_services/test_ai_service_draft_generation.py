@@ -95,23 +95,32 @@ class TestAIServiceDraftGeneration:
         assert result["metadata"]["target_length"] == 2000
 
     @pytest.mark.asyncio
-    async def test_generate_chapter_draft_handles_openai_error(self, ai_service):
-        """Test error handling when OpenAI API fails."""
-        # Mock an error
+    async def test_generate_chapter_draft_propagates_structured_ai_errors(self, ai_service):
+        """A failed OpenAI call surfaces as AIServiceError, not a flattened dict.
+
+        This previously asserted the opposite: the handler caught everything and
+        returned {"success": False, "error": str(e)}, which discarded error_code,
+        retryable and retry_after. The endpoint could then only answer 503 — losing
+        the rate-limit backoff hint and the difference between "try later" and
+        "this request is wrong" (#352). _retry_with_backoff already wraps raw
+        exceptions into AIServiceError; draft generation now lets that through so
+        the endpoint's error mapping can do its job.
+        """
+        from app.services.ai_errors import AIServiceError
+
         ai_service.client.chat.completions.create.side_effect = Exception("OpenAI API error")
 
-        result = await ai_service.generate_chapter_draft(
-            chapter_title="Test Chapter",
-            chapter_description="Test description",
-            question_responses=[],
-            book_metadata={}
-        )
+        with pytest.raises(AIServiceError) as exc:
+            await ai_service.generate_chapter_draft(
+                chapter_title="Test Chapter",
+                chapter_description="Test description",
+                question_responses=[],
+                book_metadata={}
+            )
 
-        assert result["success"] is False
-        assert "error" in result
-        assert "OpenAI API error" in result["error"]
-        assert "draft" in result
-        assert result["draft"] == ""
+        # The structured detail the old dict threw away.
+        assert exc.value.error_code
+        assert "OpenAI API error" in exc.value.message
 
     @pytest.mark.asyncio
     async def test_generate_chapter_draft_calculates_metadata(self, ai_service):
