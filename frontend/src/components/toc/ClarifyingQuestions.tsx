@@ -142,10 +142,30 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
           Help us create the best table of contents by answering a few questions about your book.
         </p>
 
+        {/*
+          One always-mounted polite region (#349). A role="status" node inserted
+          at the same instant as its text is often never announced — the reader
+          must already be observing it. (role="alert" below is different:
+          insertion is itself the trigger, so the failure branch keeps its own.)
+        */}
+        <div role="status" aria-live="polite" className="sr-only">
+          {/* Precedence must mirror the visual branches below. Checking
+              lastSaved before saveError announced "auto-saved" at the very
+              moment the alert announced failure, because lastSaved survives
+              from the previous successful save. */}
+          {isSaving
+            ? 'Saving your answers'
+            : saveError
+              ? ''
+              : lastSaved
+                ? 'Answers auto-saved'
+                : ''}
+        </div>
+
         {/* Auto-save status */}
         <div className="mt-3 flex items-center text-sm">
           {isSaving ? (
-            <div className="flex items-center text-blue-400">
+            <div className="flex items-center text-blue-400" aria-hidden="true">
               <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-blue-400 mr-2"></div>
               Saving...
             </div>
@@ -157,14 +177,14 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
               Auto-save failed — your latest answers may not be saved
             </div>
           ) : lastSaved ? (
-            <div className="flex items-center text-green-400">
+            <div className="flex items-center text-green-400" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-2" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
               Auto-saved
             </div>
           ) : (
-            <div className="text-gray-500">
+            <div className="text-gray-400">
               Responses will be saved automatically
             </div>
           )}
@@ -199,11 +219,19 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         </div>
       ) : (
         <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6">
-          <h3 className="text-gray-100 font-medium mb-4 text-lg">
+          <h3
+            id="clarifying-question-prompt"
+            className="text-gray-100 font-medium mb-4 text-lg"
+          >
             {currentQuestion}
           </h3>
 
+          {/* The question itself is the field's label. Placeholder text is not
+              an accessible name — it disappears on input and is skipped by some
+              screen readers, so this field previously announced as unlabelled
+              (#349). */}
           <textarea
+            aria-labelledby="clarifying-question-prompt"
             value={responses[currentQuestionIndex] || ''}
             onChange={(e) => handleResponseChange(currentQuestionIndex, e.target.value)}
             placeholder="Type your answer here..."
@@ -261,7 +289,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
 
       {/* Questions overview */}
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
-        <h4 className="text-gray-300 font-medium mb-3">Question Overview</h4>
+        <h3 className="text-gray-300 font-medium mb-3">Question Overview</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {questions.map((_, index) => (
             <button

@@ -73,7 +73,7 @@ function TocItem({ chapter, level, isActive, isExpanded, onToggle, onSelect, act
 
         {/* Word Count Badge */}
         {chapter.word_count > 0 && (
-          <span className="text-xs text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">
+          <span className="text-xs text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded">
             {chapter.word_count}w
           </span>
         )}
@@ -128,7 +128,7 @@ export function TocSidebar({
   if (!tocData || !tocData.chapters || tocData.chapters.length === 0) {
     return (
       <div className={cn("w-64 border-r border-gray-800 bg-gray-900", className)}>
-        <div className="p-4 text-center text-gray-500">
+        <div className="p-4 text-center text-gray-400">
           <HugeiconsIcon icon={BookOpen01Icon} size={32} className="mx-auto mb-2 opacity-50" aria-hidden="true" />
           <p className="text-sm">No chapters available</p>
         </div>
@@ -174,11 +174,11 @@ export function TocSidebar({
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="text-center">
             <div className="text-lg font-bold text-gray-100">{tocData.total_chapters}</div>
-            <div className="text-gray-500">Chapters</div>
+            <div className="text-gray-400">Chapters</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold text-gray-100">{tocData.estimated_pages}</div>
-            <div className="text-gray-500">Pages</div>
+            <div className="text-gray-400">Pages</div>
           </div>
         </div>
       </div>

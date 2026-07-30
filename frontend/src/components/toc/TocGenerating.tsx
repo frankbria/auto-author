@@ -62,7 +62,7 @@ export default function TocGenerating() {
                   )}
                 </div>
                 <span className={`text-sm ${
-                  index <= currentStep ? 'text-gray-300' : 'text-gray-500'
+                  index <= currentStep ? 'text-gray-300' : 'text-gray-400'
                 }`}>
                   {step}
                 </span>

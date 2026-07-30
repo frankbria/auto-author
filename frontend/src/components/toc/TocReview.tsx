@@ -201,7 +201,7 @@ function ChapterItem({ chapter, index, isExpanded, onToggle, expandedChapters, t
               <p className="text-gray-400 text-sm mt-1">{chapter.description}</p>
             )}
             {chapter.word_count && (
-              <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+              <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
                 <span>{chapter.word_count} words</span>
                 {chapter.estimated_reading_time && (
                   <>
