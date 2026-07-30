@@ -33,7 +33,6 @@ from .user import (
 )
 
 # Backward compatibility alias for migration period
-get_user_by_clerk_id = get_user_by_auth_id
 
 from .book import (
     create_book,

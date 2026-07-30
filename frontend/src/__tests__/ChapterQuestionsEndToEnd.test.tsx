@@ -10,7 +10,6 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
-import { BrowserRouter } from 'react-router-dom';
 
 // Components under test
 import QuestionContainer from '../components/chapters/questions/QuestionContainer';
@@ -194,10 +193,11 @@ describe('Chapter Questions End-to-End Tests', () => {
   // No QueryClientProvider: react-query was a declared dependency with zero
   // runtime usage, removed in #347. Nothing under test calls a react-query hook,
   // so the provider was ceremony left over from an adoption that never happened.
+  // No BrowserRouter: this is a Next.js app, so react-router provides nothing —
+  // next/navigation is mocked globally in jest.setup.ts. The dependency was
+  // wrong-stack leftover and is removed in #351.
   const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <BrowserRouter>
-      {children}
-    </BrowserRouter>
+    <>{children}</>
   );
 
   describe('Complete Question Generation Workflow', () => {

@@ -16,7 +16,7 @@
 
 **Lint & Format**:
 - Backend: `uv run ruff check . && uv run ruff format .`
-- Frontend: `npm run lint && npm run type-check`
+- Frontend: `npm run lint && npm run typecheck`
 
 ## Code Style Guidelines
 - **Python**: Use Pydantic models, async/await, type hints, snake_case. Import order: stdlib, third-party, local
@@ -57,7 +57,7 @@ Before marking ANY feature complete:
 - [ ] Error handling implemented
 
 ## Key Development Tools
-- **Testing**: pytest (backend), Vitest (frontend), Playwright (E2E)
+- **Testing**: pytest (backend), Jest (frontend), Playwright (E2E)
 - **Error Handling**: Unified error handler with exponential backoff retry
 - **Performance**: `usePerformanceTracking` hook with operation budgets
 - **Loading States**: `LoadingStateManager` and `ProgressIndicator` components
