@@ -149,7 +149,17 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
           insertion is itself the trigger, so the failure branch keeps its own.)
         */}
         <div role="status" aria-live="polite" className="sr-only">
-          {isSaving ? 'Saving your answers' : lastSaved ? 'Answers auto-saved' : ''}
+          {/* Precedence must mirror the visual branches below. Checking
+              lastSaved before saveError announced "auto-saved" at the very
+              moment the alert announced failure, because lastSaved survives
+              from the previous successful save. */}
+          {isSaving
+            ? 'Saving your answers'
+            : saveError
+              ? ''
+              : lastSaved
+                ? 'Answers auto-saved'
+                : ''}
         </div>
 
         {/* Auto-save status */}

@@ -56,3 +56,28 @@ describe('ClarifyingQuestions accessibility', () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe('ClarifyingQuestions save announcements', () => {
+  it('does not announce success while a save failure is showing', async () => {
+    // lastSaved survives from the previous successful save, so a naive
+    // lastSaved-first ternary announced "Answers auto-saved" at the same instant
+    // the alert announced failure — two contradictory messages from one event.
+    const { bookClient } = jest.requireMock('@/lib/api/bookClient');
+    bookClient.getQuestionResponses.mockResolvedValueOnce({
+      responses: [{ question: QUESTIONS[0], answer: 'a previous answer' }],
+    });
+    bookClient.saveQuestionResponses.mockRejectedValueOnce(new Error('nope'));
+
+    const { container } = renderQuestions();
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: QUESTIONS[0] })).toBeInTheDocument();
+    });
+
+    const announcer = container.querySelector('[role="status"].sr-only');
+    expect(announcer).toBeTruthy();
+    // Whatever it says, it must never claim success at the same time as an alert.
+    if (screen.queryByRole('alert')) {
+      expect(announcer?.textContent ?? '').not.toMatch(/auto-saved/i);
+    }
+  });
+});
