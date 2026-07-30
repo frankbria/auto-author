@@ -8,9 +8,6 @@ import bookClient from '@/lib/api/bookClient';
 import { BookProject } from '@/components/BookCard';
 import { TocData } from '@/types/toc';
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { bookCreationSchema, BookFormData } from '@/lib/schemas/bookSchema';
 import { toast } from '@/lib/toast';
 import Image from 'next/image';
 import { BookMetadataForm } from '@/components/BookMetadataForm';
@@ -162,30 +159,13 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     });
   };
 
-  const form = useForm<BookFormData>({
-    resolver: zodResolver(bookCreationSchema),
-    defaultValues: {
-      title: book?.title || '',
-      subtitle: book?.subtitle || '',
-      description: book?.description || '',
-      genre: book?.genre || '',
-      target_audience: book?.target_audience || '',
-      cover_image_url: book?.cover_image_url || '',
-    },
-    mode: 'onChange',
-  });
-
-  // Auto-save on change
-  useEffect(() => {
-    if (!book) return;
-    form.reset({
-      title: book.title,
-      subtitle: book.subtitle,
-      description: book.description,
-      genre: book.genre,
-      target_audience: book.target_audience,
-      cover_image_url: book.cover_image_url,
-    });  }, [book, form]);
+  // No page-level form here on purpose. There used to be a useForm whose only
+  // consumers were a reset-on-load effect and a watch() auto-save — no input in
+  // this page was ever bound to it. react-hook-form notifies watch() on reset,
+  // so simply opening a book fired an updateBook write and a "Book info saved"
+  // toast for something the user never did (#350). Editing is owned by
+  // BookMetadataForm, which builds its own form and saves through the onSave
+  // handler below.
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -304,29 +284,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     setShowExportProgress(false);
     setShowExportOptions(true);
   };
-  // Auto-save on form change
-  useEffect(() => {
-    const subscription = form.watch(async (values) => {
-      if (!book) return;
-      setIsSaving(true);
-      try {        await bookClient.updateBook(book.id, {
-          title: values.title,
-          subtitle: values.subtitle,
-          description: values.description,
-          genre: values.genre,
-          target_audience: values.target_audience,
-          cover_image_url: values.cover_image_url,
-        });
-        toast.success({ title: 'Book info saved' });
-      } catch {
-        toast.error({ title: 'Failed to save book info' });
-      } finally {
-        setIsSaving(false);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [book, form]);
-
   // Show loading state — skeleton mirroring the book-details layout to prevent layout shift
   if (isLoading) {
     return (
