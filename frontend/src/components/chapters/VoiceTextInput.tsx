@@ -10,6 +10,10 @@ import {
   Square01Icon
 } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
+import {
+  describeSpeechError,
+  isSpeechRecognitionSupported,
+} from '@/lib/voice/speechRecognitionErrors';
 
 type InputMode = 'text' | 'voice';
 
@@ -67,6 +71,21 @@ export function VoiceTextInput({
   const [isSupported, setIsSupported] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // getUserMedia hands back a live MediaStream. Its tracks keep the microphone
+  // open — and the browser's recording indicator lit — until something calls
+  // stop() on each one; recognition.stop() does not do it. The stream used to be
+  // requested and thrown away, so the mic stayed live for the life of the page,
+  // even after the user pressed Stop (#348).
+  const micStreamRef = useRef<MediaStream | null>(null);
+  // getUserMedia is async, which opens two windows where a stream can be
+  // acquired with nothing left to release it (#348):
+  //   - two Start clicks before the first promise resolves: both pass the
+  //     release-then-acquire guard while micStreamRef is still null, and the
+  //     second overwrites the first, orphaning its tracks;
+  //   - unmount while the promise is pending: cleanup runs against a null ref,
+  //     then the stream arrives and is held by a component that no longer exists.
+  const startingRef = useRef(false);
+  const unmountedRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Mirror the latest `value` prop so the long-lived onresult handler reads the
@@ -80,14 +99,79 @@ export function VoiceTextInput({
 
   // Check for speech recognition support
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    setIsSupported(!!SpeechRecognition);
+    setIsSupported(isSpeechRecognitionSupported());
+  }, []);
+
+  // Release the microphone if this unmounts mid-recording (#348). Without this,
+  // navigating away while dictating left recognition running and the browser's
+  // recording indicator lit — the user has no control left to stop it.
+  //
+  // Empty deps so it runs only on unmount, and it reads the ref rather than
+  // state so it cannot capture a stale recorder. Handlers are detached first:
+  // stop() fires onend, which would otherwise call setState on an unmounted
+  // component.
+  useEffect(() => {
+    // Reset on every mount, not just the first. StrictMode double-invokes
+    // effects in development (mount → cleanup → mount), so a flag only ever set
+    // to true latches after that first cleanup — and startRecording's
+    // unmounted-guard would then abort every recording for the rest of the
+    // session. The component is very much mounted here.
+    unmountedRef.current = false;
+
+    return () => {
+      unmountedRef.current = true;
+      const recognition = recognitionRef.current;
+      if (recognition) {
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+        try {
+          recognition.stop();
+        } catch {
+          // Already stopped/destroyed — nothing to release.
+        }
+        recognitionRef.current = null;
+      }
+      // Stopping recognition is not enough on its own — the getUserMedia tracks
+      // are what hold the microphone open.
+      const stream = micStreamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch {
+            // Already ended.
+          }
+        });
+        micStreamRef.current = null;
+      }
+    };
   }, []);
 
   // Update mode when prop changes
   useEffect(() => {
     setCurrentMode(mode);
   }, [mode]);
+
+  // Every path that ends a dictation session must run this, not just the ones
+  // the user drives. Recognition can end on its own (onend) or fail (onerror),
+  // and neither releases the getUserMedia tracks that actually hold the
+  // microphone — so leaving either out keeps the recording indicator lit with no
+  // control left to turn it off (#348).
+  const releaseMicStream = useCallback(() => {
+    const stream = micStreamRef.current;
+    if (!stream) {
+      return;
+    }
+    stream.getTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch {
+        // Already ended.
+      }
+    });
+    micStreamRef.current = null;
+  }, []);
 
   // Initialize speech recognition
   const initializeSpeechRecognition = useCallback(() => {
@@ -159,18 +243,36 @@ export function VoiceTextInput({
     };
 
     recognition.onerror = (event: ErrorEvent) => {
-      console.error('Speech recognition error:', event.error);
-      setError(`Error recording audio: ${event.error || 'Unknown error'}`);
+      // no-speech/aborted are routine (a silent window, or the user stopping),
+      // so they end the session without an error banner. Everything else gets
+      // copy that says what to do rather than echoing the raw code (#348).
+      const code = (event as unknown as { error?: string }).error;
+      const message = describeSpeechError(code);
+      if (message) {
+        console.error('Speech recognition error:', code);
+        setError(message);
+      }
+      releaseMicStream();
+      // Clear the handle too: startRecording's re-entrancy guard checks it, so
+      // leaving a dead recognizer here would make every later Start a silent
+      // no-op and strand voice input until unmount.
+      recognitionRef.current = null;
       setIsRecording(false);
     };
 
     recognition.onend = () => {
+      // Recognition can end without the user asking — a service timeout, or the
+      // browser deciding the utterance finished. The mic must go with it, and so
+      // must the handle: startRecording's guard checks it, and onend fires
+      // routinely, so holding a dead recognizer here would brick every restart.
+      releaseMicStream();
+      recognitionRef.current = null;
       setIsRecording(false);
       setInterimTranscript('');
     };
 
     return recognition;
-  }, [isSupported, onChange]);
+  }, [isSupported, onChange, releaseMicStream]);
 
   const toggleMode = () => {
     const newMode = currentMode === 'text' ? 'voice' : 'text';
@@ -191,9 +293,36 @@ export function VoiceTextInput({
       return;
     }
 
+    // Ignore a second Start while one is still in flight; the button stays
+    // enabled until onstart fires, so a double-click is easy to land.
+    if (startingRef.current || recognitionRef.current) {
+      return;
+    }
+    startingRef.current = true;
+
     try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Release any stream still held from a previous attempt before acquiring
+      // another; overwriting the ref would orphan the old tracks for the page's
+      // lifetime with no handle left to stop them.
+      releaseMicStream();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // The await above is a suspension point: this component may have unmounted
+      // while permission was pending, in which case the cleanup already ran and
+      // nothing will ever release this stream. Hand it back immediately.
+      if (unmountedRef.current) {
+        stream.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch {
+            // Already ended.
+          }
+        });
+        return;
+      }
+
+      // Keep the stream so its tracks can be released again (see micStreamRef).
+      micStreamRef.current = stream;
 
       setError(null);
       const recognition = initializeSpeechRecognition();
@@ -204,6 +333,16 @@ export function VoiceTextInput({
     } catch (err) {
       console.error('Failed to start recording:', err);
       setError('Failed to access microphone. Please check permissions.');
+      releaseMicStream();
+      // The handle is assigned just before start(), so a throw from start()
+      // lands here with a dead recognizer still stored — and no onend/onerror
+      // will fire to clear it. Left behind, the guard above would brick every
+      // later Start. This is the last writer of recognitionRef without a
+      // clearer; all five exits now release both the stream and the handle.
+      recognitionRef.current = null;
+      setIsRecording(false);
+    } finally {
+      startingRef.current = false;
     }
   };
 
@@ -212,6 +351,7 @@ export function VoiceTextInput({
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
+    releaseMicStream();
     setIsRecording(false);
     setInterimTranscript('');
   };

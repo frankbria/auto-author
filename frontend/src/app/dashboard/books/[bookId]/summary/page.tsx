@@ -11,6 +11,11 @@ import {
   countSummaryCharacters,
   getSummaryReadinessError,
 } from '@/lib/constants/summary-readiness';
+import {
+  describeSpeechError,
+  isSpeechRecognitionSupported,
+  SPEECH_UNSUPPORTED_MESSAGE,
+} from '@/lib/voice/speechRecognitionErrors';
 
 export default function BookSummaryPage() {
   const router = useRouter();
@@ -20,6 +25,12 @@ export default function BookSummaryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
+  // Advertised capability must match reality: this button used to render enabled
+  // in Firefox/Safari and over plain HTTP, and only failed on click (#348).
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  // Interim results were thrown away, so nothing showed until a phrase
+  // finalised and the surface looked frozen while listening.
+  const [interimTranscript, setInterimTranscript] = useState('');
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastSaved = useRef('');
   const [summaryHistory, setSummaryHistory] = useState<unknown[]>([]);
@@ -76,11 +87,35 @@ export default function BookSummaryPage() {
   // Speech recognition setup
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
+  useEffect(() => {
+    setVoiceSupported(isSpeechRecognitionSupported());
+  }, []);
+
+  // Release the microphone if this page unmounts mid-dictation (#348).
+  // Handlers are detached first so stop()'s onend cannot setState after unmount.
+  useEffect(() => {
+    return () => {
+      const recognition = recognitionRef.current;
+      if (!recognition) {
+        return;
+      }
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      try {
+        recognition.stop();
+      } catch {
+        // Already stopped — nothing to release.
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
+
   const startListening = () => {
     const SpeechRecognitionCtor =
       (window.SpeechRecognition || window.webkitSpeechRecognition) as typeof SpeechRecognition | undefined;
-    if (!SpeechRecognitionCtor) {
-      setError('Speech recognition is not supported in your browser.');
+    if (!voiceSupported || !SpeechRecognitionCtor) {
+      setError(SPEECH_UNSUPPORTED_MESSAGE);
       return;
     }
     setError('');
@@ -91,21 +126,34 @@ export default function BookSummaryPage() {
     recognition.lang = 'en-US';
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let transcript = '';
+      let interim = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           transcript += event.results[i][0].transcript;
+        } else {
+          // Surface in-progress speech so the page shows something while
+          // listening instead of appearing frozen until a phrase finalises.
+          interim += event.results[i][0].transcript;
         }
       }
+      setInterimTranscript(interim);
       if (transcript) {
         setSummary(prev => (prev ? prev + ' ' : '') + transcript.trim());
       }
     };
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      setError('Error occurred in recognition: ' + event.error);
+      // Benign codes (no-speech/aborted) end the session silently; the rest get
+      // actionable copy rather than the raw code (#348).
+      const message = describeSpeechError(event.error);
+      if (message) {
+        setError(message);
+      }
       setIsListening(false);
+      setInterimTranscript('');
     };
     recognition.onend = () => {
       setIsListening(false);
+      setInterimTranscript('');
     };
     recognitionRef.current = recognition;
     recognition.start();
@@ -119,6 +167,7 @@ export default function BookSummaryPage() {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
+    setInterimTranscript('');
     setIsListening(false);
   };
 
@@ -159,8 +208,13 @@ export default function BookSummaryPage() {
           Describe your book's main concepts and structure. This summary will be used to generate a Table of Contents.
         </p>
       </div>
+      {/* role="alert" so a screen reader announces a dictation failure instead of
+          leaving it silently on screen (#348). */}
       {error && (
-        <div className="p-4 mb-6 rounded-lg bg-red-900/20 border border-red-700 text-red-400">
+        <div
+          role="alert"
+          className="p-4 mb-6 rounded-lg bg-red-900/20 border border-red-700 text-red-400"
+        >
           {error}
         </div>
       )}
@@ -170,26 +224,34 @@ export default function BookSummaryPage() {
             <div className="flex justify-between items-center mb-2">
               <label className="text-muted-foreground" htmlFor="summary">Book Summary</label>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={startListening}
-                  disabled={isListening}
-                  className={`px-3 py-1 rounded-md text-sm ${
-                    isListening
-                      ? 'bg-red-600 text-white'
-                      : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
-                  }`}
-                >
-                  {isListening ? 'Listening...' : '🎤 Voice Input'}
-                </button>
-                {isListening && (
-                  <button
-                    type="button"
-                    onClick={stopListening}
-                    className="px-3 py-1 rounded-md text-sm bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border"
-                  >
-                    Stop
-                  </button>
+                {/* Only offered where it can actually work — previously this
+                    rendered enabled in Firefox/Safari and over plain HTTP, and
+                    failed only once clicked (#348). */}
+                {voiceSupported && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={startListening}
+                      disabled={isListening}
+                      aria-pressed={isListening}
+                      className={`px-3 py-1 rounded-md text-sm ${
+                        isListening
+                          ? 'bg-red-600 text-white'
+                          : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
+                      }`}
+                    >
+                      {isListening ? 'Listening...' : '🎤 Voice Input'}
+                    </button>
+                    {isListening && (
+                      <button
+                        type="button"
+                        onClick={stopListening}
+                        className="px-3 py-1 rounded-md text-sm bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border"
+                      >
+                        Stop
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -202,6 +264,31 @@ export default function BookSummaryPage() {
               placeholder="Describe your book's main concepts, structure, and key points that should be organized into chapters..."
               required
             ></textarea>
+
+            {/* Dictation status, announced politely. A voice-only affordance with
+                no live region gives a screen-reader user no way to know whether
+                the mic is live (#348) — mirrors VoiceTextInput. */}
+            <div role="status" aria-live="polite" className="sr-only">
+              {isListening ? 'Recording started - speak now' : ''}
+            </div>
+
+            {/* In-progress speech, so the page visibly responds while listening
+                instead of staying blank until a phrase finalises. */}
+            {isListening && interimTranscript && (
+              <div
+                className="mt-2 text-sm italic text-muted-foreground"
+                data-testid="summary-interim-transcript"
+              >
+                {interimTranscript}
+              </div>
+            )}
+
+            {!voiceSupported && (
+              <div className="mt-2 text-xs text-muted-foreground">
+                {SPEECH_UNSUPPORTED_MESSAGE}
+              </div>
+            )}
+
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
               <span>{countSummaryWords(summary)} / {SUMMARY_MIN_WORDS} words</span>
               <span>{countSummaryCharacters(summary)} / {SUMMARY_MIN_CHARACTERS} characters</span>
