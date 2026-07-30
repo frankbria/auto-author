@@ -33,6 +33,7 @@ import bookClient from '@/lib/api/bookClient';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   CheckmarkCircle01Icon,
+  AlertCircleIcon,
   Loading03Icon
 } from '@hugeicons/core-free-icons';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
@@ -465,8 +466,14 @@ export function ChapterEditor({
           </div>
         </div>
       )}
+      {/* role="alert": a failed autosave means the user's writing may exist only
+          in the localStorage backup. That is worth interrupting for, and it was
+          previously announced not at all (#349). */}
       {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 text-sm">
+        <div
+          role="alert"
+          className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 text-sm"
+        >
           {error}
         </div>
       )}
@@ -600,7 +607,9 @@ export function ChapterEditor({
             aria-live="polite"
             className="flex items-center gap-2"
             data-testid="save-status-indicator"
-            data-save-status={isSaving ? 'saving' : lastSaved ? 'saved' : 'idle'}
+            data-save-status={
+              isSaving ? 'saving' : error ? 'error' : lastSaved ? 'saved' : 'idle'
+            }
           >
             {isSaving && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -608,13 +617,23 @@ export function ChapterEditor({
                 Saving...
               </span>
             )}
-            {!isSaving && lastSaved && (
+            {/* `error` is checked before `lastSaved` because lastSaved survives
+                from the previous successful save: without this the region
+                announced "Saved 14:32" during a failure, which is both a stale
+                success and the opposite of what happened. */}
+            {!isSaving && error && (
+              <span className="text-xs text-destructive flex items-center gap-1">
+                <HugeiconsIcon icon={AlertCircleIcon} size={12} />
+                Not saved
+              </span>
+            )}
+            {!isSaving && !error && lastSaved && (
               <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                 <HugeiconsIcon icon={CheckmarkCircle01Icon} size={12} />
                 Saved {lastSaved.toLocaleTimeString()}
               </span>
             )}
-            {!isSaving && !lastSaved && (
+            {!isSaving && !error && !lastSaved && (
               <span className="text-xs text-muted-foreground">
                 Not saved yet
               </span>
