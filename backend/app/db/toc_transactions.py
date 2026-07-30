@@ -9,7 +9,7 @@ from bson.objectid import ObjectId
 import uuid
 from motor.motor_asyncio import AsyncIOMotorClientSession
 
-from .base import _client, _db, books_collection, ObjectId
+from .base import books_collection, ObjectId
 from .audit_log import create_audit_log
 
 
@@ -89,24 +89,23 @@ async def update_toc_with_transaction(
     """
     Update TOC with transaction support to ensure atomicity.
     Uses optimistic locking with version checking.
-    """
-    # Check if we're in a test environment or if transactions are not supported
-    use_transaction = True
-    try:
-        async with await _client.start_session() as session:
-            # Test if transactions are supported
-            info = await _client.admin.command('isMaster')
-            use_transaction = info.get('setName') is not None  # Has replica set
-    except Exception:
-        use_transaction = False
 
-    if use_transaction:
-        async with await _client.start_session() as session:
-            async with session.start_transaction():
-                return await _update_toc_internal(book_id, toc_data, user_auth_id, session)
-    else:
-        # Fallback for test environment without transactions
-        return await _update_toc_internal(book_id, toc_data, user_auth_id, None)
+    Runs as a single compare-and-swap, deliberately WITHOUT a transaction.
+
+    These are single-document writes: one read of the book, one guarded
+    ``update_one`` filtered on the version that read observed. The CAS is atomic
+    on its own, so a transaction adds nothing — and actively breaks the 409
+    contract on a replica set. Inside a transaction the guarded update reads at
+    the transaction snapshot, so the version filter always matches and the
+    conflict never raises ValueError; the genuine conflict aborts at COMMIT as a
+    WriteConflict, which reaches the endpoint as a generic OperationFailure and
+    becomes a 500. Without the transaction the filter misses, ValueError is
+    raised, and the endpoint returns 409 on every topology (#369).
+
+    ``update_chapter_statuses_with_version_guard`` (#159) already took this
+    route for the same reason.
+    """
+    return await _update_toc_internal(book_id, toc_data, user_auth_id, None)
 
 
 async def _update_toc_internal(
@@ -227,21 +226,23 @@ async def add_chapter_with_transaction(
 ) -> Dict[str, Any]:
     """
     Add a new chapter or subchapter with transaction support.
-    """
-    use_transaction = True
-    try:
-        async with await _client.start_session() as session:
-            info = await _client.admin.command('isMaster')
-            use_transaction = info.get('setName') is not None
-    except Exception:
-        use_transaction = False
 
-    if use_transaction:
-        async with await _client.start_session() as session:
-            async with session.start_transaction():
-                return await _add_chapter_internal(book_id, chapter_data, user_auth_id, parent_chapter_id, session)
-    else:
-        return await _add_chapter_internal(book_id, chapter_data, user_auth_id, parent_chapter_id, None)
+    Runs as a single compare-and-swap, deliberately WITHOUT a transaction.
+
+    These are single-document writes: one read of the book, one guarded
+    ``update_one`` filtered on the version that read observed. The CAS is atomic
+    on its own, so a transaction adds nothing — and actively breaks the 409
+    contract on a replica set. Inside a transaction the guarded update reads at
+    the transaction snapshot, so the version filter always matches and the
+    conflict never raises ValueError; the genuine conflict aborts at COMMIT as a
+    WriteConflict, which reaches the endpoint as a generic OperationFailure and
+    becomes a 500. Without the transaction the filter misses, ValueError is
+    raised, and the endpoint returns 409 on every topology (#369).
+
+    ``update_chapter_statuses_with_version_guard`` (#159) already took this
+    route for the same reason.
+    """
+    return await _add_chapter_internal(book_id, chapter_data, user_auth_id, parent_chapter_id, None)
 
 
 async def _add_chapter_internal(
@@ -311,21 +312,23 @@ async def update_chapter_with_transaction(
 ) -> Dict[str, Any]:
     """
     Update a chapter with transaction support.
-    """
-    use_transaction = True
-    try:
-        async with await _client.start_session() as session:
-            info = await _client.admin.command('isMaster')
-            use_transaction = info.get('setName') is not None
-    except Exception:
-        use_transaction = False
 
-    if use_transaction:
-        async with await _client.start_session() as session:
-            async with session.start_transaction():
-                return await _update_chapter_internal(book_id, chapter_id, chapter_updates, user_auth_id, session)
-    else:
-        return await _update_chapter_internal(book_id, chapter_id, chapter_updates, user_auth_id, None)
+    Runs as a single compare-and-swap, deliberately WITHOUT a transaction.
+
+    These are single-document writes: one read of the book, one guarded
+    ``update_one`` filtered on the version that read observed. The CAS is atomic
+    on its own, so a transaction adds nothing — and actively breaks the 409
+    contract on a replica set. Inside a transaction the guarded update reads at
+    the transaction snapshot, so the version filter always matches and the
+    conflict never raises ValueError; the genuine conflict aborts at COMMIT as a
+    WriteConflict, which reaches the endpoint as a generic OperationFailure and
+    becomes a 500. Without the transaction the filter misses, ValueError is
+    raised, and the endpoint returns 409 on every topology (#369).
+
+    ``update_chapter_statuses_with_version_guard`` (#159) already took this
+    route for the same reason.
+    """
+    return await _update_chapter_internal(book_id, chapter_id, chapter_updates, user_auth_id, None)
 
 
 async def _update_chapter_internal(
@@ -391,21 +394,23 @@ async def delete_chapter_with_transaction(
 ) -> bool:
     """
     Delete a chapter with transaction support.
-    """
-    use_transaction = True
-    try:
-        async with await _client.start_session() as session:
-            info = await _client.admin.command('isMaster')
-            use_transaction = info.get('setName') is not None
-    except Exception:
-        use_transaction = False
 
-    if use_transaction:
-        async with await _client.start_session() as session:
-            async with session.start_transaction():
-                return await _delete_chapter_internal(book_id, chapter_id, user_auth_id, session)
-    else:
-        return await _delete_chapter_internal(book_id, chapter_id, user_auth_id, None)
+    Runs as a single compare-and-swap, deliberately WITHOUT a transaction.
+
+    These are single-document writes: one read of the book, one guarded
+    ``update_one`` filtered on the version that read observed. The CAS is atomic
+    on its own, so a transaction adds nothing — and actively breaks the 409
+    contract on a replica set. Inside a transaction the guarded update reads at
+    the transaction snapshot, so the version filter always matches and the
+    conflict never raises ValueError; the genuine conflict aborts at COMMIT as a
+    WriteConflict, which reaches the endpoint as a generic OperationFailure and
+    becomes a 500. Without the transaction the filter misses, ValueError is
+    raised, and the endpoint returns 409 on every topology (#369).
+
+    ``update_chapter_statuses_with_version_guard`` (#159) already took this
+    route for the same reason.
+    """
+    return await _delete_chapter_internal(book_id, chapter_id, user_auth_id, None)
 
 
 async def _delete_chapter_internal(
@@ -548,21 +553,23 @@ async def reorder_chapters_with_transaction(
     """
     Reorder chapters with transaction support.
     chapter_orders should be a list of {"id": "chapter_id", "order": 1}
-    """
-    use_transaction = True
-    try:
-        async with await _client.start_session() as session:
-            info = await _client.admin.command('isMaster')
-            use_transaction = info.get('setName') is not None
-    except Exception:
-        use_transaction = False
 
-    if use_transaction:
-        async with await _client.start_session() as session:
-            async with session.start_transaction():
-                return await _reorder_chapters_internal(book_id, chapter_orders, user_auth_id, session)
-    else:
-        return await _reorder_chapters_internal(book_id, chapter_orders, user_auth_id, None)
+    Runs as a single compare-and-swap, deliberately WITHOUT a transaction.
+
+    These are single-document writes: one read of the book, one guarded
+    ``update_one`` filtered on the version that read observed. The CAS is atomic
+    on its own, so a transaction adds nothing — and actively breaks the 409
+    contract on a replica set. Inside a transaction the guarded update reads at
+    the transaction snapshot, so the version filter always matches and the
+    conflict never raises ValueError; the genuine conflict aborts at COMMIT as a
+    WriteConflict, which reaches the endpoint as a generic OperationFailure and
+    becomes a 500. Without the transaction the filter misses, ValueError is
+    raised, and the endpoint returns 409 on every topology (#369).
+
+    ``update_chapter_statuses_with_version_guard`` (#159) already took this
+    route for the same reason.
+    """
+    return await _reorder_chapters_internal(book_id, chapter_orders, user_auth_id, None)
 
 
 async def _reorder_chapters_internal(

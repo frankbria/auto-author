@@ -1,16 +1,23 @@
 """
 Integration tests for app/db/toc_transactions.py.
 
-Exercises the atomic TOC transaction helpers against a real local MongoDB
-(via the motor_reinit_db fixture) — happy paths AND the data-integrity
-failure paths: invalid IDs, missing/unauthorized books, optimistic-locking
-version conflicts, missing chapters, and the transaction-detection fallback.
+Exercises the atomic TOC helpers against a real local MongoDB (via the
+motor_reinit_db fixture) — happy paths AND the data-integrity failure paths:
+invalid IDs, missing/unauthorized books, optimistic-locking version conflicts,
+and missing chapters.
 
-ponytail: the `if use_transaction:` real-transaction branches require a
-MongoDB replica set; a standalone test server reports no setName, so those
-functions run via the non-transactional fallback here. Covering the live
-transaction/rollback branch would need a replica-set test fixture — upgrade
-path if/when CI runs Mongo as a replica set.
+The `if use_transaction:` branches these tests used to note as uncoverable are
+gone (#369). They needed a replica-set fixture because a standalone server
+reports no setName — but the branch they guarded was also the bug: inside a
+transaction the guarded update reads at the transaction snapshot, so the version
+filter always matched, the ValueError never raised, and a genuine conflict
+surfaced at commit as a WriteConflict → generic OperationFailure → 500 instead
+of the intended 409.
+
+Every one of these helpers is a single-document compare-and-swap, so the CAS is
+atomic without a transaction and behaves identically on standalone and replica
+set. Deleting the branch was the fix; there is no longer a topology-dependent
+path to cover, which is why the note is retired rather than satisfied.
 """
 
 import pytest
@@ -626,3 +633,65 @@ async def test_book_deleted_mid_operation_reports_not_found(
 
     with pytest.raises(ValueError, match="Book not found"):
         await call(book_id, owner)
+
+
+@pytest.mark.asyncio
+async def test_update_toc_interleaved_writer_does_not_lose_update(
+    seed_book, monkeypatch
+):
+    """update_toc is the fifth helper that lost its transaction wrapper (#369).
+
+    The other four are covered by the parametrised interleave test above; this
+    one has a different signature and a different conflict message, so it gets
+    its own. Same property: a competing commit in the read -> write window must
+    make this write raise rather than clobber.
+    """
+    book_id, owner = await seed_book(
+        toc=_toc(version=1, chapters=[{"id": "c1", "title": "Original"}])
+    )
+
+    competing = _toc(
+        version=2, chapters=[{"id": "c1", "title": "Original", "content": "autosaved"}]
+    )
+    state = _interleave_competing_write(monkeypatch, book_id, competing)
+
+    with pytest.raises(ValueError):
+        await tx.update_toc_with_transaction(
+            book_id, {"chapters": [{"id": "c1", "title": "Mine"}]}, owner
+        )
+
+    assert state["fired"], "competing write never ran — test is not interleaving"
+
+    # The competing writer's data survived intact.
+    stored = await tx.books_collection.find_one({"_id": ObjectId(book_id)})
+    assert stored["table_of_contents"] == competing
+
+
+@pytest.mark.asyncio
+async def test_helpers_do_not_open_transactions(monkeypatch, seed_book):
+    """The topology-dependent path is gone, not merely unused (#369).
+
+    Pinning this structurally rather than behaviourally: a transaction would
+    reintroduce the 500-instead-of-409 bug only on a replica set, which no
+    standalone test can observe. Asserting that no session is ever started
+    catches the regression on any topology.
+    """
+    book_id, owner = await seed_book(
+        toc=_toc(version=1, chapters=[{"id": "c1", "title": "Original"}])
+    )
+
+    import app.db.base as base
+
+    def _fail_start_session(*a, **kw):
+        raise AssertionError(
+            "TOC helpers must not open a session: inside a transaction the "
+            "guarded update reads at the snapshot, so a concurrent commit "
+            "surfaces as a WriteConflict (500) instead of ValueError (409)"
+        )
+
+    monkeypatch.setattr(base._client, "start_session", _fail_start_session)
+
+    await tx.add_chapter_with_transaction(book_id, {"title": "New"}, owner)
+    await tx.update_chapter_with_transaction(book_id, "c1", {"title": "Edited"}, owner)
+    await tx.reorder_chapters_with_transaction(book_id, [{"id": "c1", "order": 1}], owner)
+    await tx.delete_chapter_with_transaction(book_id, "c1", owner)
