@@ -327,6 +327,13 @@ export function VoiceTextInput({
       console.error('Failed to start recording:', err);
       setError('Failed to access microphone. Please check permissions.');
       releaseMicStream();
+      // The handle is assigned just before start(), so a throw from start()
+      // lands here with a dead recognizer still stored — and no onend/onerror
+      // will fire to clear it. Left behind, the guard above would brick every
+      // later Start. This is the last writer of recognitionRef without a
+      // clearer; all five exits now release both the stream and the handle.
+      recognitionRef.current = null;
+      setIsRecording(false);
     } finally {
       startingRef.current = false;
     }

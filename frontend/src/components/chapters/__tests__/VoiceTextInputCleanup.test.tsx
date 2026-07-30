@@ -14,6 +14,8 @@ import { VoiceTextInput } from '@/components/chapters/VoiceTextInput';
 // SpeechRecognition the component constructs from window.
 class TrackedRecognition {
   static instances: TrackedRecognition[] = [];
+  /** When set, the next start() throws — models a recognizer refusing to run. */
+  static failNextStart = false;
 
   onresult: ((e: unknown) => void) | null = null;
   onerror: ((e: unknown) => void) | null = null;
@@ -32,6 +34,10 @@ class TrackedRecognition {
   }
 
   start = jest.fn(() => {
+    if (TrackedRecognition.failNextStart) {
+      TrackedRecognition.failNextStart = false;
+      throw new Error('start failed');
+    }
     this.started = true;
     this.onstart?.();
   });
@@ -50,6 +56,7 @@ class TrackedRecognition {
 
 function installRecognition() {
   TrackedRecognition.instances = [];
+  TrackedRecognition.failNextStart = false;
   (window as unknown as Record<string, unknown>).SpeechRecognition = TrackedRecognition;
   (window as unknown as Record<string, unknown>).webkitSpeechRecognition = TrackedRecognition;
 }
@@ -392,4 +399,37 @@ describe('VoiceTextInput can restart after a browser-driven end (#348)', () => {
       expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
     }
   );
+});
+
+describe('VoiceTextInput survives a failing start (#348)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    installRecognition();
+  });
+
+  it('can start again after recognition.start() throws', async () => {
+    // start() is called immediately after the handle is stored, so a throw here
+    // leaves a dead recognizer that no handler will ever clear — the same brick
+    // as the onend/onerror case, reached by a different route.
+    installMicStream();
+    const user = userEvent.setup();
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(<VoiceTextInput value="" mode="voice" onChange={jest.fn()} />);
+
+    TrackedRecognition.failNextStart = true;
+    await startRecording();
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+
+    // The retry must actually reach the microphone again, not just re-render a
+    // button that does nothing.
+    await act(async () => {
+      await user.click(
+        await screen.findByRole('button', { name: /start voice recording/i })
+      );
+    });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+
+    consoleSpy.mockRestore();
+  });
 });
