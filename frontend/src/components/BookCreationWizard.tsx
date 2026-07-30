@@ -150,7 +150,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                       disabled={isSubmitting}
                     />
                   </FormControl>
-                  <FormDescription className="text-muted-foreground dark:text-gray-500">
+                  <FormDescription className="text-muted-foreground dark:text-gray-400">
                     Provide a short summary or description of your book project.
                   </FormDescription>
                   <FormMessage className="text-destructive dark:text-red-400" />
@@ -172,7 +172,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                       disabled={isSubmitting}
                     />
                   </FormControl>
-                  <FormDescription className="text-muted-foreground dark:text-gray-500">
+                  <FormDescription className="text-muted-foreground dark:text-gray-400">
                     Optional: Add a URL to your book&apos;s cover image.
                   </FormDescription>
                   <FormMessage className="text-destructive dark:text-red-400" />

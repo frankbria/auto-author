@@ -255,6 +255,10 @@ export default function BookSummaryPage() {
                 )}
               </div>
             </div>
+            {/* aria-invalid tells assistive tech the field is in an error
+                state, and aria-describedby points at the message explaining why
+                — previously the readiness error was visible text with nothing
+                associating it to the field (#349). */}
             <textarea
               id="summary"
               value={summary}
@@ -263,6 +267,8 @@ export default function BookSummaryPage() {
               className="w-full bg-background border border-border rounded-md py-2 px-3 text-foreground"
               placeholder="Describe your book's main concepts, structure, and key points that should be organized into chapters..."
               required
+              aria-invalid={Boolean(inputError)}
+              aria-describedby={inputError ? 'summary-input-error summary-help' : 'summary-help'}
             ></textarea>
 
             {/* Dictation status, announced politely. A voice-only affordance with
@@ -294,7 +300,17 @@ export default function BookSummaryPage() {
               <span>{countSummaryCharacters(summary)} / {SUMMARY_MIN_CHARACTERS} characters</span>
             </div>
             {inputError && (
-              <div className="text-red-400 text-xs mt-1">{inputError}</div>
+              // Polite, not alert: this fires on every keystroke while the
+              // summary is below the minimum, and an assertive region would
+              // interrupt the user continuously as they type.
+              <div
+                id="summary-input-error"
+                role="status"
+                aria-live="polite"
+                className="text-red-400 text-xs mt-1"
+              >
+                {inputError}
+              </div>
             )}
             <div id="summary-help" className="text-xs text-muted-foreground mt-2">
               <div>Guidelines: Aim for 1-3 paragraphs. Include the main idea, genre, and any key themes or characters. At least {SUMMARY_MIN_WORDS} words and {SUMMARY_MIN_CHARACTERS} characters are required to generate a table of contents — the more detail you give, the better the result.</div>

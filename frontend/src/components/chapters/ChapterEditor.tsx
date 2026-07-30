@@ -592,7 +592,12 @@ export function ChapterEditor({
           <span className="text-sm text-foreground">
             {editor?.storage.characterCount.characters() ?? 0} characters
           </span>
+          {/* Autosave result is otherwise a purely visual cue. Polite so it
+              never interrupts typing — which is precisely what the user is
+              doing when the 3s autosave fires (#349). */}
           <div
+            role="status"
+            aria-live="polite"
             className="flex items-center gap-2"
             data-testid="save-status-indicator"
             data-save-status={isSaving ? 'saving' : lastSaved ? 'saved' : 'idle'}

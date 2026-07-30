@@ -33,7 +33,7 @@ export default function ErrorDisplay({ error, onRetry, statusCode }: ErrorDispla
             Upgrade Plan
           </a>
 
-          <p className="text-gray-500 text-sm mt-6 max-w-md mx-auto">
+          <p className="text-gray-400 text-sm mt-6 max-w-md mx-auto">
             Contact support if you believe this is a mistake.
           </p>
         </div>
