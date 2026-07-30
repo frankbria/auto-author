@@ -526,18 +526,27 @@ export default function QuestionDisplay({
             aria-label="Your response to the question"
           />
 
+          {/*
+            Single always-mounted live region (#349). A region inserted at the
+            same moment as its text is frequently not announced at all — the
+            screen reader has to be observing the node before it mutates. The
+            visual indicators below are aria-hidden so the same status is not
+            read twice.
+          */}
+          <div role="status" aria-live="polite" className="sr-only">
+            {saveStatus === 'saving' && 'Your response is being stored'}
+            {saveStatus === 'saved' && 'Your response was stored successfully'}
+            {saveStatus === 'error' && 'Your response could not be stored'}
+            {saveStatus === 'queued' && 'Your response will be retried'}
+            {!isOnline && ' You are working offline'}
+            {wasOffline && ' Your connection is back'}
+          </div>
+
           {/* Save status and error with visual indicators */}
           <div className="flex items-center justify-between">
             {/* Save status indicator */}
             {saveStatus !== 'idle' && (
-              // Autosave outcome is otherwise a purely visual cue — a screen
-              // reader user gets no signal that their answer was stored, or
-              // wasn't (#349). Polite: it must not interrupt typing.
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex items-center gap-2 text-xs"
-              >
+              <div className="flex items-center gap-2 text-xs" aria-hidden="true">
                 {saveStatus === 'saving' && (
                   <>
                     <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin text-blue-600" />
@@ -567,11 +576,7 @@ export default function QuestionDisplay({
 
             {/* Offline indicator */}
             {!isOnline && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex items-center gap-2 text-xs text-amber-600"
-              >
+              <div className="flex items-center gap-2 text-xs text-amber-600" aria-hidden="true">
                 <HugeiconsIcon icon={WifiOff01Icon} size={16} />
                 <span>Offline mode</span>
               </div>
@@ -579,11 +584,7 @@ export default function QuestionDisplay({
 
             {/* Reconnected notification */}
             {wasOffline && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex items-center gap-2 text-xs text-green-600"
-              >
+              <div className="flex items-center gap-2 text-xs text-green-600" aria-hidden="true">
                 <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
                 <span>Connection restored</span>
               </div>
@@ -592,13 +593,11 @@ export default function QuestionDisplay({
 
           {/* Error message with retry button */}
           {saveError && (
-            // role="alert" (assertive): the user's answer may not have been
-            // saved, which is worth interrupting for.
-            <div
-              role="alert"
-              className="flex items-center justify-between bg-red-50 dark:bg-red-900/10 p-3 rounded-md"
-            >
-              <p className="text-xs text-red-600 flex-1">{saveError}</p>
+            <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/10 p-3 rounded-md">
+              {/* role="alert" on the message only: scoping it to the container
+                  would put the Retry button inside an assertive region, so its
+                  label gets announced as part of the alert. */}
+              <p role="alert" className="text-xs text-red-600 flex-1">{saveError}</p>
               {saveStatus === 'error' && retryCount < 3 && (
                 <Button
                   variant="outline"

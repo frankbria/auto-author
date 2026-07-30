@@ -142,10 +142,20 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
           Help us create the best table of contents by answering a few questions about your book.
         </p>
 
+        {/*
+          One always-mounted polite region (#349). A role="status" node inserted
+          at the same instant as its text is often never announced — the reader
+          must already be observing it. (role="alert" below is different:
+          insertion is itself the trigger, so the failure branch keeps its own.)
+        */}
+        <div role="status" aria-live="polite" className="sr-only">
+          {isSaving ? 'Saving your answers' : lastSaved ? 'Answers auto-saved' : ''}
+        </div>
+
         {/* Auto-save status */}
         <div className="mt-3 flex items-center text-sm">
           {isSaving ? (
-            <div className="flex items-center text-blue-400">
+            <div className="flex items-center text-blue-400" aria-hidden="true">
               <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-blue-400 mr-2"></div>
               Saving...
             </div>
@@ -157,7 +167,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
               Auto-save failed — your latest answers may not be saved
             </div>
           ) : lastSaved ? (
-            <div role="status" aria-live="polite" className="flex items-center text-green-400">
+            <div className="flex items-center text-green-400" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-2" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
@@ -199,12 +209,12 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         </div>
       ) : (
         <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6">
-          <h2
+          <h3
             id="clarifying-question-prompt"
             className="text-gray-100 font-medium mb-4 text-lg"
           >
             {currentQuestion}
-          </h2>
+          </h3>
 
           {/* The question itself is the field's label. Placeholder text is not
               an accessible name — it disappears on input and is skipped by some
