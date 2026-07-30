@@ -691,7 +691,41 @@ async def test_helpers_do_not_open_transactions(monkeypatch, seed_book):
 
     monkeypatch.setattr(base._client, "start_session", _fail_start_session)
 
+    await tx.update_toc_with_transaction(
+        book_id, {"chapters": [{"id": "c1", "title": "Renamed"}]}, owner
+    )
     await tx.add_chapter_with_transaction(book_id, {"title": "New"}, owner)
     await tx.update_chapter_with_transaction(book_id, "c1", {"title": "Edited"}, owner)
     await tx.reorder_chapters_with_transaction(book_id, [{"id": "c1", "order": 1}], owner)
     await tx.delete_chapter_with_transaction(book_id, "c1", owner)
+
+
+@pytest.mark.asyncio
+async def test_audit_failure_does_not_fail_a_committed_toc_update(
+    seed_book, monkeypatch
+):
+    """An audit failure must not turn a successful edit into an error (#369).
+
+    The guarded write commits before the audit row is inserted. While these ran
+    inside a transaction the two were atomic; without it, letting the audit
+    exception propagate would report failure for a change that persisted — and
+    the client's retry would then conflict with its own committed write.
+    """
+    book_id, owner = await seed_book(
+        toc=_toc(version=1, chapters=[{"id": "c1", "title": "Original"}])
+    )
+
+    async def _boom(*a, **kw):
+        raise RuntimeError("audit collection unavailable")
+
+    monkeypatch.setattr(tx, "create_audit_log", _boom)
+
+    # Must not raise.
+    await tx.update_toc_with_transaction(
+        book_id, {"chapters": [{"id": "c1", "title": "Renamed"}]}, owner
+    )
+
+    # And the edit is actually persisted, not silently dropped.
+    stored = await _get_toc(book_id)
+    assert stored["chapters"][0]["title"] == "Renamed"
+    assert stored["version"] == 2

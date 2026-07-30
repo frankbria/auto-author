@@ -6,6 +6,7 @@ Ensures atomic updates to prevent race conditions and maintain data consistency.
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 from bson.objectid import ObjectId
+import logging
 import uuid
 from motor.motor_asyncio import AsyncIOMotorClientSession
 
@@ -202,18 +203,33 @@ async def _update_toc_internal(
                 raise ValueError(f"Version conflict: TOC was updated by another process")
         raise ValueError("Failed to update TOC")
 
-    # Log the update
-    await create_audit_log(
-        action="update_toc",
-        actor_id=user_auth_id,
-        target_id=book_id,
-        resource_type="book",
-        details={
-            "chapters_count": len(updated_toc.get("chapters", [])),
-            "version": updated_toc["version"]
-        },
-        session=session
-    )
+    # Best-effort audit, explicitly. The TOC write above has already committed,
+    # so raising here would report failure for an edit that succeeded — and the
+    # client's retry would then hit a version conflict on its own change (#369).
+    # Losing an audit row is the lesser harm; it is logged at error level with
+    # enough context to reconstruct the entry. (Previously the transaction made
+    # these atomic; without it the ordering has to be handled explicitly rather
+    # than left implicit.)
+    try:
+        await create_audit_log(
+            action="update_toc",
+            actor_id=user_auth_id,
+            target_id=book_id,
+            resource_type="book",
+            details={
+                "chapters_count": len(updated_toc.get("chapters", [])),
+                "version": updated_toc["version"]
+            },
+            session=session
+        )
+    except Exception:
+        logging.getLogger(__name__).error(
+            "TOC updated but audit log failed: book=%s actor=%s version=%s",
+            book_id,
+            user_auth_id,
+            updated_toc["version"],
+            exc_info=True,
+        )
 
     return updated_toc
 
@@ -534,13 +550,23 @@ async def update_chapter_statuses_with_version_guard(
     )
 
     # Preserve the book-level audit entry the previous update_book() path emitted.
-    await create_audit_log(
-        action="book_update",
-        actor_id=user_auth_id,
-        target_id=book_id,
-        resource_type="book",
-        details={"updated_fields": ["table_of_contents", "updated_at"]},
-    )
+    # Best-effort for the same reason as above: the guarded write has committed,
+    # so an audit failure must not turn a successful edit into an error.
+    try:
+        await create_audit_log(
+            action="book_update",
+            actor_id=user_auth_id,
+            target_id=book_id,
+            resource_type="book",
+            details={"updated_fields": ["table_of_contents", "updated_at"]},
+        )
+    except Exception:
+        logging.getLogger(__name__).error(
+            "Chapter statuses updated but audit log failed: book=%s actor=%s",
+            book_id,
+            user_auth_id,
+            exc_info=True,
+        )
 
     return {"updated_chapters": updated_chapters}
 
