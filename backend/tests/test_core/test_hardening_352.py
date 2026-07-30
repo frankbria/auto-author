@@ -149,3 +149,70 @@ class TestAiMaxRetriesUpperBound:
 
     def test_the_cap_itself_is_allowed(self):
         assert config.Settings(AI_MAX_RETRIES=10).AI_MAX_RETRIES == 10
+
+
+class TestStripeOrderingIsEnforcedByTheQuery:
+    """The guard must live in the write, not in a read before it.
+
+    Two deliveries for the same customer carry different event ids, so the
+    idempotency claim does not serialize them. A read-then-write check lets both
+    pass their comparison and the older one land last — the exact downgrade the
+    guard exists to prevent.
+    """
+
+    @pytest.mark.asyncio
+    async def test_update_user_passes_the_ordering_condition_to_mongo(self, monkeypatch):
+        from app.api.endpoints import webhooks
+
+        captured = {}
+
+        async def _fake_update_user(auth_id, data, actor_id=None, extra_filter=None):
+            captured["filter"] = extra_filter
+            captured["data"] = data
+            return {"auth_id": auth_id, **data}
+
+        async def _fake_lookup(_customer_id):
+            return {"auth_id": "u1", "stripe_event_created": 500}
+
+        monkeypatch.setattr(webhooks, "update_user", _fake_update_user)
+        monkeypatch.setattr(
+            webhooks, "get_user_by_stripe_customer_id", _fake_lookup
+        )
+
+        await webhooks._apply_subscription_event(
+            "customer.subscription.deleted",
+            {"customer": "cus_1", "id": "sub_1"},
+            "evt_1",
+            400,  # older than the applied 500
+        )
+
+        # The condition must be part of the query, not evaluated beforehand.
+        assert captured["filter"] is not None, (
+            "ordering must be enforced by the write; a prior read races with a "
+            "concurrent delivery"
+        )
+        assert captured["data"]["stripe_event_created"] == 400
+
+    @pytest.mark.asyncio
+    async def test_a_rejected_write_reports_the_event_as_stale(self, monkeypatch):
+        from app.api.endpoints import webhooks
+
+        async def _fake_update_user(auth_id, data, actor_id=None, extra_filter=None):
+            return None  # Mongo matched nothing: a newer event already applied
+
+        async def _fake_lookup(_customer_id):
+            return {"auth_id": "u1", "stripe_event_created": 900}
+
+        monkeypatch.setattr(webhooks, "update_user", _fake_update_user)
+        monkeypatch.setattr(
+            webhooks, "get_user_by_stripe_customer_id", _fake_lookup
+        )
+
+        result = await webhooks._apply_subscription_event(
+            "customer.subscription.deleted",
+            {"customer": "cus_1", "id": "sub_1"},
+            "evt_old",
+            100,
+        )
+
+        assert result["status"] == "stale_event"

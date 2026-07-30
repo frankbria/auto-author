@@ -93,15 +93,27 @@ async def create_user(user_data: Dict) -> Dict:
 
 
 async def update_user(
-    auth_id: str, user_data: Dict, actor_id: str = None
+    auth_id: str, user_data: Dict, actor_id: str = None,
+    extra_filter: Optional[Dict] = None,
 ) -> Optional[Dict]:
-    """Update an existing user"""
+    """Update an existing user.
+
+    ``extra_filter`` is merged into the query so a caller can make the write
+    conditional on server-side state — the condition is then evaluated by Mongo
+    as part of the same atomic operation instead of by the caller beforehand.
+    Returns None when the filter does not match, which a caller must treat as
+    "someone else got there first" rather than "user not found" (#352).
+    """
     # Add updated_at timestamp
     user_data["updated_at"] = datetime.now(timezone.utc)
 
+    query: Dict = {"auth_id": auth_id}
+    if extra_filter:
+        query.update(extra_filter)
+
     # Update the user
     updated_user = await users_collection.find_one_and_update(
-        {"auth_id": auth_id}, {"$set": user_data}, return_document=True
+        query, {"$set": user_data}, return_document=True
     )
 
     # Log the change if user was found and updated

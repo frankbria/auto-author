@@ -145,28 +145,26 @@ async def _apply_subscription_event(
     # before rather than dropped.
     #
     # Known limit: `created` has one-second granularity, so two updates inside
-    # the same second cannot be ordered by it. The comparison is `<` rather than
-    # `<=` deliberately — dropping same-second events would discard legitimate
-    # ones, and last-write-wins within a second is the pre-existing behaviour.
+    # the same second cannot be ordered by it. The filter uses `$lte` so
+    # same-second events are still applied (last-write-wins within one second,
+    # the pre-existing behaviour) rather than silently dropped.
     # The complete fix is to re-fetch the subscription from Stripe on each event
     # and apply canonical state; that trades an extra API call (and a new failure
     # mode when Stripe is unreachable) for exactness, and is the upgrade path if
     # same-second races ever show up in practice.
-    last_applied = user.get("stripe_event_created")
-    if (
-        event_created is not None
-        and last_applied is not None
-        and event_created < last_applied
-    ):
-        logger.info(
-            "Stripe %s (created=%s) is older than the applied event (created=%s) "
-            "for user %s — ignoring",
-            event_type,
-            event_created,
-            last_applied,
-            user["auth_id"],
-        )
-        return {"status": "stale_event", "event_id": event_id}
+    # Enforced by Mongo as part of the write, not by a read here. Two deliveries
+    # for the same customer carry DIFFERENT event ids, so mark_event_processed
+    # does not serialize them: a read-then-write check lets both pass and the
+    # older one land last. The condition goes in the query instead.
+    ordering_filter = None
+    if event_created is not None:
+        ordering_filter = {
+            "$or": [
+                {"stripe_event_created": {"$exists": False}},
+                {"stripe_event_created": None},
+                {"stripe_event_created": {"$lte": event_created}},
+            ]
+        }
 
     # If a concurrent request linked this stripe_customer_id to a DIFFERENT user
     # between our lookup and this write (TOCTOU — the only way to reach it, since
@@ -177,17 +175,31 @@ async def _apply_subscription_event(
     # customer id is deliberately RETAINED — the Stripe customer still exists,
     # only the subscription ended. actor_id makes every plan transition
     # auditable (billing disputes).
-    await update_user(
+    updated = await update_user(
         user["auth_id"],
         {
             "plan": plan,
             "stripe_customer_id": customer_id,
             "stripe_subscription_id": subscription_id,
-            # Watermark for the out-of-order guard above.
+            # Watermark the ordering filter above compares against.
             **({"stripe_event_created": event_created} if event_created is not None else {}),
         },
         actor_id=f"stripe:{event_id}",
+        extra_filter=ordering_filter,
     )
+
+    if updated is None and ordering_filter is not None:
+        # The user exists (looked up above), so a no-match means the ordering
+        # condition rejected this write: a newer event has already been applied.
+        logger.info(
+            "Stripe %s (created=%s) is older than the applied event for user %s "
+            "— ignoring",
+            event_type,
+            event_created,
+            user["auth_id"],
+        )
+        return {"status": "stale_event", "event_id": event_id}
+
     logger.info(
         "Stripe %s: user %s plan set to %s", event_type, user["auth_id"], plan
     )
