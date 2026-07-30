@@ -534,7 +534,11 @@ jest.mock('@tiptap/react', () => {
 
 // Mock TipTap extensions
 jest.mock('@tiptap/starter-kit', () => {
-  return jest.fn(() => ({ name: 'starterKit' }));
+  // v3's StarterKit is configured (trailingNode is disabled — see
+  // ChapterEditor), so the mock needs .configure like the real extension.
+  const starterKit: Record<string, unknown> = jest.fn(() => ({ name: 'starterKit' }));
+  starterKit.configure = jest.fn(() => ({ name: 'starterKit' }));
+  return starterKit;
 });
 
 jest.mock('@tiptap/extension-underline', () => {
