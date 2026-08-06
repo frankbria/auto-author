@@ -196,7 +196,7 @@ python-socketio==5.16.1
     # via locust
 pywin32==310 ; sys_platform == 'win32'
     # via locust
-pyzmq==27.0.0
+pyzmq==27.1.0
     # via locust
 reportlab==5.0.0
     # via auto-author-backend
