@@ -176,7 +176,7 @@ pytest-asyncio==1.1.0
     # via auto-author-backend
 pytest-cov==6.2.1
     # via auto-author-backend
-pytest-mock==3.14.1
+pytest-mock==3.15.1
     # via auto-author-backend
 python-dateutil==2.9.0.post0
     # via botocore
