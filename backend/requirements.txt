@@ -48,7 +48,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   click
     #   pytest
     #   tqdm
-configargparse==1.7.1
+configargparse==1.7.5
     # via locust
 coverage==7.10.0
     # via
