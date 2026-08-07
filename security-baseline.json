@@ -55,7 +55,6 @@
     "GHSA-3ppc-4f35-3m26": "minimatch; fix: yes",
     "GHSA-492v-c6pp-mqqv": "next; fix: yes",
     "GHSA-49rj-9fvp-4h2h": "react-router; fix: yes",
-    "GHSA-52cp-r559-cp3m": "js-yaml; fix: yes",
     "GHSA-6g55-p6wh-862q": "postcss; fix: yes",
     "GHSA-737v-mqg7-c878": "defu; fix: yes",
     "GHSA-7r86-cg39-jmmj": "minimatch; fix: yes",
