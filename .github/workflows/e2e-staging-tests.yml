@@ -178,6 +178,10 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
+          # v9 flipped the `prune-cache` default to false to ease load on PyPI
+          # infrastructure, which grows the saved Actions cache (and its cost).
+          # Pinned to true to keep the v8 behaviour we were already getting.
+          prune-cache: true
 
       - name: Setup Python
         working-directory: backend
