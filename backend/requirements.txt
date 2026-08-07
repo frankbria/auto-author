@@ -62,7 +62,7 @@ dnspython==2.7.0
     #   pymongo
 ebooklib==0.20
     # via auto-author-backend
-email-validator==2.2.0
+email-validator==2.3.0
     # via pydantic
 faker==40.28.1
     # via auto-author-backend
