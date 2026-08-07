@@ -50,7 +50,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   tqdm
 configargparse==1.7.5
     # via locust
-coverage==7.10.0
+coverage==7.15.2
     # via
     #   auto-author-backend
     #   pytest-cov
@@ -83,7 +83,7 @@ gevent==26.5.0
     # via
     #   geventhttpclient
     #   locust
-geventhttpclient==2.3.9
+geventhttpclient==2.3.4
     # via locust
 greenlet==3.2.3 ; platform_python_implementation == 'CPython'
     # via gevent
@@ -196,7 +196,7 @@ python-socketio==5.16.1
     # via locust
 pywin32==310 ; sys_platform == 'win32'
     # via locust
-pyzmq==27.1.0
+pyzmq==27.0.0
     # via locust
 reportlab==5.0.0
     # via auto-author-backend
@@ -211,9 +211,7 @@ s3transfer==0.19.1
 sentry-sdk==2.66.1
     # via auto-author-backend
 setuptools==80.9.0
-    # via
-    #   zope-event
-    #   zope-interface
+    # via zope-interface
 simple-websocket==1.1.0
     # via python-engineio
 six==1.17.0
@@ -222,10 +220,8 @@ six==1.17.0
     #   ebooklib
     #   python-dateutil
 sniffio==1.3.1
-    # via
-    #   anyio
-    #   openai
-starlette==1.3.1
+    # via openai
+starlette==0.47.2
     # via fastapi
 stripe==15.3.0
     # via auto-author-backend
