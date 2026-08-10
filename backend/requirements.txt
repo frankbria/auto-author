@@ -227,7 +227,7 @@ stripe==15.3.0
     # via auto-author-backend
 tqdm==4.67.1
     # via openai
-typing-extensions==4.14.1
+typing-extensions==4.16.0
     # via
     #   fastapi
     #   openai
