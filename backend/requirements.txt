@@ -33,7 +33,7 @@ cffi==1.17.1 ; (implementation_name == 'pypy' and platform_python_implementation
     # via
     #   gevent
     #   pyzmq
-charset-normalizer==3.4.2
+charset-normalizer==3.4.9
     # via
     #   reportlab
     #   requests
