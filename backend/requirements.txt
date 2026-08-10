@@ -13,7 +13,7 @@ bidict==0.23.1
     # via python-socketio
 blinker==1.9.0
     # via flask
-boto3==1.43.40
+boto3==1.43.56
     # via auto-author-backend
 botocore==1.43.51
     # via
