@@ -16,6 +16,14 @@ updates:
       semver-major-days: 14
       semver-minor-days: 7
       semver-patch-days: 7
+    ignore:
+      # @types/node must track the Node we actually run, not the newest release.
+      # CI is on Node 20 and deploy-staging.yml pins 18, so a major bump (#422
+      # proposed 20 -> 26) types APIs the runtime doesn't have: typecheck goes
+      # green and the call fails on the server. Minor/patch still flow through.
+      # Lift this when #428 settles on one Node major across CI and deploy.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "uv"
     directory: "/backend"
