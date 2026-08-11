@@ -33,7 +33,17 @@ PATTERNS=(
     # Generic API keys and secrets
     '[aA][pP][iI][-_]?[kK][eE][yY].*['\''"][0-9a-zA-Z]{32,}['\''"]'
     '[sS][eE][cC][rR][eE][tT].*['\''"][0-9a-zA-Z]{32,}['\''"]'
-    '[pP][aA][sS][sS][wW][oO][rR][dD].*['\''"][^'\''\"]{8,}['\''"]'
+    # Require an actual assignment between the name and the quoted value, the
+    # same narrowing the NEXT_PUBLIC_ pattern below uses. This is the loosest
+    # pattern in the set — its value side accepts any 8+ characters, where the
+    # api-key/secret/token patterns demand a 32+ char alphanumeric run — so
+    # without an operator it fired on any identifier merely CONTAINING
+    # "password" that happened to sit near a quoted string. The real case that
+    # blocked #411: `const { sendPasswordResetEmail } = await import("@/lib/email")`
+    # matched on "Password" + ".*" + the quoted module path. Trailing
+    # [A-Za-z0-9_]* keeps compound names like `db_password_field = "..."`
+    # covered, while stopping the match from running across " } = await import(".
+    '[pP][aA][sS][sS][wW][oO][rR][dD][A-Za-z0-9_]*['\''"]?[[:space:]]*[=:][[:space:]]*['\''"][^'\''\"]{8,}['\''"]'
     '[tT][oO][kK][eE][nN].*['\''"][0-9a-zA-Z]{32,}['\''"]'
     # OAuth tokens
     'ghp_[0-9a-zA-Z]{36}'
