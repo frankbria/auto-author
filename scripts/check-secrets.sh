@@ -40,10 +40,17 @@ PATTERNS=(
     # without an operator it fired on any identifier merely CONTAINING
     # "password" that happened to sit near a quoted string. The real case that
     # blocked #411: `const { sendPasswordResetEmail } = await import("@/lib/email")`
-    # matched on "Password" + ".*" + the quoted module path. Trailing
-    # [A-Za-z0-9_]* keeps compound names like `db_password_field = "..."`
-    # covered, while stopping the match from running across " } = await import(".
-    '[pP][aA][sS][sS][wW][oO][rR][dD][A-Za-z0-9_]*['\''"]?[[:space:]]*[=:][[:space:]]*['\''"][^'\''\"]{8,}['\''"]'
+    # matched on "Password" + ".*" + the quoted module path.
+    #
+    # The name-continuation class must include - and . alongside word chars:
+    # with [A-Za-z0-9_]* alone the match stopped at the hyphen and could never
+    # reach the operator, silently dropping YAML/JSON keys like
+    # `password-value: "..."` and `"password-field": "..."` that the old pattern
+    # did catch. (`db-password: "..."` was unaffected — there the hyphen precedes
+    # the word.) Bounded repetition of a restricted class still can't cross the
+    # " } = await import(" in the false positive above, because `}` and space are
+    # outside the class and the operator must follow immediately.
+    '[pP][aA][sS][sS][wW][oO][rR][dD][A-Za-z0-9_.-]*['\''"]?[[:space:]]*[=:][[:space:]]*['\''"][^'\''\"]{8,}['\''"]'
     '[tT][oO][kK][eE][nN].*['\''"][0-9a-zA-Z]{32,}['\''"]'
     # OAuth tokens
     'ghp_[0-9a-zA-Z]{36}'
