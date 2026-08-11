@@ -146,6 +146,38 @@ jobs:
       # the tool itself broke, and that must not be swallowed into a false green.
       # `|| rc=$?` is load-bearing: steps run under `bash -e`, so without it the
       # expected exit-1 would abort the step before the check below runs.
+      # backend/requirements.txt is a generated export of uv.lock, not a source of
+      # truth — nothing installs from it (deploy and CI both run `uv sync`, and the
+      # pip-audit step below re-exports rather than reading the committed file).
+      # That made drift invisible, and Dependabot's uv ecosystem edits this file
+      # for TRANSITIVE deps, so #416-#421 and #430-#434 changed no installed
+      # version at all. Worse than churn: a bump that patches a real advisory
+      # would look applied while the vulnerable version stayed in uv.lock.
+      #
+      # Comparing the committed file against a fresh export turns both failure
+      # modes loud — a hand-edited export, and a requirements.txt-only Dependabot
+      # PR, now fail here instead of merging as a silent no-op. Regenerate with
+      # the command in the file's own header.
+      # Compared with the `#    uv export ... -o <path>` header line filtered out:
+      # uv writes its own output path into that comment, so a temp-file export can
+      # never be byte-identical to one written to requirements.txt. Filtering it is
+      # what makes this check possible at all; without it the step fails always.
+      - name: requirements.txt matches uv.lock
+        working-directory: backend
+        run: |
+          uv export --all-extras --no-emit-project --no-hashes \
+            --format requirements-txt > /tmp/reqs-raw.txt
+          grep -v '^#    uv export' /tmp/reqs-raw.txt > /tmp/reqs-expected.txt
+          grep -v '^#    uv export' requirements.txt > /tmp/reqs-actual.txt
+          if ! diff -u /tmp/reqs-actual.txt /tmp/reqs-expected.txt; then
+            echo "::error::backend/requirements.txt is out of sync with uv.lock."
+            echo "It is a generated file. Regenerate it rather than editing by hand:"
+            echo "  cd backend && uv export --all-extras --no-emit-project --no-hashes --format requirements-txt -o requirements.txt"
+            echo "If a dependency bump only touched requirements.txt, apply it to pyproject.toml/uv.lock instead — editing the export alone changes nothing that is installed."
+            exit 1
+          fi
+          echo "OK: requirements.txt matches uv.lock."
+
       - name: Run pip-audit
         working-directory: backend
         run: |
