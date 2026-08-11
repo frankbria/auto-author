@@ -85,7 +85,7 @@ gevent==26.5.0
     #   locust
 geventhttpclient==2.3.4
     # via locust
-greenlet==3.2.3 ; platform_python_implementation == 'CPython'
+greenlet==3.5.4 ; platform_python_implementation == 'CPython'
     # via gevent
 h11==0.16.0
     # via
