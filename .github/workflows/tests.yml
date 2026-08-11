@@ -154,6 +154,32 @@ jobs:
           uvx pip-audit -r /tmp/reqs.txt --format=json > /tmp/pip-audit.json || rc=$?
           if [ "$rc" -gt 1 ]; then echo "::error::pip-audit failed with exit $rc"; exit "$rc"; fi
 
+      # The npm audit below runs with working-directory: frontend, so it resolves
+      # ONLY frontend/package-lock.json. Any other npm lockfile in the repo is
+      # invisible to this gate — and .github/dependabot.yml aims its npm ecosystem
+      # at /frontend and / as well, so version updates miss it too. That blind spot
+      # is not hypothetical: frontend/scripts/package-lock.json sat there orphaned
+      # after #342 deleted its package.json and system-test.js, silently pinning a
+      # critical form-data advisory and 12 high axios ones. Only Dependabot security
+      # alerts could see it, and those were disabled until #413.
+      #
+      # Fail loudly if a new lockfile appears outside the scanned directory, rather
+      # than scanning it silently — a lockfile with no package.json beside it is
+      # usually debris to delete, and the right response is a human decision about
+      # whether to remove it or extend coverage in both this job and dependabot.yml.
+      - name: No unscanned npm lockfiles
+        run: |
+          unscanned=$(find . -name package-lock.json \
+            -not -path './node_modules/*' -not -path '*/node_modules/*' \
+            -not -path './frontend/package-lock.json')
+          if [ -n "$unscanned" ]; then
+            echo "::error::npm lockfile(s) outside the audited tree — neither npm audit nor Dependabot version updates cover these:"
+            echo "$unscanned"
+            echo "Delete them if orphaned, or add the directory to BOTH this job and .github/dependabot.yml."
+            exit 1
+          fi
+          echo "OK: frontend/package-lock.json is the only npm lockfile."
+
       # npm audit resolves straight from the lockfile — no `npm ci` needed.
       - name: Run npm audit
         working-directory: frontend
