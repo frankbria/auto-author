@@ -14,10 +14,66 @@ const dbName = process.env.DATABASE_NAME || "auto_author";
 const MAX_RETRY_ATTEMPTS = parseInt(process.env.MONGO_MAX_RETRY_ATTEMPTS || '3', 10);
 const BASE_RETRY_DELAY_MS = parseInt(process.env.MONGO_BASE_RETRY_DELAY_MS || '1000', 10);
 
+/**
+ * Build the better-auth instance for a connected database.
+ *
+ * Extracted from `getAuth()` so the singleton below can be typed as this
+ * function's return type. better-auth 1.6 made `Auth<TOptions>` invariant over
+ * its options, so the old `ReturnType<typeof betterAuth>` annotation — which
+ * resolves to the widened `Auth<BetterAuthOptions>` — no longer accepts the
+ * instance built from these concrete options. The `twoFactor()` plugin is what
+ * makes them concretely different: it adds `twoFactorEnabled` to the user
+ * schema, so the widened type is genuinely a different shape, not just a looser
+ * one. Naming the factory keeps the full inferred options type intact.
+ */
+function createAuthInstance(database: Db) {
+  return betterAuth({
+    appName: "Auto Author",
+    database: mongodbAdapter(database),
+    // TOTP two-factor authentication (#64). The MongoDB adapter creates the
+    // twoFactor collection on demand — no migration step required.
+    plugins: [twoFactor()],
+    emailAndPassword: {
+      enabled: true,
+      autoSignIn: true,
+      // Password reset configuration
+      sendResetPassword: async ({ user, url }) => {
+        // Send password reset email
+        // Use void to prevent timing attacks (don't reveal if email exists)
+        void (async () => {
+          try {
+            // Import email service dynamically to avoid issues during build
+            const { sendPasswordResetEmail } = await import("@/lib/email");
+            await sendPasswordResetEmail({
+              to: user.email,
+              name: user.name || "User",
+              resetUrl: url,
+            });
+            console.log(`Password reset email sent to ${user.email}`);
+          } catch (error) {
+            console.error("Failed to send password reset email:", error);
+          }
+        })();
+      },
+    },
+    session: {
+      expiresIn: 60 * 60 * 24 * 7, // 7 days
+      updateAge: 60 * 60 * 24, // Refresh every 24 hours
+      cookieCache: {
+        enabled: true,
+        maxAge: 5 * 60, // Cache for 5 minutes
+      },
+    },
+    advanced: {
+      defaultCookieAttributes: getDefaultCookieAttributes(),
+    },
+  });
+}
+
 // Lazy singleton pattern for MongoDB connection and auth instance
 let client: MongoClient | null = null;
 let db: Db | null = null;
-let authInstance: ReturnType<typeof betterAuth> | null = null;
+let authInstance: ReturnType<typeof createAuthInstance> | null = null;
 
 /**
  * Sleep for a specified duration with jitter
@@ -107,54 +163,18 @@ export async function getAuth() {
 
   // Create auth instance with connected database
   try {
-    authInstance = betterAuth({
-      appName: "Auto Author",
-      database: mongodbAdapter(db),
-      // TOTP two-factor authentication (#64). The MongoDB adapter creates the
-      // twoFactor collection on demand — no migration step required.
-      plugins: [twoFactor()],
-      emailAndPassword: {
-        enabled: true,
-        autoSignIn: true,
-        // Password reset configuration
-        sendResetPassword: async ({ user, url }) => {
-          // Send password reset email
-          // Use void to prevent timing attacks (don't reveal if email exists)
-          void (async () => {
-            try {
-              // Import email service dynamically to avoid issues during build
-              const { sendPasswordResetEmail } = await import("@/lib/email");
-              await sendPasswordResetEmail({
-                to: user.email,
-                name: user.name || "User",
-                resetUrl: url,
-              });
-              console.log(`Password reset email sent to ${user.email}`);
-            } catch (error) {
-              console.error("Failed to send password reset email:", error);
-            }
-          })();
-        },
-      },
-      session: {
-        expiresIn: 60 * 60 * 24 * 7, // 7 days
-        updateAge: 60 * 60 * 24, // Refresh every 24 hours
-        cookieCache: {
-          enabled: true,
-          maxAge: 5 * 60, // Cache for 5 minutes
-        },
-      },
-      advanced: {
-        defaultCookieAttributes: getDefaultCookieAttributes(),
-      },
-    });
+    const instance = createAuthInstance(db);
+    authInstance = instance;
+    // Return the local, not the module-level cache: the cache is declared
+    // `| null` (it has to be, to start empty), and returning it directly would
+    // widen this function's inferred return type to include null — which is
+    // what forced the null-check at the route handler.
+    return instance;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Failed to create auth instance:', errorMessage, { error });
     throw new Error(`Auth instance creation failed: ${errorMessage}`);
   }
-
-  return authInstance;
 }
 
 /**
