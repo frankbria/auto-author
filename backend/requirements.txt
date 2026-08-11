@@ -131,7 +131,7 @@ markupsafe==3.0.2
     #   werkzeug
 motor==3.7.1
     # via auto-author-backend
-msgpack==1.1.1
+msgpack==1.2.1
     # via locust
 openai==2.45.0
     # via auto-author-backend
