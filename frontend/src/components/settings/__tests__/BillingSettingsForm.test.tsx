@@ -2,6 +2,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BillingSettingsForm from '../BillingSettingsForm';
 import { toast } from '@/lib/toast';
 
+// jsdom 26 (jest 30) defines window.location as non-configurable and gives
+// Location no `href` setter, so the old Object.defineProperty(window,'location')
+// stub throws "Cannot redefine property: location". Navigation now goes through
+// @/lib/navigation, which is mockable. Same assertions, real seam.
+jest.mock('@/lib/navigation', () => ({
+  navigateTo: jest.fn(),
+  reloadPage: jest.fn(),
+}));
+
+import { navigateTo } from '@/lib/navigation';
+const mockNavigateTo = navigateTo as jest.MockedFunction<typeof navigateTo>;
+
 jest.mock('@/lib/toast', () => ({
   toast: Object.assign(jest.fn(), {
     success: jest.fn(),
@@ -35,17 +47,9 @@ describe('BillingSettingsForm', () => {
     expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeInTheDocument();
   });
 
-  const realLocation = window.location;
-  afterEach(() => {
-    Object.defineProperty(window, 'location', { value: realLocation, writable: true });
-  });
 
   it('starts checkout and redirects to the returned url on click', async () => {
-    const assignSpy = jest.fn();
-    Object.defineProperty(window, 'location', {
-      value: { assign: assignSpy },
-      writable: true,
-    });
+    mockNavigateTo.mockClear();
     mockStartCheckout.mockResolvedValue({ url: 'https://checkout.stripe.com/session/xyz' });
 
     render(<BillingSettingsForm plan="free" />);
@@ -55,7 +59,7 @@ describe('BillingSettingsForm', () => {
 
     await waitFor(() => expect(mockStartCheckout).toHaveBeenCalledWith('pro'));
     await waitFor(() =>
-      expect(assignSpy).toHaveBeenCalledWith('https://checkout.stripe.com/session/xyz')
+      expect(mockNavigateTo).toHaveBeenCalledWith('https://checkout.stripe.com/session/xyz')
     );
   });
 
@@ -85,11 +89,7 @@ describe('BillingSettingsForm', () => {
 
   // --- Billing portal (issue #222) ---
   it('opens the billing portal and redirects for a pro user', async () => {
-    const assignSpy = jest.fn();
-    Object.defineProperty(window, 'location', {
-      value: { assign: assignSpy },
-      writable: true,
-    });
+    mockNavigateTo.mockClear();
     mockOpenBillingPortal.mockResolvedValue({
       url: 'https://billing.stripe.com/p/session/xyz',
     });
@@ -101,7 +101,7 @@ describe('BillingSettingsForm', () => {
 
     await waitFor(() => expect(mockOpenBillingPortal).toHaveBeenCalled());
     await waitFor(() =>
-      expect(assignSpy).toHaveBeenCalledWith('https://billing.stripe.com/p/session/xyz')
+      expect(mockNavigateTo).toHaveBeenCalledWith('https://billing.stripe.com/p/session/xyz')
     );
   });
 

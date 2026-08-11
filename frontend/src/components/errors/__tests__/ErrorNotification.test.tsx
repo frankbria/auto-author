@@ -25,6 +25,15 @@ jest.mock('sonner', () => ({
 
 import { toast as sonnerToast } from 'sonner';
 
+// jsdom 26 (jest 30) makes window.location non-configurable, so the previous
+// Object.defineProperty stub throws. Navigation goes through @/lib/navigation.
+jest.mock('@/lib/navigation', () => ({
+  navigateTo: jest.fn(),
+  reloadPage: jest.fn(),
+}));
+import { navigateTo } from '@/lib/navigation';
+const mockNavigateTo = navigateTo as jest.MockedFunction<typeof navigateTo>;
+
 // Typed access to mock sub-methods
 const mockToast = sonnerToast as unknown as {
   error: jest.Mock;
@@ -361,19 +370,11 @@ describe('showErrorNotification', () => {
   });
 
   it('Upgrade CTA deep-links to the billing settings tab (issue #222)', () => {
-    const realLocation = window.location;
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-    });
-    try {
-      showErrorNotification(makeError({ type: ErrorType.ENTITLEMENT, retryable: false }));
-      const call = mockToast.error.mock.calls[0][1];
-      call.action.onClick();
-      expect(window.location.href).toBe('/dashboard/settings?tab=billing');
-    } finally {
-      Object.defineProperty(window, 'location', { value: realLocation, writable: true });
-    }
+    mockNavigateTo.mockClear();
+    showErrorNotification(makeError({ type: ErrorType.ENTITLEMENT, retryable: false }));
+    const call = mockToast.error.mock.calls[0][1];
+    call.action.onClick();
+    expect(mockNavigateTo).toHaveBeenCalledWith('/dashboard/settings?tab=billing');
   });
 
   // --- PERMANENT ---

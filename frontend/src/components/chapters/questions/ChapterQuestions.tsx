@@ -9,6 +9,7 @@ import QuestionContainer from './QuestionContainer';
 import { bookClient } from '@/lib/api/bookClient';
 import { QuestionProgressResponse } from '@/types/chapter-questions';
 import { Button } from '@/components/ui/button';
+import { reloadPage } from '@/lib/navigation';
 
 interface ChapterQuestionsProps {
   bookId: string;
@@ -212,7 +213,7 @@ export default function ChapterQuestions({
               <Button
                 className="mt-4"
                 variant="outline"
-                onClick={() => window.location.reload()}
+                onClick={() => reloadPage()}
               >
                 Retry
               </Button>

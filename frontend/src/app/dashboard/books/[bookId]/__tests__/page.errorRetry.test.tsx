@@ -4,6 +4,16 @@ import BookPage from '../page';
 import { useSession } from '@/lib/auth-client';
 import bookClient from '@/lib/api/bookClient';
 
+// jsdom 26 (jest 30) makes window.location non-configurable. The guard this test
+// enforces — retry refetches in place rather than reloading the document — is now
+// expressed against the mockable @/lib/navigation seam.
+jest.mock('@/lib/navigation', () => ({
+  navigateTo: jest.fn(),
+  reloadPage: jest.fn(),
+}));
+import { reloadPage } from '@/lib/navigation';
+const mockReloadPage = reloadPage as jest.MockedFunction<typeof reloadPage>;
+
 // The book-overview page's error state used to offer a Try Again button wired
 // to window.location.reload() — a full page reload instead of an in-place
 // refetch (#215). This suite pins the refetch behavior.
@@ -49,11 +59,7 @@ describe('BookPage error → in-place refetch (#215)', () => {
   });
 
   it('refetches in place when Try Again is clicked — no window.location.reload', async () => {
-    const reload = jest.fn();
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { ...window.location, reload },
-    });
+    mockReloadPage.mockClear();
 
     // First load fails → error state; retry succeeds → book renders.
     mockBookClient.getBook
@@ -78,7 +84,7 @@ describe('BookPage error → in-place refetch (#215)', () => {
       ).toBeInTheDocument()
     );
     expect(mockBookClient.getBook).toHaveBeenCalledTimes(2);
-    expect(reload).not.toHaveBeenCalled();
+    expect(mockReloadPage).not.toHaveBeenCalled();
   });
 });
 

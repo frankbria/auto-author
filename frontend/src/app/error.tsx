@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Alert02Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import * as Sentry from '@sentry/nextjs';
+import { navigateTo } from '@/lib/navigation';
 
 export default function Error({
   error,
@@ -61,7 +62,7 @@ export default function Error({
             <Button
               variant="outline"
               className="flex-1"
-              onClick={() => window.location.href = '/dashboard'}
+              onClick={() => navigateTo('/dashboard')}
             >
               Go to Dashboard
             </Button>
