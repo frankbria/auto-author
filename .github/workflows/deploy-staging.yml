@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '24'
   PYTHON_VERSION: '3.9'
 
 # Required GitHub Secrets:

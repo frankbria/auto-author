@@ -18,10 +18,16 @@ updates:
       semver-patch-days: 7
     ignore:
       # @types/node must track the Node we actually run, not the newest release.
-      # CI is on Node 20 and deploy-staging.yml pins 18, so a major bump (#422
-      # proposed 20 -> 26) types APIs the runtime doesn't have: typecheck goes
-      # green and the call fails on the server. Minor/patch still flow through.
-      # Lift this when #428 settles on one Node major across CI and deploy.
+      # Types ahead of the runtime remove the compile-time guardrail: typecheck
+      # goes green and the call fails on the server (#422 proposed 20 -> 26 while
+      # CI ran 20 and deploy pinned 18). Minor/patch still flow through.
+      #
+      # #428 settled the runtime on Node 24 everywhere — CI, E2E, and both deploy
+      # workflows — and @types/node is now pinned ^24 to match, so the gap this
+      # guards is closed rather than merely capped. The rule stays because the
+      # coupling is permanent: @types/node should only cross a major when the
+      # runtime does. When Node moves (24 is Active LTS to April 2028), bump the
+      # workflows, engines.node and this pin together, in one change.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
