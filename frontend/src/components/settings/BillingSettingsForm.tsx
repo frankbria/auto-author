@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useBillingApi } from '@/hooks/useBillingApi';
 import { toast } from '@/lib/toast';
+import { navigateTo } from '@/lib/navigation';
 
 interface BillingSettingsFormProps {
   plan?: string;
@@ -28,7 +29,7 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
     setIsRedirecting(true);
     try {
       const { url } = await startCheckout('pro');
-      window.location.assign(url);
+      navigateTo(url);
     } catch (err) {
       toast({
         title: 'Could not start checkout',
@@ -43,7 +44,7 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
     setIsRedirecting(true);
     try {
       const { url } = await openBillingPortal();
-      window.location.assign(url);
+      navigateTo(url);
     } catch (err) {
       toast({
         title: 'Could not open billing portal',
