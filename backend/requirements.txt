@@ -100,7 +100,7 @@ httpx==0.28.1
     # via
     #   auto-author-backend
     #   openai
-idna==3.10
+idna==3.18
     # via
     #   anyio
     #   email-validator
