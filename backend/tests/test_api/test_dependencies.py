@@ -127,6 +127,37 @@ class TestRateLimiting:
     (`motor_reinit_db`), since the whole point is the shared persistent store.
     """
 
+    @pytest.fixture(autouse=True)
+    def _frozen_clock(self):
+        """Pin the clock for every test in this class (#442).
+
+        The limiter keys its bucket on epoch-aligned wall-clock time
+        (`dependencies.py`: ``bucket_start = int(now // window) * window``), so
+        with the usual ``window=60`` the key rolls over on every real-world
+        minute. Tests here issue several sequential calls and assert on a single
+        bucket's running count; when those calls happened to straddle a minute
+        tick, the counter restarted mid-test.
+
+        That is not hypothetical — it red-lit PR #441, an unrelated frontend-only
+        dependency bump, with ``assert [2, 2, 1] == [2, 1, 0]``: three requests
+        recorded counts 1, 1, 2 instead of 1, 2, 3. The CI log timestamped the
+        failure 76 ms past an exact minute.
+
+        `test_rate_limiter_window_reset` already patched the clock for exactly
+        this reason ("no boundary-straddle flakes on loaded CI") but only for
+        itself. Hoisting it to an autouse fixture makes the whole class
+        deterministic and, more importantly, means the next test added here
+        inherits that rather than re-discovering the flake.
+
+        The value is arbitrary but deliberately mid-bucket: 1_000_000.0 is
+        16666 * 60 + 40, i.e. 40 s into a 60 s window, so a test that advances
+        time slightly still stays inside one bucket. Tests that need to control
+        time themselves (window_reset) just patch it again — the inner
+        `patch.object` nests over this one and restores it on exit.
+        """
+        with patch.object(deps.time, "time", return_value=1_000_000.0):
+            yield
+
     async def test_two_users_do_not_share_a_bucket(
         self, motor_reinit_db, real_rate_limiter
     ):
