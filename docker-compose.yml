@@ -1,0 +1,57 @@
+# Container deploy for auto-author (#427).
+#
+# Base definitions. The staging box uses this together with
+# docker-compose.staging.yml, which pins image tags and points at the host's env
+# file. There is no Mongo service: Mongo is Atlas, and adding a local one here
+# would quietly give a deploy a second, empty database to talk to.
+#
+# There is deliberately no `build:` here — see docker-compose.build.yml. Keeping
+# build definitions out of the base file means a deploy on the box physically
+# cannot rebuild an image, which is the point of the migration: no npm ci or
+# uv sync on the shared VPS.
+#
+# Ports match what nginx already fronts (backend 8000, frontend 3002) so no
+# upstream config changes. The box is shared with other apps — check the ports
+# are still free before the first deploy.
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/frankbria/auto-author-backend:staging}
+    restart: unless-stopped
+    # Bound to loopback: nginx proxies from the same host, so there is no reason
+    # to publish these on the shared box's public interface.
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Secrets come from the host env file, never baked into the image.
+      MONGODB_URI: ${MONGODB_URI:?MONGODB_URI is required}
+      DATABASE_NAME: ${DATABASE_NAME:?DATABASE_NAME is required}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      ENVIRONMENT: ${ENVIRONMENT:-staging}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    healthcheck:
+      # The same /health endpoint the existing deploy smoke-checks (#341 made it
+      # do real dependency checks rather than returning a static ok).
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/frankbria/auto-author-frontend:staging}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3002"
+    environment:
+      # Server-side only. The frontend talks to Mongo directly for better-auth.
+      DATABASE_URL: ${MONGODB_URI:?MONGODB_URI is required}
+      DATABASE_NAME: ${DATABASE_NAME:?DATABASE_NAME is required}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://dev.autoauthor.app}
+      NODE_ENV: production
+    depends_on:
+      backend:
+        condition: service_healthy
