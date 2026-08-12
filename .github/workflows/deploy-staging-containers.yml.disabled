@@ -1,0 +1,133 @@
+name: Deploy Staging (Containers)
+
+# Container deploy for staging (#427, items 5-6). DISABLED until the first
+# cutover is done with a human present — see the checklist in
+# docs/STAGING-DEPLOYMENT.md. Enable by renaming to
+# deploy-staging-containers.yml and disabling the PM2 workflow
+# (deploy-staging.yml -> .disabled), not before.
+#
+# The .disabled suffix follows this repo's existing convention
+# (deploy-production.yml.disabled). GitHub only loads .yml/.yaml, so this file
+# is inert as-is.
+#
+# What changes vs the PM2 deploy it replaces:
+#   - no npm ci / uv sync on the VPS; images are built in CI (build-images.yml)
+#     and pulled by tag
+#   - no releases/<id> symlink dance; the image tag IS the release identifier
+#   - rollback is this same workflow re-run with an older IMAGE_TAG, rather than
+#     hoping a previous release directory's node_modules still match
+#
+# Prerequisites on the box, all one-time and all human-verified before first run:
+#   1. Docker + compose plugin installed, daemon running
+#   2. /opt/auto-author/ containing docker-compose.yml, docker-compose.staging.yml
+#      and a .env file with the secrets listed in docker-compose.yml
+#   3. Ports 8000 and 3002 free — this is a SHARED box, check before assuming
+#   4. `docker login ghcr.io` (or a pull secret) if the packages are private
+#   5. nginx upstreams already point at 127.0.0.1:8000 / :3002 — unchanged from
+#      the PM2 setup, which is why those ports were kept
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (e.g. sha-3931169). Use an older tag to roll back.'
+        required: true
+        type: string
+
+# Least privilege: this only reads the repo and pulls published images.
+permissions:
+  contents: read
+
+concurrency:
+  # Never let two deploys race on one box.
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy containers to staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
+          chmod 600 ~/.ssh/staging_key
+          # No `nc` preflight or ssh-keyscan: those open connections that close
+          # before authenticating, which the box's fail2ban (aggressive,
+          # maxretry=4) counts as attacks and bans the runner for (#162). The
+          # steps below authenticate on first contact via accept-new.
+
+      - name: Ship compose files
+        run: |
+          # Retry with a cool-down: first SSH contact opens several short-lived
+          # preauth connections during host-key discovery, which on this shared
+          # box intermittently gets the follow-up dropped (#162 again).
+          for attempt in 1 2 3; do
+            if scp -i ~/.ssh/staging_key \
+                 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+                 docker-compose.yml docker-compose.staging.yml \
+                 ${{ secrets.USER }}@${{ secrets.HOST }}:/opt/auto-author/; then
+              exit 0
+            fi
+            echo "Upload attempt $attempt failed; retrying in 60s..."
+            sleep 60
+          done
+          echo "::error::Failed to ship compose files after 3 attempts"
+          exit 1
+
+      - name: Pull and start
+        run: |
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@${{ secrets.HOST }} \
+            "set -euo pipefail
+             cd /opt/auto-author
+             export IMAGE_TAG='${{ inputs.image_tag }}'
+             # --pull always so a re-run of the same tag still fetches a rebuilt
+             # image; compose would otherwise reuse a stale local layer.
+             docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
+             docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans"
+
+      - name: Health check
+        run: |
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@${{ secrets.HOST }} \
+            "set -euo pipefail
+             for i in \$(seq 1 30); do
+               be=\$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8000/api/v1/health || true)
+               fe=\$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:3002/ || true)
+               if [ \"\$be\" = '200' ] && [ \"\$fe\" = '200' ]; then
+                 echo 'Both services healthy'; exit 0
+               fi
+               sleep 5
+             done
+             echo 'Health check failed; recent logs:'
+             cd /opt/auto-author
+             docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=60
+             exit 1"
+
+      # Deliberately last and deliberately conservative: pruning before the
+      # health check would delete the image a rollback needs.
+      - name: Prune old images
+        if: success()
+        run: |
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@${{ secrets.HOST }} \
+            "docker image prune -f --filter 'until=336h'"
+
+      - name: Summary
+        if: always()
+        run: |
+          { echo '## Staging container deploy';
+            echo "- tag: \`${{ inputs.image_tag }}\`";
+            echo "- result: ${{ job.status }}";
+            echo '- rollback: re-run this workflow with an earlier `sha-` tag';
+          } >> $GITHUB_STEP_SUMMARY
