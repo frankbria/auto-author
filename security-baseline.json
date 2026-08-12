@@ -1,14 +1,8 @@
 {
   "_comment": "Known-and-accepted advisories as of #342. CI fails on anything NOT listed here, so this file is the repo's dependency-debt ledger, not an ignore-list to grow casually. Shrink it: each entry names its package and fix version. Regenerate wholesale with: python scripts/audit_gate.py --pip-audit <json> --npm-audit <json> --baseline security-baseline.json --write-baseline",
   "pypi": {
-    "PYSEC-2026-161": "starlette; fix: 1.0.1",
-    "PYSEC-2026-1942": "starlette; fix: 0.49.1",
     "PYSEC-2026-2132": "click; fix: 8.3.3",
-    "PYSEC-2026-2270": "python-dotenv; fix: 1.2.2",
-    "PYSEC-2026-2280": "starlette; fix: 1.1.0",
-    "PYSEC-2026-2281": "starlette; fix: 1.1.0",
-    "PYSEC-2026-248": "starlette; fix: 1.3.0",
-    "PYSEC-2026-249": "starlette; fix: 1.3.1"
+    "PYSEC-2026-2270": "python-dotenv; fix: 1.2.2"
   },
   "npm": {
     "GHSA-23c5-xmqv-rm74": "minimatch; fix: yes",
