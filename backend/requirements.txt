@@ -19,7 +19,7 @@ botocore==1.43.67
     # via
     #   boto3
     #   s3transfer
-brotli==1.1.0
+brotli==1.2.0
     # via geventhttpclient
 certifi==2025.7.14
     # via
