@@ -70,7 +70,7 @@ fastapi==0.139.0
     # via
     #   auto-author-backend
     #   sentry-sdk
-flask==3.1.1
+flask==3.1.3
     # via
     #   flask-cors
     #   flask-login
