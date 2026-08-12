@@ -69,7 +69,19 @@ jobs:
         with:
           oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
-          tags: tag:ci
+          # BOTH tags, deliberately. Tailscale requires the requested tags to
+          # match the OAuth client's FULL tag set, not a subset: this client
+          # (kDnQDnzTAK…) carries tag:ci and tag:staging-server, and asking for
+          # either one alone is rejected with
+          #   400 "requested tags [tag:ci] are invalid or not permitted"
+          # which reads like a permissions problem but is an exact-match rule.
+          # Verified against the API: [tag:ci] 400, [tag:staging-server] 400,
+          # [tag:ci,tag:staging-server] SUCCESS.
+          #
+          # codeframe gets away with `tags: tag:ci` only because its client
+          # carries that single tag, so its request is already the full set.
+          # If this client's tags change, this line must change with them.
+          tags: tag:ci,tag:staging-server
 
       - name: Setup SSH
         run: |
