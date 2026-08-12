@@ -1,0 +1,19 @@
+# Build overlay (#427). Used by CI and for local image builds:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml build
+#
+# Kept separate from the base file so a deploy on the VPS has no build definition
+# to fall back on if an image pull fails — it errors instead of quietly compiling
+# on the box, which is the behaviour this migration exists to remove.
+services:
+  backend:
+    build:
+      context: ./backend
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # NEXT_PUBLIC_* is inlined into the client bundle at build time, so these
+        # are build args rather than runtime env. Changing one needs a rebuild,
+        # not a restart.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.dev.autoauthor.app/api/v1}
+        NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL:-https://dev.autoauthor.app}

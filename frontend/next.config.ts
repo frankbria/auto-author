@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
+  // Emit a self-contained server bundle at .next/standalone for container images
+  // (#427). This is additive: `next build` still produces the normal .next output,
+  // so `next start` — which the current PM2 deploy uses — keeps working unchanged.
+  output: "standalone",
+  // Pin the trace root to this directory. The repo root carries its own
+  // package.json (a PM2 shell), so Next walked further up and rooted the trace at
+  // the home directory — emitting the server at
+  // .next/standalone/projects/auto-author/frontend/server.js and sweeping ~/.nvm
+  // into a 197 MB bundle. Pinning it puts the entrypoint at the documented
+  // .next/standalone/server.js, which is what the Dockerfile COPYs.
+  outputFileTracingRoot: path.join(__dirname),
+
   // Enable SWC minification and optimization
   // swcMinify: true,
 

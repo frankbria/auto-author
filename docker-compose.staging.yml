@@ -1,0 +1,13 @@
+# Staging overlay (#427). Used as:
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+#
+# Pins both images to an immutable SHA tag. That is the rollback mechanism:
+# re-run with the previous SHA rather than hoping an old release directory's
+# node_modules still match, which is what the PM2/symlink deploy required.
+#
+# No `build:` reset is needed because the base file carries none.
+services:
+  backend:
+    image: ghcr.io/frankbria/auto-author-backend:${IMAGE_TAG:?IMAGE_TAG is required (e.g. sha-abc1234)}
+  frontend:
+    image: ghcr.io/frankbria/auto-author-frontend:${IMAGE_TAG:?IMAGE_TAG is required (e.g. sha-abc1234)}
