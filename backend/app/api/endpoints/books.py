@@ -2609,7 +2609,7 @@ async def generate_chapter_draft(
             # and carries the actionable message through (#352).
             if result.get("error_code") == "DRAFT_TRUNCATED":
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail={
                         "message": result.get("error"),
                         "error_code": "DRAFT_TRUNCATED",

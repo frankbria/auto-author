@@ -145,7 +145,7 @@ def handle_validation_error(
     error_response = create_error_response(
         error_code=ErrorCode.VALIDATION_FAILED,
         message="Request validation failed",
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         details=details,
         request_id=request_id
     )
@@ -153,7 +153,7 @@ def handle_validation_error(
     logger.info(f"Validation error: field={field}, value={value} [request_id={request_id}]")
 
     return HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail=error_response.model_dump(mode='json')
     )
 

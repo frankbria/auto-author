@@ -136,7 +136,7 @@ class TestValidationErrorHandler:
                 value=100,
             )
 
-        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_includes_field_in_details(self):
         """Test that error response includes field name"""
@@ -260,7 +260,7 @@ class TestResponseSaveErrorHandler:
                 user_id="user-456",
             )
 
-        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_handles_generic_error(self):
         """Test handling generic errors"""
@@ -289,7 +289,7 @@ class TestRatingSaveErrorHandler:
                 rating_value=10,
             )
 
-        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_includes_rating_value(self):
         """Test that error includes the invalid rating value"""
