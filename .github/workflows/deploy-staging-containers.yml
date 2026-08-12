@@ -56,29 +56,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      # The box's UFW allows port 22 from exactly two places: the owner's home
-      # subnet (70.172.0.0/17, commented "never block") and the tailscale0
-      # interface. GitHub-hosted runners are on neither, so SSH from Actions
-      # times out. This is not new and not specific to containers — the PM2
-      # workflow this replaced failed the same way on all 8 of its runs on
-      # 2026-08-12, and the newest release directory on the box is dated
-      # 2026-07-30. Automated deploys have been broken for ~2 weeks.
+      # The box firewalls port 22 off the public internet — UFW allows it only
+      # from the owner's home subnet and from tailscale0 — so the runner reaches
+      # it over Tailscale. This is the same pattern the codeframe deploy uses
+      # against this same host, so the tag:ci -> tag:staging-server ACL is
+      # already proven.
       #
-      # Joining the tailnet is the sanctioned route in rather than punching
-      # GitHub's IP ranges through the firewall, which would be a large and
-      # permanent widening for a transient runner.
-      #
-      # Requires a TAILSCALE_AUTHKEY secret (an ephemeral, pre-approved auth key
-      # is the right kind). Without it this step is skipped and the deploy fails
-      # at the scp with a connection timeout — loudly, not silently.
+      # OAuth client rather than a static auth key: the node is ephemeral and
+      # re-tagged per run, so there is no long-lived key to rotate or leak.
       - name: Connect to Tailscale
-        if: env.TS_AUTHKEY != ''
-        env:
-          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
-        uses: tailscale/github-action@v3
+        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          version: latest
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
+          tags: tag:ci
 
       - name: Setup SSH
         run: |
