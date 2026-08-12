@@ -254,7 +254,7 @@ uvicorn==0.49.0
     # via auto-author-backend
 websocket-client==1.8.0
     # via python-socketio
-werkzeug==3.1.3
+werkzeug==3.1.6
     # via
     #   flask
     #   flask-cors
