@@ -5,6 +5,7 @@ import { ClassifiedError, ErrorType } from '@/lib/errors';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { AlertCircleIcon, RefreshIcon, Cancel01Icon, Clock01Icon, Database01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
+import { navigateTo } from '@/lib/navigation';
 import { useEffect, useState } from 'react';
 
 /**
@@ -94,7 +95,7 @@ export function showErrorNotification(
       action: {
         label: 'Upgrade',
         onClick: () => {
-          window.location.href = '/dashboard/settings?tab=billing';
+          navigateTo('/dashboard/settings?tab=billing');
         },
       },
       onDismiss,

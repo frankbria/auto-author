@@ -85,7 +85,7 @@ gevent==26.5.0
     #   locust
 geventhttpclient==2.3.4
     # via locust
-greenlet==3.2.3 ; platform_python_implementation == 'CPython'
+greenlet==3.5.5 ; platform_python_implementation == 'CPython'
     # via gevent
 h11==0.16.0
     # via
@@ -100,7 +100,7 @@ httpx==0.28.1
     # via
     #   auto-author-backend
     #   openai
-idna==3.10
+idna==3.18
     # via
     #   anyio
     #   email-validator
@@ -120,7 +120,7 @@ jmespath==1.0.1
     #   botocore
 locust==2.46.2
     # via auto-author-backend
-lxml==6.0.0
+lxml==6.1.1
     # via
     #   ebooklib
     #   python-docx
@@ -131,7 +131,7 @@ markupsafe==3.0.2
     #   werkzeug
 motor==3.7.1
     # via auto-author-backend
-msgpack==1.1.1
+msgpack==1.2.1
     # via locust
 openai==2.45.0
     # via auto-author-backend
