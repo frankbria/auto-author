@@ -210,7 +210,7 @@ s3transfer==0.19.1
     # via boto3
 sentry-sdk==2.66.1
     # via auto-author-backend
-setuptools==80.9.0
+setuptools==83.0.0
     # via zope-interface
 simple-websocket==1.1.0
     # via python-engineio
