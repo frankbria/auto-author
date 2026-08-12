@@ -22,8 +22,17 @@ services:
     # to publish these on the shared box's public interface.
     ports:
       - "127.0.0.1:8000:8000"
+    # The whole host env file is passed through. An explicit `environment:` list
+    # silently drops anything not enumerated — the running app also needs
+    # AWS_*, CLOUDINARY_*, BETTER_AUTH_ISSUER and BACKEND_CORS_ORIGINS, which an
+    # allowlist would have omitted and which would have failed only at the point
+    # someone uploaded a cover image.
+    env_file:
+      - .env
     environment:
-      # Secrets come from the host env file, never baked into the image.
+      # Kept explicit as required-variable assertions: compose fails fast with a
+      # clear message if one is missing, rather than the container starting and
+      # erroring later. These override the env_file values with the same values.
       MONGODB_URI: ${MONGODB_URI:?MONGODB_URI is required}
       DATABASE_NAME: ${DATABASE_NAME:?DATABASE_NAME is required}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
@@ -45,6 +54,8 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3002:3002"
+    env_file:
+      - .env
     environment:
       # Server-side only. The frontend talks to Mongo directly for better-auth.
       DATABASE_URL: ${MONGODB_URI:?MONGODB_URI is required}
