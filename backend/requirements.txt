@@ -186,7 +186,7 @@ python-dotenv==1.1.1
     # via
     #   auto-author-backend
     #   pydantic-settings
-python-engineio==4.12.2
+python-engineio==4.13.2
     # via
     #   locust
     #   python-socketio
