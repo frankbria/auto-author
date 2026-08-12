@@ -1,5 +1,14 @@
 # Staging Server Deployment Guide
 
+> **Status note (#427):** the container deploy is being introduced alongside the
+> PM2 path documented below. Images are already built and published on every
+> push to `main` (`.github/workflows/build-images.yml`), and the deploy workflow
+> is written but **disabled** pending a first supervised cutover. See
+> [Container deploy (#427)](#container-deploy-427) at the end of this document.
+>
+> Until that cutover happens the PM2 instructions below are still the live path
+> and remain correct. Do not follow both.
+
 **Last Updated**: 2025-10-19
 **Target Server**: frankbria-inspiron-7586
 **Purpose**: Stable sprint demo and integration testing environment
@@ -680,3 +689,103 @@ For deployment issues:
 **Maintained By**: Development Team
 **Review Frequency**: Before each major release
 **Last Review**: 2025-10-19
+
+
+---
+
+## Container deploy (#427)
+
+The PM2/rsync path above builds on the VPS: `npm ci` and `uv sync` run on a box
+shared with other applications, a `releases/<id>` directory is symlinked to
+`current`, and PM2 is stopped and restarted. That makes deploys depend on the
+box's toolchain versions and disk, and makes rollback a matter of hoping an old
+release directory's `node_modules` still match.
+
+The container path replaces that with immutable images.
+
+### What already exists
+
+| Piece | Where | State |
+|---|---|---|
+| Backend image | `backend/Dockerfile` | multi-stage, non-root `appuser`, uvicorn on 8000 |
+| Frontend image | `frontend/Dockerfile` | multi-stage Next standalone, non-root `node`, 3002 |
+| Compose base | `docker-compose.yml` | both services on 127.0.0.1:8000 / :3002 — the ports nginx already fronts |
+| Build overlay | `docker-compose.build.yml` | build contexts, used by CI and locally |
+| Staging overlay | `docker-compose.staging.yml` | pins both images to `${IMAGE_TAG}` |
+| Image publishing | `.github/workflows/build-images.yml` | **live** — publishes `sha-<short>` and `staging` on every push to `main` |
+| Deploy workflow | `.github/workflows/deploy-staging-containers.yml.disabled` | **written, disabled** |
+
+`build:` deliberately lives in its own overlay rather than the base file, so a
+deploy that cannot pull an image **errors** instead of quietly compiling on the
+shared box — which is the behaviour this migration exists to remove.
+
+### One-time setup on the box, before the first deploy
+
+This is a **shared machine**. Every step is a check, not an assumption.
+
+1. **Ports.** Confirm 8000 and 3002 are free, or that only this app holds them:
+   `sudo ss -ltnp | grep -E ':(8000|3002)'`
+2. **Docker.** Confirm the daemon is installed and running, and note any
+   containers already there that belong to other applications:
+   `docker ps -a`
+3. **Directory.** `mkdir -p /opt/auto-author` and place `docker-compose.yml`,
+   `docker-compose.staging.yml`, and a `.env` carrying the variables listed in
+   `docker-compose.yml` (`MONGODB_URI`, `DATABASE_NAME`, `BETTER_AUTH_SECRET`,
+   `OPENAI_API_KEY`, …). Secrets live only in that file — never in an image.
+4. **Registry access.** If the GHCR packages are private,
+   `docker login ghcr.io` with a token that has `read:packages`.
+5. **nginx.** Confirm the upstreams still point at `127.0.0.1:8000` and
+   `127.0.0.1:3002`. They should need no change — that is why those ports were
+   kept.
+
+### First cutover
+
+Do this with a person watching, not from an automatic trigger.
+
+1. Pick a tag published by `build-images.yml`, e.g. `sha-3931169`.
+2. Stop the PM2 processes for this app only:
+   `pm2 stop auto-author-backend auto-author-frontend`
+   (`pm2 list` first — other applications may be under the same PM2.)
+3. Bring the containers up:
+   ```bash
+   cd /opt/auto-author
+   IMAGE_TAG=sha-3931169 docker compose \
+     -f docker-compose.yml -f docker-compose.staging.yml up -d
+   ```
+4. Verify locally, then through nginx:
+   ```bash
+   curl -s http://127.0.0.1:8000/api/v1/health   # {"status":"healthy",...}
+   curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3002/
+   curl -s -o /dev/null -w '%{http_code}\n' https://dev.autoauthor.app/
+   ```
+5. Run the staging E2E suite (`npm run test:e2e:staging`) — it uses real auth,
+   so it is the check that actually exercises the deployed stack.
+6. If anything is wrong, roll back immediately: `docker compose … down` and
+   `pm2 start auto-author-backend auto-author-frontend`. The PM2 release
+   directory is untouched by any of the above.
+
+### Rollback
+
+Re-run the deploy with an earlier tag. That is the whole procedure:
+
+```bash
+cd /opt/auto-author
+IMAGE_TAG=sha-<previous> docker compose \
+  -f docker-compose.yml -f docker-compose.staging.yml up -d
+```
+
+The image-prune step in the deploy workflow keeps 14 days of images and runs
+only after a successful health check, so the previous tag is still present when
+you need it.
+
+### Enabling the automated deploy
+
+Only after the manual cutover has been done and verified **twice**:
+
+1. Rename `deploy-staging-containers.yml.disabled` →
+   `deploy-staging-containers.yml`
+2. Rename `deploy-staging.yml` → `deploy-staging.yml.disabled`
+3. Trigger it via workflow dispatch with an explicit `image_tag` before wiring
+   any automatic trigger
+
+Only then remove the PM2 ecosystem template and the PM2 steps (#427 AC 8).
