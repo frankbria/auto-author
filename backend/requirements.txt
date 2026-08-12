@@ -186,13 +186,13 @@ python-dotenv==1.1.1
     # via
     #   auto-author-backend
     #   pydantic-settings
-python-engineio==4.12.2
+python-engineio==4.13.4
     # via
     #   locust
     #   python-socketio
 python-multipart==0.0.32
     # via auto-author-backend
-python-socketio==5.16.1
+python-socketio==5.16.4
     # via locust
 pywin32==310 ; sys_platform == 'win32'
     # via locust
@@ -210,7 +210,7 @@ s3transfer==0.19.1
     # via boto3
 sentry-sdk==2.66.1
     # via auto-author-backend
-setuptools==80.9.0
+setuptools==84.0.0
     # via zope-interface
 simple-websocket==1.1.0
     # via python-engineio
