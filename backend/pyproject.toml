@@ -13,7 +13,7 @@ dependencies = [
     "pymongo==4.13.2",
     "motor==3.7.1",
     # Configuration and environment
-    "python-dotenv==1.1.1",
+    "python-dotenv==1.2.2",
     "pydantic[email]==2.13.4",
     "pydantic-settings==2.10.1",
     # AI and external APIs

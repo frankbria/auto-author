@@ -182,7 +182,7 @@ python-dateutil==2.9.0.post0
     # via botocore
 python-docx==1.2.0
     # via auto-author-backend
-python-dotenv==1.1.1
+python-dotenv==1.2.2
     # via
     #   auto-author-backend
     #   pydantic-settings
