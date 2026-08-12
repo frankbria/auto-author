@@ -190,7 +190,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     error_details = "; ".join(errors)
     logger.error(f"Validation error: {error_details}", exc_info=True)
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "detail": f"Validation error",
             "errors": exc.errors(),
@@ -204,7 +204,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def pydantic_validation_exception_handler(request: Request, exc: ValidationError):
     logger.error(f"Pydantic validation error: {exc}", exc_info=True)
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={"detail": "Validation error"},
     )
 
