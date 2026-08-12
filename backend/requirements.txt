@@ -137,7 +137,7 @@ openai==2.45.0
     # via auto-author-backend
 packaging==25.0
     # via pytest
-pillow==11.3.0
+pillow==12.3.0
     # via
     #   auto-author-backend
     #   reportlab
