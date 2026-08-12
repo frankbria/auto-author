@@ -56,6 +56,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      # The box's UFW allows port 22 from exactly two places: the owner's home
+      # subnet (70.172.0.0/17, commented "never block") and the tailscale0
+      # interface. GitHub-hosted runners are on neither, so SSH from Actions
+      # times out. This is not new and not specific to containers — the PM2
+      # workflow this replaced failed the same way on all 8 of its runs on
+      # 2026-08-12, and the newest release directory on the box is dated
+      # 2026-07-30. Automated deploys have been broken for ~2 weeks.
+      #
+      # Joining the tailnet is the sanctioned route in rather than punching
+      # GitHub's IP ranges through the firewall, which would be a large and
+      # permanent widening for a transient runner.
+      #
+      # Requires a TAILSCALE_AUTHKEY secret (an ephemeral, pre-approved auth key
+      # is the right kind). Without it this step is skipped and the deploy fails
+      # at the scp with a connection timeout — loudly, not silently.
+      - name: Connect to Tailscale
+        if: env.TS_AUTHKEY != ''
+        env:
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          version: latest
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -75,7 +99,7 @@ jobs:
             if scp -i ~/.ssh/staging_key \
                  -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
                  docker-compose.yml docker-compose.staging.yml \
-                 ${{ secrets.USER }}@${{ secrets.HOST }}:/opt/auto-author/; then
+                 ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }}:/opt/auto-author/; then
               exit 0
             fi
             echo "Upload attempt $attempt failed; retrying in 60s..."
@@ -87,7 +111,7 @@ jobs:
       - name: Pull and start
         run: |
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.HOST }} \
+            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              cd /opt/auto-author
              export IMAGE_TAG='${{ inputs.image_tag }}'
@@ -99,7 +123,7 @@ jobs:
       - name: Health check
         run: |
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.HOST }} \
+            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              for i in \$(seq 1 30); do
                be=\$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8000/api/v1/health || true)
@@ -120,7 +144,7 @@ jobs:
         if: success()
         run: |
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.HOST }} \
+            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "docker image prune -f --filter 'until=336h'"
 
       - name: Summary
