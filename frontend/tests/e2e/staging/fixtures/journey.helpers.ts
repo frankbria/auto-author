@@ -190,5 +190,15 @@ export async function readFirstChapterAnswer(page: Page): Promise<string> {
   await page.getByRole('tab', { name: /interview questions/i }).click();
   const responseBox = page.getByPlaceholder(/type your response here/i);
   await expect(responseBox).toBeVisible({ timeout: 30_000 });
+
+  // Visibility is not readiness. After a reload the textarea mounts empty and is
+  // populated once the saved response arrives, so reading inputValue() the moment
+  // it becomes visible races the fetch and returns "" — which then reads as an
+  // Issue #54 persistence regression when the answer is in fact saved (verified
+  // directly in the question_responses collection).
+  //
+  // Wait for the box to hold something before reading. The caller still asserts
+  // WHICH text it holds, so this removes the race without weakening the check.
+  await expect(responseBox).not.toHaveValue('', { timeout: 30_000 });
   return responseBox.inputValue();
 }
