@@ -465,6 +465,57 @@ class TestUpdateToc:
         assert get_resp.json()["status"] == "edited"
 
     @pytest.mark.asyncio
+    async def test_unwrapped_payload_is_rejected_and_preserves_toc(
+        self, auth_client_factory
+    ):
+        """A flat body (no ``toc`` wrapper) must 400, not silently wipe the TOC.
+
+        Regression for #492: ``data.get("toc", {})`` defaulted the missing key to
+        an empty dict, and the whole ``table_of_contents`` is overwritten with
+        what that resolves to — so a wrong-shaped body destroyed real chapters
+        and returned 200.
+        """
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        await api.put(
+            f"/api/v1/books/{book_id}/toc",
+            json={"toc": {"chapters": [{"title": "Keep Me"}]}},
+        )
+
+        resp = await api.put(
+            f"/api/v1/books/{book_id}/toc",
+            json={"chapters": [{"title": "Flat"}], "total_chapters": 1},
+        )
+        assert resp.status_code == 400
+        assert "toc" in resp.json()["detail"]
+
+        # The existing TOC survived.
+        get_resp = await api.get(f"/api/v1/books/{book_id}/toc")
+        assert [c["title"] for c in get_resp.json()["toc"]["chapters"]] == ["Keep Me"]
+
+    @pytest.mark.asyncio
+    async def test_toc_without_chapters_key_is_rejected(self, auth_client_factory):
+        """``chapters`` absent is a malformed body, not "save an empty TOC"."""
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        resp = await api.put(
+            f"/api/v1/books/{book_id}/toc", json={"toc": {"total_chapters": 5}}
+        )
+        assert resp.status_code == 400
+        assert "chapters" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_explicit_empty_chapters_still_saves(self, auth_client_factory):
+        """Clearing a TOC on purpose stays possible — the keys just must be there."""
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        resp = await api.put(
+            f"/api/v1/books/{book_id}/toc", json={"toc": {"chapters": []}}
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["chapters_count"] == 0
+
+    @pytest.mark.asyncio
     async def test_toc_not_an_object_returns_400(self, auth_client_factory):
         api = await auth_client_factory()
         book_id = await _create_book(api)
