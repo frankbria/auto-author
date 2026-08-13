@@ -121,6 +121,20 @@ async def get_books_by_user(
     """
     cursor = (
         books_collection.find({"owner_id": user_auth_id}, CONTENT_EXCLUDING_PROJECTION)
+        # Newest first. Without an explicit sort Mongo returns natural (roughly
+        # insertion) order, so once a user passes the endpoint's 100-row page size
+        # the dashboard shows their OLDEST 100 forever and a newly created book is
+        # never visible — it sits past the end of page one. On staging (#488) that
+        # account had 2,649 books and the dashboard's newest card was months old.
+        #
+        # Sort on updated_at ALONE, deliberately. The collection already carries
+        # owner_updated_idx (owner_id, updated_at DESC), and this exact shape uses
+        # it: explain() reports LIMIT -> FETCH -> IXSCAN. Adding an _id tiebreaker
+        # for tie determinism looks harmless but measured as
+        # SORT -> FETCH -> IXSCAN — a blocking in-memory sort on every dashboard
+        # load, which is what hits Mongo's 32MB sort cap as a library grows.
+        # Ties within one second are rare and not worth that.
+        .sort("updated_at", -1)
         .skip(skip)
         .limit(limit)
     )
