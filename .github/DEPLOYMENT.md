@@ -37,9 +37,10 @@ Configure at: `Settings` → `Secrets and variables` → `Actions`.
 | `deploy-staging.yml.disabled` | retired (rollback) | everything in the "Required/Recommended/Optional" sections below |
 | `deploy-production.yml.disabled` | retired | — |
 
-Everything below documents the **application** values. For the live deploy they
-belong in the box's `.env`; the GitHub secret of the same name exists only for
-the disabled PM2 path.
+**Server access** below is live — the container deploy reads those secrets from
+GitHub on every run. Everything after it documents **application** values: for
+the live deploy those belong in the box's `.env`, and the GitHub secret of the
+same name feeds only the disabled PM2 path.
 
 ---
 

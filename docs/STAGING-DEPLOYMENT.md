@@ -17,7 +17,8 @@ live on the same box, so every step here is a check, not an assumption.
 
 ```
 Shared VPS
-├── nginx (:80/:443, TLS + CORS/security headers)
+├── nginx (:80/:443, TLS termination + security headers; CORS itself comes
+│         from the backend's CORSMiddleware / BACKEND_CORS_ORIGINS)
 │   ├── dev.autoauthor.app      → 127.0.0.1:3002  (frontend container)
 │   └── api.dev.autoauthor.app  → 127.0.0.1:8000  (backend container)
 ├── /opt/auto-author/
@@ -100,8 +101,9 @@ Trigger **Deploy Staging (Containers)** via workflow dispatch with an explicit
 1. connects over Tailscale (#485, #489) and ships the two compose files by `scp`,
    retrying with a cool-down — first SSH contact on this box intermittently gets
    dropped during host-key discovery (#162);
-2. `docker compose pull --pull always` (a re-run of the same tag still fetches a
-   rebuilt image) then `up -d --remove-orphans`;
+2. `docker compose … pull` then `up -d --remove-orphans` — `pull` always goes to
+   the registry, so re-running the same tag still picks up a rebuilt image
+   instead of reusing a stale local layer;
 3. polls `/api/v1/health` and `/` for up to 150s, dumping the last 60 log lines
    and failing the job if either never returns 200;
 4. prunes images older than 14 days — deliberately **after** the health check, so
