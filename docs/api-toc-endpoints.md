@@ -333,28 +333,38 @@ PUT /books/{book_id}/toc
 | Name | Type | In | Description |
 |------|------|-------|------------|
 | book_id | string | path | The ID of the book |
-| toc | object | body | The updated TOC structure |
+| toc | object | body | The updated TOC structure. **Required** — see below |
 
 #### Request Body
 
+The TOC must be wrapped in a `toc` key, and `toc.chapters` must be present.
+Both are required: the update replaces `table_of_contents` wholesale, so
+omitting either used to save an empty TOC over the book's real chapters and
+still answer `200` (#492). They are now rejected with `400`.
+
 ```json
 {
-  "chapters": [
-    {
-      "id": "ch1",
-      "title": "Updated Chapter Title",
-      "description": "Updated chapter description",
-      "level": 1,
-      "order": 1,
-      "subchapters": [...]
-    },
-    ...
-  ],
-  "total_chapters": 8,
-  "estimated_pages": 240,
-  "structure_notes": "Updated structure notes"
+  "toc": {
+    "chapters": [
+      {
+        "id": "ch1",
+        "title": "Updated Chapter Title",
+        "description": "Updated chapter description",
+        "level": 1,
+        "order": 1,
+        "subchapters": [...]
+      },
+      ...
+    ],
+    "total_chapters": 8,
+    "estimated_pages": 240,
+    "structure_notes": "Updated structure notes"
+  }
 }
 ```
+
+To clear a TOC deliberately, send `{"toc": {"chapters": []}}` — an explicit
+empty list is accepted, an absent one is not.
 
 #### Response
 
@@ -379,11 +389,19 @@ PUT /books/{book_id}/toc
 
 **400 Bad Request**
 
-```json
-{
-  "detail": "Invalid TOC structure"
-}
-```
+Returned for a malformed body. `detail` names what is wrong:
+
+| `detail` | Cause |
+|---|---|
+| `Request body must contain a 'toc' object` | The `toc` wrapper is missing |
+| `TOC data must be provided as an object` | `toc` is not an object |
+| `TOC must contain a 'chapters' list` | `toc.chapters` is missing |
+| `Chapters must be provided as a list` | `toc.chapters` is not a list |
+| `Chapter {i} must be an object` | An entry in `chapters` is not an object |
+| `Chapter {i} must have a title` | A chapter has no title |
+
+**409 Conflict** — the TOC was modified by another writer since it was read
+(optimistic lock; send `expected_version` inside `toc` to opt in).
 
 ## Rate Limiting
 

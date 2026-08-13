@@ -1344,14 +1344,27 @@ async def update_book_toc(
     Update the Table of Contents for a book.
     Saves user edits to the TOC structure with transaction support.
     """
-    # Validate TOC data
-    toc_data = data.get("toc", {})
+    # Validate TOC data. Both keys are *required*, not defaulted: the update
+    # replaces `table_of_contents` wholesale, so defaulting a missing key to
+    # {} / [] wipes the saved chapters and answers 200 (#492). An intentional
+    # clear is still expressible as {"toc": {"chapters": []}}.
+    if "toc" not in data:
+        raise HTTPException(
+            status_code=400, detail="Request body must contain a 'toc' object"
+        )
+
+    toc_data = data["toc"]
     if not isinstance(toc_data, dict):
         raise HTTPException(
             status_code=400, detail="TOC data must be provided as an object"
         )
 
-    chapters = toc_data.get("chapters", [])
+    if "chapters" not in toc_data:
+        raise HTTPException(
+            status_code=400, detail="TOC must contain a 'chapters' list"
+        )
+
+    chapters = toc_data["chapters"]
     if not isinstance(chapters, list):
         raise HTTPException(
             status_code=400, detail="Chapters must be provided as a list"
@@ -1369,9 +1382,6 @@ async def update_book_toc(
             )
 
     try:
-        # Debug logging
-        import logging
-        logger = logging.getLogger(__name__)
         logger.info(f"Updating TOC for book_id={book_id}, user_auth_id={current_user.get('auth_id')}")
 
         # Update TOC with transaction
