@@ -1,16 +1,10 @@
 name: Deploy Staging (Containers)
 
-# Container deploy for staging (#427, items 5-6). DISABLED until the first
-# cutover is done with a human present — see the checklist in
-# docs/STAGING-DEPLOYMENT.md. Enable by renaming to
-# deploy-staging-containers.yml and disabling the PM2 workflow
-# (deploy-staging.yml -> .disabled), not before.
+# Container deploy for staging (#427, items 5-6). LIVE since 2026-08-12 (#484),
+# which retired the PM2 workflow to deploy-staging.yml.disabled. Box setup and
+# the rollback procedure: docs/STAGING-DEPLOYMENT.md.
 #
-# The .disabled suffix follows this repo's existing convention
-# (deploy-production.yml.disabled). GitHub only loads .yml/.yaml, so this file
-# is inert as-is.
-#
-# What changes vs the PM2 deploy it replaces:
+# What changes vs the PM2 deploy it replaced:
 #   - no npm ci / uv sync on the VPS; images are built in CI (build-images.yml)
 #     and pulled by tag
 #   - no releases/<id> symlink dance; the image tag IS the release identifier
