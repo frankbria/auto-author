@@ -12,6 +12,7 @@ Two independent changes folded into the dead-code removal:
 """
 
 import pytest
+from datetime import datetime, timezone
 from unittest.mock import patch
 from bson import ObjectId
 import motor.motor_asyncio
@@ -286,3 +287,59 @@ async def test_get_book_metadata_by_id_excludes_chapter_html(motor_reinit_db):
 async def test_get_book_metadata_by_id_returns_none_for_missing_and_malformed_ids(motor_reinit_db):
     assert await get_book_metadata_by_id(str(ObjectId())) is None
     assert await get_book_metadata_by_id("not-an-object-id") is None
+
+
+async def test_get_books_by_user_returns_newest_first(motor_reinit_db):
+    """The dashboard must show a user's most recent books, not their oldest.
+
+    `get_books_by_user` applies .skip()/.limit() with no .sort(), so Mongo returns
+    natural (roughly insertion) order. Once a user passes the 100-book page size,
+    the endpoint hands back their OLDEST 100 forever and a newly created book is
+    never visible on the dashboard — it sits past the end of the page.
+
+    Found on staging (#488): the account had 2,649 books, the dashboard rendered
+    73 cards whose newest was months old, and the "book creation succeeds and
+    persists" E2E regression failed on its final visibility assertion even though
+    the POST returned 201.
+    """
+    books = await get_collection("books")
+    # Insert oldest-first so natural order is the opposite of what we want back.
+    for i in range(5):
+        await books.insert_one({
+            "owner_id": USER,
+            "title": f"Book {i}",
+            "created_at": datetime(2026, 1, i + 1, tzinfo=timezone.utc),
+            "updated_at": datetime(2026, 1, i + 1, tzinfo=timezone.utc),
+        })
+
+    # A page smaller than the collection is what exposes the ordering bug.
+    result = await get_books_by_user(USER, limit=3)
+
+    assert [b["title"] for b in result] == ["Book 4", "Book 3", "Book 2"]
+
+
+async def test_get_books_by_user_pagination_is_stable_across_pages(motor_reinit_db):
+    """Consecutive pages must not repeat or drop rows.
+
+    Without an explicit sort the order is not guaranteed stable between queries,
+    so skip/limit paging can show the same book twice and hide another entirely.
+
+    Distinct timestamps here on purpose: the production sort is updated_at alone
+    (see get_books_by_user for why an _id tiebreaker was measured and rejected),
+    so this pins page boundaries rather than tie-order.
+    """
+    books = await get_collection("books")
+    for i in range(6):
+        await books.insert_one({
+            "owner_id": USER,
+            "title": f"Book {i}",
+            "created_at": datetime(2026, 2, i + 1, tzinfo=timezone.utc),
+            "updated_at": datetime(2026, 2, i + 1, tzinfo=timezone.utc),
+        })
+
+    page1 = [b["title"] for b in await get_books_by_user(USER, skip=0, limit=3)]
+    page2 = [b["title"] for b in await get_books_by_user(USER, skip=3, limit=3)]
+
+    assert page1 == ["Book 5", "Book 4", "Book 3"]
+    assert page2 == ["Book 2", "Book 1", "Book 0"]
+    assert not set(page1) & set(page2), "pages must not overlap"
