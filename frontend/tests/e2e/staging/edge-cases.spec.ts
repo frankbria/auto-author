@@ -31,11 +31,23 @@ async function updateToc(page: Page, bookId: string, chapterCount: number): Prom
     structure_notes: 'Staging edge-case large TOC smoke data',
   };
 
+  // The endpoint reads data.get("toc"), so the payload must be wrapped. Sent flat,
+  // it resolves to {} -> chapters [] -> an empty TOC saved with a 200, which is why
+  // this test asserted a successful PUT and then found 0 chapters on the edit
+  // screen. The endpoint accepting that silently is tracked separately.
   const response = await page.request.put(`${API_BASE_URL}/books/${bookId}/toc`, {
-    data: toc,
+    data: { toc },
   });
 
   expect(response.status(), await response.text()).toBeLessThan(400);
+
+  // A 200 is not proof of persistence here — verify the chapters actually landed.
+  const saved = await page.request.get(`${API_BASE_URL}/books/${bookId}/toc`);
+  expect(saved.status(), await saved.text()).toBeLessThan(400);
+  const savedBody = await saved.json();
+  const savedChapters =
+    savedBody?.toc?.chapters ?? savedBody?.table_of_contents?.chapters ?? savedBody?.chapters ?? [];
+  expect(savedChapters, 'TOC PUT returned 2xx but persisted no chapters').toHaveLength(chapterCount);
 }
 
 async function expectAuthenticatedDashboard(page: Page): Promise<void> {

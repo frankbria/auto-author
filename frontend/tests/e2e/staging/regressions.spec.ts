@@ -98,7 +98,14 @@ test.describe('Issue #83 regressions', () => {
 
     // The created book must be queryable after a full reload (owner_id correct).
     await page.goto('/dashboard');
-    await expect(page.getByText(bookTitle)).toBeVisible({ timeout: 15000 });
+    // 20s to match the sibling dashboard-visibility specs in edge-cases.spec.ts.
+    // This one was the outlier at 15s and was the only one failing late in a full
+    // suite run: the failure snapshot showed ZERO book cards rendered, i.e. the
+    // whole list had not loaded yet — not that this book was missing. The account
+    // carries ~2,700 books and the dashboard renders a 100-row page (~195 KB) with
+    // no pagination UI, so first paint is slow. Tracked separately; the assertion
+    // itself is unchanged.
+    await expect(page.getByText(bookTitle)).toBeVisible({ timeout: 20_000 });
   });
 
   /**
