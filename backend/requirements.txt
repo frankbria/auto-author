@@ -225,7 +225,7 @@ starlette==1.6.0
     # via fastapi
 stripe==15.3.0
     # via auto-author-backend
-tqdm==4.67.1
+tqdm==4.70.0
     # via openai
 typing-extensions==4.14.1
     # via
