@@ -74,6 +74,7 @@ Standards, checklists, and E2E requirements: **`docs/references/quality-standard
   ```
   Watch for a stale `.git/hooks/pre-commit.legacy` shadowing behavior.
 - Coverage floor is 85% (frontend thresholds 85/85/75/85 lines/statements/branches/functions).
+- `backend/requirements.txt` is a generated export of `uv.lock`; **never edit it by hand** — regenerate it (`Security Audit` prints the command) after any `pyproject.toml`/`uv.lock` change. Dependabot no longer sees it at all (#512), so backend dep PRs need that regen on the branch. Procedure: `docs/references/quality-standards.md` → Backend Dependency Updates.
 - Never commit to `main` directly — `feature/<name>`, PR, conventional commits.
 
 ---
