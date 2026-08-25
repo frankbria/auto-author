@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Pull requests from forks get a read-only token, and pushing an image from
       # an unreviewed PR would be a supply-chain hole regardless. Build to verify
