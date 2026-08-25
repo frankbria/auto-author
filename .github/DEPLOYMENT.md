@@ -1,10 +1,23 @@
 # Deployment Configuration — GitHub Secrets
 
-Secrets consumed by `.github/workflows/deploy-staging.yml` and
-`.github/workflows/e2e-staging-tests.yml`. Every entry below was cross-checked
-against those workflow files; nothing here is aspirational.
+Secrets consumed by the workflows in `.github/workflows/`. Every entry below was
+cross-checked against those files; nothing here is aspirational.
 
 Configure at: `Settings` → `Secrets and variables` → `Actions`.
+
+> ### ⚠️ Application secrets no longer come from here
+>
+> Staging moved to the container deploy on 2026-08-12 (#484). The live workflow,
+> `deploy-staging-containers.yml`, ships the compose files and runs
+> `docker compose up` — **it writes no env file**. Every application secret
+> (`MONGODB_URI`, `DATABASE_NAME`, `BETTER_AUTH_SECRET`, `OPENAI_API_KEY`, AWS,
+> Cloudinary, …) is read from `/opt/auto-author/.env` **on the server**, which is
+> maintained by hand and which no workflow touches.
+>
+> The GitHub secrets for those values now feed only `deploy-staging.yml.disabled`
+> — the retired PM2 deploy, kept as a rollback path. **Changing them does not
+> change what staging is running.** See `docs/STAGING-DEPLOYMENT.md` for the box
+> setup and `docs/DATABASE_CONNECTION_STANDARD.md` for the DB values.
 
 > **Scope matters.** The staging test credentials (`TEST_USER_EMAIL`,
 > `TEST_USER_PASSWORD`) are **environment** secrets on the `staging`
@@ -13,15 +26,36 @@ Configure at: `Settings` → `Secrets and variables` → `Actions`.
 
 ---
 
+## Which workflow uses what
+
+| Workflow | State | Secrets it reads |
+|---|---|---|
+| `deploy-staging-containers.yml` | **live** | `TS_CLIENT_ID`, `TS_AUTH_SECRET`, `SSH_KEY`, `USER`, `STAGING_TS_HOST` (falls back to `HOST`) |
+| `e2e-staging-tests.yml` | **live** | `TEST_USER_EMAIL`, `TEST_USER_PASSWORD` (staging environment), `SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL` |
+| `build-images.yml` | **live** | `GITHUB_TOKEN` (automatic) |
+| `glm-review.yml` | **live** | `ZHIPU_API_KEY` |
+| `deploy-staging.yml.disabled` | retired (rollback) | everything in the "Required/Recommended/Optional" sections below |
+| `deploy-production.yml.disabled` | retired | — |
+
+**Server access** below is live — the container deploy reads those secrets from
+GitHub on every run. Everything after it documents **application** values: for
+the live deploy those belong in the box's `.env`, and the GitHub secret of the
+same name feeds only the disabled PM2 path.
+
+---
+
 ## Required Secrets
 
-### SSH & Server Access
+### Server access
 
 | Secret | Description | Example |
 |--------|-------------|---------|
 | `SSH_KEY` | Private SSH key for server access | `-----BEGIN OPENSSH PRIVATE KEY-----…` |
-| `HOST` | Server hostname or IP address | `195.35.14.177` |
 | `USER` | SSH username | `root` |
+| `STAGING_TS_HOST` | Tailscale hostname for the box; preferred over `HOST` | `staging-vps` |
+| `HOST` | Public hostname or IP — fallback when `STAGING_TS_HOST` is unset | `195.35.14.177` |
+| `TS_CLIENT_ID` | Tailscale OAuth client id — the deploy runs over Tailscale (#485, #489) | — |
+| `TS_AUTH_SECRET` | Tailscale OAuth client secret; needs the client's full tag set (#490) | — |
 
 ### Application URLs
 
@@ -40,8 +74,18 @@ Configure at: `Settings` → `Secrets and variables` → `Actions`.
 
 | Secret | Description | Example |
 |--------|-------------|---------|
-| `MONGODB_URI` | MongoDB connection string — written to `.env` as `DATABASE_URL` | `mongodb+srv://user:pass@cluster.mongodb.net` |
+| `MONGODB_URI` | Connection string, **no database name in the path** | `mongodb+srv://user:pass@cluster.mongodb.net/` |
 | `DATABASE_NAME` | Database name | `auto_author_staging` |
+
+For the live container deploy these are keys in `/opt/auto-author/.env`, read by
+`docker-compose.yml` (which also remaps `MONGODB_URI` to the frontend's
+`DATABASE_URL`). The PM2 path wrote the same value into `.env` under the key
+`DATABASE_URL` instead — worth knowing when reading an older box.
+
+A database name in the URI path breaks Atlas auth (it becomes `defaultauthdb`,
+which `authSource` then defaults to) and is ignored by the app regardless.
+Percent-encode the password. Full rules and the rotation runbook:
+`docs/DATABASE_CONNECTION_STANDARD.md`.
 
 Staging uses MongoDB Atlas. When the server's IP changes, add the new address to
 the Atlas allowlist or every deploy health-check will fail.
@@ -156,7 +200,12 @@ regardless.
 
 ---
 
-## Environment Files the Workflow Creates
+## Environment Files — the retired PM2 layout
+
+> These files are what `deploy-staging.yml.disabled` **used to** regenerate from
+> secrets on every deploy. The container deploy creates nothing: it reads the
+> single `/opt/auto-author/.env` listed in `docker-compose.yml`. Kept here
+> because the rollback path still produces this layout.
 
 ### Backend: `/opt/auto-author/current/backend/.env`
 

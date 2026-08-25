@@ -89,8 +89,8 @@ Files under 500 lines. Never hardcode secrets. Tests before implementation. WCAG
 
 - Staging: https://dev.autoauthor.app (frontend), https://api.dev.autoauthor.app (backend). SSH as `root`, keys are local.
 - **Shared box — other apps run here.** Backend is on 8000, frontend on 3002, but check nginx for current truth before assuming a port is free.
-- PM2-managed with a symlinked `current` release dir; when things look out of sync, check that the symlink points where you think it does.
-- Deployment scripts live in the git workflow directories.
+- **Containers since 2026-08-12 (#484)** — `deploy-staging-containers.yml` ships the compose files and pulls a `sha-` image tag; the tag *is* the release id. PM2 is retired (`deploy-staging.yml.disabled`, kept for rollback).
+- **Application secrets live in `/opt/auto-author/.env` on the box, not in GitHub secrets.** No workflow writes that file. Changing the `MONGODB_URI` repo secret changes nothing that runs. See `docs/STAGING-DEPLOYMENT.md`.
 
 ---
 
