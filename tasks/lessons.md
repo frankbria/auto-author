@@ -134,3 +134,54 @@
 - **`git stash -- <pathspec>` un-stages a staged `git rm`**: a mutation-check stash/pop cycle over `frontend/src` silently converted a staged deletion into an unstaged one, and the explicit-`git add`-list commit missed it — the AC-critical file deletion shipped in a follow-up commit only because codex review diffed HEAD against the claim. After any stash/pop, re-check `git status` for ` D` (unstaged deletes) before committing; better, commit staged work BEFORE running mutation checks.
 - **`git checkout -- <file>` for mutation-revert also nukes uncommitted edits to that file**: reverting a sed mutation this way deleted the session's own uncommitted testid change. Commit first, mutate second.
 - **classifyError retry semantics differ by error shape**: bookClient throws status-less `Error`s, so a mocked HTTP 500 classifies UNKNOWN (no retry) — only network-level failures (`route.abort` → TypeError) classify NETWORK/TRANSIENT and exercise ErrorHandler backoff or the toast Retry action. When testing retry paths, inject aborts, not 5xx fulfills.
+
+## 2026-08-25 — #512: don't state a mechanism more absolutely than you verified it
+
+**Corrections taken (both from codex, post-PR):**
+
+1. Wrote "a `GITHUB_TOKEN` push does not re-trigger workflows … checks that never run"
+   as the justification for rejecting an automated fix. The documented rule is
+   narrower: GitHub's recursion guard means such a push creates no *new workflow run*.
+   The conclusion held; the premise was stated more categorically than the docs support.
+2. Wrote "Dependabot no longer sees `requirements.txt` at all" in five places while the
+   same PR's Known Limitations section correctly said `exclude-paths` scopes update
+   scans, not the dependency graph. Self-contradiction inside one changeset.
+
+**Pattern:** when a decision rests on a platform behaviour, write the claim at exactly
+the scope that was verified — name the mechanism ("recursion guard", "update scans")
+rather than the sweeping consequence. Overstated premises survive review of the *code*
+because they live in prose; they need a reviewer pointed explicitly at the docs claims.
+
+**How to apply:** ask the third-party reviewer to check the docs/comments as hard as
+the diff, naming the specific factual assertions to verify. That prompt is what caught
+both here — the pre-PR pass, aimed only at code and config, returned no findings.
+
+## 2026-08-25 — verify a config fix against the real tool, not the config file
+
+Reviewing `.github/dependabot.yml` by eye would have shipped a plausible-looking change
+with no evidence. Running `dependabot/cli` against the published
+`ghcr.io/dependabot/dependabot-updater-uv` image — twice, same tree, differing only in
+`exclude-paths` — turned "should stop the no-op PRs" into 35 → 0, and separately proved
+the issue's own fallback (`allow: dependency-type: direct`) could not have worked, and
+that the trade-off was 8× bigger than my estimate from the last batch.
+
+**How to apply:** for CI/config changes, check whether the tool ships a runnable local
+harness before settling for inspection. `dependabot`, `act`, and `actionlint` all do.
+
+## 2026-08-25 — killing a `git commit` mid-hook loses unstaged work to pre-commit's stash
+
+`pre-commit` stashes unstaged changes before running hooks and restores them on exit.
+Kill the commit before it exits — here the Bash tool's 2-minute cap hit while the
+backend pytest hook ran the full suite — and the restore never happens: unstaged edits
+vanish from the working tree with no stash entry and no warning. Cost me 33 lines of
+this file, briefly.
+
+**Recovery:** the stash is a patch under `~/.cache/pre-commit/patch<timestamp>-<pid>`.
+Find the newest one and `git apply` it. Do this *before* redoing the work.
+
+**Prevention:** any `git commit` in this repo that stages backend files runs the whole
+suite, so it needs `run_in_background`, not a foreground call — and stage everything
+you care about first, since only staged content is safe from the stash window.
+
+Related: [[commit-before-mutation-checks]] is the same lesson from a different angle —
+uncommitted work is the fragile thing; commit early.
