@@ -15,7 +15,7 @@ dependencies = [
     # Configuration and environment
     "python-dotenv==1.2.2",
     "pydantic[email]==2.13.4",
-    "pydantic-settings==2.10.1",
+    "pydantic-settings==2.14.2",
     # AI and external APIs
     "openai==2.45.0",
     "requests==2.34.2",
@@ -45,7 +45,7 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest==8.4.1",
-    "pytest-asyncio==1.1.0",
+    "pytest-asyncio==1.4.0",
     "pytest-cov==6.2.1",
     "pytest-mock==3.15.1",
     "faker==40.28.1",
