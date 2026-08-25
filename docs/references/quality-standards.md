@@ -84,9 +84,11 @@ Before moving to the next feature, ALL changes must be:
 
 ## Backend Dependency Updates
 
-`backend/requirements.txt` is a **generated export** of `uv.lock`. Nothing installs
-from it — the Dockerfile, CI and the deploy all run `uv sync` — it exists for tooling
-that cannot read a lock. The `Security Audit` job fails if it drifts from the lock.
+`backend/requirements.txt` is a **generated export** of `uv.lock`. Nothing that ships
+installs from it — the Dockerfile, CI and the deploy all run `uv sync` — it exists for
+tooling that cannot read a lock (`scripts/run-test-suite.js`,
+`scripts/validate-test-environment.js`). The `Security Audit` job fails if it drifts
+from the lock.
 
 Since #512, `.github/dependabot.yml` hides the export from Dependabot
 (`exclude-paths`). Two consequences:
