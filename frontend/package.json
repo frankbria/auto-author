@@ -48,7 +48,7 @@
     "@tailwindcss/typography": "^0.5.16",
     "@tiptap/extension-character-count": "^3.29.2",
     "@tiptap/extension-placeholder": "^3.29.2",
-    "@tiptap/extension-underline": "^3.29.2",
+    "@tiptap/extension-underline": "^3.30.2",
     "@tiptap/pm": "^3.29.2",
     "@tiptap/react": "^3.29.2",
     "@tiptap/starter-kit": "^3.29.2",
