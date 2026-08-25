@@ -70,6 +70,13 @@ Editing a value requires **recreating** the containers, not restarting them:
 
 ```bash
 cd /opt/auto-author
+# The staging overlay pins image: ...:${IMAGE_TAG:?}, so `up -d` needs IMAGE_TAG.
+# It is a per-deploy release id the workflow exports inline (never written to
+# .env), so it is absent in a manual shell — without it compose aborts during
+# interpolation and nothing is recreated. Reuse the tag already running, so an
+# env-only change does not also move the release:
+export IMAGE_TAG="$(docker ps --format '{{.Image}}' | sed -n 's#.*auto-author-backend:##p' | head -1)"
+echo "$IMAGE_TAG"   # expect sha-xxxxxxx; if empty, pass the tag explicitly
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
 ```
 

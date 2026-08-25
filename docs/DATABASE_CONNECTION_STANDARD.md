@@ -109,7 +109,17 @@ of these. `@` → `%40`, `/` → `%2F`, `%` → `%25`, `:` → `%3A`.
    containers start failing on their next reconnect, not at the next deploy.
 2. Percent-encode the new password into the URI.
 3. Edit `MONGODB_URI` in `/opt/auto-author/.env` on the box.
-4. `cd /opt/auto-author && docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d`
+4. Recreate the containers. Set `IMAGE_TAG` first — the staging overlay pins
+   `image: ...:${IMAGE_TAG:?}`, and the tag is a per-deploy release id the
+   workflow exports inline rather than writing to `.env`, so without it compose
+   aborts during interpolation and the new password is never loaded. Reusing the
+   running tag keeps this an env-only change:
+   ```bash
+   cd /opt/auto-author
+   export IMAGE_TAG="$(docker ps --format '{{.Image}}' | sed -n 's#.*auto-author-backend:##p' | head -1)"
+   echo "$IMAGE_TAG"   # expect sha-xxxxxxx; if empty, pass the tag explicitly
+   docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+   ```
    — **recreate, not restart**; a restarted container keeps its old environment.
 5. Verify: `curl -s 127.0.0.1:8000/api/v1/health`. Since #333 this does a real
    Mongo ping, so bad credentials surface here as a 503 naming the component.
