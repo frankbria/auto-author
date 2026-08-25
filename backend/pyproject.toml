@@ -35,7 +35,7 @@ dependencies = [
     "ebooklib==0.20",
     "stripe==15.3.0",
     # Error tracking (issue #334) — inert unless SENTRY_DSN is set
-    "sentry-sdk[fastapi]==2.66.1",
+    "sentry-sdk[fastapi]==2.67.1",
 ]
 
 # Test, load-test, and dev tooling are NOT production runtime dependencies.
