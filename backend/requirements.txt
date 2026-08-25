@@ -157,7 +157,7 @@ pydantic==2.13.4
     #   pydantic-settings
 pydantic-core==2.46.4
     # via pydantic
-pydantic-settings==2.10.1
+pydantic-settings==2.14.2
     # via auto-author-backend
 pygments==2.20.0
     # via pytest
@@ -172,7 +172,7 @@ pytest==8.4.1
     #   pytest-asyncio
     #   pytest-cov
     #   pytest-mock
-pytest-asyncio==1.1.0
+pytest-asyncio==1.4.0
     # via auto-author-backend
 pytest-cov==6.2.1
     # via auto-author-backend
