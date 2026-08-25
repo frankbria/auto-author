@@ -82,6 +82,44 @@ Before moving to the next feature, ALL changes must be:
    - Reference issue IDs in commit messages
    - `CURRENT_SPRINT.md` / `IMPLEMENTATION_PLAN.md` are generated snapshots — edit bd, not the markdown
 
+## Backend Dependency Updates
+
+`backend/requirements.txt` is a **generated export** of `uv.lock`. Nothing that ships
+installs from it — the Dockerfile, CI and the deploy all run `uv sync` — it exists for
+tooling that cannot read a lock (`scripts/run-test-suite.js`,
+`scripts/validate-test-environment.js`). The `Security Audit` job fails if it drifts
+from the lock.
+
+Since #512, `.github/dependabot.yml` hides the export from Dependabot's **update
+scans** (`exclude-paths`). It does not hide it from the dependency graph, so alerts
+still attribute advisories to it. Two consequences:
+
+1. **A Dependabot backend PR that bumps a dependency leaves the export stale.**
+   Regenerate it on the PR branch and push — the failing check prints this command:
+   ```bash
+   cd backend && uv export --all-extras --no-emit-project --no-hashes \
+     --format requirements-txt -o requirements.txt
+   ```
+   Push it yourself rather than letting a bot do it: GitHub's recursion guard means a
+   `GITHUB_TOKEN` push creates no new workflow run, so a bot-pushed commit leaves the
+   required checks un-run on the new head and needs a manual re-run to unblock.
+
+2. **Routine transitive bumps are yours to make by hand.** With the export out of
+   scope, Dependabot *version* updates only cover what `pyproject.toml` declares. Its *security* updates do reach
+   lockfile-only dependencies — and with the export hidden they must now write to
+   `uv.lock`, which is the point: before #512 an advisory on a transitive produced a
+   PR editing the export alone, structurally unmergeable and patching nothing.
+   Transitive advisories also surface in CI regardless — `scripts/audit_gate.py` fails
+   on any advisory absent from `security-baseline.json`. To bump one yourself:
+   ```bash
+   cd backend
+   uv lock --upgrade-package <name>            # or: uv add "<name>>=<fixed-version>"
+   uv export --all-extras --no-emit-project --no-hashes \
+     --format requirements-txt -o requirements.txt
+   uv sync --extra test && uv run pytest tests/
+   ```
+   Never edit `requirements.txt` alone — it changes nothing that is installed.
+
 ## Documentation Requirements
 
 **ALL implementation documentation MUST remain synchronized with the codebase**:

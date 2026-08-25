@@ -154,10 +154,11 @@ jobs:
       # version at all. Worse than churn: a bump that patches a real advisory
       # would look applied while the vulnerable version stayed in uv.lock.
       #
-      # Comparing the committed file against a fresh export turns both failure
-      # modes loud — a hand-edited export, and a requirements.txt-only Dependabot
-      # PR, now fail here instead of merging as a silent no-op. Regenerate with
-      # the command in the file's own header.
+      # Comparing the committed file against a fresh export turns that drift loud
+      # instead of letting it merge as a silent no-op. Regenerate with the command
+      # in the file's own header. Since #512 Dependabot no longer sees the export
+      # at all (exclude-paths), so the drift it reports on a bot PR is the export
+      # trailing a real uv.lock bump — regenerate on the branch and push.
       # Compared with the `#    uv export ... -o <path>` header line filtered out:
       # uv writes its own output path into that comment, so a temp-file export can
       # never be byte-identical to one written to requirements.txt. Filtering it is
@@ -173,7 +174,7 @@ jobs:
             echo "::error::backend/requirements.txt is out of sync with uv.lock."
             echo "It is a generated file. Regenerate it rather than editing by hand:"
             echo "  cd backend && uv export --all-extras --no-emit-project --no-hashes --format requirements-txt -o requirements.txt"
-            echo "If a dependency bump only touched requirements.txt, apply it to pyproject.toml/uv.lock instead — editing the export alone changes nothing that is installed."
+            echo "On a Dependabot PR this is expected: dependabot.yml hides the export from it (#512), so run the command above on the PR branch and push."
             exit 1
           fi
           echo "OK: requirements.txt matches uv.lock."
@@ -230,8 +231,8 @@ jobs:
           { echo '## Supply-chain audit'; echo '```'; cat /tmp/audit-report.txt; echo '```'; } >> $GITHUB_STEP_SUMMARY
           exit $rc
 
-      - name: Test the audit gate itself
-        run: uvx --with pytest pytest scripts/test_audit_gate.py -q
+      - name: Test the audit gate and dependabot config
+        run: uvx --with pytest --with pyyaml pytest scripts/ -q
 
   e2e-tests:
     name: E2E Tests (Playwright)
