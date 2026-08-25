@@ -90,8 +90,9 @@ tooling that cannot read a lock (`scripts/run-test-suite.js`,
 `scripts/validate-test-environment.js`). The `Security Audit` job fails if it drifts
 from the lock.
 
-Since #512, `.github/dependabot.yml` hides the export from Dependabot
-(`exclude-paths`). Two consequences:
+Since #512, `.github/dependabot.yml` hides the export from Dependabot's **update
+scans** (`exclude-paths`). It does not hide it from the dependency graph, so alerts
+still attribute advisories to it. Two consequences:
 
 1. **A Dependabot backend PR that bumps a dependency leaves the export stale.**
    Regenerate it on the PR branch and push — the failing check prints this command:
@@ -99,12 +100,12 @@ Since #512, `.github/dependabot.yml` hides the export from Dependabot
    cd backend && uv export --all-extras --no-emit-project --no-hashes \
      --format requirements-txt -o requirements.txt
    ```
-   Push it yourself rather than letting a bot do it: a `GITHUB_TOKEN` push does not
-   re-trigger the required checks, so a bot-pushed commit would block the PR on
-   checks that never run.
+   Push it yourself rather than letting a bot do it: GitHub's recursion guard means a
+   `GITHUB_TOKEN` push creates no new workflow run, so a bot-pushed commit leaves the
+   required checks un-run on the new head and needs a manual re-run to unblock.
 
-2. **Routine transitive bumps are yours to make by hand.** Dependabot *version*
-   updates only cover what `pyproject.toml` declares. Its *security* updates do reach
+2. **Routine transitive bumps are yours to make by hand.** With the export out of
+   scope, Dependabot *version* updates only cover what `pyproject.toml` declares. Its *security* updates do reach
    lockfile-only dependencies — and with the export hidden they must now write to
    `uv.lock`, which is the point: before #512 an advisory on a transitive produced a
    PR editing the export alone, structurally unmergeable and patching nothing.

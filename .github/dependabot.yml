@@ -42,14 +42,17 @@ updates:
     # Dependabot's uv ecosystem parsed it as a manifest, and transitive deps exist
     # ONLY there — so #499/#503/#505 each edited the export alone: nothing installed
     # changed, and each failed the lock/export sync gate in tests.yml. Upstream bug:
-    # dependabot-core#13912. Hidden here, Dependabot sees pyproject.toml/uv.lock only,
-    # so a transitive bump is either a real bump or no PR at all (#512).
+    # dependabot-core#13912. Hidden here, the uv update job sees pyproject.toml/uv.lock
+    # only, so a transitive bump is either a real bump or no PR at all (#512). Scope:
+    # this hides the export from update scans, not from the dependency graph — alerts
+    # still attribute advisories to it.
     #
     # Trade-off, deliberate: a direct-dep PR now bumps pyproject.toml/uv.lock and
     # leaves the export stale, so the sync gate asks for one command on the branch
-    # (it prints it). Not automated — a GITHUB_TOKEN push does not re-trigger the
-    # required checks, so a bot that pushed the export would leave every backend PR
-    # blocked on checks that never run. See docs/references/quality-standards.md.
+    # (it prints it). Not automated — GitHub's recursion guard means a GITHUB_TOKEN
+    # push creates no new workflow run, so a bot that pushed the export would leave the
+    # required checks un-run on the new head commit, needing a manual re-run or a
+    # separate token to unblock. See docs/references/quality-standards.md.
     #
     # Patterns are relative to `directory`, so this is "requirements.txt", not
     # "backend/requirements.txt"; test_dependabot_config.py pins that.

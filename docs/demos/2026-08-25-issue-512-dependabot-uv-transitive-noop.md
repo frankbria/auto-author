@@ -83,10 +83,11 @@ for the regen on up to 16 PRs rather than 0. `open-pull-requests-limit: 5` caps 
 many are live at once, and #517 (Dependabot grouping) is the lever that would collapse
 them into one PR and one regen.
 
-The automated alternative was built and discarded: a `GITHUB_TOKEN` push does not
-re-trigger workflows, so a bot that pushed the regenerated export would leave every
-backend Dependabot PR blocked on required checks that never run — worse than the
-manual command it replaces.
+The automated alternative was discarded before being built: GitHub's recursion guard
+means a `GITHUB_TOKEN` push creates no new workflow run, so a bot that pushed the
+regenerated export would leave the required checks un-run on the new head commit,
+needing a manual re-run or a separate token to unblock — worse than the manual command
+it replaces.
 
 ---
 
@@ -135,7 +136,7 @@ producing all 35 no-ops.
 
 ## Known limitation found while verifying
 
-`exclude-paths` scopes **update jobs**, not the dependency graph. The export still
+`exclude-paths` scopes **update scans**, not the dependency graph. The export still
 registers as a manifest for Dependabot *alerts*, visible today as one advisory
 reported twice:
 
