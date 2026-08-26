@@ -1,6 +1,6 @@
 # Demo — #517 Dependabot grouping + auto-merge
 
-**Date:** 2026-08-26 · **Branch:** `feature/517-dependabot-grouping-automerge` · **PR:** _TBD_
+**Date:** 2026-08-26 · **Branch:** `feature/517-dependabot-grouping-automerge` · **PR:** #538
 
 Every acceptance criterion below is demonstrated with **outcome** evidence — what
 Dependabot actually proposes, and what the GitHub API actually accepts — not "the YAML
