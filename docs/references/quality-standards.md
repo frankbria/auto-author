@@ -90,13 +90,28 @@ arrives as a few PRs rather than up to fifteen. What groups and what does not:
 | Ecosystem | Grouped | Arrives alone |
 |---|---|---|
 | `github-actions` | everything, majors included | — |
-| `npm` /frontend | all dev deps; prod minor + patch | **prod majors** |
+| `npm` /frontend | all dev deps; prod minor + patch | **prod majors**, plus standalone indirect bumps |
 | `uv` /backend | minor + patch | **majors** |
 
 A grouped PR is cheap to merge and expensive to review or revert, which is the wrong
 trade for a change that reaches users — so anything shipping a major gets its own PR.
 Security updates are never grouped (`applies-to` defaults to version-updates), so an
 advisory patch still lands alone and fast.
+
+Measured against this repo with `dependabot/cli` (see `docs/demos/`, #517):
+
+| | ungrouped | grouped |
+|---|---:|---:|
+| `uv` /backend | 13 PRs | **4** — one group of 13, plus `openai` 2→3, `pytest` 8→9, `pytest-cov` 6→7 |
+| `npm` /frontend | ≥33 PRs | **6** — prod group (139), dev group (35), plus 4 solo |
+
+**The npm residue is expected.** `dependency-type` classifies *direct* dependencies
+only, so an indirect dep that Dependabot bumps on its own — rather than sweeping it
+along with a direct bump — matches neither npm group and gets an individual PR. Three
+of npm's four solo PRs were that (`@babel/runtime`, `@rushstack/eslint-patch`,
+`@types/semver`; none appear in `package.json`); the fourth, `tailwind-merge` 2→3, is a
+genuine prod major behaving as designed. The `uv` group sets no `dependency-type`, so
+it has no such residue.
 
 `scripts/test_dependabot_config.py` pins both halves and runs in the `Security Audit`
 job. If you widen a group back to majors, that check fails with the reason.
