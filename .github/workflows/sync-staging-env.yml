@@ -90,6 +90,30 @@ jobs:
           fi
           echo "Secret present and well-formed (value not printed)."
 
+      - name: Pre-flight — prove the NEW credential works before touching anything
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          # Order matters here, and getting it wrong is an outage.
+          #
+          # docker-compose.yml makes the frontend `depends_on: backend:
+          # condition: service_healthy`. So if this value is also bad, a
+          # write-then-recreate would leave compose waiting on a backend that can
+          # never pass its healthcheck, abort, and take the FRONTEND down with it —
+          # converting "login broken, site up" into "site down". Worse than the
+          # state we came to fix.
+          #
+          # So: test the new credential against the live cluster first, using the
+          # container that already exists, without writing anything. A bad secret
+          # then costs one failed workflow run and changes nothing.
+          #
+          # -i plus stdin, not `docker exec -e`, so the candidate credential stays
+          # out of argv on this shared box.
+          printf '%s\n' "${MONGODB_URI}" | ssh -i ~/.ssh/staging_key \
+            -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            'set -euo pipefail; docker exec -i auto-author-backend-1 python -c "import sys, pymongo; uri = sys.stdin.readline().strip(); pymongo.MongoClient(uri, serverSelectionTimeoutMS=8000).admin.command(\"ping\"); print(\"PRE-FLIGHT PING OK\")"'
+
       - name: Write MONGODB_URI into /opt/auto-author/.env
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
@@ -133,6 +157,19 @@ jobs:
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              cd /opt/auto-author
+             # docker-compose.staging.yml pins both images to
+             # \${IMAGE_TAG:?IMAGE_TAG is required}, and the deploy workflow only
+             # exports it for the duration of its own SSH session — nothing on the
+             # box persists it. Without this, compose aborts before recreating
+             # anything and the freshly written credential is never applied.
+             #
+             # Derive it from what is ALREADY running, never from main. This
+             # workflow ships a credential, not a release: it must not quietly
+             # move staging onto a different build as a side effect.
+             IMAGE_TAG=\$(docker inspect --format '{{.Config.Image}}' auto-author-backend-1 | sed 's/.*://')
+             [ -n \"\$IMAGE_TAG\" ] || { echo 'could not determine the running image tag'; exit 1; }
+             export IMAGE_TAG
+             echo \"recreating on the running tag: \$IMAGE_TAG\"
              # --force-recreate because compose injects env at container CREATION.
              # Without it a container started before the .env edit keeps the old
              # credential and this workflow appears to do nothing — the exact
