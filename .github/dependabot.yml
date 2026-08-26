@@ -16,6 +16,31 @@ updates:
       semver-major-days: 14
       semver-minor-days: 7
       semver-patch-days: 7
+    # Grouping (#517). Ungrouped, each bump opened its own PR; with branch
+    # protection's required_status_checks.strict=true every merge flipped the rest
+    # to BEHIND, so the 2026-08-25 sweep spent ~2h20m and 9 full CI runs landing 9
+    # one-to-three-line changes. Grouping collapses that at the source.
+    #
+    # The split is deliberate: a grouped PR is cheap to merge and expensive to
+    # review or revert, which is the wrong trade for anything that reaches a user.
+    # A production major therefore matches no group and arrives on its own.
+    # mongodb 6.21.0 -> 7.5.0 (#507) is the worked example — it earned a solo PR
+    # and its own staging verification (#516), and burying it in a batch of
+    # lockfile bumps would have hidden the one change worth reading.
+    #
+    # Security updates are NOT grouped: `applies-to` defaults to version-updates,
+    # so an advisory patch still lands alone and fast. That default is the one we
+    # want; don't add `applies-to: security-updates` here.
+    groups:
+      frontend-dev:
+        # Dev deps never ship, so a major is a CI concern at worst.
+        dependency-type: "development"
+        patterns: ["*"]
+      frontend-prod:
+        dependency-type: "production"
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
     ignore:
       # @types/node must track the Node we actually run, not the newest release.
       # Types ahead of the runtime remove the compile-time guardrail: typecheck
@@ -38,6 +63,17 @@ updates:
     open-pull-requests-limit: 5
     cooldown:
       default-days: 14
+    # See the npm entry above for why majors stay ungrouped. No dev/prod split
+    # here: backend dev deps live in the `test` extra, and Dependabot's
+    # dependency-type classification of extras is not something this repo has
+    # verified — one minor/patch group is the honest version. It still does the
+    # work: of the five PRs open on 2026-08-26, four (pymongo, faker, sentry-sdk,
+    # coverage) collapse into one, and pytest 8.4.1 -> 9.1.1 correctly stays solo.
+    groups:
+      backend:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
     # requirements.txt is a generated export of uv.lock, not a source of truth.
     # Dependabot's uv ecosystem parsed it as a manifest, and transitive deps exist
     # ONLY there — so #499/#503/#505 each edited the export alone: nothing installed
@@ -64,6 +100,17 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # Majors ARE grouped here, unlike npm/uv. Actions ship no runtime code, their
+    # bumps are one-line tag moves, and a major (v3 -> v4) is the ordinary case —
+    # excluding majors would collapse almost nothing. This ecosystem is also the
+    # storm's origin: #498/#501/#504/#506 all edited build-images.yml at once, and
+    # in that pile-up Dependabot self-closed #504 claiming setup-buildx-action was
+    # "up-to-date now" while main still pinned @v3. One PR per sweep, one diff to
+    # read, no self-collision.
+    groups:
+      actions:
+        patterns: ["*"]
+
     # github-actions doesn't support semver-* cooldown keys (config parse error)
     cooldown:
       default-days: 14
