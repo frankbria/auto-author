@@ -186,10 +186,17 @@ that one:
 | drop `update-types` from `frontend-prod` (re-admitting prod majors) | `test_shipping_groups_never_swallow_a_major[npm/frontend:frontend-prod]` FAILED |
 | delete the `uv` group entirely | `test_every_ecosystem_groups_its_updates[uv/backend]` FAILED |
 | add `"major"` to the `uv` group's `update-types` | `test_shipping_groups_never_swallow_a_major[uv/backend:backend]` FAILED |
+| add a hypothetical `docker` ecosystem whose group takes majors | `test_shipping_groups_never_swallow_a_major[docker/backend:images]` FAILED |
 
 The first guard also treats an **absent** `update-types` as a failure, which is the
 silent way this protection would otherwise be lost — omitting the key means "all types",
 so a group that merely stops mentioning majors would start shipping them.
+
+The ecosystem filter is a **denylist** (`github-actions` is exempt) rather than an
+allowlist of `{npm, uv}`, so a future ecosystem is covered the day it is added rather
+than the day someone remembers to extend the set — the last row above is that case.
+This was raised by the GLM reviewer as a coverage gap it chose not to file; it was
+cheap enough to close.
 
 ---
 

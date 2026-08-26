@@ -53,10 +53,15 @@ def test_exclude_paths_are_relative_to_the_entry_directory(entry):
 # racing on .github/workflows/build-images.yml led Dependabot to self-close #504
 # with a false "up-to-date now" while main still pinned @v3.
 
-# github-actions ships no runtime code, and its bumps are one-line tag moves
-# where a major (v3 -> v4) is the ordinary case, not the risky one — so grouping
-# majors there is the point rather than a hazard. npm and uv do ship.
-_SHIPS_RUNTIME_CODE = {"npm", "uv"}
+# github-actions ships no runtime code, and its bumps are one-line tag moves where
+# a major (v3 -> v4) is the ordinary case, not the risky one — so grouping majors
+# there is the point rather than a hazard.
+#
+# Deliberately a denylist, not an allowlist of {npm, uv}: a future ecosystem —
+# `docker`, say, where a grouped base-image major is exactly the kind of change
+# that should be read on its own — must be covered the day it is added, not the
+# day someone remembers to extend this set. Unknown ecosystems fail closed.
+_EXEMPT_FROM_MAJOR_RULE = {"github-actions"}
 
 
 @pytest.mark.parametrize(
@@ -81,7 +86,7 @@ def test_every_ecosystem_groups_its_updates(entry):
         pytest.param(e["package-ecosystem"], e["directory"], name, group,
                      id=f"{e['package-ecosystem']}{e['directory']}:{name}")
         for e in UPDATES
-        if e["package-ecosystem"] in _SHIPS_RUNTIME_CODE
+        if e["package-ecosystem"] not in _EXEMPT_FROM_MAJOR_RULE
         for name, group in (e.get("groups") or {}).items()
         if group.get("dependency-type") != "development"
     ],
