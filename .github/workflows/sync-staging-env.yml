@@ -1,0 +1,175 @@
+name: Sync Staging Env
+
+# Makes the `staging` environment secret MONGODB_URI actually authoritative.
+#
+# Why this exists (#537): application secrets live in /opt/auto-author/.env on the
+# box, and until now NO workflow wrote that file. Updating the GitHub secret
+# therefore changed nothing that runs — a trap that cost a real outage its first
+# hour of debugging, because the secret's `updated_at` says the credential was
+# refreshed while the box still holds the old one. Either the secret is wired to
+# something or it should not exist; this wires it.
+#
+# Scope is deliberately ONE key. The box's .env holds 26 keys and only a subset
+# have GitHub secrets at all (AWS_*, CLOUDINARY_*, SENTRY_DSN and others exist
+# only on the box), so a whole-file render would silently delete working config.
+# Worse, a broad sync would let a *stale* GitHub secret overwrite a newer value on
+# the box — turning this workflow into an outage source. One key, updated in
+# place, everything else untouched. Add keys here only when a specific need shows
+# up, and only after checking the box's value is not the newer one.
+#
+# This does not replace deploy-staging-containers.yml. That ships images; this
+# ships one credential.
+
+on:
+  workflow_dispatch:
+    inputs:
+      recreate:
+        description: 'Recreate containers so the new value takes effect (compose injects env at container CREATION, so a plain restart keeps the old value)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # Shared with the deploy workflow on purpose: both mutate /opt/auto-author and
+  # both bounce containers. Never let them interleave on one box.
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync MONGODB_URI to the staging box
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
+
+    steps:
+      # Same access path as the deploy: the box firewalls :22 off the public
+      # internet except from the owner's home subnet, and the runner reaches it
+      # over Tailscale. Both tags are required — Tailscale matches the OAuth
+      # client's FULL tag set, not a subset. See deploy-staging-containers.yml.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
+          tags: tag:ci,tag:staging-server
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
+          chmod 600 ~/.ssh/staging_key
+
+      - name: Refuse to run on an empty secret
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          # Without this, an unset or cleared secret would happily write
+          # MONGODB_URI= to the box and take staging down on the next recreate.
+          # docker-compose.yml's `${MONGODB_URI:?...}` would then block startup.
+          if [ -z "${MONGODB_URI}" ]; then
+            echo "::error::The staging MONGODB_URI secret is empty or unset. Refusing to write it."
+            exit 1
+          fi
+          case "${MONGODB_URI}" in
+            mongodb://*|mongodb+srv://*) ;;
+            *) echo "::error::MONGODB_URI does not look like a MongoDB connection string. Refusing."; exit 1 ;;
+          esac
+          # The value crosses to the box as one line and is read back with a single
+          # `read -r`. A secret containing a newline would therefore be silently
+          # TRUNCATED at the first one and written as a valid-looking but wrong
+          # credential — the worst failure mode available here. Refuse instead.
+          if [ "$(printf '%s' "${MONGODB_URI}" | wc -l)" -ne 0 ]; then
+            echo "::error::MONGODB_URI contains a newline. Refusing rather than writing a truncated value."
+            exit 1
+          fi
+          echo "Secret present and well-formed (value not printed)."
+
+      - name: Write MONGODB_URI into /opt/auto-author/.env
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          # The value travels on STDIN, never in argv: the remote script is the ssh
+          # command argument, so the credential never appears in the box's process
+          # list. GitHub masks it in logs; this covers `ps` on a SHARED box, which
+          # masking does not.
+          printf '%s\n' "${MONGODB_URI}" | ssh -i ~/.ssh/staging_key \
+            -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} '
+              set -euo pipefail
+              IFS= read -r VALUE
+              [ -n "$VALUE" ] || { echo "empty value reached the box"; exit 1; }
+              cd /opt/auto-author
+
+              # Timestamped backup, kept. Rolling this back by hand at 2am should
+              # not require reconstructing a 26-key file from memory.
+              cp -a .env ".env.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+
+              # Targeted single-key update. Every other key is carried through
+              # byte-for-byte. The rewritten key moves to the end of the file,
+              # which compose does not care about.
+              tmp=$(mktemp)
+              grep -v "^MONGODB_URI=" .env > "$tmp" || true
+              printf "MONGODB_URI=%s\n" "$VALUE" >> "$tmp"
+              chmod 600 "$tmp"
+              mv "$tmp" .env
+
+              # Each backup is a credential-bearing file on a box shared with six
+              # other apps. Keep enough to roll back, not an unbounded archive.
+              ls -1t .env.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f
+
+              echo "Wrote MONGODB_URI. .env now has $(grep -c . .env) non-empty lines."
+            '
+
+      - name: Recreate containers
+        if: ${{ inputs.recreate }}
+        run: |
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            "set -euo pipefail
+             cd /opt/auto-author
+             # --force-recreate because compose injects env at container CREATION.
+             # Without it a container started before the .env edit keeps the old
+             # credential and this workflow appears to do nothing — the exact
+             # class of bug it was written to kill.
+             docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --force-recreate"
+
+      - name: Verify the credential actually works
+        if: ${{ inputs.recreate }}
+        run: |
+          # Outcome evidence, not 'the file was written'. Ask MongoDB directly from
+          # inside the running backend, then confirm the app's own readiness probe
+          # agrees. /health returns only an exception type, so the ping is what
+          # gives a diagnosable message.
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} bash -s <<'REMOTE'
+          set -euo pipefail
+          echo '--- direct MongoDB ping from the backend container ---'
+          docker exec auto-author-backend-1 python -c "import os, pymongo; pymongo.MongoClient(os.environ['MONGODB_URI'], serverSelectionTimeoutMS=8000).admin.command('ping'); print('PING OK')"
+          echo '--- readiness probe ---'
+          body=''
+          for i in $(seq 1 24); do
+            body=$(curl -s --max-time 5 http://127.0.0.1:8000/api/v1/health || true)
+            case "$body" in
+              *'"status":"healthy"'*) echo "$body"; exit 0 ;;
+            esac
+            sleep 5
+          done
+          echo "::error::Backend never reported healthy; last body: $body"
+          exit 1
+          REMOTE
+
+      - name: Summary
+        if: always()
+        run: |
+          { echo '## Staging env sync';
+            echo '- key: `MONGODB_URI` (value never printed)';
+            echo "- containers recreated: ${{ inputs.recreate }}";
+            echo "- result: ${{ job.status }}";
+            echo '- a timestamped `.env.bak.*` was left on the box before the write';
+          } >> $GITHUB_STEP_SUMMARY
