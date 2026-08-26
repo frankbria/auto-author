@@ -16,6 +16,40 @@ updates:
       semver-major-days: 14
       semver-minor-days: 7
       semver-patch-days: 7
+    # Grouping (#517). Ungrouped, each bump opened its own PR; with branch
+    # protection's required_status_checks.strict=true every merge flipped the rest
+    # to BEHIND, so the 2026-08-25 sweep spent ~2h20m and 9 full CI runs landing 9
+    # one-to-three-line changes. Grouping collapses that at the source.
+    #
+    # The split is deliberate: a grouped PR is cheap to merge and expensive to
+    # review or revert, which is the wrong trade for anything that reaches a user.
+    # A production major therefore matches no group and arrives on its own.
+    # mongodb 6.21.0 -> 7.5.0 (#507) is the worked example — it earned a solo PR
+    # and its own staging verification (#516), and burying it in a batch of
+    # lockfile bumps would have hidden the one change worth reading.
+    #
+    # Security updates are NOT grouped: `applies-to` defaults to version-updates,
+    # so an advisory patch still lands alone and fast. That default is the one we
+    # want; don't add `applies-to: security-updates` here.
+    groups:
+      frontend-dev:
+        # Dev deps never ship, so a major is a CI concern at worst.
+        dependency-type: "development"
+        patterns: ["*"]
+      frontend-prod:
+        dependency-type: "production"
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    #
+    # Known residue, measured not guessed: `dependency-type` classifies DIRECT
+    # dependencies only, so an indirect dep that Dependabot bumps on its own —
+    # rather than sweeping it along with a direct bump — matches neither group and
+    # still gets an individual PR. In the measured run that was 3 of 6
+    # (@babel/runtime, @rushstack/eslint-patch, @types/semver; none are in
+    # package.json). Left alone deliberately: a third catch-all group would have to
+    # rely on group-matching order, which is not documented, to avoid stealing dev
+    # majors — cleverness that breaks silently, for 3 PRs out of 33+.
+
     ignore:
       # @types/node must track the Node we actually run, not the newest release.
       # Types ahead of the runtime remove the compile-time guardrail: typecheck
@@ -38,6 +72,22 @@ updates:
     open-pull-requests-limit: 5
     cooldown:
       default-days: 14
+    # See the npm entry above for why majors stay ungrouped. No dev/prod split
+    # here: GitHub's options reference lists `dependency-type` as supported by
+    # bundler, composer, mix, maven, npm and pip — `uv` is not on that list, so
+    # splitting on it would be relying on undocumented behaviour. One minor/patch
+    # group is the honest version.
+    #
+    # Measured with dependabot/cli against this repo (docs/demos/, #517):
+    # 13 proposed PRs -> 4. One group of 13 minor/patch bumps, and three majors
+    # each on their own — openai 2.45.0 -> 3.0.0, pytest 8.4.1 -> 9.1.1,
+    # pytest-cov 6.2.1 -> 7.1.0. openai is the one that matters: a production
+    # runtime major, arriving alone, exactly as mongodb 6 -> 7 should have.
+    groups:
+      backend:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
     # requirements.txt is a generated export of uv.lock, not a source of truth.
     # Dependabot's uv ecosystem parsed it as a manifest, and transitive deps exist
     # ONLY there — so #499/#503/#505 each edited the export alone: nothing installed
@@ -64,6 +114,17 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # Majors ARE grouped here, unlike npm/uv. Actions ship no runtime code, their
+    # bumps are one-line tag moves, and a major (v3 -> v4) is the ordinary case —
+    # excluding majors would collapse almost nothing. This ecosystem is also the
+    # storm's origin: #498/#501/#504/#506 all edited build-images.yml at once, and
+    # in that pile-up Dependabot self-closed #504 claiming setup-buildx-action was
+    # "up-to-date now" while main still pinned @v3. One PR per sweep, one diff to
+    # read, no self-collision.
+    groups:
+      actions:
+        patterns: ["*"]
+
     # github-actions doesn't support semver-* cooldown keys (config parse error)
     cooldown:
       default-days: 14

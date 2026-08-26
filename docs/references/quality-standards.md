@@ -82,6 +82,69 @@ Before moving to the next feature, ALL changes must be:
    - Reference issue IDs in commit messages
    - `CURRENT_SPRINT.md` / `IMPLEMENTATION_PLAN.md` are generated snapshots — edit bd, not the markdown
 
+## Dependency Batches
+
+Since #517, `.github/dependabot.yml` **groups** version updates, so a weekly sweep
+arrives as a few PRs rather than up to fifteen. What groups and what does not:
+
+| Ecosystem | Grouped | Arrives alone |
+|---|---|---|
+| `github-actions` | everything, majors included | — |
+| `npm` /frontend | all dev deps; prod minor + patch | **prod majors**, plus standalone indirect bumps |
+| `uv` /backend | minor + patch | **majors** |
+
+A grouped PR is cheap to merge and expensive to review or revert, which is the wrong
+trade for a change that reaches users — so anything shipping a major gets its own PR.
+Security updates are never grouped (`applies-to` defaults to version-updates), so an
+advisory patch still lands alone and fast.
+
+Measured against this repo with `dependabot/cli` (see `docs/demos/`, #517):
+
+| | ungrouped | grouped |
+|---|---:|---:|
+| `uv` /backend | 13 PRs | **4** — one group of 13, plus `openai` 2→3, `pytest` 8→9, `pytest-cov` 6→7 |
+| `npm` /frontend | ≥33 PRs | **6** — prod group (139), dev group (35), plus 4 solo |
+
+**The npm residue is expected.** `dependency-type` classifies *direct* dependencies
+only, so an indirect dep that Dependabot bumps on its own — rather than sweeping it
+along with a direct bump — matches neither npm group and gets an individual PR. Three
+of npm's four solo PRs were that (`@babel/runtime`, `@rushstack/eslint-patch`,
+`@types/semver`; none appear in `package.json`); the fourth, `tailwind-merge` 2→3, is a
+genuine prod major behaving as designed. The `uv` group sets no `dependency-type`, so
+it has no such residue.
+
+`scripts/test_dependabot_config.py` pins both halves and runs in the `Security Audit`
+job. If you widen a group back to majors, that check fails with the reason.
+
+### After every batch: audit for self-closed PRs
+
+**Dependabot sometimes closes its own open PR with a false claim, and nothing surfaces
+it.** During the 2026-08-25 sweep, with four PRs all touching
+`.github/workflows/build-images.yml`, it closed #504 two minutes after #498 merged:
+
+> Looks like docker/setup-buildx-action is up-to-date now, so this is no longer needed.
+
+`main` still pinned `@v3`. Dependabot deletes the branch on close, so `gh pr reopen`
+fails outright — #515 had to be recreated by hand. A self-closed PR is indistinguishable
+from an intentionally-declined one, so had nobody re-read the file, the repo would have
+silently kept the old pin. The same failure mode applies to a bump patching an advisory.
+
+Grouping makes this much less likely — one PR per ecosystem cannot collide with itself —
+but it does not make it impossible, so after any batch of two or more dependency PRs:
+
+```bash
+# 1. What did Dependabot close without merging in the last day?
+gh pr list --state closed --author "app/dependabot" --limit 30 \
+  --json number,title,closedAt,mergedAt \
+  --jq '.[] | select(.mergedAt == null) | "#\(.number) \(.closedAt)  \(.title)"'
+
+# 2. For each, confirm on main that the bump actually landed.
+git fetch origin main && git show origin/main:<file> | grep <dependency>
+```
+
+Anything closed-but-not-merged whose version is still old on `main` was lost. Recreate it
+as a fresh PR — the original branch is gone.
+
 ## Backend Dependency Updates
 
 `backend/requirements.txt` is a **generated export** of `uv.lock`. Nothing that ships

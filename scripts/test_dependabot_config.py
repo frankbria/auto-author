@@ -45,3 +45,73 @@ def test_exclude_paths_are_relative_to_the_entry_directory(entry):
             f"exclude-paths pattern {pattern!r} matches nothing under {base}. "
             "Patterns are relative to the entry's `directory`, not the repo root."
         )
+
+
+# Grouping guards (#517). Ungrouped, every package gets its own PR, and with
+# branch protection's `strict: true` each merge flips the rest to BEHIND — the
+# 2026-08-25 sweep cost ~2h20m and 9 CI runs to land 9 bumps. Worse, four PRs
+# racing on .github/workflows/build-images.yml led Dependabot to self-close #504
+# with a false "up-to-date now" while main still pinned @v3.
+
+# github-actions ships no runtime code, and its bumps are one-line tag moves where
+# a major (v3 -> v4) is the ordinary case, not the risky one — so grouping majors
+# there is the point rather than a hazard.
+#
+# Deliberately a denylist, not an allowlist of {npm, uv}: a future ecosystem —
+# `docker`, say, where a grouped base-image major is exactly the kind of change
+# that should be read on its own — must be covered the day it is added, not the
+# day someone remembers to extend this set. Unknown ecosystems fail closed.
+_EXEMPT_FROM_MAJOR_RULE = {"github-actions"}
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        pytest.param(e, id=f"{e['package-ecosystem']}{e['directory']}")
+        for e in UPDATES
+    ],
+)
+def test_every_ecosystem_groups_its_updates(entry):
+    assert entry.get("groups"), (
+        f"{entry['package-ecosystem']} {entry['directory']} has no `groups:`, so "
+        "every bump opens its own PR. With required_status_checks.strict=true on "
+        "main, each merge flips the others to BEHIND and forces a serial "
+        "rebase -> full-CI -> merge loop (#517)."
+    )
+
+
+@pytest.mark.parametrize(
+    ("ecosystem", "directory", "name", "group"),
+    [
+        pytest.param(e["package-ecosystem"], e["directory"], name, group,
+                     id=f"{e['package-ecosystem']}{e['directory']}:{name}")
+        for e in UPDATES
+        if e["package-ecosystem"] not in _EXEMPT_FROM_MAJOR_RULE
+        for name, group in (e.get("groups") or {}).items()
+        if group.get("dependency-type") != "development"
+    ],
+)
+def test_shipping_groups_never_swallow_a_major(ecosystem, directory, name, group):
+    """A group that can match a production dependency must exclude majors.
+
+    Grouped PRs are cheap to merge and expensive to review or revert, which is
+    the wrong trade for a bump that reaches users. The worked example is this
+    repo's own `mongodb` 6.21.0 -> 7.5.0 (#507): it earned a solo PR and its own
+    staging verification (#516), and folding it into a batch of lockfile bumps
+    would have buried exactly the change worth reading.
+
+    Omitting `update-types` entirely means "all types", so an unset value fails
+    here too — that is the silent way this protection would be lost.
+    """
+    allowed = {"minor", "patch"}
+    declared = group.get("update-types")
+    assert declared is not None, (
+        f"group {name!r} in {ecosystem} {directory} sets no `update-types`, which "
+        "means every type including major. Restrict it to minor/patch, or mark "
+        'the group `dependency-type: "development"` if it cannot reach users.'
+    )
+    assert set(declared) <= allowed, (
+        f"group {name!r} in {ecosystem} {directory} groups {sorted(set(declared) - allowed)}. "
+        "A production major must arrive as its own PR so it can be reviewed and "
+        "reverted on its own."
+    )
