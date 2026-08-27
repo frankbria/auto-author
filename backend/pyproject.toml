@@ -69,8 +69,8 @@ dev = [
 # constraints rather than dependencies — listing them under [project] would
 # claim a direct dependency we do not have, and dropping them lets the resolver
 # pick a vulnerable version (a plain resolve selects gevent 25.5.1).
-# requirements.txt is now generated from uv.lock, so this file is the only
-# place a version floor can be stated.
+# uv.lock is the only dependency source (#534 deleted the generated
+# requirements.txt export), so this file is the only place a floor can be stated.
 [tool.uv]
 constraint-dependencies = [
     # Held at == rather than >=: a bare floor floats to the newest release, which

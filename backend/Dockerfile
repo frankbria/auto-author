@@ -19,8 +19,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 # Dependencies first, without the project, so this layer survives app-code edits.
 COPY pyproject.toml uv.lock ./
-# --frozen fails rather than silently re-resolving if uv.lock is stale, which is
-# the same guarantee the requirements.txt drift check gives in CI (#439).
+# --frozen fails rather than silently re-resolving if uv.lock is stale, so the
+# image can only ever install what uv.lock pins (#439). Since #534 deleted the
+# generated requirements.txt export, uv.lock is the only dependency source there is.
 # No --extra test: the test extra exists to keep production installs lean.
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
