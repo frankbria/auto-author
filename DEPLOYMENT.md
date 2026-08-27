@@ -53,10 +53,10 @@ uv sync --extra test           # `uv sync` alone omits the test tooling
 cp .env.example .env           # then fill in the values
 ```
 
-`uv sync` installs from `uv.lock`, which is generated from `pyproject.toml`.
-`requirements.txt` is a generated export kept for tooling that cannot read a
-lockfile — never hand-edit it, and never install from it in preference to
-`uv sync` (see #383).
+`uv sync` installs from `uv.lock`, which is generated from `pyproject.toml`. That is
+the only supported install path. The generated `requirements.txt` export was removed in
+#534 — nothing installed from it, and keeping it in sync cost a manual regen on every
+backend dependency PR.
 
 ---
 
