@@ -36,7 +36,13 @@ ALLOWED_HOSTS = {
 }
 
 ATLAS = re.compile(r"\b[a-z0-9][a-z0-9-]*\.[a-z0-9-]+\.mongodb\.net\b", re.I)
-SKIP_PREFIXES = ("frontend/playwright-report/", "frontend/tests/e2e/staging/playwright-report-staging/")
+SELF = "scripts/test_no_staging_identifiers.py"
+
+# No path is skipped. An earlier draft skipped the Playwright report directories
+# as "noise", but both are gitignored with zero tracked files, so the skip
+# excluded nothing while creating a blind spot in the one artifact type most
+# likely to leak a connection string: a report HTML can embed a backend error
+# body verbatim. If such a report is ever force-added, it gets scanned.
 
 
 def _tracked_text_files():
@@ -44,7 +50,7 @@ def _tracked_text_files():
         ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True
     ).stdout.split("\n")
     for rel in out:
-        if not rel or rel.startswith(SKIP_PREFIXES) or rel == "scripts/test_no_staging_identifiers.py":
+        if not rel or rel == SELF:
             continue
         p = REPO / rel
         if not p.is_file() or p.stat().st_size > 2_000_000:
@@ -80,7 +86,18 @@ def test_allowlisted_hosts_are_still_referenced(host):
     It would silently permit that exact hostname forever. If this fails, the
     example moved or was deleted -- drop the entry rather than keeping it.
     """
+    # `:!<path>` excludes this file. Without it the search matches the
+    # ALLOWED_HOSTS literal directly above and the test can never fail — it
+    # passed for exactly as long as this file was untracked, which is why the
+    # bug survived its own first run.
     hits = subprocess.run(
-        ["git", "grep", "-lF", host], cwd=REPO, capture_output=True, text=True
+        ["git", "grep", "-lF", host, "--", ":!" + SELF],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
-    assert hits, f"ALLOWED_HOSTS entry {host!r} matches no tracked file; remove it."
+    assert hits, (
+        f"ALLOWED_HOSTS entry {host!r} matches no tracked file outside this "
+        "guard; the example it allowed is gone, so the entry now only widens "
+        "what may pass. Remove it."
+    )
