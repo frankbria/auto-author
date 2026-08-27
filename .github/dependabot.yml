@@ -40,6 +40,21 @@ updates:
         dependency-type: "production"
         patterns: ["*"]
         update-types: ["minor", "patch"]
+        # better-auth arrives alone, like a production major does (#556).
+        # 1.6.26 -> 1.7.1 rode in as one line of a 26-package group and made
+        # `main` a total auth outage: 1.7 added a required `account.issuer` and
+        # keys accounts on (issuer, accountId), so every credential row written
+        # by 1.6 stopped matching and sign-in, password reset and password change
+        # all 401'd. Nothing in CI could see it — the E2E suite creates its users
+        # fresh, and new accounts work fine on 1.7 — so the only signal was a
+        # staging database with pre-1.7 accounts in it.
+        #
+        # The group's minor/patch filter is not the guard it looks like here:
+        # better-auth ships schema and credential-lookup changes under semver
+        # minor, and the whole point of the split above is that a change reaching
+        # a user should be readable on its own. Excluding it does not skip the
+        # update; it makes it a solo PR that gets its own staging verification.
+        exclude-patterns: ["better-auth"]
     #
     # `dependency-type` classifies DIRECT dependencies only. A pre-merge harness
     # run suggested that leaves an "indirect residue" of extra solo PRs, but that

@@ -13,6 +13,8 @@ documents are hand-built in the exact shapes better-auth's MongoDB adapter write
 `accountId` as a plain string.
 """
 
+from pathlib import Path
+
 import pytest
 from bson import ObjectId
 
@@ -23,7 +25,12 @@ from app.scripts.migration_account_issuer import (
     backfill_account_issuer,
 )
 
-pytestmark = pytest.mark.asyncio
+#: better-auth ships `createLocalAccountIssuer` here; the frontend owns the
+#: dependency, so this path only exists once its node_modules are installed.
+_CORE_ACCOUNT_SCHEMA = (
+    Path(__file__).resolve().parents[3]
+    / "frontend/node_modules/@better-auth/core/dist/db/schema/account.mjs"
+)
 
 
 # Not a credential: a placeholder standing in for the scrypt hash better-auth
@@ -65,6 +72,8 @@ async def _seed(users=(), accounts=()):
 
 
 class TestBackfill:
+    pytestmark = pytest.mark.asyncio
+
     async def test_backfills_a_16_shaped_credential_account(self, motor_reinit_db):
         user = _user_doc()
         account = _legacy_account(user)
@@ -134,6 +143,8 @@ class TestBackfill:
 
 
 class TestRefusals:
+    pytestmark = pytest.mark.asyncio
+
     async def test_aborts_on_an_unmigrated_non_credential_provider(
         self, motor_reinit_db
     ):
@@ -212,3 +223,33 @@ class TestRefusals:
 
         assert stats["scanned"] == 0
         assert stats["issuer_backfilled"] == 0
+
+
+class TestIssuerLiteral:
+    """The one value the whole fix turns on.
+
+    Every test above compares against `LOCAL_CREDENTIAL_ISSUER` rather than the
+    string itself, so they all pass just as happily with a wrong constant — a
+    mutation to `"credential"` survived the first pass of this suite. The issuer
+    is a wire value shared with a library we do not control, so pin it here.
+    """
+
+    def test_is_the_literal_better_auth_looks_for(self):
+        assert LOCAL_CREDENTIAL_ISSUER == "local:credential"
+
+    @pytest.mark.skipif(
+        not _CORE_ACCOUNT_SCHEMA.exists(),
+        reason="frontend node_modules not installed (backend CI job does not install them)",
+    )
+    def test_matches_create_local_account_issuer_in_the_installed_library(self):
+        # `createLocalAccountIssuer(providerId)` returns
+        # `local:${encodeURIComponent(providerId)}`, and "credential" encodes to
+        # itself. Reading the shipped source rather than restating it means an
+        # upstream change to the namespace fails here instead of silently
+        # producing an issuer nothing matches.
+        source = _CORE_ACCOUNT_SCHEMA.read_text()
+        assert "return `local:${encodeAccountIssuerProviderId(providerId)}`" in source, (
+            "better-auth changed how the local issuer is built. Re-derive "
+            f"{LOCAL_CREDENTIAL_ISSUER!r} from the new definition before trusting "
+            "the backfill."
+        )

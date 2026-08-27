@@ -102,6 +102,35 @@ password, rotation runbook): `docs/DATABASE_CONNECTION_STANDARD.md`.
 
 ## Deploying
 
+> **Gate before the first deploy carrying better-auth 1.7 (#556).** 1.7 made
+> `account.issuer` required and keys accounts on `(issuer, accountId)`. Every
+> account row written by 1.6 lacks that field, so sign-in, password reset and
+> password change all return 401 for the entire existing user base the moment 1.7
+> goes out. CI cannot catch this — the E2E suite creates its users fresh, and
+> accounts created *on* 1.7 work fine.
+>
+> Run the backfill **before** deploying, in a window with authentication writes
+> stopped and the `account` and `user` collections backed up. Both containers get
+> the same database — compose feeds `MONGODB_URI` to the backend and the identical
+> value to the frontend as `DATABASE_URL` — so the backend container's own env
+> already points at the collections better-auth writes:
+>
+> ```bash
+> # dry run first — it is the default and writes nothing
+> docker compose exec backend python -m app.scripts.migration_account_issuer \
+>     --mongodb-uri "$MONGODB_URI" --database "$DATABASE_NAME"
+> # then, once the counts read right:
+> docker compose exec backend python -m app.scripts.migration_account_issuer \
+>     --mongodb-uri "$MONGODB_URI" --database "$DATABASE_NAME" --apply
+> ```
+>
+> (`python`, not `uv run`: the runtime image ships `/app/.venv` on `PATH` but no
+> `uv` and no `pyproject.toml`.)
+>
+> It is idempotent, so re-running the dry run afterwards should report
+> `issuer_backfilled: 0`. Full runbook in the script's docstring. Acceptance test:
+> an account created under 1.6 still signs in.
+
 Trigger **Deploy Staging (Containers)** via workflow dispatch with an explicit
 `image_tag` (e.g. `sha-3931169`) published by `build-images.yml`. The workflow:
 
