@@ -53,16 +53,20 @@ Runbook
    and account linking. The guide asks for a maintenance window because a row
    inserted mid-run is not covered by the collision check.
 2. **Back up the ``account`` and ``user`` collections.**
-3. **Dry run** (the default — it writes nothing)::
+3. **Dry run** (the default — it writes nothing). Run it where better-auth's
+   ``MONGODB_URI``/``DATABASE_NAME`` are set, which in the deployment means the
+   backend container::
 
-       uv run python -m app.scripts.migration_account_issuer \
-           --mongodb-uri "$DATABASE_URL" --database "$DATABASE_NAME"
+       docker compose exec backend python -m app.scripts.migration_account_issuer
 
-   Read the counts and resolve anything it refuses on before going further.
+   Read the counts and resolve anything it refuses on before going further. Do
+   *not* spell it out as ``--mongodb-uri "$MONGODB_URI"``: under
+   ``docker compose exec`` your host shell expands that, where it is unset, and
+   the run would target an empty string. The flags exist only for a database the
+   backend's own settings do not point at.
 4. **Apply**::
 
-       uv run python -m app.scripts.migration_account_issuer \
-           --mongodb-uri "$DATABASE_URL" --database "$DATABASE_NAME" --apply
+       docker compose exec backend python -m app.scripts.migration_account_issuer --apply
 
 5. **Re-run the dry run.** It is idempotent, so a clean second pass reports
    ``issuer_backfilled: 0`` and every row already migrated.
@@ -76,6 +80,7 @@ argument error.
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from collections import defaultdict
 
@@ -123,7 +128,9 @@ async def backfill_account_issuer(db, *, dry_run: bool = True) -> dict:
     needs_issuer = [a for a in accounts if not a.get("issuer")]
     stats["already_migrated"] = len(accounts) - len(needs_issuer)
 
-    foreign = sorted({a.get("providerId") for a in needs_issuer} - {CREDENTIAL_PROVIDER})
+    foreign = sorted(
+        {a.get("providerId") for a in needs_issuer} - {CREDENTIAL_PROVIDER}
+    )
     if foreign:
         raise AccountIssuerBackfillError(
             f"{len(needs_issuer)} account(s) need an issuer but "
@@ -194,12 +201,48 @@ def _reject_collisions(accounts, updates) -> None:
         )
 
 
+def _resolve_connection(uri, database, env):
+    """Take the connection from the flags, else from the process environment.
+
+    The runbook runs this inside the backend container, where compose has already
+    put `MONGODB_URI` and `DATABASE_NAME`. Requiring the operator to pass them as
+    `--mongodb-uri "$MONGODB_URI"` under `docker compose exec` would expand them
+    on the *host*, where they are unset — so the gate would run against an empty
+    URI. Default to the environment and keep the flags for the case where the
+    better-auth database is somewhere the backend's own settings do not point.
+
+    `DATABASE_URL` is the same connection string under the name the frontend
+    container sees; the backend's settings prefer `MONGODB_URI` over it, so match
+    that order rather than inventing a new one.
+    """
+    uri = uri or env.get("MONGODB_URI") or env.get("DATABASE_URL")
+    database = database or env.get("DATABASE_NAME")
+    if not uri:
+        raise AccountIssuerBackfillError(
+            "no MongoDB connection string: pass --mongodb-uri, or run where "
+            "MONGODB_URI (or DATABASE_URL) is set. If you are using `docker compose "
+            "exec`, note that $MONGODB_URI in that command line is expanded by your "
+            "shell, not the container's."
+        )
+    if not database:
+        raise AccountIssuerBackfillError(
+            "no database name: pass --database, or run where DATABASE_NAME is set."
+        )
+    return uri, database
+
+
 async def _main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Backfill better-auth 1.7 account identity fields (#556).",
     )
-    parser.add_argument("--mongodb-uri", required=True, help="better-auth's MongoDB connection string")
-    parser.add_argument("--database", required=True, help="database better-auth writes to")
+    parser.add_argument(
+        "--mongodb-uri",
+        help="better-auth's MongoDB connection string (default: $MONGODB_URI, else $DATABASE_URL)",
+    )
+    parser.add_argument(
+        "--database",
+        help="database better-auth writes to (default: $DATABASE_NAME)",
+    )
     parser.add_argument(
         "--apply",
         action="store_true",
@@ -207,13 +250,22 @@ async def _main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    client = AsyncIOMotorClient(args.mongodb_uri)
     try:
-        stats = await backfill_account_issuer(client[args.database], dry_run=not args.apply)
+        uri, database = _resolve_connection(args.mongodb_uri, args.database, os.environ)
+    except AccountIssuerBackfillError as exc:
+        logger.error("%s", exc)
+        return 2
+
+    client = AsyncIOMotorClient(uri)
+    try:
+        stats = await backfill_account_issuer(client[database], dry_run=not args.apply)
     except AccountIssuerBackfillError as exc:
         logger.error("Refused: %s", exc)
         return 1
-    except Exception as exc:  # connection, auth, bad database name
+    except Exception as exc:  # noqa: BLE001 - operator-facing CLI
+        # Deliberately broad: a bad URI, rejected Atlas credentials or a wrong
+        # database name all surface here, and an operator mid-maintenance-window
+        # wants one clear line and an exit code, not a traceback.
         logger.error("Backfill failed: %s", exc)
         return 2
     finally:
@@ -238,5 +290,7 @@ async def _main(argv=None) -> int:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
     sys.exit(asyncio.run(_main()))

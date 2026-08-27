@@ -22,6 +22,7 @@ from app.db import base
 from app.scripts.migration_account_issuer import (
     LOCAL_CREDENTIAL_ISSUER,
     AccountIssuerBackfillError,
+    _resolve_connection,
     backfill_account_issuer,
 )
 
@@ -199,7 +200,9 @@ class TestRefusals:
         stored = await db["account"].find({}).to_list(length=None)
         assert all("issuer" not in doc for doc in stored)
 
-    async def test_matches_a_user_whose_id_was_stored_as_a_string(self, motor_reinit_db):
+    async def test_matches_a_user_whose_id_was_stored_as_a_string(
+        self, motor_reinit_db
+    ):
         # better-auth's Mongo adapter coerces id-referencing fields to ObjectId,
         # so `userId` is normally an ObjectId. A row that holds the hex string
         # instead — a custom id generator, an import, a hand-repaired document —
@@ -265,8 +268,63 @@ class TestIssuerLiteral:
         # upstream change to the namespace fails here instead of silently
         # producing an issuer nothing matches.
         source = _CORE_ACCOUNT_SCHEMA.read_text()
-        assert "return `local:${encodeAccountIssuerProviderId(providerId)}`" in source, (
+        assert (
+            "return `local:${encodeAccountIssuerProviderId(providerId)}`" in source
+        ), (
             "better-auth changed how the local issuer is built. Re-derive "
             f"{LOCAL_CREDENTIAL_ISSUER!r} from the new definition before trusting "
             "the backfill."
         )
+
+
+class TestConnectionResolution:
+    """Where the URI and database name come from.
+
+    The runbook runs this inside the backend container, and the first draft told
+    the operator to pass `--mongodb-uri "$MONGODB_URI"`. Those variables live in
+    the container, not the operator's shell, so `docker compose exec` would expand
+    them to empty strings on the host and the pre-deploy gate would fail — or
+    worse, connect somewhere stale. Read the container's own environment instead,
+    and keep the flags as overrides.
+    """
+
+    def test_reads_the_backend_container_environment(self):
+        uri, database = _resolve_connection(
+            None,
+            None,
+            {"MONGODB_URI": "mongodb://in-container", "DATABASE_NAME": "auto_author"},
+        )
+        assert (uri, database) == ("mongodb://in-container", "auto_author")
+
+    def test_falls_back_to_database_url(self):
+        # The frontend container gets the same connection string under
+        # DATABASE_URL; the backend's own settings prefer MONGODB_URI over it, so
+        # accept either and in that order.
+        uri, _ = _resolve_connection(
+            None, "db", {"DATABASE_URL": "mongodb://from-database-url"}
+        )
+        assert uri == "mongodb://from-database-url"
+
+    def test_mongodb_uri_wins_over_database_url(self):
+        uri, _ = _resolve_connection(
+            None,
+            "db",
+            {"MONGODB_URI": "mongodb://wins", "DATABASE_URL": "mongodb://loses"},
+        )
+        assert uri == "mongodb://wins"
+
+    def test_explicit_flags_override_the_environment(self):
+        uri, database = _resolve_connection(
+            "mongodb://explicit",
+            "explicit_db",
+            {"MONGODB_URI": "mongodb://env", "DATABASE_NAME": "env_db"},
+        )
+        assert (uri, database) == ("mongodb://explicit", "explicit_db")
+
+    def test_says_which_variable_is_missing_rather_than_connecting_to_nothing(self):
+        # An empty string is what host-side expansion of an unset variable
+        # produces, and it is the failure this whole class exists to prevent.
+        with pytest.raises(AccountIssuerBackfillError, match="MONGODB_URI"):
+            _resolve_connection("", "db", {})
+        with pytest.raises(AccountIssuerBackfillError, match="DATABASE_NAME"):
+            _resolve_connection("mongodb://x", None, {})

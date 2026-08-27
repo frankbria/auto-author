@@ -104,32 +104,42 @@ password, rotation runbook): `docs/DATABASE_CONNECTION_STANDARD.md`.
 
 > **Gate before the first deploy carrying better-auth 1.7 (#556).** 1.7 made
 > `account.issuer` required and keys accounts on `(issuer, accountId)`. Every
-> account row written by 1.6 lacks that field, so sign-in, password reset and
-> password change all return 401 for the entire existing user base the moment 1.7
-> goes out. CI cannot catch this — the E2E suite creates its users fresh, and
-> accounts created *on* 1.7 work fine.
+> account row written by 1.6 lacks that field, so **sign-in returns 401 for the
+> entire existing user base** the moment 1.7 goes out. CI cannot catch this — the
+> E2E suite creates its users fresh, and accounts created *on* 1.7 work fine.
+>
+> Password *reset* is worse than a 401: it succeeds and creates a **second**
+> credential account, so each rescued user leaves behind two rows that then
+> collide on the new unique key and need reconciling by hand. That is the reason
+> this runs before the deploy rather than as a repair after it.
 >
 > Run the backfill **before** deploying, in a window with authentication writes
 > stopped and the `account` and `user` collections backed up. Both containers get
 > the same database — compose feeds `MONGODB_URI` to the backend and the identical
 > value to the frontend as `DATABASE_URL` — so the backend container's own env
-> already points at the collections better-auth writes:
+> already points at the collections better-auth writes, and the command takes no
+> arguments:
 >
 > ```bash
 > # dry run first — it is the default and writes nothing
-> docker compose exec backend python -m app.scripts.migration_account_issuer \
->     --mongodb-uri "$MONGODB_URI" --database "$DATABASE_NAME"
+> docker compose exec backend python -m app.scripts.migration_account_issuer
 > # then, once the counts read right:
-> docker compose exec backend python -m app.scripts.migration_account_issuer \
->     --mongodb-uri "$MONGODB_URI" --database "$DATABASE_NAME" --apply
+> docker compose exec backend python -m app.scripts.migration_account_issuer --apply
 > ```
 >
-> (`python`, not `uv run`: the runtime image ships `/app/.venv` on `PATH` but no
-> `uv` and no `pyproject.toml`.)
+> Two things that bite here. `python`, not `uv run`: the runtime image ships
+> `/app/.venv` on `PATH` but neither `uv` nor `pyproject.toml`. And do **not**
+> spell the connection out as `--mongodb-uri "$MONGODB_URI"` — under
+> `docker compose exec` your *host* shell expands that, where the variable is
+> unset, and the gate would run against an empty string. The script reads the
+> container's own environment; `--mongodb-uri` / `--database` exist only for a
+> database the backend's settings do not point at.
 >
-> It is idempotent, so re-running the dry run afterwards should report
-> `issuer_backfilled: 0`. Full runbook in the script's docstring. Acceptance test:
-> an account created under 1.6 still signs in.
+> Exit codes: `0` done, `1` refused (read the message — an identity collision
+> needs manual reconciliation), `2` could not connect. It is idempotent, so
+> re-running the dry run afterwards should report `issuer_backfilled: 0`. Full
+> runbook in the script's docstring. Acceptance test: an account created under 1.6
+> still signs in.
 
 Trigger **Deploy Staging (Containers)** via workflow dispatch with an explicit
 `image_tag` (e.g. `sha-3931169`) published by `build-images.yml`. The workflow:
