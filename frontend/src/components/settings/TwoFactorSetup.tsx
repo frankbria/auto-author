@@ -75,6 +75,20 @@ export default function TwoFactorSetup() {
           });
           return;
         }
+        // better-auth 1.7 made enable() return a discriminated union — either
+        // { method: 'totp', totpURI, backupCodes } or a bare { method: 'otp' }.
+        // This screen renders a QR code from the TOTP URI, so an OTP response
+        // cannot drive it. Narrow explicitly rather than reaching past the union:
+        // the server decides the method, and silently rendering an empty QR would
+        // strand the user mid-setup with no way to enrol.
+        if (data.method !== 'totp') {
+          toast({
+            title: 'Could not start 2FA setup',
+            description: 'This account is configured for a 2FA method this screen cannot set up.',
+            variant: 'destructive',
+          });
+          return;
+        }
         setTotpUri(data.totpURI);
         setBackupCodes(data.backupCodes ?? []);
         setVerifyCode('');
