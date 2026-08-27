@@ -48,7 +48,7 @@ All critical infrastructure verified and operational:
 
 **MongoDB Connection**: Atlas (Cloud)
 ```bash
-DATABASE_URL=mongodb+srv://frankbria:***@briastrategygroup.oxzhocn.mongodb.net/
+DATABASE_URL=mongodb+srv://<db-user>:<redacted>@<cluster-host>/
 DATABASE_NAME=auto_author-staging
 ```
 

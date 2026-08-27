@@ -203,3 +203,27 @@ guard that watched it — the CI sync gate, `exclude-paths`, and the test pinnin
 exclusion. Nothing would have noticed the file returning, and the `uv export` command is
 still quoted in older CHANGELOG entries. **When a removal takes all existing checks with
 it, leave exactly one tripwire behind, and mutation-check it.**
+
+## #553 — a repo-scanning guard matches its own literal (2026-08-27)
+
+**Pattern:** added `scripts/test_no_staging_identifiers.py` with a second test asserting
+every `ALLOWED_HOSTS` entry still matches a real file, so a stale entry cannot silently
+whitelist a hostname forever. `git grep -lF "$HOST"` matches the `ALLOWED_HOSTS` literal
+in the guard file itself, so it could never fail.
+
+**Why it survived review-by-me:** it *did* fail on first run, catching two allowlist
+entries I had guessed at — because the file was still **untracked**, so `git grep` could
+not see it. The moment it was committed it became vacuous. I then wrote in the PR body
+that it "earned its keep immediately", crediting it for work it structurally could not do.
+
+**Rules:**
+1. Any guard that scans the repo must exclude itself: `git grep ... -- ":!$SELF"`.
+2. Mutation-check a new guard **after `git add`**, not before — tracked/untracked changes
+   what `git grep`, `git ls-files` and `git diff --cached` can see.
+3. Mutation-check **both directions**. The forbid-direction ("add the bad thing → RED")
+   passed. Only the require-direction ("remove the required thing → RED") was broken, and
+   I never tested it.
+
+**Also, again:** `git checkout <file>` to revert a mutation probe reverted an *uncommitted*
+scrub in the same file. Same trap as `commit-before-mutation-checks`. Use a backup copy
+(`cp` to scratch, `cp` back) when the working tree has uncommitted work.

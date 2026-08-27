@@ -53,7 +53,7 @@ same name feeds only the disabled PM2 path.
 | `SSH_KEY` | Private SSH key for server access | `-----BEGIN OPENSSH PRIVATE KEY-----…` |
 | `USER` | SSH username | `root` |
 | `STAGING_TS_HOST` | Tailscale hostname for the box; preferred over `HOST` | `staging-vps` |
-| `HOST` | Public hostname or IP — fallback when `STAGING_TS_HOST` is unset | `195.35.14.177` |
+| `HOST` | Public hostname or IP — fallback when `STAGING_TS_HOST` is unset | `<staging-host>` |
 | `TS_CLIENT_ID` | Tailscale OAuth client id — the deploy runs over Tailscale (#485, #489) | — |
 | `TS_AUTH_SECRET` | Tailscale OAuth client secret; needs the client's full tag set (#490) | — |
 
