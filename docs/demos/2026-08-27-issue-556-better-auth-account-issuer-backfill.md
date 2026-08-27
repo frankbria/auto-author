@@ -175,7 +175,8 @@ CI already runs `npm run typecheck`, so that is the standing guard.
 
 | gate | result |
 |---|---|
-| `pytest tests/test_db/test_migration_account_issuer.py` | **12 passed** (real MongoDB) |
+| `pytest tests/test_db/test_migration_account_issuer.py` | **18 passed** (real MongoDB) |
+| `pytest tests/` (backend, full) | **1254 passed, 9 skipped**, coverage 92.14% (gate 85%) |
 | `pytest scripts/test_dependabot_config.py` | **7 passed, 1 skipped** |
 | `npm test` (frontend) | **2288 passed, 5 skipped, 133 suites** |
 | frontend coverage gate 85/85/75/85 | **pass** |
@@ -195,6 +196,7 @@ Every test was verified to bite by breaking the source and re-running.
 | accountId repair removed | `test_repairs_an_account_id_that_does_not_match_the_user` |
 | `exclude-patterns` dropped from dependabot.yml | `test_better_auth_is_never_grouped` |
 | call site back to `forgetPassword` | `npm run typecheck` (TS2551) |
+| `str(account["userId"])` → raw value | `test_matches_a_user_whose_id_was_stored_as_a_string` |
 | `LOCAL_CREDENTIAL_ISSUER` → `"credential"` | **survived the first pass** — see below |
 
 The issuer mutation surviving is the one worth recording. Every test compared against the
@@ -202,6 +204,42 @@ constant rather than against the string better-auth actually looks for, so the s
 whole fix turns on was untested and a wrong one would have produced a clean, green, useless
 migration. Now pinned directly and cross-checked against `createLocalAccountIssuer` in the
 installed library.
+
+---
+
+## Two defects found after the first green run
+
+Recorded because both would have reached an operator mid-maintenance-window.
+
+**`userId` was matched by BSON type, not by value** (self-review). `user_ids` held
+`ObjectId`s and the membership test compared the raw stored value, so an account whose `userId`
+is the hex *string* matched no user, was filed as an orphan and skipped — a real person left
+locked out while the run reported success and exited 0. better-auth's adapter normally stores an
+ObjectId there; a custom id generator, an import or a hand-repaired document does not, and that
+is exactly the population a repair script meets. Both sides are compared as strings now.
+
+**The runbook command expanded its variables on the wrong side** (third-party review, `codex`,
+pre-PR). The first draft said `docker compose exec backend python -m ... --mongodb-uri
+"$MONGODB_URI"`. That variable lives in the container, not the operator's shell, so the host
+expands it to an empty string and the pre-deploy gate runs against nothing. Fixed at the design
+rather than the quoting: the script defaults to `MONGODB_URI` (then `DATABASE_URL`, the name the
+frontend container sees) and `DATABASE_NAME`, so the documented command takes no arguments:
+
+```
+$ docker compose exec backend python -m app.scripts.migration_account_issuer
+```
+
+Verified both ways — zero-arg against a container-shaped environment, and the empty-string case,
+which now names the footgun and exits `2`:
+
+```
+ERROR - no MongoDB connection string: pass --mongodb-uri, or run where MONGODB_URI (or
+DATABASE_URL) is set. If you are using `docker compose exec`, note that $MONGODB_URI in that
+command line is expanded by your shell, not the container's.
+```
+
+opencode/GLM was the primary reviewer and produced no output in 15 minutes before being
+terminated; `codex review` is the documented fallback and is what found the above.
 
 ---
 
