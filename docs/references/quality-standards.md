@@ -178,41 +178,36 @@ simply not worked. Staging was down for six days.
 
 ## Backend Dependency Updates
 
-`backend/requirements.txt` is a **generated export** of `uv.lock`. Nothing that ships
-installs from it — the Dockerfile, CI and the deploy all run `uv sync` — it exists for
-tooling that cannot read a lock (`scripts/run-test-suite.js`,
-`scripts/validate-test-environment.js`). The `Security Audit` job fails if it drifts
-from the lock.
+`uv.lock` is the single source of truth. The Dockerfile, CI and the deploy all run
+`uv sync`, so a bump is complete once `pyproject.toml` and `uv.lock` are updated — there
+is nothing to regenerate afterwards.
 
-Since #512, `.github/dependabot.yml` hides the export from Dependabot's **update
-scans** (`exclude-paths`). It does not hide it from the dependency graph, so alerts
-still attribute advisories to it. Two consequences:
+**#534 removed `backend/requirements.txt`.** It was a generated export of `uv.lock` that
+nothing installed from, kept for "tooling that cannot read a lock" that turned out not to
+exist: the two scripts named as its consumers were unwired and both failed against the
+current repo. It cost a manual `uv export` on every backend dependency PR (the export went
+stale the moment the lock moved, and a CI step policed the drift), and the dependency graph
+counted it as a second manifest, so advisories were reported twice. Deleting it took the
+regen, the `requirements.txt matches uv.lock` CI step, the `exclude-paths` entry in
+`.github/dependabot.yml` and the duplicate alerts with it.
 
-1. **A Dependabot backend PR that bumps a dependency leaves the export stale.**
-   Regenerate it on the PR branch and push — the failing check prints this command:
-   ```bash
-   cd backend && uv export --all-extras --no-emit-project --no-hashes \
-     --format requirements-txt -o requirements.txt
-   ```
-   Push it yourself rather than letting a bot do it: GitHub's recursion guard means a
-   `GITHUB_TOKEN` push creates no new workflow run, so a bot-pushed commit leaves the
-   required checks un-run on the new head and needs a manual re-run to unblock.
+Two things that follow:
 
-2. **Routine transitive bumps are yours to make by hand.** With the export out of
-   scope, Dependabot *version* updates only cover what `pyproject.toml` declares. Its *security* updates do reach
-   lockfile-only dependencies — and with the export hidden they must now write to
-   `uv.lock`, which is the point: before #512 an advisory on a transitive produced a
-   PR editing the export alone, structurally unmergeable and patching nothing.
-   Transitive advisories also surface in CI regardless — `scripts/audit_gate.py` fails
-   on any advisory absent from `security-baseline.json`. To bump one yourself:
+1. **A Dependabot backend PR is now mergeable as it arrives.** No regen step, so nothing
+   has to be pushed to the branch by hand. (Historical note: a bot could not have pushed
+   the regen anyway — GitHub's recursion guard means a `GITHUB_TOKEN` push creates no new
+   workflow run, leaving required checks un-run on the new head.)
+
+2. **Routine transitive bumps are still yours to make by hand.** Dependabot *version*
+   updates only cover what `pyproject.toml` declares; its *security* updates do reach
+   lockfile-only dependencies and write to `uv.lock`. Transitive advisories surface in CI
+   regardless — `scripts/audit_gate.py` fails on any advisory absent from
+   `security-baseline.json`. To bump one yourself:
    ```bash
    cd backend
    uv lock --upgrade-package <name>            # or: uv add "<name>>=<fixed-version>"
-   uv export --all-extras --no-emit-project --no-hashes \
-     --format requirements-txt -o requirements.txt
    uv sync --extra test && uv run pytest tests/
    ```
-   Never edit `requirements.txt` alone — it changes nothing that is installed.
 
 ## Documentation Requirements
 

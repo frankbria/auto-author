@@ -127,8 +127,7 @@ source .venv/bin/activate
 
 ### 2. Install Dependencies
 ```bash
-pip install -r requirements.txt
-pip install pytest pytest-asyncio pytest-cov pytest-mock factory-boy
+uv sync --extra test    # test tooling (pytest, pytest-asyncio, pytest-cov, ...) is in the `test` extra
 ```
 
 ### 3. Configuration Files

@@ -182,10 +182,8 @@ npm test
 
 # Backend
 cd backend
-python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -r requirements.txt
-python -m pytest
+uv sync --extra test
+uv run pytest
 ```
 
 ### 2. CI Environment
@@ -306,7 +304,7 @@ python -m pytest -v
 npm ci --cache .npm --prefer-offline
 
 # Update requirements
-pip install -r requirements.txt --upgrade
+uv sync --extra test
 ```
 
 #### 3. Environment Issues

@@ -185,3 +185,21 @@ you care about first, since only staged content is safe from the stash window.
 
 Related: [[commit-before-mutation-checks]] is the same lesson from a different angle —
 uncommitted work is the fragile thing; commit early.
+
+## #534 — "X reads this file" is a claim to test, not to trust (2026-08-27)
+
+**Pattern:** a decision deferred twice (#512, #521) on the assumption that two named
+scripts were live consumers of `backend/requirements.txt`. Grepping confirmed "2 readers"
+and would have kept the file. **Running them** settled it in a minute: both exit 1 against
+a healthy tree — one asserts a repo layout retired at #484, the other shells to system
+`python` in a uv project. Neither used the file in a load-bearing way (a grep for three
+strings; a `pip install` inside a try/catch that logged a WARNING and continued).
+
+**Rule:** when a keep/delete call turns on whether a consumer is real, execute the
+consumer. Static reference-counting overstates liveness.
+
+**Corollary, found by the cross-family reviewer:** deleting the export also deleted every
+guard that watched it — the CI sync gate, `exclude-paths`, and the test pinning that
+exclusion. Nothing would have noticed the file returning, and the `uv export` command is
+still quoted in older CHANGELOG entries. **When a removal takes all existing checks with
+it, leave exactly one tripwire behind, and mutation-check it.**

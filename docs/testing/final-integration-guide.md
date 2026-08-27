@@ -37,24 +37,28 @@ This document provides the final integration steps and validation procedures for
 # Install Node.js dependencies
 cd frontend && npm install
 
-# Install Python dependencies
-cd backend && pip install -r requirements.txt
+# Install Python dependencies (uv reads uv.lock; there is no requirements.txt)
+# --extra dev == [test, load]; this guide runs both pytest and locust
+cd backend && uv sync --extra dev
 
 # Install Playwright browsers
 cd frontend && npm run playwright:install
 ```
 
-### Validate Infrastructure
+### Run the suites
 ```bash
-# Run infrastructure validation
-node scripts/validate-test-environment.js
+# Backend + frontend unit suites (the repo-wide gate)
+npm test
 
-# Run comprehensive test suite
-node scripts/run-test-suite.js full
-
-# Run quick validation (unit tests only)
-node scripts/run-test-suite.js quick
+# Or individually
+cd backend && uv run pytest tests/
+cd frontend && npm test -- --watchAll=false
 ```
+
+> `scripts/validate-test-environment.js` and `scripts/run-test-suite.js` were removed in
+> #534. Both were unwired and had rotted: the validator asserted a repo layout that no
+> longer exists and exited 1 against a healthy tree, and the runner shelled to system
+> `python`, so it reported the backend suite as failing when it passes under `uv run`.
 
 ## 📋 Test Execution Options
 
@@ -117,7 +121,7 @@ python scripts/test_data_manager.py reset --env testing
 - `frontend/src/e2e/interview-prompts.spec.ts` - Comprehensive E2E tests
 
 #### Backend
-- `backend/requirements.txt` - Added Locust and Faker for testing
+- `backend/pyproject.toml` - Faker in the `test` extra; Locust in the `load` extra (both via `--extra dev`)
 - `backend/tests/conftest.py` - PyTest configuration (existing)
 - `backend/tests/factories/models.py` - Test data factories
 - `backend/tests/load/locustfile.py` - Load testing scenarios
@@ -190,8 +194,8 @@ python -m venv .venv
 # Linux/macOS:
 source .venv/bin/activate
 
-# Install requirements
-pip install -r requirements.txt
+# Install requirements (dev == test + load)
+uv sync --extra dev
 ```
 
 #### Database Connection Issues
@@ -204,7 +208,7 @@ pip install -r requirements.txt
 ### Getting Help
 
 1. **Documentation**: Check `docs/testing/` for detailed guides
-2. **Scripts**: Use `scripts/validate-test-environment.js` for diagnostics
+2. **Suites**: Run `npm test` (repo-wide) or `cd backend && uv run pytest tests/`
 3. **Logs**: Check CI/CD workflow logs in GitHub Actions
 4. **Issues**: Review test output for specific error messages
 
@@ -239,7 +243,7 @@ The test infrastructure provides comprehensive metrics:
 4. **As needed**: Update test data and scenarios
 
 ### Updating Test Infrastructure
-1. Update dependencies in `package.json` and `requirements.txt`
+1. Update dependencies in `package.json` and `backend/pyproject.toml` (then `uv lock`)
 2. Review and update test scenarios for new features
 3. Maintain CI/CD workflows for environment changes
 4. Update documentation for new procedures

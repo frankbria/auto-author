@@ -1,14 +1,11 @@
 """Guards for .github/dependabot.yml.
 
-Dependabot's `uv` ecosystem parsed backend/requirements.txt — a generated export of
-uv.lock — as a manifest. Transitive deps exist only there, so a transitive bump
-produced a PR editing the export alone: it changed nothing installed and failed the
-lock/export sync gate in tests.yml (#512, upstream dependabot-core#13912).
-`exclude-paths` hides the export so only pyproject.toml/uv.lock are ever bumped.
-
-The second test catches the one way that fix breaks silently: an exclude-paths glob
-is relative to the entry's `directory`, so a repo-relative path matches nothing and
-Dependabot carries on opening the no-op PRs with the config looking correct.
+`exclude-paths` once hid backend/requirements.txt from the uv ecosystem, which parsed
+that generated export as a manifest (#512, upstream dependabot-core#13912). #534 deleted
+the export outright, so the exclusion and the test pinning it went with it — there is no
+longer a generated file to hide. The relativity guard below stays: it is not specific to
+that entry, and an exclude-paths glob is relative to its entry's `directory`, so a
+repo-relative path silently matches nothing while the config still looks correct.
 """
 
 from pathlib import Path
@@ -20,16 +17,30 @@ REPO = Path(__file__).resolve().parent.parent
 UPDATES = yaml.safe_load((REPO / ".github" / "dependabot.yml").read_text())["updates"]
 
 
-def test_uv_ecosystem_excludes_the_generated_requirements_export():
-    uv = [e for e in UPDATES if e["package-ecosystem"] == "uv" and e["directory"] == "/backend"]
-    assert uv, "no uv entry for /backend in dependabot.yml"
-    assert "requirements.txt" in uv[0].get("exclude-paths", []), (
-        "backend/requirements.txt is a generated export of uv.lock. Without it in "
-        "exclude-paths, Dependabot opens transitive-dependency PRs that edit only "
-        "the export — unmergeable no-ops that fail the Security Audit sync gate."
+def test_the_generated_requirements_export_stays_deleted():
+    """#534 deleted backend/requirements.txt, which removed every other tripwire.
+
+    The sync-gate CI step, the `exclude-paths` entry and the test pinning it all
+    went with the file, so nothing else would notice it coming back. It comes back
+    the moment someone runs the `uv export` command still quoted in CHANGELOG and
+    demo entries — and Dependabot's uv ecosystem would parse it as a manifest
+    again, reviving #512's unmergeable transitive-only PRs with no failing check
+    to say so. uv.lock is the only dependency source; there is nothing to export.
+    """
+    assert not (REPO / "backend" / "requirements.txt").exists(), (
+        "backend/requirements.txt is back. It is a generated export of uv.lock that "
+        "nothing installs from — the Dockerfile, CI and the deploy all run `uv sync`. "
+        "#534 deleted it because keeping it in sync cost a manual `uv export` on every "
+        "backend dependency PR, and because the dependency graph counted it as a "
+        "second manifest (duplicate advisories) while Dependabot parsed it as one "
+        "(#512). Delete it again rather than restoring the gate."
     )
 
 
+# Parametrized over entries that declare `exclude-paths`. Since #534 removed the
+# only one, this collects as a single skip — deliberately: the guard self-arms the
+# day an exclusion returns, which is exactly when the directory-relative footgun
+# below matters again.
 @pytest.mark.parametrize(
     "entry",
     [

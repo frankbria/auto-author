@@ -32,7 +32,6 @@ backend/
 │   │   └── __init__.py
 │   └── schemas/
 │       └── __init__.py
-├── requirements.txt
 └── README.md
 ```
 
@@ -48,7 +47,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 2. Install dependencies:
 ```bash
-uv pip install -r requirements.txt
+uv sync --extra test    # `uv sync` alone omits the test tooling
 ```
 
 3. Set up environment variables:
@@ -93,7 +92,7 @@ uv run ruff format .                   # Format with ruff
 This project uses `uv` as the package manager. Always use `uv` commands within the virtual environment:
 
 - Install new package: `uv pip install package-name`
-- Update requirements: `uv pip freeze > requirements.txt`
+- Add a dependency: `uv add package-name` (updates `pyproject.toml` + `uv.lock`)
 - Run any command: `uv run command-name`
 
 ### Quick Validation Scripts
