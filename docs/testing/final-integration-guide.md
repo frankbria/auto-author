@@ -38,7 +38,8 @@ This document provides the final integration steps and validation procedures for
 cd frontend && npm install
 
 # Install Python dependencies (uv reads uv.lock; there is no requirements.txt)
-cd backend && uv sync --extra test
+# --extra dev == [test, load]; this guide runs both pytest and locust
+cd backend && uv sync --extra dev
 
 # Install Playwright browsers
 cd frontend && npm run playwright:install
@@ -120,7 +121,7 @@ python scripts/test_data_manager.py reset --env testing
 - `frontend/src/e2e/interview-prompts.spec.ts` - Comprehensive E2E tests
 
 #### Backend
-- `backend/pyproject.toml` - Locust and Faker declared in the `test` extra
+- `backend/pyproject.toml` - Faker in the `test` extra; Locust in the `load` extra (both via `--extra dev`)
 - `backend/tests/conftest.py` - PyTest configuration (existing)
 - `backend/tests/factories/models.py` - Test data factories
 - `backend/tests/load/locustfile.py` - Load testing scenarios
@@ -193,8 +194,8 @@ python -m venv .venv
 # Linux/macOS:
 source .venv/bin/activate
 
-# Install requirements
-uv sync --extra test
+# Install requirements (dev == test + load)
+uv sync --extra dev
 ```
 
 #### Database Connection Issues
