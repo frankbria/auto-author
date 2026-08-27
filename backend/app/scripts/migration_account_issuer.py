@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""
+better-auth 1.7 account-identity backfill (issue #556)
+======================================================
+
+better-auth 1.7 made ``account.issuer`` a required field and keys accounts on the
+unique pair ``(issuer, accountId)``. Its credential lookups all filter on it::
+
+    // better-auth/dist/api/routes/sign-in.mjs
+    const credentialIssuer = createLocalAccountIssuer("credential");  // "local:credential"
+    const credentialAccount = userRecord?.accounts.find((account) =>
+      account.providerId === "credential" &&
+      account.issuer === credentialIssuer &&
+      account.accountId === userRecord.user.id);
+
+Rows written by 1.6 carry no ``issuer``, so the lookup misses and the server
+answers ``401 INVALID_EMAIL_OR_PASSWORD`` while logging ``User not found`` about a
+user it has already loaded. The same filter guards password **reset**
+(``api/routes/password.mjs``) and password **change** (``api/routes/update-user.mjs``),
+so an affected user cannot self-rescue either. Deploying 1.7 without this backfill
+is a total auth outage for every pre-1.7 account.
+
+The values below are the ones upstream prescribes for a credential account
+(https://better-auth.com/docs/guides/1-7-upgrade-guide, "Account identity is
+scoped by issuer"): ``issuer = "local:credential"`` and ``accountId`` = the linked
+user's stable id. MongoDB needs no DDL — it is schemaless, and better-auth's Mongo
+adapter creates the ``(issuer, accountId)`` unique index itself — so the whole
+migration is this data backfill plus the collision check the guide requires before
+that index exists.
+
+This lives in the backend even though the ``account`` collection belongs to the
+frontend's better-auth instance: the repo's migration pattern, a real MongoDB in
+CI, and the test suite are all here, and the surgery is plain document editing.
+Point it at whichever database better-auth writes to (the frontend's
+``DATABASE_URL`` / ``DATABASE_NAME``), which need not be the backend's own.
+
+Runbook
+-------
+
+1. **Stop authentication writes.** Take the app down, or at minimum stop sign-up
+   and account linking. The guide asks for a maintenance window because a row
+   inserted mid-run is not covered by the collision check.
+2. **Back up the ``account`` and ``user`` collections.**
+3. **Dry run** (the default — it writes nothing)::
+
+       uv run python -m app.scripts.migration_account_issuer \
+           --mongodb-uri "$DATABASE_URL" --database "$DATABASE_NAME"
+
+   Read the counts and resolve anything it refuses on before going further.
+4. **Apply**::
+
+       uv run python -m app.scripts.migration_account_issuer \
+           --mongodb-uri "$DATABASE_URL" --database "$DATABASE_NAME" --apply
+
+5. **Re-run the dry run.** It is idempotent, so a clean second pass reports
+   ``issuer_backfilled: 0`` and every row already migrated.
+6. **Deploy 1.7**, then verify the acceptance test from #556: an account created
+   under 1.6 still signs in.
+
+Exit codes: ``0`` success, ``1`` refused (see the message), ``2`` connection or
+argument error.
+"""
+
+import argparse
+import asyncio
+import logging
+import sys
+from collections import defaultdict
+
+from motor.motor_asyncio import AsyncIOMotorClient
+
+logger = logging.getLogger(__name__)
+
+#: ``createLocalAccountIssuer("credential")`` in @better-auth/core.
+LOCAL_CREDENTIAL_ISSUER = "local:credential"
+
+ACCOUNT_COLLECTION = "account"
+USER_COLLECTION = "user"
+CREDENTIAL_PROVIDER = "credential"
+
+
+class AccountIssuerBackfillError(RuntimeError):
+    """The backfill refused to run. Nothing was written."""
+
+
+async def backfill_account_issuer(db, *, dry_run: bool = True) -> dict:
+    """Give every pre-1.7 credential account its 1.7 identity fields.
+
+    Refuses (raising :class:`AccountIssuerBackfillError`, having written nothing)
+    when it would have to guess: an unmigrated non-credential provider, whose
+    trusted issuer is a deployment decision the guide says never to derive; or an
+    ``(issuer, accountId)`` collision, which the new unique index would reject
+    halfway through the write.
+
+    Accounts whose ``userId`` matches no user are reported and skipped — they can
+    never sign in with or without an issuer, and minting an identity for a user
+    that does not exist is worse than leaving dead data alone.
+    """
+    accounts = await db[ACCOUNT_COLLECTION].find({}).to_list(length=None)
+    stats = {
+        "scanned": len(accounts),
+        "already_migrated": 0,
+        "issuer_backfilled": 0,
+        "account_id_repaired": 0,
+        "orphans": [],
+        "dry_run": dry_run,
+    }
+    if not accounts:
+        return stats
+
+    needs_issuer = [a for a in accounts if not a.get("issuer")]
+    stats["already_migrated"] = len(accounts) - len(needs_issuer)
+
+    foreign = sorted({a.get("providerId") for a in needs_issuer} - {CREDENTIAL_PROVIDER})
+    if foreign:
+        raise AccountIssuerBackfillError(
+            f"{len(needs_issuer)} account(s) need an issuer but "
+            f"{', '.join(repr(p) for p in foreign)} is not a credential provider. "
+            "A trusted issuer for an OAuth or SSO provider is a deployment "
+            "decision and must never be derived from the row — see the 1.7 "
+            "upgrade guide's issuer table, set those rows by hand, then re-run."
+        )
+
+    user_ids = {u["_id"] for u in await db[USER_COLLECTION].find({}, {"_id": 1}).to_list(length=None)}
+
+    updates = []
+    for account in needs_issuer:
+        if account.get("userId") not in user_ids:
+            stats["orphans"].append(str(account["_id"]))
+            continue
+        target_account_id = str(account["userId"])
+        changes = {"issuer": LOCAL_CREDENTIAL_ISSUER}
+        if account.get("accountId") != target_account_id:
+            changes["accountId"] = target_account_id
+            stats["account_id_repaired"] += 1
+        updates.append((account["_id"], changes))
+
+    stats["issuer_backfilled"] = len(updates)
+
+    _reject_collisions(accounts, updates)
+
+    if dry_run:
+        return stats
+
+    for account_id, changes in updates:
+        await db[ACCOUNT_COLLECTION].update_one({"_id": account_id}, {"$set": changes})
+    return stats
+
+
+def _reject_collisions(accounts, updates) -> None:
+    """Fail if the post-backfill state would violate 1.7's unique (issuer, accountId).
+
+    Checked against the whole collection, not just the rows being changed: a
+    backfilled row can just as easily collide with one that is already migrated.
+    """
+    changes_by_id = dict(updates)
+    keys = defaultdict(list)
+    for account in accounts:
+        merged = {**account, **changes_by_id.get(account["_id"], {})}
+        if not merged.get("issuer"):
+            continue  # skipped orphan — it keeps no identity to collide with
+        keys[(merged["issuer"], merged.get("accountId"))].append(str(account["_id"]))
+
+    collisions = {key: ids for key, ids in keys.items() if len(ids) > 1}
+    if collisions:
+        detail = "; ".join(
+            f"{issuer}/{account_id} -> {', '.join(ids)}"
+            for (issuer, account_id), ids in sorted(collisions.items())
+        )
+        raise AccountIssuerBackfillError(
+            f"identity collision: {len(collisions)} (issuer, accountId) key(s) map to "
+            f"more than one account row, which 1.7's unique index rejects. Nothing "
+            f"was written. Reconcile these by hand and re-run: {detail}"
+        )
+
+
+async def _main(argv=None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Backfill better-auth 1.7 account identity fields (#556).",
+    )
+    parser.add_argument("--mongodb-uri", required=True, help="better-auth's MongoDB connection string")
+    parser.add_argument("--database", required=True, help="database better-auth writes to")
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="write the changes; without it the run is a dry run and touches nothing",
+    )
+    args = parser.parse_args(argv)
+
+    client = AsyncIOMotorClient(args.mongodb_uri)
+    try:
+        stats = await backfill_account_issuer(client[args.database], dry_run=not args.apply)
+    except AccountIssuerBackfillError as exc:
+        logger.error("Refused: %s", exc)
+        return 1
+    except Exception as exc:  # connection, auth, bad database name
+        logger.error("Backfill failed: %s", exc)
+        return 2
+    finally:
+        client.close()
+
+    logger.info(
+        "%s: scanned=%d already_migrated=%d issuer_backfilled=%d account_id_repaired=%d",
+        "DRY RUN (nothing written)" if stats["dry_run"] else "APPLIED",
+        stats["scanned"],
+        stats["already_migrated"],
+        stats["issuer_backfilled"],
+        stats["account_id_repaired"],
+    )
+    if stats["orphans"]:
+        logger.warning(
+            "Skipped %d account(s) whose userId matches no user — they cannot sign in "
+            "either way, but they are unexpected: %s",
+            len(stats["orphans"]),
+            ", ".join(stats["orphans"]),
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    sys.exit(asyncio.run(_main()))

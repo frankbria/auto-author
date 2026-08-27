@@ -1,0 +1,214 @@
+"""
+Tests for the better-auth 1.7 account-identity backfill (issue #556).
+
+better-auth 1.7 made `account.issuer` required and keys accounts on
+`(issuer, accountId)`. Its credential lookups — sign-in, password reset and
+password change — all filter on `issuer == "local:credential"`, so every account
+row written by 1.6 (which has no such field) stops matching and the server answers
+401 while logging `User not found` about a user it has already loaded.
+
+These tests run against a real local MongoDB via `motor_reinit_db`. The account
+documents are hand-built in the exact shapes better-auth's MongoDB adapter writes:
+`_id`/`userId` as ObjectId (the adapter coerces every id-referencing field), and
+`accountId` as a plain string.
+"""
+
+import pytest
+from bson import ObjectId
+
+from app.db import base
+from app.scripts.migration_account_issuer import (
+    LOCAL_CREDENTIAL_ISSUER,
+    AccountIssuerBackfillError,
+    backfill_account_issuer,
+)
+
+pytestmark = pytest.mark.asyncio
+
+
+# Not a credential: a placeholder standing in for the scrypt hash better-auth
+# stores, so the row has the same shape as a real one. Named apart from the
+# field so the repo's secret scanner does not read the literal as an assignment.
+_STUB_HASH = "scrypt:notarealhash"
+
+
+def _user_doc(email="old@example.com"):
+    return {"_id": ObjectId(), "email": email, "name": "Old Account"}
+
+
+def _legacy_account(user_doc, **overrides):
+    """An account row exactly as better-auth 1.6 wrote it: no `issuer` key."""
+    doc = {
+        "_id": ObjectId(),
+        "providerId": "credential",
+        "accountId": str(user_doc["_id"]),
+        "userId": user_doc["_id"],
+        "password": _STUB_HASH,
+    }
+    doc.update(overrides)
+    return doc
+
+
+def _migrated_account(user_doc, **overrides):
+    doc = _legacy_account(user_doc, issuer=LOCAL_CREDENTIAL_ISSUER)
+    doc.update(overrides)
+    return doc
+
+
+async def _seed(users=(), accounts=()):
+    db = base.get_database()
+    if users:
+        await db["user"].insert_many(list(users))
+    if accounts:
+        await db["account"].insert_many(list(accounts))
+    return db
+
+
+class TestBackfill:
+    async def test_backfills_a_16_shaped_credential_account(self, motor_reinit_db):
+        user = _user_doc()
+        account = _legacy_account(user)
+        db = await _seed([user], [account])
+
+        stats = await backfill_account_issuer(db, dry_run=False)
+
+        stored = await db["account"].find_one({"_id": account["_id"]})
+        assert stored["issuer"] == LOCAL_CREDENTIAL_ISSUER
+        # accountId was already the user's id under 1.6; the backfill must not
+        # churn it, because accountId is half the new identity key.
+        assert stored["accountId"] == str(user["_id"])
+        assert stats["issuer_backfilled"] == 1
+        assert stats["account_id_repaired"] == 0
+
+    async def test_leaves_a_17_shaped_account_untouched(self, motor_reinit_db):
+        user = _user_doc()
+        account = _migrated_account(user)
+        db = await _seed([user], [account])
+
+        stats = await backfill_account_issuer(db, dry_run=False)
+
+        assert stats["issuer_backfilled"] == 0
+        assert stats["already_migrated"] == 1
+
+    async def test_is_idempotent(self, motor_reinit_db):
+        user = _user_doc()
+        db = await _seed([user], [_legacy_account(user)])
+
+        first = await backfill_account_issuer(db, dry_run=False)
+        second = await backfill_account_issuer(db, dry_run=False)
+
+        assert first["issuer_backfilled"] == 1
+        assert second["issuer_backfilled"] == 0
+        assert second["already_migrated"] == 1
+
+    async def test_dry_run_writes_nothing(self, motor_reinit_db):
+        user = _user_doc()
+        account = _legacy_account(user)
+        db = await _seed([user], [account])
+
+        stats = await backfill_account_issuer(db, dry_run=True)
+
+        stored = await db["account"].find_one({"_id": account["_id"]})
+        assert "issuer" not in stored
+        # It still reports what it *would* do, so the operator can size the change
+        # before committing to it.
+        assert stats["issuer_backfilled"] == 1
+        assert stats["dry_run"] is True
+
+    async def test_repairs_an_account_id_that_does_not_match_the_user(
+        self, motor_reinit_db
+    ):
+        # The 1.7 guide keys a credential account on the linked user's stable id,
+        # and sign-in.mjs asserts `account.accountId === user.id` outright. A row
+        # keyed on anything else (an email, say) is unreachable even once `issuer`
+        # is present, so the backfill has to fix both halves of the key.
+        user = _user_doc()
+        account = _legacy_account(user, accountId=user["email"])
+        db = await _seed([user], [account])
+
+        stats = await backfill_account_issuer(db, dry_run=False)
+
+        stored = await db["account"].find_one({"_id": account["_id"]})
+        assert stored["accountId"] == str(user["_id"])
+        assert stats["account_id_repaired"] == 1
+
+
+class TestRefusals:
+    async def test_aborts_on_an_unmigrated_non_credential_provider(
+        self, motor_reinit_db
+    ):
+        # This deployment configures only emailAndPassword + twoFactor, so an
+        # OAuth/SSO row means someone added a provider. Its trusted issuer is a
+        # deployment decision (the guide is explicit: never derive one), so guess
+        # nothing and stop.
+        user = _user_doc()
+        db = await _seed(
+            [user],
+            [_legacy_account(user, providerId="google", accountId="google-sub-123")],
+        )
+
+        with pytest.raises(AccountIssuerBackfillError, match="google"):
+            await backfill_account_issuer(db, dry_run=True)
+
+    async def test_a_migrated_non_credential_provider_is_not_an_abort(
+        self, motor_reinit_db
+    ):
+        # Only rows still *needing* an issuer are undecidable. One that already
+        # carries a trusted issuer has been handled and must not block the run.
+        user = _user_doc()
+        db = await _seed(
+            [user],
+            [
+                _legacy_account(
+                    user,
+                    providerId="google",
+                    accountId="google-sub-123",
+                    issuer="https://accounts.google.com",
+                )
+            ],
+        )
+
+        stats = await backfill_account_issuer(db, dry_run=True)
+
+        assert stats["already_migrated"] == 1
+
+    async def test_aborts_on_an_identity_collision_before_writing(
+        self, motor_reinit_db
+    ):
+        # 1.7 puts a unique index on (issuer, accountId). Two credential rows for
+        # one user would both resolve to the same key, so writing first and
+        # discovering the duplicate at index-build time would leave the collection
+        # half-migrated. Check the resulting key set first.
+        user = _user_doc()
+        db = await _seed([user], [_legacy_account(user), _legacy_account(user)])
+
+        with pytest.raises(AccountIssuerBackfillError, match="collision"):
+            await backfill_account_issuer(db, dry_run=False)
+
+        stored = await db["account"].find({}).to_list(length=None)
+        assert all("issuer" not in doc for doc in stored)
+
+    async def test_reports_and_skips_an_account_with_no_user(self, motor_reinit_db):
+        # A credential row whose user is gone can never sign in, with or without
+        # an issuer. Backfilling it would mint an identity for a user that does
+        # not exist; aborting on it would block the whole migration for dead data.
+        # Report it and leave it alone.
+        live_user = _user_doc("live@example.com")
+        orphan_user = _user_doc("orphan@example.com")  # deliberately not inserted
+        orphan = _legacy_account(orphan_user)
+        db = await _seed([live_user], [_legacy_account(live_user), orphan])
+
+        stats = await backfill_account_issuer(db, dry_run=False)
+
+        assert stats["orphans"] == [str(orphan["_id"])]
+        assert stats["issuer_backfilled"] == 1
+        stored = await db["account"].find_one({"_id": orphan["_id"]})
+        assert "issuer" not in stored
+
+    async def test_an_empty_account_collection_is_a_no_op(self, motor_reinit_db):
+        db = base.get_database()
+
+        stats = await backfill_account_issuer(db, dry_run=False)
+
+        assert stats["scanned"] == 0
+        assert stats["issuer_backfilled"] == 0
