@@ -15,10 +15,22 @@ unique pair ``(issuer, accountId)``. Its credential lookups all filter on it::
 
 Rows written by 1.6 carry no ``issuer``, so the lookup misses and the server
 answers ``401 INVALID_EMAIL_OR_PASSWORD`` while logging ``User not found`` about a
-user it has already loaded. The same filter guards password **reset**
-(``api/routes/password.mjs``) and password **change** (``api/routes/update-user.mjs``),
-so an affected user cannot self-rescue either. Deploying 1.7 without this backfill
-is a total auth outage for every pre-1.7 account.
+user it has already loaded. Deploying 1.7 without this backfill is a total auth
+outage for every pre-1.7 account.
+
+Two more paths go through the same ``findCredentialAccount`` filter, and they fail
+differently — which is why running this *before* the deploy matters rather than
+after:
+
+* ``/change-password`` (``api/routes/update-user.mjs``) throws
+  ``CREDENTIAL_ACCOUNT_NOT_FOUND``. Reachable only with a session cookie minted
+  before the deploy, since sign-in is already refusing.
+* ``/reset-password`` (``api/routes/password.mjs``) does **not** fail. Finding no
+  credential account, it *creates a second one* with the correct issuer, and the
+  user gets back in. The stale row stays. Both rows then key on
+  ``(local:credential, <userId>)``, so this backfill refuses on the collision and
+  the operator has to reconcile each one by hand. Every hour 1.7 serves pre-1.7
+  accounts adds more of them.
 
 The values below are the ones upstream prescribes for a credential account
 (https://better-auth.com/docs/guides/1-7-upgrade-guide, "Account identity is

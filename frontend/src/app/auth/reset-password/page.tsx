@@ -83,7 +83,10 @@ function ResetPasswordForm() {
     setLoading(true);
 
     try {
-      const { error: resetError } = await (authClient as any).resetPassword({
+      // No `as any`: the cast on this flow's other half is what let better-auth
+      // 1.7's rename of forgetPassword ship as a 404 (#556). resetPassword kept
+      // its name, but the blindfold was identical.
+      const { error: resetError } = await authClient.resetPassword({
         newPassword: password,
         token,
       });

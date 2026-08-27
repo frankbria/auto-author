@@ -566,7 +566,7 @@ jest.mock('@/hooks/useUserPreferences', () => ({
 
 // Mock better-auth for all tests
 jest.mock('@/lib/auth-client', () => {
-  const mockForgetPassword = jest.fn().mockResolvedValue({
+  const mockRequestPasswordReset = jest.fn().mockResolvedValue({
     data: {},
     error: null,
   });
@@ -645,7 +645,7 @@ jest.mock('@/lib/auth-client', () => {
         },
         error: null,
       }),
-      forgetPassword: mockForgetPassword,
+      requestPasswordReset: mockRequestPasswordReset,
       resetPassword: mockResetPassword,
       // Account security methods (#64)
       changePassword: jest.fn().mockResolvedValue({ data: {}, error: null }),
@@ -666,7 +666,7 @@ jest.mock('@/lib/auth-client', () => {
       },
     },
     // Direct exports for password reset methods
-    forgetPassword: mockForgetPassword,
+    requestPasswordReset: mockRequestPasswordReset,
     resetPassword: mockResetPassword,
     // Re-export auth methods that match the module exports
     signIn: {
