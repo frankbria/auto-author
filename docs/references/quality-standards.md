@@ -145,6 +145,34 @@ git fetch origin main && git show origin/main:<file> | grep <dependency>
 Anything closed-but-not-merged whose version is still old on `main` was lost. Recreate it
 as a fresh PR — the original branch is gone.
 
+## Staging secrets
+
+Application secrets live in `/opt/auto-author/.env` **on the box**, not in GitHub.
+
+**One exception, and it is the one that matters:** `MONGODB_URI` is synced from the
+`staging` environment secret by `.github/workflows/sync-staging-env.yml`
+(`workflow_dispatch`). Update the GitHub secret, dispatch that workflow, and it writes
+the key, recreates the containers and verifies the credential end-to-end.
+
+Every **other** key in that file — `AWS_*`, `CLOUDINARY_*`, `SENTRY_DSN`, and the rest of
+the 26 — exists only on the box. Nothing in CI writes them. Editing a GitHub secret with
+one of those names changes nothing that runs.
+
+That asymmetry is deliberate. A whole-file render from GitHub secrets would delete the
+keys that have no secret, and would let a *stale* secret overwrite a newer value on the
+box — turning the sync into an outage source. Add a key to the workflow only when there
+is a specific need, and only after confirming the box's value is not the newer one.
+
+### Why this exists
+
+Before #537, no workflow wrote that file at all. A rotated `MONGODB_URI` was pushed to
+the GitHub secret, the secret's `updated_at` duly changed, and the running containers
+kept the old credential — indistinguishable, from the outside, from a rotation that had
+simply not worked. Staging was down for six days.
+
+**Compose injects env at container *creation*.** A `restart` keeps the old values; only
+`up -d --force-recreate` picks up an edited `.env`. The workflow does this for you.
+
 ## Backend Dependency Updates
 
 `backend/requirements.txt` is a **generated export** of `uv.lock`. Nothing that ships
