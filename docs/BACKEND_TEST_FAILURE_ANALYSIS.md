@@ -21,7 +21,7 @@
 ### Error Pattern
 ```
 pymongo.errors.ServerSelectionTimeoutError: SSL handshake failed:
-ac-gdkptel-shard-00-XX.oxzhocn.mongodb.net:27017: [Errno 104] Connection reset by peer
+<cluster-host>:27017: [Errno 104] Connection reset by peer
 ```
 
 ### Affected Tests (12 in session service + 2 question generation)

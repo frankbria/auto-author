@@ -17,7 +17,7 @@ LISTEN 0      511                              *:3002             *:*
 The host firewall (ufw, default-deny) already drops external 8000/3002 — the AC "OR" branch — but nothing in the repo documented it. From an off-box machine, direct port access times out while the nginx-proxied HTTPS endpoints serve normally:
 
 ```bash
-curl -sm 5 http://195.35.14.177:8000/api/v1/health -o /dev/null -w "direct 8000: %{http_code}\n" || echo "direct 8000: TIMEOUT/UNREACHABLE"; curl -sm 5 http://195.35.14.177:3002 -o /dev/null -w "direct 3002: %{http_code}\n" || echo "direct 3002: TIMEOUT/UNREACHABLE"; curl -sm 10 https://api.dev.autoauthor.app/api/v1/health -o /dev/null -w "via nginx api: %{http_code}\n"; curl -sm 10 https://dev.autoauthor.app -o /dev/null -w "via nginx app: %{http_code}\n"
+curl -sm 5 http://<staging-host>:8000/api/v1/health -o /dev/null -w "direct 8000: %{http_code}\n" || echo "direct 8000: TIMEOUT/UNREACHABLE"; curl -sm 5 http://<staging-host>:3002 -o /dev/null -w "direct 3002: %{http_code}\n" || echo "direct 3002: TIMEOUT/UNREACHABLE"; curl -sm 10 https://api.dev.autoauthor.app/api/v1/health -o /dev/null -w "via nginx api: %{http_code}\n"; curl -sm 10 https://dev.autoauthor.app -o /dev/null -w "via nginx app: %{http_code}\n"
 ```
 
 ```output
@@ -72,7 +72,7 @@ LISTEN 0      2048                     127.0.0.1:8000       0.0.0.0:*
 The app still works end-to-end through nginx (TLS + real response bodies), deploy health checks on localhost keep working, and direct external port access remains dead:
 
 ```bash
-echo "--- via nginx (off-box) ---"; curl -sm 10 https://api.dev.autoauthor.app/api/v1/health; echo; curl -sm 15 https://dev.autoauthor.app -o /dev/null -w "frontend via nginx: %{http_code}\n"; echo "--- deploy health checks (on-box, localhost) ---"; ssh staging 'curl -sf http://localhost:8000/api/v1/health >/dev/null && echo "localhost:8000 health OK"; curl -sf http://localhost:3002 -o /dev/null && echo "localhost:3002 OK"'; echo "--- direct external (must stay unreachable) ---"; curl -sm 5 http://195.35.14.177:8000/api/v1/health -o /dev/null -w "direct 8000: %{http_code}\n" || echo "direct 8000: TIMEOUT/UNREACHABLE"; curl -sm 5 http://195.35.14.177:3002 -o /dev/null -w "direct 3002: %{http_code}\n" || echo "direct 3002: TIMEOUT/UNREACHABLE"
+echo "--- via nginx (off-box) ---"; curl -sm 10 https://api.dev.autoauthor.app/api/v1/health; echo; curl -sm 15 https://dev.autoauthor.app -o /dev/null -w "frontend via nginx: %{http_code}\n"; echo "--- deploy health checks (on-box, localhost) ---"; ssh staging 'curl -sf http://localhost:8000/api/v1/health >/dev/null && echo "localhost:8000 health OK"; curl -sf http://localhost:3002 -o /dev/null && echo "localhost:3002 OK"'; echo "--- direct external (must stay unreachable) ---"; curl -sm 5 http://<staging-host>:8000/api/v1/health -o /dev/null -w "direct 8000: %{http_code}\n" || echo "direct 8000: TIMEOUT/UNREACHABLE"; curl -sm 5 http://<staging-host>:3002 -o /dev/null -w "direct 3002: %{http_code}\n" || echo "direct 3002: TIMEOUT/UNREACHABLE"
 ```
 
 ```output
