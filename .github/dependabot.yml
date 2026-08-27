@@ -41,14 +41,11 @@ updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
     #
-    # Known residue, measured not guessed: `dependency-type` classifies DIRECT
-    # dependencies only, so an indirect dep that Dependabot bumps on its own —
-    # rather than sweeping it along with a direct bump — matches neither group and
-    # still gets an individual PR. In the measured run that was 3 of 6
-    # (@babel/runtime, @rushstack/eslint-patch, @types/semver; none are in
-    # package.json). Left alone deliberately: a third catch-all group would have to
-    # rely on group-matching order, which is not documented, to avoid stealing dev
-    # majors — cleverness that breaks silently, for 3 PRs out of 33+.
+    # `dependency-type` classifies DIRECT dependencies only. A pre-merge harness
+    # run suggested that leaves an "indirect residue" of extra solo PRs, but that
+    # was an artefact of running the job with `allowed-updates: all`: Dependabot
+    # only opens PRs for direct npm dependencies to begin with, and the first live
+    # sweep produced no such residue. No catch-all group is needed.
 
     ignore:
       # @types/node must track the Node we actually run, not the newest release.
@@ -78,11 +75,14 @@ updates:
     # splitting on it would be relying on undocumented behaviour. One minor/patch
     # group is the honest version.
     #
-    # Measured with dependabot/cli against this repo (docs/demos/, #517):
-    # 13 proposed PRs -> 4. One group of 13 minor/patch bumps, and three majors
-    # each on their own — openai 2.45.0 -> 3.0.0, pytest 8.4.1 -> 9.1.1,
-    # pytest-cov 6.2.1 -> 7.1.0. openai is the one that matters: a production
-    # runtime major, arriving alone, exactly as mongodb 6 -> 7 should have.
+    # Measured on the first live sweep, 2026-08-26 (#539): this ecosystem opened
+    # one group of 10 minor/patch bumps plus openai 2.45.0 -> 3.0.0 on its own.
+    # openai is the one that matters — a production runtime major arriving alone,
+    # exactly as mongodb 6 -> 7 should have.
+    #
+    # A pre-merge dependabot/cli run predicted larger numbers; it ran with
+    # `allowed-updates: all` and no memory of previously-closed PRs, so it
+    # overcounted. Trust the live figures.
     groups:
       backend:
         patterns: ["*"]
