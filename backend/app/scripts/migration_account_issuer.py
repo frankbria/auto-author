@@ -133,11 +133,19 @@ async def backfill_account_issuer(db, *, dry_run: bool = True) -> dict:
             "upgrade guide's issuer table, set those rows by hand, then re-run."
         )
 
-    user_ids = {u["_id"] for u in await db[USER_COLLECTION].find({}, {"_id": 1}).to_list(length=None)}
+    # Compared as strings, not as stored. better-auth's Mongo adapter coerces
+    # id-referencing fields to ObjectId, so `userId` is normally an ObjectId — but
+    # a row holding the hex string instead (a custom id generator, an import, a
+    # hand-repaired document) would otherwise match no user, be filed as an orphan
+    # and skipped, leaving a real person locked out while the run reported success.
+    user_ids = {
+        str(u["_id"])
+        for u in await db[USER_COLLECTION].find({}, {"_id": 1}).to_list(length=None)
+    }
 
     updates = []
     for account in needs_issuer:
-        if account.get("userId") not in user_ids:
+        if str(account.get("userId")) not in user_ids:
             stats["orphans"].append(str(account["_id"]))
             continue
         target_account_id = str(account["userId"])

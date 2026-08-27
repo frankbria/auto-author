@@ -199,6 +199,23 @@ class TestRefusals:
         stored = await db["account"].find({}).to_list(length=None)
         assert all("issuer" not in doc for doc in stored)
 
+    async def test_matches_a_user_whose_id_was_stored_as_a_string(self, motor_reinit_db):
+        # better-auth's Mongo adapter coerces id-referencing fields to ObjectId,
+        # so `userId` is normally an ObjectId. A row that holds the hex string
+        # instead — a custom id generator, an import, a hand-repaired document —
+        # must not be mistaken for an orphan: that would skip it silently-ish and
+        # leave a real user locked out while the run still reported success.
+        user = _user_doc()
+        account = _legacy_account(user, userId=str(user["_id"]))
+        db = await _seed([user], [account])
+
+        stats = await backfill_account_issuer(db, dry_run=False)
+
+        stored = await db["account"].find_one({"_id": account["_id"]})
+        assert stored["issuer"] == LOCAL_CREDENTIAL_ISSUER
+        assert stored["accountId"] == str(user["_id"])
+        assert stats["orphans"] == []
+
     async def test_reports_and_skips_an_account_with_no_user(self, motor_reinit_db):
         # A credential row whose user is gone can never sign in, with or without
         # an issuer. Backfilling it would mint an identity for a user that does
