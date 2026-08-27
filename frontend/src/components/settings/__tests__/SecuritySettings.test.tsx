@@ -106,6 +106,12 @@ describe('TwoFactorSetup', () => {
     });
     mockTwoFactorEnable.mockResolvedValue({
       data: {
+        // `method` is not decoration: better-auth 1.7 returns a discriminated
+        // union here — `{ method: 'otp' }` or `{ method: 'totp', totpURI,
+        // backupCodes }` (see two-factor/index.mjs, which json()s exactly those
+        // two shapes). A mock without it stopped matching the real contract, so
+        // the component's narrowing would pass tests and fail against the library.
+        method: 'totp',
         totpURI: 'otpauth://totp/Auto%20Author:a@b.com?secret=TESTSECRET',
         backupCodes: ['AAAA-1111', 'BBBB-2222'],
       },
@@ -144,6 +150,27 @@ describe('TwoFactorSetup', () => {
       expect(mockVerifyTotp).toHaveBeenCalledWith({ code: '123456' })
     );
     await waitFor(() => expect(screen.getByText('Enabled')).toBeInTheDocument());
+  });
+
+  it('refuses to start setup when the server returns a non-TOTP method', async () => {
+    // better-auth can answer enable() with `{ method: 'otp' }` and no totpURI.
+    // This screen can only enrol via a scanned QR, so it must surface an error
+    // rather than advance to a step it cannot render — a blank QR would strand
+    // the user mid-enrolment with no way to finish.
+    mockTwoFactorEnable.mockResolvedValue({ data: { method: 'otp' }, error: null });
+    render(<TwoFactorSetup />);
+    fireEvent.click(screen.getByRole('button', { name: /enable 2fa/i }));
+    fireEvent.change(screen.getByLabelText('Confirm your password'), {
+      target: { value: 'my-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+    await waitFor(() => expect(mockTwoFactorEnable).toHaveBeenCalled());
+    // Never advances to the verify step: no QR, no backup codes, and the
+    // password form is still on screen rather than a half-rendered enrolment.
+    expect(screen.queryByTestId('two-factor-qr')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Verification Code')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Confirm your password')).toBeInTheDocument();
   });
 
   it('shows a destructive toast when the enable password is wrong', async () => {
