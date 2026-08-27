@@ -98,20 +98,23 @@ trade for a change that reaches users — so anything shipping a major gets its 
 Security updates are never grouped (`applies-to` defaults to version-updates), so an
 advisory patch still lands alone and fast.
 
-Measured against this repo with `dependabot/cli` (see `docs/demos/`, #517):
+Measured on the first live sweep after #517 landed (2026-08-26), which supersedes the
+pre-merge `dependabot/cli` estimates in `docs/demos/` — those used a more permissive job
+config and overcounted:
 
-| | ungrouped | grouped |
+| | before | after |
 |---|---:|---:|
-| `uv` /backend | 13 PRs | **4** — one group of 13, plus `openai` 2→3, `pytest` 8→9, `pytest-cov` 6→7 |
-| `npm` /frontend | ≥33 PRs | **6** — prod group (139), dev group (35), plus 4 solo |
+| open Dependabot PRs | 10, all ungrouped | **5** |
 
-**The npm residue is expected.** `dependency-type` classifies *direct* dependencies
-only, so an indirect dep that Dependabot bumps on its own — rather than sweeping it
-along with a direct bump — matches neither npm group and gets an individual PR. Three
-of npm's four solo PRs were that (`@babel/runtime`, `@rushstack/eslint-patch`,
-`@types/semver`; none appear in `package.json`); the fourth, `tailwind-merge` 2→3, is a
-genuine prod major behaving as designed. The `uv` group sets no `dependency-type`, so
-it has no such residue.
+The five: an `actions` group, a `backend` group carrying 10 updates, a `frontend-prod`
+group carrying 26 — and `openai` 2.45.0 → 3.0.0 plus `pytest` 8.4.1 → 9.1.1 each on their
+own, which is the design working.
+
+**A note on `dependency-type`:** it classifies *direct* dependencies only. That has no
+practical effect here, because Dependabot only opens PRs for direct npm dependencies in
+the first place — a pre-merge harness run suggested an "indirect residue" of extra solo
+PRs, but that was an artefact of running the job with `allowed-updates: all`, and the
+live sweep produced none. The `uv` group sets no `dependency-type` at all.
 
 `scripts/test_dependabot_config.py` pins both halves and runs in the `Security Audit`
 job. If you widen a group back to majors, that check fails with the reason.

@@ -40,6 +40,34 @@ counted above.)
 
 ---
 
+> ## ⚠️ Correction — 2026-08-26, after the first live sweep
+>
+> **The harness counts below are inflated and do not transfer to production.** The
+> live sweep ran the same evening and opened **4** PRs where the harness predicted
+> **10**. Two independent causes, both in the job file rather than in `dependabot.yml`:
+>
+> 1. **`allowed-updates: [{update-type: all}]`** — no `dependency-type: direct`.
+>    Production opens PRs for *direct* npm dependencies only, so the "139-update"
+>    `frontend-prod` group is really **26**, and the `frontend-dev` group (35) and
+>    the three indirect solos **do not exist in production at all**. The whole
+>    "npm residue" section below is therefore an artefact of the harness config,
+>    not a property of the shipped setup.
+> 2. **The harness has no memory of previously-closed PRs.** `tailwind-merge`
+>    2.6.0 → 3.6.0 was PR #510, closed unmerged (it belongs to #513's Tailwind v4
+>    migration). Dependabot will not recreate a version that was declined; the
+>    harness proposed it anyway.
+>
+> **What still holds:** the A/B is valid. Both runs used identical job config and
+> differed *only* in `dependency-groups`, so "grouping collapses many PRs into a
+> few, and majors fall through to their own PR" is soundly demonstrated. Only the
+> absolute magnitudes are wrong.
+>
+> **The live numbers, which supersede these:** 10 open ungrouped PRs → **5**
+> (`actions` group #540, `backend` group with 10 updates #541, `frontend-prod`
+> group with 26 updates #543, plus `openai` 2.45.0 → 3.0.0 #542 and `pytest`
+> 8.4.1 → 9.1.1 #527 each solo). Two groups absorbed 36 updates; both majors
+> arrived alone. Recorded in #539.
+
 ## AC1 — A weekly run opens grouped PRs; multiple bumps to one file arrive as one PR
 
 Counting every `create_pull_request` the updater emitted:
