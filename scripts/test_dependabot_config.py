@@ -126,3 +126,49 @@ def test_shipping_groups_never_swallow_a_major(ecosystem, directory, name, group
         "A production major must arrive as its own PR so it can be reviewed and "
         "reverted on its own."
     )
+
+
+# #556: better-auth 1.6.26 -> 1.7.1 rode into main as one line of a 26-package
+# grouped PR and made the app a total auth outage on deploy. 1.7 added a required
+# `account.issuer` and keys accounts on (issuer, accountId), so every credential
+# row written by 1.6 stopped matching and sign-in, password reset and password
+# change all returned 401. No CI check could have caught it: the E2E suite creates
+# its users fresh and accounts created on 1.7 work fine, so only a database
+# holding pre-1.7 accounts reproduces it.
+#
+# The minor/patch filter guarding the group above is not protection here —
+# better-auth ships credential-lookup and schema changes under semver minor.
+_MUST_ARRIVE_ALONE = "better-auth"
+
+
+@pytest.mark.parametrize(
+    ("directory", "name", "group"),
+    [
+        pytest.param(e["directory"], name, group, id=f"{e['directory']}:{name}")
+        for e in UPDATES
+        if e["package-ecosystem"] == "npm"
+        for name, group in (e.get("groups") or {}).items()
+        # better-auth is a production dependency, so a dev-typed group cannot
+        # reach it however broad its patterns are — same carve-out the major
+        # rule above makes, for the same reason.
+        if group.get("dependency-type") != "development"
+    ],
+)
+def test_better_auth_is_never_grouped(directory, name, group):
+    """No npm group may match better-auth, so its bumps always arrive on their own.
+
+    A `patterns: ["*"]` group matches it unless `exclude-patterns` says otherwise;
+    checking only the prod group would miss a future group that also catches it.
+    """
+    patterns = group.get("patterns") or []
+    excluded = group.get("exclude-patterns") or []
+    matches = any(p == "*" or p == _MUST_ARRIVE_ALONE for p in patterns)
+    if not matches:
+        pytest.skip(f"group {name!r} cannot match {_MUST_ARRIVE_ALONE}")
+    assert _MUST_ARRIVE_ALONE in excluded, (
+        f"npm group {name!r} in {directory} matches {_MUST_ARRIVE_ALONE} and does not "
+        f"exclude it, so its next bump can ride in with the rest of the batch. That is "
+        f"exactly how #556 landed — a minor bump of the auth library, invisible in a "
+        f"26-package diff, that locked out every existing account on deploy. Add "
+        f'`exclude-patterns: ["{_MUST_ARRIVE_ALONE}"]` to this group.'
+    )

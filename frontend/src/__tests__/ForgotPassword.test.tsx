@@ -6,12 +6,12 @@ import ForgotPasswordPage from "@/app/auth/forgot-password/page";
 
 // Import the mock function directly from the better-auth mock
 // This gives us the same reference that authClient uses
-import { mockForgetPassword } from "../__mocks__/better-auth-react";
+import { mockRequestPasswordReset } from "../__mocks__/better-auth-react";
 
 describe("ForgotPasswordPage", () => {
   beforeEach(() => {
-    mockForgetPassword.mockReset();
-    mockForgetPassword.mockResolvedValue({
+    mockRequestPasswordReset.mockReset();
+    mockRequestPasswordReset.mockResolvedValue({
       data: {},
       error: null,
     });
@@ -40,7 +40,7 @@ describe("ForgotPasswordPage", () => {
     await waitFor(() => {
       expect(screen.getByText(/please enter a valid email address/i)).toBeInTheDocument();
     });
-    expect(mockForgetPassword).not.toHaveBeenCalled();
+    expect(mockRequestPasswordReset).not.toHaveBeenCalled();
   });
 
   it("submits form with valid email and shows success", async () => {
@@ -61,7 +61,7 @@ describe("ForgotPasswordPage", () => {
 
   it("shows error message on API failure", async () => {
     // Configure mock to return error before rendering
-    mockForgetPassword.mockResolvedValueOnce({
+    mockRequestPasswordReset.mockResolvedValueOnce({
       data: null,
       error: { message: "User not found" },
     });
@@ -80,7 +80,7 @@ describe("ForgotPasswordPage", () => {
 
   it("shows rate limit error message", async () => {
     // Configure mock to return rate limit error before rendering
-    mockForgetPassword.mockResolvedValueOnce({
+    mockRequestPasswordReset.mockResolvedValueOnce({
       data: null,
       error: { message: "Rate limit exceeded" },
     });
@@ -99,7 +99,7 @@ describe("ForgotPasswordPage", () => {
 
   it("shows loading state during submission", async () => {
     // Make mock delay response
-    mockForgetPassword.mockImplementationOnce(
+    mockRequestPasswordReset.mockImplementationOnce(
       () => new Promise((resolve) => setTimeout(() => resolve({ data: {}, error: null }), 500))
     );
 

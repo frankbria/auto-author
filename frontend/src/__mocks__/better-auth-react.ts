@@ -19,7 +19,7 @@ export const useSession = jest.fn(() => ({
 }));
 
 // Export mock functions for password reset so tests can access and configure them
-export const mockForgetPassword = jest.fn().mockResolvedValue({
+export const mockRequestPasswordReset = jest.fn().mockResolvedValue({
   data: {},
   error: null,
 });
@@ -97,7 +97,7 @@ export const createAuthClient = jest.fn(() => ({
     error: null,
   }),
   // Password reset methods
-  forgetPassword: mockForgetPassword,
+  requestPasswordReset: mockRequestPasswordReset,
   resetPassword: mockResetPassword,
   // Account security methods (#64)
   changePassword: jest.fn().mockResolvedValue({ data: {}, error: null }),
