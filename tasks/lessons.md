@@ -227,3 +227,31 @@ that it "earned its keep immediately", crediting it for work it structurally cou
 **Also, again:** `git checkout <file>` to revert a mutation probe reverted an *uncommitted*
 scrub in the same file. Same trap as `commit-before-mutation-checks`. Use a backup copy
 (`cp` to scratch, `cp` back) when the working tree has uncommitted work.
+
+## 2026-08-27 — #556: read the whole failure path before describing its blast radius
+
+I wrote "sign-in, password reset and password change all 401" into a plan comment and a commit
+message after reading only `sign-in.mjs` and grepping for the shared issuer filter. Reading
+`password.mjs` properly showed reset does something different and worse: it succeeds and creates a
+*second* credential account, so users self-rescue while the collection silently accumulates rows
+that then collide on the new unique key.
+
+The correction mattered — it inverted the deploy ordering argument from "run the backfill whenever"
+to "run it before the deploy, because every hour of drift adds manual reconciliation."
+
+**Pattern:** a shared helper appearing in three call sites is not three identical failures. Read
+what each caller does with the miss before writing the consequence down. Grep finds the call; only
+the caller says what it costs.
+
+## 2026-08-27 — #556: a test that compares against the constant tests nothing about the constant
+
+Ten tests, all green, all mutation-resistant — except the one mutation that mattered. Changing
+`LOCAL_CREDENTIAL_ISSUER` from `"local:credential"` to `"credential"` passed the whole suite,
+because every assertion read `assert stored["issuer"] == LOCAL_CREDENTIAL_ISSUER`. The single value
+the entire fix turned on was untested, and a wrong one would have produced a clean, green, useless
+migration against production data.
+
+**Pattern:** when a value is a *wire constant* — a protocol string, a route path, an enum another
+system compares against — at least one test must assert the literal, and better, derive it from the
+other system. Importing the constant into the test makes the test agree with the code by
+construction. Always include the constant itself in the mutation set.
