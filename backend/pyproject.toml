@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     # Core FastAPI dependencies
     "fastapi==0.141.1",
-    "uvicorn==0.52.1",
+    "uvicorn==0.52.3",
     "python-multipart==0.0.32",
     # Database
     "pymongo==4.17.0",
@@ -24,7 +24,7 @@ dependencies = [
     # python-jose (zero importers, dragged in ecdsa/rsa/pyasn1) and passlib
     # (helpers had no production callers) were removed in #342.
     # AWS SDK for transcription and S3
-    "boto3==1.43.70",
+    "boto3==1.43.71",
     # Image processing and storage
     "cloudinary==1.45.0",
     "pillow==12.3.0",
@@ -35,7 +35,7 @@ dependencies = [
     "ebooklib==0.20",
     "stripe==15.5.0",
     # Error tracking (issue #334) — inert unless SENTRY_DSN is set
-    "sentry-sdk[fastapi]==2.67.1",
+    "sentry-sdk[fastapi]==2.68.0",
 ]
 
 # Test, load-test, and dev tooling are NOT production runtime dependencies.
