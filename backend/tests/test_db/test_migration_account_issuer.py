@@ -344,7 +344,11 @@ class TestAtlasConnection:
     """
 
     def test_atlas_uris_get_explicit_tls_with_a_ca_bundle(self):
-        kwargs = _client_kwargs("mongodb+srv://cluster.example.mongodb.net/")
+        # `.invalid` (RFC 2606), not a `*.mongodb.net` placeholder: the #544 guard
+        # rejects any managed-cluster hostname in a tracked file of a public repo,
+        # and rightly does not care that this one is made up. Only the scheme
+        # prefix matters here — nothing connects.
+        kwargs = _client_kwargs("mongodb+srv://cluster.invalid/")
         assert kwargs["tls"] is True
         assert kwargs["tlsAllowInvalidCertificates"] is False
         assert kwargs["tlsCAFile"].endswith(".pem")
