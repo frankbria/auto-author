@@ -99,24 +99,17 @@ def test_every_ecosystem_groups_its_updates(entry):
         for e in UPDATES
         if e["package-ecosystem"] not in _EXEMPT_FROM_MAJOR_RULE
         for name, group in (e.get("groups") or {}).items()
+        if group.get("dependency-type") != "development"
     ],
 )
-def test_no_group_swallows_a_major(ecosystem, directory, name, group):
-    """Every group must exclude majors, `dependency-type: "development"` included.
+def test_shipping_groups_never_swallow_a_major(ecosystem, directory, name, group):
+    """A group that can match a production dependency must exclude majors.
 
     Grouped PRs are cheap to merge and expensive to review or revert, which is
     the wrong trade for a bump that reaches users. The worked example is this
     repo's own `mongodb` 6.21.0 -> 7.5.0 (#507): it earned a solo PR and its own
     staging verification (#516), and folding it into a batch of lockfile bumps
     would have buried exactly the change worth reading.
-
-    This rule used to skip dev-typed groups on the premise that dev deps never
-    ship (#517). `dependency-type` is an npm-manifest classification, not a
-    statement about user reach: `tailwindcss`, `postcss` and `autoprefixer` sit
-    in devDependencies and generate the CSS bundle every user downloads. #555 is
-    the bill — `tailwindcss` 3 -> 4 arrived inside a 14-update grouped PR, on the
-    same footing as an eslint bump. There is no maintainable allowlist of
-    "build-time toolchains that ship artifacts", so the exemption goes instead.
 
     Omitting `update-types` entirely means "all types", so an unset value fails
     here too — that is the silent way this protection would be lost.
@@ -125,14 +118,61 @@ def test_no_group_swallows_a_major(ecosystem, directory, name, group):
     declared = group.get("update-types")
     assert declared is not None, (
         f"group {name!r} in {ecosystem} {directory} sets no `update-types`, which "
-        "means every type including major. Restrict it to minor/patch — a major "
-        "belongs on its own PR, dev-classified or not (#555)."
+        "means every type including major. Restrict it to minor/patch, or mark "
+        'the group `dependency-type: "development"` if it cannot reach users.'
     )
     assert set(declared) <= allowed, (
         f"group {name!r} in {ecosystem} {directory} groups {sorted(set(declared) - allowed)}. "
-        "A major must arrive as its own PR so it can be reviewed and reverted on "
-        "its own, and so one blocked major cannot strand the rest of the batch."
+        "A production major must arrive as its own PR so it can be reviewed and "
+        "reverted on its own."
     )
+
+
+# #555: the dev-group carve-out above trusts `dependency-type: "development"` as a
+# statement about user reach. It is not — it classifies a manifest section. These
+# three sit in devDependencies and generate the CSS bundle every user downloads,
+# so `tailwindcss` 3 -> 4 arrived inside a 14-update grouped PR (#548) on the same
+# footing as an eslint bump.
+#
+# Not folded into the major rule above by widening it to every dev group: measured
+# on #548's manifest, `eslint` 8 -> 10, `eslint-config-next` 15 -> 16 and
+# `@typescript-eslint/*` 6 -> 8 each fail `npm install` on their own peer ranges
+# and can only move together. Forcing every dev major solo would strand that
+# cluster as four permanently-unmergeable PRs — the same lossiness #555 reports,
+# relocated. The line is what a package ships, not what section it sits in.
+_SHIPS_DESPITE_DEV_CLASSIFICATION = ("tailwindcss", "postcss", "autoprefixer")
+
+
+@pytest.mark.parametrize(
+    ("directory", "name", "group"),
+    [
+        pytest.param(e["directory"], name, group, id=f"{e['directory']}:{name}")
+        for e in UPDATES
+        if e["package-ecosystem"] == "npm"
+        for name, group in (e.get("groups") or {}).items()
+    ],
+)
+def test_build_time_toolchains_never_ride_a_major_taking_group(directory, name, group):
+    """A group that takes majors must not be able to match a shipping build tool.
+
+    Either restrict the group to minor/patch, or name the package in
+    `exclude-patterns` so its majors arrive on their own PR.
+    """
+    declared = group.get("update-types")
+    if declared is not None and set(declared) <= {"minor", "patch"}:
+        pytest.skip(f"group {name!r} takes no majors")
+    patterns = group.get("patterns") or []
+    excluded = group.get("exclude-patterns") or []
+    for package in _SHIPS_DESPITE_DEV_CLASSIFICATION:
+        if not any(p == "*" or p == package for p in patterns):
+            continue
+        assert package in excluded, (
+            f"npm group {name!r} in {directory} takes majors and matches {package!r}, "
+            f"which is dev-classified but emits an artifact every user downloads. "
+            f"That is how tailwindcss 3 -> 4 landed inside #548's 14-update batch. "
+            f'Add it to `exclude-patterns`, or give the group `update-types: '
+            f'["minor", "patch"]`.'
+        )
 
 
 # #556: better-auth 1.6.26 -> 1.7.1 rode into main as one line of a 26-package

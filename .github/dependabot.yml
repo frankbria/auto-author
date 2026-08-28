@@ -32,23 +32,26 @@ updates:
     # so an advisory patch still lands alone and fast. That default is the one we
     # want; don't add `applies-to: security-updates` here.
     groups:
+      # tailwindcss, postcss and autoprefixer are dev-classified and still reach
+      # users: they generate the CSS bundle in every build. `dependency-type` names
+      # a manifest section, not a blast radius. Listing them first and excluding
+      # them from frontend-dev below keeps their majors out of a batch (#555) —
+      # tailwindcss 3 -> 4 rode into #548 on the same footing as an eslint bump —
+      # while their minor/patch bumps still batch instead of arriving one by one.
+      frontend-build:
+        patterns: ["tailwindcss", "postcss", "autoprefixer"]
+        update-types: ["minor", "patch"]
       frontend-dev:
-        # This group used to take every update type, on the premise that dev deps
-        # never ship. That premise is wrong (#555). `dependency-type` classifies a
-        # manifest section, not user reach: tailwindcss, postcss and autoprefixer
-        # live in devDependencies and generate the CSS bundle every user
-        # downloads, so `tailwindcss` 3 -> 4 arrived in a 14-update batch on the
-        # same footing as an eslint bump.
-        #
-        # The exemption was also lossy in the other direction. #548 batched 14
-        # updates, and its six minor/patch ones could not land because two of the
-        # eight majors are already triaged as blocked (#513, #514) — packages that
-        # cannot install take the whole PR down, and Dependabot regenerates it in
-        # the same broken state every sweep.
-        # Majors here get the same solo-PR treatment as production ones.
+        # Majors ARE grouped here. eslint, jest and the typescript-eslint packages
+        # emit nothing a user downloads, and they are peer-coupled: measured on
+        # #548's manifest, `eslint` 8 -> 10, `eslint-config-next` 15 -> 16 and
+        # `@typescript-eslint/{parser,eslint-plugin}` 6 -> 8 each fail `npm install`
+        # alone and only resolve together. Splitting them into solo PRs would strand
+        # four permanently-unmergeable ones. What a package ships is the line here,
+        # not which manifest section it sits in — hence the exclusions.
         dependency-type: "development"
         patterns: ["*"]
-        update-types: ["minor", "patch"]
+        exclude-patterns: ["tailwindcss", "postcss", "autoprefixer"]
       frontend-prod:
         dependency-type: "production"
         patterns: ["*"]
@@ -90,16 +93,20 @@ updates:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
-      # Two majors that are already triaged as blocked. Without these they arrive
-      # solo every sweep, permanently red, each holding one of the five PR slots.
-      # Remove each entry when its issue closes — that is the whole condition.
+      # Two majors already triaged as blocked. Without these they open a solo PR
+      # every sweep that can never go green, each holding one of the five slots —
+      # and while typescript sits in the frontend-dev group, that PR is the whole
+      # batch (#548 is exactly this: six fine minor/patch updates that cannot land
+      # because two majors in the same PR do not install). Remove each entry when
+      # its issue closes; that is the whole condition.
       #
       # typescript 7 (#514): capped twice over — ts-jest@29 peers
       # `typescript ">=4.3 <7"`, and @typescript-eslint 8.x peers `>=4.8.4 <6.1.0`.
       # Opened and closed once already as #509.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # tailwindcss 4 (#513): needs tailwind-merge v3 in the same change.
+      # tailwindcss 4 (#513): needs tailwind-merge v3 in the same change. Excluded
+      # from every group above too, so this only stops the solo PR churning.
       - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
 
