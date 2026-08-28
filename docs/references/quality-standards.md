@@ -90,11 +90,29 @@ arrives as a few PRs rather than up to fifteen. What groups and what does not:
 | Ecosystem | Grouped | Arrives alone |
 |---|---|---|
 | `github-actions` | everything, majors included | — |
-| `npm` /frontend | all dev deps; prod minor + patch | **prod majors**, plus standalone indirect bumps |
+| `npm` /frontend `frontend-dev` | dev deps, **majors included** | — |
+| `npm` /frontend `frontend-build` | `tailwindcss`, `postcss`, `autoprefixer` minor + patch | **their majors** |
+| `npm` /frontend `frontend-prod` | prod minor + patch | **prod majors**, and `better-auth` always |
 | `uv` /backend | minor + patch | **majors** |
 
 A grouped PR is cheap to merge and expensive to review or revert, which is the wrong
 trade for a change that reaches users — so anything shipping a major gets its own PR.
+
+**The line is what a package ships, not which manifest section it sits in (#555).**
+`tailwindcss`, `postcss` and `autoprefixer` live in `devDependencies` and generate the
+CSS bundle every user downloads, so they get the production treatment despite the
+classification — `tailwindcss` 3 → 4 otherwise rides into a batch on the same footing as
+an eslint bump, which is what happened in #548. `frontend-dev` keeps its majors because
+eslint and jest genuinely ship nothing *and* are peer-coupled: measured, `eslint` 8 → 10,
+`eslint-config-next` 15 → 16 and `@typescript-eslint/{parser,eslint-plugin}` 6 → 8 each
+fail `npm install` alone and only resolve together. Forcing them solo would strand four
+permanently-unmergeable PRs.
+
+**A blocked major belongs in `ignore`, not left to churn.** A major that cannot install
+reopens every sweep, holds one of the five PR slots, and — while it sits inside a group —
+takes the whole batch down with it. `typescript` (#514) and `tailwindcss` (#513) are
+ignored at semver-major for exactly this reason; each entry names the issue whose
+closure removes it. Check that list before assuming a bump is not being offered.
 Security updates are never grouped (`applies-to` defaults to version-updates), so an
 advisory patch still lands alone and fast.
 
