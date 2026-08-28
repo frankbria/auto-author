@@ -22,6 +22,7 @@ from app.db import base
 from app.scripts.migration_account_issuer import (
     LOCAL_CREDENTIAL_ISSUER,
     AccountIssuerBackfillError,
+    _client_kwargs,
     _resolve_connection,
     backfill_account_issuer,
 )
@@ -328,3 +329,27 @@ class TestConnectionResolution:
             _resolve_connection("", "db", {})
         with pytest.raises(AccountIssuerBackfillError, match="DATABASE_NAME"):
             _resolve_connection("mongodb://x", None, {})
+
+
+class TestAtlasConnection:
+    """Connect the way the app already connects.
+
+    The whole point of this script is to repair the staging/production Atlas
+    cluster, and it had only ever been exercised against a local
+    `mongodb://127.0.0.1` — where the TLS branch never runs, so neither the demo
+    nor CI (whose MongoDB fixture is also local) would notice a difference.
+    `app/db/base.py:14-33` already establishes what works against this cluster;
+    match it rather than hand a one-shot P0 migration a connection nothing has
+    tried.
+    """
+
+    def test_atlas_uris_get_explicit_tls_with_a_ca_bundle(self):
+        kwargs = _client_kwargs("mongodb+srv://cluster.example.mongodb.net/")
+        assert kwargs["tls"] is True
+        assert kwargs["tlsAllowInvalidCertificates"] is False
+        assert kwargs["tlsCAFile"].endswith(".pem")
+
+    def test_plain_uris_get_no_tls_options(self):
+        # A local mongodb:// has no certificate to verify, and forcing tls on
+        # would break the very fixture these tests run against.
+        assert _client_kwargs("mongodb://127.0.0.1:27017") == {}

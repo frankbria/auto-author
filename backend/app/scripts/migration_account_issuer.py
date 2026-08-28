@@ -53,20 +53,22 @@ Runbook
    and account linking. The guide asks for a maintenance window because a row
    inserted mid-run is not covered by the collision check.
 2. **Back up the ``account`` and ``user`` collections.**
-3. **Dry run** (the default — it writes nothing). Run it where better-auth's
-   ``MONGODB_URI``/``DATABASE_NAME`` are set, which in the deployment means the
-   backend container::
+3. **Dry run** (the default — it writes nothing). Run it from a *throwaway*
+   container off the image you are about to deploy — **not** ``docker compose
+   exec``, which would run in the container already on the box, whose image
+   predates this script::
 
-       docker compose exec backend python -m app.scripts.migration_account_issuer
+       docker run --rm --env-file .env \\
+           ghcr.io/frankbria/auto-author-backend:sha-<tag> \\
+           python -m app.scripts.migration_account_issuer
 
-   Read the counts and resolve anything it refuses on before going further. Do
-   *not* spell it out as ``--mongodb-uri "$MONGODB_URI"``: under
-   ``docker compose exec`` your host shell expands that, where it is unset, and
-   the run would target an empty string. The flags exist only for a database the
-   backend's own settings do not point at.
-4. **Apply**::
-
-       docker compose exec backend python -m app.scripts.migration_account_issuer --apply
+   Read the counts and resolve anything it refuses on before going further.
+   ``--env-file`` puts ``MONGODB_URI``/``DATABASE_NAME`` inside the container,
+   where this reads them. Do *not* spell it out as
+   ``--mongodb-uri "$MONGODB_URI"``: your host shell expands that, where it is
+   unset, and the run would target an empty string. The flags exist only for a
+   database the backend's own settings do not point at.
+4. **Apply** — same command with ``--apply``.
 
 5. **Re-run the dry run.** It is idempotent, so a clean second pass reports
    ``issuer_backfilled: 0`` and every row already migrated.
@@ -84,6 +86,7 @@ import os
 import sys
 from collections import defaultdict
 
+import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 
 logger = logging.getLogger(__name__)
@@ -201,6 +204,23 @@ def _reject_collisions(accounts, updates) -> None:
         )
 
 
+def _client_kwargs(uri):
+    """TLS options for an Atlas URI, matching how the app itself connects.
+
+    `app/db/base.py` branches on the same `mongodb+srv://` prefix and passes an
+    explicit CA bundle. That is the configuration known to reach this cluster; a
+    one-shot migration run inside a maintenance window is the wrong place to find
+    out that a bare client would also have worked.
+    """
+    if not uri.startswith("mongodb+srv://"):
+        return {}
+    return {
+        "tls": True,
+        "tlsCAFile": certifi.where(),
+        "tlsAllowInvalidCertificates": False,
+    }
+
+
 def _resolve_connection(uri, database, env):
     """Take the connection from the flags, else from the process environment.
 
@@ -256,7 +276,7 @@ async def _main(argv=None) -> int:
         logger.error("%s", exc)
         return 2
 
-    client = AsyncIOMotorClient(uri)
+    client = AsyncIOMotorClient(uri, **_client_kwargs(uri))
     try:
         stats = await backfill_account_issuer(client[database], dry_run=not args.apply)
     except AccountIssuerBackfillError as exc:

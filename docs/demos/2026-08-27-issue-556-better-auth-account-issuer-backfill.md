@@ -175,7 +175,7 @@ CI already runs `npm run typecheck`, so that is the standing guard.
 
 | gate | result |
 |---|---|
-| `pytest tests/test_db/test_migration_account_issuer.py` | **18 passed** (real MongoDB) |
+| `pytest tests/test_db/test_migration_account_issuer.py` | **20 passed** (real MongoDB) |
 | `pytest tests/` (backend, full) | **1254 passed, 9 skipped**, coverage 92.14% (gate 85%) |
 | `pytest scripts/test_dependabot_config.py` | **7 passed, 1 skipped** |
 | `npm test` (frontend) | **2288 passed, 5 skipped, 133 suites** |
@@ -207,7 +207,7 @@ installed library.
 
 ---
 
-## Two defects found after the first green run
+## Four defects found after the first green run
 
 Recorded because both would have reached an operator mid-maintenance-window.
 
@@ -238,8 +238,41 @@ DATABASE_URL) is set. If you are using `docker compose exec`, note that $MONGODB
 command line is expanded by your shell, not the container's.
 ```
 
+**The pre-deploy gate could not be run before the deploy** (PR bot reviewer, `major`). The runbook
+said `docker compose exec backend python -m app.scripts.migration_account_issuer`. That runs in
+the container already on the box, built from the *previous* image — which does not contain this
+script (`git cat-file -e main:backend/app/scripts/migration_account_issuer.py` → absent). It would
+have died with `No module named app.scripts.migration_account_issuer`, and the only way to get the
+script onto the box would have been to perform the 1.7 deploy first, un-backfilled — the exact
+ordering the gate exists to prevent. Now documented as a throwaway container off the image about
+to be deployed, which changes nothing about what is serving traffic.
+
+Verified by building `backend/Dockerfile` and running the documented command against a seeded
+1.6-shaped account:
+
+```
+$ docker run --rm --env-file .env <backend-image> python -m app.scripts.migration_account_issuer
+DRY RUN (nothing written): scanned=1 already_migrated=0 issuer_backfilled=1 account_id_repaired=0
+$ docker run --rm --env-file .env <backend-image> python -m app.scripts.migration_account_issuer --apply
+APPLIED: scanned=1 already_migrated=0 issuer_backfilled=1 account_id_repaired=0
+issuer after apply: "local:credential"
+```
+
+**Atlas connections had no explicit CA bundle** (PR bot reviewer, `major`). The script built a bare
+`AsyncIOMotorClient(uri)`, while `app/db/base.py:14-33` branches on the same `mongodb+srv://`
+prefix and passes `tlsCAFile=certifi.where()`, `tls=True`,
+`tlsAllowInvalidCertificates=False`. Since this script had only ever run against
+`mongodb://127.0.0.1` — and CI's MongoDB fixture is local too — nothing would have exercised the
+Atlas path before the maintenance window. It now matches the app's connection, which is the one
+configuration known to reach this cluster. Two tests pin both branches.
+
+A third finding, on `None` `userId` reporting, the reviewer retracted mid-comment; the residual
+point is an observability nit with no change required, and is not acted on.
+
 opencode/GLM was the primary reviewer and produced no output in 15 minutes before being
-terminated; `codex review` is the documented fallback and is what found the above.
+terminated; `codex review` is the documented fallback and found the runbook variable-expansion
+defect. The PR's own bot reviewer found the two above and was itself cancelled at 20m with 1 of 6
+checklist items done — the behaviour already filed as #547.
 
 ---
 

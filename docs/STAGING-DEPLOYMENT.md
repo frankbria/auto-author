@@ -116,24 +116,37 @@ password, rotation runbook): `docs/DATABASE_CONNECTION_STANDARD.md`.
 > Run the backfill **before** deploying, in a window with authentication writes
 > stopped and the `account` and `user` collections backed up. Both containers get
 > the same database — compose feeds `MONGODB_URI` to the backend and the identical
-> value to the frontend as `DATABASE_URL` — so the backend container's own env
-> already points at the collections better-auth writes, and the command takes no
-> arguments:
+> value to the frontend as `DATABASE_URL` — so the backend's own env already names
+> the collections better-auth writes, and the command needs no arguments.
+>
+> **Not `docker compose exec`.** The backend container currently on the box runs
+> the image the *last* deploy shipped, and that image predates this script — the
+> exec would die with `No module named app.scripts.migration_account_issuer`. The
+> script only exists in an image built from the branch carrying the 1.7 bump, and
+> deploying that image is the thing this gate exists to hold back. So run it from
+> a **throwaway container off the new image**, which changes nothing about what is
+> serving traffic:
 >
 > ```bash
+> cd /opt/auto-author
+> TAG=sha-<the image tag you are about to deploy>
+> docker pull ghcr.io/frankbria/auto-author-backend:$TAG
+>
 > # dry run first — it is the default and writes nothing
-> docker compose exec backend python -m app.scripts.migration_account_issuer
+> docker run --rm --env-file .env ghcr.io/frankbria/auto-author-backend:$TAG \
+>     python -m app.scripts.migration_account_issuer
 > # then, once the counts read right:
-> docker compose exec backend python -m app.scripts.migration_account_issuer --apply
+> docker run --rm --env-file .env ghcr.io/frankbria/auto-author-backend:$TAG \
+>     python -m app.scripts.migration_account_issuer --apply
 > ```
 >
-> Two things that bite here. `python`, not `uv run`: the runtime image ships
+> Two more things that bite. `python`, not `uv run`: the runtime image ships
 > `/app/.venv` on `PATH` but neither `uv` nor `pyproject.toml`. And do **not**
-> spell the connection out as `--mongodb-uri "$MONGODB_URI"` — under
-> `docker compose exec` your *host* shell expands that, where the variable is
-> unset, and the gate would run against an empty string. The script reads the
-> container's own environment; `--mongodb-uri` / `--database` exist only for a
-> database the backend's settings do not point at.
+> spell the connection out as `--mongodb-uri "$MONGODB_URI"` — your *host* shell
+> expands that, where the variable is unset, and the gate would run against an
+> empty string. `--env-file .env` puts `MONGODB_URI` and `DATABASE_NAME` inside
+> the container, where the script reads them; `--mongodb-uri` / `--database` exist
+> only for a database the backend's settings do not point at.
 >
 > Exit codes: `0` done, `1` refused (read the message — an identity collision
 > needs manual reconciliation), `2` could not connect. It is idempotent, so
