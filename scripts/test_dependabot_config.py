@@ -99,17 +99,24 @@ def test_every_ecosystem_groups_its_updates(entry):
         for e in UPDATES
         if e["package-ecosystem"] not in _EXEMPT_FROM_MAJOR_RULE
         for name, group in (e.get("groups") or {}).items()
-        if group.get("dependency-type") != "development"
     ],
 )
-def test_shipping_groups_never_swallow_a_major(ecosystem, directory, name, group):
-    """A group that can match a production dependency must exclude majors.
+def test_no_group_swallows_a_major(ecosystem, directory, name, group):
+    """Every group must exclude majors, `dependency-type: "development"` included.
 
     Grouped PRs are cheap to merge and expensive to review or revert, which is
     the wrong trade for a bump that reaches users. The worked example is this
     repo's own `mongodb` 6.21.0 -> 7.5.0 (#507): it earned a solo PR and its own
     staging verification (#516), and folding it into a batch of lockfile bumps
     would have buried exactly the change worth reading.
+
+    This rule used to skip dev-typed groups on the premise that dev deps never
+    ship (#517). `dependency-type` is an npm-manifest classification, not a
+    statement about user reach: `tailwindcss`, `postcss` and `autoprefixer` sit
+    in devDependencies and generate the CSS bundle every user downloads. #555 is
+    the bill — `tailwindcss` 3 -> 4 arrived inside a 14-update grouped PR, on the
+    same footing as an eslint bump. There is no maintainable allowlist of
+    "build-time toolchains that ship artifacts", so the exemption goes instead.
 
     Omitting `update-types` entirely means "all types", so an unset value fails
     here too — that is the silent way this protection would be lost.
@@ -118,13 +125,13 @@ def test_shipping_groups_never_swallow_a_major(ecosystem, directory, name, group
     declared = group.get("update-types")
     assert declared is not None, (
         f"group {name!r} in {ecosystem} {directory} sets no `update-types`, which "
-        "means every type including major. Restrict it to minor/patch, or mark "
-        'the group `dependency-type: "development"` if it cannot reach users.'
+        "means every type including major. Restrict it to minor/patch — a major "
+        "belongs on its own PR, dev-classified or not (#555)."
     )
     assert set(declared) <= allowed, (
         f"group {name!r} in {ecosystem} {directory} groups {sorted(set(declared) - allowed)}. "
-        "A production major must arrive as its own PR so it can be reviewed and "
-        "reverted on its own."
+        "A major must arrive as its own PR so it can be reviewed and reverted on "
+        "its own, and so one blocked major cannot strand the rest of the batch."
     )
 
 

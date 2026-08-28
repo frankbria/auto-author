@@ -33,9 +33,21 @@ updates:
     # want; don't add `applies-to: security-updates` here.
     groups:
       frontend-dev:
-        # Dev deps never ship, so a major is a CI concern at worst.
+        # This group used to take every update type, on the premise that dev deps
+        # never ship. That premise is wrong (#555). `dependency-type` classifies a
+        # manifest section, not user reach: tailwindcss, postcss and autoprefixer
+        # live in devDependencies and generate the CSS bundle every user
+        # downloads, so `tailwindcss` 3 -> 4 arrived in a 14-update batch on the
+        # same footing as an eslint bump.
+        #
+        # The exemption was also lossy in the other direction. #548 carried twelve
+        # unobjectionable updates behind two majors already triaged as blocked
+        # (#513, #514); two packages that cannot install take the whole PR down,
+        # and Dependabot regenerates it in the same broken state every sweep.
+        # Majors here get the same solo-PR treatment as production ones.
         dependency-type: "development"
         patterns: ["*"]
+        update-types: ["minor", "patch"]
       frontend-prod:
         dependency-type: "production"
         patterns: ["*"]
@@ -75,6 +87,19 @@ updates:
       # runtime does. When Node moves (24 is Active LTS to April 2028), bump the
       # workflows, engines.node and this pin together, in one change.
       - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+      # Two majors that are already triaged as blocked. Without these they arrive
+      # solo every sweep, permanently red, each holding one of the five PR slots.
+      # Remove each entry when its issue closes — that is the whole condition.
+      #
+      # typescript 7 (#514): capped twice over — ts-jest@29 peers
+      # `typescript ">=4.3 <7"`, and @typescript-eslint 8.x peers `>=4.8.4 <6.1.0`.
+      # Opened and closed once already as #509.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # tailwindcss 4 (#513): needs tailwind-merge v3 in the same change.
+      - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "uv"
