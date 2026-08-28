@@ -40,10 +40,11 @@ updates:
         # downloads, so `tailwindcss` 3 -> 4 arrived in a 14-update batch on the
         # same footing as an eslint bump.
         #
-        # The exemption was also lossy in the other direction. #548 carried twelve
-        # unobjectionable updates behind two majors already triaged as blocked
-        # (#513, #514); two packages that cannot install take the whole PR down,
-        # and Dependabot regenerates it in the same broken state every sweep.
+        # The exemption was also lossy in the other direction. #548 batched 14
+        # updates, and its six minor/patch ones could not land because two of the
+        # eight majors are already triaged as blocked (#513, #514) — packages that
+        # cannot install take the whole PR down, and Dependabot regenerates it in
+        # the same broken state every sweep.
         # Majors here get the same solo-PR treatment as production ones.
         dependency-type: "development"
         patterns: ["*"]
