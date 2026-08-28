@@ -128,6 +128,53 @@ def test_shipping_groups_never_swallow_a_major(ecosystem, directory, name, group
     )
 
 
+# #555: the dev-group carve-out above trusts `dependency-type: "development"` as a
+# statement about user reach. It is not — it classifies a manifest section. These
+# three sit in devDependencies and generate the CSS bundle every user downloads,
+# so `tailwindcss` 3 -> 4 arrived inside a 14-update grouped PR (#548) on the same
+# footing as an eslint bump.
+#
+# Not folded into the major rule above by widening it to every dev group: measured
+# on #548's manifest, `eslint` 8 -> 10, `eslint-config-next` 15 -> 16 and
+# `@typescript-eslint/*` 6 -> 8 each fail `npm install` on their own peer ranges
+# and can only move together. Forcing every dev major solo would strand that
+# cluster as four permanently-unmergeable PRs — the same lossiness #555 reports,
+# relocated. The line is what a package ships, not what section it sits in.
+_SHIPS_DESPITE_DEV_CLASSIFICATION = ("tailwindcss", "postcss", "autoprefixer")
+
+
+@pytest.mark.parametrize(
+    ("directory", "name", "group"),
+    [
+        pytest.param(e["directory"], name, group, id=f"{e['directory']}:{name}")
+        for e in UPDATES
+        if e["package-ecosystem"] == "npm"
+        for name, group in (e.get("groups") or {}).items()
+    ],
+)
+def test_build_time_toolchains_never_ride_a_major_taking_group(directory, name, group):
+    """A group that takes majors must not be able to match a shipping build tool.
+
+    Either restrict the group to minor/patch, or name the package in
+    `exclude-patterns` so its majors arrive on their own PR.
+    """
+    declared = group.get("update-types")
+    if declared is not None and set(declared) <= {"minor", "patch"}:
+        pytest.skip(f"group {name!r} takes no majors")
+    patterns = group.get("patterns") or []
+    excluded = group.get("exclude-patterns") or []
+    for package in _SHIPS_DESPITE_DEV_CLASSIFICATION:
+        if not any(p == "*" or p == package for p in patterns):
+            continue
+        assert package in excluded, (
+            f"npm group {name!r} in {directory} takes majors and matches {package!r}, "
+            f"which is dev-classified but emits an artifact every user downloads. "
+            f"That is how tailwindcss 3 -> 4 landed inside #548's 14-update batch. "
+            f'Add it to `exclude-patterns`, or give the group `update-types: '
+            f'["minor", "patch"]`.'
+        )
+
+
 # #556: better-auth 1.6.26 -> 1.7.1 rode into main as one line of a 26-package
 # grouped PR and made the app a total auth outage on deploy. 1.7 added a required
 # `account.issuer` and keys accounts on (issuer, accountId), so every credential
