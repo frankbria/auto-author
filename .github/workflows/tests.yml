@@ -181,12 +181,29 @@ jobs:
           echo "OK: frontend/package-lock.json is the only npm lockfile."
 
       # npm audit resolves straight from the lockfile — no `npm ci` needed.
+      #
+      # The registry's audit endpoint fails intermittently, and npm reports that
+      # failure as exit 1 — the same code it uses for "vulnerabilities found" — so
+      # the exit status alone cannot tell the two apart. A registry error therefore
+      # slips through and hands audit_gate.py a truncated document, which it
+      # correctly rejects, turning a required check red for no real reason.
+      # Treat "output has no `vulnerabilities` key" as the retry signal instead.
       - name: Run npm audit
         working-directory: frontend
         run: |
-          rc=0
-          npm audit --json > /tmp/npm-audit.json || rc=$?
-          if [ "$rc" -gt 1 ]; then echo "::error::npm audit failed with exit $rc"; exit "$rc"; fi
+          for attempt in 1 2 3; do
+            rc=0
+            npm audit --json > /tmp/npm-audit.json || rc=$?
+            if [ "$rc" -gt 1 ]; then echo "::error::npm audit failed with exit $rc"; exit "$rc"; fi
+            if jq -e 'has("vulnerabilities")' /tmp/npm-audit.json >/dev/null 2>&1; then
+              echo "npm audit returned well-formed output on attempt $attempt"
+              exit 0
+            fi
+            echo "::warning::npm audit output has no 'vulnerabilities' key on attempt $attempt (registry audit endpoint erroring); retrying"
+            sleep $((attempt * 10))
+          done
+          echo "::error::npm audit returned malformed output on 3 consecutive attempts — the registry audit endpoint is failing, not this repo"
+          exit 1
 
       - name: Check advisories against the baseline
         run: |
