@@ -7,35 +7,35 @@ requires-python = ">=3.13"
 dependencies = [
     # Core FastAPI dependencies
     "fastapi==0.141.1",
-    "uvicorn==0.52.1",
+    "uvicorn==0.52.4",
     "python-multipart==0.0.32",
     # Database
     "pymongo==4.17.0",
     "motor==3.7.1",
     # Configuration and environment
-    "python-dotenv==1.2.2",
+    "python-dotenv==1.2.3",
     "pydantic[email]==2.13.4",
     "pydantic-settings==2.15.0",
     # AI and external APIs
-    "openai==3.0.0",
+    "openai==3.3.1",
     "requests==2.34.2",
     # Authentication is better-auth (TypeScript) end to end: the backend only
     # validates session cookies, so it needs no JWT or password-hashing library.
     # python-jose (zero importers, dragged in ecdsa/rsa/pyasn1) and passlib
     # (helpers had no production callers) were removed in #342.
     # AWS SDK for transcription and S3
-    "boto3==1.43.70",
+    "boto3==1.43.77",
     # Image processing and storage
-    "cloudinary==1.45.0",
+    "cloudinary==1.46.0",
     "pillow==12.3.0",
     # Export functionality
-    "reportlab==5.0.0",
+    "reportlab==5.0.1",
     "python-docx==1.2.0",
     "html2text==2025.4.15",
     "ebooklib==0.20",
-    "stripe==15.5.0",
+    "stripe==15.5.1",
     # Error tracking (issue #334) — inert unless SENTRY_DSN is set
-    "sentry-sdk[fastapi]==2.67.1",
+    "sentry-sdk[fastapi]==2.68.0",
 ]
 
 # Test, load-test, and dev tooling are NOT production runtime dependencies.
