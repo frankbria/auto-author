@@ -99,6 +99,7 @@
   "overrides": {
     "js-yaml@^3": "3.15.1",
     "js-yaml@^4": "4.3.1",
-    "@babel/core": "^7.29.0"
+    "@babel/core": "^7.29.0",
+    "nwsapi": "2.2.25"
   }
 }
