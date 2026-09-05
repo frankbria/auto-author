@@ -255,3 +255,37 @@ migration against production data.
 system compares against — at least one test must assert the literal, and better, derive it from the
 other system. Importing the constant into the test makes the test agree with the code by
 construction. Always include the constant itself in the mutation set.
+
+## 2026-09-05 — Dependabot sweep: a green required check is not evidence the gate ran
+
+Two separate lessons from clearing nine dependency PRs.
+
+**1. A stale-green required check is not a current one.** Four PRs last ran CI on 2026-08-28 and
+showed `Security Audit: SUCCESS`. Two high-severity `browserslist` advisories published
+2026-09-01 meant every one of them would fail the moment it re-ran — the green was an artifact of
+when the run happened, not of the code being clean. The failure also surfaced on a PR that had
+nothing to do with browserslist (a `fast-uri` bump), so reading the check name as "this PR's
+problem" pointed at entirely the wrong package.
+
+**Pattern:** on a required check, read the *run date* alongside the conclusion, and read the failing
+job's log before attributing the failure to the PR's own diff. Under `strict: true` protection the
+only conclusion that means anything is one from a run whose base is current `main`.
+
+**2. Exit codes that overload two meanings will eventually pick the wrong one.** `npm audit --json`
+exits 1 for "vulnerabilities found" — the normal case — *and* for a registry error. The workflow
+guarded with `if [ "$rc" -gt 1 ]`, so a registry failure sailed through and handed `audit_gate.py`
+an `{"error": ...}` body. The gate correctly refused to read it; the required check went red twice
+in twenty minutes on unrelated PRs, each time reading as "this PR introduced an advisory."
+
+The gate was right and needed no change. The bug was upstream of it, in trusting an exit code to
+distinguish two outcomes it cannot. Fixed by retrying on the real signal — a response body with no
+`vulnerabilities` key (#576/#577).
+
+**Pattern:** when a tool overloads one exit code across success and failure, validate the *output
+shape*, not the status. And when a required check is flaky, it is not merely annoying — with
+`strict: true` it is an intermittent, self-inflicted merge freeze that also misattributes blame.
+
+**3. Dependabot group PRs reroll on every lockfile change.** Merging them one at a time under
+`strict: true` is a treadmill: #564→#575→#579, #569→#573→#581, #568→#572→#580 all superseded
+themselves mid-session. Triage the *delta* against the superseded PR rather than re-reviewing from
+scratch, and keep the tracking issue on the blocker (#571), never on an individual reroll.
