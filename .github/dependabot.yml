@@ -42,13 +42,19 @@ updates:
         patterns: ["tailwindcss", "postcss", "autoprefixer"]
         update-types: ["minor", "patch"]
       frontend-dev:
-        # Majors ARE grouped here. eslint, jest and the typescript-eslint packages
-        # emit nothing a user downloads, and they are peer-coupled: measured on
-        # #548's manifest, `eslint` 8 -> 10, `eslint-config-next` 15 -> 16 and
+        # Majors ARE grouped here. eslint, jest and the Next lint config emit
+        # nothing a user downloads, and they are peer-coupled: measured on #548's
+        # manifest, `eslint` 8 -> 10, `eslint-config-next` 15 -> 16 and
         # `@typescript-eslint/{parser,eslint-plugin}` 6 -> 8 each fail `npm install`
         # alone and only resolve together. Splitting them into solo PRs would strand
         # four permanently-unmergeable ones. What a package ships is the line here,
         # not which manifest section it sits in — hence the exclusions.
+        #
+        # Three of those four are settled: the ESLint 9 migration took the config
+        # to flat and dropped both `@typescript-eslint` packages as direct deps
+        # (eslint-config-next 16 bundles them), and eslint itself is now capped at
+        # major 9 in the ignore block below. The coupling argument still holds for
+        # whatever pairs up next, so the grouping stays.
         dependency-type: "development"
         patterns: ["*"]
         exclude-patterns: ["tailwindcss", "postcss", "autoprefixer"]
@@ -108,6 +114,14 @@ updates:
       # tailwindcss 4 (#513): needs tailwind-merge v3 in the same change. Excluded
       # from every group above too, so this only stops the solo PR churning.
       - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      # eslint 10 (#583): capped upstream, not here. eslint-config-next 16 pulls
+      # eslint-plugin-react 7.37.5 — the latest published — and it peers
+      # `eslint ... || ^9.7` while still calling the `context.getFilename()` API
+      # that ESLint 10 removed, so linting dies on the first React file. eslint is
+      # the loudest member of the frontend-dev group, so without this every sweep
+      # reopens a batch that cannot install; #580 was exactly that.
+      - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "uv"
