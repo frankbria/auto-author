@@ -40,6 +40,12 @@ UFW_GRANT = re.compile(r"(?:ufw\s+)?allow\s+from\s+(\d{1,3}(?:\.\d{1,3}){3})", r
 
 # Consumer dynamic-DNS providers. A hostname here is a live pointer at whatever
 # connection it was set up for — it keeps resolving long after an IP goes stale.
+#
+# Naming vendors is not a disclosure: the secret in `<random>.<vendor>.com` is the
+# subdomain, not the provider, and this is a general list of eight rather than a
+# statement about anyone. The fixtures below use `abc123` for the same reason.
+# Test samples must never carry a real operator value — an ISP name in a fixture
+# reintroduces exactly what the rule removes.
 DDNS = re.compile(
     r"\b[a-z0-9][a-z0-9-]*\.(?:glddns|ddns|dyndns|no-ip|noip|duckdns|afraid|"
     r"changeip|freedns)\.(?:com|net|org|info)\b",
@@ -160,7 +166,7 @@ def test_no_public_ip_described_as_a_personal_connection():
     [
         ("ufw allow from 203.0.113.42/24 to any port 22", UFW_GRANT, "firewall grant"),
         ("User has DDNS (abc123.glddns.com) but UFW is unreliable", DDNS, "dynamic-dns"),
-        ("Attempted to use Cox dynamic IP (203.0.113.7) - not stable", PERSONAL, "personal ip"),
+        ("Attempted to use the home dynamic IP (203.0.113.7) - not stable", PERSONAL, "personal ip"),
     ],
 )
 def test_each_pattern_matches_the_shape_it_claims_to(sample, pattern, rule):

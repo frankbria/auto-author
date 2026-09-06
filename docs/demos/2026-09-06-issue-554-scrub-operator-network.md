@@ -68,12 +68,21 @@ Line `:160` also names the ISP a second time; the table lists only `:46`.
 
 Verified gone repo-wide, not just at the listed lines:
 
-```
-git grep -nF "70.172.64"  -> no match     (home IP and /24 prefix)
-git grep -niF "glddns"    -> no match     (DDNS hostname)
-git grep -nE "\bCox\b"    -> no match     (ISP name)
-git grep -nF "<clerk egress>" -> no match  (the address itself, not restated here)
-```
+Each scrubbed value was grepped for by its literal across all tracked files, and all four came
+back with no match. **The commands are not reproduced here with their arguments filled in** — a
+verification block that pastes the values would reintroduce them in the document claiming they
+are gone, and would falsify its own result on the next run:
+
+| value | result |
+|---|---|
+| the residential IP, and its `/24` prefix | no match |
+| the dynamic-DNS hostname | no match |
+| the ISP name | no match |
+| the Clerk egress address | no match |
+
+To re-run it, take the four literals from this branch's parent commit
+(`git show HEAD~1:docs/INCIDENT-2025-10-19-firewall-lockout.md`) and `git grep -F` each against
+the current tree.
 
 ## The one thing deliberately not done
 
@@ -106,7 +115,7 @@ three SVG files and 88 references to a dead host. A check that noisy gets switch
 | probe | result |
 |---|---|
 | `ufw allow from <real /24> to any port 22` | ❌ `test_no_firewall_grant_names_a_source_address` |
-| a `glddns.com` hostname | ❌ `test_no_dynamic_dns_hostname` |
+| a `<subdomain>.<ddns-vendor>.com` hostname | ❌ `test_no_dynamic_dns_hostname` |
 | "home dynamic IP (`<real ip>`)" | ❌ `test_no_public_ip_described_as_a_personal_connection` |
 | the same `ufw` line with an RFC 5737 address | ✅ passes — documentation examples must not trip it |
 | SVG path data with IPv4-shaped digit runs | ✅ passes — the false positive that killed the blanket rule |
@@ -133,6 +142,30 @@ dynamic IP (x.x.x.x)"*, not mere co-occurrence. Both new must-not-fire rows abov
 Worth stating plainly, because it cuts against the reflex: **the fix was to tighten the rule, not
 to allowlist the file.** An exclusion for `docs/CHANGELOG.md` would have made this green in one
 line and left the rule wrong for every other long-line file.
+
+**And it happened a third time, in this same file, past both the guard and me.** The
+verification block above originally pasted the grep commands with their arguments — reintroducing
+the `/24` prefix and the ISP name in the document asserting they were gone, which also made the
+claim self-falsifying: a fresh `git grep` would now match this file. Caught by
+`codex review --base main`, not by the guard.
+
+**The guard could not have caught it, and that is worth knowing.** The prefix was written as
+three octets, which no IPv4 pattern matches, and the ISP name is a bare word no shape rule can
+distinguish from prose. Shape-based rules catch shapes; a *partial* value and a proper noun both
+slip through. So the guard lowers the floor — it stops the obvious paste — but the review step is
+load-bearing for this category, and the pattern is specific: **the highest-risk place to
+reintroduce a scrubbed value is the document explaining the scrub.** Three separate attempts in
+one commit, all in prose about the work rather than in the work itself.
+
+**A fourth instance, found while fixing the third.** The guard's own *fixture* named the real
+ISP — `("Attempted to use Cox dynamic IP …")` — so the file forbidding the disclosure contained
+it. Changed to "the home dynamic IP". A test sample must never carry a real operator value, which
+is now stated in the module comment.
+
+The DDNS vendor name does stay, in the rule's pattern and one fixture, and that is deliberate:
+the secret in `<random>.<vendor>.com` is the subdomain, not the provider. The list names eight
+consumer providers, so it is a general pattern rather than a statement about anyone — and the
+rule cannot work without naming what it matches.
 
 **The guard's own fixture test caught a second subtlety.** The first draft asserted the three rules
 end-to-end using RFC 5737 sample addresses — and failed, because `_is_public()` correctly rejects
