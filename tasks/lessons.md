@@ -1,5 +1,44 @@
 # Lessons
 
+## Bisect a dep-PR failure FORWARD from a green baseline (2026-09-05, #589)
+- Reverting one suspect at a time out of a failing multi-package PR is worse than useless when the
+  culprit is something you never thought to revert: every run still fails, so each innocent package
+  looks guilty in turn. On #588 this cleared `@testing-library/user-event`, `jest` +
+  `jest-environment-jsdom`, and `@testing-library/jest-dom` 7 across three ~4-minute failing runs and
+  pointed at nothing.
+- Do instead: in a worktree on the PR branch, restore the base branch's exact `package.json` AND
+  `package-lock.json`, `npm ci`, confirm green. That control also proves the failure is the deps and
+  not your environment. Then add packages forward, in halves. Green runs were 1s against 220s failing
+  ones, so forward bisection is both cheap and unambiguous.
+- The culprit can be a package the PR does not list at all. Here it was `nwsapi` 2.2.24 -> 2.2.26,
+  jsdom's CSS selector engine, an unpinned `^2.2.x` transitive (`jest-environment-jsdom -> jsdom ->
+  nwsapi`). #588 only regenerated the lockfile and floated it. **Diff the lockfile, not the PR
+  description.**
+- When the suspect's own source diff looks cosmetic (`jest-environment-jsdom` 30.4.1 -> 30.5.0 was
+  `var` -> `let`), compare resolved TRANSITIVE versions between the two lockfiles instead of diffing
+  the named package.
+- Name the mechanism, don't guess it: monkey-patching `Element.prototype.matches` to count calls showed
+  `:fullscreen` evaluated 29,999,829 times per keypress, with `:modal` triggering ~1000 nested walks.
+  That turns "some perf regression" into a filable upstream report.
+- Fixed with `"nwsapi": "2.2.25"` in `frontend/package.json` `overrides` (#590). No new guard test:
+  `ChapterTab.keyboard.test.tsx` already fails loudly inside the required `Frontend Tests` check the
+  moment `nwsapi` floats, which is how this was caught.
+
+## Verify a dependency fix under the NEW dep set, never the old one (2026-09-05, #571/#583)
+- #571 said ESLint 10 was blocked because `eslint.config.mjs` imported `@eslint/eslintrc` without
+  declaring it. Declaring it and running `npm run lint` under the repo's THEN-current eslint 8 passes —
+  and proves nothing, because the goal was eslint 10.
+- Checked out the Dependabot branch in a worktree, applied the candidate fix there, `npm install`, ran
+  the real gate: it failed immediately with `Converting circular structure to JSON`. `eslint-config-next`
+  16 ships no eslintrc-style config at all, so `FlatCompat` cannot consume it either way. Migrating to
+  native flat config was unavoidable.
+- Two blockers were stacked; fixing the first only exposes the second. ESLint 10 is capped upstream:
+  `eslint-config-next` 16 pulls `eslint-plugin-react@7.37.5` (the latest published), which peers
+  `eslint ^9.7` and still calls the removed `context.getFilename()` (#583).
+- Flat-config gotcha worth 20 minutes: plugin namespaces resolve per file, so a rules-override object
+  with no `files` fails with *could not find plugin "react"*. Each override block must repeat the glob
+  the shared config registered that plugin under.
+
 ## #174 — entitlement gate: frontend error classification has TWO pipelines
 - A backend structured error (`HTTPException(detail=error_response.model_dump())`) surfaces as
   `{detail: {error, error_code, status_code, ...}}` — text is under `detail.error`, NOT `detail.message`.
