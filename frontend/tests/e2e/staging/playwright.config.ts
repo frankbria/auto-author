@@ -29,6 +29,12 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env.CI ? 2 : 0,
 
+  // #551: retries stay on so a genuinely transient failure still yields a trace,
+  // but a test that only passes on retry now fails the job instead of reporting
+  // `1 flaky` and exiting success. The #83 session canary is the spec most likely
+  // to catch an auth-path break; it must not be able to be green-on-retry.
+  failOnFlakyTests: !!process.env.CI,
+
   // Opt out of parallel tests on CI
   workers: process.env.STAGING_E2E_WORKERS ? Number(process.env.STAGING_E2E_WORKERS) : 1, // Single worker by default to avoid session conflicts
 
