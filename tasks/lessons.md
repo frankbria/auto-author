@@ -393,3 +393,38 @@ the registry token and the entire reason the issue was P2, did not run at its ne
 merge-to-`main` build. A workflow that runs on a PR does not necessarily run *the step that
 matters* on a PR: read the step-level `if:` before claiming a path is covered, and check the job's
 step conclusions for `skipped`, not just the job's own green tick.
+
+## 2026-09-06 — the riskiest place to re-leak a scrubbed value is the document explaining the scrub (#554)
+
+Scrubbing the operator's network from a public repo, I reintroduced scrubbed values **three
+times in one commit** — every time in prose *about* the work, never in the work itself:
+
+1. The CHANGELOG entry restated the third-party egress address while describing its removal.
+2. The demo doc's verification block pasted the `git grep` commands with their arguments filled
+   in, putting the `/24` prefix and the ISP name into the document asserting they were gone —
+   and falsifying its own claim, since a fresh grep would then match that file.
+3. The new guard's own test fixture named the real ISP, so the file forbidding the disclosure
+   contained it.
+
+The new guard caught (1). **It could not have caught (2) or (3)**: a `/24` written as three
+octets matches no IPv4 pattern, and an ISP name is a proper noun no shape rule separates from
+prose. Shape-based rules catch shapes — a *partial* value and a proper noun both walk straight
+through. (2) was caught by `codex review`; (3) only by chasing (2).
+
+**Pattern:** after scrubbing a value, grep for it again *after* writing the evidence — the
+changelog entry, the demo doc, the PR body and the guard's fixtures are all part of the same
+commit and none of them existed when the scrub was verified. Write verification blocks as
+*results* ("no match for the residential IP and its prefix") rather than as runnable commands
+with the literals inlined, and say how to reconstruct the literals from the parent commit
+instead.
+
+**Corollary, and the one I nearly got wrong:** fixing (1) revealed that the proximity rule ANDed
+"an IP anywhere on the line" with "the description anywhere on the line" — and a CHANGELOG entry
+in this repo is a single 3000-character line, so prose about the guard matched a placeholder
+mentioned paragraphs away. The tempting fix was an exclusion for `docs/CHANGELOG.md`: one line,
+instantly green. **The right fix was to tighten the rule** to require the two within 60
+characters, which is the relationship it always meant. An allowlist that silences a true
+positive-shaped false positive leaves the rule wrong for every file nobody has tested yet.
+
+Related: [[guard-tests-can-self-match]], and the #518 lesson above on reviewing a guard's *input
+set* separately from its logic.
