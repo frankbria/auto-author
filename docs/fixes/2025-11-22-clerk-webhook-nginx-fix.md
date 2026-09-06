@@ -17,7 +17,7 @@ The nginx proxy configuration for `api.dev.autoauthor.app` was not passing these
 
 From backend logs:
 ```
-2025-11-22 22:26:00,186 - Request started: POST /api/v1/webhooks/clerk from 54.216.8.72
+2025-11-22 22:26:00,186 - Request started: POST /api/v1/webhooks/clerk from <clerk-webhook-source>
 2025-11-22 22:26:00,187 - Request completed: POST /api/v1/webhooks/clerk - Status: 401, Took: 0.81ms
 ```
 

@@ -191,6 +191,44 @@ git fetch origin main && git show origin/main:<file> | grep <dependency>
 Anything closed-but-not-merged whose version is still old on `main` was lost. Recreate it
 as a fresh PR — the original branch is gone.
 
+## This repository is public — what must not be committed
+
+Two categories, two guards, both in the `Security Audit` job:
+
+| Category | Examples | Guard |
+|---|---|---|
+| Staging infrastructure (#544) | managed-cluster hostname, database username | `scripts/test_no_staging_identifiers.py` |
+| The operator's own network (#554) | a firewall grant naming a source prefix, a dynamic-DNS hostname, an address described as a home connection | `scripts/test_no_operator_network_identifiers.py` |
+
+Use placeholders that keep the document readable — `<cluster-host>`, `<db-user>`,
+`<operator-network>`, `<operator-ip>`, `<operator-ddns>`, `<former-prod-host>`. Operator access
+details live in a local, user-scoped runbook outside any repository; reference it obliquely.
+
+**Postmortems are where this leaks.** Both incidents came from an incident or fix document
+pasting real operational output verbatim — a `ufw` command, an access-log line, a connection
+string — because at the time the value *was* the evidence. Paraphrase the evidence or replace the
+identifier; the reasoning is what the document is for.
+
+**A dynamic-DNS hostname is worse than a stale IP**, which is the counter-intuitive one. A
+residential address from a year ago has almost certainly been reassigned. A DDNS hostname still
+resolves, so it is a live pointer to whatever connection it was set up for.
+
+**Neither guard names a forbidden value**, and that constraint is load-bearing: a denylist for
+this category would have to embed the strings it exists to exclude, re-committing them in the
+file that forbids them. `test_no_staging_identifiers.py` matches a `*.mongodb.net` *shape* with
+an exact-value allowlist for known-synthetic examples; `test_no_operator_network_identifiers.py`
+matches shape plus surrounding words. Its fixtures use RFC 5737 documentation addresses.
+
+**Do not widen either to a blanket public-IPv4 rule.** It was tried and rejected: this repo's
+`frontend/public/*.svg` path data contains digit runs that parse as IPv4, and there are ~88
+tracked references to a decommissioned host. A noisy check gets switched off, which is worse than
+no check.
+
+**Scrubbing the working tree does not rewrite history.** Both issues chose *rotate and accept*
+over `git filter-repo`: on a public repo the values are already in every clone and may be mirrored
+or indexed, so a force-push breaks every clone and open PR while buying little. Treat anything
+that was committed as burned — the guards exist to prevent the next one, not to undo the last.
+
 ## GitHub Actions are pinned to commit SHAs
 
 Every `uses:` in `.github/workflows/*.yml` references a **40-character commit SHA**, with the

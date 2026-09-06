@@ -3,7 +3,7 @@
 **Date**: 2025-10-19
 **Severity**: Critical
 **Status**: Awaiting Console Recovery
-**Affected System**: ClawCloud Production Server (47.88.89.175)
+**Affected System**: ClawCloud Production Server (`<former-prod-host>`)
 
 ---
 
@@ -18,7 +18,7 @@ Attempted to restrict SSH access via UFW firewall rules, but deleted all existin
 1. **19:55** - Started firewall security task (bd-13)
 2. **19:56** - Backed up UFW rules successfully
 3. **19:57** - Deleted unrestricted SSH rules (1, 3, 2, 4) sequentially
-4. **19:58** - Attempted to add restricted rule: `ufw allow from 70.172.64.0/24 to any port 22`
+4. **19:58** - Attempted to add restricted rule: `ufw allow from <operator-network>/24 to any port 22`
 5. **19:58** - Connection lost mid-command
 6. **20:01** - Confirmed lockout - unable to reconnect via SSH
 
@@ -43,8 +43,8 @@ ufw delete [old rules]  # Remove old rules AFTER
 
 ## Additional Contributing Factors
 
-1. **Dynamic IP Address**: Attempted to use Cox dynamic IP (70.172.64.212) - not a stable long-term solution
-2. **DDNS Limitations**: User has DDNS (uf06b2c.glddns.com) but UFW doesn't reliably support hostnames
+1. **Dynamic IP Address**: Attempted to use a dynamic residential IP (`<operator-ip>`) - not a stable long-term solution
+2. **DDNS Limitations**: User has a dynamic-DNS hostname (`<operator-ddns>`) but UFW doesn't reliably support hostnames
 3. **No VPN Alternative**: Tailscale considered but rejected for production environments
 
 ---
@@ -157,7 +157,7 @@ at now + 5 minutes <<< "ufw disable && ufw enable"
 
 ## Lessons Learned
 
-1. ❌ **Don't use dynamic IPs for firewall rules** - Cox assigns dynamic IPs that change
+1. ❌ **Don't use dynamic IPs for firewall rules** - residential ISPs assign dynamic IPs that change
 2. ❌ **Don't rely on DDNS for UFW** - Hostname resolution is unreliable in firewalls
 3. ❌ **Don't delete before adding** - Always add new rules before removing old ones
 4. ✅ **Do use authentication hardening** - More reliable than IP restrictions for production
