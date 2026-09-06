@@ -38,11 +38,20 @@ WORKFLOWS = REPO / ".github" / "workflows"
 USES = re.compile(r"^\s*-?\s*uses:\s*([^\s#]+)")
 SHA_PINNED = re.compile(r"@[0-9a-f]{40}$")
 
-# Only `*.yml` — the two `.disabled` PM2 files (#520) never execute, so pinning
-# them would be theatre. Renaming one back to `.yml` to reactivate it is exactly
-# when it must be pinned, and that rename is what puts it in scope here.
+# BOTH extensions. GitHub runs `.yml` and `.yaml` alike, so globbing only `.yml`
+# would leave a silent bypass: a future workflow named `.yaml` executes with the
+# repo's credentials while passing a check that never looked at it. Every file
+# here happens to be `.yml` today, which is exactly why the omission would not
+# have shown up as a failure.
+#
+# The two `.disabled` PM2 files (#520) are excluded because they never execute,
+# so pinning them would be theatre. Renaming one back to a live extension to
+# reactivate it is exactly when it must be pinned, and that rename is what puts
+# it in scope here.
 def _workflow_files():
-    return sorted(WORKFLOWS.glob("*.yml"))
+    return sorted(
+        p for ext in ("*.yml", "*.yaml") for p in WORKFLOWS.glob(ext)
+    )
 
 
 def _uses_refs(path):

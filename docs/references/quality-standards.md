@@ -230,8 +230,10 @@ already covers `github-actions` at `/`. The one trade: its PRs become SHA diffs 
 diffs, so the release notes in the PR body are the primary review artifact.
 
 `scripts/test_actions_are_sha_pinned.py` enforces all of this in the `Security Audit` job, and
-fails with the resolve commands above in the message. The two `.disabled` PM2 workflows (#520)
-are out of scope — they never execute; renaming one back to `.yml` is what puts it in scope.
+fails with the resolve commands above in the message. It scans **both `.yml` and `.yaml`** —
+GitHub runs either, so checking only one extension would leave a silent bypass. The two
+`.disabled` PM2 workflows (#520) are out of scope because they never execute; renaming one back
+to a live extension is what puts it in scope.
 
 ## Staging secrets
 

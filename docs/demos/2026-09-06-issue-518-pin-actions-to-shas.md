@@ -64,9 +64,17 @@ pass by not being seen:
 | `docker/login-action` reverted to `@v4` | ❌ `test_every_action_is_pinned_to_a_commit_sha[build-images.yml]` |
 | `codecov/codecov-action` version comment stripped | ❌ `test_every_pin_carries_a_version_comment[tests.yml]` |
 | guard repointed at a non-existent directory | ❌ `test_there_are_workflows_to_check` |
+| unpinned `zz-probe.**yaml**` dropped in | ❌ `test_every_action_is_pinned_to_a_commit_sha[zz-probe.yaml]` |
 
 The third is the one that matters most: without it, a rename or a moved directory turns every
 other assertion vacuously green, and a passing check gets read as evidence.
+
+**The fourth row is a bug the reviewer found, not one I planned for.** The first version of
+the guard globbed `*.yml` only. GitHub executes `.yaml` just as happily, so a future workflow
+named that way would have run with the repo's credentials while passing a check that never
+looked at it — a bypass in the very policy this issue introduces. Every workflow here is `.yml`
+today, which is precisely why the omission could not have surfaced as a failure. Caught by
+`codex review --base main`; the guard now globs both.
 
 **The guard found a real gap on its first run.** `glm-review.yml` was SHA-pinned but carried no
 inline version anchor — its provenance lived only in a prose comment two lines above. It now
