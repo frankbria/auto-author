@@ -88,9 +88,40 @@ with a version token, so the comment was reordered instead.
 |---|---|---|---|
 | 1 | Every third-party `uses:` pinned to a full commit SHA with a version comment | 26 references, 10 actions; `grep -rhn "uses:" .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null \| grep -vE "@[0-9a-f]{40}"` returns nothing | ✅ |
 | 2 | Each SHA verified against the tag it claims | Table above — resolved tag → commit *and* commit → tags, with the one annotated tag dereferenced | ✅ |
-| 3 | `Build Images` green, both build jobs | `build-images.yml` triggers on PRs touching itself, so both matrix jobs (`backend`, `frontend`) run on this PR — see checks | ✅ |
+| 3 | `Build Images` green, both build jobs | Both matrix jobs pass on the PR, and the runner resolved and downloaded **all five pinned SHAs** — see the caveat below | ⚠️ |
 | 4 | Dependabot still opens update PRs against the pinned SHAs | **Cannot be verified pre-merge** — needs the next weekly sweep. See below. | ⏳ |
 | 5 | Policy recorded so new workflows start pinned | `docs/references/quality-standards.md` → *GitHub Actions are pinned to commit SHAs*, plus the guard, which is the enforcing half | ✅ |
+
+## AC3 caveat: the PR run does not exercise the push path
+
+`build-images.yml` does run on this PR — it triggers on PRs touching itself — and both matrix
+jobs pass. The runner's own log is the useful evidence, because it proves each pin is a
+resolvable reference rather than a plausible-looking typo:
+
+```
+Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
+Download action repository 'docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e'
+Download action repository 'docker/login-action@dbcb813823bdd20940b903addbd779551569679f'
+Download action repository 'docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302'
+Download action repository 'docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a'
+```
+
+**But two steps are skipped on a pull request**, by design — the workflow publishes only from
+`main`:
+
+| step | PR | reason |
+|---|---|---|
+| Log in to GHCR | ⏭ skipped | `if: github.event_name != 'pull_request'` |
+| Build and push | ✅ ran, `push: false` | `push: ${{ github.event_name != 'pull_request' }}` |
+| Smoke test the built image | ⏭ skipped | nothing was published to pull |
+
+So the PR proves the pins resolve, and that checkout, buildx, metadata and the *build* half of
+`build-push-action` work at those commits. It does **not** exercise `docker/login-action` at its
+new pin, which is the single action with the most authority in this repo — precisely the one the
+issue is about. That runs first on the merge-to-`main` build.
+
+The 13–24s job times are the `type=gha` layer cache doing its job, not the build being skipped:
+`Build and push` reports `success`, not `skipped`.
 
 ## Known limitation: AC4 is a prediction until the next sweep
 
