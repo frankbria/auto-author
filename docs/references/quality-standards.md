@@ -118,7 +118,8 @@ advisory patch still lands alone and fast.
 
 Measured on the first live sweep after #517 landed (2026-08-26), which supersedes the
 pre-merge `dependabot/cli` estimates in `docs/demos/` — those used a more permissive job
-config and overcounted:
+config and overcounted. Four sweeps through 2026-09-05 held the same shape, and the
+self-close audit over all nine closed-unmerged PRs came back clean (#539):
 
 | | before | after |
 |---|---:|---:|
@@ -129,10 +130,34 @@ group carrying 26 — and `openai` 2.45.0 → 3.0.0 plus `pytest` 8.4.1 → 9.1.
 own, which is the design working.
 
 **A note on `dependency-type`:** it classifies *direct* dependencies only. That has no
-practical effect here, because Dependabot only opens PRs for direct npm dependencies in
-the first place — a pre-merge harness run suggested an "indirect residue" of extra solo
-PRs, but that was an artefact of running the job with `allowed-updates: all`, and the
-live sweep produced none. The `uv` group sets no `dependency-type` at all.
+practical effect on **version** updates, because Dependabot only opens those for direct
+npm dependencies in the first place — a pre-merge harness run suggested an "indirect
+residue" of extra solo PRs, but that was an artefact of running the job with
+`allowed-updates: all`, and no live sweep has produced one. The `uv` group sets no
+`dependency-type` at all.
+
+**Security updates are the other lane, and they do reach indirect dependencies (#539).**
+They are driven by advisories rather than by `dependabot.yml`, and `applies-to` defaults
+to version-updates, so no group can absorb one: every advisory arrives as its own PR.
+That default is the one we want — an advisory patch lands alone and fast. Three such PRs
+landed in ten days, all on packages in neither `package.json` section: `fast-uri` (#570),
+`postcss-selector-parser` (#578), `minimatch` (#586).
+
+**`open-pull-requests-limit` counts version updates only.** GitHub's options reference is
+explicit: *"security update pull requests are not subject to this limit and do not count
+toward it. There is no limit on the number of open pull requests for security updates."*
+So a moment with five open Dependabot PRs is not necessarily a moment at the cap — check
+which of them are advisory-driven before reading it as pressure on the limit.
+
+**npm's limit is 10, `uv` and `github-actions` stay at 5 — headroom, not a fix.** Peak
+concurrent npm *version-update* PRs across the four sweeps in #539 was **4 of 5**
+(2026-09-04: three groups + `better-auth`); nothing was truncated, and `uv` and
+`github-actions` never exceeded 2. But the three npm groups are fixed overhead in every
+sweep, leaving two slots for everything this config deliberately forces solo —
+`better-auth`, prod majors, build-toolchain majors — and one sweep where those coincide
+exhausts them. Dependabot does not announce a PR it declined to open, so a suppressed bump
+looks exactly like no bump being available. Grouping already caps the volume the limit was
+protecting against, so the extra slots cost nothing.
 
 `scripts/test_dependabot_config.py` pins both halves and runs in the `Security Audit`
 job. If you widen a group back to majors, that check fails with the reason.

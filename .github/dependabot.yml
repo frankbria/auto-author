@@ -10,7 +10,23 @@ updates:
     directory: "/frontend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    # 10, not the default 5 — headroom, not a fix for an observed truncation (#539).
+    # This limit governs VERSION updates only: per GitHub's options reference,
+    # "security update pull requests are not subject to this limit and do not count
+    # toward it", and there is no limit on those at all.
+    #
+    # Measured over four sweeps, 2026-08-26..09-05: peak concurrent npm version-update
+    # PRs was 4 of 5, at 2026-09-04T07:34Z — #567, #572, #573 (the three groups) plus
+    # #574 (better-auth). Nothing was truncated. But the three groups are fixed
+    # overhead in every sweep, so 5 leaves exactly two slots for everything this file
+    # deliberately forces solo: better-auth, production majors, and the
+    # build-toolchain majors. One sweep where a prod major coincides with better-auth
+    # and a tailwindcss/postcss major exhausts them, and Dependabot does not announce
+    # a PR it declined to open — a suppressed bump looks identical to no bump
+    # available, which is #504's "up-to-date now" ambiguity arriving by silence.
+    # Grouping already caps the volume this limit was protecting against, so the
+    # number costs nothing.
+    open-pull-requests-limit: 10
     cooldown:
       default-days: 14
       semver-major-days: 14
@@ -83,6 +99,15 @@ updates:
     # was an artefact of running the job with `allowed-updates: all`: Dependabot
     # only opens PRs for direct npm dependencies to begin with, and the first live
     # sweep produced no such residue. No catch-all group is needed.
+    #
+    # That holds for *version* updates only (#539). Dependabot **security** updates
+    # are a separate lane: driven by advisories rather than by this file, reaching
+    # indirect dependencies, and unabsorbable by any group above because `applies-to`
+    # defaults to version-updates. Every one arrives as its own PR, and none of them
+    # counts against `open-pull-requests-limit`. Observed 2026-09-03..05: fast-uri
+    # #570, postcss-selector-parser #578 and minimatch #586, all three indirect. So
+    # the residue is real — but it is not what makes the limit tight, and reading a
+    # security PR as a filled slot overstates the pressure on it.
 
     ignore:
       # @types/node must track the Node we actually run, not the newest release.
