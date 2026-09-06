@@ -23,7 +23,7 @@ jobs:
        github.event.pull_request.deletions >= 20)
     # Pinned to an immutable SHA (main @ 2026-07-10, verified on hai-sh#75) so
     # upstream pushes can't silently change the code that receives ZHIPU_API_KEY
-    uses: frankbria/glm-review/.github/workflows/review.yml@b877d15a0f8c0855d0d2ebdcce32ae09cec1bb2d
+    uses: frankbria/glm-review/.github/workflows/review.yml@b877d15a0f8c0855d0d2ebdcce32ae09cec1bb2d # 2026-07-10 (main; no tags upstream)
     permissions:
       contents: read
       pull-requests: write
