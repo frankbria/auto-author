@@ -1,5 +1,6 @@
 import { test as base, Page, expect } from '@playwright/test';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 /**
@@ -68,14 +69,17 @@ async function loginToStaging(page: Page): Promise<void> {
   // Wait for redirect to dashboard (indicates successful login)
   try {
     await page.waitForURL(/\/dashboard/, { timeout: SIGN_IN_TIMEOUT_MS });
-  } catch {
+  } catch (error) {
     // A bare navigation timeout says nothing about *why* sign-in stalled — the
     // page's own error alert does (rate limit, bad credentials, backend down).
     // Surfacing it here is what turned #551 from a mystery into a one-line
-    // diagnosis.
+    // diagnosis. The original error is chained, not discarded: this catch also
+    // sees non-timeout failures (closed context, browser crash) whose stack is
+    // the only thing that identifies them.
     throw new Error(
       `Sign-in did not reach /dashboard within ${SIGN_IN_TIMEOUT_MS}ms. ` +
-      `${await readSignInError(page)}`
+      `${await readSignInError(page)}`,
+      { cause: error }
     );
   }
 
@@ -128,11 +132,12 @@ export const test = base.extend<AuthFixtures, AuthWorkerFixtures>({
   // Sign in once per worker and hand every test the saved session.
   workerStorageState: [
     async ({ browser }, use, workerInfo) => {
-      const statePath = path.join(
-        workerInfo.project.outputDir,
-        `.auth-worker-${workerInfo.workerIndex}.json`
-      );
-      fs.mkdirSync(path.dirname(statePath), { recursive: true });
+      // Deliberately NOT under `project.outputDir`: that tree is uploaded whole
+      // as a CI artifact from a public repo, and this file holds a live, unexpired
+      // `__Secure-better-auth.session_token`. It belongs somewhere nothing
+      // collects. (See #599 for the same class of leak via failure snapshots.)
+      const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aa-staging-auth-'));
+      const statePath = path.join(stateDir, `worker-${workerInfo.workerIndex}.json`);
 
       // newContext() does not inherit `use.baseURL` from the project, so the
       // relative goto() in loginToStaging needs it passed explicitly.
@@ -146,7 +151,11 @@ export const test = base.extend<AuthFixtures, AuthWorkerFixtures>({
         await context.close();
       }
 
-      await use(statePath);
+      try {
+        await use(statePath);
+      } finally {
+        fs.rmSync(stateDir, { recursive: true, force: true });
+      }
     },
     { scope: 'worker' },
   ],

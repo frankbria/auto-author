@@ -35,8 +35,11 @@ export default defineConfig({
   // to catch an auth-path break; it must not be able to be green-on-retry.
   failOnFlakyTests: !!process.env.CI,
 
-  // Opt out of parallel tests on CI
-  workers: process.env.STAGING_E2E_WORKERS ? Number(process.env.STAGING_E2E_WORKERS) : 1, // Single worker by default to avoid session conflicts
+  // Opt out of parallel tests on CI. Single worker by default to avoid session
+  // conflicts; capped at 3 because each worker signs in once at startup and
+  // better-auth allows only 3 `/sign-in*` requests per 10s per IP (#551). A 4th
+  // worker would 429 its own bootstrap before a single test ran.
+  workers: Math.min(3, Number(process.env.STAGING_E2E_WORKERS) || 1),
 
   // Reporter to use
   reporter: [

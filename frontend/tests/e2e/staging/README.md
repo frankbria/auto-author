@@ -114,6 +114,15 @@ IP**, and the window only resets after 10s of silence. One sign-in per test mean
 partway through the run. If you add a spec that needs a *fresh* sign-in, do it
 inside the test rather than by widening the fixture, and keep the pacing in mind.
 
+Two consequences worth knowing before you write a spec:
+
+- **Never sign out.** The session is shared by every test in the worker, so a spec that
+  signs out revokes it server-side and every later test in that worker 401s with no
+  obvious cause. Clearing cookies is fine — that only touches the calling test's own
+  context, which is why `edge-cases.spec.ts`'s session-expiration test still works.
+- **Workers are capped at 3.** Each worker signs in once at startup, so a 4th worker
+  would 429 its own bootstrap. `STAGING_E2E_WORKERS` is clamped in the config.
+
 ### Test organization
 
 - `complete-user-journey.spec.ts` - Full workflow from start to finish
