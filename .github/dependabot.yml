@@ -125,7 +125,7 @@ updates:
         update-types: ["version-update:semver-major"]
 
       # Two majors already triaged as blocked. Without these they open a solo PR
-      # every sweep that can never go green, each holding one of the five slots —
+      # every sweep that can never go green, each holding one of the PR slots above —
       # and while typescript sits in the frontend-dev group, that PR is the whole
       # batch (#548 is exactly this: six fine minor/patch updates that cannot land
       # because two majors in the same PR do not install). Remove each entry when

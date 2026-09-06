@@ -109,7 +109,7 @@ fail `npm install` alone and only resolve together. Forcing them solo would stra
 permanently-unmergeable PRs.
 
 **A blocked major belongs in `ignore`, not left to churn.** A major that cannot install
-reopens every sweep, holds one of the five PR slots, and — while it sits inside a group —
+reopens every sweep, holds one of the ecosystem's PR slots, and — while it sits inside a group —
 takes the whole batch down with it. `typescript` (#514) and `tailwindcss` (#513) are
 ignored at semver-major for exactly this reason; each entry names the issue whose
 closure removes it. Check that list before assuming a bump is not being offered.
