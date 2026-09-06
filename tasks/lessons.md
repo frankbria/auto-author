@@ -328,3 +328,39 @@ shape*, not the status. And when a required check is flaky, it is not merely ann
 `strict: true` is a treadmill: #564→#575→#579, #569→#573→#581, #568→#572→#580 all superseded
 themselves mid-session. Triage the *delta* against the superseded PR rather than re-reviewing from
 scratch, and keep the tracking issue on the blocker (#571), never on an individual reroll.
+
+## 2026-09-06 — a concurrency count is not a cap hit until you know what the cap counts (#539)
+
+Verifying #517's grouping config, peak-concurrency over every Dependabot PR's
+`createdAt`/`closedAt` showed npm at **5 open against `open-pull-requests-limit: 5`**. That is a
+clean, arithmetically correct number, it lined up with a plausible story (three groups are fixed
+overhead, so the limit is structurally tight), and it explained an anomaly — a `minimatch`
+advisory open since 2026-08-11 whose PR appeared 2026-09-05 minutes after a slot freed. The
+config change, the demo document, `quality-standards.md` and the CHANGELOG entry were all written
+and committed on that reading.
+
+It was wrong. GitHub's Dependabot options reference:
+
+> Security update pull requests are not subject to this limit and do not count toward it. There is
+> no limit on the number of open pull requests for security updates.
+
+One of the five was advisory-driven. The real version-update peak is **4 of 5**, nothing was
+truncated, and the `minimatch` timing coincidence had no mechanism behind it — a security PR could
+never have been queued behind a full slot list. Four files had to be rewritten.
+
+**Pattern:** before reading a measurement against a threshold, read the threshold's own definition
+— specifically *which population it counts*. Every number here was right; the denominator was
+assumed. The tell was available in advance and ignored: the same investigation had just
+established that security updates are a separate lane that no group can absorb, which should have
+prompted "separate from grouping — separate from the limit too?" A finding that arrives with a
+satisfying causal story attached deserves more scepticism than one that does not, because the
+story suppresses exactly that question.
+
+Two pre-existing repo claims failed the same way and are now corrected: #536 argued urgency from
+"the limit is saturated so a security update cannot open", and the sweep-1 note on #539 read the
+limit as untested. Both were reasoning about the wrong population.
+
+**Corollary for verification issues:** the deliverable is the *observation*, so an unfalsifiable
+✅ is worse than a ❌. "Nothing was truncated" is inferred from staying under the cap, not read
+from a Dependabot log — Dependabot never announces a PR it declined to open. Say which of the two
+you have.
