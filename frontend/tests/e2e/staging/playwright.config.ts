@@ -36,10 +36,12 @@ export default defineConfig({
   failOnFlakyTests: !!process.env.CI,
 
   // Opt out of parallel tests on CI. Single worker by default to avoid session
-  // conflicts; capped at 3 because each worker signs in once at startup and
-  // better-auth allows only 3 `/sign-in*` requests per 10s per IP (#551). A 4th
-  // worker would 429 its own bootstrap before a single test ran.
-  workers: Math.min(3, Number(process.env.STAGING_E2E_WORKERS) || 1),
+  // conflicts; clamped to 1..2 because each worker signs in once at startup and
+  // better-auth allows only 3 `/sign-in*` requests per 10s per IP (#551). Three
+  // would fit but leave zero headroom: if Playwright replaces a crashed worker
+  // mid-run, its bootstrap is a 4th sign-in inside the same window and 429s.
+  // The clamp also absorbs a mistyped dispatch input (`0`, `-2`, `2.5`, `abc`).
+  workers: Math.max(1, Math.min(2, Math.round(Number(process.env.STAGING_E2E_WORKERS) || 1))),
 
   // Reporter to use
   reporter: [

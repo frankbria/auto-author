@@ -120,8 +120,10 @@ Two consequences worth knowing before you write a spec:
   signs out revokes it server-side and every later test in that worker 401s with no
   obvious cause. Clearing cookies is fine — that only touches the calling test's own
   context, which is why `edge-cases.spec.ts`'s session-expiration test still works.
-- **Workers are capped at 3.** Each worker signs in once at startup, so a 4th worker
-  would 429 its own bootstrap. `STAGING_E2E_WORKERS` is clamped in the config.
+- **Workers are clamped to 1–2.** Each worker signs in once at startup, so a 4th worker
+  would 429 its own bootstrap. The ceiling is 2 rather than 3 to leave one slot spare:
+  if Playwright replaces a crashed worker mid-run, that replacement's sign-in lands
+  inside the same 10s window. `STAGING_E2E_WORKERS` is clamped in the config.
 
 ### Test organization
 
