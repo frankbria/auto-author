@@ -364,3 +364,32 @@ limit as untested. Both were reasoning about the wrong population.
 ✅ is worse than a ❌. "Nothing was truncated" is inferred from staying under the cap, not read
 from a Dependabot log — Dependabot never announces a PR it declined to open. Say which of the two
 you have.
+
+## 2026-09-06 — a guard is code, and its blind spots are not testable by running it (#518)
+
+Pinning every Action to a commit SHA came with `scripts/test_actions_are_sha_pinned.py` to stop
+the policy decaying. The guard globbed `.github/workflows/*.yml`. **GitHub executes `.yaml`
+too**, so a future workflow named that way would have run with the repo's credentials while
+passing a check that never looked at it — a bypass in the very policy the guard existed to
+enforce.
+
+Every workflow in this repo is `.yml`. The guard was mutation-checked three ways before review —
+revert a pin, strip a version comment, point it at an empty directory — and **all three passed,
+because none of them could express the gap**. A mutation test proves the guard catches the
+failure you thought of. It says nothing about the input class you never enumerated. `codex
+review` found it by reading line 45, not by running anything.
+
+**Pattern:** when the deliverable is a check, review its *input set* separately from its logic —
+what does it glob, what does it skip, what extension/path/case would slip past — and treat that
+as a distinct question from "does it fail when I break something". For file-scanning guards the
+recurring blind spots are alternate extensions (`.yml`/`.yaml`), case, symlinks, and any path
+filter added "for noise". Related: [[guard-tests-can-self-match]], where the guard's blind spot
+was itself.
+
+**Second, smaller correction from the same PR.** The PR body claimed both image-build jobs
+"exercise the new pins pre-merge". They resolve and download all five, but `Log in to GHCR` is
+gated on `github.event_name != 'pull_request'` — so `docker/login-action`, the one action holding
+the registry token and the entire reason the issue was P2, did not run at its new pin until the
+merge-to-`main` build. A workflow that runs on a PR does not necessarily run *the step that
+matters* on a PR: read the step-level `if:` before claiming a path is covered, and check the job's
+step conclusions for `skipped`, not just the job's own green tick.
