@@ -191,6 +191,48 @@ git fetch origin main && git show origin/main:<file> | grep <dependency>
 Anything closed-but-not-merged whose version is still old on `main` was lost. Recreate it
 as a fresh PR — the original branch is gone.
 
+## GitHub Actions are pinned to commit SHAs
+
+Every `uses:` in `.github/workflows/*.yml` references a **40-character commit SHA**, with the
+human-readable version in a trailing comment:
+
+```yaml
+- uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+```
+
+**A tag is not a pin — including a full `vX.Y.Z` one.** `actions/setup-node@v7.0.0` looks
+specific and is exactly as mutable as `@v7`; any tag can be force-moved to a different commit
+by the upstream owner, or by anyone who compromises that account, and every subsequent run
+executes the new code with no diff, no PR and no notification. Only the SHA is immutable.
+
+`build-images.yml` is why this matters most: `docker/login-action` receives the registry token
+and `build-push-action` publishes the images `deploy-staging-containers.yml` later pulls and
+runs on the box. A repointed tag there is a direct path from an upstream compromise to a
+malicious image running on staging. The repo already accepted this argument once — `glm-review.yml`
+pins the reusable workflow that receives `ZHIPU_API_KEY` — and #518 made it the rule, because a
+pin that only some workflows follow gets un-followed by the next workflow someone adds.
+
+**Resolving a tag correctly.** The trap is annotated tags, where the ref points at a *tag
+object* rather than the commit:
+
+```bash
+gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq '.object.sha, .object.type'
+# .object.type == "tag"  -> ANNOTATED, dereference it:
+gh api repos/<owner>/<repo>/git/tags/<sha> --jq '.object.sha'
+```
+
+Of the ten actions pinned in #518, `codecov/codecov-action` was the one annotated tag. Pinning
+its tag-object SHA would have produced a reference that resolves to nothing.
+
+**Dependabot maintains these.** Its `github-actions` ecosystem updates SHA pins *and* rewrites
+the version comment, so pinning costs no recurring manual work — `.github/dependabot.yml`
+already covers `github-actions` at `/`. The one trade: its PRs become SHA diffs instead of tag
+diffs, so the release notes in the PR body are the primary review artifact.
+
+`scripts/test_actions_are_sha_pinned.py` enforces all of this in the `Security Audit` job, and
+fails with the resolve commands above in the message. The two `.disabled` PM2 workflows (#520)
+are out of scope — they never execute; renaming one back to `.yml` is what puts it in scope.
+
 ## Staging secrets
 
 Application secrets live in `/opt/auto-author/.env` **on the box**, not in GitHub.
