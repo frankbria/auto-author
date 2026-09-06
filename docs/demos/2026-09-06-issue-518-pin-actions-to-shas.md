@@ -56,7 +56,7 @@ commit as easily as `vX`. Specificity is not immutability.
 job. Three rules: every `uses:` is SHA-pinned, every pin carries a version comment, and every
 workflow still parses as YAML.
 
-**Mutation-checked three ways, with the guard staged (`git add`) first** — an unstaged guard can
+**Mutation-checked four ways, with the guard staged (`git add`) first** — an unstaged guard can
 pass by not being seen:
 
 | mutation | result |
@@ -86,7 +86,7 @@ with a version token, so the comment was reordered instead.
 
 | # | Criterion | Evidence | |
 |---|---|---|---|
-| 1 | Every third-party `uses:` pinned to a full commit SHA with a version comment | 26 references, 10 actions; `grep -rn "uses:" .github/workflows/*.yml \| grep -vE "@[0-9a-f]{40}"` returns nothing | ✅ |
+| 1 | Every third-party `uses:` pinned to a full commit SHA with a version comment | 26 references, 10 actions; `grep -rhn "uses:" .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null \| grep -vE "@[0-9a-f]{40}"` returns nothing | ✅ |
 | 2 | Each SHA verified against the tag it claims | Table above — resolved tag → commit *and* commit → tags, with the one annotated tag dereferenced | ✅ |
 | 3 | `Build Images` green, both build jobs | `build-images.yml` triggers on PRs touching itself, so both matrix jobs (`backend`, `frontend`) run on this PR — see checks | ✅ |
 | 4 | Dependabot still opens update PRs against the pinned SHAs | **Cannot be verified pre-merge** — needs the next weekly sweep. See below. | ⏳ |
