@@ -106,6 +106,25 @@ test('my test', async ({ authenticatedPage }) => {
 });
 ```
 
+The fixture signs in **once per worker** and shares the saved storage state with
+every test in that worker — it does not sign in per test. That is deliberate
+(#551): better-auth rate-limits any `/sign-in*` path at **3 requests per 10s per
+IP**, and the window only resets after 10s of silence. One sign-in per test meant
+11 sign-ins from a single CI IP at 2–6s spacing, which reliably tripped the limit
+partway through the run. If you add a spec that needs a *fresh* sign-in, do it
+inside the test rather than by widening the fixture, and keep the pacing in mind.
+
+Two consequences worth knowing before you write a spec:
+
+- **Never sign out.** The session is shared by every test in the worker, so a spec that
+  signs out revokes it server-side and every later test in that worker 401s with no
+  obvious cause. Clearing cookies is fine — that only touches the calling test's own
+  context, which is why `edge-cases.spec.ts`'s session-expiration test still works.
+- **Workers are clamped to 1–2.** Each worker signs in once at startup, so a 4th worker
+  would 429 its own bootstrap. The ceiling is 2 rather than 3 to leave one slot spare:
+  if Playwright replaces a crashed worker mid-run, that replacement's sign-in lands
+  inside the same 10s window. `STAGING_E2E_WORKERS` is clamped in the config.
+
 ### Test organization
 
 - `complete-user-journey.spec.ts` - Full workflow from start to finish
@@ -210,11 +229,24 @@ test('Issue #54: Question answers persist after page refresh', async ({ authenti
 
 ### Flaky tests
 
+**The job fails on flaky.** `failOnFlakyTests` is on under CI, so a test that
+fails its first attempt and passes on retry turns the run red instead of
+reporting `1 flaky` and exiting `success`. Retries (`retries: 2`) stay on so the
+retry still produces a trace — they buy diagnostics, not a green tick.
+
+This was decided in #551. The `regressions.spec.ts` #83 session canary is the
+spec most likely to catch an auth-path break; while `flaky` counted as success, a
+real regression that broke first-attempt sign-in looked exactly like the status
+quo and still reported green.
+
 If a test fails intermittently:
 1. Add explicit waits for elements/conditions
 2. Increase timeouts if operations are slow
 3. Use `waitForCondition` instead of arbitrary timeouts
 4. Check for race conditions in test
+5. Check whether you are tripping the better-auth sign-in rate limit (3 per 10s
+   per IP) — the symptom is a 30s navigation timeout with "Too many attempts.
+   Please try again later" on the sign-in page
 
 ## Resources
 

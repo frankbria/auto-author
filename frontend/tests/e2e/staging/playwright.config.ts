@@ -29,8 +29,19 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env.CI ? 2 : 0,
 
-  // Opt out of parallel tests on CI
-  workers: process.env.STAGING_E2E_WORKERS ? Number(process.env.STAGING_E2E_WORKERS) : 1, // Single worker by default to avoid session conflicts
+  // #551: retries stay on so a genuinely transient failure still yields a trace,
+  // but a test that only passes on retry now fails the job instead of reporting
+  // `1 flaky` and exiting success. The #83 session canary is the spec most likely
+  // to catch an auth-path break; it must not be able to be green-on-retry.
+  failOnFlakyTests: !!process.env.CI,
+
+  // Opt out of parallel tests on CI. Single worker by default to avoid session
+  // conflicts; clamped to 1..2 because each worker signs in once at startup and
+  // better-auth allows only 3 `/sign-in*` requests per 10s per IP (#551). Three
+  // would fit but leave zero headroom: if Playwright replaces a crashed worker
+  // mid-run, its bootstrap is a 4th sign-in inside the same window and 429s.
+  // The clamp also absorbs a mistyped dispatch input (`0`, `-2`, `2.5`, `abc`).
+  workers: Math.max(1, Math.min(2, Math.round(Number(process.env.STAGING_E2E_WORKERS) || 1))),
 
   // Reporter to use
   reporter: [
