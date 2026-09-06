@@ -428,3 +428,50 @@ positive-shaped false positive leaves the rule wrong for every file nobody has t
 
 Related: [[guard-tests-can-self-match]], and the #518 lesson above on reviewing a guard's *input
 set* separately from its logic.
+
+## 2026-09-06 — a repeatable number is not a slow path, it is a limit (#551)
+
+The #83 staging canary failed its first attempt on every run at 32.4–32.7s and passed on retry.
+The issue reasoned from that to cold-path latency — Next.js route JIT, better-auth's first Atlas
+round trip, the Mongo connect retry loop — and then honestly recorded a fact that killed its own
+theory: one run was still slow 33 minutes after deploy.
+
+The tell was in the number's *stability*, not its size. A cold start is a distribution; three
+runs landing within 0.3s of each other across two different deployed images is a **threshold**.
+The actual cause was better-auth's built-in `/sign-in*` rule — window 10s, max 3 per IP — with a
+counter that resets only after 10s of silence. The fixture signed in once per test, so 11
+sign-ins at 2–6s spacing tripped it on the 8th, every run, deterministically.
+
+**Pattern:** when a "flaky" timing reproduces to a tenth of a second, stop theorising about
+latency and go read the artifact. The answer was sitting in `error-context.md` — the page
+snapshot showed the sign-in form displaying "Too many attempts. Please try again later." One
+artifact download would have replaced the entire cold-start hypothesis. Also: the *successful*
+samples in the same log are free evidence. Seven sign-ins at 0.9–1.1s, including the first one
+27s into a fresh run, disproved "first-auth is expensive" without running anything.
+
+**Corollary — an opaque error is a cost, not a neutral.** `page.waitForURL: Timeout 30000ms
+exceeded` says nothing about why. Attaching the page's own error alert to that throw is four
+lines and converts a dedicated investigation into a one-line diagnosis. Do it wherever a wait
+can fail for a reason the page already knows.
+
+## 2026-09-06 — check that the checker covers the file before reporting it passed (#551)
+
+I ran `npx tsc --noEmit -p tsconfig.json`, saw it clean, and said the change typechecked. It had
+not: `frontend/tsconfig.json` excludes `**/e2e/**` and `**/playwright*.ts`, so neither the
+Playwright fixture I rewrote nor the config I edited was ever fed to the compiler. The third-party
+reviewer found this, not me. Typechecking the two files explicitly afterwards was clean — the
+claim happened to be true, which is exactly what makes this easy to repeat.
+
+Same shape as [[guard-tests-can-self-match]] and the #518 lesson: a gate that does not include
+your file passes for a reason unrelated to your work, and a green result reads identically either
+way.
+
+**Pattern:** before citing a gate as evidence for a specific file, confirm the file is in the
+gate's input set — read the `exclude`/`testPathIgnorePatterns`/path-filter list, or make the file
+fail on purpose and watch the gate go red. This is the mutation check applied to tooling rather
+than to tests, and it costs one command.
+
+**Related, from the same PR:** the reviewer also caught that writing a file into
+`project.outputDir` publishes it, because that whole tree is uploaded as a CI artifact and this
+repo is public. "Where does this path end up?" deserves the same treatment as "is this path
+gitignored?" — `.gitignore` protects commits, not artifacts. Tracked as #599.
