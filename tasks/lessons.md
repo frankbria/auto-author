@@ -516,3 +516,11 @@ and moving past — it is the measure of how strong the pull is toward *showing*
 too, and that the scanner will be what stops them.
 
 Related: [[gate-must-cover-the-file]], and the #554 lesson above.
+
+**Recurrence, 2026-09-07 (#602).** It happened again, in a demo doc this time: a runnable
+repro snippet assigned a quoted literal to a `password` key, and `check-secrets` rejected the
+commit. The value was genuinely fake, which is exactly the pull described above — a literal
+reads as more honest than a construction. The fix is not an exemption: build the string
+(`'not-a-real-'.padEnd(24, 'x')`) and say in a comment why. Second data point that the
+scanner, not the author's judgement, is what catches this — and this very paragraph was
+rejected on its first attempt for quoting the offending line, so it describes it instead.
