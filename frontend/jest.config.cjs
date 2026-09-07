@@ -17,10 +17,6 @@ const customJestConfig = {
     // Mock the Sentry SDK (#334) so tests stay deterministic and off the wire.
     '^@sentry/nextjs$': '<rootDir>/src/__mocks__/sentry-nextjs.ts',
   },
-  transformIgnorePatterns: [
-    // Transform better-auth and @clerk packages (they use ES modules)
-    'node_modules/(?!(better-auth|@clerk/.*)/)',
-  ],
   testPathIgnorePatterns: [
     '<rootDir>/src/e2e/',
     '<rootDir>/e2e/',                    // Exclude Playwright E2E tests
@@ -47,4 +43,24 @@ const customJestConfig = {
   ],
 }
 
-module.exports = createJestConfig(customJestConfig)
+// `transformIgnorePatterns` is OR'd, and next/jest prepends its own
+// `/node_modules/...` entry — so adding a custom "don't ignore X" pattern can
+// never un-ignore a package on its own. Patch next's entry instead. Needed so
+// `@better-auth/core` (ESM-only) can be imported by tests; see auth-ip.test.ts.
+module.exports = async () => {
+  const config = await createJestConfig(customJestConfig)()
+  const patched = config.transformIgnorePatterns.map((pattern) =>
+    pattern.startsWith('/node_modules/(?!.pnpm)')
+      ? pattern.replace('(?!.pnpm)', '(?!.pnpm)(?!@better-auth/)')
+      : pattern
+  )
+  if (patched.every((pattern, i) => pattern === config.transformIgnorePatterns[i])) {
+    throw new Error(
+      "next/jest's node_modules transformIgnorePatterns entry no longer matches the " +
+        'expected shape, so @better-auth/core would not be transformed. Re-derive the ' +
+        'patch from `npx jest --showConfig`.'
+    )
+  }
+  config.transformIgnorePatterns = patched
+  return config
+}

@@ -98,6 +98,21 @@ password, rotation runbook): `docs/DATABASE_CONNECTION_STANDARD.md`.
 5. **nginx.** Upstreams point at `127.0.0.1:8000` / `127.0.0.1:3002`. Unchanged
    from the PM2 setup — which is why those ports were kept.
 
+   The frontend `location /` **must** carry
+   `proxy_set_header X-Real-IP $remote_addr;`. better-auth buckets its sign-in
+   rate limit (3 per 10s) by client IP and reads `x-real-ip` first (#602); with
+   the header missing it falls back to `x-forwarded-for`, which nginx builds
+   with `$proxy_add_x_forwarded_for` — that *appends* to whatever the client
+   sent, so any request arriving with its own `X-Forwarded-For` becomes a
+   multi-hop chain better-auth cannot resolve and drops into a single bucket
+   shared by every such request. `X-Real-IP` is immune because `proxy_set_header`
+   overwrites a client-supplied value.
+
+   **If a second proxy is ever put in front of nginx** (CDN, load balancer),
+   `X-Real-IP` becomes *that* proxy's address. Either have the outermost proxy
+   set `X-Real-IP`, or switch `frontend/src/lib/auth-ip.ts` to
+   `advanced.ipAddress.trustedProxies` listing the whole chain.
+
 ---
 
 ## Deploying
