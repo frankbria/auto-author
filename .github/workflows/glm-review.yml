@@ -31,10 +31,24 @@ jobs:
     #
     # `user.type` rather than a name, so this covers every bot and not just
     # Dependabot.
+    #
+    # Both `user` and `sender` are tested, because they are not the same account
+    # and the action keys off the second. claude-code-action resolves
+    # `github.actor` — the PR *author* on `opened`, but the **pusher** on
+    # `synchronize`. Author-gating alone would therefore still go red on a
+    # human-authored PR that a bot pushed to (an autofix job, a rebase app,
+    # `github-actions[bot]`), and the size gate cannot save it: `changed_files`
+    # and `additions` are cumulative PR totals, so a one-line bot push to an
+    # already-qualifying PR re-fires the trigger. No workflow in this repo pushes
+    # to a PR today — none requests `contents: write` — so the gap is latent, not
+    # live; `sender.type` closes it exactly rather than leaving it for whoever
+    # adds the first autofix job. A null `sender` compares false and skips, so
+    # this fails closed like the guard above it.
     # Only then review substantial changes (5+ files, or 20+ additions/deletions).
     if: |
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.type == 'User' &&
+      github.event.sender.type == 'User' &&
       (github.event.pull_request.changed_files >= 5 ||
        github.event.pull_request.additions >= 20 ||
        github.event.pull_request.deletions >= 20)
