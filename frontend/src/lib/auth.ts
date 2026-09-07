@@ -6,6 +6,7 @@ import { twoFactor } from "better-auth/plugins";
 import { MongoClient, Db } from "mongodb";
 
 import { getDefaultCookieAttributes } from "./auth-cookies";
+import { getIpAddressConfig } from "./auth-ip";
 
 const mongoUrl = process.env.DATABASE_URL || "mongodb://localhost:27017/auto_author";
 const dbName = process.env.DATABASE_NAME || "auto_author";
@@ -66,6 +67,8 @@ function createAuthInstance(database: Db) {
     },
     advanced: {
       defaultCookieAttributes: getDefaultCookieAttributes(),
+      // Rate-limit bucketing per client rather than one shared bucket (#602).
+      ipAddress: getIpAddressConfig(),
     },
   });
 }
