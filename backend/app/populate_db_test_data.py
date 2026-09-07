@@ -9,7 +9,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "../.env"))
 DATABASE_URL = os.getenv("DATABASE_URL")
 DATABASE_NAME = os.getenv("DATABASE_NAME")
 
-FAKE_USER_EMAIL = "frank.bria@gmail.com"
+FAKE_USER_EMAIL = "seed-user@example.invalid"
 FAKE_USER_PASSWORD = "password123"
 now = datetime.now(timezone.utc)
 

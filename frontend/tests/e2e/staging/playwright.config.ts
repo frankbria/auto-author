@@ -56,8 +56,17 @@ export default defineConfig({
     // Base URL for staging environment
     baseURL: 'https://dev.autoauthor.app',
 
-    // Collect trace when retrying the failed test
-    trace: 'on-first-retry',
+    // #599: traces are OFF for staging, and this is a security setting, not a
+    // preference. A trace records request headers, so every authenticated call
+    // in it carries `Cookie: __Secure-better-auth.session_token=...`, and it
+    // records action arguments, so `fill()` on the password field stores the
+    // credential in plaintext. `test-results/` is uploaded as a CI artifact from
+    // a public repo, which published both on every failure.
+    //
+    // Screenshot and video are kept: a password input renders masked, so neither
+    // carries the credential. Reproduce a staging failure with a manual
+    // `workflow_dispatch` rather than by turning this back on.
+    trace: 'off',
 
     // Screenshot on failure
     screenshot: 'only-on-failure',

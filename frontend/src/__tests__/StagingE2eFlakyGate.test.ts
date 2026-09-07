@@ -27,6 +27,13 @@ describe('staging E2E flaky gate', () => {
     expect(config).toMatch(/^\s*retries:\s*process\.env\.CI\s*\?\s*[1-9]\d*\s*:\s*0,\s*$/m);
   });
 
+  // #599: a trace records request headers (session cookie) and action arguments
+  // (the password passed to fill()), and `test-results/` is uploaded from a public
+  // repo. This is a security setting, not a debugging preference.
+  it('keeps traces off so artifacts cannot carry credentials', () => {
+    expect(config).toMatch(/^\s*trace:\s*'off',\s*$/m);
+  });
+
   it('clamps workers so the sign-in bootstrap cannot 429 itself', () => {
     // Each worker signs in once at startup and better-auth allows 3 per 10s per
     // IP, so the ceiling must stay at 2 — 3 leaves no room for a worker restart.

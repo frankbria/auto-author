@@ -100,36 +100,44 @@ jobs:
             echo "- Environment: https://dev.autoauthor.app"
             echo "- Workflow result: ${{ job.status }}"
             echo "- Workers: ${{ github.event.inputs.staging_e2e_workers || '1' }}"
-            echo "- Visual smoke screenshots: see the staging test-results artifact"
-            echo "- Playwright HTML report: see the playwright-report-staging artifact"
+            echo "- Visual smoke screenshots and failure video: see the staging test-results artifact"
+            echo "- No trace or HTML report is published (#599) — reproduce a failure with a manual workflow_dispatch"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: playwright-report-staging
-          path: frontend/tests/e2e/staging/playwright-report-staging/
-          retention-days: 7
+      # The Playwright HTML report is deliberately NOT uploaded (#599). It inlines
+      # every failure attachment, so it reproduces `error-context.md` — whose page
+      # snapshot renders the password field's *value* in plaintext — inside a
+      # public artifact. It is still written on the runner, so `--reporter=html`
+      # works locally and in a self-hosted context.
 
       - name: Upload staging test results and visual smoke screenshots
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: staging-test-results
+          # Screenshots and video only. `error-context.md` embeds the password
+          # field's value; `trace.zip` carries session cookies in request headers
+          # and the password as a recorded `fill()` argument (#599). Traces are
+          # also off in the config — this exclusion is the second line of defence,
+          # so re-enabling one setting cannot silently re-open the leak.
           path: |
             frontend/tests/e2e/staging/test-results/
             frontend/test-results/
+            !**/error-context.md
+            !**/trace.zip
           retention-days: 7
 
-      - name: Upload failure artifacts (screenshots/videos/traces)
+      - name: Upload failure artifacts (screenshots/videos)
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: staging-failure-artifacts
+          # Same exclusions as above — this step uploads the same two trees (#599).
           path: |
             frontend/tests/e2e/staging/test-results/
             frontend/test-results/
+            !**/error-context.md
+            !**/trace.zip
           retention-days: 7
 
       - name: Notify scheduled staging failure

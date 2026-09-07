@@ -161,7 +161,33 @@ npx playwright show-report playwright-report-staging
 Failed tests automatically capture:
 - Screenshots (in `test-results/`)
 - Videos (in `test-results/`)
-- Traces (in `test-results/`)
+
+**Traces are off, and the HTML report is not uploaded. Do not turn either back on
+without reading this.** (#599)
+
+This repository is **public**, and `e2e-staging-tests.yml` uploads `test-results/`
+as a CI artifact that any GitHub user can download. Two Playwright features put
+live credentials in there:
+
+| what | why it leaks |
+|---|---|
+| `trace.zip` | records request **headers**, so every authenticated call carries `Cookie: __Secure-better-auth.session_token=...`; also records action arguments, so the password passed to `fill()` is stored verbatim |
+| `error-context.md` | its page snapshot renders each input's **value**, so the password appears in plaintext |
+| the HTML report | inlines every failure attachment, reproducing `error-context.md` |
+
+So: `trace: 'off'` in the config, `error-context.md` and `trace.zip` excluded from
+both upload steps, and the report step removed. The exclusions are deliberately
+redundant with the config setting — flipping one back on must not be enough to
+re-open the leak. A jest guard in `src/__tests__/StagingE2eFlakyGate.test.ts`
+fails if `trace` stops being `'off'`.
+
+Screenshots and video are kept: a `type="password"` input renders masked, so
+neither carries the credential.
+
+**To debug a staging failure**, re-run it with a manual `workflow_dispatch`, or
+run the suite locally with `npm run test:e2e:staging` where traces stay available
+and nothing is published. The thrown sign-in error also now carries the sign-in
+page's own alert text, which covers the common cases without a trace.
 
 ### Common issues
 

@@ -21,7 +21,7 @@ Filed as **#556**.
 
 ## The three-point reproduction
 
-One account, `frank.bria+aa550-before2@pm.me`, created on staging at 15:48 while better-auth
+One account, `<maintainer>+aa550-before2@example.invalid`, created on staging at 15:48 while better-auth
 1.6.26 was serving, then signed in at each stage:
 
 | stage | tag | better-auth | `POST /api/auth/sign-in/email` |
@@ -239,6 +239,6 @@ before/after/rollback sequence pins the failure to credential lookup specificall
   better-auth.
 - **The stale local `frontend/tests/e2e/staging/.env.test` credentials**, which 401 against
   staging and are a pre-existing rough edge this work tripped over rather than caused.
-- **Throwaway accounts left behind.** Five `frank.bria+aa550-*@pm.me` accounts remain in the
+- **Throwaway accounts left behind.** Five `<maintainer>+aa550-*@example.invalid` accounts remain in the
   staging database, one with 2FA enrolled. Harmless on staging, and left in place rather than
   deleted by hand against a live Atlas cluster.
