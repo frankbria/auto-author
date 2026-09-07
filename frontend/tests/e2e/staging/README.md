@@ -36,18 +36,31 @@ Copy the environment template:
 cp tests/e2e/staging/.env.test.example tests/e2e/staging/.env.test
 ```
 
-Edit `.env.test` and add your test credentials:
+Edit `.env.test` and add your test credentials — **single-quoted**:
 
 ```env
-STAGING_TEST_EMAIL=your-test-email@example.com
-STAGING_TEST_PASSWORD=your-test-password
+STAGING_TEST_EMAIL='you@example.com'
+STAGING_TEST_PASSWORD='REPLACE'
 ```
+
+**Quote them.** `dotenv` reads this file, and an unquoted `#` starts an inline
+comment — a 32-character password once parsed down to 4 here, failing to
+authenticate with no hint why. An unquoted `$` is separately mangled by anything
+that `source`s the file. Single quotes stop both (#558).
 
 **Important**: `.env.test` is gitignored to keep credentials safe.
 
-### 3. Create Test User (if needed)
+### 3. Get the credentials
 
-Visit https://dev.autoauthor.app and create a test user account, then use those credentials in `.env.test`.
+The live values are the `TEST_USER_EMAIL` / `TEST_USER_PASSWORD` secrets in the
+repo's `staging` GitHub environment — that is what CI uses. GitHub secrets cannot
+be read back, so you cannot copy them out: ask the maintainer, or rotate the
+account password and update both this file and the secret
+(`gh secret set TEST_USER_PASSWORD --env staging`).
+
+Creating your own throwaway account on https://dev.autoauthor.app also works for
+most specs, but the suite shares one account across all tests in a worker, so use
+a dedicated one rather than an account you care about.
 
 ## Running Tests
 
@@ -161,7 +174,40 @@ npx playwright show-report playwright-report-staging
 Failed tests automatically capture:
 - Screenshots (in `test-results/`)
 - Videos (in `test-results/`)
-- Traces (in `test-results/`)
+
+**Under CI, traces are off and three files are never uploaded. Do not turn any of
+it back on without reading this.** (#599)
+
+This repository is **public**, and `e2e-staging-tests.yml` uploads `test-results/`
+as a CI artifact that any GitHub user can download. Artifacts are **not**
+secret-masked — GitHub masks `secrets.*` in job *logs* only. Three things carried
+live credentials out:
+
+| what | why it leaks |
+|---|---|
+| `trace.zip` | records request **headers**, so every authenticated call carries `Cookie: __Secure-better-auth.session_token=...`; also records action arguments, so the password passed to `fill()` is stored verbatim |
+| `error-context.md` | its page snapshot renders each input's **value**, so the password appears in plaintext |
+| `staging-results.json` | the `json` reporter captures test stdout, so anything a fixture `console.log`s is published — this is why the auth fixture no longer logs the account email |
+| the HTML report | inlines every failure attachment, reproducing `error-context.md` |
+
+So: `trace` is `'off'` under CI, all three files are excluded from the upload, and
+the report step is gone. The exclusions are deliberately redundant with the config
+setting — flipping one back on must not be enough to re-open the leak. Guards in
+`src/__tests__/StagingE2eFlakyGate.test.ts` fail if `trace` stops being CI-off, or
+if the npm script starts passing `--trace` (a CLI flag overrides the config).
+
+Screenshots and video are kept: a `type="password"` input renders masked, so
+neither carries the credential. **If you ever write a spec that clicks the
+show-password toggle, that stops being true** — the field becomes `type="text"`
+and the value renders in both. Nothing enforces this; it is on you.
+
+**To debug a staging failure, run the suite locally** — `npm run test:e2e:staging`.
+Locally nothing is uploaded anywhere, so `trace` is `'retain-on-failure'` and you
+get a full trace on the first failure (local `retries` is 0, which is why it is
+not `on-first-retry`). A manual `workflow_dispatch` re-runs the *same CI config*
+and produces no trace, so it confirms whether a failure reproduces but does not
+help you diagnose it. The thrown sign-in error also carries the sign-in page's own
+alert text, which covers the common cases without a trace.
 
 ### Common issues
 

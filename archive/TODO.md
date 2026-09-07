@@ -171,7 +171,7 @@ Current status (Post Authentication & Connectivity Fixes - 2025-07-03):
 - ✅ **Backend server running successfully** (`uvicorn app.main:app --reload --port 8000`)
 - ✅ **API connectivity working** (Books API returning 200 OK responses)
 - ✅ **Authentication system functional** (Clerk JWT verification working)
-- ✅ **User database configured** (frank.bria@gmail.com user created with correct Clerk ID)
+- ✅ **User database configured** (the maintainer's account created with correct Clerk ID)
 - ✅ **CSP policies updated** (No more connection violations)
 - ✅ Application loads in browser without crashes
 - ✅ Error boundaries prevent app crashes
