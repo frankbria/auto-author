@@ -29,10 +29,11 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env.CI ? 2 : 0,
 
-  // #551: retries stay on so a genuinely transient failure still yields a trace,
-  // but a test that only passes on retry now fails the job instead of reporting
-  // `1 flaky` and exiting success. The #83 session canary is the spec most likely
-  // to catch an auth-path break; it must not be able to be green-on-retry.
+  // #551: retries stay on so a genuinely transient failure is still absorbed and
+  // reported, but a test that only passes on retry now fails the job instead of
+  // reporting `1 flaky` and exiting success. The #83 session canary is the spec
+  // most likely to catch an auth-path break; it must not be green-on-retry.
+  // (Retries no longer buy a trace under CI — see the `trace` setting below.)
   failOnFlakyTests: !!process.env.CI,
 
   // Opt out of parallel tests on CI. Single worker by default to avoid session
@@ -56,17 +57,21 @@ export default defineConfig({
     // Base URL for staging environment
     baseURL: 'https://dev.autoauthor.app',
 
-    // #599: traces are OFF for staging, and this is a security setting, not a
+    // #599: traces are OFF under CI, and that is a security setting, not a
     // preference. A trace records request headers, so every authenticated call
     // in it carries `Cookie: __Secure-better-auth.session_token=...`, and it
     // records action arguments, so `fill()` on the password field stores the
     // credential in plaintext. `test-results/` is uploaded as a CI artifact from
     // a public repo, which published both on every failure.
     //
-    // Screenshot and video are kept: a password input renders masked, so neither
-    // carries the credential. Reproduce a staging failure with a manual
-    // `workflow_dispatch` rather than by turning this back on.
-    trace: 'off',
+    // Locally nothing is uploaded anywhere, so traces stay on — and on
+    // `retain-on-failure` rather than `on-first-retry`, because local `retries`
+    // is 0 and a retry-only trace would never be produced. That keeps a real
+    // debugging path: reproduce a CI failure by running the suite locally.
+    //
+    // Screenshot and video are kept in both cases: a password input renders
+    // masked, so neither carries the credential.
+    trace: process.env.CI ? 'off' : 'retain-on-failure',
 
     // Screenshot on failure
     screenshot: 'only-on-failure',

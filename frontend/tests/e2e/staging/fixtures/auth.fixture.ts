@@ -51,7 +51,11 @@ async function loginToStaging(page: Page): Promise<void> {
     );
   }
 
-  console.log(`🔐 Logging in as ${email}...`);
+  // Deliberately does NOT log the email (#599). GitHub masks `secrets.*` in job
+  // logs, but NOT in artifacts, and the json reporter writes test stdout into
+  // `test-results/staging-results.json` — inside the uploaded tree. Logging it
+  // published `secrets.TEST_USER_EMAIL` verbatim on every run.
+  console.log('🔐 Logging in to staging...');
 
   // Navigate to sign-in page
   await page.goto('/auth/sign-in');

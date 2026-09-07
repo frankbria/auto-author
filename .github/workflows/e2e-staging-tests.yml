@@ -101,43 +101,37 @@ jobs:
             echo "- Workflow result: ${{ job.status }}"
             echo "- Workers: ${{ github.event.inputs.staging_e2e_workers || '1' }}"
             echo "- Visual smoke screenshots and failure video: see the staging test-results artifact"
-            echo "- No trace or HTML report is published (#599) — reproduce a failure with a manual workflow_dispatch"
+            echo "- No trace, HTML report or results JSON is published (#599) — reproduce a failure by running the suite locally, where traces are on"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # The Playwright HTML report is deliberately NOT uploaded (#599). It inlines
-      # every failure attachment, so it reproduces `error-context.md` — whose page
-      # snapshot renders the password field's *value* in plaintext — inside a
-      # public artifact. It is still written on the runner, so `--reporter=html`
-      # works locally and in a self-hosted context.
-
+      # Screenshots and video only (#599). Everything excluded here carries a live
+      # credential into a public artifact:
+      #   error-context.md      - its page snapshot renders the password field's VALUE
+      #   trace.zip             - request headers (session cookie) + the fill() argument
+      #   staging-results.json  - the json reporter captures test stdout, and GitHub
+      #                           masks secrets in LOGS but not in ARTIFACTS
+      # Traces are also off under CI in the config; these exclusions are a second,
+      # independent line of defence, so re-enabling one setting is not enough to
+      # re-open the leak. `**/` matches at any depth, so each exclusion covers both
+      # include roots.
+      #
+      # The Playwright HTML report is deliberately not uploaded either: it inlines
+      # every failure attachment, which reproduces error-context.md. It is still
+      # written on the runner, so the reporter works locally.
+      #
+      # This single always() step replaces the former failure()-only duplicate,
+      # which uploaded the identical two trees under a second artifact name.
       - name: Upload staging test results and visual smoke screenshots
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: staging-test-results
-          # Screenshots and video only. `error-context.md` embeds the password
-          # field's value; `trace.zip` carries session cookies in request headers
-          # and the password as a recorded `fill()` argument (#599). Traces are
-          # also off in the config — this exclusion is the second line of defence,
-          # so re-enabling one setting cannot silently re-open the leak.
           path: |
             frontend/tests/e2e/staging/test-results/
             frontend/test-results/
             !**/error-context.md
             !**/trace.zip
-          retention-days: 7
-
-      - name: Upload failure artifacts (screenshots/videos)
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: staging-failure-artifacts
-          # Same exclusions as above — this step uploads the same two trees (#599).
-          path: |
-            frontend/tests/e2e/staging/test-results/
-            frontend/test-results/
-            !**/error-context.md
-            !**/trace.zip
+            !**/staging-results.json
           retention-days: 7
 
       - name: Notify scheduled staging failure

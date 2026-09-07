@@ -162,32 +162,39 @@ Failed tests automatically capture:
 - Screenshots (in `test-results/`)
 - Videos (in `test-results/`)
 
-**Traces are off, and the HTML report is not uploaded. Do not turn either back on
-without reading this.** (#599)
+**Under CI, traces are off and three files are never uploaded. Do not turn any of
+it back on without reading this.** (#599)
 
 This repository is **public**, and `e2e-staging-tests.yml` uploads `test-results/`
-as a CI artifact that any GitHub user can download. Two Playwright features put
-live credentials in there:
+as a CI artifact that any GitHub user can download. Artifacts are **not**
+secret-masked — GitHub masks `secrets.*` in job *logs* only. Three things carried
+live credentials out:
 
 | what | why it leaks |
 |---|---|
 | `trace.zip` | records request **headers**, so every authenticated call carries `Cookie: __Secure-better-auth.session_token=...`; also records action arguments, so the password passed to `fill()` is stored verbatim |
 | `error-context.md` | its page snapshot renders each input's **value**, so the password appears in plaintext |
+| `staging-results.json` | the `json` reporter captures test stdout, so anything a fixture `console.log`s is published — this is why the auth fixture no longer logs the account email |
 | the HTML report | inlines every failure attachment, reproducing `error-context.md` |
 
-So: `trace: 'off'` in the config, `error-context.md` and `trace.zip` excluded from
-both upload steps, and the report step removed. The exclusions are deliberately
-redundant with the config setting — flipping one back on must not be enough to
-re-open the leak. A jest guard in `src/__tests__/StagingE2eFlakyGate.test.ts`
-fails if `trace` stops being `'off'`.
+So: `trace` is `'off'` under CI, all three files are excluded from the upload, and
+the report step is gone. The exclusions are deliberately redundant with the config
+setting — flipping one back on must not be enough to re-open the leak. Guards in
+`src/__tests__/StagingE2eFlakyGate.test.ts` fail if `trace` stops being CI-off, or
+if the npm script starts passing `--trace` (a CLI flag overrides the config).
 
 Screenshots and video are kept: a `type="password"` input renders masked, so
-neither carries the credential.
+neither carries the credential. **If you ever write a spec that clicks the
+show-password toggle, that stops being true** — the field becomes `type="text"`
+and the value renders in both. Nothing enforces this; it is on you.
 
-**To debug a staging failure**, re-run it with a manual `workflow_dispatch`, or
-run the suite locally with `npm run test:e2e:staging` where traces stay available
-and nothing is published. The thrown sign-in error also now carries the sign-in
-page's own alert text, which covers the common cases without a trace.
+**To debug a staging failure, run the suite locally** — `npm run test:e2e:staging`.
+Locally nothing is uploaded anywhere, so `trace` is `'retain-on-failure'` and you
+get a full trace on the first failure (local `retries` is 0, which is why it is
+not `on-first-retry`). A manual `workflow_dispatch` re-runs the *same CI config*
+and produces no trace, so it confirms whether a failure reproduces but does not
+help you diagnose it. The thrown sign-in error also carries the sign-in page's own
+alert text, which covers the common cases without a trace.
 
 ### Common issues
 
