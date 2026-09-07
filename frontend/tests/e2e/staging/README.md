@@ -36,18 +36,31 @@ Copy the environment template:
 cp tests/e2e/staging/.env.test.example tests/e2e/staging/.env.test
 ```
 
-Edit `.env.test` and add your test credentials:
+Edit `.env.test` and add your test credentials — **single-quoted**:
 
 ```env
-STAGING_TEST_EMAIL=your-test-email@example.com
-STAGING_TEST_PASSWORD=your-test-password
+STAGING_TEST_EMAIL='you@example.com'
+STAGING_TEST_PASSWORD='REPLACE'
 ```
+
+**Quote them.** `dotenv` reads this file, and an unquoted `#` starts an inline
+comment — a 32-character password once parsed down to 4 here, failing to
+authenticate with no hint why. An unquoted `$` is separately mangled by anything
+that `source`s the file. Single quotes stop both (#558).
 
 **Important**: `.env.test` is gitignored to keep credentials safe.
 
-### 3. Create Test User (if needed)
+### 3. Get the credentials
 
-Visit https://dev.autoauthor.app and create a test user account, then use those credentials in `.env.test`.
+The live values are the `TEST_USER_EMAIL` / `TEST_USER_PASSWORD` secrets in the
+repo's `staging` GitHub environment — that is what CI uses. GitHub secrets cannot
+be read back, so you cannot copy them out: ask the maintainer, or rotate the
+account password and update both this file and the secret
+(`gh secret set TEST_USER_PASSWORD --env staging`).
+
+Creating your own throwaway account on https://dev.autoauthor.app also works for
+most specs, but the suite shares one account across all tests in a worker, so use
+a dedicated one rather than an account you care about.
 
 ## Running Tests
 
