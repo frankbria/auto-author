@@ -475,3 +475,44 @@ than to tests, and it costs one command.
 `project.outputDir` publishes it, because that whole tree is uploaded as a CI artifact and this
 repo is public. "Where does this path end up?" deserves the same treatment as "is this path
 gitignored?" — `.gitignore` protects commits, not artifacts. Tracked as #599.
+
+## 2026-09-07 — the document describing a credential pattern reproduces it (#599, #601)
+
+The #554 lesson above says the riskiest place to re-leak a scrubbed value is the document
+explaining the scrub. #601 produced three instances of the same shape in one PR, none of
+which involved a real secret:
+
+1. `.env.test.example` was changed to show single-quoted values, per #558. The pre-commit
+   secret scan flags a password-ish key assigned a quoted literal of eight or more
+   characters, and the obvious placeholder was exactly that shape. Rejected.
+2. The placeholder was shortened and a comment added explaining *why* it was short. The
+   comment spelled the rule out longhand, quoting its shape. Rejected again, by the same
+   rule.
+3. Both fixed, committed, pushed — and **GitGuardian** then flagged a different line in the
+   same file: `PASSWORD=abc#def`, written to illustrate how dotenv truncates an unquoted
+   value. A documentation example of a bad password assignment is, to a scanner,
+   indistinguishable from a bad password assignment.
+
+**Pattern:** when documenting a credential mistake, *describe* it, never *demonstrate* it.
+"An unquoted value is cut at the first `#`" carries the same information as showing
+`KEY=abc#def` and matches nothing. Say in the file why it is phrased that way, or the next
+person helpfully adds the example back.
+
+**The other half, and the one that matters more:** the fix was never to loosen the rule. An
+allowlist or a per-file exclusion would have cleared all three in one line, and left the
+rule wrong for every file nobody has tested yet — the #554 corollary, arrived at from the
+opposite direction. Two of the three were my own prose; the rule was right each time.
+
+**Corollary on scanner scope:** GitGuardian scans every commit in a PR, not the head tree.
+Fixing the working tree does not clear it — the finding stays pinned to the commit that
+introduced the string. The options are rewriting branch history, dismissing the incident, or
+squash-merging so it never reaches `main`. Worth knowing before promising a green check.
+
+**And a fourth instance, writing this entry.** The first draft quoted the offending
+placeholder verbatim to illustrate point 1, and the pre-commit hook rejected `lessons.md`
+for it. The lesson tripped over its own subject. That is not a coincidence worth smiling at
+and moving past — it is the measure of how strong the pull is toward *showing* rather than
+*telling*, even while writing down the instruction not to. Assume the next person feels it
+too, and that the scanner will be what stops them.
+
+Related: [[gate-must-cover-the-file]], and the #554 lesson above.
