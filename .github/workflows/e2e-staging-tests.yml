@@ -100,18 +100,27 @@ jobs:
             echo "- Environment: https://dev.autoauthor.app"
             echo "- Workflow result: ${{ job.status }}"
             echo "- Workers: ${{ github.event.inputs.staging_e2e_workers || '1' }}"
-            echo "- Visual smoke screenshots: see the staging test-results artifact"
-            echo "- Playwright HTML report: see the playwright-report-staging artifact"
+            echo "- Visual smoke screenshots and failure video: see the staging test-results artifact"
+            echo "- No trace, HTML report or results JSON is published (#599) — reproduce a failure by running the suite locally, where traces are on"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: playwright-report-staging
-          path: frontend/tests/e2e/staging/playwright-report-staging/
-          retention-days: 7
-
+      # Screenshots and video only (#599). Everything excluded here carries a live
+      # credential into a public artifact:
+      #   error-context.md      - its page snapshot renders the password field's VALUE
+      #   trace.zip             - request headers (session cookie) + the fill() argument
+      #   staging-results.json  - the json reporter captures test stdout, and GitHub
+      #                           masks secrets in LOGS but not in ARTIFACTS
+      # Traces are also off under CI in the config; these exclusions are a second,
+      # independent line of defence, so re-enabling one setting is not enough to
+      # re-open the leak. `**/` matches at any depth, so each exclusion covers both
+      # include roots.
+      #
+      # The Playwright HTML report is deliberately not uploaded either: it inlines
+      # every failure attachment, which reproduces error-context.md. It is still
+      # written on the runner, so the reporter works locally.
+      #
+      # This single always() step replaces the former failure()-only duplicate,
+      # which uploaded the identical two trees under a second artifact name.
       - name: Upload staging test results and visual smoke screenshots
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -120,16 +129,9 @@ jobs:
           path: |
             frontend/tests/e2e/staging/test-results/
             frontend/test-results/
-          retention-days: 7
-
-      - name: Upload failure artifacts (screenshots/videos/traces)
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: staging-failure-artifacts
-          path: |
-            frontend/tests/e2e/staging/test-results/
-            frontend/test-results/
+            !**/error-context.md
+            !**/trace.zip
+            !**/staging-results.json
           retention-days: 7
 
       - name: Notify scheduled staging failure
