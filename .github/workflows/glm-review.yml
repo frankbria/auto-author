@@ -15,19 +15,52 @@ jobs:
     # `pull_request_target`) — the same pwn-request class #191 closed for the
     # staging E2E workflow. `head.repo.full_name` is null for a deleted fork, and
     # `null == github.repository` is false, so the guard fails closed there too.
+    # Then skip bot-authored PRs. This repo gets heavy Dependabot traffic, and a
+    # lockfile bump clears the size gate easily, so these were the largest single
+    # block of red on the check: claude-code-action refuses any run whose actor
+    # is not a User ("Workflow initiated by non-human actor"), failing the step
+    # in ~8 seconds and marking a PR red that was never reviewed.
+    #
+    # Deliberately a skip rather than the action's `allowed_bots`. Opening the
+    # guard would not produce a review: GitHub runs Dependabot-triggered
+    # pull_request workflows with a read-only token and the separate Dependabot
+    # secret store, so ZHIPU_API_KEY arrives empty and the summary comment could
+    # not be posted even if it did not. It would trade an 8-second bot-guard
+    # failure for a credential failure. A bug-hunting reviewer has little to say
+    # about a dependency bump in any case.
+    #
+    # `user.type` rather than a name, so this covers every bot and not just
+    # Dependabot.
     # Only then review substantial changes (5+ files, or 20+ additions/deletions).
     if: |
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.type == 'User' &&
       (github.event.pull_request.changed_files >= 5 ||
        github.event.pull_request.additions >= 20 ||
        github.event.pull_request.deletions >= 20)
-    # Pinned to an immutable SHA (main @ 2026-07-10, verified on hai-sh#75) so
-    # upstream pushes can't silently change the code that receives ZHIPU_API_KEY
-    uses: frankbria/glm-review/.github/workflows/review.yml@b877d15a0f8c0855d0d2ebdcce32ae09cec1bb2d # 2026-07-10 (main; no tags upstream)
+    # Pinned to an immutable SHA so upstream pushes can't silently change the
+    # code that receives ZHIPU_API_KEY.
+    #
+    # Re-pinned off b877d15a (2026-07-10). That callee capped the run with a
+    # 20-minute *job* timeout, which cancels every remaining step — `if:
+    # always()` included — so a killed review uploaded no transcript and left
+    # its "Reviewing..." stub standing, indistinguishable from a review that ran
+    # and found nothing. The new pin moves the clock onto the review step (35m,
+    # with 40m on the job as a backstop), makes `--max-turns 60` the limit that
+    # normally binds, uploads the agent transcript as a 14-day artifact, and
+    # rewrites the stub into an explicit "GLM review did not complete" notice.
+    #
+    # `issues: write` and `id-token: write` are gone with it. They were not
+    # optional on the old pin — GitHub fails a run whose caller grants less than
+    # the called job requests, and b877d15a's job declared both — but the new
+    # callee declares neither, having verified the reviewer never mints an OIDC
+    # token (glm-review#2) and that PR comments are authorised by
+    # `pull-requests`, not `issues`, despite going through /issues/{n}/comments
+    # (glm-review#3). Keep the pin and this block in step: pinning backwards
+    # without restoring them makes every run a `startup_failure`.
+    uses: frankbria/glm-review/.github/workflows/review.yml@77dfa9c6633712256edab41fd0db42663a9416b7 # 2026-09-06 (main; no tags upstream)
     permissions:
       contents: read
       pull-requests: write
-      issues: write
-      id-token: write
     secrets:
       ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
