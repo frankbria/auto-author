@@ -10,7 +10,11 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 DATABASE_NAME = os.getenv("DATABASE_NAME")
 
 FAKE_USER_EMAIL = "seed-user@example.invalid"
-FAKE_USER_PASSWORD = "password123"
+# Local seed fixture only. Real authentication goes through better-auth, which
+# owns its own collections - nothing reads this field to sign anyone in, and
+# the value was never hashed despite the field name. Kept non-credential so a
+# public repo carries no usable password (#599).
+FAKE_USER_PASSWORD = os.getenv("SEED_USER_PASSWORD", "not-a-real-hash")
 now = datetime.now(timezone.utc)
 
 FAKE_BOOKS = [
@@ -53,9 +57,9 @@ def get_or_create_user(db):
             "hashed_password": FAKE_USER_PASSWORD,
             "auth_id": "550e8400-e29b-41d4-a716-446655440000",  # better-auth user ID (UUID)
             "role": "admin",
-            "first_name": "Frank",
-            "last_name": "Bria",
-            "display_name": "Frank",
+            "first_name": "Seed",
+            "last_name": "User",
+            "display_name": "Seed User",
         }
         user_id = users.insert_one(user).inserted_id
         user["_id"] = user_id
