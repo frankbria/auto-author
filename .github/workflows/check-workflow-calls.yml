@@ -27,8 +27,19 @@ on:
   pull_request:
     paths:
       - ".github/workflows/**"
-  # Also runnable on demand: the PR trigger cannot catch an upstream callee
-  # changing its declared permissions, since no PR here would touch that.
+  # Also on direct pushes to main. A PR-only trigger leaves the gap open: a
+  # workflow edit landing straight on main is never checked, and no later PR
+  # re-checks it unless that PR happens to touch .github/workflows/** — so a
+  # backwards re-pin would be a silent startup_failure on every subsequent PR
+  # with the guard installed and never running. Reports after the fact rather
+  # than blocking, which is still the difference between silence and a red mark.
+  # (Found by the reviewer on the sibling PR, narrative-modeling-app#592.)
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+  # Also runnable on demand: neither trigger catches an upstream callee changing
+  # its declared permissions, since no push or PR here would touch that.
   workflow_dispatch:
 
 jobs:
