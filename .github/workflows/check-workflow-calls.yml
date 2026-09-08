@@ -1,0 +1,52 @@
+name: Check workflow calls
+
+# Guards the two ways a reusable-workflow call can be misconfigured such that it
+# never runs and never says so (frankbria/glm-review#9):
+#
+#   1. A calling job granting LESS than the called workflow declares. GitHub
+#      refuses the run before any job exists, so it surfaces as a
+#      `startup_failure` with no log and no annotation naming the missing scope.
+#      Listing a `permissions:` block sets every scope you did NOT list to
+#      `none`, so the denial never appears in the caller's own text.
+#
+#   2. A caller `concurrency:` group that can expand to the same string as the
+#      callee's. The callee joins that group while its parent still holds it and
+#      cancels the parent on queue — a sibling repo had a run end in 2 seconds
+#      having started no jobs at all. The colliding groups there were not
+#      identical text; they merely expanded the same, which is why the checker
+#      compares possible expansions rather than strings.
+#
+# This repo has not hit either — its GLM Review caller is correct today. The
+# guard is here so a future re-pin or an added concurrency block cannot break it
+# silently, which is the failure mode that cost the sibling repo 266 runs.
+#
+# It cannot be a job inside review.yml: in both failures that workflow never
+# starts, so a guard inside it would never run either.
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  # Also runnable on demand: the PR trigger cannot catch an upstream callee
+  # changing its declared permissions, since no PR here would touch that.
+  workflow_dispatch:
+
+jobs:
+  check:
+    uses: frankbria/glm-review/.github/workflows/check-workflow-calls.yml@f3dbf009689671f82e7ccfaabcde112d61b5fd1c # 2026-09-08 (main; no tags upstream)
+    with:
+      # Both extensions, deliberately. GitHub runs `.yml` and `.yaml` alike, so
+      # globbing only `.yml` would leave a silent bypass — a future workflow
+      # named `.yaml` would execute with this repo's credentials while passing a
+      # check that never looked at it. Same reasoning, and the same wording, as
+      # scripts/test_actions_are_sha_pinned.py, which globs both for exactly
+      # this reason. The upstream default covers only `.yml`; overridden here
+      # until that is fixed.
+      paths: .github/workflows/*.yml .github/workflows/*.yaml
+      # Pinned to the same commit as the workflow above: the reusable workflow
+      # and the checker script it runs live in one repo, and leaving the script
+      # tracking `main` while the workflow is pinned reintroduces exactly the
+      # pin-vs-content drift this guard exists to catch.
+      guard_ref: f3dbf009689671f82e7ccfaabcde112d61b5fd1c
+    permissions:
+      contents: read
