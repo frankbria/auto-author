@@ -462,6 +462,55 @@ describe('Dashboard pagination (#493)', () => {
     expect(screen.queryByText(/no books on this page/i)).not.toBeInTheDocument();
   });
 
+  it('keeps page and content in sync when a Previous navigation fails', async () => {
+    const user = userEvent.setup();
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1)) // page 1
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1, PAGE_SIZE)) // page 2
+      .mockRejectedValueOnce(new Error('Failed to fetch books: 429')) // back to page 1 fails
+      .mockResolvedValue(makeBooks(PAGE_SIZE + 1, PAGE_SIZE));
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await screen.findByText(`Book ${PAGE_SIZE}`);
+
+    await user.click(screen.getByRole('button', { name: /previous page/i }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+
+    // Page 2's books are still on screen, so the indicator must still say Page 2.
+    // A backward-only clamp would leave it reading "Page 1" over page-2 content,
+    // with Previous disabled while later-page books are displayed.
+    expect(screen.getByText(`Book ${PAGE_SIZE}`)).toBeInTheDocument();
+    expect(screen.getByText(/page 2/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /previous page/i })).toHaveAttribute(
+      'aria-disabled',
+      'false'
+    );
+  });
+
+  it('hides the pager when a 404 empties the list on page 1', async () => {
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1)) // page 1, pager shown
+      .mockRejectedValue(new Error('Failed to fetch books: 404'));
+
+    const { rerender } = render(<Dashboard />);
+    await screen.findByText('Book 0');
+    expect(screen.getByRole('navigation', { name: /pagination/i })).toBeInTheDocument();
+
+    (useSession as jest.Mock).mockReturnValue({
+      data: { user: { id: 'user-123' }, session: { id: 'session-789' } },
+      isPending: false,
+      error: null,
+    });
+    rerender(<Dashboard />);
+
+    // hasMore must be cleared too, or the pager sits enabled behind the onboarding
+    // empty state and Next fires another doomed fetch.
+    expect(await screen.findByTestId('empty-book-state')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /pagination/i })).not.toBeInTheDocument();
+  });
+
   it('ignores a Previous click while a page fetch is still in flight', async () => {
     const user = userEvent.setup();
     getUserBooks

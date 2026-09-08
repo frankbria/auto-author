@@ -108,6 +108,10 @@ export default function Dashboard() {
         // user on every window refocus, and retrying could never succeed.
         setProjects([]);
         setPage(0);
+        // hasMore too, or the pager stays mounted and enabled behind the onboarding
+        // empty state on a page-0 404 — and Next then fires another doomed fetch.
+        setHasMore(false);
+        loadedPageRef.current = 0;
         setError(null);
       } else if (hasLoadedOnce.current) {
         // A failed page change must not replace a working dashboard — with the
@@ -115,10 +119,13 @@ export default function Dashboard() {
         // empty. Either way the user loses their place, and the per-page requests
         // this pager makes put a 429 well within reach.
         toast.error({ title: 'Failed to load that page. Please try again.' });
-        // Never roll *forward*: after a delete steps back off an emptied page, the
-        // last successfully loaded page is the one we just left, and returning to it
-        // would resurrect it.
-        setPage(prevPage => Math.min(prevPage, loadedPageRef.current));
+        // Roll back to whichever page the books currently on screen belong to. A
+        // directional clamp looks safer but is wrong for a failed *Previous*: it
+        // leaves `page` one behind the content, so the pager reads "Page 2" over
+        // page-3 books and can disable Previous while later-page books are shown.
+        // The step-back case is handled where it happens, by moving loadedPageRef
+        // with it — so this can never resurrect an evacuated page either.
+        setPage(loadedPageRef.current);
       } else if (isE2EMode) {
         // In E2E mode, treat empty list as success (no auth token = no books)
         setProjects([]);
@@ -176,6 +183,10 @@ export default function Dashboard() {
       // and deleting the last book on a later page strands the user on a blank one.
       const current = pageStateRef.current;
       if (current.page > 0 && current.projects.length === 0) {
+        // Move the last-good marker with us. The page we are leaving no longer
+        // exists, so if this step-back's own refetch fails, rolling back to
+        // loadedPageRef must land here rather than resurrecting the emptied page.
+        loadedPageRef.current = current.page - 1;
         setPage(prevPage => prevPage - 1);  // page-change effect refetches
       } else if (current.hasMore || current.page > 0) {
         await fetchBooks();
