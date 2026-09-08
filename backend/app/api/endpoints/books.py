@@ -163,10 +163,20 @@ async def create_new_book(
 @router.get("/", response_model=List[BookResponse])
 async def get_user_books(
     request: Request,
-    skip: int = Query(0, ge=0),
+    # skip is capped as well as limit, matching the admin users route: Mongo walks
+    # every skipped document, so an unbounded offset turns a cheap indexed query into
+    # a full scan the caller controls. The dashboard now drives skip from its pager
+    # (#493), which makes this a reachable input rather than a theoretical one.
+    # 100k is ~4000 pages, far past any real library.
+    skip: int = Query(0, ge=0, le=100_000),
     limit: int = Query(100, ge=1, le=100),
     current_user: Dict = Depends(get_current_user_from_session),
-    rate_limit_info: Dict = Depends(get_rate_limiter(limit=20, window=60)),
+    # 60/min, not the 20 this route carried when a dashboard visit cost exactly one
+    # GET. The pager (#493) makes every page click, delete refetch and focus-driven
+    # session refresh its own request, so a user paging through a 21-page library
+    # tripped the old budget just by browsing. Still bounded well below what a
+    # scripted enumeration would want.
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=60, window=60)),
 ):
 
     """Get all books for the current user"""

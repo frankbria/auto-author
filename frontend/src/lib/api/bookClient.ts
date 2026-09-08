@@ -221,11 +221,24 @@ export class BookClient {
    * }
    * ```
    */
-  public async getUserBooks(): Promise<BookProject[]> {
-    const response = await fetch(`${this.baseUrl}/books/`, {  // Added trailing slash
-      headers: await this.getHeaders(),
-      credentials: 'include',
-    });
+  public async getUserBooks(
+    options: { skip?: number; limit?: number } = {}
+  ): Promise<BookProject[]> {
+    // Compared against undefined, not truthiness: skip=0 is the first page and must
+    // still serialize. Omitting both keeps the URL byte-identical for callers that
+    // want the endpoint's own defaults.
+    const params = new URLSearchParams();
+    if (options.skip !== undefined) params.append('skip', String(options.skip));
+    if (options.limit !== undefined) params.append('limit', String(options.limit));
+    const query = params.toString();
+
+    const response = await fetch(
+      `${this.baseUrl}/books/${query ? `?${query}` : ''}`,  // Added trailing slash
+      {
+        headers: await this.getHeaders(),
+        credentials: 'include',
+      }
+    );
     if (!response.ok) {
       throw new Error(`Failed to fetch books: ${response.status}`);
     }

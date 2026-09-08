@@ -524,3 +524,43 @@ reads as more honest than a construction. The fix is not an exemption: build the
 (`'not-a-real-'.padEnd(24, 'x')`) and say in a comment why. Second data point that the
 scanner, not the author's judgement, is what catches this — and this very paragraph was
 rejected on its first attempt for quoting the offending line, so it describes it instead.
+
+
+---
+
+## A mutation check is only as good as its revert (#493, 2026-09-07)
+
+Mutation-testing the pagination work, the script applied a mutation, ran the suite, then
+`git checkout -- <file>` to restore. Seven mutations, results recorded, moving on. The
+results were garbage.
+
+A stale `.git/index.lock` — left by an earlier interrupted `git commit`, with no git
+process still running — made **every** `git checkout` a silent no-op. It printed its error
+to stderr, which the script did not check, and exited in a way the loop ignored. So
+mutations *accumulated*: M9's result was really M8+M9, M10's was M8+M9+M10. Four mutations
+recorded as "caught" were caught by a pile of unrelated damage, and the one genuinely
+uncaught mutation (M8) was the only honest number in the set.
+
+Worse, the review fixes being tested were **uncommitted at the time**. Had the checkout
+worked, it would have restored from the index and destroyed them — the exact hazard already
+recorded in [[commit-before-mutation-checks]]. The broken lock is the only reason the work
+survived. Both failure modes were live simultaneously, in opposite directions.
+
+**What to do differently:**
+
+1. **Assert the revert, don't assume it.** After restoring, `git diff --quiet HEAD -- <file>`
+   and abort loudly if it fails. Equally, assert the mutation *did* apply — a mutation that
+   silently fails to apply reads as "caught nothing" and looks like a passing baseline.
+2. **`git checkout HEAD -- <path>`, not `git checkout -- <path>`.** The latter restores from
+   the index, which is whatever was last staged, not what you think you are comparing to.
+3. **Commit first — and confirm the commit landed.** The commit that would have protected
+   this work had itself failed on the same lock, and the failure was buried in a background
+   task's output under a line that read `exited with code 0`.
+4. **A clean `git status` is not proof git is healthy.** Check for a stale lock when any git
+   operation behaves oddly: `ls .git/index.lock` plus `pgrep git` to confirm nothing owns it.
+
+**The general shape:** a verification harness that silently degrades reports success. Every
+step of a check that exists to catch problems needs its own check that it ran — otherwise
+the harness fails open, which is the one direction a test tool must never fail. This is the
+same fault as [[guard-tests-can-self-match]] and [[gate-must-cover-the-file]]: the gate was
+present, ran, printed green, and was measuring nothing.

@@ -1378,6 +1378,35 @@ describe('BookClient core CRUD – success paths', () => {
     expect(result[0]).toMatchObject({ id: BOOK_ID, title: 'Book A' });
   });
 
+  // #493 — the dashboard drives skip/limit to page through a large library.
+  it('getUserBooks sends no query string when called with no paging options', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson([]));
+
+    await bookClient.getUserBooks();
+
+    const [url] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toMatch(/\/books\/$/);
+  });
+
+  it('getUserBooks appends skip and limit when paging', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson([]));
+
+    await bookClient.getUserBooks({ skip: 24, limit: 25 });
+
+    const [url] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toContain('skip=24');
+    expect(url).toContain('limit=25');
+  });
+
+  it('getUserBooks serializes skip=0 rather than dropping it as falsy', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson([]));
+
+    await bookClient.getUserBooks({ skip: 0, limit: 25 });
+
+    const [url] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toContain('skip=0');
+  });
+
   // Issue #291: BookResponse has no chapters/progress fields; the client must
   // compute them from toc_items so BookCard never renders "undefined chapters".
   it('getUserBooks computes chapters/progress from toc_items', async () => {
