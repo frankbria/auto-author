@@ -82,6 +82,11 @@ export default function Dashboard() {
       const moreExist = fetched.length > PAGE_SIZE;
       setHasMore(moreExist);
       setProjects(pageBooks);
+      // Defensive, and not independently mutation-testable: the passive effect also
+      // syncs this, so removing the line only matters in the narrow window where a
+      // DELETE continuation runs in the same microtask batch as a completed fetch.
+      // Staging that ordering in a unit test is not practical; the line is one
+      // assignment and keeps the ref true at every point that writes the list.
       pageStateRef.current = { projects: pageBooks, hasMore: moreExist, page };
       loadedPageRef.current = page;
       setError(null);

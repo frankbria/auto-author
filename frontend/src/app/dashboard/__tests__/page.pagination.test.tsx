@@ -431,14 +431,35 @@ describe('Dashboard pagination (#493)', () => {
     await user.click(screen.getByText(`Delete Book ${PAGE_SIZE}`));
 
     // loadedPageRef still points at page 2, which the step-back just evacuated.
-    // Rolling back to it would resurrect an emptied page.
+    // Rolling back to it would resurrect an emptied page — and would cost a fourth
+    // fetch, which is what this counts. A bare `not.toHaveBeenLastCalledWith` would
+    // pass before that fetch ever happened.
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(getUserBooks).not.toHaveBeenLastCalledWith({
-        skip: PAGE_SIZE,
-        limit: PAGE_SIZE + 1,
-      })
-    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(getUserBooks).toHaveBeenCalledTimes(3);
+    expect(getUserBooks).toHaveBeenLastCalledWith({ skip: 0, limit: PAGE_SIZE + 1 });
+  });
+
+  it('clamps back to the first page when a later page 404s', async () => {
+    const user = userEvent.setup();
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1)) // page 1
+      .mockRejectedValueOnce(new Error('Failed to fetch books: 404')) // page 2 is gone
+      .mockResolvedValue([]); // the clamped page-1 refetch
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+
+    // Clamped to page 0, so this is the onboarding empty state, not "No books on
+    // this page." stranded behind a pager.
+    expect(await screen.findByTestId('empty-book-state')).toBeInTheDocument();
+    expect(screen.queryByText(/no books on this page/i)).not.toBeInTheDocument();
   });
 
   it('ignores a Previous click while a page fetch is still in flight', async () => {
