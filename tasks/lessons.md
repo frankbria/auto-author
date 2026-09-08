@@ -564,3 +564,49 @@ step of a check that exists to catch problems needs its own check that it ran �
 the harness fails open, which is the one direction a test tool must never fail. This is the
 same fault as [[guard-tests-can-self-match]] and [[gate-must-cover-the-file]]: the gate was
 present, ran, printed green, and was measuring nothing.
+
+---
+
+## Verify a lockfile with the npm CI actually runs — and never with `--dry-run`
+
+**Date:** 2026-09-08 (auto-author #616 / PR #617)
+
+`codex review` raised a [P1]: my lockfile change dropped the top-level `@emnapi/core` and
+`@emnapi/runtime` entries, and `npm ci` would fail. I checked, concluded it did not
+reproduce, posted a confident rebuttal blaming the reviewer's `--offline` flag — and CI then
+failed with exactly the predicted error. **The reviewer was right and I was wrong.**
+
+**Two independent flaws in my check, either one sufficient to hide the bug:**
+
+1. **`npm ci --dry-run` against a populated `node_modules` passes regardless.** It printed
+   `up to date in 657ms`, which I read as a pass. It is not a lockfile-consistency check.
+2. **Wrong npm.** This machine had npm 11.6.2; CI runs Node 24.20.0 with npm **11.19.0**.
+   They resolve `@napi-rs/wasm-runtime`'s optional `@emnapi/*` peers differently — 11.6.2
+   drops the top-level entries and is content, 11.19.0 demands them. I generated the
+   lockfile with a resolver that was not the one that would validate it.
+
+Even my "clean-room" `npm ci` in an empty directory passed, because it still used the local
+npm. The environment I controlled for was not the one that mattered.
+
+**What to do differently:**
+
+1. **Read the CI log before rebutting a review finding.** The failing job already contained
+   `Missing: @emnapi/runtime@1.11.3 from lock file`. I argued from a local reproduction
+   attempt when the authoritative evidence was one `gh api .../logs` away.
+2. **Pin the tool version to CI's before touching a lockfile.** Get it from the job log
+   (`npm: 11.19.0`) and use `npx npm@<that> install`. A lockfile is an artifact *of a
+   resolver version*; regenerating it with a different one is a silent format change.
+3. **The only valid lockfile check is `npm ci` in an empty directory under CI's npm.**
+   Not `--dry-run`, not `npm install`, not a clean-room run under the local npm.
+4. **Make the check discriminate before trusting it.** Run it against the *known-bad*
+   lockfile too. Old → `FAIL`, new → `PASS` is what turns "my check passed" into evidence.
+   I only did this after being wrong, and it settled the question immediately.
+5. **A dependency-tree diff is a first-class review artifact.** `removed: 2` was visible in
+   my own output before I pushed, and I read past it. For a lockfile change that is not a
+   removal, *anything* removed is the finding.
+
+**The general shape:** same family as [[stale-git-index-lock-breaks-reverts]] and
+[[gate-must-cover-the-file]] — the check ran, printed green, and could not have detected the
+defect. The new wrinkle is social: a correct external finding was overridden by a confident
+local "verification". Weight a specific, reproducible claim from a reviewer above your own
+negative result until your negative result is shown to discriminate.
