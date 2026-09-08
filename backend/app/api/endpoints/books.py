@@ -171,7 +171,12 @@ async def get_user_books(
     skip: int = Query(0, ge=0, le=100_000),
     limit: int = Query(100, ge=1, le=100),
     current_user: Dict = Depends(get_current_user_from_session),
-    rate_limit_info: Dict = Depends(get_rate_limiter(limit=20, window=60)),
+    # 60/min, not the 20 this route carried when a dashboard visit cost exactly one
+    # GET. The pager (#493) makes every page click, delete refetch and focus-driven
+    # session refresh its own request, so a user paging through a 21-page library
+    # tripped the old budget just by browsing. Still bounded well below what a
+    # scripted enumeration would want.
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=60, window=60)),
 ):
 
     """Get all books for the current user"""

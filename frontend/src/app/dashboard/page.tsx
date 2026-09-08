@@ -38,6 +38,20 @@ export default function Dashboard() {
   // ever loaded" keeps the pager mounted while a later page is in flight, instead of
   // replacing the whole screen with a skeleton on every Next click.
   const hasLoadedOnce = useRef(false);
+  // Fetches are no longer one-per-visit: a page click, a delete refetch and a
+  // session-identity change (better-auth refires on window focus) can all be in
+  // flight together. Without a token the slowest response wins and can restore a
+  // pre-delete snapshot over a newer one.
+  const requestIdRef = useRef(0);
+  // The last page whose fetch actually succeeded, so a failed page change can roll
+  // back to it instead of leaving the pager claiming a page that never loaded.
+  const loadedPageRef = useRef(0);
+  // Post-await decisions read this instead of the click-time closure, which goes
+  // stale across a DELETE round-trip.
+  const pageStateRef = useRef({ projects, hasMore, page });
+  useEffect(() => {
+    pageStateRef.current = { projects, hasMore, page };
+  });
 
   // E2E test mode detection
   const isE2EMode = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
@@ -45,6 +59,9 @@ export default function Dashboard() {
   const fetchBooks = useCallback(async () => {
     // In E2E mode, bypass session user check
     if (!isE2EMode && (!session)) return;
+
+    const requestId = ++requestIdRef.current;
+    const isStale = () => requestId !== requestIdRef.current;
 
     setIsLoading(true);
     try {
@@ -57,10 +74,13 @@ export default function Dashboard() {
         skip: page * PAGE_SIZE,
         limit: PAGE_SIZE + 1,
       });
+      if (isStale()) return;
       setHasMore(fetched.length > PAGE_SIZE);
       setProjects(fetched.slice(0, PAGE_SIZE));
+      loadedPageRef.current = page;
       setError(null);
     } catch (err) {
+      if (isStale()) return;
       console.error('Error fetching books:', err);
 
       // Check if this is a 404 error (user has no books yet or doesn't exist in DB)
@@ -72,15 +92,26 @@ export default function Dashboard() {
 
       // In E2E mode, treat empty list as success (no auth token = no books)
       // For 404 errors, treat as empty state (user has no books yet)
-      if (isE2EMode || is404) {
+      if (hasLoadedOnce.current) {
+        // A failed page change must not replace a working dashboard — with the
+        // full-screen error branch, or (in bypass mode) by coercing the list to
+        // empty. Either way the user loses their place, and the per-page requests
+        // this pager makes put a 429 well within reach. This is checked before the
+        // E2E/404 coercion below on purpose: that coercion is about a *first* load
+        // with no session, not about discarding a page we already have.
+        toast.error({ title: 'Failed to load that page. Please try again.' });
+        setPage(loadedPageRef.current);
+      } else if (isE2EMode || is404) {
         setProjects([]);
         setError(null);
       } else {
         setError('Failed to load your books. Please try again.');
       }
     } finally {
-      setIsLoading(false);
-      hasLoadedOnce.current = true;
+      if (!isStale()) {
+        setIsLoading(false);
+        hasLoadedOnce.current = true;
+      }
     }
   }, [session, isE2EMode, page]);
 
@@ -120,9 +151,12 @@ export default function Dashboard() {
       // On a single-page library the splice above is the whole story. Once the list is
       // paged it is not: the row that shifts up from the next page was never fetched,
       // and deleting the last book on a later page strands the user on a blank one.
-      if (page > 0 && projects.length === 1) {
+      // Read current state, not the click-time closure: a refetch can land during
+      // the DELETE round-trip and change what is actually on the page.
+      const current = pageStateRef.current;
+      if (current.page > 0 && current.projects.length === 1) {
         setPage(prevPage => prevPage - 1);  // page-change effect refetches
-      } else if (hasMore || page > 0) {
+      } else if (current.hasMore || current.page > 0) {
         await fetchBooks();
       }
     } catch (err) {
@@ -154,6 +188,9 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const isPrevDisabled = page === 0 || isLoading;
+  const isNextDisabled = !hasMore || isLoading;
 
   // Show error state
   if (error) {
@@ -217,11 +254,22 @@ export default function Dashboard() {
             aria-label="Book list pagination"
             className="mt-8 flex items-center justify-center gap-4"
           >
+            {/*
+              aria-disabled rather than disabled: the button the user just activated
+              is the one that goes inert, and a real `disabled` drops focus to <body>
+              on every page change — a keyboard user would have to tab from the top of
+              the document each time. aria-disabled keeps it focusable and announced;
+              the onClick guard is what actually stops the action.
+            */}
             <Button
               variant="outline"
               aria-label="Previous page"
-              disabled={page === 0 || isLoading}
-              onClick={() => setPage(prevPage => Math.max(0, prevPage - 1))}
+              aria-disabled={isPrevDisabled}
+              className="aria-disabled:opacity-50"
+              onClick={() => {
+                if (isPrevDisabled) return;
+                setPage(prevPage => Math.max(0, prevPage - 1));
+              }}
             >
               <HugeiconsIcon icon={ArrowLeft01Icon} size={20} className="mr-2" />
               Previous
@@ -232,8 +280,12 @@ export default function Dashboard() {
             <Button
               variant="outline"
               aria-label="Next page"
-              disabled={!hasMore || isLoading}
-              onClick={() => setPage(prevPage => prevPage + 1)}
+              aria-disabled={isNextDisabled}
+              className="aria-disabled:opacity-50"
+              onClick={() => {
+                if (isNextDisabled) return;
+                setPage(prevPage => prevPage + 1);
+              }}
             >
               Next
               <HugeiconsIcon icon={ArrowRight01Icon} size={20} className="ml-2" />
