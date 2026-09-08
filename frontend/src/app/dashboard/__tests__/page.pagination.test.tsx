@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useSession } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
@@ -287,9 +287,94 @@ describe('Dashboard pagination (#493)', () => {
     expect(await screen.findByText('Book 200')).toBeInTheDocument();
 
     // The first delete's refetch lands late carrying a pre-second-delete snapshot.
-    releaseStale(makeBooks(3, 300));
-    await waitFor(() => expect(screen.getByText('Book 200')).toBeInTheDocument());
+    // Flush inside act so the stale update actually gets its chance to apply —
+    // asserting straight after the release passes vacuously.
+    await act(async () => {
+      releaseStale(makeBooks(3, 300));
+      await Promise.resolve();
+    });
+
     expect(screen.queryByText('Book 300')).not.toBeInTheDocument();
+    expect(screen.getByText('Book 200')).toBeInTheDocument();
+  });
+
+  it('a stale response does not clear the loading state of the newer fetch', async () => {
+    const user = userEvent.setup();
+    let releaseStale: (books: unknown[]) => void = () => {};
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1))
+      .mockReturnValueOnce(new Promise(resolve => { releaseStale = resolve; })) // stale
+      .mockReturnValueOnce(new Promise(() => {})); // newer, still in flight
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+
+    await user.click(screen.getByText('Delete Book 0'));
+    await user.click(screen.getByText('Delete Book 1'));
+
+    await act(async () => {
+      releaseStale(makeBooks(3, 300));
+      await Promise.resolve();
+    });
+
+    // The newer fetch is still pending, so the pager must stay inert.
+    expect(screen.getByRole('button', { name: /next page/i })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+  });
+
+  it('decides the post-delete step-back from current state, not the click-time closure', async () => {
+    const user = userEvent.setup();
+    let resolveFirst: (v: unknown) => void = () => {};
+    let resolveSecond: (v: unknown) => void = () => {};
+    (bookClient.deleteBook as jest.Mock)
+      .mockReturnValueOnce(new Promise(resolve => { resolveFirst = resolve; }))
+      .mockReturnValueOnce(new Promise(resolve => { resolveSecond = resolve; }));
+
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1)) // page 1
+      .mockResolvedValueOnce(makeBooks(2, PAGE_SIZE)) // page 2: exactly 2 books, no more
+      .mockResolvedValueOnce(makeBooks(1, PAGE_SIZE + 1)) // first delete's refetch of page 2
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE)); // back on page 1
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await screen.findByText(`Book ${PAGE_SIZE}`);
+
+    // Both deletes are clicked while two books are on screen, so both closures
+    // captured length === 2. Only the second one is true by the time it resolves.
+    await user.click(screen.getByText(`Delete Book ${PAGE_SIZE}`));
+    await user.click(screen.getByText(`Delete Book ${PAGE_SIZE + 1}`));
+
+    await act(async () => { resolveFirst({ success: true }); await Promise.resolve(); });
+    await act(async () => { resolveSecond({ success: true }); await Promise.resolve(); });
+
+    // Page 2 is now empty, so the second delete must step back to page 1.
+    await waitFor(() =>
+      expect(getUserBooks).toHaveBeenLastCalledWith({ skip: 0, limit: PAGE_SIZE + 1 })
+    );
+    expect(await screen.findByText('Book 0')).toBeInTheDocument();
+  });
+
+  it('ignores a Previous click while a page fetch is still in flight', async () => {
+    const user = userEvent.setup();
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1)) // page 1
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1, PAGE_SIZE)) // page 2
+      .mockReturnValueOnce(new Promise(() => {})); // page 3, never settles
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await screen.findByText(`Book ${PAGE_SIZE}`);
+    await user.click(screen.getByRole('button', { name: /next page/i })); // page 3, pending
+
+    await user.click(screen.getByRole('button', { name: /previous page/i }));
+
+    // Still three fetches: the guarded Previous click must not queue a fourth.
+    expect(getUserBooks).toHaveBeenCalledTimes(3);
   });
 
   it('keeps the last good page on screen when a page change fails', async () => {
