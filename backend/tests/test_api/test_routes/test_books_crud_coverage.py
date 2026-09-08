@@ -113,6 +113,12 @@ async def test_list_user_books_invalid_query_422(auth_client_factory):
     # skip must be >= 0
     resp = await api.get("/api/v1/books/?skip=-1")
     assert resp.status_code == 422
+    # skip is bounded too (#493) — Mongo walks every skipped document, so an
+    # unbounded offset is a caller-controlled full scan.
+    resp = await api.get("/api/v1/books/?skip=100001")
+    assert resp.status_code == 422
+    resp = await api.get("/api/v1/books/?skip=100000")
+    assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

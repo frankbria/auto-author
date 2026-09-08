@@ -1,17 +1,29 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/toast';
 import { useSession } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Add01Icon, Book02Icon } from '@hugeicons/core-free-icons';
+import {
+  Add01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Book02Icon,
+} from '@hugeicons/core-free-icons';
 import BookCard, { BookProject } from '@/components/BookCard';
 import { BookCreationWizard } from '@/components/BookCreationWizard';
 import { EmptyBookState } from '@/components/EmptyBookState';
 import { Skeleton } from '@/components/ui/skeleton';
 import bookClient from '@/lib/api/bookClient';
+
+/**
+ * Books per page. The endpoint caps `limit` at 100 and the dashboard used to request
+ * all 100 with no way to reach anything past them (#493). 24 divides evenly into the
+ * 1/2/3-column grid and cuts the first-paint payload from ~195 KB to ~49 KB.
+ */
+const PAGE_SIZE = 24;
 
 export default function Dashboard() {
   const router = useRouter();
@@ -20,6 +32,12 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isBookDialogOpen, setIsBookDialogOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  // The loading branch below is a full-page early return. Gating it on "nothing has
+  // ever loaded" keeps the pager mounted while a later page is in flight, instead of
+  // replacing the whole screen with a skeleton on every Next click.
+  const hasLoadedOnce = useRef(false);
 
   // E2E test mode detection
   const isE2EMode = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
@@ -32,8 +50,15 @@ export default function Dashboard() {
     try {
       // Cookie-based authentication - no token provider needed
       // Cookies are automatically sent with credentials: 'include'
-      const books = await bookClient.getUserBooks();
-      setProjects(books);
+      // Over-fetch a single row past the page: the endpoint returns a bare array with
+      // no total, so the presence of that extra row is how we learn a next page exists
+      // without paying a second count query.
+      const fetched = await bookClient.getUserBooks({
+        skip: page * PAGE_SIZE,
+        limit: PAGE_SIZE + 1,
+      });
+      setHasMore(fetched.length > PAGE_SIZE);
+      setProjects(fetched.slice(0, PAGE_SIZE));
       setError(null);
     } catch (err) {
       console.error('Error fetching books:', err);
@@ -55,8 +80,9 @@ export default function Dashboard() {
       }
     } finally {
       setIsLoading(false);
+      hasLoadedOnce.current = true;
     }
-  }, [session, isE2EMode]);
+  }, [session, isE2EMode, page]);
 
   useEffect(() => {
     fetchBooks();
@@ -68,7 +94,13 @@ export default function Dashboard() {
 
   const handleBookCreated = (bookId: string) => {
     toast.success({ title: 'Your book has been created! Click "Open Project" to start writing.' });
-    fetchBooks();  // Refresh the list of books
+    // The list is newest-first, so a new book lands on page 1. Jumping there lets the
+    // page-change effect do the refetch; on page 1 already, refetch directly.
+    if (page === 0) {
+      fetchBooks();
+    } else {
+      setPage(0);
+    }
 
     // Redirect after a short delay to allow the user to see the success toast
     setTimeout(() => {
@@ -84,6 +116,15 @@ export default function Dashboard() {
 
       // Update the local state to remove the deleted book
       setProjects(prevProjects => prevProjects.filter(book => book.id !== bookId));
+
+      // On a single-page library the splice above is the whole story. Once the list is
+      // paged it is not: the row that shifts up from the next page was never fetched,
+      // and deleting the last book on a later page strands the user on a blank one.
+      if (page > 0 && projects.length === 1) {
+        setPage(prevPage => prevPage - 1);  // page-change effect refetches
+      } else if (hasMore || page > 0) {
+        await fetchBooks();
+      }
     } catch (err) {
       console.error('Error deleting book:', err);
       toast.error({ title: 'Failed to delete book. Please try again.' });
@@ -91,7 +132,7 @@ export default function Dashboard() {
   };
 
   // Show loading state — skeleton mirroring the book-card grid to prevent layout shift
-  if (isLoading) {
+  if (isLoading && !hasLoadedOnce.current) {
     return (
       <div
         className="container mx-auto flex-1 p-6"
@@ -151,7 +192,10 @@ export default function Dashboard() {
 
         {/* Projects Grid */}
         {projects.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            aria-busy={isLoading}
+          >
             {projects.map(project => (
               <BookCard
                 key={project.id}
@@ -160,8 +204,41 @@ export default function Dashboard() {
               />
             ))}
           </div>
-        ) : (
+        ) : page === 0 ? (
           <EmptyBookState onCreateNew={handleCreateNewBook} />
+        ) : (
+          // An empty *later* page is not an empty library — showing the onboarding
+          // "create your first book" state here would be a lie.
+          <p className="text-muted-foreground">No books on this page.</p>
+        )}
+
+        {(page > 0 || hasMore) && (
+          <nav
+            aria-label="Book list pagination"
+            className="mt-8 flex items-center justify-center gap-4"
+          >
+            <Button
+              variant="outline"
+              aria-label="Previous page"
+              disabled={page === 0 || isLoading}
+              onClick={() => setPage(prevPage => Math.max(0, prevPage - 1))}
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={20} className="mr-2" />
+              Previous
+            </Button>
+            <span aria-live="polite" className="text-sm text-muted-foreground">
+              Page {page + 1}
+            </span>
+            <Button
+              variant="outline"
+              aria-label="Next page"
+              disabled={!hasMore || isLoading}
+              onClick={() => setPage(prevPage => prevPage + 1)}
+            >
+              Next
+              <HugeiconsIcon icon={ArrowRight01Icon} size={20} className="ml-2" />
+            </Button>
+          </nav>
         )}
       </div>
 
