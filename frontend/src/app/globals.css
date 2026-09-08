@@ -138,3 +138,24 @@
     outline-offset: 2px;
   }
 }
+
+@layer utilities {
+  /* #610: `primary` is a theme-fixed brand colour (tailwind.config.js), so
+     `text-primary` stayed indigo-600 on the dark surfaces — 2.85:1 on the
+     header's `bg-card`, under the 4.5:1 WCAG 2.1 AA floor. indigo-400 clears
+     it everywhere text-primary lands in dark (6.0:1 on card, 6.6:1 on
+     background, 5.1:1 on accent).
+
+     Overriding the text role only, rather than re-theming the token: the token
+     also drives `bg-primary`, whose pair is `text-primary-foreground: white`,
+     and white on indigo-400 is 2.98:1 — that swap would trade one AA failure
+     for another. Light mode keeps indigo-600 (6.3:1 on white).
+
+     The hover selector is listed separately because Tailwind emits its own
+     `.hover\:text-primary:hover` at equal specificity and later in the
+     stylesheet; without naming it the inactive nav links would fail on hover. */
+  .dark .text-primary,
+  .dark .hover\:text-primary:hover {
+    color: rgb(129, 140, 248);
+  }
+}

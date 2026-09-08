@@ -10,13 +10,18 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { axe, toHaveNoViolations } from 'jest-axe';
 
 // Extend Jest matchers
 expect.extend(toHaveNoViolations);
 
-// Mock Next.js
+// Mock Next.js. `mockPathname` is mutable so the navigation scans below can put
+// the user on a route that actually has an active nav link; every other block
+// leaves it at '/'.
+let mockPathname = '/';
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: jest.fn(),
@@ -24,7 +29,12 @@ jest.mock('next/navigation', () => ({
     query: {},
   }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => '/',
+  usePathname: () => mockPathname,
+}));
+
+jest.mock('@/lib/api/bookClient', () => ({
+  __esModule: true,
+  default: { getUserBooks: jest.fn() },
 }));
 
 // Mock better-auth
@@ -53,10 +63,58 @@ jest.mock('@/lib/auth-client', () => ({
 
 describe('Component Accessibility Audit - Phase 1', () => {
   describe('4.1 Navigation Components', () => {
-    // Note: Navigation components would be tested here
-    // Skipping for now as we need the actual components imported
-    it.skip('should pass accessibility scan for primary navigation', async () => {
-      // TODO: Import and test navigation component
+    /**
+     * Both site navs in one scan, in their real composition: the persistent
+     * header nav from the dashboard layout and the book-list pagination nav
+     * added by #493, which until now had only been scanned by hand once.
+     *
+     * Structure only. jsdom loads no stylesheet and does no layout, so axe's
+     * `color-contrast` rule cannot run here — the dark-theme contrast this was
+     * opened for (#610) is guarded in `theme/dark-primary-text-contrast.test.ts`,
+     * which computes the ratio from the real token values.
+     */
+    beforeEach(() => {
+      mockPathname = '/dashboard';
+    });
+
+    afterEach(() => {
+      mockPathname = '/';
+    });
+
+    it('should pass accessibility scan for the header and pagination navs', async () => {
+      const DashboardLayout = (await import('@/app/dashboard/layout')).default;
+      const Dashboard = (await import('@/app/dashboard/page')).default;
+      const bookClient = (await import('@/lib/api/bookClient')).default;
+
+      // PAGE_SIZE (24) + 1: the over-fetched row is how the page learns a next
+      // page exists, and it is what mounts the pagination nav at all.
+      (bookClient.getUserBooks as jest.Mock).mockResolvedValue(
+        Array.from({ length: 25 }, (_, i) => ({
+          id: String(i),
+          title: `Book ${i}`,
+          genre: 'Non-Fiction',
+          target_audience: 'General',
+          chapters: 5,
+          word_count: 10000,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }))
+      );
+
+      const { container } = render(
+        <DashboardLayout>
+          <Dashboard />
+        </DashboardLayout>
+      );
+
+      // The pager only exists once the fetch resolves.
+      await screen.findByRole('navigation', { name: 'Book list pagination' });
+      expect(
+        screen.getByRole('navigation', { name: 'Main navigation' })
+      ).toBeInTheDocument();
+
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
     });
   });
 
