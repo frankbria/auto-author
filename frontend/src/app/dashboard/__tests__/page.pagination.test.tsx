@@ -154,6 +154,26 @@ describe('Dashboard pagination (#493)', () => {
     expect(await screen.findByText('Book 0')).toBeInTheDocument();
   });
 
+  it('keeps the pager mounted while the next page is still in flight', async () => {
+    const user = userEvent.setup();
+    let releasePageTwo: (books: unknown[]) => void = () => {};
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1))
+      .mockReturnValueOnce(new Promise(resolve => { releasePageTwo = resolve; }));
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+
+    // The full-page loading skeleton must not swallow the pager mid-transition.
+    expect(screen.getByRole('navigation', { name: /pagination/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /next page/i })).toBeDisabled();
+
+    releasePageTwo(makeBooks(5, PAGE_SIZE));
+    expect(await screen.findByText(`Book ${PAGE_SIZE}`)).toBeInTheDocument();
+  });
+
   it('refetches after a delete when more pages exist, to backfill the shifted-up row', async () => {
     const user = userEvent.setup();
     getUserBooks
