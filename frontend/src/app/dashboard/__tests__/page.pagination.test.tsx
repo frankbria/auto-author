@@ -358,6 +358,89 @@ describe('Dashboard pagination (#493)', () => {
     expect(await screen.findByText('Book 0')).toBeInTheDocument();
   });
 
+  it('steps back when two deletes empty a page within the same microtask batch', async () => {
+    // No act() flush between the two resolutions, so no passive effect runs between
+    // them — both continuations read the ref in the same batch. If the ref were only
+    // synced from useEffect, the second delete would still see two books and refetch
+    // the page it just emptied.
+    const user = userEvent.setup();
+    let resolveFirst: (v: unknown) => void = () => {};
+    let resolveSecond: (v: unknown) => void = () => {};
+    (bookClient.deleteBook as jest.Mock)
+      .mockReturnValueOnce(new Promise(resolve => { resolveFirst = resolve; }))
+      .mockReturnValueOnce(new Promise(resolve => { resolveSecond = resolve; }));
+
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1)) // page 1
+      .mockResolvedValueOnce(makeBooks(2, PAGE_SIZE)) // page 2, exactly 2 books
+      .mockResolvedValue(makeBooks(PAGE_SIZE)); // whatever is fetched next
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await screen.findByText(`Book ${PAGE_SIZE}`);
+
+    await user.click(screen.getByText(`Delete Book ${PAGE_SIZE}`));
+    await user.click(screen.getByText(`Delete Book ${PAGE_SIZE + 1}`));
+
+    await act(async () => {
+      resolveFirst({ success: true });
+      resolveSecond({ success: true });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(getUserBooks).toHaveBeenLastCalledWith({ skip: 0, limit: PAGE_SIZE + 1 })
+    );
+  });
+
+  it('treats a 404 as an empty library on every load, not just the first', async () => {
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(3))
+      .mockRejectedValue(new Error('Failed to fetch books: 404'));
+
+    const { rerender } = render(<Dashboard />);
+    await screen.findByText('Book 0');
+
+    // A later refetch 404s — an empty library, not a failed page. It must not toast.
+    (useSession as jest.Mock).mockReturnValue({
+      data: { user: { id: 'user-123' }, session: { id: 'session-456' } },
+      isPending: false,
+      error: null,
+    });
+    rerender(<Dashboard />);
+
+    expect(await screen.findByTestId('empty-book-state')).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('never rolls forward when the refetch after a step-back fails', async () => {
+    const user = userEvent.setup();
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1)) // page 1
+      .mockResolvedValueOnce(makeBooks(1, PAGE_SIZE)) // page 2, single book
+      .mockRejectedValueOnce(new Error('Failed to fetch books: 429')) // step-back fails
+      .mockResolvedValue(makeBooks(PAGE_SIZE + 1)); // any later fetch
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await screen.findByText(`Book ${PAGE_SIZE}`);
+
+    await user.click(screen.getByText(`Delete Book ${PAGE_SIZE}`));
+
+    // loadedPageRef still points at page 2, which the step-back just evacuated.
+    // Rolling back to it would resurrect an emptied page.
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(getUserBooks).not.toHaveBeenLastCalledWith({
+        skip: PAGE_SIZE,
+        limit: PAGE_SIZE + 1,
+      })
+    );
+  });
+
   it('ignores a Previous click while a page fetch is still in flight', async () => {
     const user = userEvent.setup();
     getUserBooks

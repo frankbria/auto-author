@@ -47,7 +47,10 @@ export default function Dashboard() {
   // back to it instead of leaving the pager claiming a page that never loaded.
   const loadedPageRef = useRef(0);
   // Post-await decisions read this instead of the click-time closure, which goes
-  // stale across a DELETE round-trip.
+  // stale across a DELETE round-trip. Written synchronously at every mutation site
+  // as well as from this effect: passive effects flush on a macrotask, so two
+  // DELETE continuations resolving in the same microtask batch would both read the
+  // pre-first-splice snapshot and neither would notice the page had emptied.
   const pageStateRef = useRef({ projects, hasMore, page });
   useEffect(() => {
     pageStateRef.current = { projects, hasMore, page };
@@ -75,8 +78,11 @@ export default function Dashboard() {
         limit: PAGE_SIZE + 1,
       });
       if (isStale()) return;
-      setHasMore(fetched.length > PAGE_SIZE);
-      setProjects(fetched.slice(0, PAGE_SIZE));
+      const pageBooks = fetched.slice(0, PAGE_SIZE);
+      const moreExist = fetched.length > PAGE_SIZE;
+      setHasMore(moreExist);
+      setProjects(pageBooks);
+      pageStateRef.current = { projects: pageBooks, hasMore: moreExist, page };
       loadedPageRef.current = page;
       setError(null);
     } catch (err) {
@@ -90,18 +96,26 @@ export default function Dashboard() {
         err.message.includes('not found')
       );
 
-      // In E2E mode, treat empty list as success (no auth token = no books)
-      // For 404 errors, treat as empty state (user has no books yet)
-      if (hasLoadedOnce.current) {
+      if (is404) {
+        // 404 means "this user has no books", not "the page request failed" — so it
+        // coerces to the empty state on every load, not just the first. Routing it
+        // through the retry branch below would toast an error at an empty-library
+        // user on every window refocus, and retrying could never succeed.
+        setProjects([]);
+        setPage(0);
+        setError(null);
+      } else if (hasLoadedOnce.current) {
         // A failed page change must not replace a working dashboard — with the
         // full-screen error branch, or (in bypass mode) by coercing the list to
         // empty. Either way the user loses their place, and the per-page requests
-        // this pager makes put a 429 well within reach. This is checked before the
-        // E2E/404 coercion below on purpose: that coercion is about a *first* load
-        // with no session, not about discarding a page we already have.
+        // this pager makes put a 429 well within reach.
         toast.error({ title: 'Failed to load that page. Please try again.' });
-        setPage(loadedPageRef.current);
-      } else if (isE2EMode || is404) {
+        // Never roll *forward*: after a delete steps back off an emptied page, the
+        // last successfully loaded page is the one we just left, and returning to it
+        // would resurrect it.
+        setPage(prevPage => Math.min(prevPage, loadedPageRef.current));
+      } else if (isE2EMode) {
+        // In E2E mode, treat empty list as success (no auth token = no books)
         setProjects([]);
         setError(null);
       } else {
@@ -145,16 +159,18 @@ export default function Dashboard() {
       await bookClient.deleteBook(bookId);
       toast.success({ title: 'Book deleted successfully' });
 
-      // Update the local state to remove the deleted book
-      setProjects(prevProjects => prevProjects.filter(book => book.id !== bookId));
+      // Update the local state to remove the deleted book. Applied to the ref in the
+      // same tick so a second delete resolving right behind this one sees the splice.
+      const previous = pageStateRef.current;
+      const remaining = previous.projects.filter(book => book.id !== bookId);
+      pageStateRef.current = { ...previous, projects: remaining };
+      setProjects(remaining);
 
       // On a single-page library the splice above is the whole story. Once the list is
       // paged it is not: the row that shifts up from the next page was never fetched,
       // and deleting the last book on a later page strands the user on a blank one.
-      // Read current state, not the click-time closure: a refetch can land during
-      // the DELETE round-trip and change what is actually on the page.
       const current = pageStateRef.current;
-      if (current.page > 0 && current.projects.length === 1) {
+      if (current.page > 0 && current.projects.length === 0) {
         setPage(prevPage => prevPage - 1);  // page-change effect refetches
       } else if (current.hasMore || current.page > 0) {
         await fetchBooks();
