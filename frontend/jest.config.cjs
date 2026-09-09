@@ -31,6 +31,7 @@ const customJestConfig = {
     '/node_modules/',
     '<rootDir>/src/__tests__/fixtures/',
     '<rootDir>/src/__tests__/mocks/',
+    '<rootDir>/src/__tests__/theme/helpers/',
     '<rootDir>/src/__mocks__/',
   ],
   testMatch: [

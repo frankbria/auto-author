@@ -56,7 +56,9 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* #620: 0.556 (#737373) is 4.34:1 on --muted (#f5f5f5), under the 4.5:1
+     AA floor axe-core measured. 0.54 (#6e6e6e) is 4.68:1. Light theme only. */
+  --muted-foreground: oklch(0.54 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
