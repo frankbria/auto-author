@@ -679,3 +679,19 @@ diff — a server error, distinct from the known silent-hang mode. One attempt, 
 `codex review --base main`, which worked and found a real P2. Both GLM paths failed
 on #622 (CLI 500, and the CI "GLM Review" check hung pending forever) — do not let
 either block a merge whose required checks are green.
+
+### Run opencode in the background and check its stream file at 2 minutes
+On #623 I gave opencode a 10-minute *foreground* `timeout` and got exit 143 with
+zero output — burning ten minutes on a 237-line diff. The
+`opencode-concurrent-hang` note already says to background the run and check the
+`.jsonl` stream after ~2 minutes, because a file still at 0 bytes then has never
+recovered. I had the note and did not apply it. Size is not the predictor; the
+2-minute stream check is the whole cost control.
+
+### Sweep the whole indicator row, not just the element the issue names
+#623 named one status dot (`bg-green-500`, 2.09:1). Extending the same guard over
+every dot in the same component found two more real failures: `MobileChapterTabs`
+painted the DRAFT dot `bg-muted` — its own surface, 1.00:1, *invisible*, the #618
+defect never fixed in the mobile variant — and the unsaved-changes dot at 2.57:1.
+A contrast issue split out of a larger sweep has usually only been measured where
+someone happened to look. Enumerate every sibling before deciding the scope.
