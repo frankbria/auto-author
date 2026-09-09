@@ -30,6 +30,22 @@ Tests MUST NOT use arbitrary timeouts (`await page.waitForTimeout(5000)` ❌ —
 waiting, see `testing-infrastructure.md`), depend on execution order, leave side effects, or assert
 on internal implementation details.
 
+### Theme-token debt ledger (#620)
+
+`frontend/src/__tests__/theme/core-authoring-pages-tokens.test.ts` sweeps **every** shipped
+`.ts`/`.tsx` under `frontend/src/` for hardcoded `*-gray-N` Tailwind literals — they are
+theme-blind, and are what made the core authoring flow unreadable in #331, #610 and #618.
+
+Known offenders live in `frontend/gray-literal-baseline.json`, counted **per distinct literal**
+with a reason per file (same idea as `security-baseline.json` for advisories). The guard fails
+when an unledgered file gains a literal, and when a ledgered file exceeds its allowance for any
+one shade — so swapping `text-gray-500` for `text-gray-300` fails rather than netting out.
+It does *not* fail when a count drops.
+
+**Never raise a count to make CI pass.** Use a theme token (`text-foreground`,
+`text-muted-foreground`, `bg-muted`, `border-border`). Shrink the counts freely and delete the
+entry when a file reaches zero.
+
 ### E2E Coverage Requirements
 
 EVERY user-facing feature needs an E2E test covering all five:
