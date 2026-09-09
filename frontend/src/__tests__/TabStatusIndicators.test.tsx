@@ -91,7 +91,7 @@ describe('Tab Status Indicators', () => {
     expect(indicatorsContainer).toBeInTheDocument();
 
     // Find the orange dot indicator
-    const unsavedIndicator = screen.getByTestId('indicators-container').querySelector('.bg-orange-500');
+    const unsavedIndicator = screen.getByTestId('indicators-container').querySelector('.bg-orange-600');
     expect(unsavedIndicator).not.toBeNull();
   });
 });

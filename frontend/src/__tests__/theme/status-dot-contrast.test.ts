@@ -39,6 +39,8 @@ const DOT_SOURCES = [
   { file: 'components/chapters/ChapterTab.tsx', pattern: /^\s*color: '([^']+)'/gm, count: 4 },
   { file: 'components/ui/ChapterStatusIndicator.tsx', pattern: /^\s*color: '([^']+)'/gm, count: 4 },
   { file: 'components/chapters/MobileChapterTabs.tsx', pattern: /return '(bg-[^']+)'/g, count: 5 },
+  // Not a status dot, but the same obligation on the same indicator row.
+  { file: 'components/chapters/ChapterTab.tsx', pattern: /^const UNSAVED_DOT = '([^']+)'/gm, count: 1 },
 ] as const;
 
 // The surfaces a status dot is ever painted on. Light `--card`/`--popover` share
