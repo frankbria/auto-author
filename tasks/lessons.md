@@ -610,3 +610,32 @@ npm. The environment I controlled for was not the one that mattered.
 defect. The new wrinkle is social: a correct external finding was overridden by a confident
 local "verification". Weight a specific, reproducible claim from a reviewer above your own
 negative result until your negative result is shown to discriminate.
+
+## 2026-09-08 — #618 chapter tab contrast
+
+### `pkill -f "<pattern>"` matches the invoking shell's own command line
+`pkill -f "next dev"` and `pkill -f "uvicorn app.main"` both killed the very Bash
+call that issued them (exit 144), because the pattern appears in that process's
+own argv. Twice. Use a non-self-matching pattern (`uvicorn app[.]main`), or
+record the PID at launch and kill that.
+
+### Hand-rolled contrast math on `getComputedStyle` is wrong in modern Chrome
+Colors come back as `lab(66.128 ...)`, not `rgb(...)`, so an `rgb`-shaped regex
+silently parses garbage and produces ratios like `1520538.91`. Never hand-roll it:
+read `axe.run(...)` results' `nodes[].any[0].data.contrastRatio` / `.fgColor` /
+`.bgColor`. axe resolves `lab()` correctly and is the number the AC is written against.
+
+### `next-themes` persists the theme in localStorage across agent-browser reloads
+A `localStorage.setItem('theme','light')` from an earlier step survived a reload
+and made a "dark then light" scan pair run **both halves in light** — the output
+looked plausible. Assert `document.documentElement.className` inside every scan
+payload and read it back, rather than trusting the toggle you just performed.
+
+### Prove the "before" in the same browser, not by arithmetic
+Setting the old colour back on the live nodes and re-running axe (3 violations at
+1.46:1), then restoring (0), is far stronger evidence than recomputing the ratio —
+and it validates that the scan is actually looking at the element you think it is.
+
+### A suggested fix in an issue is a hypothesis, not a spec
+#618 recommended `text-muted-foreground`. It passes on dark (5.85:1) and **fails on
+light** (4.34:1). The AC said "both themes"; only running both themes caught it.
