@@ -19,7 +19,9 @@ interface ChapterTabProps {
 
 const statusConfig = {
   [ChapterStatus.DRAFT]: {
-    color: 'bg-muted',
+    // Not `bg-muted`: that is also the inactive tab's own surface, so the dot
+    // vanished into it (pre-#618; `bg-white` never applied — twMerge dropped it).
+    color: 'bg-muted-foreground',
     icon: File01Icon,
     label: 'Draft'
   },
@@ -86,7 +88,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             {/* Chapter Title */}
             <span className={cn(
               "text-sm font-semibold truncate flex-1",
-              isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              isActive ? "text-primary" : "text-foreground hover:text-primary"
             )}>
               {truncatedTitle}
             </span>
