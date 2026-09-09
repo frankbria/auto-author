@@ -639,3 +639,43 @@ and it validates that the scan is actually looking at the element you think it i
 ### A suggested fix in an issue is a hypothesis, not a spec
 #618 recommended `text-muted-foreground`. It passes on dark (5.85:1) and **fails on
 light** (4.34:1). The AC said "both themes"; only running both themes caught it.
+
+### A count-based debt ledger has a swap loophole
+`actual > ledgered` per file lets a change drop one `text-gray-500` and add one
+`text-gray-300` for a net-zero total — precisely the wrong-shade edit the guard
+exists to catch (#618). Ledger **per distinct value**, not one total per file.
+Codex caught this in pre-PR review of #620; the mutation that proves it keeps the
+file's total unchanged, so a total-based check passes it.
+
+### Whole-tree sweep beats a transitive import walk for a "cannot omit a file" guard
+#620 offered both. The import walk is *itself* the mechanism that silently omits
+files (dynamic imports), which was the defect. Globbing everything is less code
+**and** strictly stronger, and it retires the "static walk misses dynamic imports"
+caveat instead of documenting around it. Prefer the option that removes the
+caveat over the option that scopes it precisely.
+
+### A repo-scanning guard must exclude its own doc comment
+`core-authoring-pages-tokens.test.ts` explains itself using `text-gray-100`,
+`bg-gray-800/50`, `border-gray-700` — all of which match its own pattern. It was
+safe only because it read a fixed path list; the moment it swept a directory it
+would have matched itself. Excluding test sources fixed it, but state the reason
+in the file so nobody "helpfully" re-includes them. (See also: guard-tests-can-self-match.)
+
+### Add a vacuity assertion to any guard that walks a tree
+`expect(sources.length).toBeGreaterThan(150)` plus two `toContain` anchors. Without
+it, breaking the walk (wrong root, over-eager filter) makes the guard pass on an
+empty list — green, and guarding nothing. Mutation-check it by narrowing the root.
+
+### Compute the contrast pairing you actually mean, in the theme you actually mean
+While measuring status dots I applied the *light* `--muted-foreground` (#6e6e6e)
+against the *dark* `bg-muted` (#262626) and got a plausible-looking 2.97:1 "fail".
+The real dark value is #a1a1a1 → 5.86:1, a pass. Achromatic tokens make the wrong
+pairing look reasonable. Label each row with both the theme and the resolved hex
+before believing any of them.
+
+### `codex review` is the working fallback when opencode 500s
+opencode returned `{"name":"UnknownError","ref":"err_f1fe58b5"}` on a ~580-line
+diff — a server error, distinct from the known silent-hang mode. One attempt, then
+`codex review --base main`, which worked and found a real P2. Both GLM paths failed
+on #622 (CLI 500, and the CI "GLM Review" check hung pending forever) — do not let
+either block a merge whose required checks are green.
