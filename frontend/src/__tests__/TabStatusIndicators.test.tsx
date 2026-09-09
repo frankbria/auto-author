@@ -32,7 +32,7 @@ describe('Tab Status Indicators', () => {
     const statusIndicator = screen.getByText('Test Chapter').previousSibling;
     expect(statusIndicator).toHaveClass(status === ChapterStatus.DRAFT ? 'bg-muted-foreground' :
                                status === ChapterStatus.IN_PROGRESS ? 'bg-blue-500' :
-                               status === ChapterStatus.COMPLETED ? 'bg-green-500' :
+                               status === ChapterStatus.COMPLETED ? 'bg-green-700' :
                                'bg-purple-500');
   });
 

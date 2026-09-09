@@ -31,7 +31,9 @@ const statusConfig = {
     label: 'In Progress'
   },
   [ChapterStatus.COMPLETED]: {
-    color: 'bg-green-500',
+    // #623: green-500 is 2.09:1 on light `bg-muted`, under the 3:1 non-text
+    // floor (WCAG 2.1 1.4.11). green-700 is 4.60:1 there; dark keeps 500.
+    color: 'bg-green-700 dark:bg-green-500',
     icon: Clock01Icon,
     label: 'Completed'
   },

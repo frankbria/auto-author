@@ -244,7 +244,7 @@ describe('MobileChapterTabs', () => {
         />
       );
       // Dot appears in the Select trigger area
-      const dot = document.querySelector('.bg-muted.rounded-full');
+      const dot = document.querySelector('.bg-muted-foreground.rounded-full');
       expect(dot).toBeTruthy();
     });
 
@@ -268,7 +268,7 @@ describe('MobileChapterTabs', () => {
           onChapterSelect={jest.fn()}
         />
       );
-      const dot = document.querySelector('.bg-green-500.rounded-full');
+      const dot = document.querySelector('.bg-green-700.rounded-full');
       expect(dot).toBeTruthy();
     });
 
@@ -293,7 +293,7 @@ describe('MobileChapterTabs', () => {
         />
       );
       // Falls through to default branch → bg-muted
-      const dot = document.querySelector('.bg-muted.rounded-full');
+      const dot = document.querySelector('.bg-muted-foreground.rounded-full');
       expect(dot).toBeTruthy();
     });
   });

@@ -106,10 +106,12 @@ export function MobileChapterTabs({
 
 function getStatusColor(status: string): string {
   switch (status) {
-    case 'draft': return 'bg-muted';
+    // #623: `bg-muted` was the dot's own surface, so DRAFT was invisible (1.06:1)
+    // — the #618 defect, unfixed in the mobile variant. green-500 was 2.09:1.
+    case 'draft': return 'bg-muted-foreground';
     case 'in_progress': return 'bg-blue-500';
-    case 'completed': return 'bg-green-500';
+    case 'completed': return 'bg-green-700 dark:bg-green-500';
     case 'published': return 'bg-purple-500';
-    default: return 'bg-muted';
+    default: return 'bg-muted-foreground';
   }
 }
