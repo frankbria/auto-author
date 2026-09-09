@@ -82,11 +82,11 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             }}
           >
             {/* Status Indicator */}
-            <div className={cn("w-2 h-2 rounded-full flex-shrink-0 border border-gray-400 bg-white", config.color)} />
+            <div className={cn("w-2 h-2 rounded-full flex-shrink-0 border border-border", config.color)} />
             {/* Chapter Title */}
             <span className={cn(
               "text-sm font-semibold truncate flex-1",
-              isActive ? "text-primary" : "text-gray-700 hover:text-primary"
+              isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
             )}>
               {truncatedTitle}
             </span>
@@ -110,7 +110,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             <Button
               variant="ghost"
               size="sm"
-              className="h-11 w-11 p-0 border border-gray-300 bg-gray-100 text-gray-700 hover:bg-destructive hover:text-destructive-foreground focus:bg-gray-200 focus:text-gray-900 shadow-sm"
+              className="h-11 w-11 p-0 border border-border text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus:bg-accent focus:text-accent-foreground shadow-sm"
               style={{ opacity: 1 }}
               onClick={(e) => {
                 e.stopPropagation();

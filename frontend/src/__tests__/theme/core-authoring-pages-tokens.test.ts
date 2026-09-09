@@ -22,6 +22,10 @@ const PAGES = [
   'src/app/dashboard/books/[bookId]/page.tsx',
   'src/app/dashboard/books/[bookId]/summary/page.tsx',
   'src/components/toc/TocGenerationWizard.tsx',
+  // #618: the inactive chapter tab title was hardcoded `text-gray-700` — 1.47:1 on
+  // the dark `bg-muted` tab surface. The tab strip is the same core authoring flow
+  // this guard was written for; it was only missing from the list.
+  'src/components/chapters/ChapterTab.tsx',
 ];
 
 // Matches any theme-independent gray utility — `text-gray-100`,
