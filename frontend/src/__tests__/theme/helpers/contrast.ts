@@ -71,3 +71,13 @@ export function oklchToken(block: string, name: string): [number, number, number
 }
 
 export const WCAG_AA_NORMAL_TEXT = 4.5;
+
+/** `#rrggbb` → sRGB 0-255. Tailwind v3 ships its palette as hex. */
+export function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) throw new Error(`Not a 6-digit hex colour: ${hex}`);
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+/** WCAG 2.1 1.4.11: non-text UI components need 3:1, not 4.5:1. */
+export const WCAG_AA_NON_TEXT = 3;

@@ -27,7 +27,8 @@ const statusConfig = {
     label: 'In Progress'
   },
   [ChapterStatus.COMPLETED]: {
-    color: 'bg-green-500',
+    // #623: see ChapterTab — green-500 fails 1.4.11 in light mode.
+    color: 'bg-green-700 dark:bg-green-500',
     textColor: 'text-green-600 dark:text-green-400',
     icon: CheckmarkCircle01Icon,
     label: 'Completed'

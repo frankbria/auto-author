@@ -244,7 +244,7 @@ describe('MobileChapterTabs', () => {
         />
       );
       // Dot appears in the Select trigger area
-      const dot = document.querySelector('.bg-muted.rounded-full');
+      const dot = document.querySelector('.bg-muted-foreground.rounded-full');
       expect(dot).toBeTruthy();
     });
 
@@ -268,7 +268,7 @@ describe('MobileChapterTabs', () => {
           onChapterSelect={jest.fn()}
         />
       );
-      const dot = document.querySelector('.bg-green-500.rounded-full');
+      const dot = document.querySelector('.bg-green-700.rounded-full');
       expect(dot).toBeTruthy();
     });
 
@@ -284,7 +284,7 @@ describe('MobileChapterTabs', () => {
       expect(dot).toBeTruthy();
     });
 
-    it('renders bg-muted dot for unknown status', () => {
+    it('renders bg-muted-foreground dot for unknown status', () => {
       render(
         <MobileChapterTabs
           chapters={[makeChapter('u', { status: 'unknown' as ChapterStatus })]}
@@ -292,8 +292,8 @@ describe('MobileChapterTabs', () => {
           onChapterSelect={jest.fn()}
         />
       );
-      // Falls through to default branch → bg-muted
-      const dot = document.querySelector('.bg-muted.rounded-full');
+      // Falls through to default branch → bg-muted-foreground
+      const dot = document.querySelector('.bg-muted-foreground.rounded-full');
       expect(dot).toBeTruthy();
     });
   });

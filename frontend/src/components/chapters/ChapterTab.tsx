@@ -31,7 +31,9 @@ const statusConfig = {
     label: 'In Progress'
   },
   [ChapterStatus.COMPLETED]: {
-    color: 'bg-green-500',
+    // #623: green-500 is 2.09:1 on light `bg-muted`, under the 3:1 non-text
+    // floor (WCAG 2.1 1.4.11). green-700 is 4.60:1 there; dark keeps 500.
+    color: 'bg-green-700 dark:bg-green-500',
     icon: Clock01Icon,
     label: 'Completed'
   },
@@ -41,6 +43,12 @@ const statusConfig = {
     label: 'Published'
   }
 };
+
+// #623: the unsaved-changes dot carries the same non-text 1.4.11 obligation as
+// the status dots. orange-500 was 2.57:1 on light `bg-muted`; orange-600 is
+// 3.26:1 there and improves on every other surface. Named so the contrast guard
+// reads the value from here rather than from a duplicated literal.
+const UNSAVED_DOT = 'bg-orange-600';
 
 export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
   ({ chapter, isActive, isDragging, onSelect, onClose, orientation = 'vertical', ...props }, ref) => {
@@ -96,7 +104,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             {/* Indicators */}
             <div className="flex items-center gap-1" data-testid="indicators-container">
               {chapter.has_unsaved_changes && (
-                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full border border-orange-700" />
+                <div className={cn("w-1.5 h-1.5 rounded-full border border-orange-700", UNSAVED_DOT)} />
               )}
 
               {chapter.is_loading && (
