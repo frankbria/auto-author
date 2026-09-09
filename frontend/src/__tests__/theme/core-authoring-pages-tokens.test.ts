@@ -20,8 +20,13 @@ import { join, relative, sep } from 'path';
  *
  * So the sweep is now every shipped source file under `src/`, with the known
  * offenders ledgered in `gray-literal-baseline.json` — the same shape
- * `security-baseline.json` uses for advisories. Adding a gray literal anywhere,
- * including to a file already in the ledger, fails; burning one down does not.
+ * `security-baseline.json` uses for advisories. Adding a gray literal anywhere
+ * fails; burning one down does not.
+ *
+ * The ledger records a count *per distinct literal*, not one total per file. A
+ * single total would let a swap through: drop one `text-gray-500`, add one
+ * `text-gray-300`, and the sum is unchanged — which is precisely the wrong-shade
+ * edit that shipped #618. Per-literal counts fail on that.
  *
  * Sweeping the whole tree rather than the transitive import set from the core
  * authoring routes is deliberate: an import walk is exactly the mechanism that
@@ -47,7 +52,8 @@ const IS_TEST_SOURCE = /(^|[\\/])(__tests__|__mocks__|e2e)[\\/]|\.(test|spec)\.[
 const IS_SOURCE = /\.tsx?$/;
 
 interface BaselineEntry {
-  count: number;
+  /** Distinct gray literal → how many times this file may still contain it. */
+  literals: Record<string, number>;
   reason: string;
 }
 
@@ -69,9 +75,17 @@ function shippedSources(dir: string = SRC_ROOT): string[] {
   });
 }
 
-function grayLiteralCount(relativePath: string): number {
+function grayLiteralCounts(relativePath: string): Record<string, number> {
   const source = readFileSync(join(FRONTEND_ROOT, relativePath), 'utf8');
-  return (source.match(GRAY_LITERAL) ?? []).length;
+  const counts: Record<string, number> = {};
+  for (const literal of source.match(GRAY_LITERAL) ?? []) {
+    counts[literal] = (counts[literal] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function grayLiteralTotal(relativePath: string): number {
+  return Object.values(grayLiteralCounts(relativePath)).reduce((a, b) => a + b, 0);
 }
 
 const baseline: Baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
@@ -92,17 +106,24 @@ describe('shipped source uses theme tokens, not hardcoded grays (#331, #620)', (
   it('has no gray literals outside the ledger', () => {
     const unledgered = sources
       .filter((path) => !(path in baseline.files))
-      .filter((path) => grayLiteralCount(path) > 0);
+      .filter((path) => grayLiteralTotal(path) > 0);
 
     expect(unledgered).toEqual([]);
   });
 
-  it('has no ledgered file above its recorded count', () => {
+  it('has no ledgered file above its recorded count for any literal', () => {
     // A single test rather than `it.each`, which throws on an empty table —
     // i.e. it would break at the moment the ledger is finally burned down.
-    const regressions = Object.entries(baseline.files)
-      .map(([path, entry]) => ({ path, ledgered: entry.count, actual: grayLiteralCount(path) }))
-      .filter(({ ledgered, actual }) => actual > ledgered);
+    const regressions = Object.entries(baseline.files).flatMap(([path, entry]) =>
+      Object.entries(grayLiteralCounts(path))
+        .map(([literal, actual]) => ({
+          path,
+          literal,
+          ledgered: entry.literals[literal] ?? 0,
+          actual,
+        }))
+        .filter(({ ledgered, actual }) => actual > ledgered)
+    );
 
     expect(regressions).toEqual([]);
   });
@@ -114,7 +135,7 @@ describe('shipped source uses theme tokens, not hardcoded grays (#331, #620)', (
     expect(stale).toEqual([]);
 
     const unexplained = Object.entries(baseline.files)
-      .filter(([, entry]) => !entry.reason?.trim())
+      .filter(([, entry]) => !entry.reason?.trim() || !Object.keys(entry.literals).length)
       .map(([path]) => path);
     expect(unexplained).toEqual([]);
   });
