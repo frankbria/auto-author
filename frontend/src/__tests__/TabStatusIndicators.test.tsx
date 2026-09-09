@@ -30,7 +30,7 @@ describe('Tab Status Indicators', () => {
     // We can't directly test for the status indicator class since it's not using data-testid
     // But we can check if the status color is applied correctly by checking the element with status colors
     const statusIndicator = screen.getByText('Test Chapter').previousSibling;
-    expect(statusIndicator).toHaveClass(status === ChapterStatus.DRAFT ? 'bg-muted' :
+    expect(statusIndicator).toHaveClass(status === ChapterStatus.DRAFT ? 'bg-muted-foreground' :
                                status === ChapterStatus.IN_PROGRESS ? 'bg-blue-500' :
                                status === ChapterStatus.COMPLETED ? 'bg-green-500' :
                                'bg-purple-500');
@@ -51,7 +51,9 @@ describe('Tab Status Indicators', () => {
 
     // Verify initial status color
     const initialStatusIndicator = screen.getByText('Test Chapter').previousSibling;
-    expect(initialStatusIndicator).toHaveClass('bg-muted');
+    // #618: not 'bg-muted' — that is the inactive tab's own surface, so the
+    // default-state dot was invisible against its own tab.
+    expect(initialStatusIndicator).toHaveClass('bg-muted-foreground');
 
     // Rerender with new status
     rerender(
