@@ -284,7 +284,7 @@ describe('MobileChapterTabs', () => {
       expect(dot).toBeTruthy();
     });
 
-    it('renders bg-muted dot for unknown status', () => {
+    it('renders bg-muted-foreground dot for unknown status', () => {
       render(
         <MobileChapterTabs
           chapters={[makeChapter('u', { status: 'unknown' as ChapterStatus })]}
@@ -292,7 +292,7 @@ describe('MobileChapterTabs', () => {
           onChapterSelect={jest.fn()}
         />
       );
-      // Falls through to default branch → bg-muted
+      // Falls through to default branch → bg-muted-foreground
       const dot = document.querySelector('.bg-muted-foreground.rounded-full');
       expect(dot).toBeTruthy();
     });
