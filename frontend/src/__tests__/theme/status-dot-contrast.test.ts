@@ -69,7 +69,8 @@ function dotColor(
   const palette = name.match(/^([a-z]+)-(\d{2,3})$/);
   if (palette) {
     const [, hue, shade] = palette;
-    const value = (colors as Record<string, Record<string, string>>)[hue]?.[shade];
+    const scale = colors[hue as keyof typeof colors];
+    const value = typeof scale === 'object' ? (scale as Record<string, string>)[shade] : undefined;
     if (!value) throw new Error(`No Tailwind colour \`${name}\``);
     return hexToRgb(value);
   }
