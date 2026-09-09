@@ -1,0 +1,141 @@
+{
+  "_comment": "Files still carrying theme-blind `*-gray-N` Tailwind literals, as of #620. This is the repo's theme-token debt ledger, not an ignore-list to grow: `src/__tests__/theme/core-authoring-pages-tokens.test.ts` fails when any file not listed here gains a gray literal, and when a listed file exceeds its count. Burning a file down below its count does NOT fail — shrink these numbers freely, and delete the entry when it reaches zero. Never raise a count to make CI pass; use a theme token (text-foreground / text-muted-foreground / bg-muted / border-border) instead.",
+  "files": {
+    "src/app/auth/forgot-password/page.tsx": {
+      "count": 8,
+      "reason": "Pre-#331 auth screen, off the core authoring flow. Convert when auth is next themed."
+    },
+    "src/app/auth/reset-password/page.tsx": {
+      "count": 24,
+      "reason": "Pre-#331 auth screen, off the core authoring flow. Convert when auth is next themed."
+    },
+    "src/app/auth/sign-in/page.tsx": {
+      "count": 10,
+      "reason": "Pre-#331 auth screen, off the core authoring flow. Convert when auth is next themed."
+    },
+    "src/app/auth/sign-up/page.tsx": {
+      "count": 14,
+      "reason": "Pre-#331 auth screen, off the core authoring flow. Convert when auth is next themed."
+    },
+    "src/app/dashboard/books/[bookId]/edit-toc/page.tsx": {
+      "count": 25,
+      "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
+    },
+    "src/app/dashboard/books/[bookId]/export/page.tsx": {
+      "count": 62,
+      "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
+    },
+    "src/app/dashboard/not-found.tsx": {
+      "count": 2,
+      "reason": "App shell / error boundary. Renders on its own full-bleed surface, so the #331 near-white-on-white failure mode does not apply directly, but the literals are still theme-blind."
+    },
+    "src/app/error.tsx": {
+      "count": 9,
+      "reason": "App shell / error boundary. Renders on its own full-bleed surface, so the #331 near-white-on-white failure mode does not apply directly, but the literals are still theme-blind."
+    },
+    "src/app/global-error.tsx": {
+      "count": 3,
+      "reason": "App shell / error boundary. Renders on its own full-bleed surface, so the #331 near-white-on-white failure mode does not apply directly, but the literals are still theme-blind."
+    },
+    "src/app/layout.tsx": {
+      "count": 4,
+      "reason": "App shell / error boundary. Renders on its own full-bleed surface, so the #331 near-white-on-white failure mode does not apply directly, but the literals are still theme-blind."
+    },
+    "src/app/page.tsx": {
+      "count": 10,
+      "reason": "App shell / error boundary. Renders on its own full-bleed surface, so the #331 near-white-on-white failure mode does not apply directly, but the literals are still theme-blind."
+    },
+    "src/components/BookCreationWizard.tsx": {
+      "count": 40,
+      "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
+    },
+    "src/components/BookMetadataForm.tsx": {
+      "count": 20,
+      "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
+    },
+    "src/components/auth/PasswordRequirements.tsx": {
+      "count": 2,
+      "reason": "Pre-#331 auth screen, off the core authoring flow. Convert when auth is next themed."
+    },
+    "src/components/chapters/questions/QuestionDisplay.tsx": {
+      "count": 2,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    },
+    "src/components/chapters/questions/QuestionProgress.tsx": {
+      "count": 4,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    },
+    "src/components/errors/ErrorNotification.tsx": {
+      "count": 6,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    },
+    "src/components/examples/ai-error-handling-example.tsx": {
+      "count": 9,
+      "reason": "Developer example component, not routed in the app. Lowest burn-down priority; a candidate for deletion instead."
+    },
+    "src/components/export/ExportOptionsModal.tsx": {
+      "count": 1,
+      "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
+    },
+    "src/components/loading/LoadingStateManager.tsx": {
+      "count": 5,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    },
+    "src/components/loading/ProgressIndicator.tsx": {
+      "count": 6,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    },
+    "src/components/navigation/ChapterBreadcrumb.tsx": {
+      "count": 14,
+      "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
+    },
+    "src/components/toc/ClarifyingQuestions.tsx": {
+      "count": 34,
+      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
+    },
+    "src/components/toc/ErrorDisplay.tsx": {
+      "count": 13,
+      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
+    },
+    "src/components/toc/NotReadyMessage.tsx": {
+      "count": 24,
+      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
+    },
+    "src/components/toc/ReadinessChecker.tsx": {
+      "count": 8,
+      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
+    },
+    "src/components/toc/TocGenerating.tsx": {
+      "count": 16,
+      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
+    },
+    "src/components/toc/TocReview.tsx": {
+      "count": 44,
+      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
+    },
+    "src/components/toc/TocSidebar.tsx": {
+      "count": 31,
+      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
+    },
+    "src/components/ui/ChapterStatusIndicator.tsx": {
+      "count": 3,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    },
+    "src/components/ui/avatar.tsx": {
+      "count": 2,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    },
+    "src/components/ui/loading-spinner.tsx": {
+      "count": 1,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    },
+    "src/components/ui/styled-avatar.tsx": {
+      "count": 2,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    },
+    "src/components/ui/toaster.tsx": {
+      "count": 6,
+      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
+    }
+  }
+}
