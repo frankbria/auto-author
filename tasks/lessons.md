@@ -768,3 +768,31 @@ That does not work for Tailwind utilities: once the literal leaves the source,
 the JIT stops emitting the CSS, so the restored class matches no rule and the
 element silently keeps its inherited colour — both scans return 0 and the
 "before" looks fine. Stash the fix, let the dev server recompile, then scan.
+
+### A grep for an "unprefixed" class also rejects `group-[.toast]:` and `hover:`
+`(?<![:\w-])bg-[a-z]+-900/\d+` looks like it finds classes with no `dark:` prefix.
+It finds classes with **no prefix at all** — every variant chain ends in `:`, so
+`group-[.toast]:bg-red-900/20` is invisible to it. #632's title said 19 sites, its
+hand-built table summed to 14, and the guard's first run found 18: four in
+`ui/toaster.tsx` behind a `group-` prefix that three rounds of grepping missed.
+Match the whole class token, capture the variant chain, then test whether `dark`
+is *in* it. And when an issue hands you a site list, build the sweep first and let
+it produce the count — a mismatch is a finding to report, not a discrepancy to
+quietly reconcile.
+
+### A contrast figure without its surface is not a measurement
+#632's issue quoted 1.02 / 1.76 / 1.05 / 1.05 for four badges. Recomputing over
+`--background` gave 1.10 / 1.91 / 1.03 / 1.02 — close enough to look like drift,
+wrong enough to fail `toBeCloseTo`. They reproduce exactly over `--muted`, which
+is what those badges actually sat on. Probe the candidate surfaces until the
+figure reproduces rather than adjusting the tolerance, and record the surface
+next to the number. Same trap as #629, one step further along.
+
+### Don't invent a WCAG bar the shipped idiom does not meet
+The #632 issue proposed `border-<hue>-300 dark:border-<hue>-700` and I asserted
+it at 1.4.11's 3:1. It measures 1.74:1 — as does the identical idiom #631 already
+shipped with axe green. The bar was wrong, not the code: these are alerts with
+`role="alert"`, an icon and literal text, so colour is never the sole indicator
+and 1.4.11 does not attach to the border. Check what obligation actually applies
+before picking a threshold; assert the real one (the text at 4.5:1) and label
+anything else as a design drift guard, not a WCAG claim.

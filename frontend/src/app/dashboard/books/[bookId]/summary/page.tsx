@@ -213,7 +213,7 @@ export default function BookSummaryPage() {
       {error && (
         <div
           role="alert"
-          className="p-4 mb-6 rounded-lg bg-red-900/20 border border-red-700 text-red-400"
+          className="p-4 mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400"
         >
           {error}
         </div>

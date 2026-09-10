@@ -191,12 +191,12 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
 
   if (error) {
     return (
-      <div className="p-4 bg-red-900/20 border border-red-700 rounded-lg text-red-400">
+      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400">
         <h3 className="font-bold mb-1">Error loading chapters</h3>
         <p>{error}</p>
         <button
           onClick={() => refreshChapters()}
-          className="mt-3 px-3 py-1 bg-red-800/40 hover:bg-red-800/70 text-red-200 text-sm rounded"
+          className="mt-3 px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-800/40 dark:hover:bg-red-800/70 dark:text-red-200 text-sm rounded"
         >
           Retry
         </button>

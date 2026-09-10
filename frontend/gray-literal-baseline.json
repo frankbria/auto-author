@@ -1,5 +1,5 @@
 {
-  "_comment": "Files still carrying theme-blind `*-gray-N` Tailwind literals, as of #620. This is the repo's theme-token debt ledger, not an ignore-list to grow: `src/__tests__/theme/core-authoring-pages-tokens.test.ts` fails when any file not listed here gains a gray literal, and when a listed file exceeds its allowance for any single literal. Counts are per distinct literal, not one total per file, so swapping one shade for another (text-gray-500 -> text-gray-300) fails rather than netting out. Dropping a count does NOT fail \u2014 shrink these freely, and delete the entry when it empties. Never raise a count to make CI pass; use a theme token (text-foreground / text-muted-foreground / bg-muted / border-border) instead.",
+  "_comment": "Files still carrying theme-blind `*-gray-N` Tailwind literals, as of #620. This is the repo's theme-token debt ledger, not an ignore-list to grow: `src/__tests__/theme/core-authoring-pages-tokens.test.ts` fails when any file not listed here gains a gray literal, and when a listed file exceeds its allowance for any single literal. Counts are per distinct literal, not one total per file, so swapping one shade for another (text-gray-500 -> text-gray-300) fails rather than netting out. Dropping a count does NOT fail — shrink these freely, and delete the entry when it empties. Never raise a count to make CI pass; use a theme token (text-foreground / text-muted-foreground / bg-muted / border-border) instead.",
   "files": {
     "src/app/auth/forgot-password/page.tsx": {
       "literals": {
@@ -138,14 +138,6 @@
         "bg-gray-300": 1,
         "bg-gray-700": 1,
         "text-gray-400": 1,
-        "text-gray-500": 1
-      },
-      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
-    },
-    "src/components/errors/ErrorNotification.tsx": {
-      "literals": {
-        "text-gray-300": 2,
-        "text-gray-400": 3,
         "text-gray-500": 1
       },
       "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."

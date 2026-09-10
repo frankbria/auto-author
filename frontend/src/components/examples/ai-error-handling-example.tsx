@@ -93,7 +93,7 @@ export function TOCQuestionsExample({ bookId }: AIErrorHandlingExampleProps) {
       </div>
 
       {isFromCachedContent && (
-        <Alert className="bg-blue-900/20 border-blue-500">
+        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-700 dark:border-blue-400">
           <HugeiconsIcon icon={Database01Icon} size={16} aria-hidden="true" />
           <AlertDescription>
             Using previously generated content (AI service temporarily unavailable)
@@ -198,7 +198,7 @@ export function ChapterDraftExample({ bookId, chapterId }: AIErrorHandlingExampl
       </div>
 
       {isFromCachedContent && (
-        <Alert className="bg-blue-900/20 border-blue-500">
+        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-700 dark:border-blue-400">
           <HugeiconsIcon icon={Database01Icon} size={16} aria-hidden="true" />
           <AlertDescription>
             Using previously generated draft (AI service temporarily unavailable)
@@ -287,7 +287,7 @@ export function SummaryAnalysisExample({ bookId }: AIErrorHandlingExampleProps) 
       </div>
 
       {isFromCachedContent && (
-        <Alert className="bg-blue-900/20 border-blue-500">
+        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-700 dark:border-blue-400">
           <HugeiconsIcon icon={Database01Icon} size={16} aria-hidden="true" />
           <AlertDescription>
             Using previously generated analysis
