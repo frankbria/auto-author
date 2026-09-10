@@ -154,7 +154,7 @@ export function LoadingStateManager({
       <div className="text-center space-y-2">
         <h3
           className={cn(
-            'font-medium text-gray-100',
+            'font-medium text-foreground',
             inline ? 'text-base' : 'text-lg'
           )}
         >
@@ -163,7 +163,7 @@ export function LoadingStateManager({
 
         {/* Detailed message */}
         {message && (
-          <p className="text-sm text-gray-400 max-w-md">
+          <p className="text-sm text-muted-foreground max-w-md">
             {message}
           </p>
         )}
@@ -172,13 +172,13 @@ export function LoadingStateManager({
       {/* Progress bar */}
       {hasProgress && (
         <div className="w-full max-w-md space-y-2">
-          <div className="flex justify-between text-xs text-gray-400">
+          <div className="flex justify-between text-xs text-muted-foreground">
             <span>{progressValue}% complete</span>
             {timeRemaining && timeRemaining > 0 && (
               <span>~{timeInSeconds}s remaining</span>
             )}
           </div>
-          <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
             <div
               className="bg-indigo-600 h-full rounded-full transition-all duration-500 ease-out"
               style={{ width: `${progressValue}%` }}
@@ -194,7 +194,7 @@ export function LoadingStateManager({
 
       {/* Time estimate (without progress bar) */}
       {!hasProgress && timeRemaining && timeRemaining > 0 && (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-muted-foreground">
           Estimated time: ~{timeInSeconds} second{timeInSeconds !== 1 ? 's' : ''}
         </p>
       )}

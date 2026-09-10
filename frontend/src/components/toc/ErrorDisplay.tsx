@@ -10,19 +10,19 @@ export default function ErrorDisplay({ error, onRetry, statusCode }: ErrorDispla
 
   if (isEntitlementError) {
     return (
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-8">
+      <div className="bg-muted border border-border rounded-lg p-8">
         <div className="text-center">
-          <div className="w-16 h-16 bg-indigo-900/20 border border-indigo-700 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-300 dark:border-indigo-700 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-700 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </div>
 
-          <h2 className="text-xl font-semibold text-gray-100 mb-3">
+          <h2 className="text-xl font-semibold text-foreground mb-3">
             Upgrade Required
           </h2>
 
-          <p className="text-gray-400 mb-6 max-w-md mx-auto">
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             {error}
           </p>
 
@@ -33,7 +33,7 @@ export default function ErrorDisplay({ error, onRetry, statusCode }: ErrorDispla
             Upgrade Plan
           </a>
 
-          <p className="text-gray-400 text-sm mt-6 max-w-md mx-auto">
+          <p className="text-muted-foreground text-sm mt-6 max-w-md mx-auto">
             Contact support if you believe this is a mistake.
           </p>
         </div>
@@ -42,19 +42,19 @@ export default function ErrorDisplay({ error, onRetry, statusCode }: ErrorDispla
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-8">
+    <div className="bg-muted border border-border rounded-lg p-8">
       <div className="text-center">
-        <div className="w-16 h-16 bg-red-900/20 border border-red-700 rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-700 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
 
-        <h2 className="text-xl font-semibold text-gray-100 mb-3">
+        <h2 className="text-xl font-semibold text-foreground mb-3">
           Something Went Wrong
         </h2>
 
-        <p className="text-gray-400 mb-6 max-w-md mx-auto">
+        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
           {error}
         </p>
 
@@ -68,9 +68,9 @@ export default function ErrorDisplay({ error, onRetry, statusCode }: ErrorDispla
           Try Again
         </button>
 
-        <div className="mt-8 bg-gray-800/50 border border-gray-700 rounded-lg p-4 max-w-md mx-auto">
-          <h4 className="text-gray-300 font-medium mb-2">Possible solutions:</h4>
-          <ul className="text-gray-400 text-sm list-disc list-inside space-y-1">
+        <div className="mt-8 bg-muted/50 border border-border rounded-lg p-4 max-w-md mx-auto">
+          <h4 className="text-muted-foreground font-medium mb-2">Possible solutions:</h4>
+          <ul className="text-muted-foreground text-sm list-disc list-inside space-y-1">
             <li>Check your internet connection</li>
             <li>Wait a moment and try again</li>
             <li>Refresh the page if the problem persists</li>

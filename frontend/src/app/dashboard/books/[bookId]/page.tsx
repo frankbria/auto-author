@@ -323,8 +323,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   if (error) {
     return (
       <div className="container mx-auto flex-1 p-6 flex items-center justify-center">
-        <div className="bg-red-900/20 border border-red-700 rounded-lg p-6 max-w-md">
-          <h2 className="text-red-400 text-xl font-medium mb-2">Error</h2>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg p-6 max-w-md">
+          <h2 className="text-red-700 dark:text-red-400 text-xl font-medium mb-2">Error</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
           <div className="flex space-x-4">
             <button
@@ -386,7 +386,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           <div className="flex items-center gap-4">
             <button
               onClick={handleExportClick}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 shadow-lg"
+              className="px-6 py-3 bg-green-700 hover:bg-green-800 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 shadow-lg"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
@@ -455,7 +455,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
                 <div className="font-semibold text-foreground">Write Content</div>
                 <div className="text-xs text-muted-foreground">Write and edit your chapter content</div>
                 {(book?.summary && book.summary.length >= 30 && book.chapters && book.chapters.length > 0) ? (
-                  <div className="mt-2 text-sm text-green-400">
+                  <div className="mt-2 text-sm text-green-700 dark:text-green-400">
                     ✓ Ready to write! Use the tabs below to start writing your chapters.
                   </div>
                 ) : (

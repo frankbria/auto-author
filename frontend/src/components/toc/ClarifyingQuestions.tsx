@@ -134,11 +134,11 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-8">      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-100 mb-3">
+    <div className="bg-muted border border-border rounded-lg p-8">      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-foreground mb-3">
           Clarifying Questions
         </h2>
-        <p className="text-gray-400">
+        <p className="text-muted-foreground">
           Help us create the best table of contents by answering a few questions about your book.
         </p>
 
@@ -165,26 +165,26 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         {/* Auto-save status */}
         <div className="mt-3 flex items-center text-sm">
           {isSaving ? (
-            <div className="flex items-center text-blue-400" aria-hidden="true">
+            <div className="flex items-center text-blue-700 dark:text-blue-400" aria-hidden="true">
               <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-blue-400 mr-2"></div>
               Saving...
             </div>
           ) : saveError ? (
-            <div className="flex items-center text-red-400" role="alert">
+            <div className="flex items-center text-red-700 dark:text-red-400" role="alert">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-2" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               Auto-save failed — your latest answers may not be saved
             </div>
           ) : lastSaved ? (
-            <div className="flex items-center text-green-400" aria-hidden="true">
+            <div className="flex items-center text-green-700 dark:text-green-400" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-2" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
               Auto-saved
             </div>
           ) : (
-            <div className="text-gray-400">
+            <div className="text-muted-foreground">
               Responses will be saved automatically
             </div>
           )}
@@ -193,11 +193,11 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
 
       {/* Progress indicator */}
       <div className="mb-8">
-        <div className="flex justify-between text-sm text-gray-400 mb-2">
+        <div className="flex justify-between text-sm text-muted-foreground mb-2">
           <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
           <span>{Math.round(progress)}% complete</span>
         </div>
-        <div className="w-full bg-gray-700 rounded-full h-2">
+        <div className="w-full bg-secondary rounded-full h-2">
           <div
             className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
@@ -207,21 +207,21 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
 
       {isLoadingResponses ? (
         <div
-          className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6 animate-pulse"
+          className="bg-card border border-border rounded-lg p-6 mb-6 animate-pulse"
           role="status"
           aria-live="polite"
           aria-busy="true"
           data-testid="clarifying-questions-skeleton"
         >
           <span className="sr-only">Loading your saved answers...</span>
-          <div className="h-6 w-2/3 bg-gray-700 rounded mb-4"></div>
-          <div className="h-32 w-full bg-gray-800 rounded-lg"></div>
+          <div className="h-6 w-2/3 bg-secondary rounded mb-4"></div>
+          <div className="h-32 w-full bg-muted rounded-lg"></div>
         </div>
       ) : (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6">
+        <div className="bg-card border border-border rounded-lg p-6 mb-6">
           <h3
             id="clarifying-question-prompt"
-            className="text-gray-100 font-medium mb-4 text-lg"
+            className="text-foreground font-medium mb-4 text-lg"
           >
             {currentQuestion}
           </h3>
@@ -235,11 +235,11 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
             value={responses[currentQuestionIndex] || ''}
             onChange={(e) => handleResponseChange(currentQuestionIndex, e.target.value)}
             placeholder="Type your answer here..."
-            className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+            className="w-full h-32 px-4 py-3 bg-muted border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
             disabled={isLoading}
           />
 
-          <div className="mt-3 text-gray-400 text-sm">
+          <div className="mt-3 text-muted-foreground text-sm">
             {responses[currentQuestionIndex]?.length || 0} characters
           </div>
         </div>
@@ -250,7 +250,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         <button
           onClick={handlePrevious}
           disabled={currentQuestionIndex === 0 || isLoading || isLoadingResponses}
-          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-gray-100 rounded-md transition-colors flex items-center"
+          className="px-4 py-2 bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-md transition-colors flex items-center"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -273,7 +273,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
           <button
             onClick={handleSubmit}
             disabled={!allQuestionsAnswered || isLoading || isLoadingResponses}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:text-green-400 text-white font-medium rounded-md transition-colors flex items-center"
+            className="px-6 py-2 bg-green-700 hover:bg-green-800 disabled:bg-green-800 disabled:text-green-400 text-white font-medium rounded-md transition-colors flex items-center"
           >
             {isLoading ? (
               <>
@@ -288,8 +288,8 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
       </div>
 
       {/* Questions overview */}
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
-        <h3 className="text-gray-300 font-medium mb-3">Question Overview</h3>
+      <div className="bg-card border border-border rounded-lg p-4">
+        <h3 className="text-muted-foreground font-medium mb-3">Question Overview</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {questions.map((_, index) => (
             <button
@@ -300,7 +300,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
                   ? 'bg-indigo-600 text-white'
                   : responses[index]
                   ? 'bg-green-800 text-green-100'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
               }`}
               disabled={isLoading}
             >
@@ -315,9 +315,9 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         </div>
       </div>
 
-      <div className="mt-6 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-        <h4 className="text-gray-300 font-medium mb-2">💡 Tips for better answers:</h4>
-        <ul className="text-gray-400 text-sm list-disc list-inside space-y-1">
+      <div className="mt-6 bg-muted/50 border border-border rounded-lg p-4">
+        <h4 className="text-muted-foreground font-medium mb-2">💡 Tips for better answers:</h4>
+        <ul className="text-muted-foreground text-sm list-disc list-inside space-y-1">
           <li>Be specific and detailed in your responses</li>
           <li>Think about your target audience when answering</li>
           <li>Consider the logical flow of information</li>

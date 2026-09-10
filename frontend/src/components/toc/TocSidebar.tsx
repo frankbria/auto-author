@@ -34,9 +34,9 @@ function TocItem({ chapter, level, isActive, isExpanded, onToggle, onSelect, act
       <div
         className={cn(
           "flex items-center gap-2 py-2 px-3 text-sm cursor-pointer rounded-md transition-colors",
-          "hover:bg-gray-800/50",
-          isActive && "bg-indigo-600/20 text-indigo-400 border-r-2 border-indigo-400",
-          !isActive && "text-gray-300 hover:text-gray-100"
+          "hover:bg-muted/50",
+          isActive && "bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-700 dark:border-indigo-400",
+          !isActive && "text-muted-foreground hover:text-foreground"
         )}
         style={{ paddingLeft: `${indentLevel + 12}px` }}
         onClick={() => onSelect(chapter.id)}
@@ -48,7 +48,7 @@ function TocItem({ chapter, level, isActive, isExpanded, onToggle, onSelect, act
               e.stopPropagation();
               onToggle();
             }}
-            className="p-0.5 hover:bg-gray-700/50 rounded"
+            className="p-0.5 hover:bg-secondary/50 rounded"
             aria-label={isExpanded ? "Collapse subchapters" : "Expand subchapters"}
           >
             {isExpanded ? (
@@ -73,7 +73,7 @@ function TocItem({ chapter, level, isActive, isExpanded, onToggle, onSelect, act
 
         {/* Word Count Badge */}
         {chapter.word_count > 0 && (
-          <span className="text-xs text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded">
+          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             {chapter.word_count}w
           </span>
         )}
@@ -127,8 +127,8 @@ export function TocSidebar({
 
   if (!tocData || !tocData.chapters || tocData.chapters.length === 0) {
     return (
-      <div className={cn("w-64 border-r border-gray-800 bg-gray-900", className)}>
-        <div className="p-4 text-center text-gray-400">
+      <div className={cn("w-64 border-r border-border bg-card", className)}>
+        <div className="p-4 text-center text-muted-foreground">
           <HugeiconsIcon icon={BookOpen01Icon} size={32} className="mx-auto mb-2 opacity-50" aria-hidden="true" />
           <p className="text-sm">No chapters available</p>
         </div>
@@ -138,47 +138,47 @@ export function TocSidebar({
 
   if (isCollapsed) {
     return (
-      <div className={cn("w-12 border-r border-gray-800 bg-gray-900 flex flex-col", className)}>
+      <div className={cn("w-12 border-r border-border bg-card flex flex-col", className)}>
         <button
           onClick={() => setIsCollapsed(false)}
-          className="p-3 hover:bg-gray-800 transition-colors"
+          className="p-3 hover:bg-muted transition-colors"
           aria-label="Expand table of contents"
         >
-          <HugeiconsIcon icon={Menu01Icon} size={20} className="text-gray-400" aria-hidden="true" />
+          <HugeiconsIcon icon={Menu01Icon} size={20} className="text-muted-foreground" aria-hidden="true" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className={cn("w-64 border-r border-gray-800 bg-gray-900 flex flex-col", className)}>
+    <div className={cn("w-64 border-r border-border bg-card flex flex-col", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-800">
+      <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <HugeiconsIcon icon={BookOpen01Icon} size={16} className="text-indigo-400" aria-hidden="true" />
-          <h3 className="font-medium text-gray-100">Table of Contents</h3>
+          <HugeiconsIcon icon={BookOpen01Icon} size={16} className="text-indigo-700 dark:text-indigo-400" aria-hidden="true" />
+          <h3 className="font-medium text-foreground">Table of Contents</h3>
         </div>
         {isCollapsible && (
           <button
             onClick={() => setIsCollapsed(true)}
-            className="p-1 hover:bg-gray-800 rounded transition-colors"
+            className="p-1 hover:bg-muted rounded transition-colors"
             aria-label="Collapse table of contents"
           >
-            <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-gray-400" aria-hidden="true" />
+            <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-muted-foreground" aria-hidden="true" />
           </button>
         )}
       </div>
 
       {/* TOC Stats */}
-      <div className="p-4 border-b border-gray-800">
+      <div className="p-4 border-b border-border">
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="text-center">
-            <div className="text-lg font-bold text-gray-100">{tocData.total_chapters}</div>
-            <div className="text-gray-400">Chapters</div>
+            <div className="text-lg font-bold text-foreground">{tocData.total_chapters}</div>
+            <div className="text-muted-foreground">Chapters</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-bold text-gray-100">{tocData.estimated_pages}</div>
-            <div className="text-gray-400">Pages</div>
+            <div className="text-lg font-bold text-foreground">{tocData.estimated_pages}</div>
+            <div className="text-muted-foreground">Pages</div>
           </div>
         </div>
       </div>
@@ -201,17 +201,17 @@ export function TocSidebar({
       </div>
 
       {/* Footer Actions */}
-      <div className="p-4 border-t border-gray-800">
+      <div className="p-4 border-t border-border">
         <div className="flex gap-2">
           <button
             onClick={() => setExpandedChapters(new Set(tocData.chapters.map(ch => ch.id)))}
-            className="flex-1 px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
+            className="flex-1 px-2 py-1 text-xs bg-muted hover:bg-secondary text-secondary-foreground rounded transition-colors"
           >
             Expand All
           </button>
           <button
             onClick={() => setExpandedChapters(new Set())}
-            className="flex-1 px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
+            className="flex-1 px-2 py-1 text-xs bg-muted hover:bg-secondary text-secondary-foreground rounded transition-colors"
           >
             Collapse All
           </button>
