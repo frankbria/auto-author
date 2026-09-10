@@ -439,7 +439,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         className={`border border-border rounded-lg mb-3 transition-all duration-200 ${
           isDragging ? 'opacity-50 transform scale-95' : ''
         } ${
-          isDragOver ? 'border-indigo-500 bg-indigo-900/20' : ''
+          isDragOver ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : ''
         }`}
         style={{ marginLeft: `${chapter.depth * 20}px` }}
         draggable
@@ -478,7 +478,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
             </button>
             <button
               onClick={() => deleteChapter(chapter.id)}
-              className="text-muted-foreground hover:text-red-400 p-1"
+              className="text-muted-foreground hover:text-red-700 dark:hover:text-red-400 p-1"
               title="Delete Chapter"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -529,7 +529,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       </div>
 
       {error && (
-        <div className="p-4 mb-6 rounded-lg bg-red-900/20 border border-red-700 text-red-400">
+        <div className="p-4 mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400">
           {error}
         </div>
       )}

@@ -35,7 +35,7 @@ function TocItem({ chapter, level, isActive, isExpanded, onToggle, onSelect, act
         className={cn(
           "flex items-center gap-2 py-2 px-3 text-sm cursor-pointer rounded-md transition-colors",
           "hover:bg-muted/50",
-          isActive && "bg-indigo-600/20 text-indigo-400 border-r-2 border-indigo-400",
+          isActive && "bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-700 dark:border-indigo-400",
           !isActive && "text-muted-foreground hover:text-foreground"
         )}
         style={{ paddingLeft: `${indentLevel + 12}px` }}
@@ -155,7 +155,7 @@ export function TocSidebar({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <HugeiconsIcon icon={BookOpen01Icon} size={16} className="text-indigo-400" aria-hidden="true" />
+          <HugeiconsIcon icon={BookOpen01Icon} size={16} className="text-indigo-700 dark:text-indigo-400" aria-hidden="true" />
           <h3 className="font-medium text-foreground">Table of Contents</h3>
         </div>
         {isCollapsible && (

@@ -165,7 +165,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         {/* Auto-save status */}
         <div className="mt-3 flex items-center text-sm">
           {isSaving ? (
-            <div className="flex items-center text-blue-400" aria-hidden="true">
+            <div className="flex items-center text-blue-700 dark:text-blue-400" aria-hidden="true">
               <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-blue-400 mr-2"></div>
               Saving...
             </div>
