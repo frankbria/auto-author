@@ -46,7 +46,7 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
       {/* Summary stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-card border border-border rounded-lg p-4">
-          <div className="text-2xl font-bold text-indigo-400">{tocResult.toc.total_chapters}</div>
+          <div className="text-2xl font-bold text-indigo-700 dark:text-indigo-400">{tocResult.toc.total_chapters}</div>
           <div className="text-muted-foreground text-sm">Total Chapters</div>
         </div>
 
