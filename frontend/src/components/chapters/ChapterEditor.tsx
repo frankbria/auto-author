@@ -441,7 +441,7 @@ export function ChapterEditor({
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <HugeiconsIcon icon={Loading03Icon} size={32} className="mx-auto animate-spin text-blue-600 dark:text-blue-400" />
           <p className="mt-2 text-sm text-muted-foreground">Loading chapter content...</p>
         </div>
       </div>
