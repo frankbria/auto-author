@@ -128,6 +128,23 @@ describe('shipped source uses theme tokens, not hardcoded grays (#331, #620)', (
     expect(regressions).toEqual([]);
   });
 
+  it('has no ledgered literal the file no longer contains (#624)', () => {
+    // The ledger's contract is "shrink freely, delete the entry when it empties".
+    // Nothing enforced the second half: re-adding a row for a burned-down file
+    // passed, which is the ledger being used to *pre-authorise* a literal rather
+    // than to record one — exactly what its own `_comment` forbids. A row whose
+    // actual count is zero is provably stale, so it must go. Partial shrink is
+    // still free: a row of 5 against an actual 2 is fine and does not fail here.
+    const stale = Object.entries(baseline.files).flatMap(([path, entry]) => {
+      const actual = grayLiteralCounts(path);
+      return Object.keys(entry.literals)
+        .filter((literal) => !(literal in actual))
+        .map((literal) => `${path} :: ${literal}`);
+    });
+
+    expect(stale).toEqual([]);
+  });
+
   it('ledgers only files that still exist, each with a reason', () => {
     const stale = Object.keys(baseline.files).filter(
       (path) => !existsSync(join(FRONTEND_ROOT, path))
