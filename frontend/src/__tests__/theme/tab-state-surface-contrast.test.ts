@@ -345,9 +345,13 @@ describe('ChapterTab state surfaces have a dark counterpart (#634)', () => {
     expect(beforeFix).toBeLessThan(WCAG_AA_NORMAL_TEXT);
   });
 
-  it('reproduces the alert glyph at 3.01:1, the margin the old text-red-600 had', () => {
-    // Not a failure at the 3:1 non-text floor — which is the point: it cleared
-    // by 0.01 with nothing pinning it. `text-red-400` gives 5.25 there.
+  it('reproduces the alert glyph at 3.01:1 — the margin fixing the card alone would have left', () => {
+    // Two eras, deliberately: the *old* glyph against the *new* card. While the
+    // card was light-only the glyph sat on `bg-red-50` in both themes at 4.41:1,
+    // so it never failed on its own — giving the card a dark variant is what
+    // would have pushed it to 3.01, clearing 1.4.11's floor by 0.01 with nothing
+    // pinning it. That is the drift this pins, not a shipped failure.
+    // `text-red-400` gives 5.25 there.
     const beforeFix = contrastRatio(
       hexToRgb(colors.red[600]),
       compositeOver(hexToRgb(colors.red[900]), 0.2, token('dark', 'muted'))

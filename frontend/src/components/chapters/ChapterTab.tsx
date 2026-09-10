@@ -62,20 +62,29 @@ const UNSAVED_DOT = 'bg-orange-600';
 const LOADING_SPINNER = 'text-blue-600 dark:text-blue-400';
 
 // #634: both of these were light-only surfaces — `bg-red-50` with no `dark:`
-// counterpart, while the text on top comes from tokens that do flip, so the
-// errored tab's label was 1.05:1 (`--foreground`) / 1.15:1 (`--primary`) /
-// 2.36:1 (`--muted-foreground`) in dark theme: unreadable, on exactly the tab a
-// user needs to read. They now use the `bg-<hue>-50 dark:bg-<hue>-900/20` +
-// `border-<hue>-700` idiom the other nine red surfaces in the tree already ship
-// (#631). Named so the contrast guard reads the values from here.
+// counterpart, while the text on top comes from colours that do flip, so the
+// errored tab's label was 1.05:1 (`--foreground`) / 2.36:1
+// (`--muted-foreground`) / 2.73:1 (the active title) in dark theme: unreadable,
+// on exactly the tab a user needs to read. They now use the
+// `bg-<hue>-50 dark:bg-<hue>-900/20` + `border-<hue>-700` idiom the other nine
+// red surfaces in the tree already ship (#631). Named so the contrast guard
+// reads the values from here.
+//
+// The active title is `text-primary`, which is *not* the `--primary` token: it
+// is tailwind.config.js's theme-fixed brand indigo, repainted indigo-400 in
+// dark by #610's `.dark .text-primary` override. Pricing it as the token gave
+// 1.15:1 here, a colour that never renders — see the guard's
+// `activeTitleColor()`.
 const ERROR_TAB = 'border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-900/20';
 const UNSAVED_TAB = 'border-orange-200 dark:border-orange-700';
 
 // The alert glyph on the same row, which only renders when `chapter.error` is
-// set and so is painted on the surface above. It was `text-red-600`, also
-// light-only: 3.01:1 on the dark card over `--muted`, a hair over 1.4.11's 3:1
-// floor and pinned by nothing. `text-red-700 dark:text-red-400` is the same
-// pair the other red surfaces use — 5.91 light, 5.25-6.70 dark.
+// set and so is painted on the surface above — which is why fixing that surface
+// alone would not have been enough. `text-red-600` was 4.41:1 while the card
+// stayed light-only in both themes; on the *fixed* dark card it lands at
+// 3.01:1, clearing 1.4.11's 3:1 floor by 0.01 with nothing pinning it.
+// `text-red-700 dark:text-red-400` is the pair the other red surfaces use —
+// 5.91 light, 5.25-6.70 dark.
 const ERROR_ICON = 'text-red-700 dark:text-red-400';
 
 export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
