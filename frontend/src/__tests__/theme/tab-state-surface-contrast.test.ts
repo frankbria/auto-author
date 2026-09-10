@@ -26,12 +26,22 @@ import {
  * |---|---|---|
  * | `--foreground` (inactive title) | 18.10 | **1.05** |
  * | `--muted-foreground` (close button) | 4.59 | **2.36** |
- * | `--primary` (active title) | 16.39 | **1.15** |
+ * | `text-primary` (active title) | 5.75 | **2.73** |
  *
  * 1.05:1 is not low contrast, it is unreadable — on precisely the tab a user
- * needs to read. `--primary` is a third failing foreground the issue did not
- * name: the title span overrides the row's colour with `text-primary` when the
- * tab is active.
+ * needs to read. The active title is a third failing foreground the issue did
+ * not name: the title span overrides the row's colour with `text-primary`.
+ *
+ * ## `text-primary` is not the `--primary` token
+ *
+ * It resolves to the theme-fixed brand indigo in `tailwind.config.js`
+ * (`rgb(79, 70, 229)`), repainted `rgb(129, 140, 248)` in dark by #610's
+ * `.dark .text-primary` override. The `--primary` oklch token feeds only the
+ * v4-only `@theme` block, which this repo's Tailwind v3 ignores — so pricing
+ * the active title as `--primary` measures a colour that never renders. It also
+ * measures a *much* rosier one: an opaque `dark:bg-red-900` card would keep a
+ * phantom near-white title at 7.95:1 while the real indigo-400 sat at 3.36:1,
+ * under the floor this suite exists to enforce. Caught in review on this PR.
  *
  * `axe-core` cannot see any of this: jsdom carries no stylesheet, and the repo's
  * axe runs never render an errored tab. So the guard is static, reading the
@@ -74,13 +84,37 @@ const SURFACES = ['background', 'card', 'muted'] as const;
 const THEMES = ['light', 'dark'] as const;
 
 /**
- * Every token foreground that lands on the errored tab. The row sets
- * `text-foreground`/`text-muted-foreground`, the title span overrides with
- * `text-primary` when active, and the close button re-declares
- * `text-muted-foreground`. The one non-token foreground — the alert glyph — is
- * `ERROR_ICON`, held to 1.4.11's 3:1 rather than 1.4.3's 4.5:1 below.
+ * The *token* foregrounds on the errored tab: the row sets `text-foreground`
+ * when active and `text-muted-foreground` when not, and the close button
+ * re-declares `text-muted-foreground`.
+ *
+ * The two non-token foregrounds are asserted separately — the active title (see
+ * `activeTitleColor`) and the alert glyph (`ERROR_ICON`, held to 1.4.11's 3:1
+ * rather than 1.4.3's 4.5:1).
  */
-const FOREGROUNDS = ['foreground', 'muted-foreground', 'primary'] as const;
+const FOREGROUNDS = ['foreground', 'muted-foreground'] as const;
+
+const TAILWIND_CONFIG = join(SRC, '..', 'tailwind.config.js');
+
+/**
+ * What `text-primary` actually paints. Read from the two files that decide it
+ * rather than hardcoded, so removing #610's override fails here instead of
+ * silently reverting this row to a 2.73:1 title.
+ */
+function activeTitleColor(theme: Theme, css: string): Rgb {
+  if (theme === 'dark') {
+    const override = css.match(
+      /\.dark\s+\.text-primary[^{]*\{[^}]*color:\s*rgb\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/
+    );
+    if (!override) throw new Error('globals.css has no `.dark .text-primary` rgb() override (#610)');
+    return [Number(override[1]), Number(override[2]), Number(override[3])];
+  }
+
+  const config = readFileSync(TAILWIND_CONFIG, 'utf8');
+  const brand = config.match(/primary:\s*\{\s*DEFAULT:\s*"rgb\((\d+),\s*(\d+),\s*(\d+)\)"/);
+  if (!brand) throw new Error('tailwind.config.js has no `primary.DEFAULT` rgb()');
+  return [Number(brand[1]), Number(brand[2]), Number(brand[3])];
+}
 
 /** Not a WCAG threshold — the drift floor #632 established for delimiters. */
 const BORDER_VISIBLE = 1.2;
@@ -247,6 +281,12 @@ describe('ChapterTab state surfaces have a dark counterpart (#634)', () => {
       );
     });
 
+    it.each(SURFACES)('the active title clears 4.5:1 on the errored tab over --%s', (surface) => {
+      expect(
+        contrastRatio(activeTitleColor(theme, css), errorSurface(theme, surface))
+      ).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
+    });
+
     it.each(SURFACES)('the alert glyph clears 3:1 on the errored tab over --%s', (surface) => {
       // A 12px icon, not text: WCAG 2.1 1.4.11's 3:1 non-text floor. The tab's
       // readable label is held to 4.5:1 above.
@@ -285,13 +325,23 @@ describe('ChapterTab state surfaces have a dark counterpart (#634)', () => {
   it.each([
     ['foreground', 1.05],
     ['muted-foreground', 2.36],
-    ['primary', 1.15],
   ] as const)('reproduces dark --%s at %s:1 on the unfixed bg-red-50', (fg, expected) => {
     // Pins the maths to the figures measured for the bug rather than to
     // arithmetic this file also produced, the way #623 and #632 do.
     const beforeFix = contrastRatio(token('dark', fg), hexToRgb(colors.red[50]));
 
     expect(beforeFix).toBeCloseTo(expected, 1);
+    expect(beforeFix).toBeLessThan(WCAG_AA_NORMAL_TEXT);
+  });
+
+  it('reproduces the active title at 2.73:1 on the unfixed bg-red-50', () => {
+    // Not 1.15 — that was this guard pricing the title as the `--primary` token
+    // before review caught that `text-primary` never paints it. The row was
+    // failing either way, but at 2.73, and the fixed card gives 4.87 worst case
+    // rather than the 11.53 the token model claimed.
+    const beforeFix = contrastRatio(activeTitleColor('dark', css), hexToRgb(colors.red[50]));
+
+    expect(beforeFix).toBeCloseTo(2.73, 1);
     expect(beforeFix).toBeLessThan(WCAG_AA_NORMAL_TEXT);
   });
 
