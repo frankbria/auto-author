@@ -1,5 +1,36 @@
 # Lessons
 
+## Never quote a contrast ratio you did not measure yourself (2026-09-09, #629)
+- Two wrong numbers in one change, from two different sources, both caught only by re-measuring:
+  - **Invented.** I wrote `--primary` as "15.9:1 light-muted, 12.3:1 dark-muted" into a code comment
+    from intuition about how dark the token is. Measured: **16.44 and 12.01**. Nobody would have
+    caught it — the guard only asserts `>= 3`, so a plausible-looking wrong figure sails through the
+    test suite and into the repo as a fact the next reader trusts.
+  - **Inherited.** The issue body predicted `blue-600` at 3.56 / 3.26 on the light surfaces. Measured
+    in this repo: **5.17 / 4.74**. The issue's figures were Tailwind **v4**'s `blue-600`; the repo is
+    still on v3 (#513). Palette literals are versioned data, so a ratio computed elsewhere is not
+    portable — even one written by the same project, about the same class name.
+- Do instead: before writing any ratio into a comment, commit message, PR body or changelog, run it
+  through the repo's own helper (`src/__tests__/theme/helpers/contrast.ts`) against the repo's own
+  `globals.css` and `tailwindcss/colors`. A throwaway `it()` under `src/__tests__/theme/` that
+  `console.log`s the figures takes a minute; it must live under that dir so the relative import and
+  jest's roots resolve, and delete it before committing.
+- When your measurement disagrees with the issue's, **say so in the code** rather than silently using
+  the better number — the gap otherwise reads as drift to whoever audits the guard next.
+- Generalising a source-scanning guard's regex (`bg-` to `bg|text|border`) is only safe if you check
+  it does not change how existing entries resolve. Cheap proof: the case count moved 57 -> 62, exactly
+  the new entry's 4 surfaces + 1 pin, so no existing entry started matching a different utility.
+
+## Next's app router never routes an underscore-prefixed folder (2026-09-09, #629)
+- A temporary visual-verification page at `src/app/__629/page.tsx` served a **404** with no warning,
+  no build error and no log line. `_`-prefixed directories are Next's "private folder" convention and
+  are excluded from routing. Renaming to `dev629` served 200 immediately.
+- Also: `next dev` refuses to start a second instance in the same project and prints the existing
+  PID/port instead of failing loudly — the new port is simply never bound, so `curl` gives exit 7.
+  Read the startup log before blaming the route. Reusing the running dev server is fine: it compiles
+  from the working tree, so a new page appears without a restart.
+- Kill nothing you did not start. The already-running server may be the user's.
+
 ## Bisect a dep-PR failure FORWARD from a green baseline (2026-09-05, #589)
 - Reverting one suspect at a time out of a failing multi-package PR is worse than useless when the
   culprit is something you never thought to revert: every run still fails, so each innocent package
