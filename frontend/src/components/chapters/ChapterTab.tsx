@@ -61,6 +61,23 @@ const UNSAVED_DOT = 'bg-orange-600';
 // light pair; that was Tailwind v4's blue-600 — this repo is still on v3.)
 const LOADING_SPINNER = 'text-blue-600 dark:text-blue-400';
 
+// #634: both of these were light-only surfaces — `bg-red-50` with no `dark:`
+// counterpart, while the text on top comes from tokens that do flip, so the
+// errored tab's label was 1.05:1 (`--foreground`) / 1.15:1 (`--primary`) /
+// 2.36:1 (`--muted-foreground`) in dark theme: unreadable, on exactly the tab a
+// user needs to read. They now use the `bg-<hue>-50 dark:bg-<hue>-900/20` +
+// `border-<hue>-700` idiom the other nine red surfaces in the tree already ship
+// (#631). Named so the contrast guard reads the values from here.
+const ERROR_TAB = 'border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-900/20';
+const UNSAVED_TAB = 'border-orange-200 dark:border-orange-700';
+
+// The alert glyph on the same row, which only renders when `chapter.error` is
+// set and so is painted on the surface above. It was `text-red-600`, also
+// light-only: 3.01:1 on the dark card over `--muted`, a hair over 1.4.11's 3:1
+// floor and pinned by nothing. `text-red-700 dark:text-red-400` is the same
+// pair the other red surfaces use — 5.91 light, 5.25-6.70 dark.
+const ERROR_ICON = 'text-red-700 dark:text-red-400';
+
 export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
   ({ chapter, isActive, isDragging, onSelect, onClose, orientation = 'vertical', ...props }, ref) => {
     const config = statusConfig[chapter.status];
@@ -91,8 +108,8 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
                   : "bg-background border-r-2 border-r-primary text-foreground"
                 : "bg-muted hover:bg-background text-muted-foreground hover:text-foreground",
               isDragging && "opacity-50",
-              chapter.error && "border-red-200 bg-red-50",
-              chapter.has_unsaved_changes && "border-orange-200"
+              chapter.error && ERROR_TAB,
+              chapter.has_unsaved_changes && UNSAVED_TAB
             )}
             onClick={onSelect}
             onKeyDown={(e) => {
@@ -123,7 +140,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
               )}
 
               {chapter.error && (
-                <HugeiconsIcon icon={AlertCircleIcon} size={12} className="text-red-600" />
+                <HugeiconsIcon icon={AlertCircleIcon} size={12} className={ERROR_ICON} />
               )}
             </div>
 
