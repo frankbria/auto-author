@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Cancel01Icon, File01Icon, Clock01Icon, AlertCircleIcon } from '@hugeicons/core-free-icons';
+import { Cancel01Icon, File01Icon, Clock01Icon, AlertCircleIcon, Loading03Icon } from '@hugeicons/core-free-icons';
 import { ChapterTabMetadata, ChapterStatus } from '@/types/chapter-tabs';
 
 interface ChapterTabProps {
@@ -49,6 +49,17 @@ const statusConfig = {
 // 3.26:1 there and improves on every other surface. Named so the contrast guard
 // reads the value from here rather than from a duplicated literal.
 const UNSAVED_DOT = 'bg-orange-600';
+
+// #629: the loading indicator was a hand-rolled `border-blue-400 ... bg-white`
+// ring — 2.33:1 on light `bg-muted`, under the same 3:1 non-text floor — with a
+// theme-fixed white core that read as the surface colour in light and as a
+// bright dot in dark. It is now the icon spinner used elsewhere in the app (see
+// ChapterEditor's save indicator), so there is no fill to be theme-blind about,
+// and the stroke keeps the row's blue "working" signal per theme: blue-600 is
+// 5.17:1 on light `--background` and 4.74:1 on light `--muted`, blue-400 is
+// 7.79 / 5.95 on their dark counterparts. (#629 predicted 3.56/3.26 for the
+// light pair; that was Tailwind v4's blue-600 — this repo is still on v3.)
+const LOADING_SPINNER = 'text-blue-600 dark:text-blue-400';
 
 export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
   ({ chapter, isActive, isDragging, onSelect, onClose, orientation = 'vertical', ...props }, ref) => {
@@ -108,7 +119,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
               )}
 
               {chapter.is_loading && (
-                <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin bg-white" />
+                <HugeiconsIcon icon={Loading03Icon} size={12} className={cn('animate-spin', LOADING_SPINNER)} />
               )}
 
               {chapter.error && (
