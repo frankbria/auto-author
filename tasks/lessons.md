@@ -796,3 +796,26 @@ shipped with axe green. The bar was wrong, not the code: these are alerts with
 and 1.4.11 does not attach to the border. Check what obligation actually applies
 before picking a threshold; assert the real one (the text at 4.5:1) and label
 anything else as a design drift guard, not a WCAG claim.
+
+### The token you think feeds a utility may feed nothing at all
+#634's guard priced the active tab title as the `--primary` oklch token and
+published 16.39 light / 1.15 dark for it. Under Tailwind **v3** `text-primary`
+never touches that token: `tailwind.config.js` pins `primary.DEFAULT` to a
+theme-fixed brand indigo, #610's `.dark .text-primary` override repaints it in
+dark, and the `--primary` token in `globals.css` only feeds the `@theme` block —
+which is v4 syntax this repo ignores. The real figures were 5.75 / 2.73, and
+4.87 worst-case after the fix rather than the 11.53 claimed. Same file already
+had a sibling guard (`dark-primary-text-contrast.test.ts`) reading the real
+override, which is the tell: if another guard resolves the same utility
+differently, one of you is measuring a phantom. Before asserting on a token,
+grep for what the utility actually resolves to — a `tailwind.config.js` entry
+and a `@layer utilities` override both outrank a `:root` custom property.
+
+### Verify the reviewer's failure scenario, not just its finding
+The same review claimed the phantom made the guard stay green on an opaque
+`dark:bg-red-900` card. It did not: run against the pre-review guard, that
+mutation fails 3 cases, because `--muted-foreground` is 3.88:1 there either way.
+The finding was right and the fix was necessary; the escape route was already
+closed. Reproduce the scenario before repeating it in a commit message — an
+overstated failure mode published as fact is the same error the finding was
+about.
