@@ -720,3 +720,20 @@ not on the target file list. Scan the *screen*, not the file set.
 on `bg-indigo-50` — a pass. Chromium renders it `#6f6f6f` and axe reported
 **4.49:1**, a fail by 0.01. For a token with no headroom, arithmetic is a
 prediction; axe's own `fgColor`/`contrastRatio` is the measurement.
+
+### Clean demo artifacts BEFORE `git add -A`, and read the hook output
+On #624 I staged everything while `public/axe-demo.js` (580KB), two scratch
+`.js` scanners and next-dev's untracked `AGENTS.md`/`CLAUDE.md` were still on
+disk. The large-file hook failed the commit — but I had piped the output through
+`grep -c "Failed"` and only read the count, so I believed it succeeded, then ran
+`git checkout HEAD~1 -- <files>` and destroyed the two fixes I had just made.
+The aborted hook also left a stale `.git/index.lock` that made the next two
+`git reset` calls no-ops. Clean the working tree first, stage explicitly, and
+read what the hooks actually said.
+
+### You cannot prove a Tailwind "before" by restoring classes on live DOM nodes
+The axe-traps note says to re-set the old colour on the live node and re-scan.
+That does not work for Tailwind utilities: once the literal leaves the source,
+the JIT stops emitting the CSS, so the restored class matches no rule and the
+element silently keeps its inherited colour — both scans return 0 and the
+"before" looks fine. Stash the fix, let the dev server recompile, then scan.
