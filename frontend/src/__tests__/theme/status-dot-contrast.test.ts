@@ -41,6 +41,10 @@ const DOT_SOURCES = [
   { file: 'components/chapters/MobileChapterTabs.tsx', pattern: /return '(bg-[^']+)'/g, count: 5 },
   // Not a status dot, but the same obligation on the same indicator row.
   { file: 'components/chapters/ChapterTab.tsx', pattern: /^const UNSAVED_DOT = '([^']+)'/gm, count: 1 },
+  // #629: the loading spinner, likewise. Its colour is a `text-` utility on an
+  // icon stroke rather than a `bg-` fill, which is why `indicatorColor` below
+  // resolves any of bg/text/border.
+  { file: 'components/chapters/ChapterTab.tsx', pattern: /^const LOADING_SPINNER = '([^']+)'/gm, count: 1 },
 ] as const;
 
 // The surfaces a status dot is ever painted on. Light `--card`/`--popover` share
@@ -51,22 +55,26 @@ const THEMES = ['light', 'dark'] as const;
 /**
  * Picks the utility that actually applies in `theme` from a class string, then
  * resolves it to sRGB. Tailwind palette literals come from tailwind's own
- * palette; `bg-<token>` utilities come from globals.css.
+ * palette; token utilities come from globals.css. Colour reaches these
+ * indicators as a fill (`bg-`), an icon stroke (`text-`) or a ring (`border-`) —
+ * whichever it is, it is the shape the user actually sees.
  */
-function dotColor(
+const COLOUR_UTILITY = /(^|:)(bg|text|border)-/;
+
+function indicatorColor(
   classes: string,
   theme: 'light' | 'dark',
   css: string
 ): [number, number, number] {
-  const utilities = classes.trim().split(/\s+/).filter((c) => /(^|:)bg-/.test(c));
+  const utilities = classes.trim().split(/\s+/).filter((c) => COLOUR_UTILITY.test(c));
   const applicable =
     theme === 'dark'
       ? (utilities.filter((c) => c.startsWith('dark:')).pop() ??
          utilities.filter((c) => !c.includes(':')).pop())
       : utilities.filter((c) => !c.includes(':')).pop();
 
-  if (!applicable) throw new Error(`No background utility in \`${classes}\` for ${theme}`);
-  const name = applicable.replace(/^dark:/, '').replace(/^bg-/, '');
+  if (!applicable) throw new Error(`No colour utility in \`${classes}\` for ${theme}`);
+  const name = applicable.replace(/^dark:/, '').replace(/^(bg|text|border)-/, '');
 
   const palette = name.match(/^([a-z]+)-(\d{2,3})$/);
   if (palette) {
@@ -101,7 +109,7 @@ describe('chapter status dots clear WCAG 2.1 1.4.11 on every surface (#623)', ()
 
   it.each(cases)('%s `%s`: %s theme is at least 3:1 on --%s', (_file, classes, theme, surface) => {
     const ratio = contrastRatio(
-      dotColor(classes, theme, css),
+      indicatorColor(classes, theme, css),
       oklchToken(themeBlock(css, theme), surface)
     );
 
@@ -117,6 +125,16 @@ describe('chapter status dots clear WCAG 2.1 1.4.11 on every surface (#623)', ()
     );
 
     expect(beforeFix).toBeCloseTo(2.09, 1);
+    expect(beforeFix).toBeLessThan(WCAG_AA_NON_TEXT);
+  });
+
+  it('reproduces the 2.33:1 figure measured for the old spinner ring (#629)', () => {
+    const beforeFix = contrastRatio(
+      hexToRgb(colors.blue[400]),
+      oklchToken(themeBlock(css, 'light'), 'muted')
+    );
+
+    expect(beforeFix).toBeCloseTo(2.33, 1);
     expect(beforeFix).toBeLessThan(WCAG_AA_NON_TEXT);
   });
 });
