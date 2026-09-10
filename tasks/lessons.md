@@ -695,3 +695,28 @@ painted the DRAFT dot `bg-muted` — its own surface, 1.00:1, *invisible*, the #
 defect never fixed in the mobile variant — and the unsaved-changes dot at 2.57:1.
 A contrast issue split out of a larger sweep has usually only been measured where
 someone happened to look. Enumerate every sibling before deciding the scope.
+
+### A literal count is not a failure count — measure before mass-editing
+#624's ledger said the six TOC-wizard steps were the biggest debt (139 of 464
+literals). Real axe found almost no violations there: they paint self-consistent
+dark cards, so the *pairs* are legible even on a white page. The severe failures
+(1.1:1 headings) were in files with far smaller counts. Rank by measurement, not
+by inventory.
+
+### Tokenizing a surface relocates every accent sitting on it
+Converting `bg-gray-900` cards to `bg-card` moved `text-green-400`,
+`text-purple-400` and `text-red-400` from a dark box onto a white one, creating
+seven violations that did not exist before the fix. The post-change scan is not
+a formality — it is the only thing that catches the failure the change itself
+introduced. Re-measure both themes after every surface edit.
+
+### A component you did not edit can still fail on the screen you did
+Three `text-gray-400` failures in the wizard's GENERATING step came from
+`LoadingStateManager`/`ProgressIndicator`, which the step renders but which were
+not on the target file list. Scan the *screen*, not the file set.
+
+### Trust the browser's rendered colour over the token arithmetic
+`--muted-foreground` (`oklch(0.54 0 0)`) computes to `#6e6e6e` by hand and 4.56:1
+on `bg-indigo-50` — a pass. Chromium renders it `#6f6f6f` and axe reported
+**4.49:1**, a fail by 0.01. For a token with no headroom, arithmetic is a
+prediction; axe's own `fgColor`/`contrastRatio` is the measurement.
