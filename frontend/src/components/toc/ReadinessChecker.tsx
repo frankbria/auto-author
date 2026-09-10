@@ -1,19 +1,19 @@
 export default function ReadinessChecker() {
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-8">
+    <div className="bg-muted border border-border rounded-lg p-8">
       <div className="flex flex-col items-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-6"></div>
 
-        <h2 className="text-xl font-semibold text-gray-100 mb-3">
+        <h2 className="text-xl font-semibold text-foreground mb-3">
           Analyzing Your Summary
         </h2>
-          <p className="text-gray-400 text-center mb-6 max-w-md">
+          <p className="text-muted-foreground text-center mb-6 max-w-md">
           We&apos;re checking if your book summary contains enough detail to generate a comprehensive table of contents.
         </p>
 
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 w-full max-w-md">
-          <h3 className="text-gray-300 font-medium mb-3">What we&apos;re analyzing:</h3>
-          <ul className="text-gray-400 text-sm space-y-2">
+        <div className="bg-card border border-border rounded-lg p-4 w-full max-w-md">
+          <h3 className="text-muted-foreground font-medium mb-3">What we&apos;re analyzing:</h3>
+          <ul className="text-muted-foreground text-sm space-y-2">
             <li className="flex items-center">
               <div className="w-2 h-2 bg-indigo-500 rounded-full mr-3"></div>
               Content depth and detail

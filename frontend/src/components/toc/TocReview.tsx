@@ -33,49 +33,49 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
   };
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-8">
+    <div className="bg-muted border border-border rounded-lg p-8">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-100 mb-3">
+        <h2 className="text-xl font-semibold text-foreground mb-3">
           Your Generated Table of Contents
         </h2>
-        <p className="text-gray-400">
+        <p className="text-muted-foreground">
           Review the generated structure below. You can accept it as-is or regenerate for a different approach.
         </p>
       </div>
 
       {/* Summary stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
+        <div className="bg-card border border-border rounded-lg p-4">
           <div className="text-2xl font-bold text-indigo-400">{tocResult.toc.total_chapters}</div>
-          <div className="text-gray-400 text-sm">Total Chapters</div>
+          <div className="text-muted-foreground text-sm">Total Chapters</div>
         </div>
 
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
-          <div className="text-2xl font-bold text-purple-400">{tocResult.toc.estimated_pages}</div>
-          <div className="text-gray-400 text-sm">Estimated Pages</div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <div className="text-2xl font-bold text-purple-700 dark:text-purple-400">{tocResult.toc.estimated_pages}</div>
+          <div className="text-muted-foreground text-sm">Estimated Pages</div>
         </div>
 
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
-          <div className="text-2xl font-bold text-green-400">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <div className="text-2xl font-bold text-green-700 dark:text-green-400">
             {tocResult.has_subchapters ? 'Yes' : 'No'}
           </div>
-          <div className="text-gray-400 text-sm">Has Subchapters</div>
+          <div className="text-muted-foreground text-sm">Has Subchapters</div>
         </div>
       </div>
 
       {/* Controls */}
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium text-gray-100">Chapter Structure</h3>
+        <h3 className="text-lg font-medium text-foreground">Chapter Structure</h3>
         <div className="flex gap-2">
           <button
             onClick={expandAll}
-            className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
+            className="px-3 py-1 text-sm bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded"
           >
             Expand All
           </button>
           <button
             onClick={collapseAll}
-            className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
+            className="px-3 py-1 text-sm bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded"
           >
             Collapse All
           </button>
@@ -83,7 +83,7 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
       </div>
 
       {/* TOC Display */}
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6 max-h-96 overflow-y-auto">
+      <div className="bg-card border border-border rounded-lg p-6 mb-6 max-h-96 overflow-y-auto">
         <div className="space-y-3">
           {tocResult.toc.chapters.map((chapter, index) => (
             <ChapterItem
@@ -101,9 +101,9 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
 
       {/* Structure notes */}
       {tocResult.toc.structure_notes && (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 mb-6">
-          <h4 className="text-gray-300 font-medium mb-2">📝 AI Structure Notes</h4>
-          <p className="text-gray-400 text-sm">{tocResult.toc.structure_notes}</p>
+        <div className="bg-card border border-border rounded-lg p-4 mb-6">
+          <h4 className="text-muted-foreground font-medium mb-2">📝 AI Structure Notes</h4>
+          <p className="text-muted-foreground text-sm">{tocResult.toc.structure_notes}</p>
         </div>
       )}
 
@@ -112,7 +112,7 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
         <button
           onClick={onRegenerate}
           disabled={isLoading}
-          className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-gray-100 font-medium rounded-md transition-colors flex items-center justify-center"
+          className="flex-1 px-6 py-3 bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground font-medium rounded-md transition-colors flex items-center justify-center"
         >
           {isLoading ? (
             <>
@@ -132,7 +132,7 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
         <button
           onClick={onAccept}
           disabled={isLoading}
-          className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:text-green-400 text-white font-medium rounded-md transition-colors flex items-center justify-center"
+          className="flex-1 px-6 py-3 bg-green-700 hover:bg-green-800 disabled:bg-green-800 disabled:text-green-400 text-white font-medium rounded-md transition-colors flex items-center justify-center"
         >
           {isLoading ? (
             <>
@@ -150,9 +150,9 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
         </button>
       </div>
 
-      <div className="mt-6 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-        <h4 className="text-gray-300 font-medium mb-2">✨ Next steps:</h4>
-        <ul className="text-gray-400 text-sm list-disc list-inside space-y-1">
+      <div className="mt-6 bg-muted/50 border border-border rounded-lg p-4">
+        <h4 className="text-muted-foreground font-medium mb-2">✨ Next steps:</h4>
+        <ul className="text-muted-foreground text-sm list-disc list-inside space-y-1">
           <li>Accept this structure to proceed to detailed editing</li>
           <li>You&apos;ll be able to modify individual chapters and subchapters</li>
           <li>Add, remove, or rearrange sections as needed</li>
@@ -178,9 +178,9 @@ function ChapterItem({ chapter, index, isExpanded, onToggle, expandedChapters, t
   const idx = parentIndex ? `${parentIndex}.${index}` : `${index}`;
 
   return (
-    <div className="border border-gray-700 rounded-lg overflow-hidden">
+    <div className="border border-border rounded-lg overflow-hidden">
       <div
-        className="flex items-center justify-between p-4 bg-gray-800 hover:bg-gray-750 cursor-pointer"
+        className="flex items-center justify-between p-4 bg-muted hover:bg-muted/80 cursor-pointer"
         onClick={onToggle}
       >        <div className="flex items-center flex-1">
           <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
@@ -188,7 +188,7 @@ function ChapterItem({ chapter, index, isExpanded, onToggle, expandedChapters, t
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <h4 className="text-gray-100 font-medium">{chapter.title}</h4>
+              <h4 className="text-foreground font-medium">{chapter.title}</h4>
               {chapter.status && (
                 <ChapterStatusIndicator
                   status={chapter.status}
@@ -198,10 +198,10 @@ function ChapterItem({ chapter, index, isExpanded, onToggle, expandedChapters, t
               )}
             </div>
             {chapter.description && (
-              <p className="text-gray-400 text-sm mt-1">{chapter.description}</p>
+              <p className="text-muted-foreground text-sm mt-1">{chapter.description}</p>
             )}
             {chapter.word_count && (
-              <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                 <span>{chapter.word_count} words</span>
                 {chapter.estimated_reading_time && (
                   <>
@@ -217,7 +217,7 @@ function ChapterItem({ chapter, index, isExpanded, onToggle, expandedChapters, t
         {hasSubchapters && (
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            className={`h-5 w-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
             viewBox="0 0 20 20"
             fill="currentColor"
           >
@@ -226,7 +226,7 @@ function ChapterItem({ chapter, index, isExpanded, onToggle, expandedChapters, t
         )}
       </div>
       {hasSubchapters && isExpanded && (
-        <div className="bg-gray-900 p-4 border-t border-gray-700">
+        <div className="bg-card p-4 border-t border-border">
           <div className="space-y-3">
             {chapter.subchapters.map((subchapter, subIndex) => {
               const subId = subchapter.id;

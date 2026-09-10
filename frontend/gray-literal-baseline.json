@@ -1,5 +1,5 @@
 {
-  "_comment": "Files still carrying theme-blind `*-gray-N` Tailwind literals, as of #620. This is the repo's theme-token debt ledger, not an ignore-list to grow: `src/__tests__/theme/core-authoring-pages-tokens.test.ts` fails when any file not listed here gains a gray literal, and when a listed file exceeds its allowance for any single literal. Counts are per distinct literal, not one total per file, so swapping one shade for another (text-gray-500 -> text-gray-300) fails rather than netting out. Dropping a count does NOT fail — shrink these freely, and delete the entry when it empties. Never raise a count to make CI pass; use a theme token (text-foreground / text-muted-foreground / bg-muted / border-border) instead.",
+  "_comment": "Files still carrying theme-blind `*-gray-N` Tailwind literals, as of #620. This is the repo's theme-token debt ledger, not an ignore-list to grow: `src/__tests__/theme/core-authoring-pages-tokens.test.ts` fails when any file not listed here gains a gray literal, and when a listed file exceeds its allowance for any single literal. Counts are per distinct literal, not one total per file, so swapping one shade for another (text-gray-500 -> text-gray-300) fails rather than netting out. Dropping a count does NOT fail \u2014 shrink these freely, and delete the entry when it empties. Never raise a count to make CI pass; use a theme token (text-foreground / text-muted-foreground / bg-muted / border-border) instead.",
   "files": {
     "src/app/auth/forgot-password/page.tsx": {
       "literals": {
@@ -48,35 +48,6 @@
         "text-gray-700": 2
       },
       "reason": "Pre-#331 auth screen, off the core authoring flow. Convert when auth is next themed."
-    },
-    "src/app/dashboard/books/[bookId]/edit-toc/page.tsx": {
-      "literals": {
-        "bg-gray-600": 1,
-        "bg-gray-700": 1,
-        "bg-gray-800": 4,
-        "bg-gray-900": 2,
-        "border-gray-700": 3,
-        "border-gray-800": 1,
-        "text-gray-100": 3,
-        "text-gray-300": 2,
-        "text-gray-400": 8
-      },
-      "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
-    },
-    "src/app/dashboard/books/[bookId]/export/page.tsx": {
-      "literals": {
-        "bg-gray-400": 2,
-        "bg-gray-600": 2,
-        "bg-gray-700": 6,
-        "bg-gray-800": 5,
-        "border-gray-700": 6,
-        "text-gray-100": 6,
-        "text-gray-200": 8,
-        "text-gray-300": 10,
-        "text-gray-400": 16,
-        "text-gray-500": 1
-      },
-      "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
     },
     "src/app/dashboard/not-found.tsx": {
       "literals": {
@@ -193,119 +164,6 @@
         "text-gray-500": 1
       },
       "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
-    },
-    "src/components/loading/LoadingStateManager.tsx": {
-      "literals": {
-        "bg-gray-700": 1,
-        "text-gray-100": 1,
-        "text-gray-400": 3
-      },
-      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
-    },
-    "src/components/loading/ProgressIndicator.tsx": {
-      "literals": {
-        "bg-gray-700": 2,
-        "text-gray-300": 1,
-        "text-gray-400": 2,
-        "text-gray-500": 1
-      },
-      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
-    },
-    "src/components/navigation/ChapterBreadcrumb.tsx": {
-      "literals": {
-        "text-gray-100": 8,
-        "text-gray-200": 3,
-        "text-gray-400": 3
-      },
-      "reason": "#620 burn-down: on the core authoring flow (transitive from the book/chapter/TOC/export routes). Highest priority to convert to theme tokens."
-    },
-    "src/components/toc/ClarifyingQuestions.tsx": {
-      "literals": {
-        "bg-gray-600": 2,
-        "bg-gray-700": 4,
-        "bg-gray-800": 5,
-        "bg-gray-900": 3,
-        "border-gray-600": 1,
-        "border-gray-700": 5,
-        "placeholder-gray-400": 1,
-        "text-gray-100": 4,
-        "text-gray-300": 3,
-        "text-gray-400": 5,
-        "text-gray-500": 1
-      },
-      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
-    },
-    "src/components/toc/ErrorDisplay.tsx": {
-      "literals": {
-        "bg-gray-800": 3,
-        "border-gray-700": 3,
-        "text-gray-100": 2,
-        "text-gray-300": 1,
-        "text-gray-400": 4
-      },
-      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
-    },
-    "src/components/toc/NotReadyMessage.tsx": {
-      "literals": {
-        "bg-gray-600": 1,
-        "bg-gray-700": 1,
-        "bg-gray-800": 2,
-        "bg-gray-900": 1,
-        "border-gray-700": 4,
-        "text-gray-100": 4,
-        "text-gray-300": 4,
-        "text-gray-400": 7
-      },
-      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
-    },
-    "src/components/toc/ReadinessChecker.tsx": {
-      "literals": {
-        "bg-gray-800": 1,
-        "bg-gray-900": 1,
-        "border-gray-700": 2,
-        "text-gray-100": 1,
-        "text-gray-300": 1,
-        "text-gray-400": 2
-      },
-      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
-    },
-    "src/components/toc/TocGenerating.tsx": {
-      "literals": {
-        "bg-gray-700": 1,
-        "bg-gray-800": 2,
-        "bg-gray-900": 2,
-        "border-gray-700": 4,
-        "text-gray-300": 4,
-        "text-gray-400": 3
-      },
-      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
-    },
-    "src/components/toc/TocReview.tsx": {
-      "literals": {
-        "bg-gray-600": 3,
-        "bg-gray-700": 3,
-        "bg-gray-750": 1,
-        "bg-gray-800": 4,
-        "bg-gray-900": 6,
-        "border-gray-700": 9,
-        "text-gray-100": 4,
-        "text-gray-300": 4,
-        "text-gray-400": 9,
-        "text-gray-500": 1
-      },
-      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
-    },
-    "src/components/toc/TocSidebar.tsx": {
-      "literals": {
-        "bg-gray-700": 3,
-        "bg-gray-800": 6,
-        "bg-gray-900": 3,
-        "border-gray-800": 6,
-        "text-gray-100": 4,
-        "text-gray-300": 3,
-        "text-gray-400": 6
-      },
-      "reason": "#620 burn-down: a TOC-wizard child step. The wizard shell was guarded, none of its screens were — 139 literals across the six steps the user actually reads."
     },
     "src/components/ui/ChapterStatusIndicator.tsx": {
       "literals": {

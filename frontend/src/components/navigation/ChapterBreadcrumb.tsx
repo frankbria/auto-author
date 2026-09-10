@@ -44,7 +44,7 @@ export function ChapterBreadcrumb({
         {/* Dashboard */}
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link href="/dashboard" className="flex items-center gap-1.5 text-gray-400 hover:text-gray-200">
+            <Link href="/dashboard" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
               <HugeiconsIcon icon={Home01Icon} size={16} />
               Dashboard
             </Link>
@@ -60,7 +60,7 @@ export function ChapterBreadcrumb({
               <BreadcrumbLink asChild>
                 <Link
                   href={`/dashboard/books/${bookId}`}
-                  className="flex items-center gap-1.5 text-gray-400 hover:text-gray-200"
+                  className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
                 >
                   <HugeiconsIcon icon={Book02Icon} size={16} />
                   {bookTitle}
@@ -75,25 +75,25 @@ export function ChapterBreadcrumb({
         {/* Current Page */}
         {isSummaryPage && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-gray-100">Book Summary</BreadcrumbPage>
+            <BreadcrumbPage className="text-foreground">Book Summary</BreadcrumbPage>
           </BreadcrumbItem>
         )}
 
         {isGenerateTocPage && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-gray-100">Generate TOC</BreadcrumbPage>
+            <BreadcrumbPage className="text-foreground">Generate TOC</BreadcrumbPage>
           </BreadcrumbItem>
         )}
 
         {isEditTocPage && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-gray-100">Edit TOC</BreadcrumbPage>
+            <BreadcrumbPage className="text-foreground">Edit TOC</BreadcrumbPage>
           </BreadcrumbItem>
         )}
 
         {isExportPage && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-gray-100">Export Book</BreadcrumbPage>
+            <BreadcrumbPage className="text-foreground">Export Book</BreadcrumbPage>
           </BreadcrumbItem>
         )}
 
@@ -101,13 +101,13 @@ export function ChapterBreadcrumb({
         {isBookPage && showChapterContext && chapterId && chapterTitle && (
           <>
             <BreadcrumbItem>
-              <BreadcrumbPage className="text-gray-100">Writing</BreadcrumbPage>
+              <BreadcrumbPage className="text-foreground">Writing</BreadcrumbPage>
             </BreadcrumbItem>
 
             <BreadcrumbSeparator />
 
             <BreadcrumbItem>
-              <BreadcrumbPage className="text-gray-100 flex items-center gap-1.5">
+              <BreadcrumbPage className="text-foreground flex items-center gap-1.5">
                 <HugeiconsIcon icon={File01Icon} size={16} />
                 {chapterTitle}
               </BreadcrumbPage>
@@ -122,7 +122,7 @@ export function ChapterBreadcrumb({
               <BreadcrumbLink asChild>
                 <Link
                   href={`/dashboard/books/${bookId}?chapter=${chapterId}`}
-                  className="text-gray-400 hover:text-gray-200"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   Writing (Tabbed)
                 </Link>
@@ -132,7 +132,7 @@ export function ChapterBreadcrumb({
             <BreadcrumbSeparator />
 
             <BreadcrumbItem>
-              <BreadcrumbPage className="text-gray-100 flex items-center gap-1.5">
+              <BreadcrumbPage className="text-foreground flex items-center gap-1.5">
                 <HugeiconsIcon icon={File01Icon} size={16} />
                 {chapterTitle} (Legacy)
               </BreadcrumbPage>
@@ -143,7 +143,7 @@ export function ChapterBreadcrumb({
         {/* Default book page when no specific context */}
         {isBookPage && !showChapterContext && (
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-gray-100">Book Overview</BreadcrumbPage>
+            <BreadcrumbPage className="text-foreground">Book Overview</BreadcrumbPage>
           </BreadcrumbItem>
         )}
       </BreadcrumbList>
