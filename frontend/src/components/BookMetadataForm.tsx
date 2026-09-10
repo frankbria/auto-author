@@ -67,7 +67,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
     <FormProvider {...form}>
       <form className="space-y-6 py-2 max-w-2xl">
         {error && (
-          <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 text-red-400">{error}</div>
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg p-4 text-red-700 dark:text-red-400">{error}</div>
         )}
         <FormField
           control={form.control}

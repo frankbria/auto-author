@@ -33,7 +33,7 @@ export default function Home() {
   if (error) {
     return (
       <main id="main-content" tabIndex={-1} className="flex flex-col items-center justify-center text-center p-6 min-h-screen">
-        <div className="bg-red-900/20 border border-red-700 text-red-400 p-4 rounded-lg mb-6 max-w-md" role="alert">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 p-4 rounded-lg mb-6 max-w-md" role="alert">
           <p>Authentication Error: {error}</p>
         </div>
         <button

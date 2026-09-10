@@ -221,35 +221,29 @@ describe('ErrorNotification component', () => {
     expect(screen.queryByText('Retry')).not.toBeInTheDocument();
   });
 
-  // Background-color class assertions
-  it('applies red background for SYSTEM error type', () => {
-    const { container } = render(<ErrorNotification error={makeError({ type: ErrorType.SYSTEM })} />);
-    expect(container.querySelector('[class*="bg-red-900"]')).toBeInTheDocument();
-  });
-
-  it('applies orange background for PERMANENT error type', () => {
-    const { container } = render(<ErrorNotification error={makeError({ type: ErrorType.PERMANENT })} />);
-    expect(container.querySelector('[class*="bg-orange-900"]')).toBeInTheDocument();
-  });
-
-  it('applies yellow background for TRANSIENT error type', () => {
-    const { container } = render(<ErrorNotification error={makeError({ type: ErrorType.TRANSIENT })} />);
-    expect(container.querySelector('[class*="bg-yellow-900"]')).toBeInTheDocument();
-  });
-
-  it('applies yellow background for AI_SERVICE error (not cached)', () => {
+  // Severity-colour class assertions.
+  //
+  // Both halves of the pair, deliberately. Before #632 these read
+  // `[class*="bg-red-900"]`, which matched the broken theme-blind
+  // `bg-red-900/20` and the fixed `dark:bg-red-900/20` equally — so they could
+  // not tell the bug from the fix. Asserting the light `-50` surface too is what
+  // makes them fail on the old shape.
+  it.each([
+    ['SYSTEM', ErrorType.SYSTEM, undefined, 'red'],
+    ['PERMANENT', ErrorType.PERMANENT, undefined, 'orange'],
+    ['TRANSIENT', ErrorType.TRANSIENT, undefined, 'yellow'],
+    ['AI_SERVICE (not cached)', ErrorType.AI_SERVICE, false, 'yellow'],
+    ['AI_SERVICE (cached)', ErrorType.AI_SERVICE, true, 'blue'],
+  ] as const)('paints a themed %s card in %s', (_label, type, isFromCache, hue) => {
     const { container } = render(
-      <ErrorNotification error={makeError({ type: ErrorType.AI_SERVICE })} isFromCache={false} />
+      <ErrorNotification error={makeError({ type })} isFromCache={isFromCache} />
     );
-    expect(container.querySelector('[class*="bg-yellow-900"]')).toBeInTheDocument();
+
+    const card = container.querySelector(`[class*="bg-${hue}-50"]`);
+    expect(card).toBeInTheDocument();
+    expect(card).toHaveClass(`dark:bg-${hue}-900/20`);
   });
 
-  it('applies blue background for AI_SERVICE error when isFromCache=true', () => {
-    const { container } = render(
-      <ErrorNotification error={makeError({ type: ErrorType.AI_SERVICE })} isFromCache={true} />
-    );
-    expect(container.querySelector('[class*="bg-blue-900"]')).toBeInTheDocument();
-  });
 });
 
 // ---------------------------------------------------------------------------

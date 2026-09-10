@@ -81,3 +81,25 @@ export function hexToRgb(hex: string): [number, number, number] {
 
 /** WCAG 2.1 1.4.11: non-text UI components need 3:1, not 4.5:1. */
 export const WCAG_AA_NON_TEXT = 3;
+
+/**
+ * `overlay` at `alpha` composited over `base`, in gamma-encoded sRGB.
+ *
+ * Which is what a browser actually does for a Tailwind `bg-red-900/20`: the
+ * default `srgb` compositing space for a translucent background is the encoded
+ * one, not linear light. Compositing in linear light here would produce a
+ * lighter result than the screen shows and quietly inflate every ratio measured
+ * against a translucent surface (#632).
+ */
+export function compositeOver(
+  overlay: [number, number, number],
+  alpha: number,
+  base: [number, number, number]
+): [number, number, number] {
+  if (alpha < 0 || alpha > 1) throw new Error(`Alpha out of range: ${alpha}`);
+  return overlay.map((c, i) => Math.round(c * alpha + base[i] * (1 - alpha))) as [
+    number,
+    number,
+    number,
+  ];
+}

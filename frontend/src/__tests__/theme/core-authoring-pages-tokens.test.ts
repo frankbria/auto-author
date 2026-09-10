@@ -1,5 +1,7 @@
-import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join, relative, sep } from 'path';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+
+import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
 
 /**
  * Recurrence guard for #331 (P0.2): the book-detail, summary, and TOC-wizard
@@ -36,20 +38,17 @@ import { join, relative, sep } from 'path';
  *
  * Test sources are out of scope — they aren't shipped UI, several legitimately
  * assert on gray class names, and this file's own doc comment above contains
- * `*-gray-N` literals, so a guard that scanned tests would match itself.
+ * `*-gray-N` literals, so a guard that scanned tests would match itself. That
+ * walk now lives in `helpers/sources.ts`, shared with the #632 overlay guard so
+ * the two cannot disagree about which files are shipped.
  */
 
-const FRONTEND_ROOT = join(__dirname, '..', '..', '..');
-const SRC_ROOT = join(FRONTEND_ROOT, 'src');
 const BASELINE_PATH = join(FRONTEND_ROOT, 'gray-literal-baseline.json');
 
 // Matches any theme-independent gray utility — `text-gray-100`,
 // `bg-gray-800/50`, `border-gray-700`, and also `ring-gray-*`/`placeholder-gray-*`
 // so a future reintroduction through a different utility can't slip past.
 const GRAY_LITERAL = /\b[a-z-]*gray-\d+/g;
-
-const IS_TEST_SOURCE = /(^|[\\/])(__tests__|__mocks__|e2e)[\\/]|\.(test|spec)\.[jt]sx?$/;
-const IS_SOURCE = /\.tsx?$/;
 
 interface BaselineEntry {
   /** Distinct gray literal → how many times this file may still contain it. */
@@ -60,19 +59,6 @@ interface BaselineEntry {
 interface Baseline {
   _comment: string;
   files: Record<string, BaselineEntry>;
-}
-
-/** Every shipped `.ts`/`.tsx` under `src/`, repo-relative and POSIX-separated. */
-function shippedSources(dir: string = SRC_ROOT): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const absolute = join(dir, entry.name);
-    const relativePath = relative(FRONTEND_ROOT, absolute).split(sep).join('/');
-
-    if (entry.isDirectory()) return shippedSources(absolute);
-    if (!IS_SOURCE.test(entry.name)) return [];
-    if (IS_TEST_SOURCE.test(relativePath)) return [];
-    return [relativePath];
-  });
 }
 
 function grayLiteralCounts(relativePath: string): Record<string, number> {
