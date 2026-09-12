@@ -82,16 +82,29 @@ interface Utility {
   property: string;
 }
 
+/**
+ * `text-*` also spells the type scale, and `text-lg` on a spinner (sizing an SVG
+ * by font-size is a common idiom) is not a colour. Left in, it made a site count
+ * as coloured — so it needed no `inherits` row — while resolving to nothing.
+ */
+const TYPE_SCALE = new Set([
+  'xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl',
+  'left', 'center', 'right', 'justify', 'start', 'end',
+  'ellipsis', 'clip', 'wrap', 'nowrap', 'balance', 'pretty',
+]);
+
 /** Colour utilities in one class expression. */
 function colourUtilities(expression: string): Utility[] {
-  return [...expression.matchAll(COLOUR_UTILITY)].map(([, variants, utility, name]) => ({
-    variants: variants ? variants.split(':').filter(Boolean) : [],
-    utility,
-    name,
-    // The edge suffix stays part of the property: `border-t` and `border-l` set
-    // different things and must not be read as covering each other.
-    property: utility.slice(0, utility.length - name.length - 1),
-  }));
+  return [...expression.matchAll(COLOUR_UTILITY)]
+    .filter(([, , utility, name]) => !(utility.startsWith('text-') && TYPE_SCALE.has(name)))
+    .map(([, variants, utility, name]) => ({
+      variants: variants ? variants.split(':').filter(Boolean) : [],
+      utility,
+      name,
+      // The edge suffix stays part of the property: `border-t` and `border-l`
+      // set different things and must not cover each other.
+      property: utility.slice(0, utility.length - name.length - 1),
+    }));
 }
 
 /** Applies in the resting state of `theme` — not on hover/focus/group. */
@@ -209,6 +222,15 @@ interface BaselineEntry {
 interface InheritEntry {
   inherits: string;
   surface: string;
+  /**
+   * How many colourless spinners the file may hold on this pair. Asserted for
+   * *equality*, not as a ceiling: a row is per file, so a second colourless
+   * spinner on a different pair — a `variant="destructive"` button added to a
+   * file already ledgered for `text-foreground`/`background` — would otherwise
+   * need no row and never be measured. That is the file-level trap the `sites`
+   * ledger rejects two tests below, and it applies here too.
+   */
+  count: number;
   reason: string;
 }
 
@@ -290,6 +312,86 @@ function resolveColour(name: string, theme: Theme, property: string = 'text'): R
   } catch {
     return null;
   }
+}
+
+/**
+ * Does `path` actually paint `surface` behind its spinner?
+ *
+ * A ledgered `surface` is otherwise a hand-written claim no test checks, and the
+ * regression it hides is this PR's own headline bug: change the accept button's
+ * `disabled:bg-green-800` to `disabled:bg-muted` and `border-white` still occurs
+ * once, the counts still match, and the ratio is still measured against the
+ * *string* "green-800" — 7.13 green while the shipped ring drops to 1.09.
+ *
+ * Evidence is either the background class written in the file, or — for an icon
+ * inside a `<Button>` — the variant's own background from `button.tsx`, since
+ * that is where the pair is actually defined. `ghost` and `link` paint no
+ * background, so their icons sit on the page surface.
+ */
+const BUTTON_VARIANTS = (() => {
+  const source = readFileSync(join(SRC, 'components', 'ui', 'button.tsx'), 'utf8');
+  // Scoped to the `variant:` group. `size:` has its own `default` key, and an
+  // unscoped scan let it overwrite the colour one — so every default-variant
+  // button resolved to `h-9 px-4 py-2` and looked like it painted no background.
+  const from = source.indexOf('variant: {');
+  const to = source.indexOf('size: {', from);
+  if (from === -1 || to === -1) {
+    throw new Error('button.tsx no longer has a `variant: {` … `size: {` shape — the ledger cannot be checked');
+  }
+
+  const variants = new Map<string, string>();
+  for (const [, name, body] of source.slice(from, to).matchAll(/(\w+):\s*\n?\s*"([^"]+)"/g)) {
+    variants.set(name, body);
+  }
+  if (!variants.has('default') || !variants.has('destructive')) {
+    throw new Error('button.tsx variant definitions did not parse — the ledger cannot be checked');
+  }
+  return variants;
+})();
+
+/** Variants that paint nothing, so their contents sit on the page surface. */
+const TRANSPARENT_VARIANTS = new Set(['ghost', 'link']);
+const PAGE_SURFACES = new Set(['background', 'card', 'muted', 'popover']);
+
+/**
+ * Variants a background may carry and still be the surface behind the spinner.
+ *
+ * `disabled` counts because these buttons disable themselves *while loading* —
+ * that is the state the spinner renders in. `hover`/`focus`/`active` do not: a
+ * hover background is not what the ring sits on at rest, and accepting one is
+ * how the first version of this check passed the mutation it exists to catch —
+ * swapping `disabled:bg-green-800` for `disabled:bg-muted` left the sibling
+ * `hover:bg-green-800` behind as false evidence.
+ */
+const RESTING_VARIANTS = new Set(['disabled', 'dark']);
+
+/** Does `source` set `bg-<surface>` in a state the spinner is actually shown in? */
+function paintsAtRest(source: string, surface: string): boolean {
+  const pattern = new RegExp(
+    `(?:^|[\\s'"\`])((?:[a-z0-9-]+:)*)bg-${surface}(?:/\\d+)?(?=$|[\\s'"\`])`,
+    'gm'
+  );
+  return [...source.matchAll(pattern)].some(([, variants]) =>
+    (variants ? variants.split(':').filter(Boolean) : []).every((v) => RESTING_VARIANTS.has(v))
+  );
+}
+
+function paintsSurface(path: string, surface: string): boolean {
+  const source = readFileSync(join(FRONTEND_ROOT, path), 'utf8');
+
+  if (paintsAtRest(source, surface)) return true;
+  // A CSS custom property pointing at the token (Sonner sets `--normal-bg`).
+  if (source.includes(`var(--${surface})`)) return true;
+
+  const used = [...source.matchAll(/variant="(\w+)"/g)].map(([, name]) => name);
+  // A `<Button` with no variant prop takes `default`.
+  if (/<Button[\s>]/.test(source)) used.push('default');
+
+  return used.some((name) => {
+    if (TRANSPARENT_VARIANTS.has(name)) return PAGE_SURFACES.has(surface);
+    const body = BUTTON_VARIANTS.get(name);
+    return body ? paintsAtRest(body, surface) : false;
+  });
 }
 
 /** One `className` expression carrying `animate-spin`, in one file. */
@@ -395,13 +497,20 @@ describe('every animate-spin ring clears WCAG 2.1 1.4.11 (#635)', () => {
     expect(new Set(sites.map((s) => s.path)).size).toBeGreaterThanOrEqual(12);
   });
 
-  it('leaves no spinner unaccounted for', () => {
-    // The claim in this file's title is "every" — so a site with no colour of
-    // its own must be declared as inheriting one, not silently skipped.
-    const unaccounted = sites
-      .filter((site) => !site.utilities.length)
-      .map((site) => site.path)
-      .filter((path) => !(path in inheriting));
+  it('leaves no spinner unaccounted for, in either theme', () => {
+    // The claim in this file's title is "every" — so a site that resolves no
+    // colour must be declared as inheriting one, not silently skipped.
+    //
+    // Per theme, not overall: a ring whose only colour utility is variant-
+    // prefixed (`dark:border-blue-400`, or a `disabled:`-only one) produces no
+    // light-theme case at all, yet `utilities` is non-empty — so an overall
+    // check leaves it painting Preflight's default border colour, invisible,
+    // with the guard green.
+    const unaccounted = sites.flatMap((site) =>
+      THEMES.filter((theme) => !effective(site.expression, theme).length)
+        .filter(() => !(site.path in inheriting))
+        .map((theme) => `${site.path} (${theme})`)
+    );
 
     expect([...new Set(unaccounted)]).toEqual([]);
   });
@@ -417,7 +526,13 @@ describe('every animate-spin ring clears WCAG 2.1 1.4.11 (#635)', () => {
 
     it.each(cases)('%s `%s` clears 3:1 on --%s', (path, utility, surface, name, property) => {
       const colour = resolveColour(name, theme, property);
-      if (colour === null) return; // e.g. `border-transparent` — nothing to see
+      // Loud, not silent: a name this resolver cannot price is #634's rule, and
+      // dropping it here would let `border-[#e5e7eb]` — or a `text-lg` mistaken
+      // for a colour — pass as though it were safe.
+      if (colour === null && !NOT_A_COLOUR.has(name)) {
+        throw new Error(`Unpriceable spinner colour \`${utility}\` in ${path}`);
+      }
+      if (colour === null) return; // `border-transparent` and friends
 
       expect(contrastRatio(colour, oklchToken(themeBlock(css, theme), surface))).toBeGreaterThanOrEqual(
         WCAG_AA_NON_TEXT
@@ -455,6 +570,17 @@ describe('every animate-spin ring clears WCAG 2.1 1.4.11 (#635)', () => {
     expect(failures).toEqual([]);
   });
 
+  it('ledgers a surface the file actually paints', () => {
+    const unsupported = [
+      ...Object.entries(baseline).map(([key, entry]) => [key.split(' :: ')[0], key, entry.surface] as const),
+      ...Object.entries(inheriting).map(([path, entry]) => [path, path, entry.surface] as const),
+    ]
+      .filter(([path, , surface]) => !paintsSurface(path, surface))
+      .map(([, key, surface]) => `${key}: nothing in the file paints \`${surface}\``);
+
+    expect(unsupported).toEqual([]);
+  });
+
   it('ledgers only what still exists, each with a surface, a count and a reason', () => {
     // Counted per value, not per file: `TocReview` shipped *two* `border-white`
     // rings on two different surfaces, and a file-level row would have
@@ -467,16 +593,26 @@ describe('every animate-spin ring clears WCAG 2.1 1.4.11 (#635)', () => {
       .map(([key, entry]) => `${key}: ${utilityCounts.get(key)} > ${entry.count} ledgered`);
     expect(overCount).toEqual([]);
 
-    const colourless = new Set(sites.filter((s) => !s.utilities.length).map((s) => s.path));
-    const staleInherits = Object.keys(inheriting).filter((path) => !colourless.has(path));
+    const colourlessCounts = new Map<string, number>();
+    for (const site of sites) {
+      if (site.utilities.length) continue;
+      colourlessCounts.set(site.path, (colourlessCounts.get(site.path) ?? 0) + 1);
+    }
+
+    const staleInherits = Object.keys(inheriting).filter((path) => !colourlessCounts.has(path));
     expect(staleInherits).toEqual([]);
+
+    const miscounted = Object.entries(inheriting)
+      .filter(([path, entry]) => (colourlessCounts.get(path) ?? 0) !== entry.count)
+      .map(([path, entry]) => `${path}: ${colourlessCounts.get(path)} colourless spinners, ${entry.count} ledgered`);
+    expect(miscounted).toEqual([]);
 
     const unexplained = [
       ...Object.entries(baseline)
         .filter(([, e]) => !e.reason?.trim() || !e.surface?.trim() || !(e.count > 0))
         .map(([key]) => key),
       ...Object.entries(inheriting)
-        .filter(([, e]) => !e.reason?.trim() || !e.surface?.trim() || !e.inherits?.trim())
+        .filter(([, e]) => !e.reason?.trim() || !e.surface?.trim() || !e.inherits?.trim() || !(e.count > 0))
         .map(([key]) => key),
     ];
     expect(unexplained).toEqual([]);
