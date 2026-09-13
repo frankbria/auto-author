@@ -68,6 +68,21 @@ export default function QuestionContainer({
   }));
 
   // Fetch questions with retry logic and stale-while-revalidate
+  // Declared before fetchQuestions, which calls it (#584,
+  // react-hooks/immutability). With the order reversed the call sat in the
+  // binding's temporal dead zone — it worked because the call happens inside an
+  // async body that runs later, but the earlier access cannot see a later
+  // redefinition of the value.
+  const fetchProgress = async () => {
+    try {
+      const progressData = await bookClient.getChapterQuestionProgress(bookId, chapterId);
+      setProgress(progressData);
+    } catch (err) {
+      console.error('Error fetching progress:', err);
+    }
+  };
+
+
   const fetchQuestions = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -129,15 +144,6 @@ export default function QuestionContainer({
   }, [bookId, chapterId]);
 
   // Fetch progress data
-  const fetchProgress = async () => {
-    try {
-      const progressData = await bookClient.getChapterQuestionProgress(bookId, chapterId);
-      setProgress(progressData);
-    } catch (err) {
-      console.error('Error fetching progress:', err);
-    }
-  };
-
   // Generate new questions
   const handleGenerateQuestions = async (
     count: number = 10,

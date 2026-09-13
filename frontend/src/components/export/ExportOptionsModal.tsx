@@ -95,13 +95,10 @@ export function ExportOptionsModal({
   const [stats, setStats] = useState<BookExportStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
 
-  // Load book statistics when modal opens
-  useEffect(() => {
-    if (isOpen && bookId) {
-      loadBookStats();
-    }
-  }, [isOpen, bookId]);
-
+  // Declared before the effect that calls it (#584, react-hooks/immutability).
+  // With the effect first, the call sat in the binding's temporal dead zone: it
+  // works because effects run after render, but the earlier access cannot see a
+  // later redefinition of the value.
   const loadBookStats = async () => {
     try {
       setLoadingStats(true);
@@ -117,6 +114,14 @@ export function ExportOptionsModal({
       setLoadingStats(false);
     }
   };
+
+
+  // Load book statistics when modal opens
+  useEffect(() => {
+    if (isOpen && bookId) {
+      loadBookStats();
+    }
+  }, [isOpen, bookId]);
 
   const handleExport = () => {
     const hasCustomization = Object.keys(customization).length > 0;
