@@ -200,6 +200,93 @@ describe('Dashboard pagination (#493)', () => {
     expect(await screen.findByText('Book 0')).toBeInTheDocument();
   });
 
+  // ----------------------------------------------------------------------- #
+  // #612: an empty list after a failed refetch is not an empty library
+  // ----------------------------------------------------------------------- #
+
+  it('does not show the onboarding empty state when the step-back refetch fails', async () => {
+    // The #612 sequence: page 2 holds one book, deleting it splices the list
+    // empty and steps back to page 1, and page 1's refetch then fails (a 429 is
+    // the realistic case). `projects` is empty and `page` is 0, which used to
+    // render EmptyBookState — telling a user with a full library that they have
+    // never created a book.
+    const user = userEvent.setup();
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1)) // page 1, more exist
+      .mockResolvedValueOnce(makeBooks(1, PAGE_SIZE)) // page 2, single book
+      .mockRejectedValueOnce(new Error('Request failed: 429')); // step-back fails
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await screen.findByText(`Book ${PAGE_SIZE}`);
+
+    await user.click(screen.getByText(`Delete Book ${PAGE_SIZE}`));
+
+    // The retry affordance, not the onboarding state.
+    expect(await screen.findByRole('button', { name: /try again/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('empty-book-state')).not.toBeInTheDocument();
+  });
+
+  it('recovers in place when the retry succeeds, without a reload', async () => {
+    // AC2: the user gets an in-place retry. Before #612 the list only came back
+    // on a window refocus or a full reload.
+    const user = userEvent.setup();
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1))
+      .mockResolvedValueOnce(makeBooks(1, PAGE_SIZE))
+      .mockRejectedValueOnce(new Error('Request failed: 429'))
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE)); // the retry
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await screen.findByText(`Book ${PAGE_SIZE}`);
+    await user.click(screen.getByText(`Delete Book ${PAGE_SIZE}`));
+
+    await user.click(await screen.findByRole('button', { name: /try again/i }));
+
+    expect(await screen.findByText('Book 0')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+  });
+
+  it('clears the pending flag on recovery, so a later real empty library is not mistaken for a failure', async () => {
+    // Mutation M3 found this uncovered: with `setReloadPending(false)` deleted the
+    // suite still passed, because after a successful retry `projects` is non-empty
+    // and the render never consults the flag. It matters on the NEXT empty render
+    // — a stale flag shows "Could not load your books" to someone who has genuinely
+    // deleted them all.
+    const user = userEvent.setup();
+    getUserBooks
+      .mockResolvedValueOnce(makeBooks(PAGE_SIZE + 1)) // page 1
+      .mockResolvedValueOnce(makeBooks(1, PAGE_SIZE)) // page 2
+      .mockRejectedValueOnce(new Error('Request failed: 429')) // step-back fails
+      .mockResolvedValueOnce(makeBooks(1)) // retry succeeds, one book left
+      .mockResolvedValueOnce([]); // that last book is deleted -> truly empty
+
+    render(<Dashboard />);
+    await screen.findByText('Book 0');
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await screen.findByText(`Book ${PAGE_SIZE}`);
+    await user.click(screen.getByText(`Delete Book ${PAGE_SIZE}`));
+    await user.click(await screen.findByRole('button', { name: /try again/i }));
+    await screen.findByText('Book 0');
+
+    // Now empty the library for real.
+    await user.click(screen.getByText('Delete Book 0'));
+
+    expect(await screen.findByTestId('empty-book-state')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+  });
+
+  it('still shows the onboarding empty state for a genuinely empty library', () => {
+    // The counterpart the fix must not break: a real empty library on page 0
+    // with no failure in play still gets the onboarding state, not a retry.
+    getUserBooks.mockResolvedValueOnce([]);
+    render(<Dashboard />);
+    return screen.findByTestId('empty-book-state');
+  });
+
   it('keeps the pager mounted while the next page is still in flight', async () => {
     const user = userEvent.setup();
     let releasePageTwo: (books: unknown[]) => void = () => {};

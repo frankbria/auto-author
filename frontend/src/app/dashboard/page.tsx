@@ -30,6 +30,12 @@ export default function Dashboard() {
   const { data: session, isPending: isSessionPending } = useSession();
   const [projects, setProjects] = useState<BookProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // `projects` being empty is not the same fact as "this library is empty" (#612).
+  // After a delete evacuates a later page we splice locally and step back; if that
+  // step-back's refetch then fails, the list is empty because a reload is pending,
+  // not because the user has no books — and rendering EmptyBookState there tells a
+  // user with a full library that they have never created one.
+  const [reloadPending, setReloadPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isBookDialogOpen, setIsBookDialogOpen] = useState(false);
   const [page, setPage] = useState(0);
@@ -89,6 +95,7 @@ export default function Dashboard() {
       // assignment and keeps the ref true at every point that writes the list.
       pageStateRef.current = { projects: pageBooks, hasMore: moreExist, page };
       loadedPageRef.current = page;
+      setReloadPending(false);
       setError(null);
     } catch (err) {
       if (isStale()) return;
@@ -119,6 +126,10 @@ export default function Dashboard() {
         // empty. Either way the user loses their place, and the per-page requests
         // this pager makes put a 429 well within reach.
         toast.error({ title: 'Failed to load that page. Please try again.' });
+        // The list on screen may be the locally-spliced empty array from a delete
+        // that evacuated a later page. Mark it pending so the render shows a retry
+        // rather than the onboarding empty state (#612).
+        setReloadPending(true);
         // Roll back to whichever page the books currently on screen belong to. A
         // directional clamp looks safer but is wrong for a failed *Previous*: it
         // leaves `page` one behind the content, so the pager reads "Page 2" over
@@ -272,6 +283,19 @@ export default function Dashboard() {
                 onDelete={handleDeleteBook}
               />
             ))}
+          </div>
+        ) : reloadPending ? (
+          // Empty because a refetch failed, not because the library is empty. The
+          // onboarding state would be actively wrong here, and until #612 the only
+          // recovery was a window refocus or a reload.
+          <div role="status" aria-live="polite" className="text-center py-12">
+            <p className="text-muted-foreground mb-4">
+              Could not load your books. They are still there — this is a loading
+              problem, not a missing-books one.
+            </p>
+            <Button onClick={() => fetchBooks()} disabled={isLoading} variant="outline">
+              Try again
+            </Button>
           </div>
         ) : page === 0 ? (
           <EmptyBookState onCreateNew={handleCreateNewBook} />
