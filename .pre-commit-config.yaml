@@ -27,6 +27,16 @@ repos:
         stages: [manual]
         verbose: true
 
+  # Commit message - a negated closing keyword still closes the issue
+  - repo: local
+    hooks:
+      - id: check-commit-message
+        name: Commit message does not accidentally close an issue
+        entry: ./scripts/check-commit-message.sh
+        language: system
+        stages: [commit-msg]
+        verbose: true
+
   # Security - Check for secrets and credentials
   - repo: local
     hooks:

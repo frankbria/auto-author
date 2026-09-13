@@ -947,3 +947,69 @@ Run the linter on the one file before writing the classification, not after.
 (The same probe found the blind spot's shape: converting the callee to a `.then()`
 chain silences it. That is a fix for the count, not for the code, and belongs in
 a ledger rather than in five components.)
+
+### "Does not close #584" closes #584
+2026-09-13. Wrote a disclaimer into a commit message specifically to stop a
+closure — *"Does not close #584 — its condition is the rules back at `error`"* —
+and that sentence closed #584 on merge, with 17 violations outstanding and all
+three rules still at `warn`. GitHub's linked-issue parser matches
+`close|fixes|resolved #<n>` anywhere in a commit message or PR body and does not
+parse negation. The disclaimer was the trigger.
+
+To reference an issue without closing it, drop the keyword entirely: "#584's
+close condition", "per #584", "partial progress on #584". Now enforced by
+`scripts/check-commit-message.sh` at the `commit-msg` stage. Note what that hook
+cannot see: a PR **body** closes issues the same way, and no local hook reads it.
+
+### A wiring assertion that greps the whole config proves nothing
+2026-09-13, in the guard for the entry above. Its "is this hook actually wired
+up" test read the pre-commit config as text and asserted `"commit-msg" in
+config`. That string also appears in `default_install_hook_types: [pre-commit,
+commit-msg]` a hundred lines away, so retagging the hook to `stages: [manual]`
+left the test green — the guard for the guard was vacuous in exactly the way the
+guards it sits beside exist to prevent.
+
+Found by mutating the one thing the assertion claimed to check, which is the
+only reason it is now parsed YAML asserting `hooks[0]["stages"] == ["commit-msg"]`.
+Substring checks against a structured file are not assertions about structure.
+**When a test claims a thing is configured, mutate that configuration** — not
+the code it configures.
+
+### git strips comment lines, except when it does not
+2026-09-13, the second defect in the same guard. It skipped lines starting with
+`#` on the reasoning that git removes comments before a message reaches GitHub.
+Git does — in **editor** mode, where cleanup defaults to `strip`. `git commit -m`
+uses `--cleanup=whitespace` and keeps every line.
+
+The first message the guard ever ran on opened its body with an issue number, so
+the skip discarded that whole line and the negated closing keyword inside it. The
+hook reported *Passed* on the one message it was written to catch, and the commit
+would have closed the issue a second time. Caught only by running the finished
+guard against the message that motivated it — a check worth doing every time a
+guard exists because of one specific artefact.
+
+For a guard, the asymmetry decides it: a false positive on a genuine comment is a
+reword; a false negative is the failure you already paid for. Do not filter the
+input.
+
+The reviewer then found a third defect of the same class: `grep` is line-based,
+commit bodies wrap at ~72 columns, so "This does not" / "close #123" split across
+two lines reads as safe while GitHub, which has no concept of the wrap, closes
+the issue. Newlines now collapse to spaces before matching.
+
+All three defects were in the **filtering of the input**, not in the pattern —
+skipping `#` lines, and letting line boundaries break a match. The pattern was
+right from the start and never touched. When a guard reads a file line by line,
+the bug is usually upstream of the regex.
+
+### `git checkout HEAD -- <file>` reverted uncommitted work, again
+2026-09-13. Fourth instance this session, and this time the file was one I had
+*just* created content in: a mutation loop reverted `.pre-commit-config.yaml`
+between cases, silently deleting the uncommitted hook block being tested. The
+next test run failed against a tree missing the feature, which reads exactly like
+a broken test.
+
+The existing lesson says commit before mutating. The gap was that I applied it to
+the file under mutation and not to the *other* files the same loop reverts. Commit
+the whole change set first — the revert step does not distinguish "my mutation"
+from "my work".
