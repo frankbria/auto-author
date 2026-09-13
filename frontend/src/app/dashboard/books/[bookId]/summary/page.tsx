@@ -13,9 +13,9 @@ import {
 } from '@/lib/constants/summary-readiness';
 import {
   describeSpeechError,
-  isSpeechRecognitionSupported,
   SPEECH_UNSUPPORTED_MESSAGE,
 } from '@/lib/voice/speechRecognitionErrors';
+import { useSpeechRecognitionSupported } from '@/lib/voice/useSpeechRecognitionSupported';
 
 export default function BookSummaryPage() {
   const router = useRouter();
@@ -27,14 +27,17 @@ export default function BookSummaryPage() {
   const [error, setError] = useState('');
   // Advertised capability must match reality: this button used to render enabled
   // in Firefox/Safari and over plain HTTP, and only failed on click (#348).
-  const [voiceSupported, setVoiceSupported] = useState(false);
+  const voiceSupported = useSpeechRecognitionSupported();
   // Interim results were thrown away, so nothing showed until a phrase
   // finalised and the surface looked frozen while listening.
   const [interimTranscript, setInterimTranscript] = useState('');
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastSaved = useRef('');
   const [summaryHistory, setSummaryHistory] = useState<unknown[]>([]);
-  const [inputError, setInputError] = useState('');
+  // Derived during render, not mirrored into state via an effect (#584,
+  // react-hooks/set-state-in-effect). `getSummaryReadinessError` is a pure
+  // function of `summary`, so storing it cost an extra render pass on every
+  // keystroke and could show a stale error for one frame.
 
   // Load summary and history from remote on mount
   useEffect(() => {
@@ -79,17 +82,11 @@ export default function BookSummaryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
 
-  // Real-time validation
-  useEffect(() => {
-    setInputError(getSummaryReadinessError(summary));
-  }, [summary]);
+  const inputError = getSummaryReadinessError(summary);
 
   // Speech recognition setup
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  useEffect(() => {
-    setVoiceSupported(isSpeechRecognitionSupported());
-  }, []);
 
   // Release the microphone if this page unmounts mid-dictation (#348).
   // Handlers are detached first so stop()'s onend cannot setState after unmount.
