@@ -108,8 +108,12 @@ function classRuns(line: string): string[] {
  * Known and accepted: a Prettier-wrapped `cn(...)` that splits a pair across two
  * string literals reports the light half as stranded. That is a **false positive**
  * — it fails loudly and is resolved by a ledger row or by keeping the pair
- * together — and is the right way round. A false green ships the bug; no shipped
- * file has that shape today (`TocSidebar.tsx:38` keeps its pair in one run).
+ * together — and is the right way round, since a false green ships the bug.
+ *
+ * No shipped file has that shape. The nearest was `TocSidebar.tsx`, whose
+ * multi-line `cn(...)` kept its pair inside one string literal; it was deleted in
+ * #630 as an orphan no module ever imported, so the sweep now finds no multi-line
+ * `cn(...)` carrying a pale-hue pair at all.
  */
 /** A variant chain as a comparable key, with `dark` removed. `""` = resting state. */
 function stateKey(variants: string): string {
