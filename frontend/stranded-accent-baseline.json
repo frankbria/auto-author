@@ -15,11 +15,11 @@
     },
     "src/components/toc/ClarifyingQuestions.tsx": {
       "utilities": { "text-indigo-400": 1, "text-green-400": 1 },
-      "reason": "disabled: button labels on disabled: dark surfaces (indigo-400 on indigo-800 = 3.33:1, green-400 on green-800 = 4.09:1). WCAG 1.4.3 exempts text that is part of an inactive user interface component from any contrast requirement, so these are not failures. Both buttons are theme-fixed (bg-indigo-600 / bg-green-700 with white labels in both themes), so a dark: counterpart would have nothing to swap to. The separate question of whether disabled states are legible enough in practice is #642."
+      "reason": "disabled: button labels on disabled: dark surfaces (indigo-400 on indigo-800 = 3.33:1, green-400 on green-800 = 4.09:1). WCAG 1.4.3 exempts text that is part of an inactive user interface component from any contrast requirement, so these are not failures. Both buttons are theme-fixed (bg-indigo-600 / bg-green-700 with white labels in both themes), so a dark: counterpart would have nothing to swap to. The separate question of whether disabled states are legible enough in practice was #642, and it is now answered: #683 took option 1 and gave *busy* buttons their own full-opacity treatment while leaving the genuinely-unavailable state exactly as it is. These two are the unavailable kind — Previous with no earlier question, Next with nothing answered — so the exemption stands and they are correct as written."
     },
     "src/components/toc/TocReview.tsx": {
       "utilities": { "text-green-400": 1 },
-      "reason": "disabled: accept-button label, green-400 on disabled:bg-green-800 = 4.09:1. Inactive-component exemption (WCAG 1.4.3), same as ClarifyingQuestions.tsx. Tracked for legibility in #642."
+      "reason": "disabled: accept-button label, green-400 on disabled:bg-green-800 = 4.09:1. Inactive-component exemption (WCAG 1.4.3), same as ClarifyingQuestions.tsx. Tracked for legibility in #684, not #642: #642/#683 fixed the shared `<Button>` component, and this is a raw `<button>` that component never styled. The exemption is also weaker here than for ClarifyingQuestions.tsx — this button is disabled *because it is saving* and says so, which is not an inactive component in the sense 1.4.3 means."
     },
     "src/components/chapters/VoiceTextInput.tsx": {
       "utilities": { "border-green-200": 1 },
