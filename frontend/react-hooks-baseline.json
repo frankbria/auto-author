@@ -1,0 +1,91 @@
+{
+  "_comment": "#675 ledger: the eslint-plugin-react-hooks 7 violations that existed when the gate was turned on, per file per rule. eslint.config.mjs holds these three rules at `warn` until #584 burns them to zero; this file is what keeps that interval safe. Counts are per rule so a net-zero swap inside one file cannot pass (#624). A row the tree no longer contains FAILS as stale rather than silently pre-authorising the next violation on that file (#631). Shrink freely \u2014 a lower count is reported, never failed. Adding a row to silence a NEW violation defeats the gate. When this empties, delete it and the three \"warn\" lines in eslint.config.mjs.",
+  "files": {
+    "src/app/auth/reset-password/page.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1
+      }
+    },
+    "src/app/dashboard/books/[bookId]/page.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1
+      }
+    },
+    "src/app/dashboard/books/[bookId]/summary/page.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 2
+      }
+    },
+    "src/app/dashboard/page.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1,
+        "react-hooks/refs": 2
+      }
+    },
+    "src/app/dashboard/settings/page.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 2
+      }
+    },
+    "src/app/page.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1
+      }
+    },
+    "src/components/BookCreationWizard.tsx": {
+      "rules": {
+        "react-hooks/refs": 1
+      }
+    },
+    "src/components/chapters/ChapterEditor.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 3
+      }
+    },
+    "src/components/chapters/VoiceTextInput.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1
+      }
+    },
+    "src/components/chapters/questions/QuestionContainer.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1
+      }
+    },
+    "src/components/export/ExportOptionsModal.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 2
+      }
+    },
+    "src/components/export/ExportProgressModal.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1
+      }
+    },
+    "src/components/loading/LoadingStateManager.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 2
+      }
+    },
+    "src/components/settings/ActiveSessionsList.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1
+      }
+    },
+    "src/components/toc/ClarifyingQuestions.tsx": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1
+      }
+    },
+    "src/hooks/useSwipeGesture.ts": {
+      "rules": {
+        "react-hooks/refs": 1
+      }
+    },
+    "src/hooks/useUserPreferences.ts": {
+      "rules": {
+        "react-hooks/set-state-in-effect": 1
+      }
+    }
+  }
+}

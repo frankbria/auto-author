@@ -58,6 +58,14 @@ jobs:
         working-directory: frontend
         run: npm run typecheck:tests
 
+      # eslint.config.mjs holds three eslint-plugin-react-hooks 7 rules at `warn`
+      # until #584 burns the backlog to zero, and `npx eslint .` already prints
+      # 437 warnings — a new violation lands in that pile unseen. This ledgers the
+      # known ones per file per rule so the count can only shrink (#675).
+      - name: react-hooks backlog can only shrink
+        working-directory: frontend
+        run: npm run gate:react-hooks
+
       - name: Run unit tests
         working-directory: frontend
         run: npm test -- --coverage --passWithNoTests

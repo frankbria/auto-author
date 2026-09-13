@@ -46,6 +46,28 @@ It does *not* fail when a count drops.
 `text-muted-foreground`, `bg-muted`, `border-border`). Shrink the counts freely and delete the
 entry when a file reaches zero.
 
+### react-hooks backlog ledger (#675)
+
+`eslint.config.mjs` holds three `eslint-plugin-react-hooks` 7 rules — `set-state-in-effect`,
+`refs`, `immutability` — at `warn` rather than their default `error`, so the ESLint 9 upgrade
+(#583) could land as an upgrade. #584 tracks burning them to zero, and until it does, `npx eslint .`
+prints hundreds of warnings that a new violation disappears into.
+
+`npm run gate:react-hooks` (`Frontend Tests` → *react-hooks backlog can only shrink*) fails on:
+
+- a violation in a file with no row in `frontend/react-hooks-baseline.json`,
+- a ledgered file above its recorded count **for that rule** — counts are per rule, so swapping a
+  `refs` violation for a `set-state-in-effect` one in the same file fails rather than netting out,
+- a **stale** row, i.e. one whose violation is gone. A stale row is not harmless: it
+  pre-authorises the next violation of that rule in that file.
+
+A count that drops is **reported, not failed** — the same contract `audit_gate.py` and
+`typecheck-tests.mjs` use. Nobody's build should break because someone fixed something.
+
+**Never add a row to silence a new violation.** The ledger records what existed when the gate was
+turned on. When it empties, delete it along with the three `"warn"` lines in `eslint.config.mjs`,
+which is #584's close condition.
+
 ### E2E Coverage Requirements
 
 EVERY user-facing feature needs an E2E test covering all five:
