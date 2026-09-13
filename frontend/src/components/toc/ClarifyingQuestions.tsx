@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { QuestionResponse } from '@/types/toc';
 import { bookClient } from '@/lib/api/bookClient';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Loading03Icon } from '@hugeicons/core-free-icons';
 
 interface ClarifyingQuestionsProps {
   questions: string[];
@@ -166,7 +168,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         <div className="mt-3 flex items-center text-sm">
           {isSaving ? (
             <div className="flex items-center text-blue-700 dark:text-blue-400" aria-hidden="true">
-              <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-blue-400 mr-2"></div>
+              <HugeiconsIcon icon={Loading03Icon} size={12} className="mr-2 animate-spin text-blue-600 dark:text-blue-400" />
               Saving...
             </div>
           ) : saveError ? (

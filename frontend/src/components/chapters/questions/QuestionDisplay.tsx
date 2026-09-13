@@ -549,7 +549,7 @@ export default function QuestionDisplay({
               <div className="flex items-center gap-2 text-xs" aria-hidden="true">
                 {saveStatus === 'saving' && (
                   <>
-                    <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin text-blue-600" />
+                    <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin text-blue-600 dark:text-blue-400" />
                     <span className="text-blue-600">Saving...</span>
                   </>
                 )}

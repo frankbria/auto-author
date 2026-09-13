@@ -6,6 +6,8 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from './ui/form';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Loading03Icon } from '@hugeicons/core-free-icons';
 import { GENRE_OPTIONS, TARGET_AUDIENCE_OPTIONS } from '@/lib/constants/book-metadata';
 
 export interface BookMetadataFormProps {
@@ -173,7 +175,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
         />
         {isSaving && (
           <div className="flex items-center text-gray-400" role="status" aria-live="polite">
-            <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400 mr-2"></div>
+            <HugeiconsIcon icon={Loading03Icon} size={12} className="mr-2 animate-spin text-blue-600 dark:text-blue-400" />
             Saving...
           </div>
         )}

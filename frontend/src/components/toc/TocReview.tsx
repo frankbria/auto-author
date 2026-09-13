@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { TocGenerationResult, TocChapter } from '@/types/toc';
 import { ChapterStatusIndicator } from '@/components/ui/ChapterStatusIndicator';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Loading03Icon } from '@hugeicons/core-free-icons';
 
 interface TocReviewProps {
   tocResult: TocGenerationResult;
@@ -116,7 +118,7 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
         >
           {isLoading ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+              <HugeiconsIcon icon={Loading03Icon} size={16} className="mr-2 animate-spin text-blue-600 dark:text-blue-400" />
               Regenerating...
             </>
           ) : (

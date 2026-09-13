@@ -1,0 +1,71 @@
+{
+  "_comment": "#635. A row here does NOT excuse a ring \u2014 it names the surface that ring is actually painted on, and the guard measures the ratio against that surface instead of against the three theme tokens. `count` is per distinct utility per file, because the same utility can appear twice in one file on two different surfaces: TocReview shipped two `border-white` rings, one on `disabled:bg-green-800` (7.13) and one on `disabled:bg-muted` (1.09), and a file-level row would have pre-authorised the broken one. Shrink freely; delete the row when the ring goes. `inherits` rows carry a count too, asserted for equality: a row is per file, so a second colourless spinner on a different pair would otherwise need no row and never be measured.",
+  "sites": {
+    "src/components/toc/TocReview.tsx :: border-white": {
+      "surface": "green-800",
+      "count": 1,
+      "reason": "The accept button is a raw <button> whose `disabled:bg-green-800` paints at spinner time (`disabled` and the spinner share the `isLoading` flag). White on green-800 is 7.13:1. Surface-agnostic it would fail, because white on light `--muted` is 1.09 \u2014 which was exactly the sibling regenerate button's bug, fixed in this PR."
+    },
+    "src/components/toc/ClarifyingQuestions.tsx :: border-white": {
+      "surface": "green-800",
+      "count": 1,
+      "reason": "Same shape as TocReview's accept button: raw <button>, `disabled:bg-green-800` at spinner time, 7.13:1."
+    }
+  },
+  "inherits": {
+    "src/components/BookCreationWizard.tsx": {
+      "inherits": "text-primary-foreground",
+      "surface": "primary",
+      "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. Explicit `bg-primary text-primary-foreground` on the submit button.",
+      "count": 1
+    },
+    "src/components/books/DeleteBookModal.tsx": {
+      "inherits": "text-white",
+      "surface": "destructive",
+      "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. `variant=\"destructive\"` is `bg-destructive text-white`.",
+      "count": 1
+    },
+    "src/components/chapters/questions/QuestionContainer.tsx": {
+      "inherits": "text-foreground",
+      "surface": "background",
+      "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. `variant=\"outline\"` keeps `bg-background` and the inherited `--foreground`.",
+      "count": 1
+    },
+    "src/components/chapters/questions/QuestionDisplay.tsx": {
+      "inherits": "text-foreground",
+      "surface": "background",
+      "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. The regenerate control is `variant=\"ghost\"`, which paints no background of its own, so the icon sits on the page surface in the inherited `--foreground`. (The other spinner in this file declares `text-blue-600 dark:text-blue-400` and is swept normally.)",
+      "count": 1
+    },
+    "src/components/chapters/questions/QuestionGenerator.tsx": {
+      "inherits": "text-primary-foreground",
+      "surface": "primary",
+      "reason": "A `\u25cc` glyph, not a ring, in a default <Button> (`bg-primary text-primary-foreground`). As a text character its obligation is 1.4.3, not 1.4.11; it is measured here at the 3:1 floor alongside the rings rather than left out. Note the button is disabled while it spins, so `disabled:opacity-50` from button.tsx's base halves the real contrast for this and every other disabled button in the app \u2014 tracked separately, not a spinner bug.",
+      "count": 1
+    },
+    "src/components/chapters/questions/RegenerateQuestionsDialog.tsx": {
+      "inherits": "text-primary-foreground",
+      "surface": "primary",
+      "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. Default variant on the confirm button.",
+      "count": 1
+    },
+    "src/components/examples/ai-error-handling-example.tsx": {
+      "inherits": "text-primary-foreground",
+      "surface": "primary",
+      "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. Three default-variant buttons in the same demo component.",
+      "count": 3
+    },
+    "src/components/chapters/ChapterEditor.tsx": {
+      "inherits": "text-muted-foreground",
+      "surface": "muted",
+      "reason": "The save-status spinner is `currentColor` inside a `text-xs text-muted-foreground` span. This is the site that showed why colourless spinners need rows at all: with no utility of its own it produced no sweep entry, so this guard's own \"every ring\" claim was false for it until review caught it.",
+      "count": 1
+    },
+    "src/components/ui/sonner.tsx": {
+      "inherits": "text-popover-foreground",
+      "surface": "popover",
+      "reason": "Sonner's `icons.loading`. The toast root sets `--normal-bg: var(--popover)` and `--normal-text: var(--popover-foreground)`, so the icon paints that pair rather than anything on the page behind it.",
+      "count": 1
+    }
+  }
+}

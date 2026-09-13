@@ -104,7 +104,7 @@ const TAILWIND_CONFIG = join(SRC, '..', 'tailwind.config.js');
 function activeTitleColor(theme: Theme, css: string): Rgb {
   if (theme === 'dark') {
     const override = css.match(
-      /\.dark\s+\.text-primary[^{]*\{[^}]*color:\s*rgb\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/
+      /\.dark\s+\.text-primary(?![\w-])[^{]*\{[^}]*color:\s*rgb\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/
     );
     if (!override) throw new Error('globals.css has no `.dark .text-primary` rgb() override (#610)');
     return [Number(override[1]), Number(override[2]), Number(override[3])];
