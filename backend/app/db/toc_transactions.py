@@ -151,14 +151,32 @@ async def _update_toc_internal(
         if current_version != expected_version:
             raise ValueError(f"Version conflict: expected {expected_version}, current {current_version}")
 
-    # Create updated TOC with atomic version increment
+    # Create updated TOC with atomic version increment.
+    #
+    # Merged over the stored TOC, not substituted for it (#496). Spreading only
+    # `toc_data` dropped every key the caller omitted, so a valid partial body
+    # like {"toc": {"chapters": [...]}} — which is exactly what the E2E helpers
+    # send — silently cleared `estimated_pages` and `structure_notes`, and
+    # GET /toc then reported `total_chapters: 0` alongside real chapters. Same
+    # root pattern as #492: a missing key resolving to a destructive default.
+    #
+    # `chapters` is still effectively required — the endpoint rejects a body
+    # without it (#492/#495) — so merging cannot resurrect deleted chapters;
+    # an intentional clear is {"chapters": []}, which is present and wins.
     updated_toc = {
+        **current_toc,
         **toc_data,
         "generated_at": current_toc.get("generated_at"),
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "status": "edited",
         "version": current_version + 1
     }
+
+    # Derived, never trusted from the client (#496). Every other producer in the
+    # codebase already computes it this way — ai_service, export_service, the
+    # flat chapter listing, and the frontend's own edit-TOC page — so accepting a
+    # client value only created a way for the two to disagree.
+    updated_toc["total_chapters"] = len(updated_toc.get("chapters", []))
 
     # Assign IDs to chapters that don't have them
     for chapter in updated_toc.get("chapters", []):
