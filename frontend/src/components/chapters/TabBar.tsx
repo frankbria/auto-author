@@ -78,19 +78,11 @@ export function TabBar({
     const activeTab = scrollAreaRef.current.querySelector(`[data-rfd-draggable-id="${activeChapterId}"]`);
     if (activeTab && typeof HTMLElement !== 'undefined' && activeTab instanceof HTMLElement) {
       try {
-        // Check if scrollIntoView is available (it won't be in some test environments)
-        if (typeof activeTab.scrollIntoView === 'function') {
-          activeTab.scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest'
-          });
-        } else {
-          // For test environments, simulate scrolling by updating scroll state
-          setCanScrollUp(true);
-          setCanScrollDown(true);
-        }
+        activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } catch (err) {
-        // Silently handle scrollIntoView errors in test environment
+        // Defensive only. `scrollIntoView` exists in every browser this ships to
+        // and is stubbed in jest.setup.ts, so this is for an engine that throws
+        // on the options object rather than for a missing method (#672).
         console.debug('Failed to scroll into view:', err);
       }
     }
