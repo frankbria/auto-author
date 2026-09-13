@@ -247,7 +247,7 @@ export default function Dashboard() {
       <div className="container mx-auto flex-1 p-6">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-2">
-            <HugeiconsIcon icon={Book02Icon} size={32} className="text-indigo-400" />
+            <HugeiconsIcon icon={Book02Icon} size={32} className="text-indigo-700 dark:text-indigo-400" />
             <h2 className="text-3xl font-bold text-foreground">My Books</h2>
           </div>
           <Button

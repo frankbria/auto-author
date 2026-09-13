@@ -468,7 +468,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
           <div className="flex items-center space-x-2">
             <button
               onClick={() => addSubchapter(chapter.id)}
-              className="text-muted-foreground hover:text-indigo-400 p-1"
+              className="text-muted-foreground hover:text-indigo-700 dark:hover:text-indigo-400 p-1"
               title="Add Subchapter"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
