@@ -865,6 +865,21 @@ even when the issue is recent, detailed, and written by someone who was right
 about the class. Especially then: a confident, specific issue is the one you are
 least likely to re-measure.
 
+**Extended, same session, #672:** the fifth was **my own issue, filed five
+minutes earlier**. I wrote that `TabBar`'s `else` branch existed because
+`scrollIntoView` is missing under jest, so "the real path has no coverage at
+all". `jest.setup.ts` already stubs `scrollIntoView` — added for Radix Select,
+nothing to do with tabs — so the branch was dead and the real path was the only
+one running. Freshness is not evidence, and neither is authorship: I had read
+the component, not the setup file, and the premise was a plausible inference
+from the code comment rather than something I checked.
+
+What settled it in under a minute: put a `throw` where the code under suspicion
+runs and run the suite. A branch that cannot throw is a branch that does not
+execute. Do that **before** writing the issue, not after — it costs one test run
+and it is the difference between "no coverage" and "dead code", which are
+opposite fixes.
+
 ### `git reset --hard` on a tidy-up discards config you forgot was uncommitted
 2026-09-12, the same session as the entry above, and worse than it. Used
 `git reset --hard origin/main` to clean up a local `main` that had briefly
