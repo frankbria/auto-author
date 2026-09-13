@@ -39,7 +39,6 @@ const eslintConfig = [
       // ESLint upgrade instead of a React refactor — see the follow-up issue.
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/refs": "warn",
-      "react-hooks/immutability": "warn",
     },
   },
   {
