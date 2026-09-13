@@ -2,6 +2,16 @@ import type { NextConfig } from "next";
 import path from "node:path";
 
 const nextConfig: NextConfig = {
+  // Next generates AGENTS.md and CLAUDE.md on every `next dev` start (#611).
+  // Turned off rather than ignored: this repo already has a considered root
+  // CLAUDE.md, and a second auto-generated instruction file one directory down
+  // competes with it silently — every agent session started in `frontend/`
+  // would read the generated one as project instructions. They were also
+  // untracked and unignored, so any `git add -A` mid-task swept them in.
+  // `frontend/.gitignore` still lists both as a second line of defence, in case
+  // a future Next version regenerates them regardless of this flag.
+  agentRules: false,
+
   // Emit a self-contained server bundle at .next/standalone for container images
   // (#427). This is additive: `next build` still produces the normal .next output,
   // so `next start` — which the current PM2 deploy uses — keeps working unchanged.
