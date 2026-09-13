@@ -6,7 +6,6 @@ import uuid
 from app.schemas.book import (
     QuestionCreate,
     Question,
-    QuestionResponse,
     QuestionResponseCreate,
     QuestionRating,
     QuestionProgressResponse,
@@ -664,7 +663,7 @@ class QuestionGenerationService:
             Based on this content, generate questions that will help the author expand and improve the chapter.
             """
         else:
-            prompt += f"""
+            prompt += """
             The chapter does not have any content yet. Generate questions that will help the author create initial
             content for this chapter based on the title.
             """

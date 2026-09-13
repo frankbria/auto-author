@@ -1,7 +1,6 @@
 # backend/tests/test_services/test_ai_service.py
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-import asyncio
+from unittest.mock import Mock, patch
 from app.services.ai_service import AIService, ai_service
 
 
@@ -206,7 +205,7 @@ SUGGESTIONS: Consider adding more specific examples. Include target audience det
         )
 
         assert result is not None
-        assert result["success"] == True
+        assert result["success"]
         assert "toc" in result
         assert result["toc"]["total_chapters"] == 2
         assert len(result["toc"]["chapters"]) == 2
@@ -410,7 +409,7 @@ SUGGESTIONS: Add more concrete examples. Define target audience clearly. Include
 
         result = service._parse_toc_response(valid_json_response)
 
-        assert result["success"] == True
+        assert result["success"]
         assert "toc" in result
         assert result["toc"]["total_chapters"] == 1
         assert len(result["toc"]["chapters"]) == 1
@@ -484,7 +483,7 @@ SUGGESTIONS: Add more concrete examples. Define target audience clearly. Include
 
         result = service._create_fallback_toc("Chapter 1\nChapter 2")
 
-        assert result["success"] == True
+        assert result["success"]
         assert "toc" in result
         assert result["toc"]["total_chapters"] >= 2
         # The fallback should create "Chapter 1" from the text, not "Introduction"
@@ -659,7 +658,7 @@ SUGGESTIONS: None needed
         assert call_args[1]["max_tokens"] == 1000
 
         # Verify result structure
-        assert result["is_ready_for_toc"] == True
+        assert result["is_ready_for_toc"]
         assert result["confidence_score"] == 0.9
 
     @pytest.mark.asyncio
@@ -736,6 +735,6 @@ SUGGESTIONS: None needed
         assert call_args[1]["max_tokens"] == 1500
 
         # Verify result structure
-        assert result["success"] == True
+        assert result["success"]
         assert result["chapters_count"] == 1
         assert "toc" in result

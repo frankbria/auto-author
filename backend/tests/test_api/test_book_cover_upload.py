@@ -2,12 +2,10 @@
 Test Book Cover Upload API endpoint
 """
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from fastapi import UploadFile, HTTPException
-from httpx import AsyncClient
+from unittest.mock import patch, AsyncMock
+from fastapi import HTTPException
 from PIL import Image
 from io import BytesIO
-import base64
 
 
 class TestBookCoverUpload:

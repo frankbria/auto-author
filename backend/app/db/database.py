@@ -90,6 +90,13 @@ __all__ += [
     "get_book_metadata_by_id",
     "get_books_by_user",
     "update_book",
+    # Both are consumed as `from app.db.database import ...` by
+    # api/endpoints/books.py but were missing here, so this facade's declared
+    # surface disagreed with its real one. Turning the ruff gate on (#561) is what
+    # surfaced it: F401 called the imports unused, and auto-removing them broke
+    # the import books.py depends on.
+    "apply_chapter_content_update",
+    "update_book_summary_atomic",
     "delete_book",
     "delete_all_user_books",
     # Audit log DAOs

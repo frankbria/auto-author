@@ -12,12 +12,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.question_generation_service import QuestionGenerationService
 from app.schemas.book import (
     QuestionCreate,
-    Question,
     QuestionType,
     QuestionDifficulty,
     QuestionListResponse,
-    QuestionMetadata,
-    ResponseStatus
+    QuestionMetadata
 )
 
 

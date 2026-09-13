@@ -2,10 +2,8 @@
 Test Cloud Storage Service functionality
 Tests S3, Cloudinary, and factory pattern
 """
-import sys
 import pytest
-import os
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from botocore.exceptions import ClientError
 from app.services.cloud_storage_service import (
     S3StorageService,
@@ -199,7 +197,7 @@ class TestCloudStorageFactory:
     def test_create_s3_storage(self):
         """Test S3 storage service creation."""
         with patch('app.services.cloud_storage_service.S3StorageService') as mock_s3:
-            service = CloudStorageFactory.create_storage_service(
+            CloudStorageFactory.create_storage_service(
                 provider='s3',
                 bucket_name='test-bucket',
                 region='us-east-1',
@@ -217,7 +215,7 @@ class TestCloudStorageFactory:
     def test_create_cloudinary_storage(self):
         """Test Cloudinary storage service creation."""
         with patch('app.services.cloud_storage_service.CloudinaryStorageService') as mock_cloudinary:
-            service = CloudStorageFactory.create_storage_service(
+            CloudStorageFactory.create_storage_service(
                 provider='cloudinary',
                 cloud_name='test',
                 api_key='key',
@@ -277,7 +275,7 @@ class TestGetCloudStorageService:
             mock_service = Mock()
             mock_factory.return_value = mock_service
 
-            service = get_cloud_storage_service()
+            get_cloud_storage_service()
 
             mock_factory.assert_called_once_with(
                 provider='s3',

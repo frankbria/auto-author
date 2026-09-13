@@ -141,8 +141,6 @@ class TestStartupSecurityValidation:
 
         with patch("app.main.settings", mock_settings):
             # Need to reimport the function to test it in isolation
-            import importlib
-            import app.main as main_module
 
             # Call the function directly
             with pytest.raises(RuntimeError) as exc_info:

@@ -1,8 +1,5 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-from datetime import datetime, timezone
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 
 
 # Mock TOC response for testing

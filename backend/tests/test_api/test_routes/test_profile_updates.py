@@ -1,9 +1,6 @@
 # filepath: d:\Projects\auto-author\backend\tests\test_api\test_routes\test_profile_updates.py
 import pytest
-import pytest_asyncio
-from httpx import AsyncClient
-from unittest.mock import patch, MagicMock, AsyncMock
-from datetime import datetime, timezone
+from unittest.mock import patch
 
 pytestmark = pytest.mark.asyncio
 

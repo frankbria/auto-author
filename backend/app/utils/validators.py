@@ -3,7 +3,7 @@ import re
 import json
 import os
 from pydantic import ValidationError
-from app.schemas.book import BookCreate, BookUpdate, TocItemCreate, TocItemUpdate
+from app.schemas.book import BookCreate, BookUpdate, TocItemCreate
 
 
 def validate_book_create_data(book_data: Dict[str, Any]) -> Dict[str, Any]:

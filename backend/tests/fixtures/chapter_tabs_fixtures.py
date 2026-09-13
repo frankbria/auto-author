@@ -1,6 +1,5 @@
 import pytest
 from datetime import datetime, timezone
-from bson import ObjectId
 from app.models.chapter_access import ChapterAccessLog
 from app.schemas.book import ChapterStatus
 

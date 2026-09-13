@@ -1,5 +1,5 @@
 from pymongo.errors import DuplicateKeyError
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, List
 from fastapi import HTTPException, status, Request
 from app.core.better_auth_session import (
     validate_better_auth_session,

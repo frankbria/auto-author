@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from enum import Enum
-from app.schemas.user import UserResponse
 
 
 class ChapterStatus(str, Enum):

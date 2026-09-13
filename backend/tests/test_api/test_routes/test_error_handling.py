@@ -1,15 +1,9 @@
-import pytest, pytest_asyncio
-from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
-from fastapi import Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import pytest
+from unittest.mock import MagicMock
 from app.main import app
-from app.core import security
 from app.core.security import get_current_user_from_session
 from app.db import database
 from app.api.endpoints import users as users_endpoint
-import app.db.user as users_dao
 
 
 @pytest.mark.asyncio
@@ -63,7 +57,7 @@ async def test_error_handling_missing_user(auth_client_factory):
 
     # Assert validation error
     assert response.status_code == 422
-    data = response.json()
+    response.json()
     err = response.json()["errors"]
     assert any(e["type"] == "json_invalid" for e in err)
 

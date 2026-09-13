@@ -1,7 +1,5 @@
 import pytest
-from app.models.user import UserRead, UserCreate, UserDB
-from unittest.mock import patch
-import pytest_asyncio
+from app.models.user import UserCreate
 
 
 @pytest.fixture

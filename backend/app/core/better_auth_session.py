@@ -18,7 +18,7 @@ Better-auth stores sessions in the 'session' collection with the following schem
 
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
-from fastapi import Request, HTTPException, status
+from fastapi import Request
 import logging
 
 from app.db.base import get_collection

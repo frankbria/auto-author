@@ -8,7 +8,7 @@ endpoints with consistent formatting and detailed debugging information.
 
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException, status
-from app.schemas.errors import ErrorCode, ErrorDetail, ErrorResponse, create_error_response
+from app.schemas.errors import ErrorCode, ErrorDetail, create_error_response
 from app.services.ai_errors import AIServiceError
 import logging
 import uuid

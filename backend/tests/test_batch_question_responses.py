@@ -1,7 +1,6 @@
 # tests/test_batch_question_responses.py
 
 import pytest
-from datetime import datetime, timezone
 from bson import ObjectId
 
 from app.db.base import get_collection

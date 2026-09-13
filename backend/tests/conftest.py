@@ -17,7 +17,6 @@ import app.db.book as books_dao
 import app.db.audit_log as audit_log_dao
 import app.db.toc_transactions as toc_transactions
 from app.db import base
-from app import db
 
 
 # Patch the DB connection for tests to use a real MongoDB instance
@@ -89,7 +88,7 @@ real_get_ai_usage_quota = getattr(
 )
 deps._real_get_ai_usage_quota = real_get_ai_usage_quota
 deps.get_ai_usage_quota = fake_get_ai_usage_quota
-import pytest, pytest_asyncio
+import pytest_asyncio
 
 
 @pytest.fixture
@@ -107,11 +106,9 @@ def real_ai_quota():
 
 
 from httpx import AsyncClient, ASGITransport
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from typing import Dict, Optional
 from app.main import app
-import app.core.security as sec
 import asyncio
 from datetime import datetime, timezone
 from app.core.security import get_current_user_from_session
@@ -357,7 +354,6 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
     async def make_client(*, overrides: dict = None, auth: bool = True):
         nonlocal override_installed
         from fastapi import Request as FastAPIRequest
-        from app.core.security import get_current_user_from_session
 
         user = _seed_user(overrides)
 

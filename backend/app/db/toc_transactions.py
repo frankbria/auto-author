@@ -10,7 +10,7 @@ import logging
 import uuid
 from motor.motor_asyncio import AsyncIOMotorClientSession
 
-from .base import books_collection, ObjectId
+from .base import books_collection
 from .audit_log import create_audit_log
 
 
@@ -119,7 +119,7 @@ async def _update_toc_internal(
     # Get current book with version check
     try:
         book_oid = ObjectId(book_id)
-    except Exception as e:
+    except Exception:
         raise ValueError(f"Invalid book ID format: {book_id}")
 
     find_query = {"_id": book_oid, "owner_id": user_auth_id}
@@ -218,7 +218,7 @@ async def _update_toc_internal(
         if current_book:
             current_v = current_book.get("table_of_contents", {}).get("version", 1)
             if current_v != current_version:
-                raise ValueError(f"Version conflict: TOC was updated by another process")
+                raise ValueError("Version conflict: TOC was updated by another process")
         raise ValueError("Failed to update TOC")
 
     # Best-effort audit, explicitly. The TOC write above has already committed,

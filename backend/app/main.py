@@ -9,6 +9,7 @@ from app.api.endpoints.router import router as api_router
 from app.core.config import settings, is_production_env
 import logging
 import os
+from app.api.request_validation import RequestValidationMiddleware
 from pathlib import Path
 
 # Set up logging
@@ -158,9 +159,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add custom request validation middleware
-from app.api.request_validation import RequestValidationMiddleware
-
 app.add_middleware(RequestValidationMiddleware)
 
 # Include API router
@@ -192,7 +190,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
-            "detail": f"Validation error",
+            "detail": "Validation error",
             "errors": exc.errors(),
             "error_summary": error_details,
         },

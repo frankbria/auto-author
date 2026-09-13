@@ -20,9 +20,7 @@ from app.utils.error_handlers import (
 )
 from app.schemas.errors import ErrorCode
 from app.services.ai_errors import (
-    AIServiceError,
     AIRateLimitError,
-    AINetworkError,
     AIInvalidRequestError,
 )
 

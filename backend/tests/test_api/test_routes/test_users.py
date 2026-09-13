@@ -1,10 +1,5 @@
 import pytest
-import pytest_asyncio
-from httpx import AsyncClient
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
-from fastapi import HTTPException, status
-from app.core import security
+from fastapi import status
 
 pytestmark = pytest.mark.asyncio
 

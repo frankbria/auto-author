@@ -48,7 +48,7 @@ async def test_file_upload_service():
         is_valid, error_msg = await file_upload_service.validate_image_upload(valid_image)
         print(f"   Validation result: {is_valid}")
         print(f"   Error message: {error_msg}")
-        assert is_valid == True
+        assert is_valid
         print("   ✅ Valid image test passed")
     except Exception as e:
         print(f"   ❌ Valid image test failed: {e}")
@@ -64,7 +64,7 @@ async def test_file_upload_service():
         is_valid, error_msg = await file_upload_service.validate_image_upload(invalid_file)
         print(f"   Validation result: {is_valid}")
         print(f"   Error message: {error_msg}")
-        assert is_valid == False
+        assert not is_valid
         assert "Invalid file type" in error_msg
         print("   ✅ Invalid file type test passed")
     except Exception as e:
@@ -82,7 +82,7 @@ async def test_file_upload_service():
         is_valid, error_msg = await file_upload_service.validate_image_upload(large_file)
         print(f"   Validation result: {is_valid}")
         print(f"   Error message: {error_msg}")
-        assert is_valid == False
+        assert not is_valid
         assert "too large" in error_msg
         print("   ✅ File size test passed")
     except Exception as e:

@@ -152,7 +152,6 @@ def test_validate_text_safety():
     # Create a temporary offensive words file for testing
     import json
     import os
-    import tempfile
 
     offensive_words = ["badword", "offensive", "inappropriate"]
 

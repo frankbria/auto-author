@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 from bson import ObjectId
 from app.services.question_generation_service import get_question_generation_service
-from app.schemas.book import QuestionDifficulty
 from app.db import base  # Use fixture-managed collections
 
 

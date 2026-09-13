@@ -36,7 +36,7 @@ async def test_ai_service():
             ]
         )
 
-        assert result["success"] == True
+        assert result["success"]
         assert result["draft"] == "Generated draft content"
         assert result["metadata"]["word_count"] == 3
         assert "suggestions" in result

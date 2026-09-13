@@ -5,7 +5,6 @@ Tests for AI Service Error Types
 Tests the custom exception classes used for AI service error handling.
 """
 
-import pytest
 from datetime import datetime
 from app.services.ai_errors import (
     AIServiceError,

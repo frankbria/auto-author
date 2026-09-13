@@ -1,7 +1,7 @@
 """Test the AI draft generation endpoint - simplified version"""
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 
 @pytest.mark.asyncio
@@ -67,7 +67,7 @@ async def test_generate_chapter_draft_with_mock_book(auth_client_factory):
             }
 
             response = await client.post(
-                f"/api/v1/books/test_book_id/chapters/ch1/generate-draft",
+                "/api/v1/books/test_book_id/chapters/ch1/generate-draft",
                 json=draft_data
             )
 

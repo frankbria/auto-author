@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
-from app.models.user import PyObjectId
 
 
 class TocItem(BaseModel):

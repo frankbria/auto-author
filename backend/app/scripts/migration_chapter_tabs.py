@@ -19,7 +19,7 @@ import asyncio
 import argparse
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List
 import sys
 import os
 
@@ -27,7 +27,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.db.base import _db as database
-from app.db.database import get_collection
 from app.db.indexing_strategy import ChapterTabIndexManager
 from app.schemas.book import ChapterStatus
 
@@ -206,7 +205,6 @@ class ChapterTabsMigration:
     def _count_chapters(self, toc: Dict) -> int:
         """Count total number of chapters (including subchapters) in TOC."""
         chapters = toc.get("chapters", [])
-        total = 0
 
         def count_recursive(chapter_list: List[Dict]) -> int:
             count = len(chapter_list)

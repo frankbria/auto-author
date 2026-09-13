@@ -15,7 +15,6 @@ from app.services.export_service import (
     ExportValidationError,
     ExportTimeoutError,
 )
-from reportlab.pdfgen import canvas
 from docx import Document
 
 

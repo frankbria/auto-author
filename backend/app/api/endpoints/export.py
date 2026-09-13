@@ -4,7 +4,7 @@ Export endpoints for generating PDF and DOCX files
 import json
 import logging
 from typing import Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from app.api.dependencies import get_rate_limiter
 from app.core.security import get_current_user_from_session

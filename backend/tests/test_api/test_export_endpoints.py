@@ -3,7 +3,7 @@ Test Export API endpoints
 """
 import pytest
 import zipfile
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import patch, AsyncMock
 import io
 from bson import ObjectId
 from app.db import base
