@@ -1,5 +1,4 @@
-import pytest, pytest_asyncio
-from httpx import AsyncClient
+import pytest
 from app.main import app
 from fastapi.encoders import jsonable_encoder
 
@@ -30,7 +29,7 @@ async def test_book_metadata_edge_cases(async_client_factory, test_book):
         # print(payload_book)
 
         # Insert book into the database
-        response = await api_client.post(f"/api/v1/books/", json=payload_book)
+        response = await api_client.post("/api/v1/books/", json=payload_book)
         assert response.status_code == 201
         new_id = response.json()["id"]
 
@@ -80,7 +79,7 @@ async def test_book_metadata_retrieval_and_update(auth_client_factory, test_book
     # print(payload_book)
 
     # Insert book into the database
-    response = await api_client.post(f"/api/v1/books/", json=payload_book)
+    response = await api_client.post("/api/v1/books/", json=payload_book)
     assert response.status_code == 201
     new_id = response.json()["id"]
 
@@ -126,7 +125,7 @@ async def test_book_metadata_persistence(auth_client_factory, test_book):
     payload_book = jsonable_encoder(payload)
     # print(payload_book)
     # Insert book into the database
-    response = await api_client.post(f"/api/v1/books/", json=payload_book)
+    response = await api_client.post("/api/v1/books/", json=payload_book)
     assert response.status_code == 201
     new_id = response.json()["id"]
 

@@ -2,7 +2,6 @@
 Tests for batch question creation with transaction safety.
 """
 import pytest
-from datetime import datetime, timezone
 from app.db.questions import create_questions_batch
 from app.schemas.book import (
     QuestionCreate,

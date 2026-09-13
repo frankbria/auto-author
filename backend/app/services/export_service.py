@@ -7,7 +7,6 @@ import html
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, BinaryIO
-from datetime import datetime
 import re
 
 from app.core.config import settings
@@ -56,7 +55,7 @@ try:
     from reportlab.lib.units import inch
     from reportlab.platypus import (
         SimpleDocTemplate, Paragraph, Spacer, PageBreak,
-        Table, TableStyle, KeepTogether
+        Table, TableStyle
     )
     from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
     PDF_AVAILABLE = True
@@ -67,7 +66,6 @@ try:
     from docx import Document
     from docx.shared import Inches, Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
-    from docx.enum.style import WD_STYLE_TYPE
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
     DOCX_AVAILABLE = True
@@ -560,9 +558,6 @@ class ExportService:
 
         if template:
             self._apply_docx_template(doc, template, book_data)
-
-        # Set up styles
-        styles = doc.styles
 
         # Title page
         title = doc.add_heading(book_data.get('title', 'Untitled'), 0)

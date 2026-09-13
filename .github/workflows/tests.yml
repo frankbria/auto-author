@@ -146,6 +146,15 @@ jobs:
       # the tool itself broke, and that must not be swallowed into a false green.
       # `|| rc=$?` is load-bearing: steps run under `bash -e`, so without it the
       # expected exit-1 would abort the step before the check below runs.
+      # ruff runs here as well as in pre-commit (#561). The pre-commit hook is the
+      # fast local signal, but it is bypassable with --no-verify and only fires on
+      # `files: ^backend/`; CI is the enforced gate. app/ and tests/ are clean at
+      # 0 findings under the pinned rule set, so this starts green and stays that
+      # way rather than arriving with a backlog.
+      - name: Backend lint (ruff)
+        working-directory: backend
+        run: uv run --extra test ruff check app/ tests/
+
       # Scans the FULL dependency surface, extras included (#522). It previously
       # exported `--no-dev`, so anything reachable only through the `test`, `load`
       # or `dev` extras was invisible: it could not fail CI and never reached

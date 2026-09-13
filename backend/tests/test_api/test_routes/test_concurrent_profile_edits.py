@@ -1,9 +1,7 @@
 # filepath: d:\Projects\auto-author\backend\tests\test_api\test_routes\test_concurrent_profile_edits.py
 import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock, AsyncMock, call
+from unittest.mock import patch
 import asyncio
-import json
 from datetime import datetime, timezone
 
 pytest.skip("Skipping this file for now - haven't dealt with concurrency yet.", allow_module_level=True)

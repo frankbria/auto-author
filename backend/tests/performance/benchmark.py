@@ -14,7 +14,6 @@ import json
 import sys
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Any, Optional
-from concurrent.futures import ThreadPoolExecutor
 import psutil
 import argparse
 
@@ -323,7 +322,7 @@ class PerformanceReporter:
         print(f"Error Rate: {metrics.error_rate:.2f}%")
         print(f"Duration: {metrics.total_duration:.2f}s")
         print(f"Requests/sec: {metrics.requests_per_second:.2f}")
-        print(f"\nResponse Times (ms):")
+        print("\nResponse Times (ms):")
         print(f"  Average: {metrics.avg_response_time:.2f}")
         print(f"  Min: {metrics.min_response_time:.2f}")
         print(f"  Max: {metrics.max_response_time:.2f}")
@@ -397,7 +396,7 @@ async def run_performance_suite(base_url: str, auth_token: Optional[str] = None)
             PerformanceReporter.print_metrics(test_metrics)
 
         # System resource summary
-        resource_metrics = monitor.stop_monitoring()
+        monitor.stop_monitoring()
         resource_summary = monitor.get_resource_summary()
 
         if resource_summary:

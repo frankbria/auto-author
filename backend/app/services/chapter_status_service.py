@@ -1,6 +1,6 @@
 """Chapter status management service"""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Dict, Optional, Any
 from app.schemas.book import ChapterStatus
 
@@ -120,11 +120,11 @@ class ChapterStatusService:
 
             try:
                 # Validate status format
-                if isinstance(update["status"], ChapterStatus):
-                    status_value = update["status"].value
-                else:
+                # A ChapterStatus instance is already valid by construction; only a
+                # raw value needs checking. (Was an if/else whose first branch only
+                # bound a variable nothing read — #561.)
+                if not isinstance(update["status"], ChapterStatus):
                     cls.validate_status_data(update["status"])
-                    status_value = update["status"]
 
                 valid_count += 1
 

@@ -51,6 +51,7 @@ test = [
     "faker==40.37.0",
     "coverage[toml]==7.15.4",
     "httpx==0.28.1",  # used only by tests; not imported by app/
+    "ruff==0.16.7",  # the backend-lint pre-commit hook runs this (#561)
 ]
 load = [
     # locust <2.46 caps gevent below 26, which collides with the gevent floor in
@@ -80,3 +81,22 @@ constraint-dependencies = [
     "gevent==26.5.0",
     "h11>=0.16.0",
 ]
+
+[tool.ruff]
+# Pinned deliberately. ruff's own default rule set has grown across releases: on
+# 0.16.7 it reports 1522 findings in this tree, where the documented classic
+# default (E4/E7/E9/F) reports 218. Selecting explicitly means the gate checks
+# the same thing after a ruff upgrade as before it, instead of turning red on a
+# dependency bump that changed nothing in this repo.
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# Re-export surfaces: the import IS the public interface, so "unused" is wrong.
+"__init__.py" = ["F401"]
+# conftest must set the asyncio event-loop policy BEFORE pytest and motor are
+# imported, so its imports legitimately are not all at the top.
+"tests/conftest.py" = ["E402"]

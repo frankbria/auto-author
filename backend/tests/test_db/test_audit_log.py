@@ -3,7 +3,7 @@
 import pytest
 from app.db.audit_log import create_audit_log
 from unittest.mock import AsyncMock, patch
-from datetime import datetime, timezone
+from datetime import datetime
 
 
 @pytest.mark.asyncio

@@ -6,7 +6,7 @@ This module defines standardized error response schemas for API endpoints,
 providing consistent error formatting and detailed debugging information.
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Any, List
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, timezone
 from enum import Enum

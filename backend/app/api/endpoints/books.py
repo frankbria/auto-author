@@ -28,7 +28,6 @@ from app.utils.error_handlers import (
     handle_generic_error,
     generate_request_id,
 )
-from app.schemas.errors import ErrorCode
 
 from app.core.security import get_current_user_from_session, SessionRoleChecker
 from app.schemas.book import (
@@ -36,19 +35,13 @@ from app.schemas.book import (
     BookUpdate,
     BookResponse,
     BookDetailResponse,
-    TabStateResponse,
-    # Question schemas
     Question,
     QuestionType,
-    QuestionDifficulty,
-    QuestionCreate,
-    QuestionResponse,
     QuestionResponseCreate,
     QuestionRating,
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
     RegenerateQuestionRequest,
-    QuestionListParams,
     QuestionListResponse,
     QuestionProgressResponse,
 )
@@ -60,10 +53,9 @@ from app.db.database import (
 )
 from app.db.toc_transactions import (
     update_toc_with_transaction,
-    reorder_chapters_with_transaction,
 )
 from app.api.dependencies import (
-    audit_request, sanitize_input, get_rate_limiter, get_ai_usage_quota,
+    audit_request, get_rate_limiter, get_ai_usage_quota,
     get_entitlement_checker
 )
 from app.services.ai_service import ai_service

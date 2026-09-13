@@ -3,7 +3,7 @@ Test AI Service Draft Generation functionality
 Tests the generate_chapter_draft method after bug fix
 """
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 from app.services.ai_service import AIService
 from openai import OpenAI
 

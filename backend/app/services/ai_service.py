@@ -4,7 +4,6 @@ import logging
 import asyncio
 import time
 import uuid
-import hashlib
 from typing import Dict, List, Optional, Any
 from openai import OpenAI
 from app.core.config import settings
@@ -13,8 +12,7 @@ from app.services.ai_errors import (
     AIRateLimitError,
     AINetworkError,
     AIServiceUnavailableError,
-    AIInvalidRequestError,
-    AIResponseParsingError
+    AIInvalidRequestError
 )
 from app.services.style_templates import (
     STYLE_LABELS,
@@ -421,7 +419,7 @@ Make questions specific, actionable, and focused on content structure rather tha
             elif line.startswith("CONFIDENCE:"):
                 try:
                     confidence = float(line.split(":", 1)[1].strip())
-                except:
+                except ValueError:
                     confidence = 0.5
             elif line.startswith("ANALYSIS:"):
                 analysis = line.split(":", 1)[1].strip()
@@ -827,7 +825,6 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
 
         # If still no questions, try simple question extraction
         if not questions:
-            question_lines = []
             for line in lines:
                 if '?' in line and len(line.strip()) > 10:
                     # Extract just the question part

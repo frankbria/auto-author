@@ -1,4 +1,4 @@
-from fastapi import Depends, Header, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status, Request
 from typing import Dict, Optional, Any
 import logging
 import time

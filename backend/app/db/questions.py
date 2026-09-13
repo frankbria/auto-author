@@ -10,9 +10,7 @@ import math
 
 from .base import get_collection
 from app.schemas.book import (
-    Question,
     QuestionCreate,
-    QuestionResponse,
     QuestionResponseCreate,
     QuestionRating,
     QuestionListResponse,
@@ -635,7 +633,7 @@ async def get_question_by_id(question_id: str, user_id: str) -> Optional[Dict[st
 
     try:
         object_id = ObjectId(question_id)
-    except:
+    except Exception:
         return None
 
     question = await questions_collection.find_one({

@@ -3,8 +3,6 @@ Test File Upload Service functionality
 Tests both local and cloud storage modes
 """
 import pytest
-import os
-from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from fastapi import UploadFile, HTTPException
 from PIL import Image

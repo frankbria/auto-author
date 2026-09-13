@@ -6,11 +6,9 @@ It tests: Book creation -> Summary -> Book questions -> TOC generation
 """
 
 import pytest
-import asyncio
 import time
 from datetime import datetime
 from typing import Dict, List, Any
-from unittest.mock import Mock, AsyncMock, patch
 
 import httpx
 
@@ -182,7 +180,7 @@ class SimplifiedSystemTest:
             print(f"\n✅ SIMPLIFIED SYSTEM TEST PASSED in {duration:.2f} seconds!\n")
 
         except Exception as e:
-            print(f"\n❌ SIMPLIFIED SYSTEM TEST FAILED!\n")
+            print("\n❌ SIMPLIFIED SYSTEM TEST FAILED!\n")
             print(f"Error: {e}")
             if hasattr(e, "response"):
                 print(f"Response: {e.response.text}")

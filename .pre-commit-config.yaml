@@ -83,7 +83,7 @@ repos:
     hooks:
       - id: backend-lint
         name: Backend Linting (ruff)
-        entry: bash -c 'cd backend && uv run ruff check app/ tests/ || true'
+        entry: bash -c 'cd backend && uv run --extra test ruff check app/ tests/'
         language: system
         files: ^backend/
         pass_filenames: false

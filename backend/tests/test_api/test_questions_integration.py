@@ -16,16 +16,9 @@ verifying that all components work together correctly:
 import pytest
 from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
-from datetime import datetime, timezone
 from bson import ObjectId
-from typing import Dict, List
 
 from app.db import base
-from app.schemas.book import (
-    QuestionType,
-    QuestionDifficulty,
-    ResponseStatus,
-)
 
 AI_METHOD = "app.services.ai_service.ai_service.generate_chapter_questions"
 
@@ -76,7 +69,6 @@ async def add_test_chapter(
     description: str = "Test chapter description"
 ) -> str:
     """Add a test chapter to a book and return chapter ID."""
-    from bson import ObjectId
 
     chapter_id = f"ch-{str(ObjectId())}"
 
@@ -751,7 +743,7 @@ async def test_data_integrity_cannot_create_question_for_nonexistent_chapter(
     assert response.status_code in [200, 404]
 
     if response.status_code == 200:
-        data = response.json()
+        response.json()
         # If successful, should have no questions or handle gracefully
         # Implementation may vary
 
@@ -794,7 +786,7 @@ async def test_user_isolation_cannot_access_other_users_questions(
         json={"count": 5}
     )
     assert gen2_response.status_code == 200
-    user2_questions = gen2_response.json()["questions"]
+    gen2_response.json()["questions"]
 
     # User 2 tries to access User 1's questions
     access_response = await client2.get(

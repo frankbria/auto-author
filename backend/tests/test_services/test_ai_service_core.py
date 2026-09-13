@@ -3,7 +3,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from app.services.ai_service import AIService
-from app.core.config import settings
 
 
 @pytest.fixture
@@ -37,7 +36,7 @@ SUGGESTIONS: Consider adding more specific examples for each chapter.
             }
         )
 
-        assert result["is_ready_for_toc"] == True
+        assert result["is_ready_for_toc"]
         assert result["confidence_score"] == 0.9
         assert "clear structure" in result["analysis"]
 
@@ -133,7 +132,7 @@ async def test_generate_toc_from_summary_and_responses(ai_service):
         assert len(result["toc"]["chapters"]) >= 2
         assert result["toc"]["total_chapters"] >= 2
         assert "success" in result
-        assert result["success"] == True
+        assert result["success"]
 
 
 @pytest.mark.asyncio
@@ -174,7 +173,7 @@ async def test_generate_chapter_questions(ai_service):
     with patch.object(ai_service, '_make_openai_request',
                       AsyncMock(return_value=mock_response)):
         # Build prompt from chapter data
-        prompt = f"Generate questions for chapter: The Beginning - Introduction to the story"
+        prompt = "Generate questions for chapter: The Beginning - Introduction to the story"
         result = await ai_service.generate_chapter_questions(
             prompt=prompt,
             count=2
@@ -248,7 +247,7 @@ She had always known she was different, but tonight everything would change...
             writing_style="Descriptive and atmospheric"
         )
 
-        assert result["success"] == True
+        assert result["success"]
         assert "draft" in result
         assert "Sarah" in result["draft"]
         assert "powers" in result["draft"]

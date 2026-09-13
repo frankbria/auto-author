@@ -1,6 +1,5 @@
 """Debug test for question schema validation"""
 
-import pytest
 from app.schemas.book import QuestionCreate, Question, QuestionType, QuestionDifficulty, QuestionMetadata
 from datetime import datetime, timezone
 

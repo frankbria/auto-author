@@ -67,12 +67,13 @@ Specs: `tests/e2e/staging/complete-user-journey.spec.ts`, `regressions.spec.ts` 
 Standards, checklists, and E2E requirements: **`docs/references/quality-standards.md`**. The repo-specific facts:
 
 - **CI is the real gate.** `main` branch protection requires the `Frontend Tests` and `Backend Tests` checks (coverage included) to pass. Merge via PR — no `--admin`, no `--no-verify`. Gates have been green at baseline and enforced since #118.
-- **The installed `.git/hooks/pre-commit` is the bd flush hook — it runs no quality gates.** `.pre-commit-config.yaml` defines lint/test/coverage/E2E hooks, but they only run if you invoke them:
+- **`pre-commit` IS installed and its hooks DO run on every commit** (corrected in #561 — this entry previously claimed the installed hook was the bd flush hook and ran no gates; `.git/hooks/pre-commit` is the pre-commit framework's own hook). Lint, tests and coverage run locally on commit for the paths each hook declares.
   ```bash
-  pre-commit install                              # wire them into git (optional, slow commits)
   pre-commit run --from-ref HEAD~1 --to-ref HEAD  # check just your commits before a PR
+  pre-commit run backend-lint --all-files         # one hook, whole tree
   ```
   Watch for a stale `.git/hooks/pre-commit.legacy` shadowing behavior.
+- **Backend lint is `ruff`, pinned.** `ruff==0.16.7` is in the `test` extra and `[tool.ruff.lint]` selects `E4,E7,E9,F` explicitly, so the gate checks the same thing across ruff upgrades rather than growing with each release (ruff's own default set reports 1522 findings here; the pinned one reports 0). It runs in pre-commit **and** in CI's `Security Audit` job — the hook is bypassable with `--no-verify`, CI is not. **No formatter is enforced**: `black` and `ruff format` disagree with the tree on 36 and 42 files respectively, so adopting either is its own mechanical PR, not a drive-by.
 - Coverage floor is 85% (frontend thresholds 85/85/75/85 lines/statements/branches/functions).
 - **`uv.lock` is the only backend dependency source of truth.** The generated `backend/requirements.txt` export was deleted in #534 — nothing installed from it, and it cost a manual regen on every backend dep PR. Those PRs are now mergeable as they arrive. Procedure: `docs/references/quality-standards.md` → Backend Dependency Updates.
 - Never commit to `main` directly — `feature/<name>`, PR, conventional commits.

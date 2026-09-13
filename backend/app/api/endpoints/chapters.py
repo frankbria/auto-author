@@ -319,7 +319,7 @@ async def update_chapter(
             updates["metadata"] = chapter_data.metadata
 
         # Update chapter with transaction
-        updated_chapter = await update_chapter_with_transaction(
+        await update_chapter_with_transaction(
             book_id=book_id,
             chapter_id=chapter_id,
             chapter_updates=updates,
@@ -384,7 +384,7 @@ async def delete_chapter(
     """
     try:
         # Delete chapter with transaction
-        success = await delete_chapter_with_transaction(
+        await delete_chapter_with_transaction(
             book_id=book_id,
             chapter_id=chapter_id,
             user_auth_id=current_user.get("auth_id")

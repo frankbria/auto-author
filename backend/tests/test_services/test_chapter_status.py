@@ -3,7 +3,6 @@
 import pytest
 from app.services.chapter_status_service import ChapterStatusService
 from app.schemas.book import ChapterStatus
-from datetime import datetime
 
 
 @pytest.fixture

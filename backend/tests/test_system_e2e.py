@@ -19,11 +19,9 @@ Note: This test requires:
 """
 
 import pytest
-import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any
-from unittest.mock import Mock, AsyncMock, patch
 import os
 
 import httpx
@@ -347,8 +345,8 @@ class SystemE2ETest:
             book_questions = await self.generate_book_questions()
             await self.answer_book_questions(book_questions)
 
-            toc = await self.generate_toc()
-            chapters = await self.get_chapters()
+            await self.generate_toc()
+            await self.get_chapters()
 
             chapter_questions = await self.generate_chapter_questions()
             await self.answer_chapter_questions(chapter_questions)
@@ -362,7 +360,7 @@ class SystemE2ETest:
             print(f"\n✅ SYSTEM TEST PASSED in {duration:.2f} seconds!\n")
 
         except Exception as e:
-            print(f"\n❌ SYSTEM TEST FAILED!\n")
+            print("\n❌ SYSTEM TEST FAILED!\n")
             print(f"Error: {e}")
             if hasattr(e, "response"):
                 print(f"Response: {e.response.text}")

@@ -4,7 +4,6 @@
 import factory
 from datetime import datetime, timezone
 import random
-import string
 from bson import ObjectId
 from typing import Dict, Any, List
 from faker import Faker

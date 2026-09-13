@@ -2,8 +2,7 @@
 
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
-from bson import ObjectId
-from app.models.chapter_access import ChapterAccessLog, ChapterAccessCreate
+from app.models.chapter_access import ChapterAccessLog
 from app.db.database import get_collection
 
 

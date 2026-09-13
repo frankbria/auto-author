@@ -10,11 +10,10 @@ This script simulates realistic user behavior for performance testing:
 """
 
 from locust import HttpUser, task, between, events
-import json
 import os
 import random
 import time
-from typing import Dict, Any
+from typing import Dict
 
 # Load-test credential — not a real secret; override via env for real runs.
 LOAD_TEST_PW = os.getenv("LOAD_TEST_PW", "testpassword123")
