@@ -1,7 +1,14 @@
 # CI/CD Recovery Plan - Auto-Author Project
 
 **Date:** 2025-10-24
-**Status:** CRITICAL - Staging Deployments Blocked
+**Status:** **HISTORICAL — resolved, not current state.** Marked in #520. This
+document describes the PM2/rsync deploy path, which staging left on 2026-08-12
+(#484) and whose workflows were deleted in #520. Its `secrets.DATABASE_NAME`
+reference and its recovery steps no longer correspond to anything that runs. Kept
+for the incident record; do not follow it operationally. Current deployment:
+`docs/STAGING-DEPLOYMENT.md` and `.github/workflows/deploy-staging-containers.yml`.
+
+**Status at the time:** CRITICAL - Staging Deployments Blocked
 **Author:** CI/CD Pipeline Engineer
 
 ---

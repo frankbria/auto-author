@@ -51,9 +51,17 @@ which ships the compose files and runs `docker compose up`. **It writes no env
 file.** The values come from `/opt/auto-author/.env`, maintained by hand on the
 server.
 
-There is a `MONGODB_URI` GitHub secret, but it is referenced only by
-`deploy-staging.yml.disabled` — the retired PM2 deploy. Changing it does not
-affect what staging connects with.
+The `MONGODB_URI` **`staging` environment secret is authoritative** — changing it
+does change what staging connects with. `sync-staging-env.yml` (#545) reads that
+secret, writes it into `/opt/auto-author/.env`, recreates both containers and
+verifies the credential with a real Mongo ping. Run that workflow rather than
+editing the box by hand where you can; hand-editing is the fallback for when the
+workflow itself cannot run.
+
+(This paragraph previously said the secret was read only by the retired PM2
+deploy and that changing it did nothing. That stopped being true when #545
+landed, and #537 was the outage that followed from the secret being wrong while
+everyone believed it was inert.)
 
 ### 2. Compose passes it to both services
 
@@ -124,9 +132,18 @@ of these. `@` → `%40`, `/` → `%2F`, `%` → `%25`, `:` → `%3A`.
 5. Verify: `curl -s 127.0.0.1:8000/api/v1/health`. Since #333 this does a real
    Mongo ping, so bad credentials surface here as a 503 naming the component.
 
-Optionally update the `MONGODB_URI` GitHub secret to keep the disabled PM2
-workflow from holding a dead credential — but note that leaves a second copy of a
-live credential with no consumer.
+6. **Update the `MONGODB_URI` `staging` environment secret — this is not
+   optional.** It is the input to `sync-staging-env.yml`, so leaving it stale
+   means the next run of that workflow overwrites the box with the dead password.
+
+Prefer doing steps 3–5 *by running `sync-staging-env.yml`* after step 6: it
+performs the same edit, recreation and ping, and leaves the secret and the box in
+agreement by construction.
+
+(This section used to call step 6 optional and warn that it left "a second copy
+of a live credential with no consumer". Both halves were wrong once #545 gave the
+secret a live consumer — and following that advice during a rotation, which is
+exactly when being misled is expensive, is what #537 cost.)
 
 ## 🚫 Common mistakes
 
