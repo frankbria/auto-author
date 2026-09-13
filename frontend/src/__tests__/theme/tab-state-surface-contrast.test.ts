@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 import colors from 'tailwindcss/colors';
+import { twMerge } from 'tailwind-merge';
 
 import {
   compositeOver,
@@ -359,5 +360,136 @@ describe('ChapterTab state surfaces have a dark counterpart (#634)', () => {
 
     expect(beforeFix).toBeCloseTo(3.01, 1);
     expect(beforeFix).toBeLessThan(WCAG_AA_NORMAL_TEXT);
+  });
+});
+
+/**
+ * #640. `cn()` is `twMerge`, and a generic `border-<color>` collides with a
+ * directional `border-r-<color>`: whichever comes last wins outright. With the
+ * active accent applied *before* the state classes, `ERROR_TAB`'s
+ * `border-red-200` deleted `border-r-primary`, so the selected edge painted pale
+ * pink at 1.45:1 instead of the accent at 6.29:1 — on exactly the tab a user is
+ * most likely to be in, the broken one.
+ *
+ * The accent is now applied last. These pin both halves: that it survives every
+ * state combination, and that it is legible in both themes.
+ *
+ * Two figures in the issue are wrong and are corrected here. It quotes the
+ * accent at 16.39:1, which is the `--primary` *token* — `border-*` never
+ * resolves to it, exactly the mistake #634 shipped and corrected;
+ * `border-r-primary` is `tailwind.config.js`'s theme-fixed brand indigo, 6.29:1
+ * on white. And it transposes its two border figures: `border-red-200` is 1.45,
+ * `border-orange-200` is 1.35.
+ */
+describe('the active-tab accent survives twMerge and is legible (#640)', () => {
+  const css = readFileSync(GLOBALS_CSS, 'utf8');
+  const source = readFileSync(CHAPTER_TAB, 'utf8');
+  const token = (theme: Theme, name: string) => oklchToken(themeBlock(css, theme), name);
+
+  /** tailwind.config.js's theme-fixed brand indigo — what `border-primary` paints. */
+  const BRAND_PRIMARY = [79, 70, 229] as Rgb;
+
+  const named = (name: string) => {
+    const found = [...source.matchAll(new RegExp(`^const ${name} = '([^']+)'`, 'gm'))].map(
+      (m) => m[1]
+    );
+    // Vacuity guard: a renamed constant must fail here, not silently measure nothing.
+    expect({ name, count: found.length }).toEqual({ name, count: 1 });
+    return found[0];
+  };
+
+  const VERTICAL = named('ACTIVE_ACCENT_VERTICAL');
+  const HORIZONTAL = named('ACTIVE_ACCENT_HORIZONTAL');
+  const ERROR = named('ERROR_TAB');
+  const UNSAVED = named('UNSAVED_TAB');
+  const ACTIVE = 'bg-background text-foreground';
+
+  const directionalColour = (accent: string) =>
+    accent.split(' ').find((c) => /^border-[rb]-(?!\d)/.test(c))!;
+
+  it.each([
+    ['active', [ACTIVE]],
+    ['active + error', [ACTIVE, ERROR]],
+    ['active + unsaved', [ACTIVE, UNSAVED]],
+    ['active + error + unsaved', [ACTIVE, ERROR, UNSAVED]],
+  ] as const)('%s keeps its edge accent after twMerge', (label, parts) => {
+    for (const [name, accent] of [
+      ['vertical', VERTICAL],
+      ['horizontal', HORIZONTAL],
+    ] as const) {
+      const resolved = twMerge(...parts, accent);
+      const colour = directionalColour(accent);
+      expect({ case: `${label} / ${name}`, kept: resolved.includes(colour) }).toEqual({
+        case: `${label} / ${name}`,
+        kept: true,
+      });
+    }
+  });
+
+  it('applies the accent AFTER the state classes in the component itself', () => {
+    // The assertion the rest of this block cannot make. Everything else here
+    // feeds twMerge a list with the accent last and checks the outcome — which
+    // is true by construction and stays true even if the component stops doing
+    // it. Mutation M1 proved exactly that: moving the accent back above
+    // UNSAVED_TAB reintroduced #640 and the suite still passed 60/60.
+    //
+    // So read the real `cn(...)` call and check the order there. Positions, not
+    // presence: the whole defect is that the accent is applied too early.
+    const call = /className=\{cn\(([\s\S]*?)\n {12}\)\}/.exec(source);
+    expect(call).not.toBeNull();
+    const args = call![1];
+
+    const at = (needle: string) => {
+      const i = args.indexOf(needle);
+      expect({ needle, found: i !== -1 }).toEqual({ needle, found: true });
+      return i;
+    };
+
+    const accent = Math.min(at('ACTIVE_ACCENT_HORIZONTAL'), at('ACTIVE_ACCENT_VERTICAL'));
+    expect({ what: 'accent after ERROR_TAB', ok: accent > at('ERROR_TAB') }).toEqual({
+      what: 'accent after ERROR_TAB',
+      ok: true,
+    });
+    expect({ what: 'accent after UNSAVED_TAB', ok: accent > at('UNSAVED_TAB') }).toEqual({
+      what: 'accent after UNSAVED_TAB',
+      ok: true,
+    });
+  });
+
+  it('the state classes still own the other edges and the card tint', () => {
+    // Ordering the accent last is only correct if it does not cost the state its
+    // own classes. Putting the accent *first* instead keeps the accent but loses
+    // `bg-red-50` to `bg-background` — undoing #634. This is that trade, pinned.
+    const resolved = twMerge(ACTIVE, ERROR, VERTICAL);
+    for (const cls of ERROR.split(' ')) {
+      expect({ cls, kept: resolved.includes(cls) }).toEqual({ cls, kept: true });
+    }
+  });
+
+  it.each(SURFACES)('dark: the accent clears 1.4.11 on --%s', (surface) => {
+    // `.dark .text-primary` is overridden in globals.css; `.dark .border-primary`
+    // is NOT, so before this change the accent stayed brand indigo on dark
+    // surfaces — 2.85 on --card, 2.41 on --muted. The #635 trap again.
+    const dark = VERTICAL.split(' ').find((c) => c.startsWith('dark:border-r-'));
+    expect(dark).toBeDefined();
+    const shade = /dark:border-r-([a-z]+)-(\d+)/.exec(dark!);
+    expect(shade).not.toBeNull();
+    const rgb = hexToRgb(
+      (colors as unknown as Record<string, Record<string, string>>)[shade![1]][shade![2]]
+    );
+    expect(contrastRatio(rgb, token('dark', surface))).toBeGreaterThanOrEqual(
+      WCAG_AA_NON_TEXT
+    );
+  });
+
+  it('reproduces the two failures this fixes', () => {
+    // What the selected edge painted instead of the accent.
+    expect(contrastRatio(hexToRgb(colors.red[200]), token('light', 'background'))).toBeCloseTo(
+      1.45,
+      1
+    );
+    // And the dark accent before the fix: brand indigo on --card, under 3:1.
+    expect(contrastRatio(BRAND_PRIMARY, token('dark', 'card'))).toBeCloseTo(2.85, 1);
+    expect(contrastRatio(BRAND_PRIMARY, token('dark', 'card'))).toBeLessThan(WCAG_AA_NON_TEXT);
   });
 });
