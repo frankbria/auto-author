@@ -129,10 +129,10 @@ describe('busy buttons keep their status text legible (#642)', () => {
   });
 });
 
-/** `<Button ...>` spans, with JSX braces balanced so `{a > b}` cannot end a tag. */
-function buttonElements(source: string): { tag: string; body: string }[] {
+/** `<Button ...>` or raw `<button ...>` spans, with JSX braces balanced so `{a > b}` cannot end a tag. */
+function buttonElements(source: string, name: 'Button' | 'button' = 'Button'): { tag: string; body: string }[] {
   const found: { tag: string; body: string }[] = [];
-  for (const match of source.matchAll(/<Button\b/g)) {
+  for (const match of source.matchAll(new RegExp(`<${name}\\b`, 'g'))) {
     const start = match.index!;
     let i = start + 1;
     let depth = 0;
@@ -148,7 +148,7 @@ function buttonElements(source: string): { tag: string; body: string }[] {
       i++;
     }
     if (tagEnd === -1) continue;
-    const close = source.indexOf('</Button>', tagEnd);
+    const close = source.indexOf(`</${name}>`, tagEnd);
     found.push({ tag: source.slice(start, tagEnd), body: close === -1 ? '' : source.slice(tagEnd, close) });
   }
   return found;
@@ -212,6 +212,61 @@ describe('every busy-labelled Button declares it (#642)', () => {
     const offenders = sources.flatMap((path) =>
       buttonElements(readFileSync(join(FRONTEND_ROOT, path), 'utf8'))
         .filter(({ tag, body }) => BUSY_LABEL.test(body) && !/\bbusy\b/.test(tag))
+        .map(({ body }) => `${path} :: ${BUSY_LABEL.exec(body)![0]}`)
+    );
+
+    expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * Raw `<button>` elements with a busy label (#684).
+ *
+ * `buttonVariants` never styled these, so they neither had #642's defect nor got
+ * its fix — they carry their own colours, and four of the six measured between
+ * 2.29:1 and 4.09:1. Fixed in #684 by removing the opacity/pale-text treatment
+ * from the states that are *only* ever busy, and making it conditional on the
+ * two buttons that are disabled for two different reasons.
+ *
+ * `aria-busy` is the marker here rather than a colour assertion: these buttons
+ * have no shared class string to read a ratio out of, and requiring the marker
+ * forces a new hand-styled busy button through the same thinking rather than
+ * letting it appear unmeasured.
+ */
+const RAW_BUSY_EXEMPT: ReadonlyArray<readonly [string, string]> = [
+  [
+    'src/app/dashboard/books/[bookId]/summary/page.tsx',
+    // A microphone toggle, not a pending operation: `aria-pressed` already
+    // conveys the state, and `aria-busy` ("this element is being updated") would
+    // be the wrong word for it. Measured at 4.83:1 (white on red-600) with no
+    // opacity treatment at all, so there is nothing to fix.
+    'Listening',
+  ],
+];
+
+describe('raw <button> elements with a busy label declare it (#684)', () => {
+  const sources = shippedSources().filter((path) => path.endsWith('.tsx'));
+
+  it('still finds the raw busy buttons', () => {
+    const raw = sources.flatMap((path) =>
+      buttonElements(readFileSync(join(FRONTEND_ROOT, path), 'utf8'), 'button').filter(({ body }) =>
+        BUSY_LABEL.test(body)
+      )
+    );
+    // Same floor logic as the `<Button>` sweep: narrowing the pattern must fail
+    // rather than quietly check less.
+    expect(raw.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('every raw busy button sets aria-busy, or is exempt with a reason', () => {
+    const offenders = sources.flatMap((path) =>
+      buttonElements(readFileSync(join(FRONTEND_ROOT, path), 'utf8'), 'button')
+        .filter(({ tag, body }) => {
+          if (!BUSY_LABEL.test(body)) return false;
+          if (/aria-busy/.test(tag)) return false;
+          const label = BUSY_LABEL.exec(body)![1];
+          return !RAW_BUSY_EXEMPT.some(([file, exempt]) => path === file && exempt === label);
+        })
         .map(({ body }) => `${path} :: ${BUSY_LABEL.exec(body)![0]}`)
     );
 

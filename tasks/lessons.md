@@ -1045,3 +1045,20 @@ Caught by the pre-PR reviewer, not by me, and not by my own test for that path:
 I had asserted the link does *not* get `disabled`, which was the half I was
 thinking about, and never asserted what it does get instead. When a branch
 deliberately drops something, test what replaces it.
+
+### A mutation that does not apply looks exactly like one that survives
+2026-09-13, #684. Ran four mutations against a new guard; three failed as
+intended and the fourth passed, which I was one keystroke from writing up as "the
+guard does not cover this". It did. My `str.replace()` carried the wrong
+indentation — fourteen spaces where the file has ten — so the substitution
+matched nothing, the file was unchanged, and the suite passed because there was
+no mutation to catch.
+
+The tell is that a *surviving* mutation and a *no-op* mutation produce identical
+output: a green run. Nothing distinguishes them unless the mutation step asserts
+it changed something.
+
+Every mutation now goes through a substitution with `assert n == 1`, the same way
+the guards themselves assert their own sweeps are non-empty. A mutation check
+whose mutation is unverified is a test of nothing, and it fails safe in the
+direction that makes a weak guard look thorough.

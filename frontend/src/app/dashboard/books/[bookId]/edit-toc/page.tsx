@@ -578,10 +578,17 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         >
           Back
         </button>
+        {/* Disabled for two different reasons (#684). While saving, the label is
+            the only signal the action is running, so it keeps full opacity —
+            6.29:1 rather than 2.29:1. While merely unavailable (an empty TOC)
+            the greyed affordance is correct and WCAG 1.4.3 exempts it. */}
         <button
           onClick={handleSaveTOC}
           disabled={isLoading || toc.length === 0}
-          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md disabled:opacity-50"
+          aria-busy={isLoading || undefined}
+          className={`px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md ${
+            isLoading ? 'disabled:opacity-100 cursor-progress' : 'disabled:opacity-50'
+          }`}
         >
           {isLoading ? 'Saving...' : 'Save & Continue'}
         </button>
