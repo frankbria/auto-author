@@ -1,7 +1,15 @@
 name: GLM Review
 on:
   pull_request:
-    types: [opened, synchronize]
+    # `ready_for_review` is here and drafts are skipped below, because the pair
+    # of defaults was wrong in both directions (#607, raised by the cross-family
+    # review on #605). `opened` fires for drafts, so a sizeable draft burned a
+    # 35-minute / 60-turn review of work explicitly not ready; and without
+    # `ready_for_review`, a PR opened as a draft and later marked ready was
+    # **never** reviewed unless something else happened to push to it. The two
+    # pull opposite ways, so they are one decision: review exactly once, when the
+    # PR is ready for people to read.
+    types: [opened, synchronize, ready_for_review]
     paths-ignore:
       - "**/*.md"
       - ".gitignore"
@@ -44,9 +52,14 @@ jobs:
     # live; `sender.type` closes it exactly rather than leaving it for whoever
     # adds the first autofix job. A null `sender` compares false and skips, so
     # this fails closed like the guard above it.
+    # Skip drafts. This covers `opened` and `synchronize` on a draft; the
+    # `ready_for_review` type above is what brings the PR back when it is
+    # marked ready. A PR toggled ready -> draft -> ready is reviewed again,
+    # which is a deliberate state change and rare enough to leave alone.
     # Only then review substantial changes (5+ files, or 20+ additions/deletions).
     if: |
       github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft &&
       github.event.pull_request.user.type == 'User' &&
       github.event.sender.type == 'User' &&
       (github.event.pull_request.changed_files >= 5 ||
