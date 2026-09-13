@@ -177,16 +177,6 @@
         "text-gray-100": 1
       },
       "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
-    },
-    "src/components/ui/toaster.tsx": {
-      "literals": {
-        "bg-gray-700": 1,
-        "bg-gray-900": 1,
-        "border-gray-700": 1,
-        "text-gray-200": 2,
-        "text-gray-400": 1
-      },
-      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
     }
   }
 }

@@ -1,14 +1,4 @@
 {
-  "_comment": "Files still carrying a theme-blind dark translucent overlay — `bg-<hue>-{700,800,900}/NN` with no `dark:` prefix, which is by construction authored for a dark page (#632). This is a debt ledger, not an ignore-list to grow: `src/__tests__/theme/dark-translucent-overlay.test.ts` fails when any file not listed here gains one, and when a listed file exceeds its allowance for any single overlay. Counts are per distinct overlay, not one total per file, so swapping one hue for another does not net out. Dropping a count does NOT fail — shrink these freely. A row the file no longer contains DOES fail, so the ledger cannot be used to pre-authorise an overlay. Never raise a count to make CI pass; use the `bg-<hue>-50 dark:bg-<hue>-900/NN` pair instead.",
-  "files": {
-    "src/components/ui/toaster.tsx": {
-      "overlays": {
-        "bg-green-900/20": 1,
-        "bg-red-900/20": 1,
-        "bg-blue-900/20": 1,
-        "bg-yellow-900/20": 1
-      },
-      "reason": "Not a live contrast failure: this component hardcodes `theme=\"dark\"` on the Sonner root and paints `bg-gray-900 text-gray-200` in both app themes, so these four severity tints composite over a surface that is pinned dark rather than over an unknown page. Adding `dark:` here would delete the tint in light mode instead of fixing it. The real fix is to make the toast follow the app theme, which is a behaviour change, not a class swap — and which `gray-literal-baseline.json` already defers for the same file (\"convert with its consumers\"). Burn both rows down together."
-    }
-  }
+  "_comment": "Files still carrying a theme-blind dark translucent overlay \u2014 `bg-<hue>-{700,800,900}/NN` with no `dark:` prefix, which is by construction authored for a dark page (#632). This is a debt ledger, not an ignore-list to grow: `src/__tests__/theme/dark-translucent-overlay.test.ts` fails when any file not listed here gains one, and when a listed file exceeds its allowance for any single overlay. Counts are per distinct overlay, not one total per file, so swapping one hue for another does not net out. Dropping a count does NOT fail \u2014 shrink these freely. A row the file no longer contains DOES fail, so the ledger cannot be used to pre-authorise an overlay. Never raise a count to make CI pass; use the `bg-<hue>-50 dark:bg-<hue>-900/NN` pair instead.",
+  "files": {}
 }
