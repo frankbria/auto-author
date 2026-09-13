@@ -48,6 +48,12 @@ jobs:
       # The base tsconfig excludes every test-shaped path, so the step above sees
       # none of the ~170 test files, and next/jest's SWC strips types without
       # checking them. This covers that gap against a ledger (#625). ~6s.
+      # A spec no config's testDir covers can never run, and reports identically
+      # to one that passes (#613). Same shape as "No unscanned npm lockfiles".
+      - name: Every Playwright spec is reachable by a config
+        working-directory: frontend
+        run: npm run check:specs
+
       - name: Type check test sources
         working-directory: frontend
         run: npm run typecheck:tests

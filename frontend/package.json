@@ -21,7 +21,8 @@
     "test:e2e:staging:headed": "playwright test --config=tests/e2e/staging/playwright.config.ts --headed",
     "test:e2e:staging:debug": "playwright test --config=tests/e2e/staging/playwright.config.ts --debug",
     "typecheck": "tsc --noEmit",
-    "typecheck:tests": "node scripts/typecheck-tests.mjs"
+    "typecheck:tests": "node scripts/typecheck-tests.mjs",
+    "check:specs": "node scripts/check-spec-coverage.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
