@@ -265,7 +265,7 @@ describe('the #637 conversions clear WCAG in both themes', () => {
   it.each([
     ['red', 'summary input error'],
     ['indigo', 'summary revert link / edit-toc hover'],
-  ] as const)('light: %s-700 on white clears 4.5:1', (hue) => {
+  ] as const)('light: %s-700 on white clears 4.5:1 (%s)', (hue, _site) => {
     expect(
       contrastRatio(swatch(hue, 700), token('light', 'background'))
     ).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
@@ -274,7 +274,7 @@ describe('the #637 conversions clear WCAG in both themes', () => {
   it.each([
     ['red', 'summary input error'],
     ['indigo', 'summary revert link / edit-toc hover'],
-  ] as const)('dark: %s-400 on the dark page clears 4.5:1', (hue) => {
+  ] as const)('dark: %s-400 on the dark page clears 4.5:1 (%s)', (hue, _site) => {
     expect(
       contrastRatio(swatch(hue, 400), token('dark', 'background'))
     ).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
