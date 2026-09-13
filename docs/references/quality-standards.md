@@ -207,6 +207,36 @@ git fetch origin main && git show origin/main:<file> | grep <dependency>
 Anything closed-but-not-merged whose version is still old on `main` was lost. Recreate it
 as a fresh PR — the original branch is gone.
 
+## What the supply-chain audit gate actually covers
+
+`Security Audit` runs two scanners against `scripts/audit_gate.py`, which fails only on an
+advisory absent from `security-baseline.json`. Knowing the **scanned surface** matters as much as
+the result, because an advisory outside it produces a green check rather than a finding.
+
+| Ecosystem | Command | Surface |
+|---|---|---|
+| PyPI | `uv export --all-extras --no-emit-project` → `pip-audit` | backend production **and** the `test` / `load` / `dev` extras |
+| npm | `npm audit --json` in `frontend/` | `frontend/package-lock.json` only — prod and dev, resolved from the lockfile |
+
+Two limits worth stating plainly rather than discovering:
+
+- **npm advisories below `high` never fail this gate.** `audit_gate.py` defaults `--min-severity`
+  to `high` and the workflow does not override it. A moderate advisory is not baselined, not
+  reported, and not a failure — by design, but invisible unless you know to look.
+- **Only `frontend/package-lock.json` is scanned.** A lockfile anywhere else in the repo is
+  invisible to both this gate and Dependabot's version updates, which is why a separate step fails
+  the build when one appears outside that path.
+
+The PyPI side scanned **production only** until #522. Anything reachable solely through an extra
+could not fail CI and never reached the baseline either — not deferred with a reason, simply
+unseen, so GitHub's alert list and CI disagreed with no record of why. The neighbouring
+lockfile-sync step already exported `--all-extras`; the two steps scanning different sets was the
+defect. Widening cost nothing when it landed: 478 → 977 exported lines and no new advisories.
+
+A test-only advisory does not ship to the container, but it does run in CI against this
+repository, so the rule is the same as for any other: fix it, or ledger it in
+`security-baseline.json` with a reason. Never leave it to a blind spot.
+
 ## This repository is public — what must not be committed
 
 Two categories, two guards, both in the `Security Audit` job:

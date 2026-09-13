@@ -146,10 +146,24 @@ jobs:
       # the tool itself broke, and that must not be swallowed into a false green.
       # `|| rc=$?` is load-bearing: steps run under `bash -e`, so without it the
       # expected exit-1 would abort the step before the check below runs.
+      # Scans the FULL dependency surface, extras included (#522). It previously
+      # exported `--no-dev`, so anything reachable only through the `test`, `load`
+      # or `dev` extras was invisible: it could not fail CI and never reached
+      # `security-baseline.json` either — not deferred with a reason, simply
+      # unseen. GitHub's alert list and this gate then disagreed with no record of
+      # why, which is exactly what the baselined design exists to prevent. The
+      # neighbouring lockfile-sync step already exported `--all-extras`; the two
+      # steps scanning different sets was the real defect.
+      #
+      # Widening cost nothing when it landed: 478 -> 977 exported lines, and the
+      # only advisory on the wider surface was click's PYSEC-2026-2132, already
+      # baselined. A test-only advisory does not ship to the container, but it
+      # does run in CI against this repo, so it is ledgered with a reason rather
+      # than hidden.
       - name: Run pip-audit
         working-directory: backend
         run: |
-          uv export --no-dev --no-emit-project --format requirements-txt > /tmp/reqs.txt
+          uv export --all-extras --no-emit-project --format requirements-txt > /tmp/reqs.txt
           rc=0
           uvx pip-audit -r /tmp/reqs.txt --format=json > /tmp/pip-audit.json || rc=$?
           if [ "$rc" -gt 1 ]; then echo "::error::pip-audit failed with exit $rc"; exit "$rc"; fi
