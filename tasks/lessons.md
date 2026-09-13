@@ -903,3 +903,29 @@ This is the third instance in one session of the same family — knowing a rule
 about destructive git operations, having written it down, and then reaching for
 the destructive command anyway. The pattern is that the rule fires when the
 operation *feels* risky, and these all felt like tidying.
+
+### A watcher that cannot fail is not a watcher
+2026-09-13. Set a background monitor on a PR's CI with
+`gh pr checks <N> --json name,bucket`. This `gh` build has no `--json` flag on
+`pr checks`, so the command errored every poll, the `|| echo '[]'` swallowed it,
+and the monitor sat silent for its full window. Silence is what "still running"
+looks like, so nothing distinguished it from a healthy watch.
+
+Rewrote it against `gh pr view --json statusCheckRollup` and it reported **ALL
+CHECKS COMPLETE** while three checks were still running: a check in flight has
+`conclusion: ""`, and `.conclusion // "RUNNING"` does not substitute for an empty
+string — only for `null` — so every running check read as finished. Fixed that,
+and the third version broke out at `length >= 9` moments before a tenth check
+(`E2E Tests (Playwright)`) registered; a rollup polled right after a push is
+partial, so any count threshold is a race.
+
+Three variants, three different false greens, all of the same family as the
+`git rebase --continue` redirected to `/dev/null` earlier in this session:
+**acting on a success signal I never validated.** What finally worked was not a
+better predicate over the check list but a different source of truth —
+`mergeStateStatus` reaching `CLEAN`, which is the state the merge itself
+consults. When you are about to trust a derived signal, prefer the one the next
+step actually reads.
+
+Before arming any watcher, ask what it prints when the thing it watches is
+broken. If the answer is "nothing", it is a timer, not a check.

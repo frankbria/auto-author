@@ -1,0 +1,186 @@
+#!/usr/bin/env node
+/**
+ * Ledger the `eslint-plugin-react-hooks` 7 backlog so it can only shrink (#675).
+ *
+ * `eslint.config.mjs` downgrades three rules that the plugin makes errors by
+ * default, so the ESLint 9 upgrade (#583) could land as an upgrade rather than a
+ * React refactor. #669 and #670 restored two of them. `set-state-in-effect` is
+ * down from 26 to a remainder that needs a data-layer decision, a hydration
+ * answer, or the running app — so it will be `warn` for a while.
+ *
+ * `npx eslint .` already prints 437 warnings. A new violation lands in that pile
+ * and nobody sees it. The backlog is not the risk; the backlog growing
+ * invisibly is.
+ *
+ * So this is the shape every other backlog in this repo already has — a ledger
+ * that only shrinks, like `security-baseline.json`, `gray-literal-baseline.json`
+ * and `typecheck-test-baseline.json`. Counts are **per file per rule**, because
+ * a per-file total lets a net-zero swap through (#624); a row the tree no longer
+ * contains **fails as stale** rather than pre-authorising the next violation on
+ * that file (#631); and shrinkage is reported, never failed, which is the
+ * contract `audit_gate.py` uses.
+ *
+ * Run: cd frontend && npm run gate:react-hooks
+ */
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const FRONTEND_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const BASELINE = resolve(FRONTEND_ROOT, 'react-hooks-baseline.json');
+
+/** The three rules `eslint.config.mjs` downgrades. Keep in sync with that file. */
+const LEDGERED_RULES = [
+  'react-hooks/set-state-in-effect',
+  'react-hooks/refs',
+  'react-hooks/immutability',
+];
+
+/**
+ * The tree is large enough that an ESLint run covering only a handful of files
+ * is a broken run, not a clean one — the failure `typecheck-tests.mjs` had to
+ * learn, and the empty-set failure #613 was about.
+ */
+const MIN_FILES_LINTED = 200;
+
+function runEslint() {
+  // ESLint exits 1 when it finds errors, which is normal here and not a crash.
+  let stdout;
+  try {
+    stdout = execFileSync('npx', ['eslint', '.', '-f', 'json'], {
+      cwd: FRONTEND_ROOT,
+      encoding: 'utf8',
+      maxBuffer: 128 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    stdout = err.stdout ?? '';
+  }
+
+  let results;
+  try {
+    results = JSON.parse(stdout);
+  } catch {
+    console.error('FAIL — eslint did not produce parseable JSON. This is a broken run, not a pass.');
+    console.error(stdout.slice(0, 2000));
+    process.exit(1);
+  }
+
+  if (!Array.isArray(results) || results.length < MIN_FILES_LINTED) {
+    console.error(
+      `FAIL — eslint reported on ${Array.isArray(results) ? results.length : 0} files, ` +
+        `fewer than the ${MIN_FILES_LINTED} this tree has. The sweep is broken; ` +
+        'an empty result set would otherwise pass every assertion below.'
+    );
+    process.exit(1);
+  }
+  return results;
+}
+
+/** `{ "<relative path>": { "<rule>": <count> } }` */
+function countViolations(results) {
+  const counts = {};
+  for (const file of results) {
+    for (const message of file.messages) {
+      const rule = message.ruleId;
+      if (!LEDGERED_RULES.includes(rule)) continue;
+      const path = relative(FRONTEND_ROOT, file.filePath);
+      counts[path] ??= {};
+      counts[path][rule] = (counts[path][rule] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+const ledger = JSON.parse(readFileSync(BASELINE, 'utf8')).files;
+const actual = countViolations(runEslint());
+
+// Every (file, rule) pair on either side, so nothing is compared one-way.
+// Tuples rather than a joined string key: any delimiter is a guess about what a
+// path cannot contain, and the first version of this used one that turned the
+// file into a binary blob as far as `git diff` was concerned.
+const pairs = [];
+const seen = new Set();
+const addPair = (file, rule) => {
+  const key = JSON.stringify([file, rule]);
+  if (seen.has(key)) return;
+  seen.add(key);
+  pairs.push([file, rule]);
+};
+for (const [file, rules] of Object.entries(actual)) {
+  for (const rule of Object.keys(rules)) addPair(file, rule);
+}
+for (const [file, entry] of Object.entries(ledger)) {
+  for (const rule of Object.keys(entry.rules)) addPair(file, rule);
+}
+
+const unledgered = [];
+const regressed = [];
+const stale = [];
+const shrunk = [];
+
+for (const [file, rule] of pairs) {
+  const found = actual[file]?.[rule] ?? 0;
+  const recorded = ledger[file]?.rules?.[rule] ?? 0;
+
+  if (recorded === 0) unledgered.push({ file, rule, found });
+  else if (found === 0) stale.push({ file, rule, recorded });
+  else if (found > recorded) regressed.push({ file, rule, found, recorded });
+  else if (found < recorded) shrunk.push({ file, rule, found, recorded });
+}
+
+const total = Object.values(actual)
+  .flatMap((rules) => Object.values(rules))
+  .reduce((a, b) => a + b, 0);
+const byRule = Object.fromEntries(
+  LEDGERED_RULES.map((rule) => [
+    rule,
+    Object.values(actual).reduce((sum, rules) => sum + (rules[rule] ?? 0), 0),
+  ])
+);
+console.log(`react-hooks backlog: ${total} violations across ${Object.keys(actual).length} files.`);
+for (const [rule, n] of Object.entries(byRule)) console.log(`  ${rule}: ${n}`);
+console.log();
+
+if (shrunk.length) {
+  console.log('Shrunk — lower these counts in react-hooks-baseline.json:');
+  for (const { file, rule, recorded, found } of shrunk) {
+    console.log(`  ${file}  ${rule}: ${recorded} -> ${found}`);
+  }
+  console.log();
+}
+
+if (!unledgered.length && !regressed.length && !stale.length) {
+  console.log(`PASS — no new react-hooks violations (${total} known, all ledgered).`);
+  process.exit(0);
+}
+
+if (unledgered.length) {
+  console.log(`Violations with no ledger row (${unledgered.length}):`);
+  for (const { file, rule, found } of unledgered) console.log(`  ${file}  ${rule} (${found})`);
+  console.log();
+}
+if (regressed.length) {
+  console.log(`Ledgered files above their recorded count (${regressed.length}):`);
+  for (const { file, rule, recorded, found } of regressed) {
+    console.log(`  ${file}  ${rule}: ${recorded} -> ${found}`);
+  }
+  console.log();
+}
+if (stale.length) {
+  console.log(`Stale rows — these are fixed, delete them (${stale.length}):`);
+  for (const { file, rule, recorded } of stale) console.log(`  ${file}  ${rule} (${recorded})`);
+  console.log(
+    '\nA stale row is not harmless: it pre-authorises the next violation of that\n' +
+      'rule in that file, which is exactly what this gate exists to catch.'
+  );
+  console.log();
+}
+
+console.log(
+  'FAIL — fix these. Adding a ledger row to silence a NEW violation defeats the gate;\n' +
+    'the ledger records the backlog that existed when #675 turned this on, and only shrinks.\n' +
+    'When it empties, delete it along with the three "warn" lines in eslint.config.mjs (#584).'
+);
+process.exit(1);
