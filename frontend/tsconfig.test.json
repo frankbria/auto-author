@@ -1,6 +1,10 @@
 {
   "//": "#625. `tsconfig.json` excludes every test-shaped path, so `npm run typecheck` sees zero of the ~170 test files — and jest transpiles through next/jest's SWC, which strips types WITHOUT checking them. A guard with a type error is a guard that may not be guarding. This config is the same compiler settings over the files the base one drops.",
   "extends": "./tsconfig.json",
+  "//incremental": "A diagnostic-parsing gate has no use for incremental state: it reads tsc's stdout every run, never reuses output, and the inherited `incremental: true` writes a ~700KB tsconfig.test.tsbuildinfo for nothing. Review (codex) also raised that a cached incremental run might exit non-zero without re-emitting diagnostics, which would trip the wrapper's crashed-tsc branch. That did NOT reproduce — three consecutive unchanged runs all passed and raw tsc emitted byte-identical output both times — but the option earns nothing here, so it is off rather than relied upon.",
+  "compilerOptions": {
+    "incremental": false
+  },
   "exclude": ["node_modules"],
   "include": [
     "next-env.d.ts",
