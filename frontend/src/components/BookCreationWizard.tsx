@@ -97,7 +97,16 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
           </DialogDescription>
         </DialogHeader>
         <FormProvider {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-2">
+          <form
+            // The call is made at event time, not during render (#584,
+            // react-hooks/refs). `handleSubmit` is an opaque library call, and
+            // `onSubmit` reads `submitInFlight.current`; evaluating it during
+            // render means the rule cannot rule out the ref being read there.
+            // `handleSubmit(onSubmit)` returns a submit handler, so invoking it
+            // with the event here is equivalent.
+            onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
+            className="space-y-6 py-2"
+          >
             <FormField
               control={form.control}
               name="title"

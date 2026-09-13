@@ -43,7 +43,15 @@ export default function Dashboard() {
   // The loading branch below is a full-page early return. Gating it on "nothing has
   // ever loaded" keeps the pager mounted while a later page is in flight, instead of
   // replacing the whole screen with a skeleton on every Next click.
+  // Two flags for one fact, deliberately (#584, react-hooks/refs).
+  //
+  // The ref is read inside the fetch callbacks, where it must be synchronous and
+  // must not itself cause a render. The state is read during render, to decide
+  // whether to show the first-load skeleton — and reading a ref there is what the
+  // rule catches: a render that depends on a ref will not re-run when the ref
+  // changes. They are written together, so they cannot drift.
   const hasLoadedOnce = useRef(false);
+  const [hasRenderedOnce, setHasRenderedOnce] = useState(false);
   // Fetches are no longer one-per-visit: a page click, a delete refetch and a
   // session-identity change (better-auth refires on window focus) can all be in
   // flight together. Without a token the slowest response wins and can restore a
@@ -148,6 +156,7 @@ export default function Dashboard() {
       if (!isStale()) {
         setIsLoading(false);
         hasLoadedOnce.current = true;
+        setHasRenderedOnce(true);
       }
     }
   }, [session, isE2EMode, page]);
@@ -209,7 +218,7 @@ export default function Dashboard() {
   };
 
   // Show loading state — skeleton mirroring the book-card grid to prevent layout shift
-  if (isLoading && !hasLoadedOnce.current) {
+  if (isLoading && !hasRenderedOnce) {
     return (
       <div
         className="container mx-auto flex-1 p-6"
