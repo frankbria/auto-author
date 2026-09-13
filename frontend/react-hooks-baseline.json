@@ -1,5 +1,5 @@
 {
-  "_comment": "#675 ledger: the eslint-plugin-react-hooks 7 violations that existed when the gate was turned on, per file per rule. eslint.config.mjs holds these three rules at `warn` until #584 burns them to zero; this file is what keeps that interval safe. Counts are per rule so a net-zero swap inside one file cannot pass (#624). A row the tree no longer contains FAILS as stale rather than silently pre-authorising the next violation on that file (#631). Shrink freely — a lower count is reported, never failed. Adding a row to silence a NEW violation defeats the gate. When this empties, delete it and the three \"warn\" lines in eslint.config.mjs.",
+  "_comment": "#675 ledger: the eslint-plugin-react-hooks 7 violations that existed when the gate was turned on, per file per rule. eslint.config.mjs holds these three rules at `warn` until #584 burns them to zero; this file is what keeps that interval safe. Counts are per rule so a net-zero swap inside one file cannot pass (#624). A row the tree no longer contains FAILS as stale rather than silently pre-authorising the next violation on that file (#631). Shrink freely \u2014 a lower count is reported, never failed. Adding a row to silence a NEW violation defeats the gate. When this empties, delete it and the three \"warn\" lines in eslint.config.mjs.",
   "files": {
     "src/app/auth/reset-password/page.tsx": {
       "rules": {
@@ -49,11 +49,6 @@
     "src/components/export/ExportOptionsModal.tsx": {
       "rules": {
         "react-hooks/set-state-in-effect": 2
-      }
-    },
-    "src/components/export/ExportProgressModal.tsx": {
-      "rules": {
-        "react-hooks/set-state-in-effect": 1
       }
     },
     "src/components/settings/ActiveSessionsList.tsx": {
