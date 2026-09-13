@@ -55,6 +55,7 @@ export default function QuestionDisplay({
 }: QuestionDisplayProps) {
   // State for response text
   const [responseText, setResponseText] = useState('');
+  const wordCount = responseText.split(/\s+/).filter(Boolean).length;
   // State for auto-saving
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'queued'>('idle');
@@ -62,7 +63,9 @@ export default function QuestionDisplay({
   // State for response completion
   const [isCompleted, setIsCompleted] = useState(false);
   // State for word count
-  const [wordCount, setWordCount] = useState(0);
+  // Derived during render (#584). A pure function of `responseText`, so the
+  // effect that mirrored it into state bought an extra render per keystroke
+  // and a frame of staleness.
   // State for rating
   const [rating, setRating] = useState(0);
   // State for retry attempts
@@ -87,7 +90,6 @@ export default function QuestionDisplay({
         const result = await bookClient.getQuestionResponse(bookId, chapterId, question.id);
         if (result && result.response) {
           setResponseText(result.response.response_text || '');
-          setWordCount((result.response.response_text || '').split(/\s+/).filter(Boolean).length);
           setIsCompleted(result.response.status === ResponseStatus.COMPLETED);
         }
       } catch (error) {
@@ -102,7 +104,6 @@ export default function QuestionDisplay({
     // Reset states when question changes
     return () => {
       setResponseText('');
-      setWordCount(0);
       setIsCompleted(false);
       setSaveStatus('idle');
       setSaveError('');
@@ -110,10 +111,6 @@ export default function QuestionDisplay({
     };
   }, [bookId, chapterId, question.id]);
 
-  // Update word count when response text changes
-  useEffect(() => {
-    setWordCount(responseText.split(/\s+/).filter(Boolean).length);
-  }, [responseText]);
 
   // Get question type icon
   const getQuestionTypeIcon = (type: QuestionType) => {

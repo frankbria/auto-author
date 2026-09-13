@@ -34,7 +34,10 @@ export default function BookSummaryPage() {
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastSaved = useRef('');
   const [summaryHistory, setSummaryHistory] = useState<unknown[]>([]);
-  const [inputError, setInputError] = useState('');
+  // Derived during render, not mirrored into state via an effect (#584,
+  // react-hooks/set-state-in-effect). `getSummaryReadinessError` is a pure
+  // function of `summary`, so storing it cost an extra render pass on every
+  // keystroke and could show a stale error for one frame.
 
   // Load summary and history from remote on mount
   useEffect(() => {
@@ -79,10 +82,7 @@ export default function BookSummaryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
 
-  // Real-time validation
-  useEffect(() => {
-    setInputError(getSummaryReadinessError(summary));
-  }, [summary]);
+  const inputError = getSummaryReadinessError(summary);
 
   // Speech recognition setup
   const recognitionRef = useRef<SpeechRecognition | null>(null);
