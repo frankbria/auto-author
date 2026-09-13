@@ -12,8 +12,8 @@ import {
 import { cn } from '@/lib/utils';
 import {
   describeSpeechError,
-  isSpeechRecognitionSupported,
 } from '@/lib/voice/speechRecognitionErrors';
+import { useSpeechRecognitionSupported } from '@/lib/voice/useSpeechRecognitionSupported';
 
 type InputMode = 'text' | 'voice';
 
@@ -68,7 +68,7 @@ export function VoiceTextInput({
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [interimTranscript, setInterimTranscript] = useState('');
-  const [isSupported, setIsSupported] = useState(false);
+  const isSupported = useSpeechRecognitionSupported();
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   // getUserMedia hands back a live MediaStream. Its tracks keep the microphone
@@ -97,10 +97,6 @@ export function VoiceTextInput({
     valueRef.current = value;
   }, [value]);
 
-  // Check for speech recognition support
-  useEffect(() => {
-    setIsSupported(isSpeechRecognitionSupported());
-  }, []);
 
   // Release the microphone if this unmounts mid-recording (#348). Without this,
   // navigating away while dictating left recognition running and the browser's
