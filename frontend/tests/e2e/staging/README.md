@@ -294,6 +294,39 @@ If a test fails intermittently:
    per IP) — the symptom is a 30s navigation timeout with "Too many attempts.
    Please try again later" on the sign-in page
 
+## What this account can reach (#603)
+
+The suite signs in as **one real staging user**, and #599 established that its
+credentials can escape through an artifact path nobody anticipated. What a future
+leak would be *worth* is #603's open question. This section records what is
+established, so the decision is made against facts rather than an assumption.
+
+**The account is not an ordinary staging user.** Its email is written to the
+backend as `E2E_EXEMPT_EMAILS`, and `_is_exempt_e2e_user` in
+`backend/app/api/dependencies.py` is consulted at three places:
+
+| line | what the exemption skips | why it exists |
+|---|---|---|
+| 105 | the per-user rate limiter | #180 — the suite legitimately bursts past human limits |
+| 177 | the AI generation quota | #173 — same reason, and the quota is monthly |
+| 241 | plan entitlement checks | the suite must reach features a free plan does not have |
+
+So a leaked credential does not buy a normal account's access. It buys
+**unmetered AI generation against the operator's provider budget**, and paid-tier
+features without a plan. The cost axis is the one that matters here: staging's
+*data* is disposable, its *spend* is not.
+
+**The fence holds, and is tested.** `_is_exempt_e2e_user` returns `False`
+whenever `is_production_env()` is true, so none of this can loosen limits on the
+real product, and `backend/tests/test_api/test_e2e_exempt.py::test_never_exempt_in_production`
+asserts exactly that. Two further tests pin that an exempt user skips the AI
+quota and a non-exempt one is still capped.
+
+**What is not decided** — the scoping question in #603 is open, and this section
+deliberately does not answer it. The options there should be weighed knowing that
+"staging holds nothing real" is a weaker argument than it first appears: it is
+true of the data and false of the spend.
+
 ## Resources
 
 - [Playwright Documentation](https://playwright.dev)
