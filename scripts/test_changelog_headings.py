@@ -15,11 +15,16 @@ that is a convention choice (append-within-day, or one file per entry assembled
 at release) recorded in #661 with the trade-offs, and deliberately left to a
 human because it changes how everyone writes entries.
 
-The tree carries 13 dates with a duplicated heading, 25 extra headings in all,
-predating this guard. They are ledgered rather than merged: reordering historical
-entries is a large, hard-to-review diff over text whose within-day order may
-carry meaning, and the value here is stopping the *next* one. The ledger only
-shrinks.
+The tree carried 11 dates with a duplicated heading when this guard landed, and
+the original note said merging them meant "reordering historical entries … a
+large, hard-to-review diff". That was true of exactly one of them. In the other
+ten, every section of a given date was **contiguous**, so merging was deleting
+the redundant heading line — twenty of them, `0 insertions, 20 deletions`, no
+content moved and no entry reordered (#661).
+
+One remains: 2026-07-18's four sections are split by five other dates, so merging
+it really would move text across them. It stays ledgered, with that as the
+reason. The ledger only shrinks.
 
 Run: uvx --with pytest pytest scripts/test_changelog_headings.py -q
 """
@@ -34,20 +39,20 @@ CHANGELOG = Path(__file__).resolve().parent.parent / "docs" / "CHANGELOG.md"
 
 DATE_HEADING = re.compile(r"^### (\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
 
-# Dates whose headings were already duplicated when this guard landed. Shrink by
-# merging the sections; never extend to silence a new one.
+# 2026-07-18 is the last date whose sections cannot be merged by deleting a
+# heading. Its four sections are not contiguous: two sit together, then five
+# other dates (07-12 through 07-17) intervene, then two more. Merging it would
+# move text across those dates, which is the "large, hard-to-review diff over
+# text whose within-day order may carry meaning" this ledger was written for.
+#
+# The other ten were not that at all, and the original note over-generalised
+# from this one. Every section of each was **contiguous**, so #661 merged them by
+# deleting twenty redundant heading lines — `0 insertions, 20 deletions`, no
+# content moved, no entry reordered.
+#
+# Shrink by merging the sections; never extend to silence a new one.
 KNOWN_DUPLICATES = {
-    "2026-06-26",
-    "2026-06-29",
-    "2026-06-30",
-    "2026-07-04",
-    "2026-07-05",
-    "2026-07-09",
-    "2026-07-12",
-    "2026-07-13",
-    "2026-07-14",
     "2026-07-18",
-    "2026-08-26",
 }
 
 
