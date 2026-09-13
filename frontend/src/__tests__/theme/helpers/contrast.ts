@@ -70,6 +70,26 @@ export function oklchToken(block: string, name: string): [number, number, number
   return oklchToRgb(Number(match[1]), Number(match[2]), Number(match[3]));
 }
 
+/**
+ * Reads `--<name>` out of a CSS block whether it is written as `oklch(...)` or
+ * `rgb(...)`.
+ *
+ * Most tokens here are oklch. `--destructive` is rgb, because #682 needs two
+ * exact Tailwind palette shades (red-700 in light, red-400 in dark) and writing
+ * them as oklch would mean round-tripping a value whose whole point is that it
+ * matches `colors.red[700]` exactly.
+ */
+export function colorToken(block: string, name: string): [number, number, number] {
+  // Bare channels first — `--destructive-rgb: 185 28 28`. Tailwind v3 needs that
+  // form to apply an opacity modifier (#682), so the value a utility actually
+  // renders lives there rather than in a wrapped `rgb(...)`.
+  const channels = block.match(new RegExp(`--${name}:\\s*(\\d+)\\s+(\\d+)\\s+(\\d+)\\s*;`));
+  if (channels) return [Number(channels[1]), Number(channels[2]), Number(channels[3])];
+  const rgb = block.match(new RegExp(`--${name}:\\s*rgb\\(\\s*(\\d+)[,\\s]+(\\d+)[,\\s]+(\\d+)\\s*\\)`));
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  return oklchToken(block, name);
+}
+
 export const WCAG_AA_NORMAL_TEXT = 4.5;
 
 /** `#rrggbb` → sRGB 0-255. Tailwind v3 ships its palette as hex. */

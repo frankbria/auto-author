@@ -21,8 +21,8 @@
     },
     "src/components/books/DeleteBookModal.tsx": {
       "inherits": "text-white",
-      "surface": "destructive",
-      "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. `variant=\"destructive\"` is `bg-destructive text-white`.",
+      "surface": "destructive-surface",
+      "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. `variant=\"destructive\"` is `bg-destructive-surface text-white`: #682 split the destructive role in two, because white needs a dark red to sit on while red text needs a light one, and no single value does both on a dark background. The fill is the theme-fixed `surface`; `destructive` alone is now theme-aware and would price this pair at 2.24:1 in dark.",
       "count": 1
     },
     "src/components/chapters/questions/QuestionContainer.tsx": {

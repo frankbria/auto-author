@@ -4,6 +4,7 @@ import { join } from 'path';
 import colors from 'tailwindcss/colors';
 
 import {
+  colorToken,
   contrastRatio,
   hexToRgb,
   oklchToken,
@@ -308,7 +309,11 @@ function resolveColour(name: string, theme: Theme, property: string = 'text'): R
   }
 
   try {
-    return oklchToken(themeBlock(css, theme), name);
+    // `colorToken`, not `oklchToken`: #682 writes `--destructive` as `rgb(...)`
+    // so the two shades can be exact Tailwind palette values, and an
+    // oklch-only reader prices it as null — which reads here as "unpriceable
+    // colour" and fails a site that is in fact fine.
+    return colorToken(themeBlock(css, theme), name);
   } catch {
     return null;
   }
