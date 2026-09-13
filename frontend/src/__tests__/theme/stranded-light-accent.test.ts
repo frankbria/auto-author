@@ -67,9 +67,13 @@ const PROPS =
   'text|border|ring|fill|stroke|divide|outline|decoration|caret|accent';
 const NEUTRAL = 'gray|slate|zinc|neutral|stone|white|black|transparent|current|inherit';
 
-/** Variant chain, then a pale non-neutral colour utility with no alpha suffix. */
+/**
+ * Variant chain, then a pale non-neutral colour utility with no alpha suffix.
+ * Property and hue are captured separately because pairing is checked on BOTH —
+ * see `strandedAccents`.
+ */
 const PALE_FOREGROUND = new RegExp(
-  `((?:[a-z0-9.\\[\\]-]+:)*)((${PROPS})-(?!${NEUTRAL})[a-z]+-(?:200|300|400))(?![/\\w-])`,
+  `((?:[a-z0-9.\\[\\]-]+:)*)((${PROPS})-(?!${NEUTRAL})([a-z]+)-(?:200|300|400))(?![/\\w-])`,
   'g'
 );
 
@@ -78,17 +82,25 @@ const IS_COMMENT = /^\s*(\/\/|\*|\/\*)/;
 /**
  * Every *stranded* pale foreground in `source`, as class strings.
  *
- * Exported shape is per-line because the pairing test is per-line: a `dark:`
- * counterpart three elements away in the same file does not rescue this one.
+ * Per-line, because the pairing test is per-line: a `dark:` counterpart three
+ * elements away in the same file does not rescue this one.
+ *
+ * Pairing requires the same property **and the same hue**. The first cut of this
+ * guard matched property alone, and mutation M1 caught what that lets through: a
+ * stranded `text-orange-400` on an alert row that already carries
+ * `dark:text-red-400` was reported as paired, because *some* `dark:text-` was
+ * present. Since a stranded accent is most likely to be added to exactly such a
+ * row — one already full of correct pairs — property-only pairing would have made
+ * the guard quietly useless in the commonest case.
  */
 export function strandedAccents(source: string): string[] {
   return source.split('\n').flatMap((line) => {
     if (IS_COMMENT.test(line)) return [];
     return [...line.matchAll(PALE_FOREGROUND)]
       .filter(([, variants]) => !variants.split(':').includes('dark'))
-      .filter(([, , , property]) => {
+      .filter(([, , , property, hue]) => {
         const paired = new RegExp(
-          `(?:[a-z0-9.\\[\\]-]+:)*dark:(?:[a-z0-9.\\[\\]-]+:)*${property}-`
+          `(?:[a-z0-9.\\[\\]-]+:)*dark:(?:[a-z0-9.\\[\\]-]+:)*${property}-${hue}-`
         );
         return !paired.test(line);
       })
@@ -138,6 +150,14 @@ describe('no stranded pale accents in shipped source (#637)', () => {
     expect(strandedAccents('className="text-red-400 dark:border-red-700"')).toEqual([
       'text-red-400',
     ]);
+
+    // ...and per-HUE. Mutation M1's exact shape: a stranded orange on an alert row
+    // that is otherwise a correct red pair. Property-only pairing passed this.
+    expect(
+      strandedAccents(
+        'className="text-orange-400 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"'
+      )
+    ).toEqual(['text-orange-400']);
 
     // Whole variant chain is read, either order.
     expect(strandedAccents('className="hover:dark:text-red-400"')).toEqual([]);
