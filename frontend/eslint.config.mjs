@@ -38,7 +38,7 @@ const eslintConfig = [
       // pre-existing call sites. Warned rather than fixed here to keep this an
       // ESLint upgrade instead of a React refactor — see the follow-up issue.
       "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/refs": "warn",
+
     },
   },
   {

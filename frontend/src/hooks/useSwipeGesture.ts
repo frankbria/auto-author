@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 interface SwipeGestureOptions {
   onSwipeLeft?: () => void;
@@ -29,8 +29,17 @@ export function useSwipeGesture<T extends HTMLElement = HTMLElement>({
   threshold = 50,
 }: SwipeGestureOptions) {
   // Keep the latest callbacks without re-binding listeners every render.
+  //
+  // Assigned in an effect rather than during render (#584, react-hooks/refs).
+  // The write is safe either way here — `latest.current` is only ever read
+  // inside event handlers, which run after commit — but a render-phase ref
+  // write is exactly what the rule exists to catch, and an effect is the
+  // documented place for it. The initial value keeps the first gesture correct
+  // if one somehow fires before the effect runs.
   const latest = useRef({ onSwipeLeft, onSwipeRight, threshold });
-  latest.current = { onSwipeLeft, onSwipeRight, threshold };
+  useEffect(() => {
+    latest.current = { onSwipeLeft, onSwipeRight, threshold };
+  }, [onSwipeLeft, onSwipeRight, threshold]);
 
   const cleanupRef = useRef<(() => void) | null>(null);
 
