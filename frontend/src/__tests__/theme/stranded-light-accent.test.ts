@@ -80,31 +80,51 @@ const PALE_FOREGROUND = new RegExp(
 const IS_COMMENT = /^\s*(\/\/|\*|\/\*)/;
 
 /**
+ * One quoted run per element's class list.
+ *
+ * Pairing is resolved **inside the string the accent sits in**, not across the
+ * whole line, because two elements can share a source line. `chapters/
+ * [chapterId]/page.tsx:41` is exactly that shape today — an outer
+ * `className="… border-b"` and an inner `className="… border-blue-200
+ * dark:border-blue-800 …"` on one line — so scoping to the line lets the inner
+ * element's `dark:` counterpart rescue a stranded accent on the outer one. That
+ * is the utility-pooling false green #635's guard shipped and its review caught;
+ * this one is scoped so the same shape cannot arise.
+ */
+function classRuns(line: string): string[] {
+  return line.match(/"[^"]*"|'[^']*'|`[^`]*`/g) ?? [];
+}
+
+/**
  * Every *stranded* pale foreground in `source`, as class strings.
  *
- * Per-line, because the pairing test is per-line: a `dark:` counterpart three
- * elements away in the same file does not rescue this one.
+ * Pairing requires the same property **and the same hue**, within the same class
+ * string. Mutation M1 caught what property-only pairing lets through: a stranded
+ * `text-orange-400` on an alert row already carrying `dark:text-red-400` was
+ * reported as paired because *some* `dark:text-` was present. Since a pale accent
+ * is most likely to be added to exactly such a row, that made the guard quietly
+ * useless in the commonest case.
  *
- * Pairing requires the same property **and the same hue**. The first cut of this
- * guard matched property alone, and mutation M1 caught what that lets through: a
- * stranded `text-orange-400` on an alert row that already carries
- * `dark:text-red-400` was reported as paired, because *some* `dark:text-` was
- * present. Since a stranded accent is most likely to be added to exactly such a
- * row — one already full of correct pairs — property-only pairing would have made
- * the guard quietly useless in the commonest case.
+ * Known and accepted: a Prettier-wrapped `cn(...)` that splits a pair across two
+ * string literals reports the light half as stranded. That is a **false positive**
+ * — it fails loudly and is resolved by a ledger row or by keeping the pair
+ * together — and is the right way round. A false green ships the bug; no shipped
+ * file has that shape today (`TocSidebar.tsx:38` keeps its pair in one run).
  */
 export function strandedAccents(source: string): string[] {
   return source.split('\n').flatMap((line) => {
     if (IS_COMMENT.test(line)) return [];
-    return [...line.matchAll(PALE_FOREGROUND)]
-      .filter(([, variants]) => !variants.split(':').includes('dark'))
-      .filter(([, , , property, hue]) => {
-        const paired = new RegExp(
-          `(?:[a-z0-9.\\[\\]-]+:)*dark:(?:[a-z0-9.\\[\\]-]+:)*${property}-${hue}-`
-        );
-        return !paired.test(line);
-      })
-      .map(([, , utility]) => utility);
+    return classRuns(line).flatMap((run) =>
+      [...run.matchAll(PALE_FOREGROUND)]
+        .filter(([, variants]) => !variants.split(':').includes('dark'))
+        .filter(([, , , property, hue]) => {
+          const paired = new RegExp(
+            `(?:[a-z0-9.\\[\\]-]+:)*dark:(?:[a-z0-9.\\[\\]-]+:)*${property}-${hue}-`
+          );
+          return !paired.test(run);
+        })
+        .map(([, , utility]) => utility)
+    );
   });
 }
 
@@ -158,6 +178,17 @@ describe('no stranded pale accents in shipped source (#637)', () => {
         'className="text-orange-400 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"'
       )
     ).toEqual(['text-orange-400']);
+
+    // ...and per class RUN. Two elements on one source line must not pool their
+    // utilities: the inner element's `dark:text-red-400` does not rescue the
+    // outer element's stranded `text-red-400`. This is the false green #635's
+    // guard shipped, and the tree has the two-elements-one-line shape today
+    // (`chapters/[chapterId]/page.tsx:41`).
+    expect(
+      strandedAccents(
+        '<div className="text-red-400"><span className="text-red-700 dark:text-red-400">x</span></div>'
+      )
+    ).toEqual(['text-red-400']);
 
     // Whole variant chain is read, either order.
     expect(strandedAccents('className="hover:dark:text-red-400"')).toEqual([]);
