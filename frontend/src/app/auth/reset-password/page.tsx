@@ -275,6 +275,7 @@ function ResetPasswordForm() {
               type="submit"
               className="w-full"
               disabled={loading || !isPasswordValid(password) || !passwordsMatch}
+              busy={loading}
             >
               {loading ? "Resetting..." : "Reset Password"}
             </Button>

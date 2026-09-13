@@ -76,6 +76,7 @@ export function TOCQuestionsExample({ bookId }: AIErrorHandlingExampleProps) {
         <Button
           onClick={generateQuestions}
           disabled={isLoading}
+          busy={isLoading}
           data-testid="generate-questions-button"
         >
           {isLoading ? (
@@ -181,6 +182,7 @@ export function ChapterDraftExample({ bookId, chapterId }: AIErrorHandlingExampl
         <Button
           onClick={generateDraft}
           disabled={isLoading}
+          busy={isLoading}
           data-testid="generate-draft-button"
         >
           {isLoading ? (
@@ -270,6 +272,7 @@ export function SummaryAnalysisExample({ bookId }: AIErrorHandlingExampleProps) 
         <Button
           onClick={analyzeSummary}
           disabled={isLoading}
+          busy={isLoading}
           data-testid="analyze-button"
         >
           {isLoading ? (

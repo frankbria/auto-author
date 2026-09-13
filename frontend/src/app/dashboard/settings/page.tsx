@@ -234,6 +234,7 @@ export default function SettingsPage() {
             onClick={handleSaveSettings}
             size="lg"
             disabled={isSaving || !isLoaded || !intervalValid}
+            busy={isSaving}
           >
             {isSaving ? 'Saving...' : loadState === 'loading' ? 'Loading...' : 'Save Settings'}
           </Button>

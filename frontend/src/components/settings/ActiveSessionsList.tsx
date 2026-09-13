@@ -152,6 +152,7 @@ export default function ActiveSessionsList() {
                           size="sm"
                           onClick={() => void revokeSession(s.token)}
                           disabled={revokingToken !== null}
+                          busy={revokingToken === s.token}
                         >
                           {revokingToken === s.token ? 'Revoking…' : 'Revoke'}
                         </Button>

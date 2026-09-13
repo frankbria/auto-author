@@ -38,15 +38,50 @@ const buttonVariants = cva(
   }
 )
 
+/**
+ * The busy state, kept apart from the disabled state (#642).
+ *
+ * `disabled:opacity-50` in the base string is right for a button that is simply
+ * unavailable — WCAG 1.4.3 exempts inactive components, and the greyed look is
+ * the affordance. It is wrong for a button that disables itself *while working*
+ * and renders its own status text ("Saving...", "Generating..."): CSS `opacity`
+ * groups the element, so the fill and the label are each blended 50% with the
+ * page behind the button rather than composited against each other. The default
+ * variant's label falls from 6.29:1 to **2.29:1** in light — the hardest text on
+ * screen to read, at the moment the user most needs to read it.
+ *
+ * `busy` restores full opacity and marks the state for assistive technology,
+ * while keeping the button unclickable. It does not change how an unavailable
+ * button looks anywhere.
+ */
+const BUSY_CLASSES = "disabled:opacity-100 disabled:pointer-events-none cursor-progress"
+
+/**
+ * The same intent for `asChild`, where the child may be an anchor and cannot
+ * take `disabled` at all. Every class above is `disabled:`-prefixed, so without
+ * that attribute none of them applies and the "busy" link stays fully clickable
+ * — which the pre-PR reviewer caught, and which is the opposite of the contract.
+ * These are unprefixed, and `aria-disabled` carries the state to assistive
+ * technology in place of the attribute the element cannot have.
+ */
+const BUSY_CLASSES_AS_CHILD = "opacity-100 pointer-events-none cursor-progress"
+
 function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
+  busy = false,
+  disabled,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    /**
+     * The action is running. Implies `disabled` unless one is passed
+     * explicitly, sets `aria-busy`, and keeps the label legible.
+     */
+    busy?: boolean
   }) {
   const Comp = asChild ? Slot : "button"
 
@@ -55,10 +90,19 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+      data-busy={busy ? "true" : undefined}
+      aria-busy={busy || undefined}
+      // `asChild` renders someone else's element, which may not accept
+      // `disabled` at all — an anchor, say. Only the real button gets it.
+      disabled={asChild ? undefined : (disabled ?? busy)}
+      aria-disabled={asChild && busy && disabled !== false ? true : undefined}
+      className={cn(
+        buttonVariants({ variant, size, className }),
+        busy && (asChild ? BUSY_CLASSES_AS_CHILD : BUSY_CLASSES)
+      )}
       {...props}
     />
   )
 }
 
-export { Button, buttonVariants }
+export { Button, buttonVariants, BUSY_CLASSES, BUSY_CLASSES_AS_CHILD }

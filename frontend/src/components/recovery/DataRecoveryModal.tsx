@@ -144,6 +144,7 @@ export function DataRecoveryModal({
           <Button
             onClick={handleRestore}
             disabled={isProcessing}
+            busy={isProcessing}
             className="bg-green-600 hover:bg-green-700"
           >
             {isProcessing ? 'Restoring...' : 'Restore Backup'}

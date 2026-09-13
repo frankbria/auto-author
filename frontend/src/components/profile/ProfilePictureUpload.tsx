@@ -107,7 +107,7 @@ export function ProfilePictureUpload({ currentAvatarUrl, onUploaded }: ProfilePi
         type="button"
         variant="outline"
         onClick={() => inputRef.current?.click()}
-        disabled={uploading}
+        disabled={uploading} busy={uploading}
       >
         {uploading ? 'Uploading…' : 'Change photo'}
       </Button>
