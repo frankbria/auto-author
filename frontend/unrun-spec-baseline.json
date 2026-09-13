@@ -1,0 +1,8 @@
+{
+  "_comment": "#613 ledger: Playwright spec files no config's testDir covers, so no invocation can ever run them. CI fails on any spec NOT listed here. A spec that never runs reports identically to one that passes, which is why this is a gate and not a lint warning. Shrink it by wiring the spec into a config or deleting it; never add a row to silence a newly-stranded file.",
+  "files": {
+    "tests/e2e/ai-error-handling.spec.ts": {
+      "reason": "Stranded in tests/e2e/ root, which no config covers: playwright.config.ts points at src/e2e, and the staging and deployment configs each cover their own subdirectory. Last touched 2025-12-22 (#67), so it has not executed in ~9 months. Its subject \u2014 AI rate-limit countdown, network retry, cached-content fallback \u2014 overlaps src/e2e/error-recovery-flow.spec.ts and toc-generation-resilience.spec.ts, so whether to wire it up or delete it is a coverage decision rather than a mechanical one. Ledgered to make the choice explicit instead of leaving it silent."
+    }
+  }
+}
