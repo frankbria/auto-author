@@ -45,6 +45,13 @@ jobs:
         working-directory: frontend
         run: npm run typecheck
 
+      # The base tsconfig excludes every test-shaped path, so the step above sees
+      # none of the ~170 test files, and next/jest's SWC strips types without
+      # checking them. This covers that gap against a ledger (#625). ~6s.
+      - name: Type check test sources
+        working-directory: frontend
+        run: npm run typecheck:tests
+
       - name: Run unit tests
         working-directory: frontend
         run: npm test -- --coverage --passWithNoTests

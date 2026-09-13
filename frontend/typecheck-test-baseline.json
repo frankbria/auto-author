@@ -1,0 +1,121 @@
+{
+  "_comment": "#625 ledger: test files carrying type errors when `typecheck:tests` was first enforced. CI fails on any file NOT listed here, and on any listed file ABOVE its recorded count — so new test code is type-checked while the backlog stays explicit and countable. Shrink freely; delete the row when it reaches zero. Never add a row to silence a new error: fix it.",
+  "files": {
+    "src/lib/performance/__tests__/metrics.test.ts": {
+      "errors": 45,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2540 ×44 — assigns to a read-only property (mocking a getter or a frozen global)."
+    },
+    "src/components/chapters/__tests__/ChapterEditor.saveStatus.test.tsx": {
+      "errors": 18,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2345 ×18 — argument type mismatch — usually a partial fixture passed where the full shape is required."
+    },
+    "src/__tests__/ChapterQuestionsPerformance.test.tsx": {
+      "errors": 17,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2339 ×13 — property does not exist on the type — a fixture or mock narrower than the real object."
+    },
+    "src/components/chapters/__tests__/ChapterEditor.localStorage.test.tsx": {
+      "errors": 16,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2345 ×16 — argument type mismatch — usually a partial fixture passed where the full shape is required."
+    },
+    "src/lib/errors/errorHandler.test.ts": {
+      "errors": 14,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2345 ×14 — argument type mismatch — usually a partial fixture passed where the full shape is required."
+    },
+    "src/__tests__/QuestionResponseVerification.test.tsx": {
+      "errors": 8,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2741 ×6 — object literal missing required properties (partial fixture)."
+    },
+    "src/lib/__tests__/email.test.ts": {
+      "errors": 8,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2540 ×8 — assigns to a read-only property (mocking a getter or a frozen global)."
+    },
+    "src/__tests__/TabOverflowScroll.test.tsx": {
+      "errors": 7,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2339 ×7 — property does not exist on the type — a fixture or mock narrower than the real object."
+    },
+    "src/jest.setup.ts": {
+      "errors": 6,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2347 ×1 — untyped function call with type arguments."
+    },
+    "src/lib/__tests__/toast.test.ts": {
+      "errors": 6,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2339 ×5 — property does not exist on the type — a fixture or mock narrower than the real object."
+    },
+    "src/__tests__/ChapterQuestionsIntegration.test.tsx": {
+      "errors": 4,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2322 ×4 — type not assignable — commonly a widened string where a union is required."
+    },
+    "src/__tests__/bookClient.test.tsx": {
+      "errors": 4,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2345 ×2 — argument type mismatch — usually a partial fixture passed where the full shape is required."
+    },
+    "src/lib/__tests__/logger.test.ts": {
+      "errors": 4,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2540 ×4 — assigns to a read-only property (mocking a getter or a frozen global)."
+    },
+    "src/__tests__/ChapterQuestionsMobileAccessibility.test.tsx": {
+      "errors": 2,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2339 ×2 — property does not exist on the type — a fixture or mock narrower than the real object."
+    },
+    "src/e2e/profile-editing.spec.ts": {
+      "errors": 2,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2339 ×2 — property does not exist on the type — a fixture or mock narrower than the real object."
+    },
+    "src/hooks/__tests__/usePerformanceTracking.test.ts": {
+      "errors": 2,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2322 ×2 — type not assignable — commonly a widened string where a union is required."
+    },
+    "src/__tests__/ChapterQuestionsEndToEnd.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2322 ×1 — type not assignable — commonly a widened string where a union is required."
+    },
+    "src/__tests__/ProfilePage.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2741 ×1 — object literal missing required properties (partial fixture)."
+    },
+    "src/__tests__/VoiceTextInputIntegration.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2741 ×1 — object literal missing required properties (partial fixture)."
+    },
+    "src/__tests__/accessibility/ComponentAccessibilityAudit.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2741 ×1 — object literal missing required properties (partial fixture)."
+    },
+    "src/components/books/__tests__/BookCreationWizard.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2322 ×1 — type not assignable — commonly a widened string where a union is required."
+    },
+    "src/components/chapters/__tests__/ChapterEditor.questionsToggle.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2345 ×1 — argument type mismatch — usually a partial fixture passed where the full shape is required."
+    },
+    "src/components/chapters/__tests__/ChapterTab.keyboard.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2739 ×1 — object literal missing multiple required properties."
+    },
+    "src/components/chapters/__tests__/MobileChapterTabs.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2347 ×1 — untyped function call with type arguments."
+    },
+    "src/components/chapters/questions/__tests__/QuestionDisplay.enhanced.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2353 ×1 — object literal specifies a property the type does not declare."
+    },
+    "src/components/chapters/questions/__tests__/QuestionGenerator.test.tsx": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2347 ×1 — untyped function call with type arguments."
+    },
+    "src/lib/__tests__/auth-ip.test.ts": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2339 ×1 — property does not exist on the type — a fixture or mock narrower than the real object."
+    },
+    "tests/e2e/ai-error-handling.spec.ts": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2345 ×1 — argument type mismatch — usually a partial fixture passed where the full shape is required."
+    },
+    "tests/e2e/staging/playwright.config.ts": {
+      "errors": 1,
+      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2769 ×1 — no overload matches this call."
+    }
+  }
+}
