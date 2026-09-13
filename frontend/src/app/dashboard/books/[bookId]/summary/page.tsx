@@ -307,7 +307,7 @@ export default function BookSummaryPage() {
                 id="summary-input-error"
                 role="status"
                 aria-live="polite"
-                className="text-red-400 text-xs mt-1"
+                className="text-red-700 dark:text-red-400 text-xs mt-1"
               >
                 {inputError}
               </div>
@@ -354,7 +354,7 @@ export default function BookSummaryPage() {
                         : 'Unknown time'}
                     </div>
                     <button
-                      className="text-indigo-400 text-xs hover:underline"
+                      className="text-indigo-700 dark:text-indigo-400 text-xs hover:underline"
                       onClick={() => handleRevert(summaryHistory.length - 1 - idx)}
                     >
                       Revert

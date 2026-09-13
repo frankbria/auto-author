@@ -1,0 +1,29 @@
+{
+  "_comment": "#637 ledger: pale non-neutral foregrounds (200/300/400) with NO dark: counterpart for the same property, which are nonetheless correct. Per-distinct-utility counts so a hue swap cannot net out, and a row the file no longer contains fails (the #624 stale-row rule) rather than silently pre-authorising the class. Shrink freely; delete the row when it empties.",
+  "files": {
+    "src/app/error.tsx": {
+      "utilities": { "text-red-400": 2 },
+      "reason": "Theme-fixed dark error boundary. This route renders when the app has already failed, so it deliberately does not depend on the theme system or on any token being resolvable — its Card is a literal bg-gray-900. text-red-400 on gray-900 measures 6.41:1, well over AA. A dark: pair here would be dead code: there is no light surface for it to swap to."
+    },
+    "src/app/global-error.tsx": {
+      "utilities": { "text-red-400": 1 },
+      "reason": "Theme-fixed dark error boundary, same rationale as error.tsx. Renders its own <html>/<body> with a literal bg-gray-950 because a global error means the layout itself failed. text-red-400 on gray-950 measures 7.28:1."
+    },
+    "src/app/layout.tsx": {
+      "utilities": { "text-red-400": 1 },
+      "reason": "The root layout's inline error fallback, on a literal bg-gray-950 for the same reason as global-error.tsx: it must render without the theme system. 7.28:1."
+    },
+    "src/components/toc/ClarifyingQuestions.tsx": {
+      "utilities": { "text-indigo-400": 1, "text-green-400": 1 },
+      "reason": "disabled: button labels on disabled: dark surfaces (indigo-400 on indigo-800 = 3.33:1, green-400 on green-800 = 4.09:1). WCAG 1.4.3 exempts text that is part of an inactive user interface component from any contrast requirement, so these are not failures. Both buttons are theme-fixed (bg-indigo-600 / bg-green-700 with white labels in both themes), so a dark: counterpart would have nothing to swap to. The separate question of whether disabled states are legible enough in practice is #642."
+    },
+    "src/components/toc/TocReview.tsx": {
+      "utilities": { "text-green-400": 1 },
+      "reason": "disabled: accept-button label, green-400 on disabled:bg-green-800 = 4.09:1. Inactive-component exemption (WCAG 1.4.3), same as ClarifyingQuestions.tsx. Tracked for legibility in #642."
+    },
+    "src/components/chapters/VoiceTextInput.tsx": {
+      "utilities": { "border-green-200": 1 },
+      "reason": "A light-only success toast (bg-green-50 / border-green-200 / text-green-800) with no dark: anything. In light it is correct — text-green-800 on green-50 is 6.81:1. Its defect is the mirror of this issue: in dark the card keeps its light surface and the whole thing is wrong (text-green-800 over --background measures 2.78:1). That is #633's shape — a light-authored surface stranded in dark — not #637's, and converting it needs the whole card, not this one border. Ledgered here so the sweep stays green while the real fix lands under #633."
+    }
+  }
+}
