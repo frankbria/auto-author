@@ -864,3 +864,27 @@ Re-derive the measurement and re-check the consumer list before implementing,
 even when the issue is recent, detailed, and written by someone who was right
 about the class. Especially then: a confident, specific issue is the one you are
 least likely to re-measure.
+
+### `git reset --hard` on a tidy-up discards config you forgot was uncommitted
+2026-09-12, the same session as the entry above, and worse than it. Used
+`git reset --hard origin/main` to clean up a local `main` that had briefly
+carried a commit by mistake. That silently destroyed several hours of
+uncommitted `.claude/settings.json` work — seeded permissions, a dead-config
+removal, a plugin enablement — none of which was the subject of the tidy-up, and
+all of which was invisible in the command. The untracked rule files beside it
+survived only because `reset --hard` leaves untracked files alone, which is luck,
+not design.
+
+Two habits, neither of which I had:
+- Before any `reset --hard` / `checkout --` / `clean`, run `git status` and read
+  it as a **list of things about to be lost**, not as noise to scroll past. A
+  file modified hours ago and unrelated to the current task is the likeliest
+  casualty, because it has stopped registering as "work in progress".
+- Fix a branch mix-up with the narrowest tool: `git branch <name>` then
+  `git reset --hard` **only** once you have confirmed nothing else is pending, or
+  better, `git branch -f` and switch away without resetting at all.
+
+This is the third instance in one session of the same family — knowing a rule
+about destructive git operations, having written it down, and then reaching for
+the destructive command anyway. The pattern is that the rule fires when the
+operation *feels* risky, and these all felt like tidying.
