@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "path": "rules/reuse-first.md",
+      "hash": "c8db2b1620b1f74e5060bcd3b1987e2b5e722c67313c2c972dcf1025019ba0f7",
+      "description": "Reuse-first implementation",
+      "globs": [],
+      "dirs": [],
+      "prompt": [],
+      "priority": 90,
+      "enabled": true,
+      "include": []
+    },
+    {
+      "path": "rules/self-improvement.md",
+      "hash": "736a16a05138c67f1863053e00dce33742475102580779da4846fb27996cd2f6",
+      "description": "Self-improvement: build the capability that makes the next goal cheaper",
+      "globs": [],
+      "dirs": [],
+      "prompt": [],
+      "priority": 40,
+      "enabled": true,
+      "include": []
+    },
+    {
+      "path": "rules/static-guard-invariants.md",
+      "hash": "01d35644cb8838761a2488935269dd831a1b2d0d865cdcda4fc424a479230ca9",
+      "description": "Static theme/contrast guards \u2014 what makes one real instead of decorative",
+      "globs": [
+        "frontend/src/__tests__/theme/**",
+        "frontend/*baseline*.json",
+        "frontend/src/app/globals.css",
+        "frontend/tailwind.config.js"
+      ],
+      "dirs": [],
+      "prompt": [],
+      "priority": 65,
+      "enabled": true,
+      "include": []
+    },
+    {
+      "path": "rules/verified-reverts.md",
+      "hash": "78738d0e1a97c3afb104636614957feef34f24767454ef99b75c888e6d739425",
+      "description": "Mutation checks and reverts that actually revert",
+      "globs": [],
+      "dirs": [],
+      "prompt": [
+        "mutation",
+        "mutate",
+        "revert",
+        "verify the guard",
+        "mutation-check"
+      ],
+      "priority": 70,
+      "enabled": true,
+      "include": []
+    }
+  ]
+}
