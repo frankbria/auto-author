@@ -356,7 +356,9 @@ describe('BookCard', () => {
       expect(deleteButton).toHaveClass(
         'bg-secondary',
         'text-secondary-foreground',
-        'hover:bg-destructive',
+        // #682 split the destructive role: the opaque fill is the theme-fixed
+        // `-surface` shade, because white is 2.24:1 on the theme-aware token in dark.
+        'hover:bg-destructive-surface',
         'hover:text-destructive-foreground'
       );
     });

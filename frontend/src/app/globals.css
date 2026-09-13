@@ -61,7 +61,13 @@
   --muted-foreground: oklch(0.54 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  /* #682: red-700. White on it is 6.47:1 (the destructive button's label), and
+     as `text-destructive` it is 6.47 on --background and --card, 5.93 on
+     --muted, 5.45 on the bg-destructive/10 error card. The previous brand red
+     (red-500, pinned in tailwind.config.js and overriding this token) was
+     3.76:1 in both roles. */
+  --destructive-rgb: 185 28 28;
+  --destructive: rgb(var(--destructive-rgb));
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -97,7 +103,12 @@
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  /* #682: red-400. A red dark enough for white to sit on is 3.06:1 here, so the
+     text role has to lighten in dark: 7.16 on --background, 6.48 on --card,
+     5.47 on --muted, 4.76 on the bg-destructive/20 error card. White is 2.24:1
+     on this, which is why the *fill* does not use this token — see
+     `destructive.surface` in tailwind.config.js. */
+  --destructive-rgb: 248 113 113;
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);

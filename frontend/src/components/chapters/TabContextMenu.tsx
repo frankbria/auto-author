@@ -123,7 +123,7 @@ export default function TabContextMenu({
 
             {onDelete && (
               <button
-                className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive-surface hover:text-destructive-foreground"
                 onClick={() => handleAction(() => onDelete(chapterId))}
               >
                 <HugeiconsIcon icon={Delete02Icon} size={16} className="mr-2" />

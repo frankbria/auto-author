@@ -143,7 +143,7 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
         </Button>
         {onDelete && (
           <Button
-            className="bg-secondary text-secondary-foreground hover:bg-destructive hover:text-destructive-foreground h-11 w-11"
+            className="bg-secondary text-secondary-foreground hover:bg-destructive-surface hover:text-destructive-foreground h-11 w-11"
             onClick={(e) => {
               e.stopPropagation();
               setShowDeleteDialog(true);

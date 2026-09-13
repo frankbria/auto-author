@@ -117,15 +117,18 @@ describe('busy buttons keep their status text legible (#642)', () => {
     }
   });
 
-  it('records that the destructive variant still falls short, and by how much', () => {
-    // Not a failure of this fix — `busy` takes the two delete buttons from
-    // 1.97:1 to 3.76:1. The remainder is the brand red itself: white on
-    // rgb(239, 68, 68) is below AA in *every* state, enabled included, which is
-    // its own issue and a brand decision. Pinned so that a change to the red is
-    // noticed here rather than discovered in an audit.
+  it('clears AA for the destructive variant too, in both themes', () => {
+    // This recorded a shortfall until #682. `busy` took the two delete buttons
+    // from 1.97:1 to 3.76:1 and no further, because the remainder was the brand
+    // red itself — white on rgb(239, 68, 68) is below AA in *every* state,
+    // enabled included. #682 moved the token to red-700, and this assertion
+    // flipped from "record the gap" to "there is no gap", which is what the
+    // recorded expectation was there to prompt.
+    //
+    // The fill is theme-fixed, so one ratio covers both themes; `text-destructive`
+    // needs a dark override and is guarded in `destructive-text-contrast.test.ts`.
     const ratio = contrastRatio(WHITE, brandRgb('destructive'));
-    expect(ratio).toBeGreaterThan(3.5);
-    expect(ratio).toBeLessThan(WCAG_AA_NORMAL_TEXT);
+    expect(ratio).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
   });
 });
 

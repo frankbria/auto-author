@@ -1062,3 +1062,41 @@ Every mutation now goes through a substitution with `assert n == 1`, the same wa
 the guards themselves assert their own sweeps are non-empty. A mutation check
 whose mutation is unverified is a test of nothing, and it fails safe in the
 direction that makes a weak guard look thorough.
+
+### A guard that reads a selector must anchor it
+2026-09-13, #682. The guard for a new `.dark .text-destructive` override located
+it with `/\.dark \.text-destructive[^{]*\{/`. Renaming the selector to
+`.dark .text-destructive-RENAMED` left the guard **green**: the pattern matched
+the rename as a prefix, so it happily read a colour out of a rule that no longer
+applied to anything.
+
+Fixed by requiring the selector to end — `\.text-destructive\s*[,{]` — which
+the same mutation then fails. Same family as #680's three defects: the pattern
+was fine, the *boundary* was missing, and the failure mode is a guard reporting
+on something that is no longer there.
+
+When a test reads a value out of a name (a CSS selector, a config key, a class),
+mutate the **name**, not just the value. Mutating the value proves the maths;
+mutating the name proves the guard is still pointed at the thing.
+
+### A config that measures right can still emit nothing
+2026-09-13, #682. Split the destructive colour into a theme-aware token so every
+`text-destructive` shape would follow the theme without a stylesheet override
+naming each variant. Every guard passed: the ratios were right, the tokens were
+right, the sweep was clean.
+
+The pre-PR reviewer pointed out that Tailwind v3 cannot apply an opacity modifier
+to a plain `var()`. Built the CSS to check, and `bg-destructive/10`,
+`border-destructive/20`, `text-destructive/90` and `ring-destructive/20` each
+emitted **zero rules**. Error-card tints, invalid-state rings and destructive menu
+backgrounds would have shipped colourless, with the whole theme suite green.
+
+Every guard in that directory reads the config and the stylesheet and does colour
+maths. **None of them can see whether a class produces a rule.** "The config is
+correct" and "the CSS exists" are different claims, and only the second one
+ships. The fix is the channel form, `rgb(var(--x-rgb) / <alpha-value>)`, and the
+new guard **builds the stylesheet** and asserts each class appears in it.
+
+Generalises past Tailwind: whenever a guard checks an *input* to a generator —
+a config, a template, a schema — ask what it would take for the generator to
+produce nothing from a valid-looking input, and check the output instead.

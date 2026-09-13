@@ -177,7 +177,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             <Button
               variant="ghost"
               size="sm"
-              className="h-11 w-11 p-0 border border-border text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus:bg-accent focus:text-accent-foreground shadow-sm"
+              className="h-11 w-11 p-0 border border-border text-muted-foreground hover:bg-destructive-surface hover:text-destructive-foreground focus:bg-accent focus:text-accent-foreground shadow-sm"
               style={{ opacity: 1 }}
               onClick={(e) => {
                 e.stopPropagation();
