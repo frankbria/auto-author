@@ -1,33 +1,52 @@
 {
-  "env": {
-    "CLAUDE_FLOW_AUTO_COMMIT": "false",
-    "CLAUDE_FLOW_AUTO_PUSH": "false",
-    "CLAUDE_FLOW_HOOKS_ENABLED": "true",
-    "CLAUDE_FLOW_TELEMETRY_ENABLED": "true",
-    "CLAUDE_FLOW_REMOTE_EXECUTION": "true",
-    "CLAUDE_FLOW_CHECKPOINTS_ENABLED": "true"
-  },
   "permissions": {
     "allow": [
-      "Bash(npm run lint)",
-      "Bash(npm run test:*)",
-      "Bash(npm test :*)",
-      "Bash(git status)",
-      "Bash(git diff :*)",
-      "Bash(git log :*)",
+      "Bash(cat:*)",
+      "Bash(comm:*)",
+      "Bash(diff:*)",
+      "Bash(find:*)",
+      "Bash(gh api /advisories*)",
+      "Bash(gh api /repos/*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
       "Bash(git add :*)",
-      "Bash(git commit :*)",
-      "Bash(git push)",
-      "Bash(git config :*)",
-      "Bash(git tag :*)",
       "Bash(git branch :*)",
       "Bash(git checkout :*)",
+      "Bash(git commit :*)",
+      "Bash(git config :*)",
+      "Bash(git diff :*)",
+      "Bash(git log :*)",
+      "Bash(git push)",
       "Bash(git stash :*)",
+      "Bash(git status)",
+      "Bash(git tag :*)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
       "Bash(jq :*)",
+      "Bash(ls :*)",
       "Bash(node :*)",
-      "Bash(which :*)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm test :*)",
+      "Bash(npx eslint:*)",
+      "Bash(npx jest:*)",
+      "Bash(npx tsc:*)",
       "Bash(pwd)",
-      "Bash(ls :*)"
+      "Bash(sed -n:*)",
+      "Bash(tail:*)",
+      "Bash(uv export:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(wc:*)",
+      "Bash(which :*)"
     ],
     "deny": [
       "Bash(rm -rf /)",
@@ -35,5 +54,7 @@
     ]
   },
   "includeCoAuthoredBy": true,
-  "enabledMcpjsonServers": ["ruv-swarm"]
+  "enabledPlugins": {
+    "live-rules@eigenwise-toolshed": true
+  }
 }
