@@ -48,7 +48,13 @@ class StagingSmokeUser(HttpUser):
             catch_response=True,
         ) as response:
             if response.status_code >= 400:
-                response.failure(f"sign-in returned {response.status_code}: {response.text[:300]}")
+                # Status only — never the body (#604). `load-smoke-report.html` is
+                # uploaded as a CI artifact on a PUBLIC repo, and this is an auth
+                # endpoint receiving the staging password in its request. better-auth
+                # does not echo the submitted password today, but a framework-level
+                # 422 that echoed request fields would land in a public artifact, and
+                # the status code is what actually diagnoses a smoke failure.
+                response.failure(f"sign-in returned {response.status_code}")
                 raise RuntimeError("Better Auth sign-in failed during staging load smoke")
             response.success()
 
@@ -67,7 +73,10 @@ class StagingSmokeUser(HttpUser):
                 response.failure(f"book create auth failed with {response.status_code}")
                 raise RuntimeError("Authenticated book create failed during staging load smoke")
             if response.status_code >= 500:
-                response.failure(f"book create returned {response.status_code}: {response.text[:300]}")
+                # Status only, for the same reason (#604): this request carries a
+                # session cookie, and a 500 body can contain anything the server
+                # chose to serialise.
+                response.failure(f"book create returned {response.status_code}")
                 return
             if response.status_code < 400:
                 payload: dict[str, Any] = response.json()
