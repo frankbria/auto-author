@@ -134,7 +134,7 @@ export default function VerifyTwoFactorPage() {
                 Trust this device for 30 days
               </Label>
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting || code.length === 0}>
+            <Button type="submit" className="w-full" disabled={isSubmitting || code.length === 0} busy={isSubmitting}>
               {isSubmitting ? 'Verifying…' : 'Verify'}
             </Button>
             <button

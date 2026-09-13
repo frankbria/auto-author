@@ -105,7 +105,7 @@ export default function RegenerateQuestionsDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isRegenerating}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={isRegenerating}>
+          <Button onClick={handleConfirm} disabled={isRegenerating} busy={isRegenerating}>
             {isRegenerating ? (
               <>
                 <HugeiconsIcon icon={RefreshIcon} size={16} className="mr-2 animate-spin" />

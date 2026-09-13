@@ -396,7 +396,7 @@ export function DraftGenerationButton({
             )}
 
             {step === 'generating' && (
-              <Button variant="outline" onClick={() => setIsOpen(false)} disabled className="transition-all">
+              <Button variant="outline" onClick={() => setIsOpen(false)} busy className="transition-all">
                 Generating...
               </Button>
             )}

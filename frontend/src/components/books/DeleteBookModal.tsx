@@ -190,6 +190,7 @@ export function DeleteBookModal({
             type="submit"
             variant="destructive"
             disabled={!isConfirmed || isDeleting}
+            busy={isDeleting}
             className="transition-all focus-visible:ring-[3px]"
           >
             {isDeleting ? (

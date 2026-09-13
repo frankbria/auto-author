@@ -81,7 +81,7 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
                   : 'Upgrade to Pro for full access to every AI writing feature.'}
               </p>
             </div>
-            <Button onClick={handleUpgrade} disabled={isRedirecting}>
+            <Button onClick={handleUpgrade} disabled={isRedirecting} busy={isRedirecting}>
               {isRedirecting ? 'Redirecting…' : 'Upgrade to Pro'}
             </Button>
             <p className="text-xs text-muted-foreground">
@@ -97,6 +97,7 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
               variant={isPro ? 'default' : 'outline'}
               onClick={handleManageBilling}
               disabled={isRedirecting}
+              busy={isRedirecting}
             >
               {isRedirecting ? 'Redirecting…' : 'Manage billing'}
             </Button>

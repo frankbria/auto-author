@@ -345,7 +345,7 @@ export default function UserProfile() {
             >
               Delete Account
             </Button>
-            <Button type="submit" disabled={loadState !== 'loaded'}>
+            <Button type="submit" disabled={loadState !== 'loaded'} busy={loadState === 'loading'}>
               {loadState === 'loading' ? 'Loading…' : 'Save Changes'}
             </Button>
           </div>
@@ -419,6 +419,7 @@ export default function UserProfile() {
                   type="submit"
                   variant="destructive"
                   disabled={!deleteConfirmed || deleting}
+                  busy={deleting}
                 >
                   {deleting ? 'Deleting…' : 'Delete account permanently'}
                 </Button>

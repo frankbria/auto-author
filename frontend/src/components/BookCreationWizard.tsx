@@ -263,6 +263,7 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                 type="submit"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-white"
                 disabled={isSubmitting}
+                busy={isSubmitting}
               >
                 {isSubmitting ? (
                   <>

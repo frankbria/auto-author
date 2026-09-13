@@ -113,7 +113,7 @@ export default function PasswordChangeForm() {
               {validationError}
             </p>
           )}
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting} busy={isSubmitting}>
             {isSubmitting ? 'Changing…' : 'Change Password'}
           </Button>
         </form>

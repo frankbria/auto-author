@@ -650,6 +650,7 @@ export function ChapterEditor({
         <Button
           onClick={() => handleSave(false)}
           disabled={isSaving}
+          busy={isSaving}
         >
           {isSaving ? 'Saving...' : 'Save'}
         </Button>

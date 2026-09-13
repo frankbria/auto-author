@@ -1013,3 +1013,35 @@ The existing lesson says commit before mutating. The gap was that I applied it t
 the file under mutation and not to the *other* files the same loop reverts. Commit
 the whole change set first — the revert step does not distinguish "my mutation"
 from "my work".
+
+### A sweep cannot fail on what its pattern does not match
+2026-09-13, #642. Wrote a guard asserting that every `<Button>` showing a busy
+label declares `busy`, with the label pattern enumerating ten verbs — taken from
+what the sweep had already found in the tree. That is circular, and the reviewer
+produced three more it missed. Broadening it from an enumeration to the actual
+shape (a gerund plus an ellipsis) found **twelve** more sites, more than doubling
+the fix.
+
+The deeper problem was that **narrowing the pattern back could not fail the
+guard**. A sweep of the form "everything matching X must also have Y" passes
+trivially when X matches nothing; shrinking X makes it *more* green, so the
+mutation that should have caught this was the one mutation that survived. The
+fix is a floor on what the sweep finds — `>= 23` busy-labelled buttons — so the
+count can rise freely and only drops when a label genuinely leaves the tree.
+
+Any guard whose failure requires a match needs a separate assertion that matches
+still happen. The anti-vacuity fixture tests I had ("this pattern recognises a
+busy button") do not cover it: they pin the pattern against a literal, not
+against the tree.
+
+### A prefixed utility class is inert without the state that prefixes it
+2026-09-13, the same guard's feature. `busy` applied
+`disabled:opacity-100 disabled:pointer-events-none`, which is right for a real
+`<button>`. Under `asChild` the component deliberately omits `disabled` — an
+anchor has no such attribute — so **every one of those classes was inert** and
+the "busy" link stayed fully clickable. The prop's own contract said otherwise.
+
+Caught by the pre-PR reviewer, not by me, and not by my own test for that path:
+I had asserted the link does *not* get `disabled`, which was the half I was
+thinking about, and never asserted what it does get instead. When a branch
+deliberately drops something, test what replaces it.

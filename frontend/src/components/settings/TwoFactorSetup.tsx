@@ -215,7 +215,7 @@ export default function TwoFactorSetup() {
               />
             </div>
             <div className="flex gap-2">
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} busy={isSubmitting}>
                 {isSubmitting
                   ? 'Please wait…'
                   : mode === 'enable'
@@ -293,6 +293,7 @@ export default function TwoFactorSetup() {
                 <Button
                   type="submit"
                   disabled={isSubmitting || verifyCode.length !== 6 || !codesAcknowledged}
+                  busy={isSubmitting}
                 >
                   {isSubmitting ? 'Verifying…' : 'Verify & Enable'}
                 </Button>
