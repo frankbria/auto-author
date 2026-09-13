@@ -483,4 +483,76 @@ describe('LoadingStateManager', () => {
       expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
   });
+  describe('A second load re-arms both timers (#584)', () => {
+    // `visible` and `timeRemaining` are derived from `isLoading`/`estimatedTime`
+    // rather than mirrored into state by an effect. That moved the reset of both
+    // timer counters into effect cleanup, which nothing covered: with the resets
+    // dropped, every test above still passed, because none of them loads twice.
+
+    it('applies the 200ms anti-flicker delay again on the next load', () => {
+      const { rerender } = render(
+        <LoadingStateManager isLoading={true} operation="First Operation" />
+      );
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+      expect(screen.getByText('First Operation')).toBeInTheDocument();
+
+      rerender(<LoadingStateManager isLoading={false} operation="First Operation" />);
+      expect(screen.queryByText('First Operation')).not.toBeInTheDocument();
+
+      // Second load: the spinner must not appear instantly, or the anti-flicker
+      // delay only ever works once per mount.
+      rerender(<LoadingStateManager isLoading={true} operation="Second Operation" />);
+      act(() => {
+        jest.advanceTimersByTime(199);
+      });
+      expect(screen.queryByText('Second Operation')).not.toBeInTheDocument();
+
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(screen.getByText('Second Operation')).toBeInTheDocument();
+    });
+
+    it('restarts the countdown from the full estimate on the next load', () => {
+      const { rerender } = render(
+        <LoadingStateManager
+          isLoading={true}
+          operation="Test Operation"
+          estimatedTime={5000}
+          progress={50}
+        />
+      );
+      act(() => {
+        jest.advanceTimersByTime(200);
+        jest.advanceTimersByTime(3000);
+      });
+      expect(screen.getByText(/~2s remaining/i)).toBeInTheDocument();
+
+      rerender(
+        <LoadingStateManager
+          isLoading={false}
+          operation="Test Operation"
+          estimatedTime={5000}
+          progress={50}
+        />
+      );
+      rerender(
+        <LoadingStateManager
+          isLoading={true}
+          operation="Test Operation"
+          estimatedTime={5000}
+          progress={50}
+        />
+      );
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+
+      // Not ~2s: the countdown carrying over would tell the user a fresh
+      // 5-second operation has 2 seconds left.
+      expect(screen.getByText(/~5s remaining/i)).toBeInTheDocument();
+    });
+  });
 });

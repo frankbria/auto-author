@@ -87,36 +87,39 @@ export function LoadingStateManager({
   className,
   inline = false,
 }: LoadingStateManagerProps) {
-  const [visible, setVisible] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(estimatedTime);
+  // Both of these were `setState` mirrors driven by effects (#584). They are
+  // derivations of `isLoading` and `estimatedTime`, so they are computed during
+  // render instead; the effects now own only the timers, which is the part that
+  // genuinely belongs to them.
+  const [delayElapsed, setDelayElapsed] = useState(false);
+  const [countedDown, setCountedDown] = useState(0);
 
   // Delay showing the loading state to avoid flicker for very fast operations
   useEffect(() => {
-    if (isLoading) {
-      const timer = setTimeout(() => setVisible(true), 200);
-      return () => clearTimeout(timer);
-    } else {
-      setVisible(false);
-    }
+    if (!isLoading) return;
+    const timer = setTimeout(() => setDelayElapsed(true), 200);
+    return () => {
+      clearTimeout(timer);
+      // Re-arm the delay for the next load. Resetting in cleanup rather than in
+      // the body keeps `visible` false for a finished load without a second
+      // render pass, because `isLoading` alone already makes it false.
+      setDelayElapsed(false);
+    };
   }, [isLoading]);
 
   // Countdown timer for estimated time
   useEffect(() => {
-    if (!isLoading || !estimatedTime) {
-      setTimeRemaining(estimatedTime);
-      return;
-    }
-
-    setTimeRemaining(estimatedTime);
-    const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (!prev || prev <= 0) return 0;
-        return prev - 100;
-      });
-    }, 100);
-
-    return () => clearInterval(interval);
+    if (!isLoading || !estimatedTime) return;
+    const interval = setInterval(() => setCountedDown((elapsed) => elapsed + 100), 100);
+    return () => {
+      clearInterval(interval);
+      setCountedDown(0);
+    };
   }, [isLoading, estimatedTime]);
+
+  const visible = isLoading && delayElapsed;
+  const timeRemaining =
+    estimatedTime === undefined ? undefined : Math.max(estimatedTime - countedDown, 0);
 
   if (!isLoading || !visible) {
     return null;
