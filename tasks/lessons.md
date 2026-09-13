@@ -929,3 +929,21 @@ step actually reads.
 
 Before arming any watcher, ask what it prints when the thing it watches is
 broken. If the answer is "nothing", it is a timer, not a check.
+### A lint fix is a measurement, not a reading
+2026-09-13. Read `ActiveSessionsList`, saw `setLoadState('loading')` at the top
+of an async function an effect calls, saw that `loadState` already initialises to
+`'loading'` and that the only other caller is a Retry button, and wrote on the
+issue that hoisting the setter into that handler was "exact". Made the change.
+The warning stayed: `react-hooks/set-state-in-effect` flags **any** `setState`
+reachable inside an `async` callee, regardless of whether an `await` precedes it.
+The shape of the reset was never what the rule objected to.
+
+The same session's `ExportProgressModal` change — move the reset into the effect's
+cleanup — did work, and looked no more certain beforehand. The two were
+indistinguishable by reading and separated in one `npx eslint <file>`.
+
+Rules have blind spots that no amount of reasoning about intent will predict.
+Run the linter on the one file before writing the classification, not after.
+(The same probe found the blind spot's shape: converting the callee to a `.then()`
+chain silences it. That is a fix for the count, not for the code, and belongs in
+a ledger rather than in five components.)

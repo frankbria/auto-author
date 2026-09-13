@@ -66,16 +66,21 @@ export function ExportProgressModal({
 }: ExportProgressModalProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
 
-  // Track elapsed time while processing
+  // Track elapsed time while processing. The reset lives in cleanup rather than
+  // at the top of the effect (#584): `elapsedTime` is only read while the status
+  // is processing or pending, so clearing it on the way out is invisible, and it
+  // costs one render pass fewer than a synchronous setState in the effect body.
   useEffect(() => {
-    if (status === 'processing' || status === 'pending') {
-      setElapsedTime(0);
-      const interval = setInterval(() => {
-        setElapsedTime((prev) => prev + 1);
-      }, 1000);
+    if (status !== 'processing' && status !== 'pending') return;
 
-      return () => clearInterval(interval);
-    }
+    const interval = setInterval(() => {
+      setElapsedTime((prev) => prev + 1);
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      setElapsedTime(0);
+    };
   }, [status]);
 
   const formatTime = (seconds: number) => {
