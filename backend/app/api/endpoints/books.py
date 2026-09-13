@@ -1401,9 +1401,18 @@ async def update_book_toc(
             user_auth_id=current_user.get("auth_id")
         )
 
+        # Describe what was stored, not what was sent (#496). Echoing `toc_data`
+        # meant a partial update answered 200 with the partial object while the
+        # database held the merged one, so a client trusting the response then
+        # disagreed with its own next GET. Shape matches GET /toc exactly.
         return {
             "book_id": book_id,
-            "toc": toc_data,
+            "toc": {
+                "chapters": updated_toc.get("chapters", []),
+                "total_chapters": updated_toc.get("total_chapters", 0),
+                "estimated_pages": updated_toc.get("estimated_pages", 0),
+                "structure_notes": updated_toc.get("structure_notes", ""),
+            },
             "updated_at": updated_toc["updated_at"],
             "version": updated_toc["version"],
             "chapters_count": len(chapters),

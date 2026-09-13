@@ -610,3 +610,125 @@ class TestUpdateToc:
         )
         assert resp.status_code == 400
         assert "Invalid book ID format" in resp.json()["detail"]
+
+    # ----------------------------------------------------------------------- #
+    # #496: partial updates must not silently drop stored metadata
+    # ----------------------------------------------------------------------- #
+
+    @pytest.mark.asyncio
+    async def test_partial_update_preserves_omitted_metadata(
+        self, auth_client_factory
+    ):
+        """Omitting a metadata key must merge, not erase (#496).
+
+        ``_update_toc_internal`` built the new document as ``{**toc_data, ...}``,
+        so anything the caller left out was dropped rather than carried over.
+        A body of ``{"toc": {"chapters": [...]}}`` is valid and is exactly what
+        the E2E helpers send, and it silently cleared ``total_chapters``,
+        ``estimated_pages`` and ``structure_notes``. ``GET /toc`` then defaulted
+        ``total_chapters`` to 0 while returning real chapters — an internally
+        inconsistent response.
+
+        Same root pattern as #492: a missing key resolving to a destructive
+        default, here on the metadata rather than on ``chapters``.
+        """
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+
+        # A full save, the way the shipped client sends it.
+        full = {
+            "chapters": [
+                {"title": "Chapter One", "order": 1},
+                {"title": "Chapter Two", "order": 2},
+            ],
+            "total_chapters": 2,
+            "estimated_pages": 180,
+            "structure_notes": "Two-act structure.",
+        }
+        resp = await api.put(f"/api/v1/books/{book_id}/toc", json={"toc": full})
+        assert resp.status_code == 200, resp.text
+
+        # A partial save that omits every metadata field.
+        partial = {
+            "chapters": [
+                {"title": "Chapter One", "order": 1},
+                {"title": "Chapter Two", "order": 2},
+                {"title": "Chapter Three", "order": 3},
+            ]
+        }
+        resp = await api.put(f"/api/v1/books/{book_id}/toc", json={"toc": partial})
+        assert resp.status_code == 200, resp.text
+
+        stored = (await api.get(f"/api/v1/books/{book_id}/toc")).json()["toc"]
+        assert [c["title"] for c in stored["chapters"]] == [
+            "Chapter One",
+            "Chapter Two",
+            "Chapter Three",
+        ]
+        # Carried over from the full save rather than erased.
+        assert stored["estimated_pages"] == 180
+        assert stored["structure_notes"] == "Two-act structure."
+
+    @pytest.mark.asyncio
+    async def test_total_chapters_is_derived_not_trusted(self, auth_client_factory):
+        """``total_chapters`` comes from the chapter list, not from the client (#496).
+
+        Every other producer in the codebase already computes it that way
+        (``ai_service``, ``export_service``, the flat-structure chapter list, and
+        the frontend's own edit-TOC page), so trusting a client-supplied value
+        only created a way for the two to disagree.
+        """
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+
+        resp = await api.put(
+            f"/api/v1/books/{book_id}/toc",
+            json={
+                "toc": {
+                    "chapters": [
+                        {"title": "Only Chapter", "order": 1},
+                        {"title": "Second Chapter", "order": 2},
+                    ],
+                    # Deliberately wrong.
+                    "total_chapters": 99,
+                }
+            },
+        )
+        assert resp.status_code == 200, resp.text
+
+        stored = (await api.get(f"/api/v1/books/{book_id}/toc")).json()["toc"]
+        assert stored["total_chapters"] == 2
+
+    @pytest.mark.asyncio
+    async def test_put_response_agrees_with_subsequent_get(self, auth_client_factory):
+        """The PUT response must describe what was stored, not echo the request.
+
+        The handler returned ``"toc": toc_data`` — the client's own body — so a
+        partial update answered 200 with the partial object while the database
+        held the merged one. A client trusting the response then disagreed with
+        its next GET. Found while fixing #496; same inconsistency, one layer up.
+        """
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+
+        await api.put(
+            f"/api/v1/books/{book_id}/toc",
+            json={
+                "toc": {
+                    "chapters": [{"title": "Ch 1", "order": 1}],
+                    "estimated_pages": 42,
+                    "structure_notes": "Keep me.",
+                }
+            },
+        )
+
+        put_body = (
+            await api.put(
+                f"/api/v1/books/{book_id}/toc",
+                json={"toc": {"chapters": [{"title": "Ch 1", "order": 1}]}},
+            )
+        ).json()
+        get_body = (await api.get(f"/api/v1/books/{book_id}/toc")).json()
+
+        for field in ("total_chapters", "estimated_pages", "structure_notes"):
+            assert put_body["toc"][field] == get_body["toc"][field], field
