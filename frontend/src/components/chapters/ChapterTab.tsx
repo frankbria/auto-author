@@ -87,6 +87,23 @@ const UNSAVED_TAB = 'border-orange-200 dark:border-orange-700';
 // 5.91 light, 5.25-6.70 dark.
 const ERROR_ICON = 'text-red-700 dark:text-red-400';
 
+// The selected-tab edge accent, applied LAST so it survives `twMerge` (#640).
+// `cn()` is twMerge, and a generic `border-<color>` collides with a directional
+// `border-r-<color>`: with the accent applied before ERROR_TAB, its
+// `border-red-200` deleted `border-r-primary` outright and the selected edge
+// painted pale pink at 1.45:1 instead of the accent at 6.29:1 — on exactly the
+// tab a user is most likely to be in, the broken one. Ordering it after the
+// state classes keeps both: the state still owns the other three edges and the
+// card tint, the accent owns its own edge.
+//
+// The dark half is a second defect, unreported: `.dark .text-primary` is
+// overridden in globals.css but `.dark .border-primary` is NOT, so the accent
+// stayed theme-fixed brand indigo on dark surfaces — 2.85:1 on `--card` and
+// 2.41:1 on `--muted`, under 1.4.11's 3:1. The same trap #635 hit. indigo-400
+// takes it to 5.07-6.64, and 4.87-6.21 over the errored dark card.
+const ACTIVE_ACCENT_VERTICAL = 'border-r-2 border-r-primary dark:border-r-indigo-400';
+const ACTIVE_ACCENT_HORIZONTAL = 'border-b-2 border-b-primary dark:border-b-indigo-400';
+
 export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
   ({ chapter, isActive, isDragging, onSelect, onClose, orientation = 'vertical', ...props }, ref) => {
     const config = statusConfig[chapter.status];
@@ -112,13 +129,16 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
                 ? "px-3 py-2 border-r min-w-0 max-w-[200px]"
                 : "px-3 py-3 w-full min-h-[48px]",
               isActive
-                ? orientation === 'horizontal'
-                  ? "bg-background border-b-2 border-b-primary text-foreground"
-                  : "bg-background border-r-2 border-r-primary text-foreground"
+                ? "bg-background text-foreground"
                 : "bg-muted hover:bg-background text-muted-foreground hover:text-foreground",
               isDragging && "opacity-50",
               chapter.error && ERROR_TAB,
-              chapter.has_unsaved_changes && UNSAVED_TAB
+              chapter.has_unsaved_changes && UNSAVED_TAB,
+              // After the state classes, deliberately — see ACTIVE_ACCENT_* (#640).
+              isActive &&
+                (orientation === 'horizontal'
+                  ? ACTIVE_ACCENT_HORIZONTAL
+                  : ACTIVE_ACCENT_VERTICAL)
             )}
             onClick={onSelect}
             onKeyDown={(e) => {
