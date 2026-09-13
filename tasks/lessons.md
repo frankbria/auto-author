@@ -819,3 +819,72 @@ The finding was right and the fix was necessary; the escape route was already
 closed. Reproduce the scenario before repeating it in a commit message — an
 overstated failure mode published as fact is the same error the finding was
 about.
+
+### Writing the rule down is not the same as following it
+2026-09-12. Installed a live rule (`verified-reverts.md`) that says: commit
+before mutating, because `git checkout HEAD --` cannot restore an *uncommitted*
+file. Then skipped it twice in the same session — in #613 and #661 — both times
+on a brand-new guard script. The revert silently did nothing, the broken
+mutation persisted into the next check, and the only reason it surfaced was
+re-running the gate rather than trusting the revert message.
+
+The operational form that actually works: **commit the new file first, then
+mutate**, and treat "the revert printed nothing" as unverified until
+`git diff --quiet HEAD -- <path>` says so. A revert that cannot fail is not a
+revert. Assert it every time, including — especially — for files created minutes
+ago, which is exactly when it feels unnecessary.
+
+### `pkill -f` / `pgrep -f` match the shell that runs them
+2026-09-12, twice in one session, both `exit 144` with the invoking Bash call
+killed mid-script so the *rest* of the command never ran. `pgrep -f "next dev"`
+matches its own command line. The bracket trick (`next[-]server`) helps for the
+literal being searched but not for a pattern that appears elsewhere in the same
+line. Use a captured PID (`echo $! > file`), or find the listener by port with
+`ss -ltnp`. The failure is worse than it looks: the shell dies silently
+part-way, so a later step reports on a mutation that never happened.
+
+### Build the ledger with the guard's own matcher, never a convenience grep
+2026-09-12, #661. Generated a ledger of duplicated changelog dates with
+`grep -oE "^### [0-9]{4}-..."` — a prefix match — while the guard used an
+anchored `\s*$` regex. It listed 13 dates where the guard saw 11; the extra two
+were `### 2026-07-21 (evening)` and similar, an existing deliberate convention
+for splitting a busy day. Four false rows, in a ledger whose whole purpose is to
+be trusted. Generate the ledger by calling the same function the guard calls —
+if that is awkward, the guard's matcher is not reusable enough yet.
+
+### An issue's numbers age; its premise can rot entirely
+2026-09-12. Four issues in one batch had premises that did not survive checking:
+#630 and #638 described defects in components **no module imports** (one never
+imported in any commit); #640 quoted a contrast figure that had already been
+retracted in #634 and transposed two others; #613's "vacuous helpers" turned out
+to be called by no spec at all while the live suite was fine. In every case the
+defect class was real and the specific claim was not.
+
+Re-derive the measurement and re-check the consumer list before implementing,
+even when the issue is recent, detailed, and written by someone who was right
+about the class. Especially then: a confident, specific issue is the one you are
+least likely to re-measure.
+
+### `git reset --hard` on a tidy-up discards config you forgot was uncommitted
+2026-09-12, the same session as the entry above, and worse than it. Used
+`git reset --hard origin/main` to clean up a local `main` that had briefly
+carried a commit by mistake. That silently destroyed several hours of
+uncommitted `.claude/settings.json` work — seeded permissions, a dead-config
+removal, a plugin enablement — none of which was the subject of the tidy-up, and
+all of which was invisible in the command. The untracked rule files beside it
+survived only because `reset --hard` leaves untracked files alone, which is luck,
+not design.
+
+Two habits, neither of which I had:
+- Before any `reset --hard` / `checkout --` / `clean`, run `git status` and read
+  it as a **list of things about to be lost**, not as noise to scroll past. A
+  file modified hours ago and unrelated to the current task is the likeliest
+  casualty, because it has stopped registering as "work in progress".
+- Fix a branch mix-up with the narrowest tool: `git branch <name>` then
+  `git reset --hard` **only** once you have confirmed nothing else is pending, or
+  better, `git branch -f` and switch away without resetting at all.
+
+This is the third instance in one session of the same family — knowing a rule
+about destructive git operations, having written it down, and then reaching for
+the destructive command anyway. The pattern is that the rule fires when the
+operation *feels* risky, and these all felt like tidying.
