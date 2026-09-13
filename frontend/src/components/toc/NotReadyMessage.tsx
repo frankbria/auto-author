@@ -107,7 +107,8 @@ export default function NotReadyMessage({ readiness, onRetry, bookId }: NotReady
         <button
           onClick={handleAnalyzeSummary}
           disabled={isAnalyzing}
-          className="flex-1 px-6 py-3 bg-green-700 hover:bg-green-800 disabled:bg-green-800 disabled:opacity-50 text-white font-medium rounded-md transition-colors"
+          aria-busy={isAnalyzing || undefined}
+              className="flex-1 px-6 py-3 bg-green-700 hover:bg-green-800 disabled:bg-green-800 text-white font-medium rounded-md transition-colors"
         >
           {isAnalyzing ? 'Analyzing...' : 'Re-analyze Summary'}
         </button>
