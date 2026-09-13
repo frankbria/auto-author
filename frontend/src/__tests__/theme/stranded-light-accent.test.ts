@@ -111,20 +111,47 @@ function classRuns(line: string): string[] {
  * together — and is the right way round. A false green ships the bug; no shipped
  * file has that shape today (`TocSidebar.tsx:38` keeps its pair in one run).
  */
+/** A variant chain as a comparable key, with `dark` removed. `""` = resting state. */
+function stateKey(variants: string): string {
+  return variants
+    .split(':')
+    .filter((v) => v && v !== 'dark')
+    .sort()
+    .join('|');
+}
+
+/** Every `dark:`-prefixed colour utility in a run, as `property-hue → stateKey[]`. */
+function darkCounterparts(run: string): Map<string, string[]> {
+  const found = new Map<string, string[]>();
+  const ANY_COLOUR = new RegExp(
+    `((?:[a-z0-9.\\[\\]-]+:)*)(${PROPS})-(?!${NEUTRAL})([a-z]+)-\\d+`,
+    'g'
+  );
+  for (const [, variants, property, hue] of run.matchAll(ANY_COLOUR)) {
+    if (!variants.split(':').includes('dark')) continue;
+    const key = `${property}-${hue}`;
+    found.set(key, [...(found.get(key) ?? []), stateKey(variants)]);
+  }
+  return found;
+}
+
 export function strandedAccents(source: string): string[] {
   return source.split('\n').flatMap((line) => {
     if (IS_COMMENT.test(line)) return [];
-    return classRuns(line).flatMap((run) =>
-      [...run.matchAll(PALE_FOREGROUND)]
+    return classRuns(line).flatMap((run) => {
+      const counterparts = darkCounterparts(run);
+      return [...run.matchAll(PALE_FOREGROUND)]
         .filter(([, variants]) => !variants.split(':').includes('dark'))
-        .filter(([, , , property, hue]) => {
-          const paired = new RegExp(
-            `(?:[a-z0-9.\\[\\]-]+:)*dark:(?:[a-z0-9.\\[\\]-]+:)*${property}-${hue}-`
-          );
-          return !paired.test(run);
+        .filter(([, variants, , property, hue]) => {
+          // The counterpart must apply in the SAME state. `text-red-400
+          // dark:hover:text-red-700` leaves the resting colour with no dark
+          // replacement in its actual state, and `hover:text-indigo-400
+          // dark:focus:…` likewise — both reported clean before this check.
+          const states = counterparts.get(`${property}-${hue}`) ?? [];
+          return !states.includes(stateKey(variants));
         })
-        .map(([, , utility]) => utility)
-    );
+        .map(([, , utility]) => utility);
+    });
   });
 }
 
@@ -193,6 +220,24 @@ describe('no stranded pale accents in shipped source (#637)', () => {
     // Whole variant chain is read, either order.
     expect(strandedAccents('className="hover:dark:text-red-400"')).toEqual([]);
     expect(strandedAccents('className="dark:hover:text-red-400"')).toEqual([]);
+
+    // The counterpart must apply in the SAME state (found by codex review).
+    // A dark: class in a *different* state leaves the pale colour with no
+    // replacement where it actually paints. Both of these were clean before.
+    expect(strandedAccents('className="text-red-400 dark:hover:text-red-700"')).toEqual([
+      'text-red-400',
+    ]);
+    expect(
+      strandedAccents('className="hover:text-indigo-400 dark:focus:text-indigo-700"')
+    ).toEqual(['text-indigo-400']);
+    // ...and the matching-state pair still clears, in either order. This is the
+    // shape of this PR's own edit-toc fix.
+    expect(
+      strandedAccents('className="hover:text-indigo-400 dark:hover:text-indigo-700"')
+    ).toEqual([]);
+    expect(
+      strandedAccents('className="hover:text-indigo-400 hover:dark:text-indigo-700"')
+    ).toEqual([]);
     // A non-dark variant does NOT exempt it — a hover-only pale accent is still
     // stranded, which is exactly what edit-toc/page.tsx:471 was.
     expect(strandedAccents('className="hover:text-indigo-400"')).toEqual([
