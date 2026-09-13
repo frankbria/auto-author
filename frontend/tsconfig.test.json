@@ -1,0 +1,12 @@
+{
+  "//": "#625. `tsconfig.json` excludes every test-shaped path, so `npm run typecheck` sees zero of the ~170 test files — and jest transpiles through next/jest's SWC, which strips types WITHOUT checking them. A guard with a type error is a guard that may not be guarding. This config is the same compiler settings over the files the base one drops.",
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ]
+}

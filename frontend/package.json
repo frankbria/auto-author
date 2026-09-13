@@ -20,7 +20,8 @@
     "test:e2e:staging:ui": "playwright test --config=tests/e2e/staging/playwright.config.ts --ui",
     "test:e2e:staging:headed": "playwright test --config=tests/e2e/staging/playwright.config.ts --headed",
     "test:e2e:staging:debug": "playwright test --config=tests/e2e/staging/playwright.config.ts --debug",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "node scripts/typecheck-tests.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
