@@ -2,7 +2,7 @@
 
 import { logger } from '@/lib/logger';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -53,6 +53,21 @@ import {
   ChapterBackup,
 } from '@/lib/storage/dataValidator';
 
+type ChapterView = 'questions' | 'editor';
+
+// sessionStorage raises no event for writes in the same tab, and the only writer
+// is this component's own handler, which re-renders anyway.
+const subscribeToNothing = () => () => {};
+
+function readSavedView(key: string): ChapterView {
+  try {
+    return sessionStorage.getItem(key) === 'questions' ? 'questions' : 'editor';
+  } catch {
+    // Storage can be unavailable (privacy modes); the writing view is the default.
+    return 'editor';
+  }
+}
+
 interface ChapterEditorProps {
   bookId: string;
   chapterId: string;
@@ -97,16 +112,23 @@ export function ChapterEditor({
   // Default is the writing view (matches shipped UX + editor-focused unit tests); the
   // last choice is remembered per chapter in sessionStorage.
   const viewStorageKey = `chapterQuestionsTab_${bookId}_${chapterId}`;
-  // Default to the writing view. The saved per-chapter choice is restored in the
-  // effect below (not the initializer) so it (a) re-runs when this editor is
-  // reused for a different chapter — TabContent renders it without a key — and
-  // (b) can't cause an SSR hydration mismatch.
-  const [view, setView] = useState<'questions' | 'editor'>('editor');
+  // The saved per-chapter choice is read, not copied into state by an effect
+  // (#584). The server snapshot is the writing view, so hydration still matches,
+  // and a new key re-reads storage when TabContent reuses this editor (it renders
+  // it without a key) for another chapter. A choice made here is tagged with its
+  // chapter for the same reason, and wins even if persisting it failed.
+  const savedView = useSyncExternalStore(
+    subscribeToNothing,
+    () => readSavedView(viewStorageKey),
+    () => 'editor' as const
+  );
+  const [chosenView, setChosenView] = useState<{ key: string; view: ChapterView } | null>(null);
+  const view = chosenView?.key === viewStorageKey ? chosenView.view : savedView;
 
   const handleViewChange = useCallback(
     (next: string) => {
       if (next !== 'questions' && next !== 'editor') return;
-      setView(next);
+      setChosenView({ key: viewStorageKey, view: next });
       if (typeof window !== 'undefined') {
         try {
           sessionStorage.setItem(viewStorageKey, next);
@@ -117,17 +139,6 @@ export function ChapterEditor({
     },
     [viewStorageKey]
   );
-
-  // Restore (or reset) the tab whenever the chapter changes.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const saved = sessionStorage.getItem(viewStorageKey);
-      setView(saved === 'questions' || saved === 'editor' ? saved : 'editor');
-    } catch {
-      setView('editor');
-    }
-  }, [viewStorageKey]);
 
   // Keyboard access to the tabs is Radix's native arrow-key roving (WCAG tab
   // pattern) plus clicking. Ctrl+digit is intentionally NOT bound here — it is
