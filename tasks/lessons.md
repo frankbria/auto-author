@@ -1100,3 +1100,19 @@ new guard **builds the stylesheet** and asserts each class appears in it.
 Generalises past Tailwind: whenever a guard checks an *input* to a generator —
 a config, a template, a schema — ask what it would take for the generator to
 produce nothing from a valid-looking input, and check the output instead.
+
+### One flag, two jobs: check the other writers before trusting the initial value
+2026-09-13, #584. A `setIsLoading(true)` at the top of a mount effect is the
+textbook case for "initialise the state to its real initial value instead".
+Probed it, the warning cleared, the suite stayed green.
+
+Then read the other `setIsLoading` call sites: the same flag is the **submit
+button's** label. Starting it `true` opens the page with the button reading
+**"Saving..."** before anything has been saved. No test covered it, so nothing
+would have failed.
+
+The generalisation is not about React. When a change hinges on a variable's
+*initial value*, the question is not "is this value correct at mount" but "how
+many distinct things does this variable mean". Grep every writer and every
+reader first; a flag serving two jobs has no single correct initial value, and
+the fix is to split it rather than to pick one.

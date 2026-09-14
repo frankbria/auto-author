@@ -55,11 +55,6 @@
       "rules": {
         "react-hooks/set-state-in-effect": 1
       }
-    },
-    "src/components/toc/ClarifyingQuestions.tsx": {
-      "rules": {
-        "react-hooks/set-state-in-effect": 1
-      }
     }
   }
 }
