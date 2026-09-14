@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BookSummaryPage from '../page';
 import bookClient from '@/lib/api/bookClient';
 import { SUMMARY_MIN_WORDS, SUMMARY_MIN_CHARACTERS } from '@/lib/constants/summary-readiness';
@@ -123,6 +123,9 @@ describe('BookSummaryPage — readiness gate (#218)', () => {
     try {
       render(<BookSummaryPage />);
       typeSummary('too short to submit');
+      // Auto-save waits for the summary load to settle, so a stored draft is not
+      // erased on mount (#718). Text typed before then is still saved once it has.
+      await act(async () => {});
       jest.advanceTimersByTime(1000);
       await waitFor(() =>
         expect(mockClient.saveBookSummary).toHaveBeenCalledWith('book-1', 'too short to submit')
