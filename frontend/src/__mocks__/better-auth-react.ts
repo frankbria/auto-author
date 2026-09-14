@@ -1,5 +1,13 @@
 // Mock for better-auth/react
-export const useSession = jest.fn(() => ({
+//
+// This is the useSession components actually get: `@/lib/auth-client` is not
+// replaced by jest.mock factories in this setup (the one in jest.setup.ts
+// included), so it builds its client from this module, via moduleNameMapper.
+//
+// One result object for every call. better-auth keeps `data` referentially
+// stable between renders, and components list `session` in effect and callback
+// deps; a fresh object per call made the book page refetch in a loop (#584).
+const sessionResult = {
   data: {
     user: {
       id: 'test-user-id',
@@ -16,7 +24,8 @@ export const useSession = jest.fn(() => ({
   },
   isPending: false,
   error: null,
-}));
+};
+export const useSession = jest.fn(() => sessionResult);
 
 // Export mock functions for password reset so tests can access and configure them
 export const mockRequestPasswordReset = jest.fn().mockResolvedValue({
