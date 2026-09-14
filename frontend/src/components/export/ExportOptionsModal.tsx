@@ -71,10 +71,30 @@ export function ExportOptionsModal({
   const [markdownMultiFile, setMarkdownMultiFile] = useState(false);
 
   // Pre-select the user's stored export defaults (#64) until they interact.
+  //
+  // `optionsTouchedRef` guards the *first* arrival only (#693). Preferences load
+  // asynchronously, so without it a user who picks a format in the first moment
+  // after opening would have it overwritten when they arrive. It used to guard
+  // every arrival, and since it is never reset and this component never unmounts
+  // — `books/[bookId]/page.tsx` renders it unconditionally — one touch disabled
+  // the defaults for the life of the page. Changing the default in Settings then
+  // did nothing until a reload, which #674 made reachable by giving
+  // `useUserPreferences` real subscribers.
+  //
+  // A later change is therefore always applied: it can only come from the user
+  // saving new preferences, which is a deliberate act that should win over a
+  // stale ad-hoc choice. Reopening the modal keeps the last choice, because
+  // nothing here resets it.
   const userPreferences = useUserPreferences();
   const optionsTouchedRef = useRef(false);
+  const hasAppliedPreferencesRef = useRef(false);
   useEffect(() => {
-    if (!userPreferences || optionsTouchedRef.current) return;
+    if (!userPreferences) return;
+
+    const isFirstArrival = !hasAppliedPreferencesRef.current;
+    hasAppliedPreferencesRef.current = true;
+    if (isFirstArrival && optionsTouchedRef.current) return;
+
     if (userPreferences.default_export_format) {
       setFormat(userPreferences.default_export_format);
     }
