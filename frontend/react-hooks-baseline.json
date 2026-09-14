@@ -23,7 +23,7 @@
     },
     "src/app/dashboard/settings/page.tsx": {
       "rules": {
-        "react-hooks/set-state-in-effect": 2
+        "react-hooks/set-state-in-effect": 1
       }
     },
     "src/app/page.tsx": {

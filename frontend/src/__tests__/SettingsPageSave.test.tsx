@@ -319,4 +319,27 @@ describe('SettingsPage', () => {
       expect(screen.getByRole('button', { name: /save settings/i })).toBeEnabled()
     );
   });
+  it('shows the loading state, not the error, while a retry is in flight (#584)', async () => {
+    // Retry is the only path from error back to loading; that used to be a
+    // synchronous setState in the loader. This pins what the page shows meanwhile.
+    mockAuthFetch.mockRejectedValueOnce(new Error('load failed'));
+    let resolveRetry: (profile: ReturnType<typeof loadedProfile>) => void = () => {};
+    mockAuthFetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRetry = resolve;
+      })
+    );
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /loading/i })).toBeDisabled());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    resolveRetry(loadedProfile({}));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /save settings/i })).toBeEnabled()
+    );
+  });
 });
