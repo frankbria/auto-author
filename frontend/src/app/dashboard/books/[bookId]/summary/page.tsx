@@ -27,10 +27,14 @@ export default function BookSummaryPage() {
   // submit button — so while the page was *loading* the summary, its button
   // already read "Saving...", before anything had been saved.
   //
-  // `summaryLoaded` is the raw fact the effect learns. "Still loading" is derived
-  // from it, which also covers the no-bookId case (nothing to load, so nothing to
-  // wait for) without an effect having to announce it.
-  const [summaryLoaded, setSummaryLoaded] = useState(false);
+  // `loadedFor` is the raw fact the effect learns: which book's load settled.
+  // "Still loading" is derived from it, which also covers the no-bookId case
+  // (nothing to load, so nothing to wait for) without an effect having to
+  // announce it. Keyed by book rather than a boolean, so the render that switches
+  // books already reads as not loaded; a boolean reset in the effect cleanup
+  // arrived one render late and let auto-save erase the next book's draft (#718).
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const summaryLoaded = loadedFor === bookId;
   const [isSaving, setIsSaving] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
@@ -85,14 +89,10 @@ export default function BookSummaryPage() {
         if (local) setSummary(local);
       })
       .finally(() => {
-        if (!ignore) setSummaryLoaded(true);
+        if (!ignore) setLoadedFor(bookId);
       });
-    // Re-enter the loading state for the next book: the app router keeps this
-    // component mounted across a `[bookId]` change, so without this the new
-    // book's form would render the previous one's summary as though loaded.
     return () => {
       ignore = true;
-      setSummaryLoaded(false);
     };
   }, [bookId]);
 
