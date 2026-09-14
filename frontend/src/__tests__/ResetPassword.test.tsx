@@ -72,7 +72,25 @@ describe("ResetPasswordPage", () => {
     mockSearchParams.delete("token");
     render(<ResetPasswordPage />);
 
-    expect(screen.getByText(/invalid reset link/i)).toBeInTheDocument();
+    // The page title is "Invalid Reset Link" in every invalid state, so matching
+    // /invalid reset link/ here passed whatever the description said (#584).
+    expect(screen.getByText("This reset link has expired. Please request a new one")).toBeInTheDocument();
+  });
+
+  it("describes an unrecognised URL error code generically", () => {
+    mockSearchParams.set("error", "SOMETHING_ELSE");
+    render(<ResetPasswordPage />);
+
+    expect(screen.getByText("Invalid reset link. Please request a new one")).toBeInTheDocument();
+    // An error code in the URL makes the link invalid even with a token present.
+    expect(screen.queryByLabelText("New Password")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the generic description when there is no URL error", () => {
+    mockSearchParams.delete("token");
+    render(<ResetPasswordPage />);
+
+    expect(screen.getByText("This password reset link is invalid or has expired")).toBeInTheDocument();
   });
 
   it("shows password requirements", () => {

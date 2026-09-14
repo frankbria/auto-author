@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense, useEffect } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,20 @@ import {
 } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 
+// Describes an `?error=` code from the reset link. Derived during render rather
+// than copied into the form's error state by an effect (#584): with an error in
+// the URL the form never renders, so this is the only message that page shows.
+function describeUrlError(urlError: string | null): string {
+  if (!urlError) return "";
+  if (urlError === "INVALID_TOKEN" || urlError === "invalid_token") {
+    return "This reset link is invalid. Please request a new one";
+  }
+  if (urlError === "EXPIRED_TOKEN" || urlError === "expired_token") {
+    return "This reset link has expired. Please request a new one";
+  }
+  return "Invalid reset link. Please request a new one";
+}
+
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,19 +56,6 @@ function ResetPasswordForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-
-  // Handle URL error parameter (invalid/expired token)
-  useEffect(() => {
-    if (urlError) {
-      if (urlError === "INVALID_TOKEN" || urlError === "invalid_token") {
-        setError("This reset link is invalid. Please request a new one");
-      } else if (urlError === "EXPIRED_TOKEN" || urlError === "expired_token") {
-        setError("This reset link has expired. Please request a new one");
-      } else {
-        setError("Invalid reset link. Please request a new one");
-      }
-    }
-  }, [urlError]);
 
   // Check for missing token
   const hasValidToken = token && !urlError;
@@ -168,7 +169,7 @@ function ResetPasswordForm() {
             </div>
             <CardTitle className="text-2xl">Invalid Reset Link</CardTitle>
             <CardDescription className="mt-2">
-              {error || "This password reset link is invalid or has expired"}
+              {describeUrlError(urlError) || "This password reset link is invalid or has expired"}
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex flex-col space-y-4">
