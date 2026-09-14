@@ -53,9 +53,9 @@ default `error`, so a new violation fails `npm run lint` like any other error. T
 `gate:react-hooks` that held the backlog while they were at `warn` (#675) were deleted when it
 reached zero.
 
-Four effects carry an `eslint-disable-next-line react-hooks/set-state-in-effect`, each with the
-reason on the line above: the landing-page auth latch, the ChapterEditor → TipTap sync, the settings
-page's `?checkout=` landing tab, and the summary draft restore (kept pending #718). **A new
+Three effects carry an `eslint-disable-next-line react-hooks/set-state-in-effect`, each with the
+reason on the line above: the landing-page auth latch, the ChapterEditor → TipTap sync, and the
+settings page's `?checkout=` landing tab. (A fourth, the summary draft restore, was removed by #718.) **A new
 disable needs the same standard**: name the external system or constraint that makes the effect
 correct. For a value that could be computed during render, derive it instead.
 

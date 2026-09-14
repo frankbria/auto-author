@@ -48,26 +48,59 @@ export default function BookSummaryPage() {
   // function of `summary`, so storing it cost an extra render pass on every
   // keystroke and could show a stale error for one frame.
 
+  // Which copy of the summary wins (#718). The server copy is the source of
+  // truth and replaces the field when it loads, except over anything the user
+  // typed while it was loading. The localStorage draft is the fallback when the
+  // load fails. A book change starts from that book's state: the app router keeps
+  // this page mounted across `[bookId]`, so the previous book's text is cleared
+  // during render rather than shown, or saved, under the next book.
+  const userEditedRef = useRef(false);
+  const editSummary = (next: string | ((prev: string) => string)) => {
+    userEditedRef.current = true;
+    setSummary(next);
+  };
+  const [summaryFor, setSummaryFor] = useState(bookId);
+  if (summaryFor !== bookId) {
+    setSummaryFor(bookId);
+    setSummary('');
+    setSummaryHistory([]);
+  }
+
   // Load summary and history from remote on mount
   useEffect(() => {
     if (!bookId) return;
+    let ignore = false;
+    userEditedRef.current = false;
+    lastSaved.current = '';
     bookClient.getBookSummary(bookId)
       .then((data) => {
-        setSummary(data.summary || '');
+        if (ignore) return;
         setSummaryHistory(data.summary_history || []);
         lastSaved.current = data.summary || '';
+        if (!userEditedRef.current) setSummary(data.summary || '');
       })
-      .catch(() => {})
-      .finally(() => setSummaryLoaded(true));
+      .catch(() => {
+        if (ignore || userEditedRef.current) return;
+        const local = localStorage.getItem(`book-summary-${bookId}`);
+        if (local) setSummary(local);
+      })
+      .finally(() => {
+        if (!ignore) setSummaryLoaded(true);
+      });
     // Re-enter the loading state for the next book: the app router keeps this
     // component mounted across a `[bookId]` change, so without this the new
     // book's form would render the previous one's summary as though loaded.
-    return () => setSummaryLoaded(false);
+    return () => {
+      ignore = true;
+      setSummaryLoaded(false);
+    };
   }, [bookId]);
 
-  // Auto-save to localStorage and remote (debounced)
+  // Auto-save to localStorage and remote (debounced). Not before the load has
+  // settled: on mount `summary` is still empty, and writing it would erase the
+  // stored draft before a failed load could fall back to it (#718).
   useEffect(() => {
-    if (!bookId) return;
+    if (!bookId || !summaryLoaded) return;
     // Save to localStorage
     localStorage.setItem(`book-summary-${bookId}`, summary);
     // Debounce remote save
@@ -84,19 +117,7 @@ export default function BookSummaryPage() {
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
-  }, [summary, bookId]);
-
-  // Restore from localStorage if available (for offline/refresh)
-  useEffect(() => {
-    if (!bookId) return;
-    const local = localStorage.getItem(`book-summary-${bookId}`);
-    // Deliberately kept (#584): this restore races the server fetch and the user
-    // for the same field, and which should win is undecided — tracked in #718.
-    // Changing it inside a lint fix would pick an answer silently.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (local && !summary) setSummary(local);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookId]);
+  }, [summary, bookId, summaryLoaded]);
 
   // Derived, not stored: with no book there is nothing to load, so nothing to
   // wait for, and the effect never has to say so.
@@ -154,7 +175,7 @@ export default function BookSummaryPage() {
       }
       setInterimTranscript(interim);
       if (transcript) {
-        setSummary(prev => (prev ? prev + ' ' : '') + transcript.trim());
+        editSummary(prev => (prev ? prev + ' ' : '') + transcript.trim());
       }
     };
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -192,7 +213,7 @@ export default function BookSummaryPage() {
   const handleRevert = (revIdx: number) => {
     const rev = summaryHistory[revIdx] as Revision;
     if (rev && typeof rev.summary === 'string') {
-      setSummary(rev.summary);
+      editSummary(rev.summary);
     }
   };
 
@@ -278,7 +299,7 @@ export default function BookSummaryPage() {
             <textarea
               id="summary"
               value={summary}
-              onChange={(e) => setSummary(e.target.value)}
+              onChange={(e) => editSummary(e.target.value)}
               rows={10}
               className="w-full bg-background border border-border rounded-md py-2 px-3 text-foreground"
               placeholder="Describe your book's main concepts, structure, and key points that should be organized into chapters..."
