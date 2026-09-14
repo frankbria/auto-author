@@ -106,11 +106,13 @@ export default function BookSummaryPage() {
     };
   }, [bookId, loadKey]);
 
-  // Auto-save to localStorage and remote (debounced). Not before the load has
-  // settled: on mount `summary` is still empty, and writing it would erase the
-  // stored draft before a failed load could fall back to it (#718).
+  // Auto-save to localStorage and remote (debounced). Not the untouched field
+  // before the load settles: on mount `summary` is still empty, and writing it
+  // would erase the stored draft before a failed load could fall back to it. An
+  // edit made during the load is saved at once, or a refresh mid-load loses it
+  // (#718).
   useEffect(() => {
-    if (!bookId || !summaryLoaded) return;
+    if (!bookId || (!summaryLoaded && !userEditedRef.current)) return;
     // Save to localStorage
     localStorage.setItem(`book-summary-${bookId}`, summary);
     // Debounce remote save

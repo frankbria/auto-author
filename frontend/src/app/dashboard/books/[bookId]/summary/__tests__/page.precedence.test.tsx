@@ -63,6 +63,18 @@ describe('BookSummaryPage summary precedence (#718)', () => {
     expect(field()).toHaveValue('Typed during the load');
   });
 
+  it('stores what the user types locally even while the load is still pending', async () => {
+    // From the fourth pre-PR review: waiting for the load before auto-saving
+    // stops the empty mount-time write, but an edit made during a slow load must
+    // still reach localStorage, or a refresh mid-load loses it.
+    mockedClient.getBookSummary.mockReturnValue(new Promise<SummaryResponse>(() => {}));
+    render(<BookSummaryPage />);
+
+    fireEvent.change(field(), { target: { value: 'Typed while it loads' } });
+
+    await waitFor(() => expect(localStorage.getItem('book-summary-book-1')).toBe('Typed while it loads'));
+  });
+
   it('shows the server copy when it loads, even with a local draft stored', async () => {
     localStorage.setItem('book-summary-book-1', 'Old local draft');
     mockedClient.getBookSummary.mockResolvedValue({ summary: 'Server copy', summary_history: [] } as SummaryResponse);
