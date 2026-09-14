@@ -1133,3 +1133,28 @@ same as running it. The frontend gate list is `lint`, `typecheck`,
 `typecheck:tests`, `gate:react-hooks`, `check:specs`, `jest` — **adding a test
 file makes `typecheck:tests` load-bearing**, and that is the case where it is
 easiest to forget, because the change "is only a test".
+
+### A codemod rewrites guard fixtures and English along with markup
+2026-09-13, #513. Measured `@tailwindcss/upgrade` in a throwaway worktree before
+trusting it. Its class renames in shipped source were correct. It also rewrote
+the **guard tests**, and could not tell a class used in markup from a class that
+is *the input a guard is testing*, or from an English word:
+
+- `hover:dark:bg-red-800/70` → `dark:hover:bg-red-800/70` inside three guards'
+  fixtures. Those fixtures exist to prove a `dark:` **buried after another
+  variant** is still caught. Normalising it moves `dark:` to the front — the easy
+  case — so each guard silently lost the harder half of its coverage and would
+  have stayed green through a regression on exactly that shape.
+- "every animate-spin **ring** clears WCAG" → "ring-3". The word, not the class.
+
+It also silently repainted the brand: it ported `--color-primary` correctly into
+a new `@theme {}` block but left a pre-existing `@theme inline {}` block that set
+it later, so the later one won and every `bg-primary` went near-black. The tool's
+one *loud* failure (an invalid `@utility` name) was the least harmful of its
+four mistakes.
+
+Before running any codemod over a repo with guard tests, **exclude the test tree
+and review test edits by hand**. A fixture string is data describing a case, not
+code to modernise, and a tool that normalises it deletes the case. And diff the
+built output, not the source: the repaint was invisible in the stylesheet diff
+and obvious in one `grep` of the generated CSS.
