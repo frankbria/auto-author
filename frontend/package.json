@@ -58,7 +58,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "date-fns": "^4.4.0",
-    "dompurify": "^3.4.14",
+    "dompurify": "^3.4.15",
     "lodash.debounce": "^4.0.8",
     "mongodb": "^7.6.0",
     "next": "^16.3.4",
