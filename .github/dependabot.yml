@@ -51,8 +51,9 @@ updates:
       # tailwindcss, @tailwindcss/* and postcss are dev-classified and still reach
       # users: they generate the CSS bundle in every build. Under v4 (#513)
       # `tailwindcss` and `@tailwindcss/postcss` must also move in lockstep.
-      # `dependency-type` names a manifest section, not a blast radius. Listing them first and excluding
-      # them from frontend-dev below keeps their majors out of a batch (#555) —
+      # `dependency-type` names a manifest section, not a blast radius. Listing
+      # them first and excluding them from frontend-dev below keeps their majors
+      # out of a batch (#555) —
       # tailwindcss 3 -> 4 rode into #548 on the same footing as an eslint bump —
       # while their minor/patch bumps still batch instead of arriving one by one.
       frontend-build:
