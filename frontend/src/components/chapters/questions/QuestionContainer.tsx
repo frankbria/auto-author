@@ -42,7 +42,9 @@ export default function QuestionContainer({
   // State
   const [questions, setQuestions] = useState<Question[]>([]);
   const [cachedQuestions, setCachedQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Set by the retry path, which reloads from a handler. The per-chapter load is
+  // tracked by `loadedFor` below and derived, not flagged from an effect (#584).
+  const [manualLoading, setManualLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
@@ -67,80 +69,115 @@ export default function QuestionContainer({
     maxDelay: 30000,
   }));
 
-  // Fetch questions with retry logic and stale-while-revalidate
-  // Declared before fetchQuestions, which calls it (#584,
-  // react-hooks/immutability). With the order reversed the call sat in the
-  // binding's temporal dead zone — it worked because the call happens inside an
-  // async body that runs later, but the earlier access cannot see a later
-  // redefinition of the value.
-  const fetchProgress = async () => {
+  // The container is reused across chapters, so every load is for a chapter key,
+  // and a response that arrives after the chapter changed is dropped: answers are
+  // saved against the question ids on screen (#584). `loadedFor` records which
+  // chapter's initial load has settled; until the current one has, it is loading.
+  const chapterKey = `${bookId}:${chapterId}`;
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const loading = manualLoading || loadedFor !== chapterKey;
+  // A new chapter starts without the previous chapter's error, as each load did
+  // when it began. Adjusted during render, not in an effect.
+  const [errorFor, setErrorFor] = useState(chapterKey);
+  if (errorFor !== chapterKey) {
+    setErrorFor(chapterKey);
+    setError(null);
+  }
+
+  // Declared before the loaders that call it (#584, react-hooks/immutability).
+  const fetchProgress = async (isCurrent: () => boolean = () => true) => {
     try {
       const progressData = await bookClient.getChapterQuestionProgress(bookId, chapterId);
-      setProgress(progressData);
+      if (isCurrent()) setProgress(progressData);
     } catch (err) {
       console.error('Error fetching progress:', err);
     }
   };
 
+  const applyQuestions = async (questionsLoaded: Question[], isCurrent: () => boolean) => {
+    if (questionsLoaded.length > 0) {
+      setQuestions(questionsLoaded);
+      setCachedQuestions(questionsLoaded);
+      await fetchProgress(isCurrent);
+    }
+    if (!isCurrent()) return;
+    setError(null);
+    setErrorType(null);
+  };
 
+  const reportQuestionsError = (err: unknown) => {
+    console.error('Error fetching questions:', err);
+    const errType = classifyError(err);
+    setErrorType(errType);
+
+    // Provide actionable error messages
+    let errorMessage = 'Failed to load questions.';
+    if (errType === ErrorType.NETWORK) {
+      errorMessage = 'Network error. Please check your connection.';
+      // Use cached questions if available (stale-while-revalidate)
+      if (cachedQuestions.length > 0) {
+        setQuestions(cachedQuestions);
+        errorMessage += ' Showing cached questions.';
+      }
+    } else if (errType === ErrorType.AUTH) {
+      errorMessage = 'Authentication error. Please sign in again.';
+    } else if (errType === ErrorType.SERVER) {
+      errorMessage = 'Server error. Our team has been notified.';
+    }
+
+    setError(errorMessage);
+
+    toast({
+      title: 'Error Loading Questions',
+      description: errorMessage,
+      variant: 'destructive',
+    });
+  };
+
+  // Reload from a handler: a retry, or a refresh after generating or saving.
   const fetchQuestions = async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setIsRefreshing(true);
-        setError(null);
       } else {
-        setLoading(true);
-        setError(null);
+        setManualLoading(true);
       }
+      setError(null);
 
       // Execute with retry logic
       const response = await errorHandlerRef.current.execute(() =>
         bookClient.getChapterQuestions(bookId, chapterId)
       );
-
-      if (response.questions.length > 0) {
-        setQuestions(response.questions);
-        setCachedQuestions(response.questions);
-        await fetchProgress();
-      }
-
-      setError(null);
-      setErrorType(null);
+      await applyQuestions(response.questions, () => true);
     } catch (err) {
-      console.error('Error fetching questions:', err);
-      const errType = classifyError(err);
-      setErrorType(errType);
-
-      // Provide actionable error messages
-      let errorMessage = 'Failed to load questions.';
-      if (errType === ErrorType.NETWORK) {
-        errorMessage = 'Network error. Please check your connection.';
-        // Use cached questions if available (stale-while-revalidate)
-        if (cachedQuestions.length > 0) {
-          setQuestions(cachedQuestions);
-          errorMessage += ' Showing cached questions.';
-        }
-      } else if (errType === ErrorType.AUTH) {
-        errorMessage = 'Authentication error. Please sign in again.';
-      } else if (errType === ErrorType.SERVER) {
-        errorMessage = 'Server error. Our team has been notified.';
-      }
-
-      setError(errorMessage);
-
-      toast({
-        title: 'Error Loading Questions',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      reportQuestionsError(err);
     } finally {
-      setLoading(false);
+      setManualLoading(false);
       setIsRefreshing(false);
     }
   };
 
+  // The chapter's initial load.
   useEffect(() => {
-    fetchQuestions();
+    let ignore = false;
+    const isCurrent = () => !ignore;
+    const loadChapterQuestions = async () => {
+      try {
+        const response = await errorHandlerRef.current.execute(() =>
+          bookClient.getChapterQuestions(bookId, chapterId)
+        );
+        if (ignore) return;
+        await applyQuestions(response.questions, isCurrent);
+      } catch (err) {
+        if (!ignore) reportQuestionsError(err);
+      } finally {
+        if (!ignore) setLoadedFor(`${bookId}:${chapterId}`);
+      }
+    };
+    loadChapterQuestions();
+    return () => {
+      ignore = true;
+    };
   }, [bookId, chapterId]);
 
   // Fetch progress data

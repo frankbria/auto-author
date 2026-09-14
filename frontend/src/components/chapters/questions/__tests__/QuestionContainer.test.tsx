@@ -689,3 +689,85 @@ describe('QuestionContainer - error handling', () => {
     });
   });
 });
+
+describe('QuestionContainer - chapter change (#584)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('does not show a previous chapter’s questions when its response lands last', async () => {
+    // The container is reused across chapters. If chapter 1's request is slow and
+    // chapter 2's is fast, chapter 1's response must not replace chapter 2's
+    // questions: answers are saved against the question ids on screen.
+    type QuestionsResponse = Awaited<ReturnType<typeof bookClient.getChapterQuestions>>;
+    let resolveFirst: (value: QuestionsResponse) => void = () => {};
+    mockedBookClient.getChapterQuestions
+      .mockReturnValueOnce(new Promise<QuestionsResponse>((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValueOnce({
+        questions: [makeQuestion({ id: 'q-ch2', chapter_id: 'ch-2', question_text: 'Chapter 2 question' })],
+      } as QuestionsResponse);
+    mockedBookClient.getChapterQuestionProgress.mockResolvedValue(mockProgress);
+
+    const { rerender } = render(<QuestionContainer {...defaultProps} />);
+    rerender(<QuestionContainer {...defaultProps} chapterId="ch-2" />);
+    await waitFor(() => expect(screen.getByText('Chapter 2 question')).toBeInTheDocument());
+
+    await act(async () => {
+      resolveFirst({
+        questions: [makeQuestion({ id: 'q-ch1', question_text: 'Chapter 1 question' })],
+      } as QuestionsResponse);
+    });
+
+    expect(screen.getByText('Chapter 2 question')).toBeInTheDocument();
+    expect(screen.queryByText('Chapter 1 question')).not.toBeInTheDocument();
+  });
+
+  it('does not show a previous chapter’s progress when it lands after the switch', async () => {
+    // Chapter 1's questions arrive and its progress request is still out when the
+    // user moves on. That progress belongs to chapter 1.
+    type QuestionsResponse = Awaited<ReturnType<typeof bookClient.getChapterQuestions>>;
+    let resolveFirstProgress: (value: QuestionProgressResponse) => void = () => {};
+    mockedBookClient.getChapterQuestions
+      .mockResolvedValueOnce({ questions: [makeQuestion({ id: 'q-ch1', question_text: 'Chapter 1 question' })] } as QuestionsResponse)
+      .mockResolvedValueOnce({
+        questions: [makeQuestion({ id: 'q-ch2', chapter_id: 'ch-2', question_text: 'Chapter 2 question' })],
+      } as QuestionsResponse);
+    mockedBookClient.getChapterQuestionProgress
+      .mockReturnValueOnce(new Promise<QuestionProgressResponse>((resolve) => { resolveFirstProgress = resolve; }))
+      .mockResolvedValueOnce({ ...mockProgress, total: 4, completed: 3 });
+
+    const { rerender } = render(<QuestionContainer {...defaultProps} />);
+    await waitFor(() => expect(mockedBookClient.getChapterQuestionProgress).toHaveBeenCalledTimes(1));
+
+    rerender(<QuestionContainer {...defaultProps} chapterId="ch-2" />);
+    await waitFor(() => expect(screen.getByText('3/4 complete')).toBeInTheDocument());
+
+    await act(async () => {
+      resolveFirstProgress({ ...mockProgress, total: 9, completed: 1 });
+    });
+
+    expect(screen.getByText('3/4 complete')).toBeInTheDocument();
+    expect(screen.queryByText('1/9 complete')).not.toBeInTheDocument();
+  });
+
+  it('clears the previous chapter’s error when the chapter changes', async () => {
+    // Only visible while chapter 1's questions are still on screen: they stay up
+    // during chapter 2's load, and so did chapter 1's error banner unless the
+    // change clears it, as each load used to when it began.
+    type QuestionsResponse = Awaited<ReturnType<typeof bookClient.getChapterQuestions>>;
+    mockedBookClient.getChapterQuestions
+      .mockResolvedValueOnce({ questions: [makeQuestion({ question_text: 'Chapter 1 question' })] } as QuestionsResponse)
+      .mockRejectedValueOnce(new Error('refresh failed'))
+      .mockReturnValueOnce(new Promise<QuestionsResponse>(() => {}));
+    mockedBookClient.getChapterQuestionProgress.mockResolvedValue(mockProgress);
+
+    const { rerender } = render(<QuestionContainer {...defaultProps} />);
+    await waitFor(() => expect(screen.getByText('Chapter 1 question')).toBeInTheDocument());
+
+    // A refresh after saving a response fails and raises the banner.
+    fireEvent.click(screen.getByTestId('response-saved-btn'));
+    await waitFor(() => expect(screen.getByText('Failed to load questions.')).toBeInTheDocument());
+
+    rerender(<QuestionContainer {...defaultProps} chapterId="ch-2" />);
+
+    expect(screen.queryByText('Failed to load questions.')).not.toBeInTheDocument();
+  });
+});
