@@ -689,3 +689,34 @@ describe('QuestionContainer - error handling', () => {
     });
   });
 });
+
+describe('QuestionContainer - chapter change (#584)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('does not show a previous chapter’s questions when its response lands last', async () => {
+    // The container is reused across chapters. If chapter 1's request is slow and
+    // chapter 2's is fast, chapter 1's response must not replace chapter 2's
+    // questions: answers are saved against the question ids on screen.
+    type QuestionsResponse = Awaited<ReturnType<typeof bookClient.getChapterQuestions>>;
+    let resolveFirst: (value: QuestionsResponse) => void = () => {};
+    mockedBookClient.getChapterQuestions
+      .mockReturnValueOnce(new Promise<QuestionsResponse>((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValueOnce({
+        questions: [makeQuestion({ id: 'q-ch2', chapter_id: 'ch-2', question_text: 'Chapter 2 question' })],
+      } as QuestionsResponse);
+    mockedBookClient.getChapterQuestionProgress.mockResolvedValue(mockProgress);
+
+    const { rerender } = render(<QuestionContainer {...defaultProps} />);
+    rerender(<QuestionContainer {...defaultProps} chapterId="ch-2" />);
+    await waitFor(() => expect(screen.getByText('Chapter 2 question')).toBeInTheDocument());
+
+    await act(async () => {
+      resolveFirst({
+        questions: [makeQuestion({ id: 'q-ch1', question_text: 'Chapter 1 question' })],
+      } as QuestionsResponse);
+    });
+
+    expect(screen.getByText('Chapter 2 question')).toBeInTheDocument();
+    expect(screen.queryByText('Chapter 1 question')).not.toBeInTheDocument();
+  });
+});
