@@ -65,6 +65,16 @@ export function VoiceTextInput({
   disabled = false
 }: VoiceTextInputProps) {
   const [currentMode, setCurrentMode] = useState<InputMode>(mode);
+  // A `mode` prop change resets the shown mode; a toggle holds until then.
+  // Adjusted during render, React's pattern for state that resets when a prop
+  // changes, rather than in an effect that first paints the stale mode (#584).
+  // Comparing against the previous prop, not the current mode, is what makes a
+  // text -> voice -> text round trip reset a toggle instead of resurrecting it.
+  const [modeProp, setModeProp] = useState<InputMode>(mode);
+  if (modeProp !== mode) {
+    setModeProp(mode);
+    setCurrentMode(mode);
+  }
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -143,11 +153,6 @@ export function VoiceTextInput({
       }
     };
   }, []);
-
-  // Update mode when prop changes
-  useEffect(() => {
-    setCurrentMode(mode);
-  }, [mode]);
 
   // Every path that ends a dictation session must run this, not just the ones
   // the user drives. Recognition can end on its own (onend) or fail (onerror),

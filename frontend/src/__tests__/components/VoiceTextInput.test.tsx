@@ -75,6 +75,36 @@ describe('VoiceTextInput Component', () => {
       // Content should be preserved
       expect(screen.getByText(/Existing content/)).toBeInTheDocument();
     });
+
+    // #584: the `mode` prop resets the shown mode whenever it changes, and a
+    // toggle holds until then. Nothing pinned this before the effect that did it
+    // was replaced.
+    it('follows a mode prop change made by the parent', () => {
+      const { rerender } = render(<VoiceTextInput value="" mode="text" onChange={mockOnChange} />);
+      expect(screen.getByRole('textbox')).toBeInTheDocument();
+
+      rerender(<VoiceTextInput value="" mode="voice" onChange={mockOnChange} />);
+
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /start voice recording/i })).toBeInTheDocument();
+    });
+
+    it('keeps a toggle until the prop changes, then takes the prop, even back to the same value', async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(<VoiceTextInput value="" mode="text" onChange={mockOnChange} />);
+
+      await user.click(screen.getByRole('button', { name: /switch to voice/i }));
+      // An unrelated re-render with the same prop must not undo the toggle.
+      rerender(<VoiceTextInput value="typed" mode="text" onChange={mockOnChange} />);
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+
+      // text -> voice -> text: the prop changed twice, so the earlier toggle is
+      // gone and the latest prop wins. A fix keyed on the prop's value, rather
+      // than on its change, would resurrect the toggle here.
+      rerender(<VoiceTextInput value="typed" mode="voice" onChange={mockOnChange} />);
+      rerender(<VoiceTextInput value="typed" mode="text" onChange={mockOnChange} />);
+      expect(screen.getByRole('textbox')).toBeInTheDocument();
+    });
   });
 
   describe('Voice Recording', () => {
