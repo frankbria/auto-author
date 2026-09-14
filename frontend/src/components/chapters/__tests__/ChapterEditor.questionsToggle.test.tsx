@@ -112,4 +112,39 @@ describe('ChapterEditor view toggle', () => {
     await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
     expect(screen.queryByTestId('question-container')).not.toBeInTheDocument();
   });
+
+  // #584 replaced the restore effect with a read of sessionStorage plus the
+  // choice made in this editor. These two pin that choice's own rules, which the
+  // storage-seeded tests above cannot reach.
+
+  it('does not carry a tab chosen in one chapter into the next when reused', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<ChapterEditor {...props} />);
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
+    await user.click(screen.getByRole('tab', { name: /interview questions/i }));
+    expect(screen.getByTestId('question-container')).toBeInTheDocument();
+
+    rerender(<ChapterEditor {...props} chapterId="chapter-2" />);
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
+    expect(screen.queryByTestId('question-container')).not.toBeInTheDocument();
+  });
+
+  it('keeps the chosen tab when sessionStorage refuses the write', async () => {
+    // Privacy modes can throw on setItem. Persisting is best-effort; switching
+    // tabs is not.
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    try {
+      const user = userEvent.setup();
+      render(<ChapterEditor {...props} />);
+      await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
+
+      await user.click(screen.getByRole('tab', { name: /interview questions/i }));
+
+      expect(screen.getByTestId('question-container')).toBeInTheDocument();
+    } finally {
+      setItem.mockRestore();
+    }
+  });
 });
