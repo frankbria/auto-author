@@ -195,6 +195,48 @@ AI Action:
 5. Update all references
 ```
 
+## The changelog convention (#661)
+
+`docs/CHANGELOG.md` groups entries under a `### YYYY-MM-DD` heading, **newest
+first within the day**. Every PR inserts its bullet immediately under today's
+heading, creating the heading if it is the first entry of the day.
+
+### Write entries the same way; the merge is handled for you
+
+That shape means every open PR inserts at the same line, so historically every
+merge made every other open PR conflict — eight times in one session, always
+positional, never semantic.
+
+`.gitattributes` sets `docs/CHANGELOG.md merge=union`: git's built-in "keep both
+sides" driver, which is exactly the resolution a human performs by hand on an
+append-only log. Two PRs adding entries under the same date now rebase cleanly.
+`scripts/test_changelog_merge.py` proves it by building a throwaway repo and
+running the case, rather than asserting that a line exists in a config file.
+
+**#661 considered changing the convention** — appending within the day instead of
+prepending, or one file per entry assembled at release (`towncrier` / `changesets`
+shape). Both were rejected once the merge driver landed: the entire cost they
+were meant to remove is gone, and each has its own price — appending buries the
+newest entry of a busy day at the bottom, and file-per-entry adds a build step
+and makes the changelog generated rather than edited. Keeping the shape people
+already write, and fixing the merge, is the smaller change.
+
+### One date per heading
+
+A mis-resolved conflict can append a **second** `### <date>` section instead of
+merging into the first. Nothing about that looks wrong in review — both halves
+are correct on their own — and one reached `main` this way.
+
+`scripts/test_changelog_headings.py` fails on any date carrying more than one
+bare heading, and runs in CI via the `Security Audit` job's `pytest scripts/`
+step. Suffixed headings like `### 2026-07-21 (evening)` are a deliberate way to
+split a busy day and are not duplicates.
+
+One historical date (`2026-07-18`) is still ledgered there, because its sections
+are separated by five other dates and merging them would genuinely move text
+across them. The other ten were merged in #661 by deleting the redundant heading
+line — `0 insertions, 20 deletions`, nothing reordered.
+
 ## Documentation Quality Standards
 
 All documentation must meet these standards:
