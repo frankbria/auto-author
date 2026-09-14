@@ -104,7 +104,7 @@ export function ChapterStatusIndicator({
     <div
       data-slot="status-dot"
       className={cn(
-        "rounded-full flex-shrink-0 transition-all",
+        "rounded-full shrink-0 transition-all",
         sizes.dot,
         config.color,
         className

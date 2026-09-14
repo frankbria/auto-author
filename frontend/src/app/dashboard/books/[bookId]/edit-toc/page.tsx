@@ -455,7 +455,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
               type="text"
               value={chapter.title}
               onChange={(e) => updateChapter(chapter.id, 'title', e.target.value)}
-              className="bg-muted border-none focus:ring-1 focus:ring-indigo-500 outline-none text-foreground font-medium flex-1"
+              className="bg-muted border-none focus:ring-1 focus:ring-indigo-500 outline-hidden text-foreground font-medium flex-1"
             />
             {chapter.status && (
               <ChapterStatusIndicator

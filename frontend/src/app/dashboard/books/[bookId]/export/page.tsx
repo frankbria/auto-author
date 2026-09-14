@@ -290,7 +290,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                               checked={includeEmptyChapters}
                               onChange={() => setIncludeEmptyChapters(!includeEmptyChapters)}
                             />
-                            <div className="w-10 h-5 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-muted-foreground after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
+                            <div className="w-10 h-5 bg-secondary peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-muted-foreground after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
                           </div>
                         </label>
                       </div>
@@ -342,7 +342,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
                                 checked={multiFile}
                                 onChange={() => setMultiFile(!multiFile)}
                               />
-                              <div className="w-10 h-5 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-muted-foreground after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
+                              <div className="w-10 h-5 bg-secondary peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-muted-foreground after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-900 peer-checked:after:bg-indigo-500"></div>
                             </div>
                           </label>
                         </div>

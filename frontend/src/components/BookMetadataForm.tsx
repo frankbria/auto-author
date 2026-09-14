@@ -119,7 +119,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
                 <FormLabel>Genre</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
                   <FormControl>
-                    <SelectTrigger className="text-gray-100 placeholder:text-gray-300 bg-gray-800 border-gray-700 min-w-[12rem]">
+                    <SelectTrigger className="text-gray-100 placeholder:text-gray-300 bg-gray-800 border-gray-700 min-w-48">
                       <SelectValue placeholder="Select genre" className="text-gray-300" />
                     </SelectTrigger>
                   </FormControl>
@@ -143,7 +143,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
                 <FormLabel>Target Audience</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
                   <FormControl>
-                    <SelectTrigger className="text-gray-100 placeholder:text-gray-300 bg-gray-800 border-gray-700 min-w-[12rem]">
+                    <SelectTrigger className="text-gray-100 placeholder:text-gray-300 bg-gray-800 border-gray-700 min-w-48">
                       <SelectValue placeholder="Select target audience" className="text-gray-300" />
                     </SelectTrigger>
                   </FormControl>

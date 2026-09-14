@@ -45,7 +45,7 @@ export function StyledAvatar({
     <div
       data-slot="avatar"
       className={cn(
-        'styled-avatar rounded-full border-2 border-primary overflow-hidden flex-shrink-0 transition-all',
+        'styled-avatar rounded-full border-2 border-primary overflow-hidden shrink-0 transition-all',
         container
       )}
     >

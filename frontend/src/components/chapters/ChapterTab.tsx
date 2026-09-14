@@ -124,7 +124,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             aria-label={`Open chapter ${chapter.title}`}
             aria-selected={isActive}
             className={cn(
-              "group relative flex items-center gap-2 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+              "group relative flex items-center gap-2 cursor-pointer transition-colors focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2",
               orientation === 'horizontal'
                 ? "px-3 py-2 border-r min-w-0 max-w-[200px]"
                 : "px-3 py-3 w-full min-h-[48px]",
@@ -149,7 +149,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             }}
           >
             {/* Status Indicator */}
-            <div className={cn("w-2 h-2 rounded-full flex-shrink-0 border border-border", config.color)} />
+            <div className={cn("w-2 h-2 rounded-full shrink-0 border border-border", config.color)} />
             {/* Chapter Title */}
             <span className={cn(
               "text-sm font-semibold truncate flex-1",
@@ -177,7 +177,7 @@ export const ChapterTab = forwardRef<HTMLDivElement, ChapterTabProps>(
             <Button
               variant="ghost"
               size="sm"
-              className="h-11 w-11 p-0 border border-border text-muted-foreground hover:bg-destructive-surface hover:text-destructive-foreground focus:bg-accent focus:text-accent-foreground shadow-sm"
+              className="h-11 w-11 p-0 border border-border text-muted-foreground hover:bg-destructive-surface hover:text-destructive-foreground focus:bg-accent focus:text-accent-foreground shadow-xs"
               style={{ opacity: 1 }}
               onClick={(e) => {
                 e.stopPropagation();

@@ -473,7 +473,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           <>
             {book.cover_image_url && (
               <div className="mt-4">
-                <Image src={book.cover_image_url} alt="Book cover" width={256} height={384} className="max-w-xs rounded shadow border border-border" />
+                <Image src={book.cover_image_url} alt="Book cover" width={256} height={384} className="max-w-xs rounded shadow-sm border border-border" />
               </div>
             )}
             <div className="mt-2">
