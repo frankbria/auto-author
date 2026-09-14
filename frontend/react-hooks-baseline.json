@@ -45,11 +45,6 @@
       "rules": {
         "react-hooks/set-state-in-effect": 1
       }
-    },
-    "src/components/settings/ActiveSessionsList.tsx": {
-      "rules": {
-        "react-hooks/set-state-in-effect": 1
-      }
     }
   }
 }
