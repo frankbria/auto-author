@@ -101,4 +101,22 @@ describe('BookSummaryPage summary precedence (#718)', () => {
     });
     expect(field()).toHaveValue('Book two summary');
   });
+
+  it('ignores the previous book’s load when it lands after the switch', async () => {
+    const first = deferred<SummaryResponse>();
+    mockedClient.getBookSummary
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce({ summary: 'Book two summary', summary_history: [] } as SummaryResponse);
+
+    const { rerender } = render(<BookSummaryPage />);
+    mockParams = { bookId: 'book-2' };
+    rerender(<BookSummaryPage />);
+    await waitFor(() => expect(field()).toHaveValue('Book two summary'));
+
+    await act(async () => {
+      first.resolve({ summary: 'Book one summary', summary_history: [] } as SummaryResponse);
+    });
+
+    expect(field()).toHaveValue('Book two summary');
+  });
 });
