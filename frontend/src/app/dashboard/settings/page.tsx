@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import BillingSettingsForm from '@/components/settings/BillingSettingsForm';
 import ExportSettingsForm from '@/components/settings/ExportSettingsForm';
@@ -25,8 +25,8 @@ export default function SettingsPage() {
   const { getUserProfile, updateUserProfile } = useProfileApi();
   const { setTheme } = useTheme();
   // next-themes may hand back a new setTheme identity after a theme change; a
-  // ref keeps it out of loadPreferences' deps so changing the theme can't
-  // re-fire the loader and clobber in-progress edits.
+  // ref keeps it out of the loader's deps so changing the theme can't re-fire
+  // the loader and clobber in-progress edits.
   const setThemeRef = useRef(setTheme);
   useEffect(() => {
     setThemeRef.current = setTheme;
@@ -37,7 +37,12 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   // 'loading' | 'loaded' | 'error'. Saving is only allowed after a successful load
   // so a failed/partial load can't overwrite persisted preferences with UI defaults.
-  const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading');
+  // Each load is an attempt (Retry starts the next), and an attempt without a
+  // recorded outcome is loading. Derived, not set to 'loading' before the request,
+  // which was a synchronous setState in an effect (#584).
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [loadOutcome, setLoadOutcome] = useState<{ attempt: number; state: 'loaded' | 'error' } | null>(null);
+  const loadState = loadOutcome?.attempt === loadAttempt ? loadOutcome.state : 'loading';
   // Full preferences object from the server, merged with edits before every save so
   // fields this page doesn't expose are never reset (PATCH replaces the whole object).
   const [preferences, setPreferences] = useState<Partial<UserPreferences>>({});
@@ -46,9 +51,8 @@ export default function SettingsPage() {
   // Stripe customer linkage (#222) — gates the billing-portal button exactly like the backend.
   const [hasBillingAccount, setHasBillingAccount] = useState(false);
 
-  const loadPreferences = useCallback(() => {
+  useEffect(() => {
     let active = true;
-    setLoadState('loading');
     getUserProfile()
       .then((profile) => {
         if (!active) return;
@@ -56,7 +60,7 @@ export default function SettingsPage() {
         setPreferences(loaded);
         setPlan(profile?.plan);
         setHasBillingAccount(Boolean(profile?.stripe_customer_id));
-        setLoadState('loaded');
+        setLoadOutcome({ attempt: loadAttempt, state: 'loaded' });
         // The stored preference is the source of truth — sync next-themes
         // (which persists per-browser) so all devices converge on it.
         if (loaded.theme && !themeSyncedRef.current) {
@@ -66,14 +70,12 @@ export default function SettingsPage() {
       })
       .catch(() => {
         // Do NOT enable saving: saving now would overwrite persisted fields with defaults.
-        if (active) setLoadState('error');
+        if (active) setLoadOutcome({ attempt: loadAttempt, state: 'error' });
       });
     return () => {
       active = false;
     };
-  }, [getUserProfile]);
-
-  useEffect(() => loadPreferences(), [loadPreferences]);
+  }, [getUserProfile, loadAttempt]);
 
   // Land back from Stripe checkout (issue #221) on the Billing tab with a status toast,
   // then strip the query param so a refresh can't re-toast. Also honor ?tab= deep links
@@ -214,7 +216,7 @@ export default function SettingsPage() {
           className="mt-6 flex items-center justify-between rounded-md bg-destructive/10 p-3 text-sm text-destructive"
         >
           <span>Couldn&apos;t load your current preferences. Saving is disabled to avoid overwriting them.</span>
-          <Button variant="outline" size="sm" onClick={loadPreferences}>
+          <Button variant="outline" size="sm" onClick={() => setLoadAttempt((n) => n + 1)}>
             Retry
           </Button>
         </div>
