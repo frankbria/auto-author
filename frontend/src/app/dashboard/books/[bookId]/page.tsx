@@ -88,15 +88,25 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   const initialChapter = searchParams.get('chapter');
 
   const [book, setBook] = useState<BookDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
 
   // Unwrap params using React.use (Next.js 15+)
   const { bookId } = React.use(params);
 
-  const fetchBookData = React.useCallback(async () => {
-      setIsLoading(true);
+  // The app router keeps this page mounted across a `[bookId]` change, so each
+  // load owns its result: a response for a book the user has left is dropped,
+  // or its details would render, and save, under the next book (#584). Try Again
+  // starts a new attempt. A load is settled for one book, attempt and session,
+  // and anything else is loading, derived rather than flagged from the effect.
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const loadKey = `${bookId}:${loadAttempt}`;
+  const [settledLoad, setSettledLoad] = useState<{ key: string; session: typeof session } | null>(null);
+  const isLoading = !(settledLoad && settledLoad.key === loadKey && settledLoad.session === session);
+
+  useEffect(() => {
+    let ignore = false;
+    const loadBook = async () => {
       try {
 
         // Fetch book details
@@ -121,6 +131,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           summary = '';
         }
 
+        if (ignore) return;
         setBook({
           ...bookData,
           description: bookData.description || 'No description available',
@@ -138,16 +149,18 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
         });
         setError(null);
       } catch (err: unknown) {
+        if (ignore) return;
         console.error('Error fetching book details:', err);
         setError('Failed to load book details. Please try again.');
       } finally {
-        setIsLoading(false);
+        if (!ignore) setSettledLoad({ key: `${bookId}:${loadAttempt}`, session });
       }
-  }, [bookId, session]);
-
-  useEffect(() => {
-    fetchBookData();
-  }, [fetchBookData]);
+    };
+    loadBook();
+    return () => {
+      ignore = true;
+    };
+  }, [bookId, session, loadAttempt]);
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -328,7 +341,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           <p className="text-muted-foreground mb-4">{error}</p>
           <div className="flex space-x-4">
             <button
-              onClick={() => fetchBookData()}
+              onClick={() => setLoadAttempt((n) => n + 1)}
               className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md"
             >
               Try Again
