@@ -8,6 +8,7 @@ that entry, and an exclude-paths glob is relative to its entry's `directory`, so
 repo-relative path silently matches nothing while the config still looks correct.
 """
 
+from fnmatch import fnmatch
 from pathlib import Path
 
 import pytest
@@ -140,7 +141,9 @@ def test_shipping_groups_never_swallow_a_major(ecosystem, directory, name, group
 # and can only move together. Forcing every dev major solo would strand that
 # cluster as four permanently-unmergeable PRs — the same lossiness #555 reports,
 # relocated. The line is what a package ships, not what section it sits in.
-_SHIPS_DESPITE_DEV_CLASSIFICATION = ("tailwindcss", "postcss", "autoprefixer")
+# Since #513 (Tailwind v4) the PostCSS plugin is `@tailwindcss/postcss`, and
+# autoprefixer is gone.
+_SHIPS_DESPITE_DEV_CLASSIFICATION = ("tailwindcss", "@tailwindcss/postcss", "postcss")
 
 
 @pytest.mark.parametrize(
@@ -164,9 +167,10 @@ def test_build_time_toolchains_never_ride_a_major_taking_group(directory, name, 
     patterns = group.get("patterns") or []
     excluded = group.get("exclude-patterns") or []
     for package in _SHIPS_DESPITE_DEV_CLASSIFICATION:
-        if not any(p == "*" or p == package for p in patterns):
+        # Dependabot patterns are globs, so `@tailwindcss/*` covers the plugin.
+        if not any(fnmatch(package, p) for p in patterns):
             continue
-        assert package in excluded, (
+        assert any(fnmatch(package, p) for p in excluded), (
             f"npm group {name!r} in {directory} takes majors and matches {package!r}, "
             f"which is dev-classified but emits an artifact every user downloads. "
             f"That is how tailwindcss 3 -> 4 landed inside #548's 14-update batch. "

@@ -140,7 +140,7 @@ export default function QuestionProgress({
 
           // Add subtle pulsing effect to current question with enhanced focus
           if (isCurrent) {
-            dotClasses += " ring-[3px] ring-blue-300 dark:ring-blue-700 ring-opacity-50";
+            dotClasses += " ring-[3px] ring-blue-300/50 dark:ring-blue-700";
           }
 
           const dotLabel =

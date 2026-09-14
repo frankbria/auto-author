@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-import colors from 'tailwindcss/colors';
+import { colors, themeColor } from './helpers/palette';
 
 import {
   colorToken,
@@ -39,7 +39,7 @@ import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
  * were "likely fine": two are (7.13 on `bg-green-800`), but the regenerate
  * button paints `disabled:bg-muted` at exactly the moment its spinner shows, so
  * that ring is white on `#f5f5f5`. And it missed `border-primary` entirely —
- * which is the #634 trap: `tailwind.config.js` pins `primary` to the brand
+ * which is the #634 trap: `@theme` pins `--color-primary` to the brand
  * indigo `rgb(79, 70, 229)` and #610's override is `.dark .text-primary` only,
  * so `border-primary` does not flip with the theme.
  *
@@ -55,7 +55,6 @@ import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
 
 const SRC = join(FRONTEND_ROOT, 'src');
 const GLOBALS_CSS = join(SRC, 'app', 'globals.css');
-const TAILWIND_CONFIG = join(FRONTEND_ROOT, 'tailwind.config.js');
 
 const SURFACES = ['background', 'muted', 'card'] as const;
 const THEMES = ['light', 'dark'] as const;
@@ -248,21 +247,10 @@ const sources = shippedSources();
  */
 const NOT_A_COLOUR = new Set(['transparent', 'current', 'inherit', 'none']);
 
-/**
- * `tailwind.config.js` as the app loads it. Requiring the module rather than
- * regexing its text is the difference between reading
- * `theme.extend.colors.primary` and reading whatever `primary:` appears first —
- * a nested `sidebar: { primary: {...} }` group, which the shadcn template this
- * repo standardises on does add, would otherwise win.
- */
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const tailwindConfig = require(TAILWIND_CONFIG);
-const BRAND_COLOURS: Record<string, unknown> =
-  ((tailwindConfig.default ?? tailwindConfig).theme?.extend?.colors ?? {}) as Record<string, unknown>;
 
 /**
  * Resolve a Tailwind colour name the way the running app does, in order:
- * `tailwind.config.js`'s `theme.extend.colors` (where the brand colours are
+ * globals.css's `@theme` `--color-*` entries (where the brand colours are
  * pinned — they outrank a `:root` custom property, the #634 lesson), then the
  * palette, then a `globals.css` token.
  */
@@ -286,16 +274,11 @@ function resolveColour(name: string, theme: Theme, property: string = 'text'): R
   // `text-primary-foreground` comes from `colors.primary.foreground`, not from a
   // top-level `primary-foreground` key — and the config's literal there ("white")
   // beats the `--primary-foreground` token of the same name.
-  const [group, ...rest] = name.split('-');
-  const subkey = rest.join('-');
-  const brand = BRAND_COLOURS[name] ?? (subkey ? BRAND_COLOURS[group] : undefined);
-  if (brand && typeof brand === 'object') {
-    const record = brand as Record<string, unknown>;
-    const raw = BRAND_COLOURS[name] ? record.DEFAULT : record[subkey];
+  const raw = themeColor(name);
+  if (raw !== undefined) {
     if (raw === 'white') return [255, 255, 255];
     if (raw === 'black') return [0, 0, 0];
-    const value = raw;
-    const rgb = typeof value === 'string' ? value.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/) : null;
+    const rgb = raw.match(/^rgb\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)\s*\)$/);
     if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
     // A token entry (`var()`, or the `color-mix` form #697 wraps it in) falls
     // through to the token lookup below.
@@ -488,8 +471,10 @@ describe('every animate-spin ring clears WCAG 2.1 1.4.11 (#635)', () => {
     expect(resolveColour('primary', 'light', 'text')).toEqual([79, 70, 229]);
     // ...while `text-primary` in dark is #610's override, not the brand colour.
     expect(resolveColour('primary', 'dark', 'text')).toEqual([129, 140, 248]);
-    // Read from the config object, so a nested same-named key cannot win.
-    expect(BRAND_COLOURS.primary).toEqual({ DEFAULT: 'rgb(79, 70, 229)', foreground: 'white' });
+    // Read from the theme's own `--color-primary`, so a longer name that ends
+    // in `-primary` cannot win.
+    expect(themeColor('primary')).toBe('rgb(79 70 229)');
+    expect(themeColor('primary-foreground')).toBe('white');
   });
 
   it('sweeps the whole src tree, and never itself', () => {
@@ -648,8 +633,8 @@ describe('every animate-spin ring clears WCAG 2.1 1.4.11 (#635)', () => {
   });
 
   it('reproduces border-primary at 2.85:1 on dark --card (#635)', () => {
-    // Not the `--primary` token, which would be 14.23 here: `tailwind.config.js`
-    // pins `primary` to brand indigo and #610 overrode only `.dark .text-primary`.
+    // Not the `--primary` token, which would be 14.23 here: `@theme` pins
+    // `--color-primary` to brand indigo and #610 overrode only `.dark .text-primary`.
     const brand = resolveColour('primary', 'dark', 'border')!;
     const beforeFix = contrastRatio(brand, oklchToken(themeBlock(css, 'dark'), 'card'));
 

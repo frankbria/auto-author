@@ -88,7 +88,7 @@ export default function NotReadyMessage({ readiness, onRetry, bookId }: NotReady
               <ul className="text-muted-foreground text-sm space-y-2">
                 {readiness.suggestions.map((suggestion, index) => (
                   <li key={index} className="flex items-start">
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
+                    <div className="w-2 h-2 bg-indigo-500 rounded-full mr-3 mt-2 shrink-0"></div>
                     {suggestion}
                   </li>
                 ))}

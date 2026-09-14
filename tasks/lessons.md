@@ -1133,3 +1133,68 @@ same as running it. The frontend gate list is `lint`, `typecheck`,
 `typecheck:tests`, `gate:react-hooks`, `check:specs`, `jest` — **adding a test
 file makes `typecheck:tests` load-bearing**, and that is the case where it is
 easiest to forget, because the change "is only a test".
+
+### A codemod rewrites guard fixtures and English along with markup
+2026-09-13, #513. Measured `@tailwindcss/upgrade` in a throwaway worktree before
+trusting it. Its class renames in shipped source were correct. It also rewrote
+the **guard tests**, and could not tell a class used in markup from a class that
+is *the input a guard is testing*, or from an English word:
+
+- `hover:dark:bg-red-800/70` → `dark:hover:bg-red-800/70` inside three guards'
+  fixtures. Those fixtures exist to prove a `dark:` **buried after another
+  variant** is still caught. Normalising it moves `dark:` to the front — the easy
+  case — so each guard silently lost the harder half of its coverage and would
+  have stayed green through a regression on exactly that shape.
+- "every animate-spin **ring** clears WCAG" → "ring-3". The word, not the class.
+
+It also silently repainted the brand: it ported `--color-primary` correctly into
+a new `@theme {}` block but left a pre-existing `@theme inline {}` block that set
+it later, so the later one won and every `bg-primary` went near-black. The tool's
+one *loud* failure (an invalid `@utility` name) was the least harmful of its
+four mistakes.
+
+Before running any codemod over a repo with guard tests, **exclude the test tree
+and review test edits by hand**. A fixture string is data describing a case, not
+code to modernise, and a tool that normalises it deletes the case. And diff the
+built output, not the source: the repaint was invisible in the stylesheet diff
+and obvious in one `grep` of the generated CSS.
+
+The same codemod, finished (2026-09-14): it also rewrote two **prop values**
+(`variant="outline"` → `"outline-solid"`), left v3's removed `bg-opacity-50` in
+place (a solid black overlay under v4), and never opened a stylesheet outside
+the main entry (`editor.css` failed the production build on `@apply prose`).
+Only typecheck, tailwind-merge's own diff, and `next build` saw those; the
+computed-style diff over `globals.css` could not, because it never loaded
+`editor.css`. **A visual diff covers the stylesheets it loads, and the build is
+the only check that loads all of them.**
+
+And a per-element computed diff is blind to **variants that target other
+elements** (`*:`, `[svg]:`, `[&_x]:`). v4 reads stacked variants left to right,
+v3 right to left, and the codemod reordered nine shadcn classes to keep v3's
+meaning. Those nine were already dead on v3, so "preserved" meant "still dead".
+The third-party review found two of them, and a sweep of every reordered variant
+list found the rest. Diff the emitted selectors for child-targeting variants,
+because the measured element never shows them.
+
+### Making a dead class render is a visual change that needs measuring
+2026-09-13, #697. `ring-ring/50` emitted no CSS under v3, so shadcn's controls
+fell back to Tailwind's default blue focus ring. The fix made the class render,
+and the colour it rendered was *weaker* than the accident it replaced (1.54:1
+against 1.83:1, both under 1.4.11). A green emission guard said "fixed"; the
+screenshot said "harder to see". When a fix brings a dead rule to life, price
+what the rule paints before calling it done. The same thing applied in reverse
+converting `ring-opacity-50`: in v3, `dark:ring-blue-700` reset the opacity to
+1, so a mechanical `/50` on both colours halved a ring v3 painted opaque.
+
+### A sweep that finds zero where you know of one is broken, not clean
+2026-09-14, #513. A rename sweep over the codemod's diff reported **0**
+string-value rewrites while typecheck had already named two. Splitting hunks on
+`^@@.*$` under `re.M` left the pairing misaligned. Seed every sweep with a case
+you know is there; if the known case is missing from the output, the output is
+about the sweep.
+
+### Reinstall before trusting tests after a dependency-branch switch
+2026-09-13, #695. Switching from the Tailwind v4 branch back to a v3 branch kept
+v4's `node_modules`, and jest reported **158 failures** that had nothing to do
+with the change. `npm ci` with CI's npm, then the same suite: 0. After any
+checkout that changes `package-lock.json`, reinstall first.

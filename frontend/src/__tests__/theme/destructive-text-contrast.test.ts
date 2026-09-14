@@ -8,6 +8,7 @@ import {
   themeBlock,
   WCAG_AA_NORMAL_TEXT,
 } from './helpers/contrast';
+import { themeColor, themeRgb } from './helpers/palette';
 import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
 
 /**
@@ -40,22 +41,12 @@ import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
  */
 
 const GLOBALS = join(FRONTEND_ROOT, 'src', 'app', 'globals.css');
-const TAILWIND = join(FRONTEND_ROOT, 'tailwind.config.js');
 
 const WHITE: [number, number, number] = [255, 255, 255];
 
 /** Every surface `text-destructive` is known to land on. */
 const SURFACES = ['background', 'card', 'muted'] as const;
 
-/** A literal `rgb(...)` under a key in `tailwind.config.js`'s destructive block. */
-function configRgb(key: string): [number, number, number] {
-  const config = readFileSync(TAILWIND, 'utf8');
-  const block = config.match(/destructive:\s*\{([^}]*)\}/);
-  if (!block) throw new Error('No `destructive` colour block in tailwind.config.js');
-  const value = block[1].match(new RegExp(`${key}:\\s*"rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)\\)"`));
-  if (!value) throw new Error(`\`destructive.${key}\` is not an rgb() literal`);
-  return [Number(value[1]), Number(value[2]), Number(value[3])];
-}
 
 describe('the destructive role clears AA in both of its uses (#682)', () => {
   const css = readFileSync(GLOBALS, 'utf8');
@@ -68,7 +59,7 @@ describe('the destructive role clears AA in both of its uses (#682)', () => {
     expect(light).toHaveLength(3);
     expect(dark).toHaveLength(3);
     expect(light).not.toEqual(dark);
-    expect(configRgb('surface')).toHaveLength(3);
+    expect(themeRgb('destructive-surface')).toHaveLength(3);
   });
 
   it('keeps the token theme-aware rather than a literal', () => {
@@ -76,13 +67,10 @@ describe('the destructive role clears AA in both of its uses (#682)', () => {
     // #634 trap and how this defect survived: globals.css already carried a
     // per-theme `--destructive` that nothing rendered.
     //
-    // The *channel* form specifically. A plain `var(--destructive)` is
-    // theme-aware but stops Tailwind v3 emitting every opacity variant —
-    // `bg-destructive/10` and friends vanish silently, which the pre-PR review
-    // caught and `opacity-utilities-emitted.test.ts` now proves.
-    const config = readFileSync(TAILWIND, 'utf8');
-    const block = config.match(/destructive:\s*\{([^}]*)\}/)![1];
-    expect(block).toMatch(/DEFAULT:\s*"rgb\(var\(--destructive-rgb\) \/ <alpha-value>\)"/);
+    // Under v3 it also had to be the channel form, or every opacity variant
+    // vanished (#682, #697); v4 applies `/alpha` to any colour, and
+    // `opacity-utilities-emitted.test.ts` checks that they still emit.
+    expect(themeColor('destructive')).toBe('rgb(var(--destructive-rgb))');
   });
 
   it.each(['light', 'dark'] as const)('is readable text on every %s surface', (theme) => {
@@ -135,7 +123,7 @@ describe('the destructive role clears AA in both of its uses (#682)', () => {
 
   it('keeps white legible on the fill, in both themes', () => {
     // `destructive.surface` is theme-fixed precisely so this is one number.
-    expect(contrastRatio(WHITE, configRgb('surface'))).toBeGreaterThanOrEqual(
+    expect(contrastRatio(WHITE, themeRgb('destructive-surface'))).toBeGreaterThanOrEqual(
       WCAG_AA_NORMAL_TEXT
     );
   });

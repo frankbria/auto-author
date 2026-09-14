@@ -473,7 +473,7 @@ export default function QuestionDisplay({
 
         <CardDescription>
           {/* Question text */}
-          <p className="text-lg font-medium mt-4 mb-2 break-words" id="question-text" style={{ wordWrap: 'break-word' }}>{question.question_text}</p>
+          <p className="text-lg font-medium mt-4 mb-2 wrap-break-word" id="question-text" style={{ wordWrap: 'break-word' }}>{question.question_text}</p>
           {/* Help text and examples if available */}
           {question.metadata?.help_text && (
             <div className="mt-2 text-sm text-muted-foreground" id="question-help-text">

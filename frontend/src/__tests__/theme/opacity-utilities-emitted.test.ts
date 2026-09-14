@@ -9,8 +9,8 @@ import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
  * Every opacity-modified colour class the app uses is actually emitted
  * (#682, widened in #697).
  *
- * The other guards in this directory read `tailwind.config.js` and
- * `globals.css` and do colour maths on what they find. None of them can see
+ * The other guards in this directory read `globals.css` (its tokens and its
+ * `@theme` colours) and do colour maths on what they find. None of them can see
  * whether Tailwind *generates a rule* for a class, and v3 silently generates
  * none for `<colour>/<n>` when it cannot parse the colour:
  *
@@ -41,7 +41,11 @@ function alphaColourClasses(): string[] {
   return [...found].sort();
 }
 
-/** Build just these classes, against the real config, and return the CSS. */
+/**
+ * Build the real stylesheet with these classes added as a source, and return
+ * the CSS. Importing globals.css rather than a bare `tailwindcss` is what makes
+ * the theme real: `bg-muted/50` only exists if `@theme` defines `--color-muted`.
+ */
 function build(classes: string[]): string {
   const dir = mkdtempSync(join(tmpdir(), 'tw-alpha-'));
   try {
@@ -49,10 +53,11 @@ function build(classes: string[]): string {
     const input = join(dir, 'in.css');
     const output = join(dir, 'out.css');
     writeFileSync(html, `<div class="${classes.join(' ')}"></div>`, 'utf8');
-    writeFileSync(input, '@tailwind utilities;\n', 'utf8');
+    const globals = join(FRONTEND_ROOT, 'src', 'app', 'globals.css');
+    writeFileSync(input, `@import ${JSON.stringify(globals)};\n@source ${JSON.stringify(html)};\n`, 'utf8');
     execFileSync(
       'npx',
-      ['tailwindcss', '-i', input, '-o', output, '--content', html],
+      ['@tailwindcss/cli', '-i', input, '-o', output],
       { cwd: FRONTEND_ROOT, stdio: ['ignore', 'pipe', 'pipe'] }
     );
     return readFileSync(output, 'utf8');
@@ -82,6 +87,19 @@ describe('opacity-modified colour utilities are emitted, not just configured (#6
   it('builds a stylesheet at all', () => {
     // Separates "the build broke" from "a class is missing".
     expect(css.length).toBeGreaterThan(100);
+  });
+
+  it('uses no v3 `<property>-opacity-N` utilities, which v4 removed (#513)', () => {
+    // v4 dropped `bg-opacity-50` and friends without a replacement rule, and the
+    // upgrade codemod left them in place: `bg-black bg-opacity-50` became a solid
+    // black overlay, and tailwind-merge 3 then dropped `bg-black` as well. The
+    // slash form (`bg-black/50`) is what the sweep above builds.
+    const offenders = shippedSources().flatMap((path) =>
+      [...readFileSync(join(FRONTEND_ROOT, path), 'utf8').matchAll(
+        /(?<![\w-])(?:bg|text|border|ring|divide|placeholder)-opacity-\d+(?![\w-])/g
+      )].map((m) => `${path}: ${m[0]}`)
+    );
+    expect(offenders).toEqual([]);
   });
 
   it.each(classes)('emits a rule for %s', (className) => {

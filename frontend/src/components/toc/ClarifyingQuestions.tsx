@@ -245,7 +245,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
             value={responses[currentQuestionIndex] || ''}
             onChange={(e) => handleResponseChange(currentQuestionIndex, e.target.value)}
             placeholder="Type your answer here..."
-            className="w-full h-32 px-4 py-3 bg-muted border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+            className="w-full h-32 px-4 py-3 bg-muted border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
             disabled={isLoading}
           />
 

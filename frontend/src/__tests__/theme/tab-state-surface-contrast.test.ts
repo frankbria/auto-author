@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import colors from 'tailwindcss/colors';
+import { colors, themeRgb } from './helpers/palette';
 import { twMerge } from 'tailwind-merge';
 
 import {
@@ -35,10 +35,10 @@ import {
  *
  * ## `text-primary` is not the `--primary` token
  *
- * It resolves to the theme-fixed brand indigo in `tailwind.config.js`
+ * It resolves to the theme-fixed brand indigo, `--color-primary` in `@theme`
  * (`rgb(79, 70, 229)`), repainted `rgb(129, 140, 248)` in dark by #610's
- * `.dark .text-primary` override. The `--primary` oklch token feeds only the
- * v4-only `@theme` block, which this repo's Tailwind v3 ignores — so pricing
+ * `.dark .text-primary` override. The `--primary` oklch token feeds no colour
+ * utility at all, because `@theme` pins the brand instead of aliasing it — so pricing
  * the active title as `--primary` measures a colour that never renders. It also
  * measures a *much* rosier one: an opaque `dark:bg-red-900` card would keep a
  * phantom near-white title at 7.95:1 while the real indigo-400 sat at 3.36:1,
@@ -95,7 +95,6 @@ const THEMES = ['light', 'dark'] as const;
  */
 const FOREGROUNDS = ['foreground', 'muted-foreground'] as const;
 
-const TAILWIND_CONFIG = join(SRC, '..', 'tailwind.config.js');
 
 /**
  * What `text-primary` actually paints. Read from the two files that decide it
@@ -111,10 +110,7 @@ function activeTitleColor(theme: Theme, css: string): Rgb {
     return [Number(override[1]), Number(override[2]), Number(override[3])];
   }
 
-  const config = readFileSync(TAILWIND_CONFIG, 'utf8');
-  const brand = config.match(/primary:\s*\{\s*DEFAULT:\s*"rgb\((\d+),\s*(\d+),\s*(\d+)\)"/);
-  if (!brand) throw new Error('tailwind.config.js has no `primary.DEFAULT` rgb()');
-  return [Number(brand[1]), Number(brand[2]), Number(brand[3])];
+  return themeRgb('primary');
 }
 
 /** Not a WCAG threshold — the drift floor #632 established for delimiters. */
@@ -377,7 +373,7 @@ describe('ChapterTab state surfaces have a dark counterpart (#634)', () => {
  * Two figures in the issue are wrong and are corrected here. It quotes the
  * accent at 16.39:1, which is the `--primary` *token* — `border-*` never
  * resolves to it, exactly the mistake #634 shipped and corrected;
- * `border-r-primary` is `tailwind.config.js`'s theme-fixed brand indigo, 6.29:1
+ * `border-r-primary` is the theme-fixed brand indigo from `@theme`, 6.29:1
  * on white. And it transposes its two border figures: `border-red-200` is 1.45,
  * `border-orange-200` is 1.35.
  */
@@ -386,7 +382,7 @@ describe('the active-tab accent survives twMerge and is legible (#640)', () => {
   const source = readFileSync(CHAPTER_TAB, 'utf8');
   const token = (theme: Theme, name: string) => oklchToken(themeBlock(css, theme), name);
 
-  /** tailwind.config.js's theme-fixed brand indigo — what `border-primary` paints. */
+  /** `@theme`'s theme-fixed brand indigo — what `border-primary` paints. */
   const BRAND_PRIMARY = [79, 70, 229] as Rgb;
 
   const named = (name: string) => {

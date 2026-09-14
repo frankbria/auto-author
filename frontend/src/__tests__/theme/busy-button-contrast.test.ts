@@ -8,6 +8,7 @@ import {
   themeBlock,
   WCAG_AA_NORMAL_TEXT,
 } from './helpers/contrast';
+import { themeRgb } from './helpers/palette';
 import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
 
 /**
@@ -38,19 +39,11 @@ import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
 
 const BUTTON = join(FRONTEND_ROOT, 'src', 'components', 'ui', 'button.tsx');
 const GLOBALS = join(FRONTEND_ROOT, 'src', 'app', 'globals.css');
-const TAILWIND = join(FRONTEND_ROOT, 'tailwind.config.js');
 
 const WHITE: [number, number, number] = [255, 255, 255];
 
-/** `rgb(r, g, b)` for a brand colour in tailwind.config.js. */
-function brandRgb(name: string): [number, number, number] {
-  const config = readFileSync(TAILWIND, 'utf8');
-  const block = config.match(new RegExp(`${name}:\\s*\\{([^}]*)\\}`));
-  if (!block) throw new Error(`No \`${name}\` colour in tailwind.config.js`);
-  const rgb = block[1].match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-  if (!rgb) throw new Error(`\`${name}\` in tailwind.config.js is not an rgb() literal`);
-  return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
-}
+/** `rgb(r, g, b)` for a theme-fixed brand colour. */
+const brandRgb = themeRgb;
 
 /** The `disabled:opacity-*` the base string applies to an ordinary button. */
 function baseDisabledOpacity(): number {
@@ -102,7 +95,7 @@ describe('busy buttons keep their status text legible (#642)', () => {
   it('clears AA for the default variant in both themes, on both surfaces', () => {
     // `busy` restores opacity-100, so the label composites against its own fill
     // and the surface behind it no longer enters the maths. `bg-primary` and
-    // `text-primary-foreground` are theme-fixed in tailwind.config.js (#634), so
+    // `text-primary-foreground` are theme-fixed in `@theme` (#634), so
     // one ratio covers both themes — asserted per surface anyway, because the
     // day that stops being true is the day this should fail.
     const css = readFileSync(GLOBALS, 'utf8');
@@ -127,7 +120,7 @@ describe('busy buttons keep their status text legible (#642)', () => {
     //
     // The fill is theme-fixed, so one ratio covers both themes; `text-destructive`
     // needs a dark override and is guarded in `destructive-text-contrast.test.ts`.
-    const ratio = contrastRatio(WHITE, brandRgb('destructive'));
+    const ratio = contrastRatio(WHITE, brandRgb('destructive-surface'));
     expect(ratio).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
   });
 });

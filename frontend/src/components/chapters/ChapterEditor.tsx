@@ -165,7 +165,7 @@ export function ChapterEditor({
     },
     editorProps: {
       attributes: {
-        class: 'focus:outline-none text-black',
+        class: 'focus:outline-hidden text-black',
       },
     },
     // Set this to false to avoid SSR hydration issues

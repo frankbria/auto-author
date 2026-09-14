@@ -136,7 +136,7 @@ export function DeleteBookModal({
           {/* Data Loss Warning */}
           <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 transition-all">
             <div className="flex items-start gap-2">
-              <HugeiconsIcon icon={Alert02Icon} size={16} color="rgb(234 179 8)" className="mt-0.5 flex-shrink-0" />
+              <HugeiconsIcon icon={Alert02Icon} size={16} color="rgb(234 179 8)" className="mt-0.5 shrink-0" />
               <div className="text-sm text-foreground">
                 <p className="font-medium mb-1">All data will be permanently deleted:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">

@@ -337,7 +337,9 @@ describe('Chapter Questions Mobile and Accessibility Tests', () => {
       // Verify text has word-wrap to handle zoom scenarios
       expect(questionText).toBeVisible();
       expect(questionText).toHaveStyle({ wordWrap: 'break-word' });
-      expect(questionText).toHaveClass('break-words');
+      // Tailwind v4 name for v3's `break-words` (#513); the style assertion
+      // above is the behaviour.
+      expect(questionText).toHaveClass('wrap-break-word');
     });
 
     test('handles virtual keyboard appearance correctly', async () => {

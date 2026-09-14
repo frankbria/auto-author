@@ -295,7 +295,9 @@ describe('ChapterTab keyboard accessibility', () => {
       const tabElement = screen.getByRole('button', { name: /open chapter test chapter/i });
 
       // Verify focus styles are present in className
-      expect(tabElement.className).toContain('focus:outline-none');
+      // Tailwind v4 name for v3's `outline-none` (#513): still transparent, and
+      // still visible under forced colours.
+      expect(tabElement.className).toContain('focus:outline-hidden');
       expect(tabElement.className).toContain('focus:ring-2');
       expect(tabElement.className).toContain('focus:ring-primary');
     });

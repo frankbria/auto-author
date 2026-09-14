@@ -244,9 +244,9 @@ export function ErrorNotification({
     >
       <div className="flex items-start gap-3">
         {error.type === ErrorType.AI_SERVICE && isFromCache ? (
-          <HugeiconsIcon icon={Database01Icon} size={20} className={`flex-shrink-0 mt-0.5 ${iconColor}`} />
+          <HugeiconsIcon icon={Database01Icon} size={20} className={`shrink-0 mt-0.5 ${iconColor}`} />
         ) : (
-          <HugeiconsIcon icon={AlertCircleIcon} size={20} className={`flex-shrink-0 mt-0.5 ${iconColor}`} />
+          <HugeiconsIcon icon={AlertCircleIcon} size={20} className={`shrink-0 mt-0.5 ${iconColor}`} />
         )}
 
         <div className="flex-1 min-w-0">
@@ -321,7 +321,7 @@ export function ErrorNotification({
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Dismiss"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={16} />
