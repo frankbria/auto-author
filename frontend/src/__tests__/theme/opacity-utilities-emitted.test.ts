@@ -89,6 +89,19 @@ describe('opacity-modified colour utilities are emitted, not just configured (#6
     expect(css.length).toBeGreaterThan(100);
   });
 
+  it('uses no v3 `<property>-opacity-N` utilities, which v4 removed (#513)', () => {
+    // v4 dropped `bg-opacity-50` and friends without a replacement rule, and the
+    // upgrade codemod left them in place: `bg-black bg-opacity-50` became a solid
+    // black overlay, and tailwind-merge 3 then dropped `bg-black` as well. The
+    // slash form (`bg-black/50`) is what the sweep above builds.
+    const offenders = shippedSources().flatMap((path) =>
+      [...readFileSync(join(FRONTEND_ROOT, path), 'utf8').matchAll(
+        /(?<![\w-])(?:bg|text|border|ring|divide|placeholder)-opacity-\d+(?![\w-])/g
+      )].map((m) => `${path}: ${m[0]}`)
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it.each(classes)('emits a rule for %s', (className) => {
     expect(css).toContain(selectorFor(className));
   });

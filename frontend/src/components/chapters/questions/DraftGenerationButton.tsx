@@ -237,7 +237,7 @@ export function DraftGenerationButton({
         <Button
           onClick={handleOpenDialog}
           disabled={!canGenerate}
-          variant={canGenerate ? "default" : "outline-solid"}
+          variant={canGenerate ? "default" : "outline"}
           className="w-full gap-2 min-h-[44px] transition-all focus-visible:ring-[3px]"
         >
           <HugeiconsIcon icon={SparklesIcon} size={16} />

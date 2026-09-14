@@ -94,7 +94,7 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
         {hasBillingAccount && (
           <>
             <Button
-              variant={isPro ? 'default' : 'outline-solid'}
+              variant={isPro ? 'default' : 'outline'}
               onClick={handleManageBilling}
               disabled={isRedirecting}
               busy={isRedirecting}
