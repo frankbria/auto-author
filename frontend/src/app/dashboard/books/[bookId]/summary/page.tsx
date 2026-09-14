@@ -86,7 +86,12 @@ export default function BookSummaryPage() {
       .catch(() => {
         if (ignore || userEditedRef.current) return;
         const local = localStorage.getItem(`book-summary-${bookId}`);
-        if (local) setSummary(local);
+        if (local) {
+          // Shown, not saved: the server may hold a newer copy and only failed to
+          // load. Baselining it means auto-save waits for a real edit (#718).
+          lastSaved.current = local;
+          setSummary(local);
+        }
       })
       .finally(() => {
         if (!ignore) setLoadedFor(bookId);

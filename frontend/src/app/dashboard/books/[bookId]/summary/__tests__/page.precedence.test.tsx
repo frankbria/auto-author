@@ -81,6 +81,28 @@ describe('BookSummaryPage summary precedence (#718)', () => {
     await waitFor(() => expect(field()).toHaveValue('Local draft'));
   });
 
+  it('does not push a fallback draft to the server until the user edits it', async () => {
+    // From the pre-PR review: the server stays the source of truth. A load can
+    // fail transiently while the server holds a newer copy, so restoring the old
+    // draft must not overwrite it on its own; only a deliberate edit saves.
+    localStorage.setItem('book-summary-book-1', 'Old local draft');
+    mockedClient.getBookSummary.mockRejectedValue(new Error('transient'));
+
+    render(<BookSummaryPage />);
+    await waitFor(() => expect(field()).toHaveValue('Old local draft'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    });
+    expect(mockedClient.saveBookSummary).not.toHaveBeenCalled();
+
+    fireEvent.change(field(), { target: { value: 'Old local draft, now edited' } });
+    await waitFor(
+      () => expect(mockedClient.saveBookSummary).toHaveBeenCalledWith('book-1', 'Old local draft, now edited'),
+      { timeout: 2500 }
+    );
+  });
+
   it('does not carry the previous book’s text into the next book', async () => {
     mockedClient.getBookSummary.mockResolvedValueOnce({ summary: 'Book one summary', summary_history: [] } as SummaryResponse);
     const second = deferred<SummaryResponse>();
