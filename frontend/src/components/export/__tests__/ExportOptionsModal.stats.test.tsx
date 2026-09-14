@@ -139,4 +139,31 @@ describe('ExportOptionsModal book statistics (#584)', () => {
     await waitFor(() => expect(screen.getByText('9')).toBeInTheDocument());
     expect(exportButton()).toBeEnabled();
   });
+
+  it('ignores an earlier open’s response that lands after the current one', async () => {
+    // The other ordering. Keying alone hides a stale response that arrives first,
+    // because its key never matches; one that arrives *last* would overwrite the
+    // current figures and mark a dead request as the settled one, leaving Export
+    // disabled for good. Only ignoring dismissed opens prevents that.
+    const first = deferred<Formats>();
+    const second = deferred<Formats>();
+    mockGetExportFormats.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+
+    const { rerender } = render(<ExportOptionsModal {...props} isOpen />);
+    await waitFor(() => expect(exportButton()).toBeDisabled());
+    rerender(<ExportOptionsModal {...props} isOpen={false} />);
+    rerender(<ExportOptionsModal {...props} isOpen />);
+    await waitFor(() => expect(mockGetExportFormats).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      second.resolve(formats(9));
+    });
+    await act(async () => {
+      first.resolve(formats(7));
+    });
+
+    expect(screen.getByText('9')).toBeInTheDocument();
+    expect(screen.queryByText('7')).not.toBeInTheDocument();
+    expect(exportButton()).toBeEnabled();
+  });
 });
