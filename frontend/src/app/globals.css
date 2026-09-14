@@ -128,13 +128,27 @@
 }
 
 @layer base {
+  /* These referenced `--color-border`, `--color-background` and
+     `--color-foreground` — Tailwind v4 theme variables that only exist because of
+     the `@theme inline` block above, which Tailwind v3 ignores. Under v3 all three
+     were undefined, so every declaration here was invalid at computed-value time
+     and silently dropped. The visible consequence was the `*` rule: an element
+     with a `border` and no border-colour class drew it in `currentColor` —
+     near-black in light, near-white in dark — instead of the subtle `--border`
+     this rule was written to apply. `<body>` was masked because layout.tsx also
+     puts `bg-background text-foreground` on it.
+
+     The raw tokens are used instead of the `--color-*` aliases for a second
+     reason that matters once v4 lands (#513): a theme alias is declared on :root
+     and computed there, so `var(--color-border)` would inherit the light value
+     into `.dark`. `var(--border)` resolves at the element and follows the theme. */
   * {
-    border-color: var(--color-border);
+    border-color: var(--border);
     outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
   }
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--background);
+    color: var(--foreground);
   }
   /* Visible keyboard-focus fallback (WCAG 2.4.7) for any interactive element
      that doesn't define its own focus-visible ring. Components with their own
