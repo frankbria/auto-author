@@ -7,10 +7,11 @@ import {
   themeBlock,
   WCAG_AA_NORMAL_TEXT,
 } from './helpers/contrast';
+import { themeRgb } from './helpers/palette';
 
 /**
  * Recurrence guard for #610 (P2.27): `text-primary` is the theme-fixed brand
- * indigo-600 (`tailwind.config.js` → `primary.DEFAULT`), and on the dark
+ * indigo-600 (`--color-primary` in globals.css's `@theme`), and on the dark
  * `--card` surface that is 2.85:1 — below the 4.5:1 WCAG 2.1 AA floor for
  * normal-weight body text. It shipped on the active header nav link, i.e. on
  * every authenticated page. `globals.css` now lightens the *text* role to
@@ -67,16 +68,8 @@ describe('text-primary clears WCAG 2.1 AA on the dark surfaces (#610)', () => {
   it('leaves bg-primary alone, whose white foreground needs the darker indigo', () => {
     // Re-theming the shared `primary` token instead would make `bg-primary`
     // indigo-400, and white on indigo-400 is 2.98:1 — a new AA failure.
-    const config = readFileSync(join(__dirname, '..', '..', '..', 'tailwind.config.js'), 'utf8');
     const white: [number, number, number] = [255, 255, 255];
-    const brand = config.match(/primary:\s*\{\s*DEFAULT:\s*"rgb\((\d+),\s*(\d+),\s*(\d+)\)"/);
-    if (!brand) throw new Error('No `primary.DEFAULT` rgb() in tailwind.config.js');
-
-    const ratio = contrastRatio(white, [
-      Number(brand[1]),
-      Number(brand[2]),
-      Number(brand[3]),
-    ]);
+    const ratio = contrastRatio(white, themeRgb('primary'));
 
     expect(ratio).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
   });

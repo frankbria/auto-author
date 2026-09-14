@@ -41,7 +41,11 @@ function alphaColourClasses(): string[] {
   return [...found].sort();
 }
 
-/** Build just these classes, against the real config, and return the CSS. */
+/**
+ * Build the real stylesheet with these classes added as a source, and return
+ * the CSS. Importing globals.css rather than a bare `tailwindcss` is what makes
+ * the theme real: `bg-muted/50` only exists if `@theme` defines `--color-muted`.
+ */
 function build(classes: string[]): string {
   const dir = mkdtempSync(join(tmpdir(), 'tw-alpha-'));
   try {
@@ -49,10 +53,11 @@ function build(classes: string[]): string {
     const input = join(dir, 'in.css');
     const output = join(dir, 'out.css');
     writeFileSync(html, `<div class="${classes.join(' ')}"></div>`, 'utf8');
-    writeFileSync(input, '@tailwind utilities;\n', 'utf8');
+    const globals = join(FRONTEND_ROOT, 'src', 'app', 'globals.css');
+    writeFileSync(input, `@import ${JSON.stringify(globals)};\n@source ${JSON.stringify(html)};\n`, 'utf8');
     execFileSync(
       'npx',
-      ['tailwindcss', '-i', input, '-o', output, '--content', html],
+      ['@tailwindcss/cli', '-i', input, '-o', output],
       { cwd: FRONTEND_ROOT, stdio: ['ignore', 'pipe', 'pipe'] }
     );
     return readFileSync(output, 'utf8');

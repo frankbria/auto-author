@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { colors } from './helpers/palette';
+import { colors, themeRgb } from './helpers/palette';
 import { twMerge } from 'tailwind-merge';
 
 import {
@@ -95,7 +95,6 @@ const THEMES = ['light', 'dark'] as const;
  */
 const FOREGROUNDS = ['foreground', 'muted-foreground'] as const;
 
-const TAILWIND_CONFIG = join(SRC, '..', 'tailwind.config.js');
 
 /**
  * What `text-primary` actually paints. Read from the two files that decide it
@@ -111,10 +110,7 @@ function activeTitleColor(theme: Theme, css: string): Rgb {
     return [Number(override[1]), Number(override[2]), Number(override[3])];
   }
 
-  const config = readFileSync(TAILWIND_CONFIG, 'utf8');
-  const brand = config.match(/primary:\s*\{\s*DEFAULT:\s*"rgb\((\d+),\s*(\d+),\s*(\d+)\)"/);
-  if (!brand) throw new Error('tailwind.config.js has no `primary.DEFAULT` rgb()');
-  return [Number(brand[1]), Number(brand[2]), Number(brand[3])];
+  return themeRgb('primary');
 }
 
 /** Not a WCAG threshold — the drift floor #632 established for delimiters. */
