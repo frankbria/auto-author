@@ -152,7 +152,7 @@
   }
 }
 
-@layer utilities {
+
   /* #610: `primary` is a theme-fixed brand colour (tailwind.config.js), so
      `text-primary` stayed indigo-600 on the dark surfaces — 2.85:1 on the
      header's `bg-card`, under the 4.5:1 WCAG 2.1 AA floor. indigo-400 clears
@@ -171,4 +171,4 @@
   .dark .hover\:text-primary:hover {
     color: rgb(129, 140, 248);
   }
-}
+
