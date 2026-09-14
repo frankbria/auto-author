@@ -297,7 +297,8 @@ function resolveColour(name: string, theme: Theme, property: string = 'text'): R
     const value = raw;
     const rgb = typeof value === 'string' ? value.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/) : null;
     if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
-    // A `var(--token)` brand entry falls through to the token lookup below.
+    // A token entry (`var()`, or the `color-mix` form #697 wraps it in) falls
+    // through to the token lookup below.
   }
 
   const palette = name.match(/^([a-z]+)-(\d{2,3})$/);

@@ -70,7 +70,14 @@
   --destructive: rgb(var(--destructive-rgb));
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* #697: the focus indicator. Buttons, inputs, selects, badges and textareas
+     draw focus as `ring-ring/50` over `outline-none`, so this token at half
+     strength *is* the indicator. shadcn's 0.708 gave 1.54:1 on the page, under
+     WCAG 1.4.11's 3:1 — hidden until #697, because v3 emitted no rule for
+     `ring-ring/50` and those controls fell back to Tailwind's default blue
+     (1.83:1, also failing). 0.205 is the --primary lightness: 3.34:1 at worst,
+     on --muted. `focus-ring-contrast.test.ts` measures it. */
+  --ring: oklch(0.205 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -111,7 +118,9 @@
   --destructive-rgb: 248 113 113;
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  /* #697: 0.922, the dark --primary lightness. 0.556 gave 1.88:1 at 50%;
+     this is 4.16:1 at worst, on --muted. */
+  --ring: oklch(0.922 0 0);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);

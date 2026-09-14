@@ -1,6 +1,14 @@
 import tailwindcssAnimate from "tailwindcss-animate";
 import typography from "@tailwindcss/typography";
 
+// #697. Tailwind v3 cannot put an opacity modifier on a colour it cannot parse,
+// so a bare `var(--muted)` made `bg-muted/50` emit **no rule at all** — and
+// `hover:bg-secondary/80`, `ring-ring/50`, `bg-input/30` with it. The tokens are
+// oklch, so #682's channel form does not fit; `color-mix` takes `<alpha-value>`
+// for any colour. Opaque classes get `calc(1 * 100%)`, i.e. the token itself.
+const token = (name) =>
+  `color-mix(in oklch, var(--${name}) calc(<alpha-value> * 100%), transparent)`;
+
 /** @type {import('tailwindcss').Config} */
 const config = {
   darkMode: ["class"],
@@ -27,19 +35,19 @@ const config = {
         // .dark values match the previous hardcoded RGBs, so the default dark
         // look is unchanged. NB: the old var(--color-*) names only existed in
         // the Tailwind-v4 @theme block, which v3 ignores — they never resolved.
-        border: "var(--border)",
-        input: "var(--input)",
-        ring: "var(--ring)",
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        border: token("border"),
+        input: token("input"),
+        ring: token("ring"),
+        background: token("background"),
+        foreground: token("foreground"),
         // Brand colors stay fixed across themes.
         primary: {
           DEFAULT: "rgb(79, 70, 229)",
           foreground: "white",
         },
         secondary: {
-          DEFAULT: "var(--secondary)",
-          foreground: "var(--secondary-foreground)",
+          DEFAULT: token("secondary"),
+          foreground: token("secondary-foreground"),
         },
         // #682. The destructive role needs **two** colours, because its two uses
         // pull opposite ways on a dark background: white must be legible on the
@@ -75,20 +83,20 @@ const config = {
           surface: "rgb(185, 28, 28)",
         },
         muted: {
-          DEFAULT: "var(--muted)",
-          foreground: "var(--muted-foreground)",
+          DEFAULT: token("muted"),
+          foreground: token("muted-foreground"),
         },
         accent: {
-          DEFAULT: "var(--accent)",
-          foreground: "var(--accent-foreground)",
+          DEFAULT: token("accent"),
+          foreground: token("accent-foreground"),
         },
         popover: {
-          DEFAULT: "var(--popover)",
-          foreground: "var(--popover-foreground)",
+          DEFAULT: token("popover"),
+          foreground: token("popover-foreground"),
         },
         card: {
-          DEFAULT: "var(--card)",
-          foreground: "var(--card-foreground)",
+          DEFAULT: token("card"),
+          foreground: token("card-foreground"),
         },
       },
       borderRadius: {

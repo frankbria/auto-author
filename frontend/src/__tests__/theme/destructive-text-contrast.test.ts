@@ -79,7 +79,7 @@ describe('the destructive role clears AA in both of its uses (#682)', () => {
     // The *channel* form specifically. A plain `var(--destructive)` is
     // theme-aware but stops Tailwind v3 emitting every opacity variant —
     // `bg-destructive/10` and friends vanish silently, which the pre-PR review
-    // caught and `destructive-utilities-emitted.test.ts` now proves.
+    // caught and `opacity-utilities-emitted.test.ts` now proves.
     const config = readFileSync(TAILWIND, 'utf8');
     const block = config.match(/destructive:\s*\{([^}]*)\}/)![1];
     expect(block).toMatch(/DEFAULT:\s*"rgb\(var\(--destructive-rgb\) \/ <alpha-value>\)"/);
