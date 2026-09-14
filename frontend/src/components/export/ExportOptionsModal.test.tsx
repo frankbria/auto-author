@@ -9,11 +9,12 @@ import { ExportOptionsModal } from './ExportOptionsModal';
 import bookClient from '@/lib/api/bookClient';
 
 // Mock the performance tracking hook
-jest.mock('@/hooks/usePerformanceTracking', () => ({
-  usePerformanceTracking: () => ({
-    trackOperation: async (_name: string, fn: () => any) => fn(),
-  }),
-}));
+// One function for the module, as the real hook's useCallback([]) provides.
+// A fresh one per render would re-run every effect that depends on it.
+jest.mock('@/hooks/usePerformanceTracking', () => {
+  const trackOperation = async (_name: string, fn: () => any) => fn();
+  return { usePerformanceTracking: () => ({ trackOperation }) };
+});
 
 // Mock sonner toast
 jest.mock('sonner', () => ({

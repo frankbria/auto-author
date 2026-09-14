@@ -111,37 +111,50 @@ export function ExportOptionsModal({
   const [templateId, setTemplateId] = useState<string | undefined>(undefined);
   const [customization, setCustomization] = useState<TemplateCustomization>({});
 
-  // Book statistics
+  // Book statistics, fetched once per open (#584).
+  //
+  // Each open is its own request, so a reopen hides the figures and disables
+  // Export until *that* open's response settles, as before. Opens are counted
+  // during render (React's pattern for state that changes with a prop), and the
+  // request is keyed on them. Loading is then derived: a request is loading until
+  // a response tagged with its key settles. The effect only sets state after
+  // awaiting, and ignores a response for an open the user already dismissed,
+  // which the old flag could not tell apart from the current one.
   const [stats, setStats] = useState<BookExportStats | null>(null);
-  const [loadingStats, setLoadingStats] = useState(false);
+  const [openCount, setOpenCount] = useState(isOpen ? 1 : 0);
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) setOpenCount(openCount + 1);
+  }
+  const statsRequest = isOpen && bookId ? `${bookId}:${openCount}` : null;
+  const [settledRequest, setSettledRequest] = useState<string | null>(null);
+  const loadingStats = statsRequest !== null && settledRequest !== statsRequest;
 
-  // Declared before the effect that calls it (#584, react-hooks/immutability).
-  // With the effect first, the call sat in the binding's temporal dead zone: it
-  // works because effects run after render, but the earlier access cannot see a
-  // later redefinition of the value.
-  const loadBookStats = async () => {
-    try {
-      setLoadingStats(true);
-      const { data: response } = await trackOperation('export-stats', async () => {
-        return await bookClient.getExportFormats(bookId);
-      }, { bookId });
-      setStats(response.book_stats);
-      setTemplates(response.templates ?? []);
-    } catch (error) {
-      console.error('Failed to load book statistics:', error);
-      toast.error({ title: 'Failed to load book information' });
-    } finally {
-      setLoadingStats(false);
-    }
-  };
-
-
-  // Load book statistics when modal opens
   useEffect(() => {
-    if (isOpen && bookId) {
-      loadBookStats();
-    }
-  }, [isOpen, bookId]);
+    if (!statsRequest) return;
+    let ignore = false;
+    const loadBookStats = async () => {
+      try {
+        const { data: response } = await trackOperation('export-stats', async () => {
+          return await bookClient.getExportFormats(bookId);
+        }, { bookId });
+        if (ignore) return;
+        setStats(response.book_stats);
+        setTemplates(response.templates ?? []);
+      } catch (error) {
+        if (ignore) return;
+        console.error('Failed to load book statistics:', error);
+        toast.error({ title: 'Failed to load book information' });
+      } finally {
+        if (!ignore) setSettledRequest(statsRequest);
+      }
+    };
+    loadBookStats();
+    return () => {
+      ignore = true;
+    };
+  }, [statsRequest, bookId, trackOperation]);
 
   const handleExport = () => {
     const hasCustomization = Object.keys(customization).length > 0;
