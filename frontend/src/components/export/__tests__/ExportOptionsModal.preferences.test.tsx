@@ -6,11 +6,12 @@ import '@testing-library/jest-dom';
 import { ExportOptionsModal } from '../ExportOptionsModal';
 import type { UserPreferences } from '@/hooks/useProfileApi';
 
-jest.mock('@/hooks/usePerformanceTracking', () => ({
-  usePerformanceTracking: () => ({
-    trackOperation: async (_name: string, fn: () => unknown) => fn(),
-  }),
-}));
+// One function for the module, as the real hook's useCallback([]) provides.
+// A fresh one per render would re-run every effect that depends on it.
+jest.mock('@/hooks/usePerformanceTracking', () => {
+  const trackOperation = async (_name: string, fn: () => unknown) => fn();
+  return { usePerformanceTracking: () => ({ trackOperation }) };
+});
 jest.mock('sonner', () => ({ toast: { error: jest.fn(), success: jest.fn() } }));
 jest.mock('@/lib/api/bookClient', () => ({
   __esModule: true,
