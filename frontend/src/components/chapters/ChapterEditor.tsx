@@ -68,6 +68,25 @@ function readSavedView(key: string): ChapterView {
   }
 }
 
+// Whether a restorable backup exists for a chapter. Read on every render through
+// useSyncExternalStore, so it is keyed to the chapter on screen and always agrees
+// with storage (#584). Validation parses a whole chapter, so it only runs when the
+// stored string changes; an unchanged string reuses the last answer.
+let backupCache: { raw: string; valid: boolean } | null = null;
+function readHasBackup(key: string): boolean {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(key);
+  } catch {
+    return false;
+  }
+  if (raw === null) return false;
+  if (backupCache?.raw === raw) return backupCache.valid;
+  const valid = getValidatedItem<ChapterBackup>(key, validateChapterBackup) !== null;
+  backupCache = { raw, valid };
+  return valid;
+}
+
 interface ChapterEditorProps {
   bookId: string;
   chapterId: string;
@@ -100,7 +119,11 @@ export function ChapterEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [autoSavePending, setAutoSavePending] = useState(false);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
-  const [hasBackup, setHasBackup] = useState(false);
+  const backupKey = `chapter-backup-${bookId}-${chapterId}`;
+  const hasBackup = useSyncExternalStore(subscribeToNothing, () => readHasBackup(backupKey), () => false);
+  // Storage raises no event in the tab that wrote it; bumping this re-reads it.
+  const [, setBackupWrites] = useState(0);
+  const noteBackupWrite = () => setBackupWrites((n) => n + 1);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Snapshot of content before a style transform, for single-level revert (#58).
   const [preTransformContent, setPreTransformContent] = useState<string | null>(null);
@@ -183,15 +206,6 @@ export function ChapterEditor({
     immediatelyRender: false,
   });
 
-  // Check for localStorage backup on mount (with validation)
-  useEffect(() => {
-    const backupKey = `chapter-backup-${bookId}-${chapterId}`;
-    const backup = getValidatedItem<ChapterBackup>(backupKey, validateChapterBackup);
-    if (backup) {
-      setHasBackup(true);
-    }
-  }, [bookId, chapterId]);
-
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -269,7 +283,7 @@ export function ChapterEditor({
         // Clear backup after successful save
         const backupKey = `chapter-backup-${bookId}-${chapterId}`;
         localStorage.removeItem(backupKey);
-        setHasBackup(false);
+        noteBackupWrite();
       } catch (err) {
         console.error('Failed to auto-save chapter:', err);
 
@@ -283,7 +297,7 @@ export function ChapterEditor({
           };
           const saved = setValidatedItem(backupKey, backup, validateChapterBackup);
           if (saved) {
-            setHasBackup(true);
+            noteBackupWrite();
             setError('Failed to auto-save. Content backed up locally.');
           } else {
             setError('Failed to auto-save and backup chapter content');
@@ -318,7 +332,7 @@ export function ChapterEditor({
       // Clear backup after successful save
       const backupKey = `chapter-backup-${bookId}-${chapterId}`;
       localStorage.removeItem(backupKey);
-      setHasBackup(false);
+      noteBackupWrite();
 
       if (onSave) {
         onSave(content);
@@ -339,7 +353,7 @@ export function ChapterEditor({
           error: err instanceof Error ? err.message : 'Unknown error'
         };
         setValidatedItem(backupKey, backup, validateChapterBackup);
-        setHasBackup(true);
+        noteBackupWrite();
       } catch (storageErr) {
         console.error('Failed to backup after manual save failure:', storageErr);
       }
@@ -433,7 +447,7 @@ export function ChapterEditor({
         editor.commands.setContent(backup.content);
         setAutoSavePending(true); // Trigger auto-save of recovered content
         setHasUnsavedChanges(true);
-        setHasBackup(false);
+        noteBackupWrite();
         localStorage.removeItem(backupKey);
       } catch (err) {
         console.error('Failed to recover backup:', err);
@@ -445,7 +459,7 @@ export function ChapterEditor({
   const handleDismissBackup = () => {
     const backupKey = `chapter-backup-${bookId}-${chapterId}`;
     localStorage.removeItem(backupKey);
-    setHasBackup(false);
+    noteBackupWrite();
   };
 
   if (isLoading) {
