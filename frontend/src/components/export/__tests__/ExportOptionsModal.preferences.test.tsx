@@ -30,10 +30,14 @@ jest.mock('@/lib/api/bookClient', () => ({
   },
 }));
 
-let preferences: UserPreferences | null = null;
+// `mock`-prefixed so the hoisted `jest.mock` factory below may close over it.
+// This repo transforms with SWC, which does not enforce that — the file passes
+// without it — but babel-plugin-jest-hoist does, so the prefix keeps it
+// portable, matching `mockPush`/`mockParams` elsewhere.
+let mockPreferences: UserPreferences | null = null;
 jest.mock('@/hooks/useUserPreferences', () => ({
   __esModule: true,
-  useUserPreferences: () => preferences,
+  useUserPreferences: () => mockPreferences,
   invalidateUserPreferencesCache: jest.fn(),
 }));
 
@@ -78,14 +82,14 @@ function selectedFormat(): string | undefined {
 describe('ExportOptionsModal stored defaults (#693)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    preferences = null;
+    mockPreferences = null;
   });
 
   it('applies the stored default when preferences arrive', async () => {
     const { rerender } = render(<ExportOptionsModal {...props} />);
     expect(selectedFormat()).toBe('pdf');
 
-    preferences = prefs('epub');
+    mockPreferences = prefs('epub');
     rerender(<ExportOptionsModal {...props} />);
 
     expect(selectedFormat()).toBe('epub');
@@ -99,7 +103,7 @@ describe('ExportOptionsModal stored defaults (#693)', () => {
     await userEvent.click(screen.getByLabelText(/Word Document/i));
     expect(selectedFormat()).toBe('docx');
 
-    preferences = prefs('epub');
+    mockPreferences = prefs('epub');
     rerender(<ExportOptionsModal {...props} />);
 
     expect(selectedFormat()).toBe('docx');
@@ -108,14 +112,14 @@ describe('ExportOptionsModal stored defaults (#693)', () => {
   it('applies a later change even after the format has been touched', async () => {
     // The defect. Saving a new default in Settings notifies this consumer; the
     // old guard made it a no-op for the life of the page.
-    preferences = prefs('pdf');
+    mockPreferences = prefs('pdf');
     const { rerender } = render(<ExportOptionsModal {...props} />);
     expect(selectedFormat()).toBe('pdf');
 
     await userEvent.click(screen.getByLabelText(/Word Document/i));
     expect(selectedFormat()).toBe('docx');
 
-    preferences = prefs('epub');
+    mockPreferences = prefs('epub');
     rerender(<ExportOptionsModal {...props} />);
 
     expect(selectedFormat()).toBe('epub');
@@ -124,7 +128,7 @@ describe('ExportOptionsModal stored defaults (#693)', () => {
   it('leaves the choice alone when the preferences object is unchanged', async () => {
     // Re-rendering for any other reason must not undo a choice — the guard on
     // object identity, not just on "did anything arrive".
-    preferences = prefs('pdf');
+    mockPreferences = prefs('pdf');
     const { rerender } = render(<ExportOptionsModal {...props} />);
 
     await userEvent.click(screen.getByLabelText(/Word Document/i));
