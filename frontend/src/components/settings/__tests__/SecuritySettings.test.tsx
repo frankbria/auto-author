@@ -434,4 +434,37 @@ describe('ActiveSessionsList', () => {
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
     await waitFor(() => expect(screen.getByText('This device')).toBeInTheDocument());
   });
+
+  it('shows the loading state again while a retry is in flight (#584)', async () => {
+    // Retry is the one path where the list goes from error back to loading. That
+    // used to be a synchronous setState in the loader; this pins what it showed.
+    mockListSessions.mockRejectedValueOnce(new Error('nope'));
+    let resolveRetry: (value: { data: typeof sessions; error: null }) => void = () => {};
+    mockListSessions.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRetry = resolve;
+      })
+    );
+    render(<ActiveSessionsList />);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Loading sessions'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    resolveRetry({ data: sessions, error: null });
+    await waitFor(() => expect(screen.getByText('This device')).toBeInTheDocument());
+  });
+
+  it('shows the error again when a retry also fails', async () => {
+    mockListSessions.mockRejectedValueOnce(new Error('nope')).mockRejectedValueOnce(new Error('still nope'));
+    render(<ActiveSessionsList />);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+
+    await waitFor(() => expect(mockListSessions).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+  });
 });

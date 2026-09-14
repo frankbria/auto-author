@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,24 +42,29 @@ export default function ActiveSessionsList() {
   const currentToken = session?.session?.token;
 
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading');
+  // Each load is an attempt; Retry starts the next one. The effect records how
+  // an attempt ended, and an attempt without an outcome yet is loading. Derived
+  // rather than set to 'loading' before the request, which was a synchronous
+  // setState in an effect (#584). No stale-response guard: Retry only renders
+  // once the current attempt has failed, so two are never in flight.
+  const [attempt, setAttempt] = useState(0);
+  const [outcome, setOutcome] = useState<{ attempt: number; state: 'loaded' | 'error' } | null>(null);
+  const loadState = outcome?.attempt === attempt ? outcome.state : 'loading';
   const [revokingToken, setRevokingToken] = useState<string | null>(null);
 
-  const loadSessions = useCallback(async () => {
-    setLoadState('loading');
-    try {
-      const { data, error } = await authClient.listSessions();
-      if (error) throw new Error(error.message || 'Failed to load sessions');
-      setSessions((data ?? []) as SessionInfo[]);
-      setLoadState('loaded');
-    } catch {
-      setLoadState('error');
-    }
-  }, []);
-
   useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const { data, error } = await authClient.listSessions();
+        if (error) throw new Error(error.message || 'Failed to load sessions');
+        setSessions((data ?? []) as SessionInfo[]);
+        setOutcome({ attempt, state: 'loaded' });
+      } catch {
+        setOutcome({ attempt, state: 'error' });
+      }
+    };
     void loadSessions();
-  }, [loadSessions]);
+  }, [attempt]);
 
   const revokeSession = async (token: string) => {
     setRevokingToken(token);
@@ -115,7 +120,7 @@ export default function ActiveSessionsList() {
         {loadState === 'error' && (
           <div role="alert" className="flex items-center justify-between text-sm text-destructive">
             <span>Couldn&apos;t load your sessions.</span>
-            <Button variant="outline" size="sm" onClick={() => void loadSessions()}>
+            <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>
               Retry
             </Button>
           </div>
