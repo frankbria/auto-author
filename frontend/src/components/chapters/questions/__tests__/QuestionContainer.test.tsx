@@ -719,4 +719,46 @@ describe('QuestionContainer - chapter change (#584)', () => {
     expect(screen.getByText('Chapter 2 question')).toBeInTheDocument();
     expect(screen.queryByText('Chapter 1 question')).not.toBeInTheDocument();
   });
+
+  it('does not show a previous chapter’s progress when it lands after the switch', async () => {
+    // Chapter 1's questions arrive and its progress request is still out when the
+    // user moves on. That progress belongs to chapter 1.
+    type QuestionsResponse = Awaited<ReturnType<typeof bookClient.getChapterQuestions>>;
+    let resolveFirstProgress: (value: QuestionProgressResponse) => void = () => {};
+    mockedBookClient.getChapterQuestions
+      .mockResolvedValueOnce({ questions: [makeQuestion({ id: 'q-ch1', question_text: 'Chapter 1 question' })] } as QuestionsResponse)
+      .mockResolvedValueOnce({
+        questions: [makeQuestion({ id: 'q-ch2', chapter_id: 'ch-2', question_text: 'Chapter 2 question' })],
+      } as QuestionsResponse);
+    mockedBookClient.getChapterQuestionProgress
+      .mockReturnValueOnce(new Promise<QuestionProgressResponse>((resolve) => { resolveFirstProgress = resolve; }))
+      .mockResolvedValueOnce({ ...mockProgress, total: 4, completed: 3 });
+
+    const { rerender } = render(<QuestionContainer {...defaultProps} />);
+    await waitFor(() => expect(mockedBookClient.getChapterQuestionProgress).toHaveBeenCalledTimes(1));
+
+    rerender(<QuestionContainer {...defaultProps} chapterId="ch-2" />);
+    await waitFor(() => expect(screen.getByText('3/4 complete')).toBeInTheDocument());
+
+    await act(async () => {
+      resolveFirstProgress({ ...mockProgress, total: 9, completed: 1 });
+    });
+
+    expect(screen.getByText('3/4 complete')).toBeInTheDocument();
+    expect(screen.queryByText('1/9 complete')).not.toBeInTheDocument();
+  });
+
+  it('clears the previous chapter’s load error when the chapter changes', async () => {
+    type QuestionsResponse = Awaited<ReturnType<typeof bookClient.getChapterQuestions>>;
+    mockedBookClient.getChapterQuestions
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockReturnValueOnce(new Promise<QuestionsResponse>(() => {}));
+
+    const { rerender } = render(<QuestionContainer {...defaultProps} />);
+    await waitFor(() => expect(screen.getByTestId('generator-error')).toBeInTheDocument());
+
+    rerender(<QuestionContainer {...defaultProps} chapterId="ch-2" />);
+
+    await waitFor(() => expect(screen.queryByTestId('generator-error')).not.toBeInTheDocument());
+  });
 });
