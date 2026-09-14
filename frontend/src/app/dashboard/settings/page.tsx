@@ -84,19 +84,30 @@ export default function SettingsPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
-    if (tab && SETTINGS_TABS.includes(tab)) {
-      setActiveTab(tab);
-    }
     const checkout = params.get('checkout');
+    // A checkout result lands on Billing whatever ?tab= says.
+    const landingTab =
+      checkout === 'success' || checkout === 'cancel'
+        ? 'billing'
+        : tab && SETTINGS_TABS.includes(tab)
+          ? tab
+          : null;
+    if (landingTab) {
+      // Read from an external system once, on arrival (#584): the tab comes from
+      // the URL, which this same effect then rewrites to strip ?checkout=, so a
+      // value derived from the URL during render would change underneath itself.
+      // Rewriting ?checkout=success to ?tab=billing instead would break #221's
+      // clean-URL behaviour, which the billing tests pin.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab(landingTab);
+    }
     if (checkout === 'success') {
-      setActiveTab('billing');
       toast({
         title: 'Checkout complete',
         description: 'Payment received — your plan will update shortly once Stripe confirms it.',
         variant: 'success',
       });
     } else if (checkout === 'cancel') {
-      setActiveTab('billing');
       toast({
         title: 'Checkout canceled',
         description: 'You have not been charged.',
@@ -111,7 +122,6 @@ export default function SettingsPage() {
         `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isLoaded = loadState === 'loaded';

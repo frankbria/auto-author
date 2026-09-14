@@ -22,7 +22,6 @@
     "test:e2e:staging:debug": "playwright test --config=tests/e2e/staging/playwright.config.ts --debug",
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "node scripts/typecheck-tests.mjs",
-    "gate:react-hooks": "node scripts/react-hooks-gate.mjs",
     "check:specs": "node scripts/check-spec-coverage.mjs"
   },
   "dependencies": {

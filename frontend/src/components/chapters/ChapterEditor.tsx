@@ -257,6 +257,12 @@ export function ChapterEditor({
   useEffect(() => {
     if (editor && initialContent && editor.getHTML() !== initialContent) {
       editor.commands.setContent(initialContent);
+      // Synchronising an external system (#584): the TipTap editor is imperative,
+      // and whether it needs new content is only knowable by reading it. The saved
+      // marker must move with the content pushed into it, or the next update reads
+      // as an unsaved change; deriving it during render would change which content
+      // counts as saved.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLastAutoSavedContent(initialContent);
     }
   }, [initialContent, editor]);
