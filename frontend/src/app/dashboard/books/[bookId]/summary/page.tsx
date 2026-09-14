@@ -22,7 +22,16 @@ export default function BookSummaryPage() {
   const params = useParams();
   const bookId = typeof params?.bookId === 'string' ? params.bookId : Array.isArray(params?.bookId) ? params.bookId[0] : '';
   const [summary, setSummary] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  // Two flags, because these were one and that one meant two things (#584). The
+  // fetch and the save both wrote the single flag, and its only reader was the
+  // submit button — so while the page was *loading* the summary, its button
+  // already read "Saving...", before anything had been saved.
+  //
+  // `summaryLoaded` is the raw fact the effect learns. "Still loading" is derived
+  // from it, which also covers the no-bookId case (nothing to load, so nothing to
+  // wait for) without an effect having to announce it.
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
   // Advertised capability must match reality: this button used to render enabled
@@ -42,7 +51,6 @@ export default function BookSummaryPage() {
   // Load summary and history from remote on mount
   useEffect(() => {
     if (!bookId) return;
-    setIsLoading(true);
     bookClient.getBookSummary(bookId)
       .then((data) => {
         setSummary(data.summary || '');
@@ -50,7 +58,11 @@ export default function BookSummaryPage() {
         lastSaved.current = data.summary || '';
       })
       .catch(() => {})
-      .finally(() => setIsLoading(false));
+      .finally(() => setSummaryLoaded(true));
+    // Re-enter the loading state for the next book: the app router keeps this
+    // component mounted across a `[bookId]` change, so without this the new
+    // book's form would render the previous one's summary as though loaded.
+    return () => setSummaryLoaded(false);
   }, [bookId]);
 
   // Auto-save to localStorage and remote (debounced)
@@ -82,6 +94,9 @@ export default function BookSummaryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
 
+  // Derived, not stored: with no book there is nothing to load, so nothing to
+  // wait for, and the effect never has to say so.
+  const isLoadingSummary = Boolean(bookId) && !summaryLoaded;
   const inputError = getSummaryReadinessError(summary);
 
   // Speech recognition setup
@@ -184,7 +199,7 @@ export default function BookSummaryPage() {
       setError(validation);
       return;
     }
-    setIsLoading(true);
+    setIsSaving(true);
     setError('');
     try {
       await bookClient.saveBookSummary(bookId, summary);
@@ -193,7 +208,7 @@ export default function BookSummaryPage() {
       setError(err instanceof Error ? err.message : String(err));
       setIsListening(false);
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -330,13 +345,13 @@ export default function BookSummaryPage() {
                 is correct and WCAG 1.4.3 exempts it. */}
             <button
               type="submit"
-              disabled={isLoading || !!inputError}
-              aria-busy={isLoading || undefined}
+              disabled={isSaving || isLoadingSummary || !!inputError}
+              aria-busy={isSaving || undefined}
               className={`px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md ${
-                isLoading ? 'disabled:opacity-100 cursor-progress' : 'disabled:opacity-50'
+                isSaving ? 'disabled:opacity-100 cursor-progress' : 'disabled:opacity-50'
               }`}
             >
-              {isLoading ? 'Saving...' : 'Continue to TOC Generation'}
+              {isSaving ? 'Saving...' : 'Continue to TOC Generation'}
             </button>
           </div>
         </form>
