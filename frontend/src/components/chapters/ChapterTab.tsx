@@ -71,7 +71,7 @@ const LOADING_SPINNER = 'text-blue-600 dark:text-blue-400';
 // reads the values from here.
 //
 // The active title is `text-primary`, which is *not* the `--primary` token: it
-// is tailwind.config.js's theme-fixed brand indigo, repainted indigo-400 in
+// is the theme-fixed brand indigo (`--color-primary` in globals.css's `@theme`), repainted indigo-400 in
 // dark by #610's `.dark .text-primary` override. Pricing it as the token gave
 // 1.15:1 here, a colour that never renders — see the guard's
 // `activeTitleColor()`.

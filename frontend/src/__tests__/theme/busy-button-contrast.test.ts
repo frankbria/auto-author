@@ -95,7 +95,7 @@ describe('busy buttons keep their status text legible (#642)', () => {
   it('clears AA for the default variant in both themes, on both surfaces', () => {
     // `busy` restores opacity-100, so the label composites against its own fill
     // and the surface behind it no longer enters the maths. `bg-primary` and
-    // `text-primary-foreground` are theme-fixed in tailwind.config.js (#634), so
+    // `text-primary-foreground` are theme-fixed in `@theme` (#634), so
     // one ratio covers both themes — asserted per surface anyway, because the
     // day that stops being true is the day this should fail.
     const css = readFileSync(GLOBALS, 'utf8');

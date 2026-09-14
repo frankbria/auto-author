@@ -407,7 +407,7 @@
    text role has to lighten in dark: 7.16 on --background, 6.48 on --card,
    5.47 on --muted, 4.76 on the bg-destructive/20 error card. White is 2.24:1
    on this, which is why the *fill* does not use this token — see
-   `destructive.surface` in tailwind.config.js. */
+   `--color-destructive-surface` in `@theme`. */
   --destructive-rgb: 248 113 113;
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
@@ -469,7 +469,7 @@
 }
 
 @layer utilities {
-  /* #610: `primary` is a theme-fixed brand colour (tailwind.config.js), so
+  /* #610: `primary` is a theme-fixed brand colour (`--color-primary` in `@theme`), so
      `text-primary` stayed indigo-600 on the dark surfaces — 2.85:1 on the
      header's `bg-card`, under the 4.5:1 WCAG 2.1 AA floor. indigo-400 clears
      it everywhere text-primary lands in dark (6.0:1 on card, 6.6:1 on

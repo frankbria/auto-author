@@ -25,13 +25,13 @@
     },
     {
       "path": "rules/static-guard-invariants.md",
-      "hash": "01d35644cb8838761a2488935269dd831a1b2d0d865cdcda4fc424a479230ca9",
+      "hash": "558d20ef2cb81a8f2321fc9ad70792babf27308979440006ebbdab6201998c81",
       "description": "Static theme/contrast guards \u2014 what makes one real instead of decorative",
       "globs": [
         "frontend/src/__tests__/theme/**",
         "frontend/*baseline*.json",
         "frontend/src/app/globals.css",
-        "frontend/tailwind.config.js"
+        "frontend/src/components/**/*.css"
       ],
       "dirs": [],
       "prompt": [],

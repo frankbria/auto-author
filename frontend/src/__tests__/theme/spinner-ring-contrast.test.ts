@@ -39,7 +39,7 @@ import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
  * were "likely fine": two are (7.13 on `bg-green-800`), but the regenerate
  * button paints `disabled:bg-muted` at exactly the moment its spinner shows, so
  * that ring is white on `#f5f5f5`. And it missed `border-primary` entirely —
- * which is the #634 trap: `tailwind.config.js` pins `primary` to the brand
+ * which is the #634 trap: `@theme` pins `--color-primary` to the brand
  * indigo `rgb(79, 70, 229)` and #610's override is `.dark .text-primary` only,
  * so `border-primary` does not flip with the theme.
  *
@@ -633,8 +633,8 @@ describe('every animate-spin ring clears WCAG 2.1 1.4.11 (#635)', () => {
   });
 
   it('reproduces border-primary at 2.85:1 on dark --card (#635)', () => {
-    // Not the `--primary` token, which would be 14.23 here: `tailwind.config.js`
-    // pins `primary` to brand indigo and #610 overrode only `.dark .text-primary`.
+    // Not the `--primary` token, which would be 14.23 here: `@theme` pins
+    // `--color-primary` to brand indigo and #610 overrode only `.dark .text-primary`.
     const brand = resolveColour('primary', 'dark', 'border')!;
     const beforeFix = contrastRatio(brand, oklchToken(themeBlock(css, 'dark'), 'card'));
 

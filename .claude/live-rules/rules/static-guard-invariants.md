@@ -1,6 +1,6 @@
 ---
 description: Static theme/contrast guards — what makes one real instead of decorative
-globs: ["frontend/src/__tests__/theme/**", "frontend/*baseline*.json", "frontend/src/app/globals.css", "frontend/tailwind.config.js"]
+globs: ["frontend/src/__tests__/theme/**", "frontend/*baseline*.json", "frontend/src/app/globals.css", "frontend/src/components/**/*.css"]
 priority: 65
 ---
 Every rule here is a defect this repo actually shipped, not a style preference.
@@ -15,10 +15,12 @@ file nobody registered.
 not a measurement. Re-derive it from `globals.css` tokens and the palette using
 `__tests__/theme/helpers/contrast.ts`. Two wrong numbers shipped by copying them out of an issue.
 
-**Confirm which declaration the utility actually resolves to.** `text-primary` is `tailwind.config.js`'s
-brand indigo plus a `.dark .text-primary` override in `globals.css` — not the `--primary` token, which
-feeds only the v4-only `@theme` block that v3 ignores. #634 published 16.39/1.15 for a colour that
-never renders. Check `tailwind.config.js` and any `@layer utilities` before pricing a class.
+**Confirm which declaration the utility actually resolves to.** `text-primary` is `@theme`'s pinned
+`--color-primary` (brand indigo) plus a `.dark .text-primary` override in `globals.css` — not the
+`--primary` token, which no colour utility reads. #634 published 16.39/1.15 for a colour that never
+renders. Check the `@theme` `--color-*` entry and any `@layer utilities` before pricing a class; the
+guards read it through `helpers/palette.ts` (`themeColor`, `colors`), never `tailwindcss/colors`,
+whose v4 export is an oklch palette the app does not paint.
 
 **Ledger per distinct value, never a per-file total.** A single total lets a net-zero swap through:
 drop one `text-gray-500`, add one `text-gray-300`, count unchanged. Pair it with a stale-row assertion

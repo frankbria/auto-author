@@ -9,8 +9,8 @@ import { FRONTEND_ROOT, shippedSources } from './helpers/sources';
  * Every opacity-modified colour class the app uses is actually emitted
  * (#682, widened in #697).
  *
- * The other guards in this directory read `tailwind.config.js` and
- * `globals.css` and do colour maths on what they find. None of them can see
+ * The other guards in this directory read `globals.css` (its tokens and its
+ * `@theme` colours) and do colour maths on what they find. None of them can see
  * whether Tailwind *generates a rule* for a class, and v3 silently generates
  * none for `<colour>/<n>` when it cannot parse the colour:
  *
