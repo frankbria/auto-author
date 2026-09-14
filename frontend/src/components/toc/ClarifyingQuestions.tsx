@@ -50,9 +50,12 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
 
     if (bookId && questions.length > 0) {
       loadExistingResponses();
-    } else {
-      setIsLoadingResponses(false);
     }
+    // No `else { setIsLoadingResponses(false) }` (#584). "There is nothing to
+    // load" is a fact about `bookId` and `questions`, not a fetch result, so it
+    // is derived below rather than written into the fetch's own state by an
+    // effect. The state now means one thing — *the fetch has not finished* — and
+    // the two conditions are combined where they are read.
   }, [bookId, questions]);
   // Auto-save responses with debouncing
   useEffect(() => {
@@ -128,6 +131,11 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
     }
   };
 
+  // Derived, not stored (#584): the skeleton shows while the fetch is in flight
+  // *and* there is something to fetch. With no book or no questions there is
+  // nothing to wait for, which the effect used to record by writing `false` into
+  // the fetch's own state.
+  const showLoadingResponses = isLoadingResponses && Boolean(bookId) && questions.length > 0;
   const allQuestionsAnswered = questions.every((_, index) =>
     responses[index] && responses[index].trim().length > 0
   );
@@ -207,7 +215,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         </div>
       </div>
 
-      {isLoadingResponses ? (
+      {showLoadingResponses ? (
         <div
           className="bg-card border border-border rounded-lg p-6 mb-6 animate-pulse"
           role="status"
@@ -251,7 +259,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
       <div className="flex justify-between items-center mb-6">
         <button
           onClick={handlePrevious}
-          disabled={currentQuestionIndex === 0 || isLoading || isLoadingResponses}
+          disabled={currentQuestionIndex === 0 || isLoading || showLoadingResponses}
           className="px-4 py-2 bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-md transition-colors flex items-center"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -263,7 +271,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         {currentQuestionIndex < questions.length - 1 ? (
           <button
             onClick={handleNext}
-            disabled={!responses[currentQuestionIndex]?.trim() || isLoading || isLoadingResponses}
+            disabled={!responses[currentQuestionIndex]?.trim() || isLoading || showLoadingResponses}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 disabled:text-indigo-400 text-white rounded-md transition-colors flex items-center"
           >
             Next
@@ -274,7 +282,7 @@ export default function ClarifyingQuestions({ questions, onSubmit, isLoading, bo
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={!allQuestionsAnswered || isLoading || isLoadingResponses}
+            disabled={!allQuestionsAnswered || isLoading || showLoadingResponses}
             className="px-6 py-2 bg-green-700 hover:bg-green-800 disabled:bg-green-800 disabled:text-green-400 text-white font-medium rounded-md transition-colors flex items-center"
           >
             {isLoading ? (
