@@ -16,6 +16,11 @@ jest.mock('../DraftGenerator', () => ({
 
 const mockBookClient = bookClient as jest.Mocked<typeof bookClient>;
 
+// A fully typed chapter-content response. The older tests here pass a bare
+// `{ content }`, which is ledgered in the test typecheck backlog (#625).
+type ChapterContent = Awaited<ReturnType<typeof bookClient.getChapterContent>>;
+const chapterContent = (content: string) => ({ content } as ChapterContent);
+
 describe('ChapterEditor localStorage backup', () => {
   const defaultProps = {
     bookId: 'book-1',
@@ -452,6 +457,52 @@ describe('ChapterEditor localStorage backup', () => {
       // Both backups should still exist (neither was dismissed/restored)
       expect(localStorage.getItem(backupKey1)).toBeTruthy();
       expect(localStorage.getItem(backupKey2)).toBeTruthy();
+    });
+
+    // #584: the banner is read from storage for the chapter on screen, instead of
+    // a flag an effect set once on mount and eight handlers kept in step by hand.
+    // These two are the cases where the flag and storage disagreed.
+
+    it('drops the banner when the editor is reused for a chapter without a backup', async () => {
+      localStorage.setItem(
+        'chapter-backup-book-1-chapter-1',
+        JSON.stringify({ content: '<p>Chapter 1 backup</p>', timestamp: Date.now(), error: 'Error 1' })
+      );
+      mockBookClient.getChapterContent.mockResolvedValue(chapterContent('<p>Current</p>'));
+
+      const { rerender } = render(<ChapterEditor {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByText(/A local backup of your content is available/i)).toBeInTheDocument();
+      });
+
+      // TabContent reuses this editor for the next chapter without a key.
+      rerender(<ChapterEditor {...defaultProps} chapterId="chapter-2" />);
+
+      await waitFor(() => {
+        expect(screen.queryByText(/A local backup of your content is available/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('offers no restore when a failed manual save could not write the backup', async () => {
+      const user = userEvent.setup({ delay: null });
+      mockBookClient.getChapterContent.mockResolvedValue(chapterContent('<p>Initial content</p>'));
+      mockBookClient.saveChapterContent.mockRejectedValue(new Error('Server error'));
+      const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      });
+
+      try {
+        render(<ChapterEditor {...defaultProps} />);
+        await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument());
+
+        await user.click(screen.getByRole('button', { name: /save/i }));
+        await waitFor(() => expect(screen.getByText(/Failed to save/i)).toBeInTheDocument());
+
+        // Nothing was stored, so a Restore button would restore nothing.
+        expect(screen.queryByRole('button', { name: /restore backup/i })).not.toBeInTheDocument();
+      } finally {
+        setItem.mockRestore();
+      }
     });
   });
 });

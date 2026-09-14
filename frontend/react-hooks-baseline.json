@@ -28,7 +28,7 @@
     },
     "src/components/chapters/ChapterEditor.tsx": {
       "rules": {
-        "react-hooks/set-state-in-effect": 2
+        "react-hooks/set-state-in-effect": 1
       }
     },
     "src/components/chapters/questions/QuestionContainer.tsx": {
