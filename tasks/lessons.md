@@ -1198,3 +1198,22 @@ about the sweep.
 v4's `node_modules`, and jest reported **158 failures** that had nothing to do
 with the change. `npm ci` with CI's npm, then the same suite: 0. After any
 checkout that changes `package-lock.json`, reinstall first.
+
+### A manual mock under an import alias makes every factory for that module miss
+2026-09-14, #713. `frontend/__mocks__/@/lib/auth-client.ts` sat there from #39. next/jest's
+SWC transform compiles `import … from '@/lib/auth-client'` to `require('../lib/auth-client')`,
+while `jest.mock('@/lib/auth-client', factory)` keeps the alias, and Jest folded the manual mock
+into only the aliased specifier's module id. The global factory in `jest.setup.ts` and fourteen
+per-test factories therefore never reached a component. Every one of those tests passed, against
+a different mock. When a factory seems not to apply, compare a top-level `import` with an inline
+`require` of the same specifier in one file: two answers means two module instances. Then
+list every `__mocks__` directory.
+
+### Verify the commit landed before a mutation loop that reverts to HEAD
+2026-09-14, #712. The implementation commit and the mutation checks ran in one chained
+command. Pre-commit's `git write-tree` hit a transient `.git/index.lock`, the commit did not
+land, and the first `git checkout HEAD -- page.tsx` reverted the uncommitted page to main. It
+was recoverable only because the edit was a deterministic script. "Commit first" (#201) is not
+enough when the commit can fail inside the same command: capture `git rev-parse HEAD` before,
+compare after, require a clean `git status`, and exit before mutating if any check fails. That
+gate stopped the same failure twice more in #715.
