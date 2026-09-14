@@ -55,11 +55,12 @@ describe('ClarifyingQuestions loading skeleton (#584)', () => {
     // The counterweight: the derivation must not swallow the state it derives
     // from. A `showLoading` hard-wired to `false` would pass the two tests above
     // and fail this one.
-    let resolveFetch: (value: unknown) => void = () => {};
+    type Responses = Awaited<ReturnType<typeof bookClient.getQuestionResponses>>;
+    let resolveFetch: (value: Responses) => void = () => {};
     mockedBookClient.getQuestionResponses.mockReturnValue(
-      new Promise((resolve) => {
+      new Promise<Responses>((resolve) => {
         resolveFetch = resolve;
-      }) as ReturnType<typeof bookClient.getQuestionResponses>
+      })
     );
 
     render(<ClarifyingQuestions {...props} />);
@@ -69,7 +70,7 @@ describe('ClarifyingQuestions loading skeleton (#584)', () => {
       'true'
     );
 
-    resolveFetch({ responses: [], answered_at: null });
+    resolveFetch({ responses: [], status: 'ok' });
     await waitFor(() =>
       expect(screen.queryByTestId('clarifying-questions-skeleton')).not.toBeInTheDocument()
     );

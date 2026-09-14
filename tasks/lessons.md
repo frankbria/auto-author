@@ -1116,3 +1116,20 @@ The generalisation is not about React. When a change hinges on a variable's
 many distinct things does this variable mean". Grep every writer and every
 reader first; a flag serving two jobs has no single correct initial value, and
 the fix is to split it rather than to pick one.
+
+### Run every gate the PR can trip, not the ones you were thinking about
+2026-09-13, #691. Verified a change with `npx jest`, `npx eslint` and
+`npm run typecheck`, called it green, and opened the PR. CI failed on
+`typecheck:tests` — the **new test file** I had just written had a type error.
+
+`npm run typecheck` cannot see it: `tsconfig.json` excludes every test-shaped
+path, which is the whole reason `typecheck:tests` exists (#625). And jest runs
+through SWC, which strips types without checking them. So the two commands I ran
+were structurally incapable of catching a type error in the file I had added, and
+I ran them anyway and reported green.
+
+The repo's own note for #625 says exactly this. Knowing a gate exists is not the
+same as running it. The frontend gate list is `lint`, `typecheck`,
+`typecheck:tests`, `gate:react-hooks`, `check:specs`, `jest` — **adding a test
+file makes `typecheck:tests` load-bearing**, and that is the case where it is
+easiest to forget, because the change "is only a test".
