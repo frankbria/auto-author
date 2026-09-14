@@ -1,5 +1,9 @@
 /* frontend/src/components/chapters/editor.css */
 
+/* #513: under v4 a stylesheet outside the main entry must @reference the theme
+   before @apply can see any utility, including the pinned palette and prose. */
+@reference "../../app/globals.css";
+
 .tiptap-editor {
   @apply prose prose-sm max-w-none text-black;
 }
@@ -51,11 +55,11 @@
 
 /* Focus styles */
 .tiptap-editor:focus {
-  @apply outline-none;
+  @apply outline-hidden;
 }
 
 .tiptap-editor .ProseMirror:focus {
-  @apply outline-none;
+  @apply outline-hidden;
 }
 
 /* Placeholder */
