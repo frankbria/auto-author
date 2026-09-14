@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-import colors from 'tailwindcss/colors';
+import { colors } from './helpers/palette';
 
 import {
   contrastRatio,
