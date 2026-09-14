@@ -4,7 +4,6 @@ import '@testing-library/jest-dom';
 
 import BookPage from '../page';
 import bookClient from '@/lib/api/bookClient';
-import { useSession } from '@/lib/auth-client';
 
 
 jest.mock('next/navigation', () => {
@@ -72,17 +71,14 @@ const page = (bookId: string) => (
   </Suspense>
 );
 
-// `@/lib/auth-client` is mocked globally in jest.setup.ts, and a file-level
-// jest.mock does not replace it, so the global useSession is configured instead.
-// Its default builds a new session object on every call; real better-auth keeps
-// `data` stable between renders, and this page lists `session` in its loader's
-// deps, so the default refetches in a loop. One object for every call.
-const stableSession = { data: { user: { id: 'u1' }, session: { token: 'tok' } }, isPending: false, error: null };
+// The session comes from `src/__mocks__/better-auth-react.ts`, which returns one
+// stable object as better-auth does. This page lists `session` in its loader's
+// deps, so a mock that built a fresh object per call made it refetch in a loop
+// and these tests time out. They are the tripwire for that mock.
 
 describe('BookPage loading (#584)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useSession as unknown as jest.Mock).mockReturnValue(stableSession);
     mockedClient.getToc.mockRejectedValue(new Error('no toc'));
     mockedClient.getBookSummary.mockResolvedValue({ summary: '' } as Awaited<ReturnType<typeof bookClient.getBookSummary>>);
   });
