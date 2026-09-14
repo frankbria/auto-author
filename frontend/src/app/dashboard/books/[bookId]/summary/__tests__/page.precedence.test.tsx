@@ -142,6 +142,27 @@ describe('BookSummaryPage summary precedence (#718)', () => {
     await waitFor(() => expect(field()).toHaveValue('Book two draft'));
   });
 
+  it('keeps a book’s draft when the user returns to it before the other book loads', async () => {
+    // From the third pre-PR review: A loads, the user goes to B and back to A
+    // before B settles. Keyed by book alone, A still read as loaded on its second
+    // visit, so auto-save could erase A's draft before that visit's load failed.
+    mockedClient.getBookSummary
+      .mockResolvedValueOnce({ summary: 'Book one summary', summary_history: [] } as SummaryResponse)
+      .mockReturnValueOnce(new Promise<SummaryResponse>(() => {}))
+      .mockRejectedValueOnce(new Error('offline'));
+
+    const { rerender } = render(<BookSummaryPage />);
+    await waitFor(() => expect(field()).toHaveValue('Book one summary'));
+
+    mockParams = { bookId: 'book-2' };
+    rerender(<BookSummaryPage />);
+    localStorage.setItem('book-summary-book-1', 'Book one draft');
+    mockParams = { bookId: 'book-1' };
+    rerender(<BookSummaryPage />);
+
+    await waitFor(() => expect(field()).toHaveValue('Book one draft'));
+  });
+
   it('ignores the previous book’s load when it lands after the switch', async () => {
     const first = deferred<SummaryResponse>();
     mockedClient.getBookSummary

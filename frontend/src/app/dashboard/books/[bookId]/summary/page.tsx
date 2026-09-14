@@ -27,14 +27,18 @@ export default function BookSummaryPage() {
   // submit button — so while the page was *loading* the summary, its button
   // already read "Saving...", before anything had been saved.
   //
-  // `loadedFor` is the raw fact the effect learns: which book's load settled.
+  // `loadedFor` is the raw fact the effect learns: which visit's load settled.
   // "Still loading" is derived from it, which also covers the no-bookId case
   // (nothing to load, so nothing to wait for) without an effect having to
   // announce it. Keyed by book rather than a boolean, so the render that switches
   // books already reads as not loaded; a boolean reset in the effect cleanup
   // arrived one render late and let auto-save erase the next book's draft (#718).
+  // Keyed by visit, not only book: going A → B → A before B settles would
+  // otherwise find A's first load still recorded and treat the return as loaded.
+  const [visit, setVisit] = useState(0);
+  const loadKey = `${bookId}:${visit}`;
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
-  const summaryLoaded = loadedFor === bookId;
+  const summaryLoaded = loadedFor === loadKey;
   const [isSaving, setIsSaving] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
@@ -66,6 +70,7 @@ export default function BookSummaryPage() {
   const [summaryFor, setSummaryFor] = useState(bookId);
   if (summaryFor !== bookId) {
     setSummaryFor(bookId);
+    setVisit(visit + 1);
     setSummary('');
     setSummaryHistory([]);
   }
@@ -94,12 +99,12 @@ export default function BookSummaryPage() {
         }
       })
       .finally(() => {
-        if (!ignore) setLoadedFor(bookId);
+        if (!ignore) setLoadedFor(loadKey);
       });
     return () => {
       ignore = true;
     };
-  }, [bookId]);
+  }, [bookId, loadKey]);
 
   // Auto-save to localStorage and remote (debounced). Not before the load has
   // settled: on mount `summary` is still empty, and writing it would erase the
