@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/toast';
 import { useSession } from '@/lib/auth-client';
@@ -29,7 +29,6 @@ export default function Dashboard() {
   const router = useRouter();
   const { data: session, isPending: isSessionPending } = useSession();
   const [projects, setProjects] = useState<BookProject[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   // `projects` being empty is not the same fact as "this library is empty" (#612).
   // After a delete evacuates a later page we splice locally and step back; if that
   // step-back's refetch then fails, the list is empty because a reload is pending,
@@ -54,9 +53,17 @@ export default function Dashboard() {
   const [hasRenderedOnce, setHasRenderedOnce] = useState(false);
   // Fetches are no longer one-per-visit: a page click, a delete refetch and a
   // session-identity change (better-auth refires on window focus) can all be in
-  // flight together. Without a token the slowest response wins and can restore a
-  // pre-delete snapshot over a newer one.
-  const requestIdRef = useRef(0);
+  // flight together. Without a guard the slowest response wins and can restore a
+  // pre-delete snapshot over a newer one. Every load now runs from one effect, keyed
+  // on the session, the page and a reload attempt, and its cleanup drops the
+  // superseded response. Callers that used to call the loader bump the attempt.
+  const [reloadAttempt, setReloadAttempt] = useState(0);
+  const reloadBooks = () => setReloadAttempt((n) => n + 1);
+  // Loading until a load has settled for this page, attempt and session: derived,
+  // not set before each request, which was a synchronous setState in an effect (#584).
+  const loadKey = `${page}:${reloadAttempt}`;
+  const [settledLoad, setSettledLoad] = useState<{ key: string; session: typeof session } | null>(null);
+  const isLoading = !(settledLoad && settledLoad.key === loadKey && settledLoad.session === session);
   // The last page whose fetch actually succeeded, so a failed page change can roll
   // back to it instead of leaving the pager claiming a page that never loaded.
   const loadedPageRef = useRef(0);
@@ -73,97 +80,96 @@ export default function Dashboard() {
   // E2E test mode detection
   const isE2EMode = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
-  const fetchBooks = useCallback(async () => {
-    // In E2E mode, bypass session user check
-    if (!isE2EMode && (!session)) return;
-
-    const requestId = ++requestIdRef.current;
-    const isStale = () => requestId !== requestIdRef.current;
-
-    setIsLoading(true);
-    try {
-      // Cookie-based authentication - no token provider needed
-      // Cookies are automatically sent with credentials: 'include'
-      // Over-fetch a single row past the page: the endpoint returns a bare array with
-      // no total, so the presence of that extra row is how we learn a next page exists
-      // without paying a second count query.
-      const fetched = await bookClient.getUserBooks({
-        skip: page * PAGE_SIZE,
-        limit: PAGE_SIZE + 1,
-      });
-      if (isStale()) return;
-      const pageBooks = fetched.slice(0, PAGE_SIZE);
-      const moreExist = fetched.length > PAGE_SIZE;
-      setHasMore(moreExist);
-      setProjects(pageBooks);
-      // Defensive, and not independently mutation-testable: the passive effect also
-      // syncs this, so removing the line only matters in the narrow window where a
-      // DELETE continuation runs in the same microtask batch as a completed fetch.
-      // Staging that ordering in a unit test is not practical; the line is one
-      // assignment and keeps the ref true at every point that writes the list.
-      pageStateRef.current = { projects: pageBooks, hasMore: moreExist, page };
-      loadedPageRef.current = page;
-      setReloadPending(false);
-      setError(null);
-    } catch (err) {
-      if (isStale()) return;
-      console.error('Error fetching books:', err);
-
-      // Check if this is a 404 error (user has no books yet or doesn't exist in DB)
-      const is404 = err instanceof Error && (
-        err.message.includes('404') ||
-        err.message.includes('Not Found') ||
-        err.message.includes('not found')
-      );
-
-      if (is404) {
-        // 404 means "this user has no books", not "the page request failed" — so it
-        // coerces to the empty state on every load, not just the first. Routing it
-        // through the retry branch below would toast an error at an empty-library
-        // user on every window refocus, and retrying could never succeed.
-        setProjects([]);
-        setPage(0);
-        // hasMore too, or the pager stays mounted and enabled behind the onboarding
-        // empty state on a page-0 404 — and Next then fires another doomed fetch.
-        setHasMore(false);
-        loadedPageRef.current = 0;
-        setError(null);
-      } else if (hasLoadedOnce.current) {
-        // A failed page change must not replace a working dashboard — with the
-        // full-screen error branch, or (in bypass mode) by coercing the list to
-        // empty. Either way the user loses their place, and the per-page requests
-        // this pager makes put a 429 well within reach.
-        toast.error({ title: 'Failed to load that page. Please try again.' });
-        // The list on screen may be the locally-spliced empty array from a delete
-        // that evacuated a later page. Mark it pending so the render shows a retry
-        // rather than the onboarding empty state (#612).
-        setReloadPending(true);
-        // Roll back to whichever page the books currently on screen belong to. A
-        // directional clamp looks safer but is wrong for a failed *Previous*: it
-        // leaves `page` one behind the content, so the pager reads "Page 2" over
-        // page-3 books and can disable Previous while later-page books are shown.
-        // The step-back case is handled where it happens, by moving loadedPageRef
-        // with it — so this can never resurrect an evacuated page either.
-        setPage(loadedPageRef.current);
-      } else if (isE2EMode) {
-        // In E2E mode, treat empty list as success (no auth token = no books)
-        setProjects([]);
-        setError(null);
-      } else {
-        setError('Failed to load your books. Please try again.');
-      }
-    } finally {
-      if (!isStale()) {
-        setIsLoading(false);
-        hasLoadedOnce.current = true;
-        setHasRenderedOnce(true);
-      }
-    }
-  }, [session, isE2EMode, page]);
-
   useEffect(() => {
-    fetchBooks();
-  }, [fetchBooks]);
+    let ignore = false;
+    const loadBooks = async () => {
+        // In E2E mode, bypass session user check
+        if (!isE2EMode && (!session)) return;
+
+        try {
+          // Cookie-based authentication - no token provider needed
+          // Cookies are automatically sent with credentials: 'include'
+          // Over-fetch a single row past the page: the endpoint returns a bare array with
+          // no total, so the presence of that extra row is how we learn a next page exists
+          // without paying a second count query.
+          const fetched = await bookClient.getUserBooks({
+            skip: page * PAGE_SIZE,
+            limit: PAGE_SIZE + 1,
+          });
+          if (ignore) return;
+          const pageBooks = fetched.slice(0, PAGE_SIZE);
+          const moreExist = fetched.length > PAGE_SIZE;
+          setHasMore(moreExist);
+          setProjects(pageBooks);
+          // Defensive, and not independently mutation-testable: the passive effect also
+          // syncs this, so removing the line only matters in the narrow window where a
+          // DELETE continuation runs in the same microtask batch as a completed fetch.
+          // Staging that ordering in a unit test is not practical; the line is one
+          // assignment and keeps the ref true at every point that writes the list.
+          pageStateRef.current = { projects: pageBooks, hasMore: moreExist, page };
+          loadedPageRef.current = page;
+          setReloadPending(false);
+          setError(null);
+        } catch (err) {
+          if (ignore) return;
+          console.error('Error fetching books:', err);
+
+          // Check if this is a 404 error (user has no books yet or doesn't exist in DB)
+          const is404 = err instanceof Error && (
+            err.message.includes('404') ||
+            err.message.includes('Not Found') ||
+            err.message.includes('not found')
+          );
+
+          if (is404) {
+            // 404 means "this user has no books", not "the page request failed" — so it
+            // coerces to the empty state on every load, not just the first. Routing it
+            // through the retry branch below would toast an error at an empty-library
+            // user on every window refocus, and retrying could never succeed.
+            setProjects([]);
+            setPage(0);
+            // hasMore too, or the pager stays mounted and enabled behind the onboarding
+            // empty state on a page-0 404 — and Next then fires another doomed fetch.
+            setHasMore(false);
+            loadedPageRef.current = 0;
+            setError(null);
+          } else if (hasLoadedOnce.current) {
+            // A failed page change must not replace a working dashboard — with the
+            // full-screen error branch, or (in bypass mode) by coercing the list to
+            // empty. Either way the user loses their place, and the per-page requests
+            // this pager makes put a 429 well within reach.
+            toast.error({ title: 'Failed to load that page. Please try again.' });
+            // The list on screen may be the locally-spliced empty array from a delete
+            // that evacuated a later page. Mark it pending so the render shows a retry
+            // rather than the onboarding empty state (#612).
+            setReloadPending(true);
+            // Roll back to whichever page the books currently on screen belong to. A
+            // directional clamp looks safer but is wrong for a failed *Previous*: it
+            // leaves `page` one behind the content, so the pager reads "Page 2" over
+            // page-3 books and can disable Previous while later-page books are shown.
+            // The step-back case is handled where it happens, by moving loadedPageRef
+            // with it — so this can never resurrect an evacuated page either.
+            setPage(loadedPageRef.current);
+          } else if (isE2EMode) {
+            // In E2E mode, treat empty list as success (no auth token = no books)
+            setProjects([]);
+            setError(null);
+          } else {
+            setError('Failed to load your books. Please try again.');
+          }
+        } finally {
+          if (!ignore) {
+            setSettledLoad({ key: `${page}:${reloadAttempt}`, session });
+            hasLoadedOnce.current = true;
+            setHasRenderedOnce(true);
+          }
+        }
+    };
+    loadBooks();
+    return () => {
+      ignore = true;
+    };
+  }, [session, isE2EMode, page, reloadAttempt]);
 
   const handleCreateNewBook = () => {
     setIsBookDialogOpen(true);
@@ -174,7 +180,7 @@ export default function Dashboard() {
     // The list is newest-first, so a new book lands on page 1. Jumping there lets the
     // page-change effect do the refetch; on page 1 already, refetch directly.
     if (page === 0) {
-      fetchBooks();
+      reloadBooks();
     } else {
       setPage(0);
     }
@@ -209,7 +215,7 @@ export default function Dashboard() {
         loadedPageRef.current = current.page - 1;
         setPage(prevPage => prevPage - 1);  // page-change effect refetches
       } else if (current.hasMore || current.page > 0) {
-        await fetchBooks();
+        reloadBooks();
       }
     } catch (err) {
       console.error('Error deleting book:', err);
@@ -252,7 +258,7 @@ export default function Dashboard() {
           <h2 className="text-red-700 dark:text-red-400 text-xl font-medium mb-2">Error</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
           <Button
-            onClick={() => fetchBooks()}
+            onClick={() => reloadBooks()}
             className="bg-red-600 hover:bg-red-700 text-white"
           >
             Try Again
@@ -302,7 +308,7 @@ export default function Dashboard() {
               Could not load your books. They are still there — this is a loading
               problem, not a missing-books one.
             </p>
-            <Button onClick={() => fetchBooks()} disabled={isLoading} variant="outline">
+            <Button onClick={() => reloadBooks()} disabled={isLoading} variant="outline">
               Try again
             </Button>
           </div>
