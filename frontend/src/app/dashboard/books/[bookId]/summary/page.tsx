@@ -90,6 +90,10 @@ export default function BookSummaryPage() {
   useEffect(() => {
     if (!bookId) return;
     const local = localStorage.getItem(`book-summary-${bookId}`);
+    // Deliberately kept (#584): this restore races the server fetch and the user
+    // for the same field, and which should win is undecided — tracked in #718.
+    // Changing it inside a lint fix would pick an answer silently.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (local && !summary) setSummary(local);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);

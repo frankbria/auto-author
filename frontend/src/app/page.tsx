@@ -13,6 +13,12 @@ export default function Home() {
 
   useEffect(() => {
     if (!isPending) {
+      // A latch, not a derivation (#584): better-auth sets `isPending` back to
+      // true on every session refetch while `data` is null, i.e. for every
+      // signed-out visitor, so `!isPending` would re-show this full-page loader
+      // over the landing page on each refetch. `isRefetching` cannot tell the
+      // first load from a refetch either; the first request sets it too.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsAuthReady(true);
     }
   }, [isPending]);

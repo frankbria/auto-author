@@ -34,10 +34,6 @@ const eslintConfig = [
       "react/no-unescaped-entities": "warn",
       "@next/next/no-html-link-for-pages": "warn",
       "prefer-const": "warn",
-      // New in eslint-plugin-react-hooks 7, error by default and flagging 30
-      // pre-existing call sites. Warned rather than fixed here to keep this an
-      // ESLint upgrade instead of a React refactor — see the follow-up issue.
-      "react-hooks/set-state-in-effect": "warn",
 
     },
   },
