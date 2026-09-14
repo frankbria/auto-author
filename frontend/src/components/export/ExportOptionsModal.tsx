@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Download01Icon, File01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { toast } from '@/lib/toast';
@@ -72,7 +72,7 @@ export function ExportOptionsModal({
 
   // Pre-select the user's stored export defaults (#64) until they interact.
   //
-  // `optionsTouchedRef` guards the *first* arrival only (#693). Preferences load
+  // `optionsTouched` guards the *first* arrival only (#693). Preferences load
   // asynchronously, so without it a user who picks a format in the first moment
   // after opening would have it overwritten when they arrive. It used to guard
   // every arrival, and since it is never reset and this component never unmounts
@@ -85,26 +85,33 @@ export function ExportOptionsModal({
   // saving new preferences, which is a deliberate act that should win over a
   // stale ad-hoc choice. Reopening the modal keeps the last choice, because
   // nothing here resets it.
+  //
+  // Applied during render when the preferences object changes, React's pattern
+  // for state that follows a prop, rather than in an effect that painted the old
+  // options first (#584). That is also why "touched" is state, not a ref: render
+  // may not read a ref.
   const userPreferences = useUserPreferences();
-  const optionsTouchedRef = useRef(false);
-  const hasAppliedPreferencesRef = useRef(false);
-  useEffect(() => {
-    if (!userPreferences) return;
-
-    const isFirstArrival = !hasAppliedPreferencesRef.current;
-    hasAppliedPreferencesRef.current = true;
-    if (isFirstArrival && optionsTouchedRef.current) return;
-
-    if (userPreferences.default_export_format) {
-      setFormat(userPreferences.default_export_format);
+  const [optionsTouched, setOptionsTouched] = useState(false);
+  const [prevPreferences, setPrevPreferences] = useState<typeof userPreferences>(null);
+  const [hasAppliedPreferences, setHasAppliedPreferences] = useState(false);
+  if (userPreferences !== prevPreferences) {
+    setPrevPreferences(userPreferences);
+    if (userPreferences) {
+      setHasAppliedPreferences(true);
+      const isFirstArrival = !hasAppliedPreferences;
+      if (!(isFirstArrival && optionsTouched)) {
+        if (userPreferences.default_export_format) {
+          setFormat(userPreferences.default_export_format);
+        }
+        if (userPreferences.default_page_size) {
+          setPageSize(userPreferences.default_page_size);
+        }
+        if (typeof userPreferences.include_empty_chapters === 'boolean') {
+          setIncludeEmptyChapters(userPreferences.include_empty_chapters);
+        }
+      }
     }
-    if (userPreferences.default_page_size) {
-      setPageSize(userPreferences.default_page_size);
-    }
-    if (typeof userPreferences.include_empty_chapters === 'boolean') {
-      setIncludeEmptyChapters(userPreferences.include_empty_chapters);
-    }
-  }, [userPreferences]);
+  }
 
   // Template state (issue #59)
   const [templates, setTemplates] = useState<ExportTemplate[]>([]);
@@ -249,7 +256,7 @@ export function ExportOptionsModal({
             <RadioGroup
               value={format}
               onValueChange={(value) => {
-                optionsTouchedRef.current = true;
+                setOptionsTouched(true);
                 setFormat(value as ExportFormat);
               }}
             >
@@ -345,7 +352,7 @@ export function ExportOptionsModal({
               <RadioGroup
                 value={pageSize}
                 onValueChange={(value) => {
-                  optionsTouchedRef.current = true;
+                  setOptionsTouched(true);
                   setPageSize(value as PageSize);
                 }}
               >
@@ -384,7 +391,7 @@ export function ExportOptionsModal({
               id="include-empty"
               checked={includeEmptyChapters}
               onCheckedChange={(checked) => {
-                optionsTouchedRef.current = true;
+                setOptionsTouched(true);
                 setIncludeEmptyChapters(checked);
               }}
             />
