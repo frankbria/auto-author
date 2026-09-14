@@ -347,107 +347,95 @@
   --color-rose-950: #4c0519;
 }
 
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
-  }
+:root {
+  --radius: 0.625rem;
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  /* #620: 0.556 (#737373) is 4.34:1 on --muted (#f5f5f5), under the 4.5:1
+   AA floor axe-core measured. 0.54 (#6e6e6e) is 4.68:1. Light theme only. */
+  --muted-foreground: oklch(0.54 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  /* #682: red-700. White on it is 6.47:1 (the destructive button's label), and
+   as `text-destructive` it is 6.47 on --background and --card, 5.93 on
+   --muted, 5.45 on the bg-destructive/10 error card. The previous brand red
+   (red-500, pinned in tailwind.config.js and overriding this token) was
+   3.76:1 in both roles. */
+  --destructive-rgb: 185 28 28;
+  --destructive: rgb(var(--destructive-rgb));
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  /* #697: the focus indicator. Buttons, inputs, selects, badges and textareas
+     draw focus as `ring-ring/50` over `outline-none`, so this token at half
+     strength *is* the indicator. shadcn's 0.708 gave 1.54:1 on the page, under
+     WCAG 1.4.11's 3:1 — hidden until #697, because v3 emitted no rule for
+     `ring-ring/50` and those controls fell back to Tailwind's default blue
+     (1.83:1, also failing). 0.205 is the --primary lightness: 3.34:1 at worst,
+     on --muted. `focus-ring-contrast.test.ts` measures it. */
+  --ring: oklch(0.205 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
 }
 
-@layer utilities {
-  :root {
-    --radius: 0.625rem;
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    /* #620: 0.556 (#737373) is 4.34:1 on --muted (#f5f5f5), under the 4.5:1
-     AA floor axe-core measured. 0.54 (#6e6e6e) is 4.68:1. Light theme only. */
-    --muted-foreground: oklch(0.54 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    /* #682: red-700. White on it is 6.47:1 (the destructive button's label), and
-     as `text-destructive` it is 6.47 on --background and --card, 5.93 on
-     --muted, 5.45 on the bg-destructive/10 error card. The previous brand red
-     (red-500, pinned in tailwind.config.js and overriding this token) was
-     3.76:1 in both roles. */
-    --destructive-rgb: 185 28 28;
-    --destructive: rgb(var(--destructive-rgb));
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    /* #697: the focus indicator. Buttons, inputs, selects, badges and textareas
-       draw focus as `ring-ring/50` over `outline-none`, so this token at half
-       strength *is* the indicator. shadcn's 0.708 gave 1.54:1 on the page, under
-       WCAG 1.4.11's 3:1 — hidden until #697, because v3 emitted no rule for
-       `ring-ring/50` and those controls fell back to Tailwind's default blue
-       (1.83:1, also failing). 0.205 is the --primary lightness: 3.34:1 at worst,
-       on --muted. `focus-ring-contrast.test.ts` measures it. */
-    --ring: oklch(0.205 0 0);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-  }
-
-  .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    /* #682: red-400. A red dark enough for white to sit on is 3.06:1 here, so the
-     text role has to lighten in dark: 7.16 on --background, 6.48 on --card,
-     5.47 on --muted, 4.76 on the bg-destructive/20 error card. White is 2.24:1
-     on this, which is why the *fill* does not use this token — see
-     `destructive.surface` in tailwind.config.js. */
-    --destructive-rgb: 248 113 113;
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    /* #697: 0.922, the dark --primary lightness. 0.556 gave 1.88:1 at 50%;
-       this is 4.16:1 at worst, on --muted. */
-    --ring: oklch(0.922 0 0);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-  }
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  /* #682: red-400. A red dark enough for white to sit on is 3.06:1 here, so the
+   text role has to lighten in dark: 7.16 on --background, 6.48 on --card,
+   5.47 on --muted, 4.76 on the bg-destructive/20 error card. White is 2.24:1
+   on this, which is why the *fill* does not use this token — see
+   `destructive.surface` in tailwind.config.js. */
+  --destructive-rgb: 248 113 113;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  /* #697: 0.922, the dark --primary lightness. 0.556 gave 1.88:1 at 50%;
+     this is 4.16:1 at worst, on --muted. */
+  --ring: oklch(0.922 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {
@@ -489,7 +477,7 @@
   }
 }
 
-
+@layer utilities {
   /* #610: `primary` is a theme-fixed brand colour (tailwind.config.js), so
      `text-primary` stayed indigo-600 on the dark surfaces — 2.85:1 on the
      header's `bg-card`, under the 4.5:1 WCAG 2.1 AA floor. indigo-400 clears
@@ -508,4 +496,4 @@
   .dark .hover\:text-primary:hover {
     color: rgb(129, 140, 248);
   }
-
+}
