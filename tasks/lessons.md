@@ -1168,6 +1168,14 @@ computed-style diff over `globals.css` could not, because it never loaded
 `editor.css`. **A visual diff covers the stylesheets it loads, and the build is
 the only check that loads all of them.**
 
+And a per-element computed diff is blind to **variants that target other
+elements** (`*:`, `[svg]:`, `[&_x]:`). v4 reads stacked variants left to right,
+v3 right to left, and the codemod reordered nine shadcn classes to keep v3's
+meaning. Those nine were already dead on v3, so "preserved" meant "still dead".
+The third-party review found two of them, and a sweep of every reordered variant
+list found the rest. Diff the emitted selectors for child-targeting variants,
+because the measured element never shows them.
+
 ### Making a dead class render is a visual change that needs measuring
 2026-09-13, #697. `ring-ring/50` emitted no CSS under v3, so shadcn's controls
 fell back to Tailwind's default blue focus ring. The fix made the class render,
