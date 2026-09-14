@@ -383,7 +383,14 @@
     --destructive: rgb(var(--destructive-rgb));
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    /* #697: the focus indicator. Buttons, inputs, selects, badges and textareas
+       draw focus as `ring-ring/50` over `outline-none`, so this token at half
+       strength *is* the indicator. shadcn's 0.708 gave 1.54:1 on the page, under
+       WCAG 1.4.11's 3:1 — hidden until #697, because v3 emitted no rule for
+       `ring-ring/50` and those controls fell back to Tailwind's default blue
+       (1.83:1, also failing). 0.205 is the --primary lightness: 3.34:1 at worst,
+       on --muted. `focus-ring-contrast.test.ts` measures it. */
+    --ring: oklch(0.205 0 0);
     --chart-1: oklch(0.646 0.222 41.116);
     --chart-2: oklch(0.6 0.118 184.704);
     --chart-3: oklch(0.398 0.07 227.392);
@@ -424,7 +431,9 @@
     --destructive-rgb: 248 113 113;
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    /* #697: 0.922, the dark --primary lightness. 0.556 gave 1.88:1 at 50%;
+       this is 4.16:1 at worst, on --muted. */
+    --ring: oklch(0.922 0 0);
     --chart-1: oklch(0.488 0.243 264.376);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
@@ -442,13 +451,27 @@
 }
 
 @layer base {
+  /* These referenced `--color-border`, `--color-background` and
+     `--color-foreground` — Tailwind v4 theme variables that only exist because of
+     the `@theme inline` block above, which Tailwind v3 ignores. Under v3 all three
+     were undefined, so every declaration here was invalid at computed-value time
+     and silently dropped. The visible consequence was the `*` rule: an element
+     with a `border` and no border-colour class drew it in `currentColor` —
+     near-black in light, near-white in dark — instead of the subtle `--border`
+     this rule was written to apply. `<body>` was masked because layout.tsx also
+     puts `bg-background text-foreground` on it.
+
+     The raw tokens are used instead of the `--color-*` aliases for a second
+     reason that matters once v4 lands (#513): a theme alias is declared on :root
+     and computed there, so `var(--color-border)` would inherit the light value
+     into `.dark`. `var(--border)` resolves at the element and follows the theme. */
   * {
-    border-color: var(--color-border);
+    border-color: var(--border);
     outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
   }
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--background);
+    color: var(--foreground);
   }
   /* Visible keyboard-focus fallback (WCAG 2.4.7) for any interactive element
      that doesn't define its own focus-visible ring. Components with their own
