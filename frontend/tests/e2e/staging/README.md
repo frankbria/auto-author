@@ -62,6 +62,29 @@ Creating your own throwaway account on https://dev.autoauthor.app also works for
 most specs, but the suite shares one account across all tests in a worker, so use
 a dedicated one rather than an account you care about.
 
+### 4. What the account is allowed to be worth (#603)
+
+The E2E account is a **dedicated, fixture-only staging user**. Decided 2026-09-14,
+closing #599's last criterion:
+
+- It holds nothing a human authored. Every book, summary, TOC and answer under it
+  was written by a spec, and a spec may delete any of it at any time.
+- It has no privileges a fresh signup lacks. Nothing in the backend is gated on it,
+  and it must never be granted anything that is (billing, admin, other users' data).
+- Staging holds no real users, so a leak of this account reaches only its own
+  generated fixtures. **The residual risk is accepted on those grounds.**
+- No scheduled rotation. Rotation stays the manual #599 procedure: reset the
+  password, revoke sessions, update the `staging` environment secret and your
+  `.env.test`. Do it whenever the credentials are suspected to have escaped.
+
+If any of the first three bullets stops being true — real data lands on staging, or
+the account gains a capability — this decision expires and the options in #603
+(rotation, restriction) are back on the table.
+
+Throwaway accounts made by hand for a one-off verification are not covered by
+this, and they don't get cleaned up by anything. Delete them when the verification
+ends; the six `+aa550-*` accounts from #550 sat for three weeks before #603 did.
+
 ## Running Tests
 
 ### Run all staging tests
