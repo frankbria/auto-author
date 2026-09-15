@@ -239,6 +239,8 @@ before/after/rollback sequence pins the failure to credential lookup specificall
   better-auth.
 - **The stale local `frontend/tests/e2e/staging/.env.test` credentials**, which 401 against
   staging and are a pre-existing rough edge this work tripped over rather than caused.
-- **Throwaway accounts left behind.** Five `<maintainer>+aa550-*@example.invalid` accounts remain in the
-  staging database, one with 2FA enrolled. Harmless on staging, and left in place rather than
-  deleted by hand against a live Atlas cluster.
+- **Throwaway accounts left behind.** Six `<maintainer>+aa550-*@example.invalid` accounts (this
+  doc originally said five) remained in the staging database, one with 2FA enrolled and one owning
+  two books. Left in place at the time rather than deleted by hand against a live Atlas cluster;
+  **deleted 2026-09-14 under #603**, with their sessions, accounts, 2FA rows, books and question
+  data, after an inventory of what each owned.
