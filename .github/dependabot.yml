@@ -44,10 +44,14 @@ updates:
     # and its own staging verification (#516), and burying it in a batch of
     # lockfile bumps would have hidden the one change worth reading.
     #
-    # Security updates are NOT grouped: `applies-to` defaults to version-updates,
-    # so an advisory patch still lands alone and fast. That default is the one we
-    # want; don't add `applies-to: security-updates` here.
+    # Security updates ARE grouped (2026-09-29, owner decision across all repos):
+    # the `security-updates` group collects every advisory fix for this ecosystem
+    # into one PR. It still opens immediately; security PRs ignore the schedule,
+    # cooldown and open-pull-requests-limit.
     groups:
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
       # tailwindcss, @tailwindcss/* and postcss are dev-classified and still reach
       # users: they generate the CSS bundle in every build. Under v4 (#513)
       # `tailwindcss` and `@tailwindcss/postcss` must also move in lockstep.
@@ -169,6 +173,9 @@ updates:
     # `allowed-updates: all` and no memory of previously-closed PRs, so it
     # overcounted. Trust the live figures.
     groups:
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
       backend:
         patterns: ["*"]
         update-types: ["minor", "patch"]
@@ -186,6 +193,9 @@ updates:
     # "up-to-date now" while main still pinned @v3. One PR per sweep, one diff to
     # read, no self-collision.
     groups:
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
       actions:
         patterns: ["*"]
 
