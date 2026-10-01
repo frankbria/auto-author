@@ -5,7 +5,7 @@ maintainer fixed the same reentry on master (dperini/nwsapi#214) and published i
 (2026-09-18): 2.2.28 captures the host matcher before anything can replace it, and never reads
 `node.matches` at match time. [#589](https://github.com/frankbria/auto-author/issues/589) then
 removed the `nwsapi: "2.2.25"` override from `frontend/package.json`. On 2.2.28,
-`ChapterTab.keyboard.test.tsx` runs 23/23 in about 2s, against about 238s on 2.2.27.
+`ChapterTab.keyboard.test.tsx` runs 23/23 in 1.8s, against 202s (16 timeouts) on 2.2.27 (captured in `docs/demos/2026-10-01-issue-589-drop-nwsapi-override.md`).
 
 Everything below the line is the report. Suggested title:
 

@@ -55,8 +55,8 @@
   `ChapterTab.keyboard.test.tsx` already fails loudly inside the required `Frontend Tests` check the
   moment `nwsapi` floats, which is how this was caught.
 - The override came out in #589 once 2.2.28 shipped the upstream fix. Verify that kind of release by
-  swapping only that package into the current tree and timing the tripwire test: 2.2.27 took 238s,
-  while 2.2.28 and 2.2.25 each took about 2s. Then diff the release's source for the fix you expect.
+  swapping only that package into the current tree and timing the tripwire test (16 timeouts in 202s on 2.2.27, 23/23 in 1.8s on
+  2.2.28). Then diff the release's source for the fix you expect.
   A version number named in a close condition is a hypothesis until the test runs fast on it.
 
 ## Verify a dependency fix under the NEW dep set, never the old one (2026-09-05, #571/#583)
