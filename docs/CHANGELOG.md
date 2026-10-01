@@ -2,6 +2,10 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-01
+
+- **`main` red since #732: security-update groups now obey the Dependabot guards (#736, P1.16)**: #732 grouped every ecosystem's advisory fixes into a `security-updates` group with `patterns: ["*"]` and nothing else, and merged with the required `Security Audit` check failing. Four guards in `scripts/test_dependabot_config.py` rejected it, so every PR after it inherited the red check: no `update-types` (production majors can batch, #507), a major-taking group matching `tailwindcss` (#555), and a group matching `better-auth` (#556's auth outage). Both security groups now take `update-types: ["minor", "patch"]` and the npm one excludes `better-auth`. Grouping stays, since that was the owner's decision. A security major or a better-auth fix matches no group, and per GitHub's options reference it opens as its own PR, still immediately. The guards were not loosened.
+
 ### 2026-09-14
 
 - **Staging E2E account scoped, and the #550 throwaway accounts deleted (#603, P3.32)**: #599's last criterion, deferred there, was to make a *future* leak of the staging E2E credentials uninteresting rather than merely contained. The decision is written into the staging E2E README: the account is a dedicated, fixture-only staging user with no privileges a fresh signup lacks, staging holds no real users, and the residual risk is accepted on those grounds. No scheduled rotation; the manual #599 procedure stays, and the decision names the three conditions under which it expires. The demo doc for #550 recorded five `+aa550-*` throwaway accounts left in staging Atlas; an inventory found **six**, one with 2FA and one owning two books. All six were deleted from the box, with their sessions, accounts, 2FA rows, books and question data, after a script that asserts the expected counts before touching anything. Nothing in the app changed.

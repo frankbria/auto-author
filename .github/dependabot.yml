@@ -48,10 +48,15 @@ updates:
     # the `security-updates` group collects every advisory fix for this ecosystem
     # into one PR. It still opens immediately; security PRs ignore the schedule,
     # cooldown and open-pull-requests-limit.
+    #
+    # The incident rules below hold for this lane too (#736): a major or a
+    # better-auth fix matches no group, so it still opens immediately, on its own.
     groups:
       security-updates:
         applies-to: security-updates
         patterns: ["*"]
+        update-types: ["minor", "patch"]
+        exclude-patterns: ["better-auth"]
       # tailwindcss, @tailwindcss/* and postcss are dev-classified and still reach
       # users: they generate the CSS bundle in every build. Under v4 (#513)
       # `tailwindcss` and `@tailwindcss/postcss` must also move in lockstep.
@@ -176,6 +181,7 @@ updates:
       security-updates:
         applies-to: security-updates
         patterns: ["*"]
+        update-types: ["minor", "patch"]
       backend:
         patterns: ["*"]
         update-types: ["minor", "patch"]
