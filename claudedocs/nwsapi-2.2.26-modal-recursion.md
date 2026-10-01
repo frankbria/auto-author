@@ -1,10 +1,11 @@
 # Upstream report draft — nwsapi `:modal` self-recursion under jsdom
 
-**Not filed.** This is ready to post verbatim at <https://github.com/dperini/nwsapi/issues> and is
-kept here because filing publishes under the repo owner's identity. Tracked by
-[#589](https://github.com/frankbria/auto-author/issues/589); nothing in this repo depends on it —
-the `nwsapi: "2.2.25"` override in `frontend/package.json` is the working fix and stays until
-upstream ships one.
+**Resolved upstream; kept as a record.** The upstream report was never filed from this draft. The
+maintainer fixed the same reentry on master (dperini/nwsapi#214) and published it in **2.2.28**
+(2026-09-18): 2.2.28 captures the host matcher before anything can replace it, and never reads
+`node.matches` at match time. [#589](https://github.com/frankbria/auto-author/issues/589) then
+removed the `nwsapi: "2.2.25"` override from `frontend/package.json`. On 2.2.28,
+`ChapterTab.keyboard.test.tsx` runs 23/23 in about 2s, against about 238s on 2.2.27.
 
 Everything below the line is the report. Suggested title:
 
