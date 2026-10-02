@@ -61,7 +61,8 @@ export default function QuestionDisplay({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'queued'>('idle');
   const [saveError, setSaveError] = useState('');
   // Text the server last accepted (or already holds). Auto-save only fires for
-  // text that differs from it, so an idle answer is never re-saved (#761).
+  // text that differs from it, so an idle answer is never re-saved and a loaded
+  // COMPLETED answer is never rewritten as a draft (#761).
   const lastSavedTextRef = useRef('');
   // State for response completion
   const [isCompleted, setIsCompleted] = useState(false);
@@ -324,7 +325,6 @@ export default function QuestionDisplay({
     if (
       responseText.trim() &&
       responseText !== lastSavedTextRef.current &&
-      !isCompleted &&
       !isSaving &&
       saveStatus !== 'error'
     ) {
@@ -338,7 +338,7 @@ export default function QuestionDisplay({
         clearTimeout(autoSaveTimer);
       }
     };
-  }, [responseText, isCompleted, isSaving, saveStatus, handleSaveDraft]);
+  }, [responseText, isSaving, saveStatus, handleSaveDraft]);
 
   // A new edit is the user acting on a failed save: clear the error and
   // return to idle so auto-save resumes for the new input (#197)
