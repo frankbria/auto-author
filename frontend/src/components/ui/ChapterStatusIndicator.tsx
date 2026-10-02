@@ -66,7 +66,8 @@ export function ChapterStatusIndicator({
   showIcon = false,
   className
 }: ChapterStatusIndicatorProps) {
-  const config = statusConfig[status];
+  // Unknown status (e.g. a value the backend adds later) must not crash the page.
+  const config = statusConfig[status] ?? statusConfig[ChapterStatus.DRAFT];
   const sizes = sizeConfig[size];
 
   if (showIcon && showLabel) {

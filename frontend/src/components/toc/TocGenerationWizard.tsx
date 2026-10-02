@@ -179,10 +179,13 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
     try {
       if (!wizardState.generatedToc?.toc) return;
 
-      setWizardState(prev => ({ ...prev, isLoading: true }));
+      setWizardState(prev => ({ ...prev, isLoading: true, error: undefined }));
 
       // Save the TOC to the backend
-      await bookClient.updateToc(bookId, wizardState.generatedToc.toc);
+      await bookClient.updateToc(bookId, {
+        ...wizardState.generatedToc.toc,
+        expected_version: wizardState.generatedToc.base_version,
+      });
 
       // Navigate to the edit TOC page
       router.push(`/dashboard/books/${bookId}/edit-toc`);
@@ -285,12 +288,22 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
 
       case WizardStep.REVIEW:
         return (
-          <TocReview
-            tocResult={wizardState.generatedToc!}
-            onAccept={handleAcceptToc}
-            onRegenerate={handleRegenerateToc}
-            isLoading={wizardState.isLoading}
-          />
+          <>
+            {wizardState.error && (
+              <div
+                role="alert"
+                className="mb-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-700 dark:bg-red-950 dark:text-red-100"
+              >
+                {wizardState.error}
+              </div>
+            )}
+            <TocReview
+              tocResult={wizardState.generatedToc!}
+              onAccept={handleAcceptToc}
+              onRegenerate={handleRegenerateToc}
+              isLoading={wizardState.isLoading}
+            />
+          </>
         );
 
       case WizardStep.ERROR:
