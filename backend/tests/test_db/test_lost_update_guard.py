@@ -175,6 +175,44 @@ async def test_missing_subchapter_no_match(motor_reinit_db):
 
 
 @pytest.mark.asyncio
+async def test_stale_last_modified_is_a_no_match(motor_reinit_db):
+    """#759: a writer that commits between the caller's read and its write
+    turns the caller's write into a no-match, at the database, not in Python."""
+    book_id = await _seed(
+        toc={"version": 1, "chapters": [{"id": "a", "content": "x", "last_modified": "t0"}]}
+    )
+    # The caller read "t0"; another device commits first.
+    assert await bookdao.apply_chapter_content_update(
+        book_id, "a", None, {"content": "other", "last_modified": "t1"}, OWNER,
+        expected_last_modified="t0",
+    )
+
+    matched = await bookdao.apply_chapter_content_update(
+        book_id, "a", None, {"content": "stale", "last_modified": "t2"}, OWNER,
+        expected_last_modified="t0",
+    )
+    assert matched is False
+    toc = (await _book(book_id))["table_of_contents"]
+    assert _by_id(toc["chapters"], "a")["content"] == "other"
+    assert toc["version"] == 2  # only the first write bumped it
+
+
+@pytest.mark.asyncio
+async def test_none_last_modified_matches_a_never_saved_chapter(motor_reinit_db):
+    book_id = await _seed(
+        toc={"version": 1, "chapters": [{"id": "p", "subchapters": [{"id": "s"}]}]}
+    )
+    assert await bookdao.apply_chapter_content_update(
+        book_id, "s", "p", {"content": "y", "last_modified": "t1"}, OWNER,
+        expected_last_modified=None,
+    )
+    assert not await bookdao.apply_chapter_content_update(
+        book_id, "s", "p", {"content": "z", "last_modified": "t2"}, OWNER,
+        expected_last_modified=None,
+    )
+
+
+@pytest.mark.asyncio
 async def test_wrong_owner_not_matched(motor_reinit_db):
     book_id = await _seed(
         toc={"version": 1, "chapters": [{"id": "a", "content": "x"}]}
