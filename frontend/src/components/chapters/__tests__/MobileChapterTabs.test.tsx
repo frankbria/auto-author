@@ -248,10 +248,10 @@ describe('MobileChapterTabs', () => {
       expect(dot).toBeTruthy();
     });
 
-    it('renders a blue dot for in_progress chapters', () => {
+    it('renders a blue dot for a chapter whose API status is in-progress (#861)', () => {
       render(
         <MobileChapterTabs
-          chapters={[makeChapter('p', { status: ChapterStatus.IN_PROGRESS })]}
+          chapters={[makeChapter('p', { status: 'in-progress' as ChapterStatus })]}
           activeChapterId="p"
           onChapterSelect={jest.fn()}
         />

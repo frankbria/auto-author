@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Menu01Icon } from '@hugeicons/core-free-icons';
-import { ChapterTabMetadata } from '@/types/chapter-tabs';
+import { ChapterTabMetadata, ChapterStatus } from '@/types/chapter-tabs';
 import { cn } from '@/lib/utils';
 
 interface MobileChapterTabsProps {
@@ -108,10 +108,10 @@ function getStatusColor(status: string): string {
   switch (status) {
     // #623: `bg-muted` was the dot's own surface, so DRAFT was invisible (1.06:1)
     // — the #618 defect, unfixed in the mobile variant. green-500 was 2.09:1.
-    case 'draft': return 'bg-muted-foreground';
-    case 'in_progress': return 'bg-blue-500';
-    case 'completed': return 'bg-green-700 dark:bg-green-500';
-    case 'published': return 'bg-purple-500';
+    case ChapterStatus.DRAFT: return 'bg-muted-foreground';
+    case ChapterStatus.IN_PROGRESS: return 'bg-blue-500';
+    case ChapterStatus.COMPLETED: return 'bg-green-700 dark:bg-green-500';
+    case ChapterStatus.PUBLISHED: return 'bg-purple-500';
     default: return 'bg-muted-foreground';
   }
 }
