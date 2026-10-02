@@ -14,7 +14,7 @@ describe('ChapterStatusIndicator (#861)', () => {
     expect(screen.getByText('In Progress')).toBeInTheDocument();
   });
 
-  it.each([
+  it.each<[{ showLabel?: boolean; showIcon?: boolean }]>([
     [{ showLabel: true }],
     [{ showIcon: true }],
     [{ showLabel: true, showIcon: true }],
