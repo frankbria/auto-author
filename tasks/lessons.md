@@ -1,5 +1,24 @@
 # Lessons
 
+## A triage rebuttal is a claim: check it before posting (2026-10-02, #749)
+- Two reviewers flagged that a *stored* `subchapters: null` would crash the new TOC walk. I closed
+  it as a nitpick on the PR with "every other writer stores a list". I never checked that, and it
+  was false. generate-toc persists the AI's JSON verbatim, and `_is_valid_toc` validates only
+  chapter titles. The glm-review bot then reproduced it as a **Major regression**: before #749,
+  PUT /toc on such a book succeeded and replaced the bad value; after it, every save would 500.
+- What made it easy to miss: the input-side fix (a 400 at the endpoint) felt like it closed the
+  topic, but data **already stored** by a different writer never passes that endpoint. A new read of
+  stored data needs its own answer to "which writers produced this, and what do they validate?"
+- Do instead: before dismissing a finding with "X never happens", grep every writer of the field
+  (`grep -rn '"table_of_contents"' backend/app`) and read what each validates. Put the writer list
+  in the rebuttal. If you cannot name them, the finding is not a nitpick.
+
+## The conducting-demo skill's Showboat syntax needs a language (2026-10-02, #749)
+- `showboat exec demo.md ./script.sh` hangs forever reading stdin. The real form is
+  `showboat exec demo.md bash "./script.sh"` (`exec <file> <lang> [code]`). `agent-browser` is not
+  installed on this box; the Playwright copy in `frontend/node_modules` drove the real page instead
+  (`require('<repo>/frontend/node_modules/playwright')` from a `.cjs` script outside the repo).
+
 ## Never quote a contrast ratio you did not measure yourself (2026-09-09, #629)
 - Two wrong numbers in one change, from two different sources, both caught only by re-measuring:
   - **Invented.** I wrote `--primary` as "15.9:1 light-muted, 12.3:1 dark-muted" into a code comment
