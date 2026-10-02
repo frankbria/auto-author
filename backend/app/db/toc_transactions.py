@@ -122,9 +122,14 @@ SERVER_OWNED_CHAPTER_FIELDS = (
 
 
 def _walk_toc(chapters):
+    # Stored TOCs can hold AI JSON verbatim (generate-toc validates only chapter
+    # titles), so subchapters may be null or non-objects. Skip them rather than
+    # 500 every later edit of that book.
     for chapter in chapters:
         yield chapter
-        yield from chapter.get("subchapters", [])
+        subchapters = chapter.get("subchapters")
+        if isinstance(subchapters, list):
+            yield from (sub for sub in subchapters if isinstance(sub, dict))
 
 
 def _carry_server_fields(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]) -> None:

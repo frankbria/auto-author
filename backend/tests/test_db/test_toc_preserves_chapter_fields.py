@@ -162,3 +162,26 @@ async def test_idless_items_never_match_each_other(motor_reinit_db):
         str(doc["_id"]), {"chapters": [{"title": "Fresh", "order": 1}]}, OWNER
     )
     assert "content" not in result["chapters"][0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad", [None, ["a string"]])
+async def test_malformed_stored_subchapters_do_not_block_an_edit(motor_reinit_db, bad):
+    """generate-toc stores AI JSON verbatim and validates only chapter titles,
+    so a stored chapter can hold `subchapters: null` or strings. An edit must
+    still succeed and replace it, as it did before #749 added the stored walk."""
+    stored = _stored("c1", "One", 1)
+    stored["subchapters"] = bad
+    doc = {
+        "_id": ObjectId(),
+        "owner_id": OWNER,
+        "title": "T",
+        "table_of_contents": {"version": 1, "chapters": [stored]},
+    }
+    await tx.books_collection.insert_one(doc)
+
+    result = await tx.update_toc_with_transaction(
+        str(doc["_id"]), {"chapters": [_edit_toc_item("c1", "One", 1, [])]}, OWNER
+    )
+    _assert_draft_kept(result["chapters"][0], "c1")
+    assert result["chapters"][0]["subchapters"] == []
