@@ -287,6 +287,9 @@ describe('TocGenerationWizard step flow', () => {
     });
     expect(push).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'accept-toc' })).toBeInTheDocument();
+    // The failure must be visible, not just held in state: a 409 from the
+    // version guard (#753) is otherwise a button that silently does nothing.
+    expect(screen.getByRole('alert')).toHaveTextContent('save failed');
   });
 
   it('regenerating the TOC calls generateToc again and returns to review', async () => {
