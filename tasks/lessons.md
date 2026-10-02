@@ -1221,3 +1221,17 @@ was recoverable only because the edit was a deterministic script. "Commit first"
 enough when the commit can fail inside the same command: capture `git rev-parse HEAD` before,
 compare after, require a clean `git status`, and exit before mutating if any check fails. That
 gate stopped the same failure twice more in #715.
+
+## Count the population before writing "exactly N" (#607 / #746, 2026-10-02)
+
+- Closing #607, I wrote "five of six notices were supersessions, exactly one real timeout" into the
+  issue, the CHANGELOG and a workflow pin comment. The figures came from the runs the issue thread
+  happened to cite. A count of every September `glm-review.yml` run (215) found 33 of 36 cancellations
+  superseded and **4** real 35-minute timeouts. The third-party review on #747 caught it before merge.
+- The same issue was declared "unobserved" by three status checks because they counted run
+  *conclusions*. The outcome the criterion asked about was a rewritten PR *comment* (#622's stub).
+- Do instead: any "exactly N" or "M of K" about runs or events gets a whole-population query first
+  (`gh run list --created <range> --limit 400` + jq), captured in the demo as a command rather than
+  typed. When a criterion is about what a run posted, read the PR comments. On a workflow with
+  `cancel-in-progress`, treat a cancelled run as a supersession until its timing says otherwise:
+  compare its end time with the next run on the same branch.
