@@ -137,9 +137,10 @@ export function ChapterEditor({
   const viewStorageKey = `chapterQuestionsTab_${bookId}_${chapterId}`;
   // The saved per-chapter choice is read, not copied into state by an effect
   // (#584). The server snapshot is the writing view, so hydration still matches,
-  // and a new key re-reads storage when TabContent reuses this editor (it renders
-  // it without a key) for another chapter. A choice made here is tagged with its
-  // chapter for the same reason, and wins even if persisting it failed.
+  // and a new key re-reads storage if a caller reuses this editor for another
+  // chapter without remounting it (TabContent keys it by chapter since #756). A
+  // choice made here is tagged with its chapter for the same reason, and wins
+  // even if persisting it failed.
   const savedView = useSyncExternalStore(
     subscribeToNothing,
     () => readSavedView(viewStorageKey),
@@ -222,16 +223,21 @@ export function ChapterEditor({
 
   // Load chapter content if no initial content provided
   useEffect(() => {
+    // A response for a chapter that is no longer this effect's chapter must not
+    // land: it would become the content the next save writes under the new id (#756).
+    let ignore = false;
     const loadChapterContent = async () => {
       setIsLoading(true);
       setError(null);
       try {
         const contentData = await bookClient.getChapterContent(bookId, chapterId);
+        if (ignore) return;
         if (editor) {
           editor.commands.setContent(contentData.content || '');
           setLastAutoSavedContent(contentData.content || '');
         }
       } catch (err) {
+        if (ignore) return;
         // Ignore tab state errors as they shouldn't affect the editor functionality
         if (err instanceof Error && !err.message.includes('Failed to get tab state')) {
           console.error('Failed to load chapter content:', err);
@@ -245,12 +251,16 @@ export function ChapterEditor({
           }
         }
       } finally {
-        setIsLoading(false);
+        // The superseding load owns the spinner.
+        if (!ignore) setIsLoading(false);
       }
     };
     if (!initialContent && bookId && chapterId) {
       loadChapterContent();
     }
+    return () => {
+      ignore = true;
+    };
   }, [bookId, chapterId, initialContent, editor]);
 
   // Update content if initialContent changes
