@@ -1445,8 +1445,12 @@ async def update_book_toc(
 def _last_modified_token(value: Any) -> Optional[str]:
     """The chapter's save token (#759) as clients see it. The content PATCH
     stores an ISO string, but the bulk-status endpoint and the tab migration
-    store a BSON Date, so both are rendered as one string."""
-    return value.isoformat() if isinstance(value, datetime) else value
+    store a BSON Date, so both are rendered as one string. Motor decodes a Date
+    as naive UTC; the offset is added so both kinds read the same way. Clients
+    must echo it verbatim: it is compared, not parsed."""
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=value.tzinfo or timezone.utc).isoformat()
+    return value
 
 
 async def _chapter_save_rejected(book_id: str, chapter_id: str) -> HTTPException:

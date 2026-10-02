@@ -214,6 +214,8 @@ async def test_date_stored_last_modified_round_trips(auth_client_factory):
     stored = datetime(2026, 10, 1, 10, 0, 0, 123000, tzinfo=timezone.utc)
     book_id = await _book_with(api, [_ch("c1", content="v0", last_modified=stored)])
     token = await _token(api, book_id, "c1")
+    # Same shape as the tokens the PATCH writes, so a client never sees two formats.
+    assert token == "2026-10-01T10:00:00.123000+00:00"
 
     r = await api.patch(
         _url(book_id, "c1"), json={"content": "fresh", "expected_last_modified": token}
