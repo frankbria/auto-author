@@ -4,6 +4,11 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **One author's chapter text can no longer appear in another author's export (#751, P0.3)**:
+  - **The bug.** `ExportService` held one `html2text.HTML2Text()` on the module singleton, and `_clean_html_content` called it from the export thread pool and from `book_stats` on the event loop. The parser keeps its state (`outtextlist`, `rawdata`) on the instance, so concurrent calls mixed documents, raised `AssertionError` from the HTML parser, and could leave the parser poisoned until restart.
+  - **The fix.** `_clean_html_content` builds a new parser per call, as `_content_to_markdown` already did, and `self.h2t` and `__init__` are gone. Any later markdownify swap (#800) must keep per-call construction.
+  - **Verified.** A new test runs 8 threads over 8 distinct tagged documents, 200 calls each, and asserts no output contains another document's tag. It fails on main with the parser `AssertionError` and passes 3 of 3 runs on the fix.
+
 - **Saving the Edit TOC page no longer erases every chapter's draft (#749, P0.1)**:
   - **The bug.** `_update_toc_internal` merged the TOC only at the top level. The Edit TOC page sends each chapter as `{id, title, description, level, order, subchapters}`, so its `chapters` list replaced the stored one. One rename set every chapter's and subchapter's `content`, `status` and `word_count` to `None`, and the API answered 200. Reproduced on real Mongo: 3 of the 4 new tests fail on main.
   - **The fix.** `_carry_server_fields` now indexes the stored tree by id, with chapters and subchapters flattened so a subchapter moved under another parent keeps its draft. It copies the server-owned fields (`content`, `status`, `word_count`, `last_modified`, `estimated_reading_time`, `is_active_tab`, `created_at`) onto the matching incoming items. Stored values win over client values. Ids the server has not seen keep what was sent, because the AI wizard computes those fields for new chapters. Omitted chapters are still removed.
