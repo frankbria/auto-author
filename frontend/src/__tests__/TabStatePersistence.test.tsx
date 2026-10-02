@@ -32,7 +32,7 @@ describe('Tab State Persistence', () => {
     {
       id: 'ch2',
       title: 'Chapter 2',
-      status: 'in_progress',
+      status: 'in-progress',
       word_count: 1500,
       estimated_reading_time: 8,
       has_content: true,
