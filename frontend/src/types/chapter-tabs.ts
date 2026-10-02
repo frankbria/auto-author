@@ -1,4 +1,5 @@
 // Enhanced types for Chapter Tabs functionality
+import { ChapterStatus } from './book';
 export interface ChapterTabMetadata {
   id: string;
   title: string;
@@ -34,9 +35,5 @@ export interface TabContextMenuAction {
   destructive?: boolean;
 }
 
-export enum ChapterStatus {
-  DRAFT = 'draft',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-  PUBLISHED = 'published'
-}
+// One enum for the whole frontend; values must match the backend (#861).
+export { ChapterStatus };

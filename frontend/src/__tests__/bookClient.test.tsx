@@ -1,4 +1,5 @@
 import { bookClient } from '@/lib/api/bookClient';
+import { ChapterStatus } from '@/types/chapter-tabs';
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -1106,7 +1107,7 @@ describe('BookClient', () => {
         json: async () => mockResponse,
       });
 
-      const result = await bookClient.updateChapterStatus('book123', 'ch1', 'in-progress' as any);
+      const result = await bookClient.updateChapterStatus('book123', 'ch1', ChapterStatus.IN_PROGRESS);
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:8000/api/v1/books/book123/chapters/bulk-status',
