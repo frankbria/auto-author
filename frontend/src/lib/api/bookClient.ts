@@ -787,6 +787,8 @@ export class BookClient {
       estimated_pages: number;
       structure_notes: string;
     } | null;
+    /** Stored TOC version (0 when no TOC exists yet); send back as expected_version on PUT. */
+    version?: number;
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/toc`, {
       headers: await this.getHeaders(),
