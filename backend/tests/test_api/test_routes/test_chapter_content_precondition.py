@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import pytest
 from bson import ObjectId
 
+from app.api.endpoints import books as books_endpoint
 from app.db import base
 
 API = "/api/v1/books"
@@ -117,6 +118,63 @@ async def test_concurrent_writers_with_one_token_exactly_one_wins(auth_client_fa
     assert codes == [200, 409, 409, 409, 409], [r.text for r in responses]
     winner = next(i for i, r in enumerate(responses) if r.status_code == 200)
     assert await _stored_content(book_id, "c1") == f"writer-{winner}"
+
+
+def _commit_first(monkeypatch, competing_write):
+    """Run a real competing write in the window between the handler's read and
+    its own write. The gather test above usually lands there too, but only
+    when the event loop happens to interleave; this pins the window open."""
+    real = books_endpoint.apply_chapter_content_update
+
+    async def write_after_competitor(**kwargs):
+        await competing_write(real, kwargs)
+        return await real(**kwargs)
+
+    monkeypatch.setattr(
+        books_endpoint, "apply_chapter_content_update", write_after_competitor
+    )
+
+
+@pytest.mark.asyncio
+async def test_save_committed_after_the_read_still_gets_409(
+    auth_client_factory, monkeypatch
+):
+    api = await auth_client_factory()
+    book_id = await _book_with(
+        api, [_ch("c1", content="v0", last_modified="2026-10-01T10:00:00+00:00")]
+    )
+    token = await _token(api, book_id, "c1")
+
+    async def other_device_saves(real, kwargs):
+        fields = {"content": "other device", "last_modified": "2026-10-01T11:00:00+00:00"}
+        assert await real(**{**kwargs, "chapter_fields": fields})
+
+    _commit_first(monkeypatch, other_device_saves)
+    r = await api.patch(
+        _url(book_id, "c1"), json={"content": "stale", "expected_last_modified": token}
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["current_content"] == "other device"
+    assert await _stored_content(book_id, "c1") == "other device"
+
+
+@pytest.mark.asyncio
+async def test_chapter_deleted_after_the_read_is_404(auth_client_factory, monkeypatch):
+    api = await auth_client_factory()
+    book_id = await _book_with(api, [_ch("c1", content="v0"), _ch("c2")])
+    token = await _token(api, book_id, "c1")
+
+    async def chapter_deleted(real, kwargs):
+        await base.books_collection.update_one(
+            {"_id": ObjectId(book_id)},
+            {"$pull": {"table_of_contents.chapters": {"id": "c1"}}},
+        )
+
+    _commit_first(monkeypatch, chapter_deleted)
+    r = await api.patch(
+        _url(book_id, "c1"), json={"content": "A", "expected_last_modified": token}
+    )
+    assert r.status_code == 404, r.text
 
 
 @pytest.mark.asyncio
