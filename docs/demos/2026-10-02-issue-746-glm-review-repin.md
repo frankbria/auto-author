@@ -34,3 +34,7 @@ secrets required: ['ZHIPU_API_KEY']
 inputs without a default: []
 job review permissions: {'contents': 'read', 'pull-requests': 'write'}
 ```
+
+## Criterion: a review cancelled by a newer push says so
+
+Review A ran on `5f4341b`, the first head over the 20-line size gate. While A's agent was mid-review (progress stub posted, `GLM bug-hunting review` step in progress), this section was pushed as `5f4341b`'s successor. `cancel-in-progress` should cancel A, and the new pin should report that as a supersession, not as a timeout.
