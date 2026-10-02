@@ -109,6 +109,49 @@ async def update_toc_with_transaction(
     return await _update_toc_internal(book_id, toc_data, user_auth_id, None)
 
 
+# Written only by the autosave, status and tab endpoints, never by a TOC edit.
+SERVER_OWNED_CHAPTER_FIELDS = (
+    "content",
+    "status",
+    "word_count",
+    "last_modified",
+    "estimated_reading_time",
+    "is_active_tab",
+    "created_at",
+)
+
+
+def _walk_toc(chapters):
+    # Stored TOCs can hold AI JSON verbatim (generate-toc validates only chapter
+    # titles), so subchapters may be null or non-objects. Skip them rather than
+    # 500 every later edit of that book.
+    for chapter in chapters:
+        yield chapter
+        subchapters = chapter.get("subchapters")
+        if isinstance(subchapters, list):
+            yield from (sub for sub in subchapters if isinstance(sub, dict))
+
+
+def _carry_server_fields(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]) -> None:
+    """Copy each stored chapter's server-owned fields onto the incoming item with
+    the same id, so a TOC edit cannot erase drafts (#749).
+
+    The top-level merge replaces ``chapters`` wholesale, and the Edit TOC page
+    sends only ids, titles and ordering. Before this, one rename set every
+    chapter's content to None. Matching runs over the flattened tree, so a
+    subchapter moved to another parent keeps its draft. Stored values win over
+    client values. Ids the server has not seen are left as sent.
+    """
+    stored = {c["id"]: c for c in _walk_toc(stored_toc.get("chapters", [])) if c.get("id")}
+    for item in _walk_toc(updated_toc.get("chapters", [])):
+        source = stored.get(item.get("id")) if item.get("id") else None
+        if source is None:
+            continue
+        for field in SERVER_OWNED_CHAPTER_FIELDS:
+            if field in source:
+                item[field] = source[field]
+
+
 async def _update_toc_internal(
     book_id: str,
     toc_data: Dict[str, Any],
@@ -172,20 +215,17 @@ async def _update_toc_internal(
         "version": current_version + 1
     }
 
+    _carry_server_fields(current_toc, updated_toc)
+
     # Derived, never trusted from the client (#496). Every other producer in the
     # codebase already computes it this way — ai_service, export_service, the
     # flat chapter listing, and the frontend's own edit-TOC page — so accepting a
     # client value only created a way for the two to disagree.
     updated_toc["total_chapters"] = len(updated_toc.get("chapters", []))
 
-    # Assign IDs to chapters that don't have them
-    for chapter in updated_toc.get("chapters", []):
-        if not chapter.get("id"):
-            chapter["id"] = str(uuid.uuid4())
-        # Also handle subchapters
-        for subchapter in chapter.get("subchapters", []):
-            if not subchapter.get("id"):
-                subchapter["id"] = str(uuid.uuid4())
+    for item in _walk_toc(updated_toc.get("chapters", [])):
+        if not item.get("id"):
+            item["id"] = str(uuid.uuid4())
 
     # Update the book with the new TOC
     # For new books without TOC, don't check version

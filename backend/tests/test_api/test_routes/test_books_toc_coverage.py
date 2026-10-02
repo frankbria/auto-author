@@ -548,6 +548,20 @@ class TestUpdateToc:
         assert "must be an object" in resp.json()["detail"]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("subchapters", [None, {"not": "a list"}, ["just a string"]])
+    async def test_malformed_subchapters_returns_400(self, auth_client_factory, subchapters):
+        """A non-list or non-object subchapter would 500 in the TOC walk and,
+        if stored, crash every reader that iterates subchapters (#749)."""
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        resp = await api.put(
+            f"/api/v1/books/{book_id}/toc",
+            json={"toc": {"chapters": [{"title": "Ch", "subchapters": subchapters}]}},
+        )
+        assert resp.status_code == 400
+        assert "subchapters" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
     async def test_chapter_missing_title_returns_400(self, auth_client_factory):
         api = await auth_client_factory()
         book_id = await _create_book(api)
