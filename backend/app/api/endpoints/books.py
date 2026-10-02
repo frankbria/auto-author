@@ -53,6 +53,7 @@ from app.db.database import (
 )
 from app.db.toc_transactions import (
     update_toc_with_transaction,
+    _walk_toc,
 )
 from app.api.dependencies import (
     audit_request, get_rate_limiter, get_ai_usage_quota,
@@ -1197,28 +1198,27 @@ async def generate_table_of_contents(
             summary, responses, book_metadata
         )
 
-        # Store generated TOC in book record. Increment the version from the
-        # current TOC (0 -> 1 on first generation) rather than hardcoding 1, so a
-        # regenerate doesn't reset the compare-and-swap counter other writers
-        # rely on (#177).
-        current_version = (book.get("table_of_contents") or {}).get("version", 0)
-        toc_data = {
-            **toc_result["toc"],
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "status": "generated",
-            "version": current_version + 1,
-        }
-
-        update_data = {
-            "table_of_contents": toc_data,
-            "updated_at": datetime.now(timezone.utc),
-        }
-        await update_book(book_id, update_data, current_user.get("auth_id"))
+        # Propose only; never persist (#753). The old unguarded $set replaced the
+        # stored TOC and every chapter draft before the user saw the result, and
+        # lost any autosave that landed during the AI call. PUT /toc on accept is
+        # the only writer. `base_version` is the version read before the AI call
+        # (PUT's default is 1 for a book with no TOC); the client sends it back
+        # as expected_version so a TOC that changed meanwhile is a 409.
+        stored_toc = book.get("table_of_contents") or {}
+        base_version = stored_toc.get("version", 1)
+        # What accepting this proposal would replace, so the wizard can say so.
+        replaces_drafts = sum(
+            1
+            for item in _walk_toc(stored_toc.get("chapters") or [])
+            if str(item.get("content") or "").strip()
+        )
 
         return {
             "book_id": book_id,
             "toc": toc_result["toc"],
-            "generated_at": toc_data["generated_at"],
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "base_version": base_version,
+            "replaces_drafts": replaces_drafts,
             "chapters_count": toc_result["chapters_count"],
             "has_subchapters": toc_result["has_subchapters"],
             "success": toc_result["success"],

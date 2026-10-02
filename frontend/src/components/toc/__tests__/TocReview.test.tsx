@@ -56,6 +56,35 @@ describe('TocReview Accept button loading state', () => {
   });
 });
 
+describe('TocReview replace warning (#753)', () => {
+  const render_ = (replaces_drafts?: number) =>
+    render(
+      <TocReview
+        tocResult={{ ...tocResult, replaces_drafts }}
+        onAccept={jest.fn()}
+        onRegenerate={jest.fn()}
+        isLoading={false}
+      />
+    );
+
+  it('explains that accepting replaces existing chapter drafts', () => {
+    render_(3);
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(/replaces your current table of contents/i);
+    expect(alert).toHaveTextContent(/3 chapters with written content/i);
+  });
+
+  it('uses the singular for one draft', () => {
+    render_(1);
+    expect(screen.getByRole('alert')).toHaveTextContent(/1 chapter with written content/i);
+  });
+
+  it.each([0, undefined])('shows no warning when nothing would be lost (%s)', (n) => {
+    render_(n);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
 describe('TocReview structure rendering', () => {
   function renderToc(chapters: unknown[]) {
     const result = {

@@ -45,6 +45,20 @@ export default function TocReview({ tocResult, onAccept, onRegenerate, isLoading
         </p>
       </div>
 
+      {!!tocResult.replaces_drafts && (
+        <div
+          role="alert"
+          className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+        >
+          <p className="font-medium">Accepting this replaces your current table of contents.</p>
+          <p className="mt-1">
+            You have {tocResult.replaces_drafts} chapter{tocResult.replaces_drafts === 1 ? '' : 's'} with
+            written content. Accepting removes them and their text. Nothing has been changed yet; to keep
+            your drafts, leave this page without accepting.
+          </p>
+        </div>
+      )}
+
       {/* Summary stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-card border border-border rounded-lg p-4">

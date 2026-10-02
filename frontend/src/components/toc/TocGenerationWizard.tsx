@@ -182,7 +182,10 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
       setWizardState(prev => ({ ...prev, isLoading: true }));
 
       // Save the TOC to the backend
-      await bookClient.updateToc(bookId, wizardState.generatedToc.toc);
+      await bookClient.updateToc(bookId, {
+        ...wizardState.generatedToc.toc,
+        expected_version: wizardState.generatedToc.base_version,
+      });
 
       // Navigate to the edit TOC page
       router.push(`/dashboard/books/${bookId}/edit-toc`);
