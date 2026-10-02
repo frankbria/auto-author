@@ -1382,6 +1382,14 @@ async def update_book_toc(
             raise HTTPException(
                 status_code=400, detail=f"Chapter {i} must have a title"
             )
+        subchapters = chapter.get("subchapters", [])
+        if not isinstance(subchapters, list) or not all(
+            isinstance(sub, dict) for sub in subchapters
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Chapter {i} subchapters must be a list of objects",
+            )
 
     try:
         logger.info(f"Updating TOC for book_id={book_id}, user_auth_id={current_user.get('auth_id')}")

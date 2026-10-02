@@ -218,14 +218,9 @@ async def _update_toc_internal(
     # client value only created a way for the two to disagree.
     updated_toc["total_chapters"] = len(updated_toc.get("chapters", []))
 
-    # Assign IDs to chapters that don't have them
-    for chapter in updated_toc.get("chapters", []):
-        if not chapter.get("id"):
-            chapter["id"] = str(uuid.uuid4())
-        # Also handle subchapters
-        for subchapter in chapter.get("subchapters", []):
-            if not subchapter.get("id"):
-                subchapter["id"] = str(uuid.uuid4())
+    for item in _walk_toc(updated_toc.get("chapters", [])):
+        if not item.get("id"):
+            item["id"] = str(uuid.uuid4())
 
     # Update the book with the new TOC
     # For new books without TOC, don't check version
