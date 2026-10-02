@@ -149,22 +149,33 @@ class TestGenerateToc:
         assert len(m.call_args[0][1]) == 2
 
     @pytest.mark.asyncio
-    async def test_regenerate_increments_version_not_reset_to_1(
+    async def test_generation_does_not_persist_or_touch_drafts(
         self, auth_client_factory
     ):
-        """Regenerating a TOC bumps the version from the current value (#177),
-        rather than hardcoding 1 and resetting the compare-and-swap counter."""
+        """generate-toc only proposes a TOC (#753). The stored TOC, its version
+        and every chapter draft stay exactly as they were until the user accepts
+        and PUT /toc writes."""
         import app.db.base as base
         from bson import ObjectId
 
         api = await auth_client_factory()
         book_id = await _create_book(api)
         await _set_summary(api, book_id)
-
-        # Simulate an existing edited TOC already at version 5.
+        stored = {
+            "chapters": [
+                {
+                    "id": "mine",
+                    "title": "My chapter",
+                    "content": "<p>three weeks of writing</p>",
+                    "status": "in-progress",
+                    "word_count": 4000,
+                    "subchapters": [],
+                }
+            ],
+            "version": 5,
+        }
         await base.books_collection.update_one(
-            {"_id": ObjectId(book_id)},
-            {"$set": {"table_of_contents": {"chapters": [], "version": 5}}},
+            {"_id": ObjectId(book_id)}, {"$set": {"table_of_contents": stored}}
         )
 
         with patch(AI_PATCH_TARGET, new=AsyncMock(return_value=MOCK_TOC_RESULT)):
@@ -173,9 +184,67 @@ class TestGenerateToc:
                 json={"question_responses": [{"question": "Q", "answer": "A"}]},
             )
         assert resp.status_code == 200, resp.text
+        assert resp.json()["toc"]["chapters"][0]["title"] == "Introduction"
+        assert resp.json()["base_version"] == 5
+        assert resp.json()["replaces_drafts"] == 1
 
         book = await base.books_collection.find_one({"_id": ObjectId(book_id)})
-        assert book["table_of_contents"]["version"] == 6  # 5 + 1, not reset to 1
+        assert book["table_of_contents"] == stored
+
+    @pytest.mark.asyncio
+    async def test_accept_after_concurrent_edit_conflicts(self, auth_client_factory):
+        """The version read before the AI call rides back on accept as
+        expected_version, so a TOC that changed while the AI ran is a 409, not a
+        silent overwrite (#753)."""
+        import app.db.base as base
+        from bson import ObjectId
+
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        await _set_summary(api, book_id)
+        await base.books_collection.update_one(
+            {"_id": ObjectId(book_id)},
+            {"$set": {"table_of_contents": {"chapters": [], "version": 5}}},
+        )
+        with patch(AI_PATCH_TARGET, new=AsyncMock(return_value=MOCK_TOC_RESULT)):
+            gen = (
+                await api.post(
+                    f"/api/v1/books/{book_id}/generate-toc",
+                    json={"question_responses": [{"question": "Q", "answer": "A"}]},
+                )
+            ).json()
+
+        # Someone else saves while the user reviews the proposal.
+        other = await api.put(
+            f"/api/v1/books/{book_id}/toc",
+            json={"toc": {"chapters": [{"id": "x", "title": "Other"}]}},
+        )
+        assert other.status_code == 200, other.text
+
+        accept = await api.put(
+            f"/api/v1/books/{book_id}/toc",
+            json={"toc": {**gen["toc"], "expected_version": gen["base_version"]}},
+        )
+        assert accept.status_code == 409
+
+    @pytest.mark.asyncio
+    async def test_accept_with_current_version_writes(self, auth_client_factory):
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+        await _set_summary(api, book_id)
+        with patch(AI_PATCH_TARGET, new=AsyncMock(return_value=MOCK_TOC_RESULT)):
+            gen = (
+                await api.post(
+                    f"/api/v1/books/{book_id}/generate-toc",
+                    json={"question_responses": [{"question": "Q", "answer": "A"}]},
+                )
+            ).json()
+        accept = await api.put(
+            f"/api/v1/books/{book_id}/toc",
+            json={"toc": {**gen["toc"], "expected_version": gen["base_version"]}},
+        )
+        assert accept.status_code == 200, accept.text
+        assert accept.json()["toc"]["chapters"][0]["title"] == "Introduction"
 
     @pytest.mark.asyncio
     async def test_happy_path_falls_back_to_persisted_responses(
@@ -204,10 +273,10 @@ class TestGenerateToc:
         assert m.called
         assert len(m.call_args[0][1]) == 3  # persisted responses used
 
-        # And the generated TOC was persisted on the book.
+        # Generation proposes only; nothing is stored until the user accepts (#753).
         get_resp = await api.get(f"/api/v1/books/{book_id}/toc")
         assert get_resp.status_code == 200
-        assert get_resp.json()["status"] == "generated"
+        assert get_resp.json()["status"] == "not_generated"
 
     @pytest.mark.asyncio
     async def test_book_not_found_returns_404(self, auth_client_factory):
@@ -401,13 +470,17 @@ class TestGetToc:
             )
             assert gen.status_code == 200
 
+        # Accepting is PUT /toc (#753); GET then reports what was stored.
+        accept = await api.put(
+            f"/api/v1/books/{book_id}/toc", json={"toc": gen.json()["toc"]}
+        )
+        assert accept.status_code == 200, accept.text
+
         resp = await api.get(f"/api/v1/books/{book_id}/toc")
         assert resp.status_code == 200
         body = resp.json()
         assert body["book_id"] == book_id
-        assert body["status"] == "generated"
-        assert body["version"] == 1
-        assert body["generated_at"] is not None
+        assert body["status"] == "edited"
         assert len(body["toc"]["chapters"]) == 2
         assert body["toc"]["total_chapters"] == 2
         assert body["toc"]["estimated_pages"] == 40
