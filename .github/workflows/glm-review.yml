@@ -85,7 +85,17 @@ jobs:
     # `pull-requests`, not `issues`, despite going through /issues/{n}/comments
     # (glm-review#3). Keep the pin and this block in step: pinning backwards
     # without restoring them makes every run a `startup_failure`.
-    uses: frankbria/glm-review/.github/workflows/review.yml@77dfa9c6633712256edab41fd0db42663a9416b7 # 2026-09-06 (main; no tags upstream)
+    #
+    # Re-pinned off 77dfa9c (#746). That callee reported a review cancelled by
+    # `cancel-in-progress` (a newer push superseding it) as "the step timeout,
+    # or a hung API call". In September, 33 of the 36 cancelled runs were
+    # supersessions, which buried the 4 real 35m step timeouts (#619, #622,
+    # #631, #636, all 2026-09-09/10) in noise (#607). The new pin checks the
+    # cancelled outcome first and says so (glm-review#12). It also lowers
+    # API_TIMEOUT_MS below the step timeout, so a hung request like those four
+    # surfaces as an error instead of a silent kill. Same permissions and
+    # secret as 77dfa9c; the new inputs are optional.
+    uses: frankbria/glm-review/.github/workflows/review.yml@9c7577a45e3a49bc44cc0f57330e3069ef97adc4 # 2026-09-29 (main; no tags upstream)
     permissions:
       contents: read
       pull-requests: write
