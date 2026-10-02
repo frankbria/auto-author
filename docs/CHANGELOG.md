@@ -2,6 +2,10 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-02
+
+- **glm-review re-pinned: a superseded review no longer blames a timeout (#746, P3.47)**: the callee pin moves from `77dfa9c` to glm-review `main` (`9c7577a`). At the old pin, a review cancelled by `cancel-in-progress` (a newer push superseding it) posted "the step timeout, or a hung API call". Five of September's six "did not complete" notices were supersessions, which made #607 read a reliability problem into the thread. There was exactly one real timeout (#622, run 34403229853), and it also met #607's last criterion, so #607 closed. The new callee checks the cancelled outcome before the result subtype and says the run was superseded (glm-review#12). It also lowers `API_TIMEOUT_MS` from 50m to 20m, below the 35m step timeout, so a hung request surfaces as an error rather than a silent kill. Permissions (`contents: read`, `pull-requests: write`) and the `ZHIPU_API_KEY` secret are unchanged, and the new inputs are optional.
+
 ### 2026-10-01
 
 - **`nwsapi` override removed: 2.2.28 fixed the `:modal` recursion upstream (#589, P2.26)**: the `"nwsapi": "2.2.25"` pin in `frontend/package.json` `overrides` (#590) is gone, and the lockfile floats to 2.2.28 (published 2026-09-18 by the long-time maintainer, with npm registry signatures and no install scripts). Swapping only `nwsapi` on the same tree, `ChapterTab.keyboard.test.tsx` fails 16 of 23 on timeouts in 202s on 2.2.27, and passes 23/23 in 1.8s on 2.2.28 (both runs captured in the demo). 2.2.28's source diff contains the fix: the host matcher is captured once, so jsdom's `node.matches` can no longer re-enter nwsapi. The lockfile diff is that one package. That keyboard test remains the tripwire if a later nwsapi regresses.
