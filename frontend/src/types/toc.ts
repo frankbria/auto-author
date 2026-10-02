@@ -53,6 +53,10 @@ export interface TocGenerationResult {
   success: boolean;
   chapters_count: number;
   has_subchapters: boolean;
+  /** TOC version read before generation; sent back as expected_version on accept (#753). */
+  base_version?: number;
+  /** Stored chapters with written content that accepting this proposal replaces (#753). */
+  replaces_drafts?: number;
 }
 
 export enum WizardStep {

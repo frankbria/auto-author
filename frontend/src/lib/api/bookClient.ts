@@ -727,6 +727,8 @@ export class BookClient {
     success: boolean;
     chapters_count: number;
     has_subchapters: boolean;
+    base_version?: number;
+    replaces_drafts?: number;
   }> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}/generate-toc`, {
       method: 'POST',
@@ -839,7 +841,10 @@ export class BookClient {
     }>;
     total_chapters: number;
     estimated_pages: number;
-    structure_notes: string;  }): Promise<{
+    structure_notes: string;
+    /** Optimistic lock: PUT answers 409 if the stored TOC is no longer at this version. */
+    expected_version?: number;
+  }): Promise<{
     toc: {
       chapters: Array<{
         id: string;

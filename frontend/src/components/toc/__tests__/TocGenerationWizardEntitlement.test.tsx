@@ -121,6 +121,7 @@ const TOC_RESULT = {
       { title: 'Chapter 2' },
     ],
   },
+  base_version: 7,
 } as never;
 
 /** Drive the wizard to the REVIEW step (questions answered, TOC generated). */
@@ -263,9 +264,11 @@ describe('TocGenerationWizard step flow', () => {
     await user.click(screen.getByRole('button', { name: 'accept-toc' }));
 
     await waitFor(() => {
+      // The version read before the AI call rides back, so a TOC changed in
+      // the meantime is a 409 instead of a silent overwrite (#753).
       expect(mockedBookClient.updateToc).toHaveBeenCalledWith(
         'book-1',
-        expect.objectContaining({ chapters: expect.any(Array) })
+        expect.objectContaining({ chapters: expect.any(Array), expected_version: 7 })
       );
     });
     expect(push).toHaveBeenCalledWith('/dashboard/books/book-1/edit-toc');
@@ -284,6 +287,9 @@ describe('TocGenerationWizard step flow', () => {
     });
     expect(push).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'accept-toc' })).toBeInTheDocument();
+    // The failure must be visible, not just held in state: a 409 from the
+    // version guard (#753) is otherwise a button that silently does nothing.
+    expect(screen.getByRole('alert')).toHaveTextContent('save failed');
   });
 
   it('regenerating the TOC calls generateToc again and returns to review', async () => {
