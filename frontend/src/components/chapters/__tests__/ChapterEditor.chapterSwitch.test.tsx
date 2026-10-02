@@ -104,4 +104,28 @@ describe('ChapterEditor chapter switching (#756)', () => {
 
     expect(savesTo('C').map(([, , content]) => content)).toEqual(['<p>Charlie more</p>']);
   });
+
+  it('lets a superseded load neither raise an error nor end the current spinner', async () => {
+    let rejectB!: (err: Error) => void;
+    const loadB = new Promise<never>((_, reject) => {
+      rejectB = reject;
+    });
+    const loadC = deferred('C');
+    mockBookClient.getChapterContent.mockImplementation((_book, id) =>
+      id === 'B' ? loadB : loadC.promise
+    );
+
+    const { container, queryByRole, getByText, rerender } = render(
+      <ChapterEditor bookId="bk" chapterId="B" />
+    );
+    rerender(<ChapterEditor bookId="bk" chapterId="C" />);
+
+    await act(async () => rejectB(new Error('network down')));
+    expect(queryByRole('alert')).toBeNull();
+    expect(getByText('Loading chapter content...')).toBeInTheDocument();
+
+    await act(async () => loadC.resolve('<p>Charlie</p>'));
+    await waitFor(() => expect(container.querySelector('.ProseMirror')).not.toBeNull());
+    expect(editorIn(container).getHTML()).toBe('<p>Charlie</p>');
+  });
 });
