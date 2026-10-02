@@ -4,6 +4,11 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **PDF export no longer parses author text as ReportLab markup (#752, P0.4)**:
+  - **The bug.** Title, subtitle, author name, description, genre, audience, chapter title and description, and every body paragraph went to `Paragraph()` unescaped (only `author_bio` was escaped). Text like `A </i> B` crashed the export, and `<img src="/server/path">` embedded a server-local file, with an `UnidentifiedImageError` that doubled as a file-existence oracle.
+  - **The fix.** One helper, `_pdf_text`, escapes every user-derived string before `Paragraph()`. At import, `rl_config.trustedSchemes = ['data']` and `trustedHosts = []` so a future reportlab upgrade cannot turn `<img>` into SSRF. Any new `Paragraph()` call must go through `_pdf_text`.
+  - **Verified.** A new test exports hostile text through `export_book`, extracts the text from the uncompressed content streams, and asserts it appears literally with no `/Subtype /Image`. Mutation checks: unescaped body paragraph fails the export test; dropping the scheme lock fails the config test.
+
 - **One author's chapter text can no longer appear in another author's export (#751, P0.3)**:
   - **The bug.** `ExportService` held one `html2text.HTML2Text()` on the module singleton, and `_clean_html_content` called it from the export thread pool and from `book_stats` on the event loop. The parser keeps its state (`outtextlist`, `rawdata`) on the instance, so concurrent calls mixed documents, raised `AssertionError` from the HTML parser, and could leave the parser poisoned until restart.
   - **The fix.** `_clean_html_content` builds a new parser per call, as `_content_to_markdown` already did, and `self.h2t` and `__init__` are gone. Any later markdownify swap (#800) must keep per-call construction.
