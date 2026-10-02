@@ -121,11 +121,36 @@ describe('ChapterEditor chapter switching (#756)', () => {
     rerender(<ChapterEditor bookId="bk" chapterId="C" />);
 
     await act(async () => rejectB(new Error('network down')));
-    expect(queryByRole('alert')).toBeNull();
     expect(getByText('Loading chapter content...')).toBeInTheDocument();
 
     await act(async () => loadC.resolve('<p>Charlie</p>'));
     await waitFor(() => expect(container.querySelector('.ProseMirror')).not.toBeNull());
     expect(editorIn(container).getHTML()).toBe('<p>Charlie</p>');
+    // C loaded fine, so B's failure must not be reported over it.
+    expect(queryByRole('alert')).toBeNull();
+  });
+
+  // Keying makes every tab switch a fresh mount and load, so the first typing
+  // after a load is the common path, not an edge case.
+  it('autosaves typing that starts more than one debounce after the load', async () => {
+    const load = deferred('A');
+    mockBookClient.getChapterContent.mockReturnValue(load.promise);
+
+    const { container } = render(<ChapterEditor bookId="bk" chapterId="A" />);
+    await act(async () => load.resolve('<p>Alpha</p>'));
+    await waitFor(() => expect(container.querySelector('.ProseMirror')).not.toBeNull());
+
+    // The user reads for a while before typing.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5000);
+    });
+    act(() => {
+      editorIn(container).commands.insertContent(' later');
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(savesTo('A').map(([, , content]) => content)).toEqual(['<p>Alpha later</p>']);
   });
 });

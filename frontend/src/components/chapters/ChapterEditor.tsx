@@ -283,7 +283,15 @@ export function ChapterEditor({
 
     const timer = setTimeout(async () => {
       const content = editor.getHTML();
-      if (content === lastAutoSavedContent) return;
+      if (content === lastAutoSavedContent) {
+        // Nothing to save, but the pending flag must drop: typing only re-arms
+        // this timer by flipping it false -> true. Loading a chapter raises an
+        // update that sets it with no edit made, so leaving it set here killed
+        // autosave for anyone who read for a few seconds before typing (#756).
+        setAutoSavePending(false);
+        setHasUnsavedChanges(false);
+        return;
+      }
 
       setIsSaving(true);
       setError(null);
