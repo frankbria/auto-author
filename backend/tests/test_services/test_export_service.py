@@ -454,10 +454,10 @@ class TestExportAvailabilityGuards:
         with pytest.raises(es.ExportUnavailableError, match="html2text"):
             await es.export_service.generate_markdown({"title": "x"}, [])
 
-    def test_clean_html_falls_back_without_html2text(self):
+    def test_clean_html_falls_back_without_html2text(self, monkeypatch):
         import app.services.export_service as es
+        monkeypatch.setattr(es, "HTML2TEXT_AVAILABLE", False)
         svc = es.ExportService()
-        svc.h2t = None  # simulate html2text not installed
         out = svc._clean_html_content("<p>Hello <strong>world</strong></p>")
         assert "Hello" in out and "world" in out
         assert "<" not in out
@@ -623,3 +623,32 @@ class TestExportExecutorIsolation:
         assert "pdf" in message
         # The message must not repeat the old claim that the export was stopped.
         assert "not cancelled" in message.lower() or "still running" in message.lower()
+
+
+class TestCleanHtmlConcurrency:
+    """#751: one shared html2text parser leaked text between tenants."""
+
+    def test_no_cross_document_leak_under_threads(self):
+        from concurrent.futures import ThreadPoolExecutor
+        import app.services.export_service as es
+
+        svc = es.ExportService()
+        tags = [f"TAG{i}X" for i in range(8)]
+        docs = [
+            "".join(f"<p>{t} para {j} <strong>{t}</strong> <a href='http://x/{t}'>l</a></p>" for j in range(30))
+            for t in tags
+        ]
+
+        def work(i):
+            for _ in range(200):
+                out = svc._clean_html_content(docs[i])
+                for other in tags:
+                    if other != tags[i] and other in out:
+                        return f"{tags[i]} output contains {other}"
+                assert tags[i] in out
+            return None
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            results = list(ex.map(work, range(8)))
+        assert results == [None] * 8
+        assert svc._clean_html_content("<p>hello</p>") == "hello"

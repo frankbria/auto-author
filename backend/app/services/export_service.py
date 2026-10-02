@@ -115,23 +115,19 @@ class ExportTimeoutError(TimeoutError):
 class ExportService:
     """Service for exporting books to PDF and DOCX formats."""
 
-    def __init__(self):
-        if HTML2TEXT_AVAILABLE:
-            self.h2t = html2text.HTML2Text()
-            self.h2t.ignore_links = False
-            self.h2t.ignore_images = True
-            self.h2t.body_width = 0  # Don't wrap lines
-        else:
-            self.h2t = None
-
     def _clean_html_content(self, content: str) -> str:
         """Convert HTML content to clean text, preserving basic formatting."""
         if not content:
             return ""
 
-        if self.h2t is not None:
-            # Convert HTML to markdown
-            markdown_text = self.h2t.handle(content)
+        if HTML2TEXT_AVAILABLE:
+            # html2text keeps parse state on the instance, so a shared one leaks
+            # text between concurrent exports (#751): build one per call.
+            h2t = html2text.HTML2Text()
+            h2t.ignore_links = False
+            h2t.ignore_images = True
+            h2t.body_width = 0  # Don't wrap lines
+            markdown_text = h2t.handle(content)
         else:
             # ponytail: html2text not installed — fall back to a tag strip that
             # preserves block boundaries so words/paragraphs don't merge.
