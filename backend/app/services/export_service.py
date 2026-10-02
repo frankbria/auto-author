@@ -58,6 +58,11 @@ try:
         Table, TableStyle
     )
     from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
+    from reportlab import rl_config
+    # Paragraph() can fetch/open <img src=...>; allow only inline data URIs so a
+    # future reportlab upgrade cannot turn that into SSRF or local-file reads (#752).
+    rl_config.trustedSchemes = ['data']
+    rl_config.trustedHosts = []
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
@@ -106,6 +111,11 @@ class ExportUnavailableError(RuntimeError):
 
 class ExportValidationError(ValueError):
     """Raised when a book has no exportable content (clear, user-facing message)."""
+
+
+def _pdf_text(value) -> str:
+    """Escape user text for ReportLab Paragraph(), which parses XML-like markup (#752)."""
+    return html.escape(str(value), quote=False)
 
 
 class ExportTimeoutError(TimeoutError):
@@ -364,16 +374,16 @@ class ExportService:
         story = []
 
         # Title page
-        story.append(Paragraph(book_data.get('title', 'Untitled'), title_style))
+        story.append(Paragraph(_pdf_text(book_data.get('title', 'Untitled')), title_style))
 
         if book_data.get('subtitle'):
-            story.append(Paragraph(book_data['subtitle'], subtitle_style))
+            story.append(Paragraph(_pdf_text(book_data['subtitle']), subtitle_style))
 
         story.append(Spacer(1, 0.5*inch))
 
         # Author info
         if book_data.get('author_name'):
-            story.append(Paragraph(f"by {book_data['author_name']}", subtitle_style))
+            story.append(Paragraph(f"by {_pdf_text(book_data['author_name'])}", subtitle_style))
 
         # About the Author (from the owner's profile bio). Escape the free-text
         # bio — ReportLab's Paragraph parses XML-like markup, so unescaped
@@ -381,14 +391,14 @@ class ExportService:
         if book_data.get('author_bio'):
             story.append(Spacer(1, 0.25*inch))
             story.append(Paragraph("About the Author", heading2_style))
-            story.append(Paragraph(html.escape(book_data['author_bio']), body_style))
+            story.append(Paragraph(_pdf_text(book_data['author_bio']), body_style))
 
         # Genre and audience
         metadata_parts = []
         if book_data.get('genre'):
-            metadata_parts.append(f"Genre: {book_data['genre']}")
+            metadata_parts.append(f"Genre: {_pdf_text(book_data['genre'])}")
         if book_data.get('target_audience'):
-            metadata_parts.append(f"Target Audience: {book_data['target_audience']}")
+            metadata_parts.append(f"Target Audience: {_pdf_text(book_data['target_audience'])}")
 
         if metadata_parts:
             story.append(Spacer(1, 0.3*inch))
@@ -397,7 +407,7 @@ class ExportService:
         # Description
         if book_data.get('description'):
             story.append(Spacer(1, 0.5*inch))
-            story.append(Paragraph(book_data['description'], body_style))
+            story.append(Paragraph(_pdf_text(book_data['description']), body_style))
 
         # Page break after title page
         story.append(PageBreak())
@@ -428,11 +438,11 @@ class ExportService:
         for i, chapter in enumerate(chapters, 1):
             # Chapter title
             chapter_title = chapter.get('title', f'Chapter {i}')
-            story.append(Paragraph(f"Chapter {i}: {chapter_title}", chapter_title_style))
+            story.append(Paragraph(f"Chapter {i}: {_pdf_text(chapter_title)}", chapter_title_style))
 
             # Chapter description
             if chapter.get('description'):
-                story.append(Paragraph(chapter['description'], styles['Italic']))
+                story.append(Paragraph(_pdf_text(chapter['description']), styles['Italic']))
                 story.append(Spacer(1, 0.2*inch))
 
             # Chapter content
@@ -443,13 +453,13 @@ class ExportService:
 
                 for para in formatted_content:
                     if para['style'] == 'heading1':
-                        story.append(Paragraph(para['text'], chapter_title_style))
+                        story.append(Paragraph(_pdf_text(para['text']), chapter_title_style))
                     elif para['style'] == 'heading2':
-                        story.append(Paragraph(para['text'], heading2_style))
+                        story.append(Paragraph(_pdf_text(para['text']), heading2_style))
                     elif para['style'] == 'heading3':
-                        story.append(Paragraph(para['text'], heading3_style))
+                        story.append(Paragraph(_pdf_text(para['text']), heading3_style))
                     else:
-                        story.append(Paragraph(para['text'], body_style))
+                        story.append(Paragraph(_pdf_text(para['text']), body_style))
             else:
                 story.append(Paragraph("(No content yet)", styles['Italic']))
 
@@ -584,9 +594,9 @@ class ExportService:
         # Metadata
         metadata_parts = []
         if book_data.get('genre'):
-            metadata_parts.append(f"Genre: {book_data['genre']}")
+            metadata_parts.append(f"Genre: {_pdf_text(book_data['genre'])}")
         if book_data.get('target_audience'):
-            metadata_parts.append(f"Target Audience: {book_data['target_audience']}")
+            metadata_parts.append(f"Target Audience: {_pdf_text(book_data['target_audience'])}")
 
         if metadata_parts:
             doc.add_paragraph()
@@ -868,9 +878,9 @@ class ExportService:
             lines.append(f"by {author}")
         metadata_parts = []
         if book_data.get('genre'):
-            metadata_parts.append(f"Genre: {book_data['genre']}")
+            metadata_parts.append(f"Genre: {_pdf_text(book_data['genre'])}")
         if book_data.get('target_audience'):
-            metadata_parts.append(f"Target Audience: {book_data['target_audience']}")
+            metadata_parts.append(f"Target Audience: {_pdf_text(book_data['target_audience'])}")
         if metadata_parts:
             lines.append(' • '.join(metadata_parts))
         if book_data.get('description'):
