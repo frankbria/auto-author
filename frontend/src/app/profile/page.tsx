@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useSession } from '@/lib/auth-client';
+import { authClient, useSession } from '@/lib/auth-client';
 import useProfileApi, { type UserPreferences } from '@/hooks/useProfileApi';
 import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
 import { FormField } from '@/components/ui/form';
@@ -181,6 +181,12 @@ export default function UserProfile() {
     try {
       await deleteUserAccount();
       toast.success({ title: 'Account deleted' });
+      // The server already revoked every session (#763); this clears the
+      // cookies and the client session cache. The account is gone either way,
+      // so a sign-out failure must not surface as "Delete failed".
+      await authClient
+        .signOut()
+        .catch((err) => console.error('Sign out after delete failed:', err));
       router?.push?.('/');
     } catch (err) {
       toast.error({
@@ -360,6 +366,7 @@ export default function UserProfile() {
               <DialogTitle>Delete account</DialogTitle>
               <DialogDescription>
                 This permanently deletes your account and all your books. This cannot be undone.
+                Any paid subscription is cancelled immediately, so you won&apos;t be billed again.
               </DialogDescription>
             </DialogHeader>
             {/* Form wrapper so Enter submits once the confirmation matches

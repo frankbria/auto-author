@@ -21,6 +21,30 @@ import { handleAIServiceError, AIServiceResult } from '@/lib/api/aiErrorHandler'
 import { BookResponse, toBookProject } from '@/types/book';
 import { ExportTemplate, TemplateCustomization } from '@/types/export';
 
+/** A content save rejected because the chapter was saved elsewhere (#760). */
+export type ChapterSaveConflict = Error & {
+  statusCode: 409;
+  currentLastModified: string | null;
+  currentContent: string;
+};
+
+/** The backend's 409 detail (#759), or null if the body is not one. */
+function chapterConflictDetail(
+  body: string
+): { message: string; current_last_modified: string | null; current_content: string } | null {
+  try {
+    const detail = JSON.parse(body)?.detail;
+    // Without a token (string, or null for a never-saved chapter) a resend
+    // would be unconditional, so the editor could not offer a safe overwrite.
+    const token = detail?.current_last_modified;
+    return typeof detail?.current_content === 'string' && (typeof token === 'string' || token === null)
+      ? detail
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * API client for book operations
  *
@@ -1007,17 +1031,22 @@ export class BookClient {
     chapterId: string,
     content: string,
     autoUpdateMetadata: boolean = true,
-    options: { keepalive?: boolean } = {}
+    // expectedLastModified (#760) makes the save conditional: echo the token
+    // verbatim from GET content, a save result, or a conflict. Left undefined,
+    // the key is dropped and the save is unconditional; null is sent.
+    options: { keepalive?: boolean; expectedLastModified?: string | null } = {}
   ): Promise<{
     book_id: string;
     chapter_id: string;
     success: boolean;
     message: string;
     metadata_updated: boolean;
+    last_modified: string;
   }> {
     const body = JSON.stringify({
       content,
-      auto_update_metadata: autoUpdateMetadata
+      auto_update_metadata: autoUpdateMetadata,
+      expected_last_modified: options.expectedLastModified,
     });
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content`, {
       method: 'PATCH',
@@ -1030,6 +1059,14 @@ export class BookClient {
     });
     if (!response.ok) {
       const error = await response.text();
+      const conflict = response.status === 409 ? chapterConflictDetail(error) : null;
+      if (conflict) {
+        throw Object.assign(new Error(conflict.message), {
+          statusCode: 409 as const,
+          currentLastModified: conflict.current_last_modified,
+          currentContent: conflict.current_content,
+        }) satisfies ChapterSaveConflict;
+      }
       throw new Error(`Failed to save chapter content: ${response.status} ${error}`);
     }
     return response.json();
@@ -1047,6 +1084,8 @@ export class BookClient {
     content: string;
     chapter_id: string;
     book_id: string;
+    /** The save token (#759): null until the chapter is first saved. */
+    last_modified?: string | null;
     metadata?: {
       word_count: number;
       last_modified: string;

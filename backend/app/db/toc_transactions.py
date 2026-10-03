@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorClientSession
 
 from .base import books_collection
 from .audit_log import create_audit_log
+from .questions import delete_questions_for_chapters
 
 
 def _version_guard(current_toc: Dict[str, Any]) -> Any:
@@ -125,11 +126,40 @@ def _walk_toc(chapters):
     # Stored TOCs can hold AI JSON verbatim (generate-toc validates only chapter
     # titles), so subchapters may be null or non-objects. Skip them rather than
     # 500 every later edit of that book.
+    # Recursive, so id checks and draft carry cover any depth a client sends.
     for chapter in chapters:
         yield chapter
         subchapters = chapter.get("subchapters")
         if isinstance(subchapters, list):
-            yield from (sub for sub in subchapters if isinstance(sub, dict))
+            yield from _walk_toc(sub for sub in subchapters if isinstance(sub, dict))
+
+
+def _require_unique_ids(chapters) -> None:
+    # The autosave writes with array_filters on the id, which updates every
+    # element carrying it, so one duplicate lets one save overwrite two
+    # chapters (#754). The message must avoid "not found"/"not authorized",
+    # which the endpoints map to 404/403, so it cannot echo the client's id.
+    seen = set()
+    for item in _walk_toc(chapters):
+        cid = item.get("id")
+        if isinstance(cid, str) and cid:
+            if cid in seen:
+                raise ValueError("Chapter ids must be unique across the table of contents")
+            seen.add(cid)
+
+
+def _assign_chapter_ids(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]) -> None:
+    """Reject duplicate ids, then give every item the server has not stored a
+    fresh uuid4 (#754). A client id only ever names a stored chapter, so a new
+    chapter cannot reuse a removed chapter's id and inherit its draft or
+    questions, and AI positional ids (``ch1``) cannot collide."""
+    chapters = updated_toc.get("chapters", [])
+    _require_unique_ids(chapters)
+    stored_ids = {c.get("id") for c in _walk_toc(stored_toc.get("chapters", []))}
+    for item in _walk_toc(chapters):
+        cid = item.get("id")
+        if not (isinstance(cid, str) and cid in stored_ids):
+            item["id"] = str(uuid.uuid4())
 
 
 def _carry_server_fields(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]) -> None:
@@ -140,7 +170,8 @@ def _carry_server_fields(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]
     sends only ids, titles and ordering. Before this, one rename set every
     chapter's content to None. Matching runs over the flattened tree, so a
     subchapter moved to another parent keeps its draft. Stored values win over
-    client values. Ids the server has not seen are left as sent.
+    client values. Ids the server has not stored were already replaced by
+    ``_assign_chapter_ids`` (#754), so they match nothing.
     """
     stored = {c["id"]: c for c in _walk_toc(stored_toc.get("chapters", [])) if c.get("id")}
     for item in _walk_toc(updated_toc.get("chapters", [])):
@@ -150,6 +181,38 @@ def _carry_server_fields(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]
         for field in SERVER_OWNED_CHAPTER_FIELDS:
             if field in source:
                 item[field] = source[field]
+
+
+def _chapter_ids(toc: Dict[str, Any]) -> set:
+    return {
+        c["id"] for c in _walk_toc(toc.get("chapters") or []) if isinstance(c.get("id"), str)
+    }
+
+
+async def _cascade_removed_chapters(
+    book_id: str, user_auth_id: str, removed_ids: set
+) -> None:
+    """Delete the questions, responses and ratings of chapters a committed TOC
+    write removed (#755). Call it only after the guarded write succeeds, so a
+    409 deletes nothing.
+
+    Best-effort, like the audit row: the TOC write has committed, so raising
+    would report failure for an edit that succeeded, and a retry cannot redo
+    the cascade. What a failure leaves behind cannot re-attach, because the
+    server re-mints any chapter id it has not stored (#754).
+    """
+    if not removed_ids:
+        return
+    try:
+        await delete_questions_for_chapters(book_id, removed_ids, user_auth_id)
+    except Exception:
+        logging.getLogger(__name__).error(
+            "TOC updated but chapter Q&A cascade failed: book=%s actor=%s chapters=%s",
+            book_id,
+            user_auth_id,
+            sorted(removed_ids),
+            exc_info=True,
+        )
 
 
 async def _update_toc_internal(
@@ -215,6 +278,8 @@ async def _update_toc_internal(
         "version": current_version + 1
     }
 
+    # Ids first: the carry below matches on them.
+    _assign_chapter_ids(current_toc, updated_toc)
     _carry_server_fields(current_toc, updated_toc)
 
     # Derived, never trusted from the client (#496). Every other producer in the
@@ -222,10 +287,6 @@ async def _update_toc_internal(
     # flat chapter listing, and the frontend's own edit-TOC page — so accepting a
     # client value only created a way for the two to disagree.
     updated_toc["total_chapters"] = len(updated_toc.get("chapters", []))
-
-    for item in _walk_toc(updated_toc.get("chapters", [])):
-        if not item.get("id"):
-            item["id"] = str(uuid.uuid4())
 
     # Update the book with the new TOC
     # For new books without TOC, don't check version
@@ -260,6 +321,10 @@ async def _update_toc_internal(
             if current_v != current_version:
                 raise ValueError("Version conflict: TOC was updated by another process")
         raise ValueError("Failed to update TOC")
+
+    await _cascade_removed_chapters(
+        book_id, user_auth_id, _chapter_ids(current_toc) - _chapter_ids(updated_toc)
+    )
 
     # Best-effort audit, explicitly. The TOC write above has already committed,
     # so raising here would report failure for an edit that succeeded — and the
@@ -339,9 +404,9 @@ async def _add_chapter_internal(
     version_guard = _version_guard(toc)  # snapshot before mutating `toc`
     chapters = toc.get("chapters", [])
 
-    # Generate chapter ID if not provided
-    if not chapter_data.get("id"):
-        chapter_data["id"] = str(uuid.uuid4())
+    _require_unique_ids(chapters)
+    # Always server-minted (#754): a caller id could repeat a stored one.
+    chapter_data["id"] = str(uuid.uuid4())
 
     # Add timestamps
     now = datetime.now(timezone.utc).isoformat()
@@ -506,6 +571,8 @@ async def _delete_chapter_internal(
     version_guard = _version_guard(toc)  # snapshot before mutating `toc`
     chapters = toc.get("chapters", [])
 
+    ids_before = _chapter_ids(toc)  # before the in-place delete below
+
     # Find and delete the chapter
     chapter_found = False
 
@@ -534,6 +601,9 @@ async def _delete_chapter_internal(
     await _set_toc_guarded(
         ObjectId(book_id), user_auth_id, toc, version_guard, session
     )
+
+    # The whole subtree went with it, so diff ids rather than cascade one.
+    await _cascade_removed_chapters(book_id, user_auth_id, ids_before - _chapter_ids(toc))
 
     return True
 
