@@ -378,9 +378,10 @@ async def delete_chapter(
     current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
-    Delete a specific chapter from the book's TOC.
-    Note: Deleting a chapter will also delete all its subchapters and related questions.
-    Uses transaction to ensure atomic operation.
+    Delete a specific chapter from the book's TOC, with its subchapters and the
+    questions, responses and ratings of every chapter removed (#755). The TOC
+    write is a version-guarded compare-and-swap, not a transaction; the Q&A
+    delete runs after it commits.
     """
     try:
         # Delete chapter with transaction
