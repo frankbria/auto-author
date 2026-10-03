@@ -258,6 +258,21 @@ describe('ChapterEditor save conflict (#760)', () => {
     expect(view.html()).toBe('<p>Alpha mine more</p>');
   });
 
+  it('does not claim a backup when the conflict text could not be stored', async () => {
+    mockBookClient.saveChapterContent.mockRejectedValueOnce(conflict('<p>Theirs</p>', 'T9'));
+    const view = await open();
+    view.type(' mine');
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage full', 'QuotaExceededError');
+    });
+    await flushTimers(3000);
+    setItem.mockRestore();
+
+    expect(view.getByRole('alert')).toHaveTextContent(/could not be backed up/i);
+    expect(view.getByRole('alert')).not.toHaveTextContent(/backed up on this device\. Which/i);
+    expect(view.html()).toBe('<p>Alpha mine</p>');
+  });
+
   it('keeps the text in the editor when Reload cannot back it up', async () => {
     const view = await openIntoConflict();
     view.type(' more');

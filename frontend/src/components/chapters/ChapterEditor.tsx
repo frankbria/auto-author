@@ -345,14 +345,16 @@ export function ChapterEditor({
   // The local text stays in the editor and in a backup; nothing else saves
   // until the writer picks a version, and neither choice is ever made for them.
   const handleConflict = (content: string, err: ChapterSaveConflict) => {
-    backupChapterContent({ bookId, chapterId, content }, err);
+    const backedUp = backupChapterContent({ bookId, chapterId, content }, err);
     noteBackupWrite();
     // A save that comes back after the editor moved to another chapter is
     // backed up under its own chapter; the choice belongs to that chapter.
     if (shownChapterRef.current !== chapterBackupKey(bookId, chapterId)) return;
     setConflict(err);
     setError(
-      'This chapter was changed somewhere else since you opened it. Your text is still here and backed up on this device. Which version do you want to keep?'
+      backedUp
+        ? 'This chapter was changed somewhere else since you opened it. Your text is still here and backed up on this device. Which version do you want to keep?'
+        : 'This chapter was changed somewhere else since you opened it. Your text is still here, but it could not be backed up on this device. Copy anything you want to keep before choosing.'
     );
   };
 
