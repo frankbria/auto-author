@@ -129,7 +129,8 @@ async def test_reorder_move_and_delete(book_with_drafts):
 
 @pytest.mark.asyncio
 async def test_stored_value_wins_and_new_items_keep_their_own(book_with_drafts):
-    """Server-owned fields are not client-writable; unknown ids are untouched."""
+    """Server-owned fields are not client-writable; an unknown id gets a fresh
+    server id (#754) and no stored fields."""
     payload = {
         "chapters": [
             {**_edit_toc_item("c1", "One", 1, []), "content": None, "status": "draft"},
@@ -138,11 +139,13 @@ async def test_stored_value_wins_and_new_items_keep_their_own(book_with_drafts):
     }
     await tx.update_toc_with_transaction(book_with_drafts, payload, OWNER)
 
-    items = _by_id(await _stored_toc(book_with_drafts))
-    _assert_draft_kept(items["c1"], "c1")
-    assert items["new"]["status"] == "draft"
-    assert items["new"]["word_count"] == 0
-    assert "content" not in items["new"]
+    toc = await _stored_toc(book_with_drafts)
+    _assert_draft_kept(_by_id(toc)["c1"], "c1")
+    new = toc["chapters"][1]
+    assert new["id"] != "new"
+    assert new["status"] == "draft"
+    assert new["word_count"] == 0
+    assert "content" not in new
 
 
 @pytest.mark.asyncio

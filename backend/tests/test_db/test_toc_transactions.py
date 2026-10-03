@@ -66,7 +66,7 @@ async def test_update_toc_creates_toc_and_assigns_ids(seed_book):
     assert result["status"] == "edited"
     ch = result["chapters"]
     assert ch[0]["id"] and ch[0]["subchapters"][0]["id"]  # auto-assigned
-    assert ch[1]["id"] == "keep-me"  # preserved
+    assert ch[1]["id"] != "keep-me"  # never stored, so server-minted (#754)
     # persisted
     assert (await _get_toc(book_id))["version"] == 2
 

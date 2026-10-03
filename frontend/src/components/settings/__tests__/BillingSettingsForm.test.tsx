@@ -26,18 +26,67 @@ const mockToast = toast as unknown as jest.Mock;
 
 const mockStartCheckout = jest.fn();
 const mockOpenBillingPortal = jest.fn();
+const mockGetPlanQuotas = jest.fn();
 jest.mock('@/hooks/useBillingApi', () => ({
   useBillingApi: () => ({
     startCheckout: mockStartCheckout,
     openBillingPortal: mockOpenBillingPortal,
+    getPlanQuotas: mockGetPlanQuotas,
   }),
 }));
+
+const QUOTAS = {
+  free: { daily: 10, monthly: 100 },
+  pro: { daily: 50, monthly: 500 },
+};
 
 describe('BillingSettingsForm', () => {
   beforeEach(() => {
     mockToast.mockClear();
     mockStartCheckout.mockReset();
     mockOpenBillingPortal.mockReset();
+    mockGetPlanQuotas.mockReset();
+    mockGetPlanQuotas.mockResolvedValue(QUOTAS);
+  });
+
+  it('names the concrete Free vs Pro AI limits, read from the API', async () => {
+    render(<BillingSettingsForm plan="free" />);
+
+    expect(
+      await screen.findByText(/free: 10 AI generations per day \(100 per month\)/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/pro: 50 per day \(500 per month\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/full access to every/i)).not.toBeInTheDocument();
+  });
+
+  it('says "unlimited" for a disabled (null) window instead of 0', async () => {
+    mockGetPlanQuotas.mockResolvedValue({
+      free: { daily: null, monthly: 100 },
+      pro: { daily: null, monthly: null },
+    });
+    render(<BillingSettingsForm plan="free" />);
+
+    expect(
+      await screen.findByText(
+        /free: unlimited AI generations per day \(100 per month\)\. pro: unlimited per day \(unlimited per month\)/i
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('tells a Pro user their own cap', async () => {
+    render(<BillingSettingsForm plan="pro" />);
+
+    expect(
+      await screen.findByText(/50 AI generations per day \(500 per month\)/i)
+    ).toBeInTheDocument();
+  });
+
+  it('still renders the plan and upgrade button if the limits cannot be loaded', async () => {
+    mockGetPlanQuotas.mockRejectedValue(new Error('boom'));
+    render(<BillingSettingsForm plan="free" />);
+
+    expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeInTheDocument();
+    await waitFor(() => expect(mockGetPlanQuotas).toHaveBeenCalled());
   });
 
   it('shows an Upgrade button for a free plan', () => {
