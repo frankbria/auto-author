@@ -39,6 +39,8 @@ class UserBase(BaseModel):
 class UserResponse(UserBase):
     """Schema for user data returned from API"""
 
+    # None only for a deleted account, whose retained record drops it (#763).
+    email: Optional[EmailStr] = None
     id: Optional[str] = None
     auth_id: str  # better-auth user ID
     created_at: Optional[datetime] = None
