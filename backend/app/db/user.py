@@ -92,6 +92,20 @@ async def create_user(user_data: Dict) -> Dict:
     return await get_user_by_id(str(result.inserted_id))
 
 
+async def release_email(email: str, auth_id: str) -> int:
+    """Unset ``email`` on every users doc except ``auth_id``'s (#765).
+
+    better-auth keeps emails unique and owns their verification, so when
+    ``auth_id``'s better-auth user holds ``email``, any other backend doc holding
+    it is stale (squatted through the old PATCH /users/me, or left over from a
+    deleted account). Returns how many docs were released.
+    """
+    result = await users_collection.update_many(
+        {"email": email, "auth_id": {"$ne": auth_id}}, {"$unset": {"email": ""}}
+    )
+    return result.modified_count
+
+
 async def update_user(
     auth_id: str, user_data: Dict, actor_id: str = None,
     extra_filter: Optional[Dict] = None,
