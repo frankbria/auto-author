@@ -93,6 +93,9 @@ cd /opt/auto-author
 # env-only change does not also move the release:
 export IMAGE_TAG="$(docker ps --format '{{.Image}}' | sed -n 's#.*auto-author-backend:##p' | head -1)"
 echo "$IMAGE_TAG"   # expect sha-xxxxxxx; if empty, pass the tag explicitly
+# docker-compose.yml also requires ENVIRONMENT with no default (#777); the
+# workflows export it the same way, so a manual shell must too.
+export ENVIRONMENT=staging
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
 ```
 
@@ -221,7 +224,7 @@ Re-run the deploy with an earlier tag. That is the whole procedure:
 
 ```bash
 cd /opt/auto-author
-IMAGE_TAG=sha-<previous> docker compose \
+IMAGE_TAG=sha-<previous> ENVIRONMENT=staging docker compose \
   -f docker-compose.yml -f docker-compose.staging.yml up -d
 ```
 
@@ -232,6 +235,11 @@ IMAGE_TAG=sha-<previous> docker compose \
 **Compose exits with `MONGODB_URI is required`** — the box `.env` is missing that
 key, or the deploy is running from a directory without it. This is the assertion
 working; check `/opt/auto-author/.env`.
+
+**Compose exits with `ENVIRONMENT is required`** — the shell running compose
+did not export `ENVIRONMENT`. There is deliberately no default (#777): the
+backend's production guards key off it. The workflows export `staging`; a manual
+shell must do the same.
 
 **Backend health 503** — read the `checks` object in the response body; it names
 the failing component. Mongo failures are usually a rotated password not yet
@@ -247,6 +255,8 @@ confirm the holder is ours before killing anything.
 
 ```bash
 cd /opt/auto-author
+# Every compose command interpolates the files: export IMAGE_TAG and
+# ENVIRONMENT=staging first, as in the recreate snippet above.
 docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=100 backend
 docker compose -f docker-compose.yml -f docker-compose.staging.yml ps
 ```

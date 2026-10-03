@@ -37,7 +37,9 @@ services:
       DATABASE_NAME: ${DATABASE_NAME:?DATABASE_NAME is required}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
-      ENVIRONMENT: ${ENVIRONMENT:-staging}
+      # No default (#777): the production guards key off this marker, so a
+      # forgotten value must stop the deploy, not quietly start as staging.
+      ENVIRONMENT: ${ENVIRONMENT:?ENVIRONMENT is required (development|test|staging|production)}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
     healthcheck:
