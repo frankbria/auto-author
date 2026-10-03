@@ -12,6 +12,7 @@ from app.services.ai_errors import (
     AIRateLimitError,
     AINetworkError,
     AIServiceUnavailableError,
+    AIProviderQuotaError,
     AIInvalidRequestError
 )
 from app.services.style_templates import (
@@ -102,6 +103,15 @@ class AIService:
                 return await func(*args, **kwargs)
 
             except openai.RateLimitError as e:
+                if e.code == "insufficient_quota":
+                    # Logged at ERROR so Sentry raises it: every AI feature is
+                    # down until someone adds credit (#775).
+                    logger.error(
+                        f"OpenAI refused for billing (insufficient_quota) [correlation_id={correlation_id}]"
+                    )
+                    raise AIProviderQuotaError(
+                        original_exception=e, correlation_id=correlation_id
+                    )
                 last_exception = e
                 delay = min(self.base_delay * (2**attempt), self.max_delay)
                 logger.warning(
