@@ -106,6 +106,7 @@ jobs:
             docker network create smoke-net
             docker run -d --name smoke-mongo --network smoke-net mongo:7
             docker run -d --name smoke --network smoke-net -p 8000:8000 \
+              -e ENVIRONMENT=test \
               -e MONGODB_URI=mongodb://smoke-mongo:27017 \
               -e DATABASE_NAME=smoke \
               -e BETTER_AUTH_SECRET=test-secret-for-ci-minimum-32-characters-long-safe-for-testing \

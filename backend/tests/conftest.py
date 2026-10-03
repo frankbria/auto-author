@@ -8,6 +8,11 @@ if sys.platform == "win32":
 import pytest
 import pymongo
 
+# Settings refuses to build without an explicit ENVIRONMENT (#777), and the app
+# modules below build it at import. Forced, not defaulted: a shell exporting
+# staging/production would otherwise flip the guards the suite asserts on.
+os.environ["ENVIRONMENT"] = "test"
+
 
 import app.api.dependencies as deps
 from fastapi import Request
