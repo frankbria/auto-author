@@ -4,6 +4,7 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **`Permissions-Policy` no longer blocks the shipped voice input (#772, P0.24)**: `next.config.ts` sent `microphone=()` on every route, an empty allowlist that refuses `getUserMedia` and SpeechRecognition for the app's own origin with no browser-side fix. It is now `camera=(), microphone=(self), geolocation=()`; camera and geolocation stay off and third-party frames still get no mic. It was the only place the header is set (middleware, backend and deploy config checked). `src/__tests__/nextConfigHeaders.test.ts` pins the value from the real `headers()` export. CI could not catch this before because Jest mocks media and the E2E specs skip the microphone.
 - **The chapter editor no longer drops edits or saves over a chapter it failed to load (#757, P0.9)**:
   - **The bugs.**
     - Effect cleanup only cleared the autosave timer. Since #756 keys the editor per chapter, text typed inside the 3s debounce before a tab switch was dropped on unmount.
