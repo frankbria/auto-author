@@ -4,6 +4,11 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **TOC generation no longer truncates typical TOCs into an always-failing retryable error (#774, P0.26)**:
+  - **The bug.** `generate_toc_from_summary_and_responses` asked for `max_tokens=1500`, but the prompt requests 6-12 chapters x 2-4 subchapters as pretty JSON (about 2k tokens at 8x3, 3.7k at 12x4). The cut-off JSON could not parse and the user got `AI_INVALID_RESPONSE retryable=true`; every retry failed identically and spent quota.
+  - **The fix.** Budget is now `TOC_MAX_COMPLETION_TOKENS = 6000`. A `finish_reason == "length"` response raises `AI_RESPONSE_TRUNCATED` with `retryable=false` (one API call, no retries).
+  - **Verified.** Through the real `generate-toc` endpoint against an OpenAI-compatible wire stub that truncates when `max_tokens` is below what the TOC needs: main returned `AI_INVALID_RESPONSE` (stub saw 1500), the branch returned the full 10x3 TOC (stub saw 6000), and an oversized 25x4 TOC returned `AI_RESPONSE_TRUNCATED retryable=false`. Tests in `test_toc_token_budget.py`.
+
 - **Deleting an account now actually signs it out everywhere (#763, P0.15)**:
   - **The bug.** `DELETE /users/me` cascaded the books and set `is_active: False`, but nothing read that flag. The better-auth `user`, `account`, `session` and `twoFactor` documents survived, so the same cookie kept returning 200 on `/users/me` and 201 on `POST /books`, and the old password still signed in. A session whose better-auth user row was gone also still authenticated as long as the app record existed.
   - **The fix.** `get_current_user_from_session` returns 401 when the better-auth user is missing, and when the app record has `is_active is False`. The check is an explicit False, so records that predate the field stay active. `delete_user` is the one function both delete endpoints call. It now purges the user's better-auth `session`, `account`, `twoFactor` and `user` docs, matching `userId` both as an ObjectId (what the adapter writes) and as a string. The profile page calls `authClient.signOut()` after the DELETE succeeds and before redirecting.
