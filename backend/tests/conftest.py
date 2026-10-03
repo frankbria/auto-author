@@ -176,7 +176,8 @@ def arm_real_ai_quota():
     patches = [
         _mock_patch.object(deps.settings, "BYPASS_AUTH", False),
         _mock_patch.object(deps.settings, "AI_QUOTA_ENABLED", True),
-        _mock_patch.object(deps.settings, "AI_QUOTA_MONTHLY_LIMIT", 0),
+        _mock_patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0),
+        _mock_patch.object(deps.settings, "AI_QUOTA_PRO_MONTHLY", 0),
         _mock_patch.object(deps.settings, "E2E_EXEMPT_EMAILS", ""),
     ]
     for p in patches:
@@ -202,9 +203,10 @@ def arm_real_ai_quota():
         )
         key = next(iter(captured))
 
-        p = _mock_patch.object(deps.settings, "AI_QUOTA_DAILY_LIMIT", limit)
-        p.start()
-        patches.append(p)
+        for name in ("AI_QUOTA_FREE_DAILY", "AI_QUOTA_PRO_DAILY"):
+            p = _mock_patch.object(deps.settings, name, limit)
+            p.start()
+            patches.append(p)
         app.dependency_overrides[key] = real_get_ai_usage_quota()
         armed_keys.append(key)
 

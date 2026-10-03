@@ -42,6 +42,16 @@ jest.mock('@/hooks/useAuthFetch', () => ({
   useAuthFetch: () => ({ authFetch: mockAuthFetch }),
 }));
 
+// Serve /billing/quotas separately from the profile fetch (#766).
+const mockProfile = (profile: unknown) =>
+  mockAuthFetch.mockImplementation((path: string) =>
+    Promise.resolve(
+      path === '/billing/quotas'
+        ? { free: { daily: 10, monthly: 100 }, pro: { daily: 50, monthly: 500 } }
+        : profile
+    )
+  );
+
 const loadedProfile = (
   plan: string,
   preferences: Record<string, unknown> = {},
@@ -68,7 +78,7 @@ describe('SettingsPage billing tab', () => {
 
   it('shows the current plan from GET /users/me on the Billing tab', async () => {
     const user = userEvent.setup();
-    mockAuthFetch.mockResolvedValue(loadedProfile('pro'));
+    mockProfile(loadedProfile('pro'));
     render(<SettingsPage />);
 
     await waitFor(() =>
@@ -81,7 +91,7 @@ describe('SettingsPage billing tab', () => {
 
   it('hides the shared Save button on the Billing tab', async () => {
     const user = userEvent.setup();
-    mockAuthFetch.mockResolvedValue(loadedProfile('free'));
+    mockProfile(loadedProfile('free'));
     render(<SettingsPage />);
 
     await waitFor(() =>
@@ -94,7 +104,7 @@ describe('SettingsPage billing tab', () => {
 
   it('selects the Billing tab and shows a success toast for ?checkout=success', async () => {
     setSearch('?checkout=success');
-    mockAuthFetch.mockResolvedValue(loadedProfile('free'));
+    mockProfile(loadedProfile('free'));
     render(<SettingsPage />);
 
     await waitFor(() =>
@@ -111,7 +121,7 @@ describe('SettingsPage billing tab', () => {
 
   it('shows Manage billing for a lapsed user with a Stripe customer (issue #222)', async () => {
     const user = userEvent.setup();
-    mockAuthFetch.mockResolvedValue(loadedProfile('restricted', {}, 'cus_lapsed_001'));
+    mockProfile(loadedProfile('restricted', {}, 'cus_lapsed_001'));
     render(<SettingsPage />);
 
     await waitFor(() =>
@@ -125,7 +135,7 @@ describe('SettingsPage billing tab', () => {
   // --- ?tab= deep-link (issue #222) ---
   it('selects the Billing tab for ?tab=billing without any toast', async () => {
     setSearch('?tab=billing');
-    mockAuthFetch.mockResolvedValue(loadedProfile('free'));
+    mockProfile(loadedProfile('free'));
     render(<SettingsPage />);
 
     await waitFor(() =>
@@ -139,7 +149,7 @@ describe('SettingsPage billing tab', () => {
 
   it('ignores an unknown ?tab= value and stays on the default tab', async () => {
     setSearch('?tab=bogus');
-    mockAuthFetch.mockResolvedValue(loadedProfile('free'));
+    mockProfile(loadedProfile('free'));
     render(<SettingsPage />);
 
     await waitFor(() =>
@@ -152,7 +162,7 @@ describe('SettingsPage billing tab', () => {
 
   it('selects the Billing tab and shows a canceled toast for ?checkout=cancel', async () => {
     setSearch('?checkout=cancel');
-    mockAuthFetch.mockResolvedValue(loadedProfile('free'));
+    mockProfile(loadedProfile('free'));
     render(<SettingsPage />);
 
     await waitFor(() =>
