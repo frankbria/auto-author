@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { authClient } from '@/lib/auth-client';
 import { sanitizeRedirectPath } from '@/lib/security';
 import { toast } from '@/lib/toast';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
 
 const TOTP_LENGTH = 6;
 
@@ -155,8 +156,8 @@ export default function VerifyTwoFactorPage() {
             </summary>
             <p className="mt-2">
               We can verify your identity and reset two-factor authentication manually. Email{' '}
-              <a href="mailto:support@autoauthor.com" className="underline underline-offset-4">
-                support@autoauthor.com
+              <a href={SUPPORT_MAILTO} className="underline underline-offset-4">
+                {SUPPORT_EMAIL}
               </a>{' '}
               from the email address on your account and we&apos;ll help you regain access.
             </p>
