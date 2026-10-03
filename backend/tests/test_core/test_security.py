@@ -467,7 +467,7 @@ class TestProductionSecurityValidation:
         from app.core.config import Settings
 
         monkeypatch.delenv("NODE_ENV", raising=False)
-        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "test")  # required since #777
         monkeypatch.setenv(env_var, env_value)
         monkeypatch.setenv("BYPASS_AUTH", "true")
         monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
@@ -476,12 +476,13 @@ class TestProductionSecurityValidation:
         settings = Settings()
         assert settings.BYPASS_AUTH is True
 
-    def test_bypass_auth_allowed_with_e2e_flag_when_env_not_set(self, monkeypatch):
-        """With E2E_ALLOW_BYPASS=1 the bypass stays allowed when no env marker is set (#307)."""
+    def test_bypass_auth_allowed_with_e2e_flag_when_node_env_not_set(self, monkeypatch):
+        """With E2E_ALLOW_BYPASS=1 the bypass stays allowed when NODE_ENV is unset (#307).
+        ENVIRONMENT itself can no longer be unset — that refuses to start (#777)."""
         from app.core.config import Settings
 
         monkeypatch.delenv("NODE_ENV", raising=False)
-        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "development")
         monkeypatch.setenv("BYPASS_AUTH", "true")
         monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
 
@@ -654,7 +655,7 @@ class TestProductionSecurityValidation:
         from pydantic import ValidationError as PydanticValidationError
         from app.core.config import Settings
 
-        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "development")  # NODE_ENV alone must still trip it
         monkeypatch.setenv("NODE_ENV", "Production")
         monkeypatch.setenv("BYPASS_AUTH", "false")
         monkeypatch.setenv(

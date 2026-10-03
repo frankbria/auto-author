@@ -168,10 +168,18 @@ advanced: {
     sameSite: "lax",         // CSRF protection (issue #339)
     secure: true,            // HTTPS only; localhost is a trustworthy origin
     httpOnly: true,          // Not readable from JS
-    domain: getCookieDomain(), // ".dev.autoauthor.app" in staging/prod, undefined on localhost
+    domain: getCookieDomain(), // ".dev.autoauthor.app" in staging; undefined (host-only) on localhost or an apex
   },
 }
 ```
+
+**Cookie domain (issue #778):** the domain is `.${host}` of `BETTER_AUTH_URL`, so
+`dev.autoauthor.app` shares the cookie with `api.dev.autoauthor.app`. An apex host
+(`autoauthor.app`) is never widened to `.autoauthor.app`, because that domain
+matches every subdomain, including the shared staging box. An apex gets a
+host-only cookie instead, so production must either live on a subdomain
+(`app.autoauthor.app` with the API at `api.app.autoauthor.app`) or serve the API
+from the same host.
 
 **Why `lax` and not `none`:** the backend authenticates from `request.cookies`,
 and multipart uploads (avatar, book cover) are CORS-"simple" requests that trigger

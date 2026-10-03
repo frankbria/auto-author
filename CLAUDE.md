@@ -99,6 +99,7 @@ Files under 500 lines. Never hardcode secrets. Tests before implementation. WCAG
 
 - Python: `uv`. Node: `npm`.
 - `BYPASS_AUTH=true` only takes effect alongside `E2E_ALLOW_BYPASS=1` in **every** environment (frontend middleware #272, backend FastAPI #307). Backend production is hard-blocked regardless. Never use in production.
+- **`ENVIRONMENT` is required by the backend** (`development|test|staging|production`, #777): missing or unknown refuses to start, and compose has no default. Local runs need it in `backend/.env` or the shell; the staging workflows export `staging`.
 - Otherwise standard Next.js / FastAPI vars — see `.env.example`.
 - `CURRENT_SPRINT.md` and `IMPLEMENTATION_PLAN.md` are auto-generated bd snapshots; edit bd, not the markdown.
 

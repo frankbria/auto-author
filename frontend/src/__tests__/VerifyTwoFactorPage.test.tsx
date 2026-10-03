@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 
@@ -92,7 +93,7 @@ describe('VerifyTwoFactorPage', () => {
       screen.getByText(/lost access to your authenticator and backup codes\?/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: /support@autoauthor\.com/i })
-    ).toHaveAttribute('href', 'mailto:support@autoauthor.com');
+      screen.getByRole('link', { name: SUPPORT_EMAIL })
+    ).toHaveAttribute('href', SUPPORT_MAILTO);
   });
 });

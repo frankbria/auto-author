@@ -1,10 +1,22 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field, ValidationInfo
+from dotenv import dotenv_values
 from typing import List, Union
+import hashlib
 import logging
 import os
 
 logger = logging.getLogger(__name__)
+
+ALLOWED_ENVIRONMENTS = ("development", "test", "staging", "production")
+
+# Settings reads .env, but every guard below reads os.environ. Lift ENVIRONMENT
+# out of .env so a value set only there reaches both — otherwise
+# ENVIRONMENT=production in .env would pass validation with the guards off (#777).
+if "ENVIRONMENT" not in os.environ:
+    _dotenv_environment = dotenv_values(".env").get("ENVIRONMENT")
+    if _dotenv_environment is not None:
+        os.environ["ENVIRONMENT"] = _dotenv_environment
 
 
 def is_production_env() -> bool:
@@ -41,7 +53,41 @@ def is_deployed_env() -> bool:
     return bool(markers & {"production", "staging", "prod"})
 
 
+# SHA-256 of BETTER_AUTH_SECRET values that were published in this public repo (#780).
+# Hashes, never the literals: the point is to stop shipping the secret, so the
+# deny-list must not contain it. Keep in sync with frontend/src/lib/auth-secret.ts.
+PUBLISHED_SECRET_SHA256 = frozenset({
+    "fb89705a13a017d46d0df597a15f0e7d4e5470bb331805dd91db4da49dd6ddfe",
+})
+
+
+def is_published_secret(value: str) -> bool:
+    return hashlib.sha256(value.encode()).hexdigest() in PUBLISHED_SECRET_SHA256
+
+
 class Settings(BaseSettings):
+    # Required, but defaulted to None and validated: a plain required field's
+    # "missing" error prints every other setting (Mongo URI, API keys) as its
+    # input_value into the startup log.
+    ENVIRONMENT: str | None = Field(default=None, validate_default=True)
+
+    @field_validator("ENVIRONMENT")
+    @classmethod
+    def require_known_environment(cls, v: str | None) -> str:
+        """Refuse to start without an explicit, known ENVIRONMENT (#777).
+
+        is_production_env() matches only "production", so a missing marker, a
+        typo or "prod" silently disabled every production guard. Lower-cased to
+        match the guards' own normalization (#309) and nothing more: " production"
+        would pass a strip() here and still miss the guards.
+        """
+        if v is None or v.lower() not in ALLOWED_ENVIRONMENTS:
+            raise ValueError(
+                f"ENVIRONMENT must be one of {', '.join(ALLOWED_ENVIRONMENTS)}; "
+                f"got {v!r}. Set it explicitly: there is no default."
+            )
+        return v.lower()
+
     # MongoDB connection - MONGODB_URI takes precedence over DATABASE_URL
     MONGODB_URI: str = ""  # Standard env var name (e.g., for Atlas)
     DATABASE_URL: str = "mongodb://localhost:27017"  # Fallback/legacy
@@ -218,6 +264,15 @@ class Settings(BaseSettings):
                 )
             return v  # Allow in local development and test/CI only
 
+        # A secret published in this public repo is compromised everywhere it
+        # is deployed (#780). Local dev/CI may still use it.
+        if is_published_secret(v) and is_deployed_env():
+            raise ValueError(
+                "FATAL: BETTER_AUTH_SECRET is a value that was published in this "
+                "public repository. Rotate it: "
+                "python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+
         # Reject known weak/test secrets (except our specific CI secret)
         weak_secrets = [
             "test-better-auth-secret-key",
@@ -277,7 +332,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
-        extra="ignore"
+        extra="ignore",
+        # Validation errors must not echo secrets (BETTER_AUTH_SECRET, Stripe keys) into logs.
+        hide_input_in_errors=True,
     )
 
 
