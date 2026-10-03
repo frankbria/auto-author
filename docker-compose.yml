@@ -54,15 +54,32 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3002:3002"
-    env_file:
-      - .env
+    # No `env_file:` here, unlike the backend (#781). The shared .env holds the
+    # OpenAI, Stripe, AWS and Cloudinary secrets, and an SSR compromise of this
+    # process (#738 was one) would hand over everything it was given. This list
+    # is the whole of what the Next server reads; scripts/test_frontend_env_allowlist.py
+    # fails if a name appears here that frontend/src never reads.
     environment:
-      # Server-side only. The frontend talks to Mongo directly for better-auth.
+      # The frontend talks to Mongo directly for better-auth.
       DATABASE_URL: ${MONGODB_URI:?MONGODB_URI is required}
       DATABASE_NAME: ${DATABASE_NAME:?DATABASE_NAME is required}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://dev.autoauthor.app}
       NODE_ENV: production
+      # Bare names pass through from .env when set and stay unset when not, so
+      # the code's own fallbacks still apply. Password-reset mail (#332):
+      EMAIL_SERVICE_PROVIDER:
+      EMAIL_SERVICE_API_KEY:
+      EMAIL_FROM_ADDRESS:
+      EMAIL_FROM_NAME:
+      # Read at runtime by the server-side Sentry init and the CSP middleware.
+      # Public values, not secrets. (Not build args, so the browser bundle
+      # does not get them.)
+      NEXT_PUBLIC_SENTRY_DSN:
+      NEXT_PUBLIC_ENVIRONMENT:
+      # Retry tuning for better-auth's Mongo connect (frontend/src/lib/auth.ts).
+      MONGO_MAX_RETRY_ATTEMPTS:
+      MONGO_BASE_RETRY_DELAY_MS:
     depends_on:
       backend:
         condition: service_healthy
