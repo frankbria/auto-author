@@ -126,6 +126,7 @@ of these. `@` → `%40`, `/` → `%2F`, `%` → `%25`, `:` → `%3A`.
    cd /opt/auto-author
    export IMAGE_TAG="$(docker ps --format '{{.Image}}' | sed -n 's#.*auto-author-backend:##p' | head -1)"
    echo "$IMAGE_TAG"   # expect sha-xxxxxxx; if empty, pass the tag explicitly
+   export ENVIRONMENT=staging   # compose requires it (#777)
    docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
    ```
    — **recreate, not restart**; a restarted container keeps its old environment.
