@@ -371,6 +371,7 @@ export default function QuestionDisplay({
 
         // Queue the save operation
         const queueId = `complete-${question.id}-${Date.now()}`;
+        lastSavedTextRef.current = responseText;
         retryQueue.add(
           queueId,
           () => saveOperation(ResponseStatus.COMPLETED),

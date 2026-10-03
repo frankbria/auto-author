@@ -894,6 +894,26 @@ describe('QuestionDisplay - auto-save', () => {
       expect(mockedBookClient.saveQuestionResponse).not.toHaveBeenCalled();
     });
 
+    it('queues no draft on top of an offline Complete Response', async () => {
+      const { useOnlineStatus } = require('@/hooks/useOnlineStatus');
+      useOnlineStatus.mockReturnValue({ isOnline: false, wasOffline: false });
+      try {
+        jest.useFakeTimers();
+        render(<QuestionDisplay {...defaultProps} />);
+        await idle(0);
+
+        fireEvent.change(screen.getByLabelText(/your response/i), { target: { value: 'done offline' } });
+        fireEvent.click(screen.getByText('Complete Response'));
+        await idle(30000);
+
+        const queued = mockedRetryQueue.add.mock.calls.map((c) => c[0] as string);
+        expect(queued).toHaveLength(1);
+        expect(queued[0]).toMatch(/^complete-/);
+      } finally {
+        useOnlineStatus.mockReturnValue({ isOnline: true, wasOffline: false });
+      }
+    });
+
     it('does not re-save after the user marks the answer completed', async () => {
       jest.useFakeTimers();
       render(<QuestionDisplay {...defaultProps} />);
