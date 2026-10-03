@@ -91,8 +91,22 @@ class TestPutTocRejectsDuplicateIds:
         )
 
         assert r.status_code == 400, r.text
-        assert "ch3" in r.json()["detail"]
+        assert r.json()["detail"] == "Chapter ids must be unique across the table of contents"
         assert await _stored_toc(book_id) == before
+
+    @pytest.mark.asyncio
+    async def test_duplicate_id_spelled_like_an_error_is_still_400(self, auth_client_factory):
+        """The endpoint maps "not found" in an error to 404, so the message
+        must not echo the client's id (found in cross-family review)."""
+        api = await auth_client_factory()
+        book_id = await _book_with_toc(api, [_chapter("a", "A")])
+
+        r = await api.put(
+            f"{API}/{book_id}/toc",
+            json={"toc": {"chapters": [_chapter("Book not found", "X"), _chapter("Book not found", "Y")]}},
+        )
+
+        assert r.status_code == 400, r.text
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

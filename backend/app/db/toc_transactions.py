@@ -136,14 +136,14 @@ def _walk_toc(chapters):
 def _require_unique_ids(chapters) -> None:
     # The autosave writes with array_filters on the id, which updates every
     # element carrying it, so one duplicate lets one save overwrite two
-    # chapters (#754). The message must avoid "not found"/"not authorized":
-    # the endpoints map those substrings to 404/403.
+    # chapters (#754). The message must avoid "not found"/"not authorized",
+    # which the endpoints map to 404/403, so it cannot echo the client's id.
     seen = set()
     for item in _walk_toc(chapters):
         cid = item.get("id")
         if isinstance(cid, str) and cid:
             if cid in seen:
-                raise ValueError(f"Chapter ids must be unique; duplicate id: {cid}")
+                raise ValueError("Chapter ids must be unique across the table of contents")
             seen.add(cid)
 
 
@@ -169,7 +169,8 @@ def _carry_server_fields(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]
     sends only ids, titles and ordering. Before this, one rename set every
     chapter's content to None. Matching runs over the flattened tree, so a
     subchapter moved to another parent keeps its draft. Stored values win over
-    client values. Ids the server has not seen are left as sent.
+    client values. Ids the server has not stored were already replaced by
+    ``_assign_chapter_ids`` (#754), so they match nothing.
     """
     stored = {c["id"]: c for c in _walk_toc(stored_toc.get("chapters", [])) if c.get("id")}
     for item in _walk_toc(updated_toc.get("chapters", [])):
