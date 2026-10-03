@@ -1,3 +1,5 @@
+import { isQuotaCapMessage } from '@/lib/api/aiErrorHandler';
+
 interface ErrorDisplayProps {
   error: string;
   onRetry: () => void;
@@ -7,6 +9,28 @@ interface ErrorDisplayProps {
 
 export default function ErrorDisplay({ error, onRetry, statusCode }: ErrorDisplayProps) {
   const isEntitlementError = statusCode === 402;
+
+  // Plan quota cap (#766): the message states the cap and reset time. Retrying
+  // can't help and "contact support" is the wrong answer, so show the cap and
+  // point at the billing tab.
+  if (statusCode === 429 && isQuotaCapMessage(error)) {
+    return (
+      <div className="bg-muted border border-border rounded-lg p-8">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-foreground mb-3">
+            AI usage limit reached
+          </h2>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">{error}</p>
+          <a
+            href="/dashboard/settings?tab=billing"
+            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-colors inline-flex items-center"
+          >
+            View plan limits
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   if (isEntitlementError) {
     return (
