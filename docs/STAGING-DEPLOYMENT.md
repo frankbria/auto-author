@@ -239,6 +239,8 @@ confirm the holder is ours before killing anything.
 
 ```bash
 cd /opt/auto-author
+# Every compose command interpolates the files: export IMAGE_TAG and
+# ENVIRONMENT=staging first, as in the recreate snippet above.
 docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=100 backend
 docker compose -f docker-compose.yml -f docker-compose.staging.yml ps
 ```

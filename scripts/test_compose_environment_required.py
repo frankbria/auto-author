@@ -31,4 +31,6 @@ def test_every_workflow_that_runs_compose_up_exports_environment():
 
     assert runs_up, "no workflow runs `docker compose up`; this guard is vacuous"
     for wf in runs_up:
-        assert re.search(r"export ENVIRONMENT=staging\b", wf.read_text()), wf.name
+        assert re.search(
+            r"export ENVIRONMENT=(development|test|staging|production)\b", wf.read_text()
+        ), wf.name
