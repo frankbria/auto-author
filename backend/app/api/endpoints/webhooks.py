@@ -14,7 +14,7 @@ from app.core.entitlements import (
     has_live_subscription,
     plan_for_subscription,
 )
-from app.db.stripe_events import mark_event_processed, unmark_event
+from app.db.stripe_events import is_event_processed, mark_event_processed
 from app.db.user import (
     get_user_by_auth_id,
     get_user_by_stripe_customer_id,
@@ -76,9 +76,8 @@ async def stripe_webhook(request: Request):
     if not event_type.startswith("customer.subscription.") or not event_id:
         return {"status": "ignored", "event_type": event_type}
 
-    # Atomic claim: Stripe retries deliveries, so the same event id may arrive
-    # more than once (or concurrently on two workers).
-    if not await mark_event_processed(event_id):
+    # Stripe retries deliveries, so the same event id may arrive more than once.
+    if await is_event_processed(event_id):
         logger.info("Stripe event %s already processed (replay) — skipping", event_id)
         return {"status": "replay", "event_id": event_id}
 
@@ -88,13 +87,20 @@ async def stripe_webhook(request: Request):
         # so an older update that arrives late cannot overwrite a newer plan
         # (#352) — idempotency above only stops the *same* event twice.
         event_created = event.get("created")
-        return await _apply_subscription_event(
+        result = await _apply_subscription_event(
             event_type, subscription, event_id, event_created
         )
+        # Marker AFTER the apply (#769): a crash, redeploy or CancelledError
+        # before this line leaves none, so Stripe's retry re-applies instead of
+        # being dropped as a replay. Re-applying is safe: the write is a plain
+        # $set guarded by the ordering filter. Only an applied event is recorded:
+        # an ignored one must reprocess on a dashboard Resend once its user or
+        # subscription matches, and a stale one just re-checks the watermark.
+        if result["status"] == "processed":
+            await mark_event_processed(event_id)
+        return result
     except Exception:
-        # Release the claim so Stripe's retry of this failure isn't treated as
-        # a replay, then surface a 500 (Stripe retries non-2xx).
-        await unmark_event(event_id)
+        # Nothing was recorded, so Stripe's retry (it retries non-2xx) reprocesses.
         logger.error("Failed to process Stripe event %s", event_id, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to process Stripe event")
 
@@ -124,11 +130,10 @@ async def _apply_subscription_event(
         user = await get_user_by_auth_id(auth_id) if auth_id else None
     if user is None:
         # Ack with 200 so Stripe stops retrying — there is no user to update
-        # (e.g. deleted account, or a customer created outside this app). But
-        # RELEASE the replay marker: once the user is linked later, an operator
+        # (e.g. deleted account, or a customer created outside this app). No
+        # replay marker is recorded: once the user is linked later, an operator
         # can "Resend" the event from the Stripe dashboard (same event id) and
-        # it must reprocess instead of being swallowed as a replay.
-        await unmark_event(event_id)
+        # it reprocesses.
         logger.warning(
             "Stripe %s for customer %s matches no user", event_type, customer_id
         )
@@ -142,9 +147,8 @@ async def _apply_subscription_event(
     # never establishes anything.
     current_id = user.get("stripe_subscription_id")
     if subscription_id != current_id and (deleted or has_live_subscription(user)):
-        # Release the marker, as for no_matching_user: if this subscription
-        # becomes current later, a dashboard Resend must reprocess the event.
-        await unmark_event(event_id)
+        # No marker, as for no_matching_user: if this subscription becomes
+        # current later, a dashboard Resend must reprocess the event.
         if not deleted and status in LIVE_SUBSCRIPTION_STATUSES:
             logger.error(
                 "User %s has a second live Stripe subscription %s (%s) besides "
@@ -199,9 +203,9 @@ async def _apply_subscription_event(
     # mode when Stripe is unreachable) for exactness, and is the upgrade path if
     # same-second races ever show up in practice.
     # Enforced by Mongo as part of the write, not by a read here. Two deliveries
-    # for the same customer carry DIFFERENT event ids, so mark_event_processed
-    # does not serialize them: a read-then-write check lets both pass and the
-    # older one land last. The condition goes in the query instead.
+    # for the same customer carry DIFFERENT event ids, so nothing serializes
+    # them: a read-then-write check lets both pass and the older one land last.
+    # The condition goes in the query instead.
     ordering_filter = None
     if event_created is not None:
         ordering_filter = {

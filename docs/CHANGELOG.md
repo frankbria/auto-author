@@ -4,6 +4,17 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **The Stripe webhook records an event as processed only after applying it (#769, P0.21)**:
+  - **The bug.** The handler inserted the event's idempotency marker first and deleted it again only on `Exception`. A crash, a redeploy or a `CancelledError` between the claim and the user write left the marker behind, so Stripe's retry got `replay` and the plan change was lost until the marker's 30-day TTL expired.
+  - **The fix.** `stripe_events.is_event_processed` checks for a replay, the event is applied, and only then does `mark_event_processed` record it, for `processed` results only. A worker that dies anywhere before that line leaves no marker, so the retry re-applies. Re-applying is safe: the write is a plain `$set` guarded by the `stripe_event_created` filter, so a retry that arrives after a newer event is rejected as stale. `no_matching_user` and `not_current_subscription` record nothing, as before, so a dashboard Resend still reprocesses them. `stale_event` records nothing either, so a redelivery re-checks the watermark instead of trusting it never moved back (raised by the opencode/GLM review). `unmark_event` is gone because nothing releases a marker any more.
+  - **Tests on real Mongo.** The fixture `subscription_event` now always stamps `created`, as Stripe does, from a counter so each event built is strictly newer and no test flips on a second boundary. Every signed-webhook test now runs the ordering guard; before, none did. That exposed #768's resend test, which passed only because its events had no timestamp: with real ones, B's event must postdate A's deletion to apply (an older one is `stale_event`, #768's per-user watermark limit), so it now says so. The new `test_stripe_webhook_delivery.py` covers these cases:
+    - A `BaseException` raised by the user write. This is the redeploy shape that `except Exception` never caught. Stripe's retry applies pro.
+    - A crash after the write but before the marker re-applies, and the next duplicate is a `replay`.
+    - `evt_old` after `evt_new` returns `stale_event` and leaves the plan and watermark alone.
+    - A same-second event still applies.
+    - A newer event landing between the lookup and the write still wins.
+    The two fake-DAO ordering tests in `test_hardening_352.py` were replaced by these.
+  - **Known limit.** Two concurrent deliveries of the same event id can both pass the check and both apply. The write is identical, so the only trace is a second audit-log row.
 - **The billing portal is pinned to a cancel-at-period-end Configuration made in code (#771, P0.23)**:
   - **The bug.** `POST /billing/portal` passed no `configuration`, so whether a subscriber could cancel at all depended on unversioned Stripe dashboard settings, and the #770 disclosure ("cancellation takes effect at the end of the current period") had nothing enforcing it.
   - **The fix.** `_get_or_create_portal_config` finds our active portal Configuration by metadata (`app` + `portal_config_version`) or creates it with `features.subscription_cancel` enabled in `at_period_end` mode, plus payment-method update and invoice history. Creation carries a fixed idempotency key, and the id is cached per process. Every portal session now passes `configuration=`. Bump `portal_config_version` to roll out a changed Configuration.
