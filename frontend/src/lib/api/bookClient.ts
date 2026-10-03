@@ -1004,7 +1004,8 @@ export class BookClient {
     bookId: string,
     chapterId: string,
     content: string,
-    autoUpdateMetadata: boolean = true
+    autoUpdateMetadata: boolean = true,
+    options: { keepalive?: boolean } = {}
   ): Promise<{
     book_id: string;
     chapter_id: string;
@@ -1012,14 +1013,18 @@ export class BookClient {
     message: string;
     metadata_updated: boolean;
   }> {
+    const body = JSON.stringify({
+      content,
+      auto_update_metadata: autoUpdateMetadata
+    });
     const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content`, {
       method: 'PATCH',
       headers: await this.getHeaders(),
       credentials: 'include',
-      body: JSON.stringify({
-        content,
-        auto_update_metadata: autoUpdateMetadata
-      }),
+      body,
+      // keepalive lets the request outlive the page. Browsers reject a keepalive
+      // body over 64KB outright, so a longer chapter goes as a normal request.
+      ...(options.keepalive && new Blob([body]).size < 64 * 1024 && { keepalive: true }),
     });
     if (!response.ok) {
       const error = await response.text();

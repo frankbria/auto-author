@@ -154,3 +154,144 @@ describe('ChapterEditor chapter switching (#756)', () => {
     expect(savesTo('A').map(([, , content]) => content)).toEqual(['<p>Alpha later</p>']);
   });
 });
+
+// #757: an edit must reach the chapter it was typed into, even if the editor
+// goes away first or the edit lands while a save is in flight; and a chapter
+// that never loaded must never be saved over.
+describe('ChapterEditor pending edits (#757)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    jest.useFakeTimers();
+    mockBookClient.saveChapterContent.mockResolvedValue({} as never);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  async function loadThenType(view: ReturnType<typeof render>, load: Deferred, html: string, typed: string) {
+    await act(async () => load.resolve(html));
+    await waitFor(() => expect(view.container.querySelector('.ProseMirror')).not.toBeNull());
+    act(() => {
+      editorIn(view.container).commands.insertContent(typed);
+    });
+  }
+
+  const flushTimers = (ms: number) =>
+    act(async () => {
+      await jest.advanceTimersByTimeAsync(ms);
+    });
+
+  it('saves text typed inside the debounce to its own chapter when the tab switches', async () => {
+    const loads: Record<string, Deferred> = { A: deferred('A'), B: deferred('B') };
+    mockBookClient.getChapterContent.mockImplementation((_book, id) => loads[id].promise);
+    const props = { bookId: 'bk', chapters: [] };
+    const view = render(<TabContent {...props} activeChapterId="A" />);
+    await loadThenType(view, loads.A, '<p>Alpha</p>', ' typed');
+
+    view.rerender(<TabContent {...props} activeChapterId="B" />);
+    await flushTimers(5000);
+
+    expect(savesTo('A')).toEqual([['bk', 'A', '<p>Alpha typed</p>', true, { keepalive: true }]]);
+    expect(savesTo('B')).toEqual([]);
+  });
+
+  it('saves the edit to the original chapter when a caller swaps chapterId without remounting', async () => {
+    const loads: Record<string, Deferred> = { B: deferred('B'), C: deferred('C') };
+    mockBookClient.getChapterContent.mockImplementation((_book, id) => loads[id].promise);
+    const view = render(<ChapterEditor bookId="bk" chapterId="B" />);
+    await loadThenType(view, loads.B, '<p>Bravo</p>', ' edit');
+
+    view.rerender(<ChapterEditor bookId="bk" chapterId="C" />);
+    await act(async () => loads.C.resolve('<p>Charlie</p>'));
+    await flushTimers(5000);
+
+    expect(savesTo('B').map(([, , content]) => content)).toEqual(['<p>Bravo edit</p>']);
+    expect(savesTo('C')).toEqual([]);
+  });
+
+  it('backs the edit up under its own chapter when the flush fails', async () => {
+    const load = deferred('A');
+    mockBookClient.getChapterContent.mockReturnValue(load.promise);
+    mockBookClient.saveChapterContent.mockRejectedValue(new Error('offline'));
+    const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
+    await loadThenType(view, load, '<p>Alpha</p>', ' typed');
+
+    view.unmount();
+    await flushTimers(0);
+
+    const backup = JSON.parse(localStorage.getItem('chapter-backup-bk-A') ?? 'null');
+    expect(backup?.content).toBe('<p>Alpha typed</p>');
+  });
+
+  it('does not flush an edit the user already reverted to the saved text', async () => {
+    const load = deferred('A');
+    mockBookClient.getChapterContent.mockReturnValue(load.promise);
+    const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
+    await loadThenType(view, load, '<p>Alpha</p>', ' typo');
+    act(() => {
+      editorIn(view.container).commands.setContent('<p>Alpha</p>');
+    });
+
+    view.unmount();
+    await flushTimers(0);
+
+    expect(mockBookClient.saveChapterContent).not.toHaveBeenCalled();
+  });
+
+  it('saves an edit typed while the previous save was in flight', async () => {
+    const load = deferred('A');
+    mockBookClient.getChapterContent.mockReturnValue(load.promise);
+    let finishFirstSave!: () => void;
+    mockBookClient.saveChapterContent.mockImplementationOnce(
+      () => new Promise((resolve) => (finishFirstSave = () => resolve({} as never)))
+    );
+    const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
+    await loadThenType(view, load, '<p>Alpha</p>', ' one');
+
+    await flushTimers(3000);
+    expect(savesTo('A')).toHaveLength(1);
+    act(() => {
+      editorIn(view.container).commands.insertContent(' two');
+    });
+    await act(async () => finishFirstSave());
+    await flushTimers(5000);
+
+    expect(savesTo('A').map(([, , content]) => content)).toEqual([
+      '<p>Alpha one</p>',
+      '<p>Alpha one two</p>',
+    ]);
+  });
+
+  it('keeps a chapter that failed to load read-only and unsaved until Retry loads it', async () => {
+    let serverDown = true;
+    mockBookClient.getChapterContent.mockImplementation(async () => {
+      if (serverDown) throw new Error('Failed to get chapter content: 500');
+      return { content: '<p>Real chapter</p>', chapter_id: 'A', book_id: 'bk' };
+    });
+    const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
+
+    const retry = await view.findByRole('button', { name: 'Retry' });
+    const editor = editorIn(view.container);
+    expect(editor.isEditable).toBe(false);
+
+    // Programmatic edits (AI tools, restoring a backup) bypass read-only.
+    act(() => {
+      editor.commands.setContent('<p>should never be saved</p>');
+    });
+    await flushTimers(5000);
+    expect(mockBookClient.saveChapterContent).not.toHaveBeenCalled();
+
+    serverDown = false;
+    await act(async () => retry.click());
+    await waitFor(() => expect(editorIn(view.container).getHTML()).toBe('<p>Real chapter</p>'));
+    expect(editorIn(view.container).isEditable).toBe(true);
+    expect(view.queryByRole('button', { name: 'Retry' })).toBeNull();
+
+    view.unmount();
+    await flushTimers(0);
+    expect(mockBookClient.saveChapterContent).not.toHaveBeenCalled();
+  });
+});

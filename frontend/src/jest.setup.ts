@@ -276,6 +276,10 @@ jest.mock('@tiptap/react', () => {
       // Core properties
       isDestroyed: false,
       isFocused: false,
+      isEditable: true,
+      setEditable: jest.fn((editable: boolean) => {
+        mockEditor.isEditable = editable;
+      }),
 
       // State management
       state: {},

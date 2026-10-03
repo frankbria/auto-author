@@ -52,6 +52,7 @@ jest.mock('@tiptap/react', () => {
     can: () => mockCan,
     isActive: () => false,
     getHTML: () => '<p>Test content</p>',
+    setEditable: jest.fn(),
     // This file spreads the real module, so the real useEditorState runs and
     // registers a 'transaction' listener on the editor (#347). Without these the
     // toolbar's subscription throws. No-ops are enough: these tests assert
