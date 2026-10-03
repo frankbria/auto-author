@@ -104,6 +104,10 @@ async def test_existing_record_mirrors_better_auth_email(motor_reinit_db):
     stored = await base.users_collection.find_one({"auth_id": "attacker-id"})
     assert stored["email"] == "mallory@example.com"
     assert await base.users_collection.count_documents({"email": VICTIM_EMAIL}) == 0
+    # An email change is security-relevant: the mirror leaves an audit trail.
+    assert await base.audit_logs_collection.count_documents(
+        {"action": "user_update", "target_id": "attacker-id"}
+    ) == 1
 
 
 async def test_mirror_releases_email_held_by_another_record(motor_reinit_db):
