@@ -93,6 +93,13 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     expect(confirmButton).toBeDisabled();
   });
 
+  it('warns that a paid subscription is cancelled with the account (#764)', async () => {
+    await openDeleteDialog();
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      /subscription is cancelled immediately/i
+    );
+  });
+
   it('enables on exact match; confirming sends DELETE /users/me and redirects home', async () => {
     const { input, confirmButton } = await openDeleteDialog();
 
