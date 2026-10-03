@@ -16,8 +16,11 @@ function grep(pattern: string): string[] {
     return execFileSync('git', ['grep', '-nIE', pattern, '--', SRC], { encoding: 'utf8' })
       .split('\n')
       .filter((l) => l && !l.includes(SELF));
-  } catch {
-    return []; // exit 1 = no match
+  } catch (e) {
+    // Exit 1 is git-grep's "no match". Anything else (no git, not a repo) must
+    // fail the guard rather than pass it vacuously.
+    if ((e as { status?: number }).status === 1) return [];
+    throw e;
   }
 }
 
