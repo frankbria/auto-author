@@ -15,6 +15,14 @@ export type PortalSession = {
 /** A null window is unlimited. */
 export type PlanQuotas = Record<'free' | 'pro', { daily: number | null; monthly: number | null }>;
 
+/** The auto-renewal terms to show verbatim before the subscribe action (#770). */
+export type RenewalDisclosure = {
+  version: string;
+  text: string;
+  sha256: string;
+  price_id: string;
+};
+
 /**
  * Hook for billing operations against the better-auth backend.
  * All requests are cookie-authenticated via useAuthFetch (credentials: 'include').
@@ -22,13 +30,23 @@ export type PlanQuotas = Record<'free' | 'pro', { daily: number | null; monthly:
 export const useBillingApi = () => {
   const { authFetch } = useAuthFetch({ baseUrl: API_BASE_URL });
 
+  /** Calling this IS the consent: pass the sha256 of the disclosure the user agreed to. */
   const startCheckout = useCallback(
-    async (plan: 'pro' = 'pro'): Promise<CheckoutSession> => {
+    async (plan: 'pro', disclosureSha256: string): Promise<CheckoutSession> => {
       return authFetch<CheckoutSession>('/billing/checkout', {
         method: 'POST',
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({
+          plan,
+          accept_renewal_terms: true,
+          disclosure_sha256: disclosureSha256,
+        }),
       });
     },
+    [authFetch]
+  );
+
+  const getRenewalDisclosure = useCallback(
+    (): Promise<RenewalDisclosure> => authFetch<RenewalDisclosure>('/billing/disclosure'),
     [authFetch]
   );
 
@@ -48,6 +66,7 @@ export const useBillingApi = () => {
     startCheckout,
     openBillingPortal,
     getPlanQuotas,
+    getRenewalDisclosure,
   };
 };
 

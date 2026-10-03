@@ -6,7 +6,12 @@ from fastapi import APIRouter, HTTPException, Request
 from stripe import SignatureVerificationError
 
 from app.core.config import settings
-from app.core.entitlements import DEFAULT_PLAN, resolve_plan_for_price
+from app.core.entitlements import (
+    DEFAULT_PLAN,
+    PRICED,
+    SUBSCRIPTION_STATUS_PLAN,
+    plan_for_subscription,
+)
 from app.db.stripe_events import mark_event_processed, unmark_event
 from app.db.user import (
     get_user_by_auth_id,
@@ -39,7 +44,8 @@ async def stripe_webhook(request: Request):
     Deliberately unauthenticated — the Stripe signature over the raw body IS the
     auth (the /api/v1/webhooks prefix is session-exempt, and no middleware
     consumes the body). On ``customer.subscription.*`` events, maps the
-    subscription's price to a plan (app.core.entitlements) and persists plan +
+    subscription's status and price to a plan (app.core.entitlements
+    ``SUBSCRIPTION_STATUS_PLAN``, #767) and persists plan +
     Stripe ids on the matching user. Replays (same event id) are no-ops.
     """
     if not settings.STRIPE_WEBHOOK_SECRET:
@@ -110,14 +116,27 @@ async def _apply_subscription_event(
         plan = DEFAULT_PLAN
         subscription_id = None  # the subscription is gone; don't retain a dead id
     else:
-        # Scan every line item — a multi-item subscription may not list the
-        # plan-bearing price first.
-        plan = DEFAULT_PLAN
-        for item in (subscription.get("items") or {}).get("data") or []:
-            resolved = resolve_plan_for_price(((item or {}).get("price") or {}).get("id"))
-            if resolved != DEFAULT_PLAN:
-                plan = resolved
-                break
+        # Status first, then price: see SUBSCRIPTION_STATUS_PLAN for the policy.
+        status = subscription.get("status")
+        price_ids = [
+            ((item or {}).get("price") or {}).get("id")
+            for item in (subscription.get("items") or {}).get("data") or []
+        ]
+        plan = plan_for_subscription(status, price_ids)
+        policy = SUBSCRIPTION_STATUS_PLAN.get(status)
+        if policy is None:
+            logger.error(
+                "Stripe subscription %s has unknown status %r — treating as %s",
+                subscription_id, status, plan,
+            )
+        elif policy == PRICED and plan == DEFAULT_PLAN:
+            # A paying subscriber is about to land on free: the pro price is
+            # unset or Stripe sent one we don't know. Needs a human.
+            logger.error(
+                "Stripe subscription %s is %s but no price %s matches "
+                "STRIPE_PRICE_ID_PRO — user resolves to %s",
+                subscription_id, status, price_ids, plan,
+            )
 
     user = await get_user_by_stripe_customer_id(customer_id) if customer_id else None
     if user is None:
@@ -178,7 +197,8 @@ async def _apply_subscription_event(
     updated = await update_user(
         user["auth_id"],
         {
-            "plan": plan,
+            # None = keep the current plan (past_due): don't write it at all.
+            **({"plan": plan} if plan is not None else {}),
             "stripe_customer_id": customer_id,
             "stripe_subscription_id": subscription_id,
             # Watermark the ordering filter above compares against.
@@ -200,7 +220,7 @@ async def _apply_subscription_event(
         )
         return {"status": "stale_event", "event_id": event_id}
 
-    logger.info(
-        "Stripe %s: user %s plan set to %s", event_type, user["auth_id"], plan
-    )
+    # Report the stored plan, whether this event wrote it or kept it.
+    plan = (updated or {}).get("plan", plan) or DEFAULT_PLAN
+    logger.info("Stripe %s: user %s plan is %s", event_type, user["auth_id"], plan)
     return {"status": "processed", "plan": plan}

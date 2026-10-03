@@ -139,7 +139,9 @@ describe('ChapterEditor with Rich Text', () => {
       expect(bookClient.saveChapterContent).toHaveBeenCalledWith(
         bookId,
         chapterId,
-        '<p>Test content</p>'
+        '<p>Test content</p>',
+        true,
+        expect.anything()
       );
     });
   });
