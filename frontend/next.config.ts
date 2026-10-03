@@ -58,7 +58,9 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            // microphone=(self): voice input (VoiceTextInput) needs getUserMedia
+            // on our own origin (#772). () blocked it with no user-side fix.
+            value: 'camera=(), microphone=(self), geolocation=()',
           },
         ],
       },
