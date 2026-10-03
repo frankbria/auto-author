@@ -445,6 +445,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         setConflict(true);
         setError('This table of contents changed elsewhere since you opened it. Reload to see the latest version; your unsaved edits here will be discarded.');
       } else {
+        setConflict(false);
         setError('Failed to save the table of contents. Please try again.');
       }
     } finally {

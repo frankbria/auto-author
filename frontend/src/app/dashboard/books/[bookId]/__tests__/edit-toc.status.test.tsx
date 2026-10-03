@@ -177,4 +177,18 @@ describe('Edit TOC page: optimistic lock (#750)', () => {
     await waitFor(() => expect(mockBookClient.updateToc).toHaveBeenCalledTimes(2));
     expect(mockBookClient.updateToc.mock.calls[1][1]).toEqual(expect.objectContaining({ expected_version: 5 }));
   });
+
+  it('drops the Reload button when a later save fails for a non-conflict reason', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockBookClient.updateToc.mockRejectedValueOnce(Object.assign(new Error('conflict'), { statusCode: 409 }));
+    renderPage();
+    await screen.findByDisplayValue('One');
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    expect(await screen.findByRole('button', { name: /reload/i })).toBeInTheDocument();
+
+    mockBookClient.updateToc.mockRejectedValueOnce(Object.assign(new Error('boom'), { statusCode: 500 }));
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    expect(await screen.findByText(/failed to save the table of contents/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /reload/i })).not.toBeInTheDocument();
+  });
 });
