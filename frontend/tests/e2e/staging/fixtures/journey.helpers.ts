@@ -38,6 +38,7 @@ async function describeAiResponse(res: Response): Promise<string> {
     // Two error shapes: {error_code, message} and the structured ErrorResponse
     // {error, details: [{code}]} that chapter generate-questions returns.
     line.error_code = detail?.error_code ?? detail?.details?.[0]?.code;
+    line.detail_code = detail?.details?.[0]?.code;
     line.message = typeof detail === 'string' ? detail : (detail?.message ?? detail?.error);
   } else if (body && typeof body === 'object') {
     line.keys = Object.keys(body);
