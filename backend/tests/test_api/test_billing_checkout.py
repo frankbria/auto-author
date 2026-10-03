@@ -326,13 +326,20 @@ async def test_disclosure_rejects_a_non_recurring_price(
 
 @pytest.mark.parametrize(
     "consent",
-    [{}, {"accept_renewal_terms": False}, {"disclosure_sha256": "x" * 64}],
-    ids=["missing", "declined", "hash-without-agreement"],
+    [
+        {},
+        # The real, current hash: only the missing agreement can refuse this one.
+        {"accept_renewal_terms": False, "disclosure_sha256": "CURRENT"},
+        {"accept_renewal_terms": True},
+    ],
+    ids=["missing", "declined", "agreed-without-hash"],
 )
 async def test_checkout_refused_without_affirmative_consent(
     auth_client_factory, stripe_configured, stripe_stub, consent
 ):
     client = await auth_client_factory()
+    if consent.get("disclosure_sha256") == "CURRENT":
+        consent = {**consent, "disclosure_sha256": (await consenting(client))["disclosure_sha256"]}
     resp = await client.post("/api/v1/billing/checkout", json={"plan": "pro", **consent})
 
     assert resp.status_code == 400, resp.text
