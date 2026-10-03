@@ -279,6 +279,16 @@ class ChapterMetadataResponse(BaseModel):
     last_active_chapter: Optional[str] = None
 
 
+class ChapterContentUpdate(BaseModel):
+    content: str
+    auto_update_metadata: bool = True
+    # #759: the chapter's last_modified as the client last saw it. Optional so
+    # the editor keeps working until #760 sends it. When the key is present,
+    # even as null (never saved), the save only lands if the chapter is still
+    # at that value; otherwise 409.
+    expected_last_modified: Optional[str] = None
+
+
 class TabStateRequest(BaseModel):
     """Schema for saving tab state"""
 
