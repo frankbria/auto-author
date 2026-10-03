@@ -50,31 +50,29 @@ async def _seed_qa(book_id, chapter_id, user_id):
             )
         ).inserted_id
     )
+    # `seed` tags the children with their chapter, so they stay countable after
+    # their question is gone; counting through surviving questions would read 0
+    # even if the cascade left every answer behind.
+    seed = f"{book_id}/{chapter_id}"
     await (await get_collection("question_responses")).insert_one(
-        {"question_id": qid, "user_id": user_id, "response_text": "An answer"}
+        {"question_id": qid, "user_id": user_id, "response_text": "An answer", "seed": seed}
     )
     await (await get_collection("question_ratings")).insert_one(
-        {"question_id": qid, "user_id": user_id, "rating": 4}
+        {"question_id": qid, "user_id": user_id, "rating": 4, "seed": seed}
     )
     return qid
 
 
 async def _qa_counts(book_id, chapter_id):
     """(questions, responses, ratings) stored for one chapter of one book."""
-    questions = await get_collection("questions")
-    qids = [
-        str(q["_id"])
-        for q in await questions.find(
+    seed = {"seed": f"{book_id}/{chapter_id}"}
+    return (
+        await (await get_collection("questions")).count_documents(
             {"book_id": book_id, "chapter_id": chapter_id}
-        ).to_list(length=None)
-    ]
-    responses = await (await get_collection("question_responses")).count_documents(
-        {"question_id": {"$in": qids}}
+        ),
+        await (await get_collection("question_responses")).count_documents(seed),
+        await (await get_collection("question_ratings")).count_documents(seed),
     )
-    ratings = await (await get_collection("question_ratings")).count_documents(
-        {"question_id": {"$in": qids}}
-    )
-    return len(qids), responses, ratings
 
 
 async def _children_of(qid):
@@ -118,6 +116,7 @@ class TestPutTocCascades:
         assert await questions.count_documents({"_id": ObjectId(other_qid)}) == 1
         assert await _children_of(other_qid) == (1, 1)
         assert await questions.count_documents({"_id": ObjectId(stranger_qid)}) == 1
+        assert await _children_of(stranger_qid) == (1, 1)
 
     @pytest.mark.asyncio
     async def test_remove_then_readd_same_id_shows_zero_questions(self, auth_client_factory):
@@ -143,7 +142,12 @@ class TestPutTocCascades:
 
     @pytest.mark.asyncio
     async def test_failed_put_deletes_nothing(self, auth_client_factory):
-        """A 409 leaves the TOC unchanged, so it must leave the Q&A too."""
+        """A 409 leaves the TOC unchanged, so it must leave the Q&A too.
+
+        This is the expected_version 409. The race 409 (another writer bumps the
+        version between read and write) cannot be produced deterministically
+        without mocking the books collection; the cascade sits after that
+        write's modified_count check for the same reason."""
         api = await auth_client_factory()
         book_id, user_id = await _book_with_toc(api, [_chapter("x", "X")])
         await _seed_qa(book_id, "x", user_id)
