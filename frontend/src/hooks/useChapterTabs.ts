@@ -249,61 +249,63 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
     setActiveChapter(chapterId);
   }, [setActiveChapter]);
 
+  // A background refresh (TOC saved here or in another tab, chapter created or
+  // deleted). It never raises is_loading: ChapterTabs shows its skeleton while
+  // loading, which unmounted the open editor and reloaded its content (#758).
+  // Tab state is merged from `prev`, not this render's closure, so a tab the
+  // user picks while the request is in flight survives it.
   const refreshChapters = useCallback(async () => {
+    let chapterTabsMetadata: ChapterTabMetadata[] = [];
+
     try {
-      setState(prev => ({ ...prev, is_loading: true, error: null }));
-
-      // Reload chapters from the TOC structure
-      let chapterTabsMetadata: ChapterTabMetadata[] = [];
-
-      try {
-        const tocResponse = await bookClient.getToc(bookId);
-        if (tocResponse.toc) {
-          const processedTocData = {
-            ...tocResponse.toc,
-            chapters: tocResponse.toc.chapters.map(ch => ({
-              ...ch,
-              status: (ch as { status?: ChapterStatus }).status || ChapterStatus.DRAFT,
-              word_count: (ch as { word_count?: number }).word_count || 0,
-              estimated_reading_time: (ch as { estimated_reading_time?: number }).estimated_reading_time || 0,
-              last_modified: (ch as { last_modified?: string }).last_modified || new Date().toISOString(),
-            }))
-          };
-
-          chapterTabsMetadata = convertTocToChapterTabs(processedTocData);
-          logger.debug('Successfully refreshed TOC structure and converted to chapter tabs');
-        }
-      } catch (tocError) {        console.warn('Failed to refresh TOC structure:', tocError);
-        // Fall back to direct chapter tabs API
-        try {
-          const metadata = await bookClient.getChaptersMetadata(bookId);
-          chapterTabsMetadata = metadata.chapters.map(ch => ({
+      const tocResponse = await bookClient.getToc(bookId);
+      if (tocResponse.toc) {
+        const processedTocData = {
+          ...tocResponse.toc,
+          chapters: tocResponse.toc.chapters.map(ch => ({
             ...ch,
-            status: ch.status as ChapterStatus,
-            has_content: false // We'll need to check this separately if needed
-          }));
-          logger.debug('Refreshed chapter data from chapter-tabs API');
-        } catch (apiError) {
-          console.error('Failed to refresh chapter metadata:', apiError);
-          throw new Error('Unable to refresh chapter data');
-        }
+            status: (ch as { status?: ChapterStatus }).status || ChapterStatus.DRAFT,
+            word_count: (ch as { word_count?: number }).word_count || 0,
+            estimated_reading_time: (ch as { estimated_reading_time?: number }).estimated_reading_time || 0,
+            last_modified: (ch as { last_modified?: string }).last_modified || new Date().toISOString(),
+          }))
+        };
+
+        chapterTabsMetadata = convertTocToChapterTabs(processedTocData);
+        logger.debug('Successfully refreshed TOC structure and converted to chapter tabs');
       }
+    } catch (tocError) {
+      console.warn('Failed to refresh TOC structure:', tocError);
+      // Fall back to direct chapter tabs API
+      try {
+        const metadata = await bookClient.getChaptersMetadata(bookId);
+        chapterTabsMetadata = metadata.chapters.map(ch => ({
+          ...ch,
+          status: ch.status as ChapterStatus,
+          has_content: false // We'll need to check this separately if needed
+        }));
+        logger.debug('Refreshed chapter data from chapter-tabs API');
+      } catch (apiError) {
+        console.error('Failed to refresh chapter metadata:', apiError);
+        // Keep the chapters on screen: the error panel replaces the editor. It
+        // is only right when nothing loaded, where its Retry calls this again.
+        setState(prev => (prev.chapters.length > 0 ? prev : { ...prev, error: 'Unable to refresh chapter data' }));
+        return;
+      }
+    }
 
+    setState(prev => {
       // Handle removed chapters: if active chapter is deleted, switch to first available
-      const currentActiveId = state.active_chapter_id;
-      const currentOpenTabs = state.open_tab_ids;
-      const currentTabOrder = state.tab_order;
-
       const existingChapterIds = chapterTabsMetadata.map(ch => ch.id);
-      const validOpenTabs = currentOpenTabs.filter(id => existingChapterIds.includes(id));
-      const validTabOrder = currentTabOrder.filter(id => existingChapterIds.includes(id));
+      const validOpenTabs = prev.open_tab_ids.filter(id => existingChapterIds.includes(id));
+      const validTabOrder = prev.tab_order.filter(id => existingChapterIds.includes(id));
 
       // Add any new chapters to tab order
       const newChapterIds = existingChapterIds.filter(id => !validTabOrder.includes(id));
       const updatedTabOrder = [...validTabOrder, ...newChapterIds];
 
-      let newActiveChapter = currentActiveId;
-      if (!currentActiveId || !existingChapterIds.includes(currentActiveId)) {
+      let newActiveChapter = prev.active_chapter_id;
+      if (!newActiveChapter || !existingChapterIds.includes(newActiveChapter)) {
         // Active chapter was deleted or doesn't exist, select first available
         newActiveChapter = validOpenTabs.length > 0 ? validOpenTabs[0] :
                           (chapterTabsMetadata.length > 0 ? chapterTabsMetadata[0].id : null);
@@ -313,24 +315,18 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
       const finalOpenTabs = validOpenTabs.length > 0 ? validOpenTabs :
                            (newActiveChapter ? [newActiveChapter] : []);
 
-      setState(prev => ({
+      return {
         ...prev,
         chapters: chapterTabsMetadata,
         active_chapter_id: newActiveChapter,
         open_tab_ids: finalOpenTabs,
         tab_order: updatedTabOrder,
-        is_loading: false,
-      }));
+        error: null,
+      };
+    });
 
-      logger.debug('Successfully refreshed chapter tabs state');
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        is_loading: false,
-        error: error instanceof Error ? error.message : 'Failed to refresh chapter tabs'
-      }));
-    }
-  }, [bookId, state.active_chapter_id, state.open_tab_ids, state.tab_order]);
+    logger.debug('Successfully refreshed chapter tabs state');
+  }, [bookId]);
 
   return {
     state,
