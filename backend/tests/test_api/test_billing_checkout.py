@@ -146,7 +146,7 @@ async def test_checkout_rejects_a_user_with_a_live_subscription(
             "stripe_subscription_status": status,
         }
     )
-    resp = await client.post("/api/v1/billing/checkout", json={"plan": "pro"})
+    resp = await client.post("/api/v1/billing/checkout", json=await consenting(client))
 
     assert resp.status_code == 409
     assert "Manage billing" in resp.json()["detail"]
@@ -166,7 +166,7 @@ async def test_checkout_allows_a_new_subscription_over_a_dead_one(
             "stripe_subscription_status": status,
         }
     )
-    resp = await client.post("/api/v1/billing/checkout", json={"plan": "pro"})
+    resp = await client.post("/api/v1/billing/checkout", json=await consenting(client))
 
     assert resp.status_code == 200, resp.text
     assert stripe_stub["session"][0]["customer"] == "cus_dead"
