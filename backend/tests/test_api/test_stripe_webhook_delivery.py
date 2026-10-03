@@ -111,8 +111,8 @@ class TestOutOfOrderDelivery:
         assert resp.json() == {"status": "stale_event", "event_id": "evt_old"}
         user = await get_user_by_auth_id("auth-stripe-1")
         assert (user["plan"], user["stripe_event_created"]) == ("pro", 2_000)
-        # Stale is final (the watermark only rises), so it is recorded.
-        assert (await _post_signed(webhook_client, old)).json()["status"] == "replay"
+        # Nothing was applied, so nothing is recorded: a redelivery re-checks.
+        assert (await _post_signed(webhook_client, old)).json()["status"] == "stale_event"
 
     async def test_same_second_event_still_applies(self, webhook_client):
         # `created` has one-second granularity: two updates in the same second

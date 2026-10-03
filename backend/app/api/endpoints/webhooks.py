@@ -93,10 +93,10 @@ async def stripe_webhook(request: Request):
         # Marker AFTER the apply (#769): a crash, redeploy or CancelledError
         # before this line leaves none, so Stripe's retry re-applies instead of
         # being dropped as a replay. Re-applying is safe: the write is a plain
-        # $set guarded by the ordering filter. Ignored events record nothing, so
-        # a dashboard Resend reprocesses them once their user or subscription
-        # matches. stale_event is final (the watermark only rises).
-        if result["status"] in ("processed", "stale_event"):
+        # $set guarded by the ordering filter. Only an applied event is recorded:
+        # an ignored one must reprocess on a dashboard Resend once its user or
+        # subscription matches, and a stale one just re-checks the watermark.
+        if result["status"] == "processed":
             await mark_event_processed(event_id)
         return result
     except Exception:
