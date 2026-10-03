@@ -48,6 +48,8 @@ const saveCalls = () => mockBookClient.saveChapterContent.mock.calls;
 const sentContent = () => saveCalls().map(([, , content]) => content);
 const sentTokens = () => saveCalls().map((call) => call[4]?.expectedLastModified);
 const backup = () => JSON.parse(localStorage.getItem(BACKUP_KEY) ?? 'null')?.content;
+// Text dropped on Reload is kept apart, so a later failed save cannot overwrite it.
+const dropped = () => JSON.parse(localStorage.getItem('chapter-dropped-bk-A') ?? 'null')?.content;
 
 function editorIn(container: HTMLElement): Editor {
   const dom = container.querySelector('.ProseMirror') as (HTMLElement & { editor?: Editor }) | null;
@@ -207,7 +209,7 @@ describe('ChapterEditor save conflict (#760)', () => {
     await flushTimers(10000);
 
     expect(view.html()).toBe('<p>Theirs</p>');
-    expect(backup()).toBe('<p>Alpha mine more</p>');
+    expect(dropped()).toBe('<p>Alpha mine more</p>');
     expect(saveCalls()).toHaveLength(1);
     expect(view.queryByRole('button', { name: 'Overwrite with mine' })).toBeNull();
     expect(view.getByRole('button', { name: 'Restore Backup' })).toBeInTheDocument();
@@ -237,6 +239,64 @@ describe('ChapterEditor save conflict (#760)', () => {
     await flushTimers(0);
 
     expect(sentContent().slice(1)).toEqual(['<p>Theirs edit</p>', '<p>Theirs edit again</p>']);
+    expect(dropped()).toBe('<p>Alpha mine</p>');
+  });
+
+  it('keeps the text dropped on Reload restorable when a later save fails and is backed up', async () => {
+    const view = await openIntoConflict();
+    view.type(' more');
+    await act(async () => view.getByRole('button', { name: 'Reload their version' }).click());
+    mockBookClient.saveChapterContent.mockRejectedValue(new Error('offline'));
+
+    view.type(' edit');
+    await flushTimers(3000);
+    expect(backup()).toBe('<p>Theirs edit</p>');
+
+    // Both versions stay on offer: dismissing the failed save's backup leaves the dropped text.
+    await act(async () => view.getByRole('button', { name: 'Dismiss' }).click());
+    await act(async () => view.getByRole('button', { name: 'Restore Backup' }).click());
+    expect(view.html()).toBe('<p>Alpha mine more</p>');
+  });
+
+  it('keeps the text in the editor when Reload cannot back it up', async () => {
+    const view = await openIntoConflict();
+    view.type(' more');
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage full', 'QuotaExceededError');
+    });
+
+    await act(async () => view.getByRole('button', { name: 'Reload their version' }).click());
+    setItem.mockRestore();
+
+    expect(view.html()).toBe('<p>Alpha mine more</p>');
+    expect(view.getByRole('alert')).toHaveTextContent(/could not back up/i);
+    expect(view.getByRole('button', { name: 'Overwrite with mine' })).toBeInTheDocument();
+
+    // Still the editor's unsaved edit: leaving tries to save it.
+    mockBookClient.saveChapterContent.mockRejectedValue(conflict('<p>Theirs</p>', 'T9'));
+    view.unmount();
+    await flushTimers(0);
+    expect(sentContent().at(-1)).toBe('<p>Alpha mine more</p>');
+  });
+
+  it('does not raise a conflict on the next chapter for a save that 409s after a swap', async () => {
+    let rejectHeld!: () => void;
+    mockBookClient.saveChapterContent
+      .mockImplementationOnce(
+        () => new Promise((_, reject) => (rejectHeld = () => reject(conflict('<p>Theirs</p>', 'T9'))))
+      )
+      .mockRejectedValue(conflict('<p>Theirs</p>', 'T9'));
+    const view = await open();
+    view.type(' mine');
+    await flushTimers(3000);
+
+    view.rerender(<ChapterEditor bookId="bk" chapterId="C" />);
+    await act(async () => rejectHeld());
+    await flushTimers(0);
+
+    await waitFor(() => expect(view.getByRole('button', { name: 'Save' })).toBeEnabled());
+    expect(view.queryByRole('button', { name: 'Overwrite with mine' })).toBeNull();
+    // Chapter A's text is still kept, under chapter A.
     expect(backup()).toBe('<p>Alpha mine</p>');
   });
 

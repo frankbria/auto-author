@@ -55,22 +55,22 @@ export async function saveChapterEdit(
   return result;
 }
 
-/** Marks the backup of text the writer dropped by reloading the server copy (#760). */
-export const DROPPED_ON_RELOAD = 'Replaced by the newer version on Reload';
+export const chapterDroppedKey = (bookId: string, chapterId: string) =>
+  `chapter-dropped-${bookId}-${chapterId}`;
 
 /**
- * Clears a chapter's backup after a successful save, which has the backed-up
- * text or newer. Not text dropped on Reload: that is a different version, kept
- * until the writer restores or dismisses it.
+ * Keeps text the writer dropped by reloading the server copy (#760). It is a
+ * different version from anything saved later, so it has its own key: a later
+ * save neither clears it nor, when it fails, overwrites it. Returns whether it
+ * was stored.
  */
-export function clearChapterBackup(bookId: string, chapterId: string): void {
-  const key = chapterBackupKey(bookId, chapterId);
-  try {
-    if (JSON.parse(localStorage.getItem(key) ?? 'null')?.error === DROPPED_ON_RELOAD) return;
-  } catch {
-    // An unreadable backup is not a dropped version; clear it.
-  }
-  localStorage.removeItem(key);
+export function keepDroppedChapterText({ bookId, chapterId, content }: PendingChapterEdit): boolean {
+  const kept: ChapterBackup = {
+    content,
+    timestamp: Date.now(),
+    error: 'Replaced by the newer version on Reload',
+  };
+  return setValidatedItem(chapterDroppedKey(bookId, chapterId), kept, validateChapterBackup);
 }
 
 /** Keeps content that failed to save in localStorage. Returns whether it was stored. */
@@ -104,7 +104,7 @@ export async function flushChapterContent(
   try {
     // A conflict lands in the backup too: leaving never overwrites the other copy.
     await saveChapterEdit(edit, seen, { keepalive: true });
-    clearChapterBackup(edit.bookId, edit.chapterId);
+    localStorage.removeItem(chapterBackupKey(edit.bookId, edit.chapterId));
   } catch (err) {
     console.error('Failed to save chapter content on leaving it:', err);
     backupChapterContent(edit, err);

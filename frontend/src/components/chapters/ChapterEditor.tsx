@@ -54,10 +54,10 @@ import {
 import {
   backupChapterContent,
   chapterBackupKey,
-  clearChapterBackup,
-  DROPPED_ON_RELOAD,
+  chapterDroppedKey,
   flushChapterContent,
   isChapterConflict,
+  keepDroppedChapterText,
   PendingChapterEdit,
   saveChapterEdit,
   SeenChapters,
@@ -82,7 +82,7 @@ function readSavedView(key: string): ChapterView {
 // useSyncExternalStore, so it is keyed to the chapter on screen and always agrees
 // with storage (#584). Validation parses a whole chapter, so it only runs when the
 // stored string changes; an unchanged string reuses the last answer.
-let backupCache: { raw: string; valid: boolean } | null = null;
+const backupCache = new Map<string, { raw: string; valid: boolean }>();
 function readHasBackup(key: string): boolean {
   let raw: string | null;
   try {
@@ -91,9 +91,10 @@ function readHasBackup(key: string): boolean {
     return false;
   }
   if (raw === null) return false;
-  if (backupCache?.raw === raw) return backupCache.valid;
+  const cached = backupCache.get(key);
+  if (cached?.raw === raw) return cached.valid;
   const valid = getValidatedItem<ChapterBackup>(key, validateChapterBackup) !== null;
-  backupCache = { raw, valid };
+  backupCache.set(key, { raw, valid });
   return valid;
 }
 
@@ -143,7 +144,19 @@ export function ChapterEditor({
   const [autoSavePending, setAutoSavePending] = useState(false);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
   const backupKey = chapterBackupKey(bookId, chapterId);
-  const hasBackup = useSyncExternalStore(subscribeToNothing, () => readHasBackup(backupKey), () => false);
+  const droppedKey = chapterDroppedKey(bookId, chapterId);
+  // The backup Restore offers: a failed save's first, then text dropped on Reload (#760).
+  const restoreKey = useSyncExternalStore(
+    subscribeToNothing,
+    () => (readHasBackup(backupKey) ? backupKey : readHasBackup(droppedKey) ? droppedKey : null),
+    () => null
+  );
+  const hasBackup = restoreKey !== null;
+  // The chapter on screen, for saves that come back after the editor moved on.
+  const shownChapterRef = useRef(backupKey);
+  useEffect(() => {
+    shownChapterRef.current = backupKey;
+  }, [backupKey]);
   // Storage raises no event in the tab that wrote it; bumping this re-reads it.
   const [, setBackupWrites] = useState(0);
   const noteBackupWrite = () => setBackupWrites((n) => n + 1);
@@ -334,6 +347,9 @@ export function ChapterEditor({
   const handleConflict = (content: string, err: ChapterSaveConflict) => {
     backupChapterContent({ bookId, chapterId, content }, err);
     noteBackupWrite();
+    // A save that comes back after the editor moved to another chapter is
+    // backed up under its own chapter; the choice belongs to that chapter.
+    if (shownChapterRef.current !== chapterBackupKey(bookId, chapterId)) return;
     setConflict(err);
     setError(
       'This chapter was changed somewhere else since you opened it. Your text is still here and backed up on this device. Which version do you want to keep?'
@@ -342,6 +358,14 @@ export function ChapterEditor({
 
   const resolveConflict = (keep: 'mine' | 'theirs') => {
     if (!conflict || !editor) return;
+    // The dropped text, including edits made since the conflict, stays
+    // restorable. If it cannot be stored, it stays in the editor instead.
+    if (keep === 'theirs' && !keepDroppedChapterText({ bookId, chapterId, content: editor.getHTML() })) {
+      setError(
+        'Could not back up your text on this device, so it was not replaced. Copy anything you want to keep, then choose again.'
+      );
+      return;
+    }
     seenRef.current.set(backupKey, {
       lastModified: conflict.currentLastModified,
       content: conflict.currentContent,
@@ -352,8 +376,8 @@ export function ChapterEditor({
       void handleSave(false);
       return;
     }
-    // The dropped text, including edits made since the conflict, stays restorable.
-    backupChapterContent({ bookId, chapterId, content: editor.getHTML() }, new Error(DROPPED_ON_RELOAD));
+    // The conflict-time backup is older text the dropped copy already holds.
+    localStorage.removeItem(backupKey);
     noteBackupWrite();
     editor.commands.setContent(conflict.currentContent);
     unsavedRef.current = null;
@@ -388,7 +412,7 @@ export function ChapterEditor({
         markSaved(content);
 
         // Clear backup after successful save
-        clearChapterBackup(bookId, chapterId);
+        localStorage.removeItem(chapterBackupKey(bookId, chapterId));
         noteBackupWrite();
       } catch (err) {
         console.error('Failed to auto-save chapter:', err);
@@ -424,7 +448,7 @@ export function ChapterEditor({
       markSaved(content);
 
       // Clear backup after successful save
-      clearChapterBackup(bookId, chapterId);
+      localStorage.removeItem(chapterBackupKey(bookId, chapterId));
       noteBackupWrite();
 
       if (onSave) {
@@ -527,14 +551,15 @@ export function ChapterEditor({
   };
 
   const handleRecoverBackup = () => {
-    const backup = getValidatedItem<ChapterBackup>(backupKey, validateChapterBackup);
+    if (!restoreKey) return;
+    const backup = getValidatedItem<ChapterBackup>(restoreKey, validateChapterBackup);
     if (backup && editor) {
       try {
         editor.commands.setContent(backup.content);
         setAutoSavePending(true); // Trigger auto-save of recovered content
         setHasUnsavedChanges(true);
         noteBackupWrite();
-        localStorage.removeItem(backupKey);
+        localStorage.removeItem(restoreKey);
       } catch (err) {
         console.error('Failed to recover backup:', err);
         setError('Failed to recover backed up content');
@@ -543,7 +568,7 @@ export function ChapterEditor({
   };
 
   const handleDismissBackup = () => {
-    localStorage.removeItem(backupKey);
+    if (restoreKey) localStorage.removeItem(restoreKey);
     noteBackupWrite();
   };
 
