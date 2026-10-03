@@ -27,13 +27,28 @@ const mockToast = toast as unknown as jest.Mock;
 const mockStartCheckout = jest.fn();
 const mockOpenBillingPortal = jest.fn();
 const mockGetPlanQuotas = jest.fn();
+const mockGetRenewalDisclosure = jest.fn();
 jest.mock('@/hooks/useBillingApi', () => ({
   useBillingApi: () => ({
     startCheckout: mockStartCheckout,
     openBillingPortal: mockOpenBillingPortal,
     getPlanQuotas: mockGetPlanQuotas,
+    getRenewalDisclosure: mockGetRenewalDisclosure,
   }),
 }));
+
+const DISCLOSURE = {
+  version: '2026-10-02',
+  text:
+    'Auto Author Pro is $12.00 per month, charged to your payment method today and again at the ' +
+    'start of each billing period. Your subscription renews automatically until you cancel. ' +
+    'Cancel anytime in Auto Author under Settings → Billing → Manage billing.',
+  sha256: 'sha-current',
+  price_id: 'price_pro',
+};
+
+/** Tick the auto-renewal consent box once the disclosure has loaded. */
+const agree = async () => fireEvent.click(await screen.findByRole('checkbox', { name: /i agree/i }));
 
 const QUOTAS = {
   free: { daily: 10, monthly: 100 },
@@ -47,6 +62,83 @@ describe('BillingSettingsForm', () => {
     mockOpenBillingPortal.mockReset();
     mockGetPlanQuotas.mockReset();
     mockGetPlanQuotas.mockResolvedValue(QUOTAS);
+    mockGetRenewalDisclosure.mockReset();
+    mockGetRenewalDisclosure.mockResolvedValue(DISCLOSURE);
+  });
+
+  // --- Auto-renewal disclosure + consent (issue #770, CA ARL / ROSCA) ---
+  it('shows price, interval, auto-renewal and the cancel path next to the Upgrade button', async () => {
+    render(<BillingSettingsForm plan="free" />);
+
+    const disclosure = await screen.findByText(/\$12\.00 per month/);
+    expect(disclosure).toHaveTextContent(/renews automatically until you cancel/i);
+    expect(disclosure).toHaveTextContent(/settings → billing → manage billing/i);
+    // Next to the subscribe action: same container as the button, and the
+    // checkbox is described by the disclosure for screen readers.
+    const button = screen.getByRole('button', { name: /upgrade to pro/i });
+    expect(button.parentElement).toContainElement(disclosure);
+    expect(screen.getByRole('checkbox', { name: /i agree/i })).toHaveAccessibleDescription(
+      DISCLOSURE.text
+    );
+  });
+
+  it('keeps Upgrade disabled until the consent box is ticked (unchecked by default)', async () => {
+    render(<BillingSettingsForm plan="free" />);
+
+    const box = await screen.findByRole('checkbox', { name: /i agree/i });
+    expect(box).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeDisabled();
+
+    fireEvent.click(box);
+    expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeEnabled();
+  });
+
+  it('links the consent label to the Terms of Service', async () => {
+    render(<BillingSettingsForm plan="free" />);
+    expect(await screen.findByRole('link', { name: /terms of service/i })).toHaveAttribute(
+      'href',
+      '/terms'
+    );
+  });
+
+  it('pauses upgrading when the renewal terms cannot be loaded', async () => {
+    mockGetRenewalDisclosure.mockRejectedValue(new Error('Payment provider error'));
+    render(<BillingSettingsForm plan="free" />);
+
+    expect(await screen.findByText(/subscription terms are unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeDisabled();
+  });
+
+  it('lets the user retry loading the renewal terms after a failure', async () => {
+    mockGetRenewalDisclosure.mockRejectedValueOnce(new Error('Payment provider error'));
+    render(<BillingSettingsForm plan="free" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /try again/i }));
+
+    expect(await screen.findByRole('checkbox', { name: /i agree/i })).not.toBeChecked();
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    expect(mockGetRenewalDisclosure).toHaveBeenCalledTimes(2);
+  });
+
+  it('reloads changed terms and clears the agreement when checkout reports them stale', async () => {
+    mockStartCheckout.mockRejectedValue(new Error('The subscription terms have changed'));
+    render(<BillingSettingsForm plan="free" />);
+    await agree();
+
+    const changed = { ...DISCLOSURE, text: 'Auto Author Pro is $15.00 per month.', sha256: 'sha-new' };
+    mockGetRenewalDisclosure.mockResolvedValue(changed);
+    fireEvent.click(screen.getByRole('button', { name: /upgrade to pro/i }));
+
+    expect(await screen.findByText(/\$15\.00 per month/)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /i agree/i })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeDisabled();
+  });
+
+  it('does not load renewal terms for a Pro user', async () => {
+    render(<BillingSettingsForm plan="pro" />);
+    await waitFor(() => expect(mockGetPlanQuotas).toHaveBeenCalled());
+    expect(mockGetRenewalDisclosure).not.toHaveBeenCalled();
   });
 
   it('names the concrete Free vs Pro AI limits, read from the API', async () => {
@@ -102,11 +194,12 @@ describe('BillingSettingsForm', () => {
     mockStartCheckout.mockResolvedValue({ url: 'https://checkout.stripe.com/session/xyz' });
 
     render(<BillingSettingsForm plan="free" />);
+    await agree();
     fireEvent.click(screen.getByRole('button', { name: /upgrade to pro/i }));
 
     expect(screen.getByRole('button', { name: /redirecting/i })).toBeDisabled();
 
-    await waitFor(() => expect(mockStartCheckout).toHaveBeenCalledWith('pro'));
+    await waitFor(() => expect(mockStartCheckout).toHaveBeenCalledWith('pro', 'sha-current'));
     await waitFor(() =>
       expect(mockNavigateTo).toHaveBeenCalledWith('https://checkout.stripe.com/session/xyz')
     );
@@ -116,6 +209,7 @@ describe('BillingSettingsForm', () => {
     mockStartCheckout.mockRejectedValue(new Error('You are already on this plan.'));
 
     render(<BillingSettingsForm plan="free" />);
+    await agree();
     fireEvent.click(screen.getByRole('button', { name: /upgrade to pro/i }));
 
     await waitFor(() =>
