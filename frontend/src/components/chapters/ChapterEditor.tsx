@@ -126,6 +126,8 @@ export function ChapterEditor({
   const [loadAttempt, setLoadAttempt] = useState(0);
   // The latest edit the server does not have yet, flushed if the editor goes away.
   const unsavedRef = useRef<PendingChapterEdit | null>(null);
+  // The save request in flight, which a flush waits for so it cannot land last.
+  const inFlightSaveRef = useRef<Promise<unknown> | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [autoSavePending, setAutoSavePending] = useState(false);
@@ -280,7 +282,7 @@ export function ChapterEditor({
     () => () => {
       const edit = unsavedRef.current;
       unsavedRef.current = null;
-      if (edit) void flushChapterContent(edit);
+      if (edit) void flushChapterContent(edit, inFlightSaveRef.current);
     },
     [bookId, chapterId]
   );
@@ -330,9 +332,9 @@ export function ChapterEditor({
       setIsSaving(true);
       setError(null);
       try {
-        await trackOperation('auto-save', async () => {
+        await (inFlightSaveRef.current = trackOperation('auto-save', async () => {
           return await bookClient.saveChapterContent(bookId, chapterId, content);
-        }, { bookId, chapterId, contentLength: content.length });
+        }, { bookId, chapterId, contentLength: content.length }));
         setLastSaved(new Date());
         markSaved(content);
 
@@ -364,9 +366,9 @@ export function ChapterEditor({
     setError(null);
 
     try {
-      await trackOperation('manual-save', async () => {
+      await (inFlightSaveRef.current = trackOperation('manual-save', async () => {
         return await bookClient.saveChapterContent(bookId, chapterId, content);
-      }, { bookId, chapterId, contentLength: content.length });
+      }, { bookId, chapterId, contentLength: content.length }));
       setLastSaved(new Date());
       markSaved(content);
 

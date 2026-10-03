@@ -4,6 +4,24 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **The chapter editor no longer drops edits or saves over a chapter it failed to load (#757, P0.9)**:
+  - **The bugs.**
+    - Effect cleanup only cleared the autosave timer. Since #756 keys the editor per chapter, text typed inside the 3s debounce before a tab switch was dropped on unmount.
+    - A successful save cleared `autoSavePending`/`hasUnsavedChanges` unconditionally, so text typed while the PATCH was in flight was never saved and raised no `beforeunload` warning.
+    - A failed content load left an empty, editable editor, and the first autosave replaced the real chapter. A legacy "tab state" branch did the same thing deliberately.
+    - Each was reproduced in a real browser against real Mongo on main. In the switch case nothing was saved. In the held-save case Mongo kept only the first burst. When the GET returned 500, typing autosaved `<p>Overwrite attempt.</p>` over the chapter.
+  - **The fix.**
+    - `onUpdate` records the latest unsaved edit as `{bookId, chapterId, content}` at edit time. It is cleared when the HTML matches the saved copy or a load replaces it.
+    - A cleanup keyed on `[bookId, chapterId]` flushes that edit to its own chapter. It uses the new `keepalive` option on `saveChapterContent`, which falls back to a normal request above the browser's 64KB keepalive limit. If the flush fails, the edit becomes the chapter's localStorage backup.
+    - Autosave and manual save clear the pending flags only when `editor.getHTML()` still equals what was sent. Otherwise the effect re-arms for the trailing edit.
+    - A failed load sets `loadFailed`. The editor becomes read-only, the alert gains a Retry button, and the toolbar, Restore Backup and Save are withheld. Autosave, manual save and the flush all refuse to write.
+    - The three copy-pasted backup blocks are now one helper in `chapterContentSave.ts`.
+  - **Verified.**
+    - Eight new real-TipTap jest tests and one bookClient keepalive test were added. Six of the editor tests fail against main's `ChapterEditor.tsx`.
+    - 12 mutations were checked and 10 were caught. The two survivors are a flush that reads the cleanup's own `chapterId`, which is equivalent because that closure belongs to the chapter being left, and the autosave `loadFailed` gate. That gate only matters for a draft inserted from the Questions tab, which the tests do not drive.
+    - The browser demo, run before and after, stored the right text in Mongo for all three scenarios.
+  - **Left for later.** A `pagehide` flush is out of scope: React does not unmount on unload, and the `beforeunload` warning is accurate again. Remounts on a background TOC refresh are #758, and save conflicts are #760.
+
 - **The chapter editor no longer saves one chapter's text into another (#756, P0.8)**:
   - **The bugs.** `TabContent` rendered one unkeyed `ChapterEditor` for every chapter. On a tab switch the pending autosave timer was re-armed with the new `chapterId` while the editor still held the old chapter's text, so if chapter B loaded slowly, chapter A's text was saved as B. Separately, the content load had no ignore guard, so a late response for a chapter the user had already left landed in the editor, and the next save wrote it under the current chapter. Reproduced in a real browser on main, with only chapter B's GET delayed by 6s: B's stored content became A's text, and in the second case C's became B's.
   - **The fix.** `<ChapterEditor key={activeChapterId}>`, plus an `ignore` flag in the load effect that drops a superseded response, its error and its spinner reset.

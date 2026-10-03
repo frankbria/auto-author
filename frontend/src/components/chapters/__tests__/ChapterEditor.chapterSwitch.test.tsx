@@ -265,6 +265,37 @@ describe('ChapterEditor pending edits (#757)', () => {
     ]);
   });
 
+  it('lets an in-flight save land before the flush, and keeps a failed flush backed up', async () => {
+    const load = deferred('A');
+    mockBookClient.getChapterContent.mockReturnValue(load.promise);
+    let finishFirstSave!: () => void;
+    mockBookClient.saveChapterContent
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirstSave = () => resolve({} as never))))
+      .mockRejectedValueOnce(new Error('offline'));
+    const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
+    await loadThenType(view, load, '<p>Alpha</p>', ' one');
+    await flushTimers(3000);
+    act(() => {
+      editorIn(view.container).commands.insertContent(' two');
+    });
+
+    view.unmount();
+    await flushTimers(0);
+    // The older save is still out: sending the newer edit now could let it land last.
+    expect(savesTo('A')).toHaveLength(1);
+
+    // The older save succeeds (clearing any backup), then the flush fails.
+    await act(async () => finishFirstSave());
+    await flushTimers(0);
+
+    expect(savesTo('A').map(([, , content]) => content)).toEqual([
+      '<p>Alpha one</p>',
+      '<p>Alpha one two</p>',
+    ]);
+    const backup = JSON.parse(localStorage.getItem('chapter-backup-bk-A') ?? 'null');
+    expect(backup?.content).toBe('<p>Alpha one two</p>');
+  });
+
   it('does not save on leaving a chapter the user never edited', async () => {
     const load = deferred('A');
     mockBookClient.getChapterContent.mockReturnValue(load.promise);

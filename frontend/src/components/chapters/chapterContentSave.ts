@@ -32,8 +32,15 @@ export function backupChapterContent(
  * Saves an edit the editor is leaving behind (unmount or chapter change, #757).
  * Nothing is left on screen to report a failure to, so a failed save becomes the
  * backup the editor offers to restore next time that chapter opens.
+ *
+ * A save still in flight goes first. Otherwise its older content could land
+ * after this edit, and its success handler could clear this edit's backup.
  */
-export async function flushChapterContent(edit: PendingChapterEdit): Promise<void> {
+export async function flushChapterContent(
+  edit: PendingChapterEdit,
+  inFlightSave: Promise<unknown> | null = null
+): Promise<void> {
+  await inFlightSave?.catch(() => {});
   try {
     await bookClient.saveChapterContent(edit.bookId, edit.chapterId, edit.content, true, {
       keepalive: true,
