@@ -166,6 +166,36 @@ describe('TocGenerationWizard entitlement routing (issue #247)', () => {
     expect(screen.queryByText(/402/)).not.toBeInTheDocument();
   });
 
+  it('shows a quota cap (429) verbatim: no Try Again, no contact-support (#766)', async () => {
+    const CAP =
+      'AI usage limit reached (50 generations per day on the pro plan). It resets at midnight UTC.';
+    mockedBookClient.analyzeSummary.mockRejectedValue(errorWithStatus(CAP, 429));
+
+    render(<TocGenerationWizard bookId="book-1" />);
+
+    expect(await screen.findByText(CAP)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/contact support/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /plan limits/i })).toHaveAttribute(
+      'href',
+      '/dashboard/settings?tab=billing'
+    );
+    expect(mockedBookClient.checkTocReadiness).not.toHaveBeenCalled();
+  });
+
+  it('a plain rate-limit 429 on analyze is still swallowed (not a quota cap)', async () => {
+    mockedBookClient.analyzeSummary.mockRejectedValue(
+      errorWithStatus('Rate limit exceeded. Try again in 5 seconds.', 429)
+    );
+    mockedBookClient.checkTocReadiness.mockResolvedValue({
+      data: { meets_minimum_requirements: false },
+    } as never);
+
+    render(<TocGenerationWizard bookId="book-1" />);
+
+    await waitFor(() => expect(mockedBookClient.checkTocReadiness).toHaveBeenCalled());
+  });
+
   it('routes a readiness-check 402 (outer catch) to the entitlement panel', async () => {
     mockedBookClient.analyzeSummary.mockResolvedValue({} as never);
     mockedBookClient.checkTocReadiness.mockRejectedValue(

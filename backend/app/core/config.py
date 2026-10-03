@@ -143,13 +143,15 @@ class Settings(BaseSettings):
     # complementing the endpoint rate limit)
     MAX_QUESTION_REGENERATION_COUNT: int = 5
 
-    # Per-user AI generation quota (cost control). Every AI generation endpoint
-    # increments a per-user counter; at the cap the endpoint returns 429. Limits
-    # are configurable per environment; a limit <= 0 disables that window.
-    # Keys off the user's auth_id today; swap to plan/entitlement when P0.2 lands.
+    # Per-user AI generation quota (cost control), per plan (#766). Every AI
+    # generation endpoint increments a per-user counter; at the plan's cap the
+    # endpoint returns 429. A limit <= 0 disables that window. `restricted` (and
+    # any unknown plan) gets no allowance at all — see entitlements.ai_quota_for_plan.
     AI_QUOTA_ENABLED: bool = True
-    AI_QUOTA_DAILY_LIMIT: int = 50
-    AI_QUOTA_MONTHLY_LIMIT: int = 500
+    AI_QUOTA_FREE_DAILY: int = 10
+    AI_QUOTA_FREE_MONTHLY: int = 100
+    AI_QUOTA_PRO_DAILY: int = 50
+    AI_QUOTA_PRO_MONTHLY: int = 500
 
     # Plan/entitlement enforcement (issue #174, P0.2). When True, AI endpoints
     # check the caller's plan against app.core.entitlements before running. Free

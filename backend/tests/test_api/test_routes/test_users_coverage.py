@@ -68,14 +68,6 @@ async def test_patch_me_happy_path(auth_client_factory):
     assert resp.json()["first_name"] == "Renamed"
 
 
-async def test_patch_me_duplicate_email_returns_409(auth_client_factory):
-    client = await auth_client_factory()
-    with patch(f"{USERS}.update_user", AsyncMock(side_effect=Exception("E11000 duplicate key error"))):
-        resp = await client.patch("/api/v1/users/me", json={"email": "dupe@example.com"})
-    assert resp.status_code == 409
-    assert resp.json()["detail"] == "Email already exists"
-
-
 async def test_patch_me_timeout_returns_504(auth_client_factory):
     client = await auth_client_factory()
     with patch(f"{USERS}.update_user", AsyncMock(side_effect=Exception("operation timed out"))):
@@ -201,6 +193,9 @@ PRIVILEGED_FIELDS = [
     ("stripe_subscription_id", "sub_evil"),
     ("book_ids", ["not-yours"]),
     ("auth_id", "someone-else"),
+    # #765: better-auth owns the (verified) email; an unverified PATCH let one
+    # user squat another's address and lock them out of their first login.
+    ("email", "victim@example.com"),
 ]
 
 

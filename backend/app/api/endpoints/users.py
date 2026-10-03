@@ -134,12 +134,7 @@ async def update_profile(
     except Exception as e:
         msg = str(e).lower()
         logger.error("Failed to update user", exc_info=True)
-        if "duplicate key error" in msg:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already exists",
-            )
-        elif "operation timed out" in msg:
+        if "operation timed out" in msg:
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 detail="Database operation timed out",
