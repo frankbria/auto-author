@@ -3,5 +3,7 @@
   "pypi": {
     "PYSEC-2026-2132": "click; fix: 8.3.3"
   },
-  "npm": {}
+  "npm": {
+    "GHSA-vfj7-8cjw-p6xm": "braces 3.0.3 (no patched version, all <=3.0.3 affected); build-time only via @tailwindcss/cli > @parcel/watcher > micromatch, globs are repo-controlled, not user input. Prune when braces ships a fix."
+  }
 }
