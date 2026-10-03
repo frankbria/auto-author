@@ -4,6 +4,24 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **The chapter editor no longer drops edits or saves over a chapter it failed to load (#757, P0.9)**:
+  - **The bugs.**
+    - Effect cleanup only cleared the autosave timer. Since #756 keys the editor per chapter, text typed inside the 3s debounce before a tab switch was dropped on unmount.
+    - A successful save cleared `autoSavePending`/`hasUnsavedChanges` unconditionally, so text typed while the PATCH was in flight was never saved and raised no `beforeunload` warning.
+    - A failed content load left an empty, editable editor, and the first autosave replaced the real chapter. A legacy "tab state" branch did the same thing deliberately.
+    - Each was reproduced in a real browser against real Mongo on main. In the switch case nothing was saved. In the held-save case Mongo kept only the first burst. When the GET returned 500, typing autosaved `<p>Overwrite attempt.</p>` over the chapter.
+  - **The fix.**
+    - `onUpdate` records the latest unsaved edit as `{bookId, chapterId, content}` at edit time. It is cleared when the HTML matches the saved copy or a load replaces it.
+    - A cleanup keyed on `[bookId, chapterId]` flushes that edit to its own chapter. It uses the new `keepalive` option on `saveChapterContent`, which falls back to a normal request above the browser's 64KB keepalive limit. If the flush fails, the edit becomes the chapter's localStorage backup.
+    - The flush waits for any save still in flight. Otherwise the older PATCH could land last, and its success handler could delete the flush's backup. Internal review caught this.
+    - Autosave and manual save clear the pending flags only when `editor.getHTML()` still equals what was sent. Otherwise the effect re-arms for the trailing edit.
+    - A failed load sets `loadFailed`. The editor becomes read-only, the alert gains a Retry button, and the toolbar, Restore Backup and Save are withheld. Autosave, manual save and the flush all refuse to write.
+    - The three copy-pasted backup blocks are now one helper in `chapterContentSave.ts`.
+  - **Verified.**
+    - Nine new real-TipTap jest tests and one bookClient keepalive test were added. Seven of the editor tests fail against main's `ChapterEditor.tsx`. The other two pin what the flush must not do: send a reverted edit, or save a chapter nobody edited.
+    - 13 mutations were checked and 11 were caught. The two survivors are a flush that reads the cleanup's own `chapterId`, which is equivalent because that closure belongs to the chapter being left, and the autosave `loadFailed` gate. That gate only matters for a draft inserted from the Questions tab, which the tests do not drive.
+    - The browser demo, run before and after, stored the right text in Mongo for all three scenarios, plus a fourth: typing during a held save and then switching tabs.
+  - **Left for later.** A `pagehide` flush is out of scope: React does not unmount on unload, and the `beforeunload` warning is accurate again. Remounts on a background TOC refresh are #758, and save conflicts are #760.
 - **Parallel question saves no longer 500, and `edit_history` stops growing (#762, P0.14)**:
   - **The bug.** `save_question_response`, `save_question_responses_batch` and `save_question_rating` each read the existing document, then inserted or updated it. Concurrent first saves all read nothing, all inserted, and every loser hit the unique `question_user_idx` as a DuplicateKeyError: a 500 from `PUT .../response` and `POST .../rating`, a failed item from the batch endpoint. Each response save also appended to `metadata.edit_history` with no cap. Reproduced over real HTTP on main with 50 parallel first saves per path: 17 of 50 response PUTs and 6 of 50 rating POSTs returned 500, 3 of 50 batch items failed, and 100 later saves left 102 history entries.
   - **The fix.** All three paths go through one helper, `_upsert_one`: a single `find_one_and_update` with `$set`, `$setOnInsert` (`_id`, `created_at`) and `upsert=True`, retried once on DuplicateKeyError. Response saves add `$push {$each, $slice: -50}` (`EDIT_HISTORY_LIMIT`). Re-rating no longer overwrites a rating's `created_at`. MongoDB 4.2+ retries a duplicate-key upsert server-side when the filter is pure equality on the unique index, as ours is, so the client retry is the fallback for servers or filters where it does not. A test with a non-equality filter forces the client path; measured locally, without the retry that burst surfaces about 1.4 duplicate-key errors per 50 upserts.
