@@ -1,0 +1,247 @@
+name: Deploy Production (Containers)
+
+# Container deploy for production (#782), modelled on
+# deploy-staging-containers.yml. It replaced the Clerk-era deploy-production.tbd,
+# whose deploy step was an `echo`. Guarded by
+# scripts/test_deploy_production_workflow.py.
+#
+# Differences from staging, each deliberate:
+#   - runs only after a human approves it: `environment: production` carries the
+#     required reviewers and the main-only deployment branch policy (repo
+#     settings, owner-configured; the workflow cannot set them)
+#   - the tag is validated before anything else runs, and reaches scripts only
+#     through `env:`, never by `${{ }}` interpolation into a script
+#   - every secret is PRODUCTION_*. An environment secret that is unset resolves
+#     to the repository secret of the same name, and the repo-level
+#     SSH_KEY/USER/HOST are staging's
+#   - the SSH host key is pinned from a secret, not trusted on first use
+#   - the summary names the tag that was running before, which is the rollback
+#
+# Configuration, all on the `production` environment (Settings > Environments):
+#   secrets  PRODUCTION_HOST            Tailscale hostname of the box
+#            PRODUCTION_SSH_USER        SSH user
+#            PRODUCTION_SSH_KEY         private key for that user
+#            PRODUCTION_SSH_KNOWN_HOSTS the box's known_hosts line(s)
+#            PRODUCTION_TS_CLIENT_ID    Tailscale OAuth client id
+#            PRODUCTION_TS_AUTH_SECRET  Tailscale OAuth client secret
+#   vars     PRODUCTION_TS_TAGS         the OAuth client's FULL tag set,
+#                                       comma-separated (an exact match is required)
+#            PRODUCTION_DEPLOY_PATH     directory holding the compose files and .env
+#
+# Box prerequisites mirror staging's (docs/STAGING-DEPLOYMENT.md): Docker + compose
+# plugin, the deploy path with a .env holding the secrets docker-compose.yml lists
+# (including BETTER_AUTH_URL, which the production overlay requires), ports 8000
+# and 3002 free on loopback, registry access, and nginx in front.
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        # The backend's tag. The production overlay pulls the frontend's
+        # production variant of the same build, <tag>-production (#779).
+        description: 'Image tag to deploy (e.g. sha-3931169). Use an older tag to roll back.'
+        required: true
+        type: string
+
+# Least privilege: this only reads the repo and pulls published images.
+permissions:
+  contents: read
+
+concurrency:
+  # Never let two deploys race on one box.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy containers to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      DEPLOY_PATH: ${{ vars.PRODUCTION_DEPLOY_PATH }}
+
+    steps:
+      # First, and before any secret is in reach. Only the immutable sha- tags
+      # build-images.yml publishes are accepted; `staging` floats, and a suffixed
+      # tag would double up with the overlay's own `-production`. The value is not
+      # echoed back, so a malformed one cannot inject a workflow command.
+      - name: Validate image tag
+        run: |
+          if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{7,40}$ ]]; then
+            echo "::error::image_tag must be a sha- tag published by build-images.yml (sha- followed by 7-40 lowercase hex characters)"
+            exit 1
+          fi
+          echo "image tag OK: $IMAGE_TAG (frontend: $IMAGE_TAG-production)"
+
+      # Fail closed and name what is missing, rather than letting ssh fail on an
+      # empty host. The ref check backs up the environment's branch policy: a
+      # dispatch from a branch would ship that branch's compose files.
+      - name: Require main and production configuration
+        env:
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+          PRODUCTION_SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+          PRODUCTION_TS_CLIENT_ID: ${{ secrets.PRODUCTION_TS_CLIENT_ID }}
+          PRODUCTION_TS_AUTH_SECRET: ${{ secrets.PRODUCTION_TS_AUTH_SECRET }}
+          PRODUCTION_TS_TAGS: ${{ vars.PRODUCTION_TS_TAGS }}
+          PRODUCTION_DEPLOY_PATH: ${{ vars.PRODUCTION_DEPLOY_PATH }}
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::production deploys run from main only (dispatched from $GITHUB_REF)"
+            exit 1
+          fi
+          missing=0
+          for name in $(compgen -e | grep '^PRODUCTION_'); do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set on the 'production' environment"
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ] || exit 1
+          echo 'production configuration present'
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Same transport as staging: the box is reachable over Tailscale only. Its
+      # own OAuth client, so a staging credential can never reach production.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
+        with:
+          oauth-client-id: ${{ secrets.PRODUCTION_TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.PRODUCTION_TS_AUTH_SECRET }}
+          tags: ${{ vars.PRODUCTION_TS_TAGS }}
+
+      # A `production` alias, so the steps below never repeat the host, user or
+      # key. Pinned known_hosts also means no keyscan, which is the preauth
+      # connection pattern fail2ban bans for (#162).
+      - name: Setup SSH
+        env:
+          HOST: ${{ secrets.PRODUCTION_HOST }}
+          SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+          SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/production_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/production_known_hosts
+          chmod 600 ~/.ssh/production_key ~/.ssh/production_known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host production
+            HostName $HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/production_key
+            IdentitiesOnly yes
+            UserKnownHostsFile ~/.ssh/production_known_hosts
+            StrictHostKeyChecking yes
+            ConnectTimeout 30
+          EOF
+
+      - name: Ship compose files
+        run: |
+          for attempt in 1 2 3; do
+            if scp docker-compose.yml docker-compose.production.yml "production:$DEPLOY_PATH/"; then
+              exit 0
+            fi
+            echo "Upload attempt $attempt failed; retrying in 60s..."
+            sleep 60
+          done
+          echo "::error::Failed to ship compose files after 3 attempts"
+          exit 1
+
+      # The rollback target. Empty on a first deploy.
+      #
+      # In the remote scripts below, $IMAGE_TAG and $DEPLOY_PATH expand on the
+      # runner (SC2029) on purpose: the tag was validated in the first step and
+      # the path is owner-set. Everything meant for the box is escaped (\$).
+      - name: Record running tag
+        id: previous
+        run: |
+          # shellcheck disable=SC2029
+          tag=$(ssh production "set -uo pipefail
+            cd '$DEPLOY_PATH'
+            export ENVIRONMENT=production IMAGE_TAG='$IMAGE_TAG'
+            id=\$(docker compose -f docker-compose.yml -f docker-compose.production.yml ps -q backend 2>/dev/null || true)
+            [ -n \"\$id\" ] && docker inspect --format '{{.Config.Image}}' \"\$id\" | sed 's/.*://' || true")
+          echo "running before this deploy: ${tag:-none}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Pull and start
+        run: |
+          # shellcheck disable=SC2029
+          ssh production "set -euo pipefail
+            cd '$DEPLOY_PATH'
+            # docker-compose.yml requires ENVIRONMENT with no default (#777).
+            export ENVIRONMENT=production IMAGE_TAG='$IMAGE_TAG'
+            # pull before up: a tag that was never built fails here, with the
+            # running stack untouched.
+            docker compose -f docker-compose.yml -f docker-compose.production.yml pull
+            docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --remove-orphans"
+
+      - name: Health check
+        run: |
+          # shellcheck disable=SC2029
+          ssh production "set -euo pipefail
+            for i in \$(seq 1 30); do
+              be=\$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8000/api/v1/health || true)
+              fe=\$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:3002/ || true)
+              if [ \"\$be\" = '200' ] && [ \"\$fe\" = '200' ]; then
+                echo 'Both services healthy'; exit 0
+              fi
+              sleep 5
+            done
+            echo 'Health check failed; recent logs:'
+            cd '$DEPLOY_PATH'
+            # \`logs\` interpolates the compose files too, so it needs the same
+            # required vars as \`up\` or it aborts instead of printing anything.
+            export ENVIRONMENT=production IMAGE_TAG='$IMAGE_TAG'
+            docker compose -f docker-compose.yml -f docker-compose.production.yml logs --tail=60
+            exit 1"
+
+      # #781's check, against the running container rather than the compose
+      # file. Prints variable NAMES only, never values, since this log is public.
+      - name: Frontend carries no backend secret
+        run: |
+          # shellcheck disable=SC2029
+          ssh production "set -euo pipefail
+            cd '$DEPLOY_PATH'
+            export ENVIRONMENT=production IMAGE_TAG='$IMAGE_TAG'
+            names=\$(docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T frontend env | cut -d= -f1)
+            # An empty or wrong read would pass the leak check vacuously.
+            printf '%s\n' \"\$names\" | grep -qx DATABASE_URL \
+              || { echo '::error::could not read the frontend container env'; exit 1; }
+            leaked=\$(printf '%s\n' \"\$names\" | grep -E '^(OPENAI|STRIPE|AWS|CLOUDINARY)|^SENTRY_DSN\$' | tr '\n' ' ' || true)
+            if [ -n \"\$leaked\" ]; then
+              echo \"::error::frontend container holds backend-only variables: \$leaked\"
+              exit 1
+            fi
+            echo 'frontend env holds no OPENAI/STRIPE/AWS/CLOUDINARY/SENTRY_DSN variables'"
+
+      # Deliberately last and deliberately conservative: pruning before the
+      # health check would delete the image a rollback needs.
+      - name: Prune old images
+        if: success()
+        run: ssh production "docker image prune -f --filter 'until=336h'"
+
+      - name: Summary
+        if: always()
+        env:
+          PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+          STATUS: ${{ job.status }}
+        run: |
+          { echo '## Production container deploy';
+            echo "- tag: \`$IMAGE_TAG\` (frontend: \`$IMAGE_TAG-production\`)";
+            echo "- result: $STATUS";
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "- previously running: \`$PREVIOUS_TAG\`";
+              echo "- rollback: re-run this workflow with image_tag \`$PREVIOUS_TAG\`";
+            else
+              echo '- previously running: none recorded (first deploy, or the run stopped before reaching the box)';
+              echo "- rollback: re-run this workflow with an earlier \`sha-\` tag";
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -73,6 +73,17 @@ def test_there_are_workflows_to_check():
     assert refs, "workflow files exist but none declares `uses:` — parser is broken"
 
 
+def test_deploy_workflows_are_in_scope():
+    """The two workflows that hold SSH keys to a box must never fall out of the glob.
+
+    Both are covered by construction today; this fails if a rename to a
+    non-workflow extension (the old `deploy-production.tbd`, #782) or a moved
+    directory quietly takes one out of the parametrized checks below.
+    """
+    names = {p.name for p in _workflow_files()}
+    assert {"deploy-staging-containers.yml", "deploy-production-containers.yml"} <= names
+
+
 @pytest.mark.parametrize(
     "path", _workflow_files(), ids=lambda p: p.name
 )
