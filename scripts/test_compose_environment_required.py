@@ -34,3 +34,14 @@ def test_every_workflow_that_runs_compose_up_exports_environment():
         assert re.search(
             r"export ENVIRONMENT=(development|test|staging|production)\b", wf.read_text()
         ), wf.name
+
+
+def test_backend_image_smoke_run_sets_environment():
+    # The smoke test boots the backend image with `docker run`, not compose, and
+    # the backend refuses to import without ENVIRONMENT. It must be a non-deployed
+    # value: the smoke BETTER_AUTH_SECRET is the committed CI secret.
+    text = (WORKFLOWS / "build-images.yml").read_text()
+    backend_run = re.search(r"docker run -d --name smoke --network smoke-net(.*?)\"\$TAG\"", text, re.S)
+
+    assert backend_run, "backend smoke `docker run` not found; this guard is vacuous"
+    assert re.search(r"-e ENVIRONMENT=(test|development)\b", backend_run.group(1))
