@@ -65,8 +65,8 @@ async def test_exempt_user_skips_ai_quota(motor_reinit_db, real_ai_quota):
     with cfg_email, cfg_prod, \
          patch.object(deps.settings, "BYPASS_AUTH", False), \
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
-         patch.object(deps.settings, "AI_QUOTA_DAILY_LIMIT", 1), \
-         patch.object(deps.settings, "AI_QUOTA_MONTHLY_LIMIT", 1):
+         patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
+         patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 1):
         checker = real_ai_quota()
         for _ in range(5):  # far past the cap of 1
             assert await checker(current_user=user) is None
@@ -80,8 +80,8 @@ async def test_non_exempt_user_still_capped(motor_reinit_db, real_ai_quota):
     with cfg_email, cfg_prod, \
          patch.object(deps.settings, "BYPASS_AUTH", False), \
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
-         patch.object(deps.settings, "AI_QUOTA_DAILY_LIMIT", 1), \
-         patch.object(deps.settings, "AI_QUOTA_MONTHLY_LIMIT", 0):
+         patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
+         patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0):
         checker = real_ai_quota()
         await checker(current_user=user)  # 1 → ok
         with pytest.raises(HTTPException) as exc:

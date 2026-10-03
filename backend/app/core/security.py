@@ -157,8 +157,15 @@ async def get_current_user_from_session(request: Request) -> Dict:
     # Convert ObjectId to string (better-auth stores userId as ObjectId)
     user_id = str(user_id)
 
-    # Get better-auth user to extract email/name for auto-creation
+    # The better-auth user row must still exist: a session outliving its user
+    # (deleted account, #763) is not a credential.
     better_auth_user = await get_better_auth_user(user_id)
+    if not better_auth_user:
+        logger.warning(f"Session for user {user_id} has no better-auth user")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found. Please sign up again."
+        )
 
     # Try to find user in application database
     try:
@@ -170,6 +177,14 @@ async def get_current_user_from_session(request: Request) -> Dict:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error fetching user",
+        )
+
+    # Explicit False: records predating the field are active (schema default).
+    if user and user.get("is_active") is False:
+        logger.warning(f"Rejected session for deactivated user {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This account is no longer active."
         )
 
     # better-auth owns the verified email; the users doc mirrors it (#765).
@@ -186,13 +201,6 @@ async def get_current_user_from_session(request: Request) -> Dict:
 
     # Auto-create user if they have a valid session but no backend record
     if not user:
-        if not better_auth_user:
-            logger.error(f"User {user_id} not found in better-auth or application database")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found. Please sign up again."
-            )
-
         logger.info(
             f"User {user_id} authenticated with valid session but not found in backend. "
             "Auto-creating user record from better-auth data."

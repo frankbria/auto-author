@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field, ValidationInfo
 from typing import List, Union
+import hashlib
 import logging
 import os
 
@@ -39,6 +40,18 @@ def is_deployed_env() -> bool:
         (os.getenv("NODE_ENV") or "").lower(),
     }
     return bool(markers & {"production", "staging", "prod"})
+
+
+# SHA-256 of BETTER_AUTH_SECRET values that were published in this public repo (#780).
+# Hashes, never the literals: the point is to stop shipping the secret, so the
+# deny-list must not contain it. Keep in sync with frontend/src/lib/auth-secret.ts.
+PUBLISHED_SECRET_SHA256 = frozenset({
+    "fb89705a13a017d46d0df597a15f0e7d4e5470bb331805dd91db4da49dd6ddfe",
+})
+
+
+def is_published_secret(value: str) -> bool:
+    return hashlib.sha256(value.encode()).hexdigest() in PUBLISHED_SECRET_SHA256
 
 
 class Settings(BaseSettings):
@@ -110,13 +123,15 @@ class Settings(BaseSettings):
     # complementing the endpoint rate limit)
     MAX_QUESTION_REGENERATION_COUNT: int = 5
 
-    # Per-user AI generation quota (cost control). Every AI generation endpoint
-    # increments a per-user counter; at the cap the endpoint returns 429. Limits
-    # are configurable per environment; a limit <= 0 disables that window.
-    # Keys off the user's auth_id today; swap to plan/entitlement when P0.2 lands.
+    # Per-user AI generation quota (cost control), per plan (#766). Every AI
+    # generation endpoint increments a per-user counter; at the plan's cap the
+    # endpoint returns 429. A limit <= 0 disables that window. `restricted` (and
+    # any unknown plan) gets no allowance at all — see entitlements.ai_quota_for_plan.
     AI_QUOTA_ENABLED: bool = True
-    AI_QUOTA_DAILY_LIMIT: int = 50
-    AI_QUOTA_MONTHLY_LIMIT: int = 500
+    AI_QUOTA_FREE_DAILY: int = 10
+    AI_QUOTA_FREE_MONTHLY: int = 100
+    AI_QUOTA_PRO_DAILY: int = 50
+    AI_QUOTA_PRO_MONTHLY: int = 500
 
     # Plan/entitlement enforcement (issue #174, P0.2). When True, AI endpoints
     # check the caller's plan against app.core.entitlements before running. Free
@@ -216,6 +231,15 @@ class Settings(BaseSettings):
                 )
             return v  # Allow in local development and test/CI only
 
+        # A secret published in this public repo is compromised everywhere it
+        # is deployed (#780). Local dev/CI may still use it.
+        if is_published_secret(v) and is_deployed_env():
+            raise ValueError(
+                "FATAL: BETTER_AUTH_SECRET is a value that was published in this "
+                "public repository. Rotate it: "
+                "python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+
         # Reject known weak/test secrets (except our specific CI secret)
         weak_secrets = [
             "test-better-auth-secret-key",
@@ -275,7 +299,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
-        extra="ignore"
+        extra="ignore",
+        # Validation errors must not echo secrets (BETTER_AUTH_SECRET, Stripe keys) into logs.
+        hide_input_in_errors=True,
     )
 
 
