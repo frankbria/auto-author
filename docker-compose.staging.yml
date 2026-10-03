@@ -10,4 +10,6 @@ services:
   backend:
     image: ghcr.io/frankbria/auto-author-backend:${IMAGE_TAG:?IMAGE_TAG is required (e.g. sha-abc1234)}
   frontend:
-    image: ghcr.io/frankbria/auto-author-frontend:${IMAGE_TAG:?IMAGE_TAG is required (e.g. sha-abc1234)}
+    # The frontend bakes NEXT_PUBLIC_* in at build time, so each environment has
+    # its own variant of every sha- tag (#779). Staging pulls `-staging`.
+    image: ghcr.io/frankbria/auto-author-frontend:${IMAGE_TAG:?IMAGE_TAG is required (e.g. sha-abc1234)}-staging
