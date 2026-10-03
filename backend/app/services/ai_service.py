@@ -44,7 +44,9 @@ DRAFT_MAX_COMPLETION_TOKENS = 8000
 
 # A TOC (6-12 chapters x 2-4 subchapters as pretty JSON) measures ~2k tokens at
 # 8x3 and ~3.7k at 12x4; 1500 truncated every typical one (#774). 6000 leaves
-# headroom over the largest shape the prompt asks for.
+# headroom over the largest shape the prompt asks for. Runs on the draft model
+# (gpt-4o, 128k context) because gpt-4's 8192-token context is shared with the
+# prompt: a 6000-token completion would leave ~2k for the summary and answers.
 TOC_MAX_COMPLETION_TOKENS = 6000
 
 
@@ -529,6 +531,7 @@ Make questions specific, actionable, and focused on content structure rather tha
                 temperature=0.4,
                 max_tokens=TOC_MAX_COMPLETION_TOKENS,
                 correlation_id=correlation_id,
+                model=DRAFT_GENERATION_MODEL,
             )
 
             choice = response.choices[0]

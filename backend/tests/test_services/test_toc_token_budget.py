@@ -68,3 +68,5 @@ async def test_realistic_10x3_toc_parses_within_budget():
     sent = svc.client.chat.completions.create.call_args.kwargs["max_tokens"]
     # Measured: 8x3 ~2k tokens, 12x4 ~3.7k. ~3 chars/token is a conservative estimate.
     assert sent >= len(_toc(12, 4)) // 3
+    # gpt-4's 8192 context is shared with the prompt; 6000 output needs gpt-4o.
+    assert svc.client.chat.completions.create.call_args.kwargs["model"] == "gpt-4o"
