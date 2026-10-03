@@ -540,6 +540,33 @@ async def delete_questions_for_book(
     return result.deleted_count
 
 
+async def delete_questions_for_chapters(
+    book_id: str,
+    chapter_ids: Iterable[str],
+    user_id: str,
+) -> int:
+    """Delete the questions, responses and ratings of chapters removed from the
+    TOC (#755), so none of them re-attach to a later chapter with the same id.
+    Returns the number of questions deleted."""
+    chapter_ids = list(chapter_ids)
+    if not chapter_ids:
+        return 0
+    questions_collection = await get_collection("questions")
+    scope = {"book_id": book_id, "user_id": user_id, "chapter_id": {"$in": chapter_ids}}
+
+    question_ids = [
+        str(q["_id"])
+        for q in await questions_collection.find(scope, {"_id": 1}).to_list(length=None)
+    ]
+    # Children first, so a failure part-way leaves no answer without its question.
+    if question_ids:
+        for name in ("question_responses", "question_ratings"):
+            await (await get_collection(name)).delete_many(
+                {"question_id": {"$in": question_ids}}
+            )
+    return (await questions_collection.delete_many(scope)).deleted_count
+
+
 async def count_questions_without_responses(
     book_id: str,
     chapter_id: str,

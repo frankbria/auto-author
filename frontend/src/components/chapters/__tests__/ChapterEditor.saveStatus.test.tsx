@@ -61,7 +61,7 @@ describe('ChapterEditor save status indicators', () => {
       const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       mockBookClient.saveChapterContent.mockImplementation(() =>
-        new Promise((resolve) => setTimeout(resolve, 1000))
+        new Promise((resolve) => setTimeout(() => resolve({} as never), 1000))
       );
 
       render(<ChapterEditor {...defaultProps} />);
@@ -92,7 +92,7 @@ describe('ChapterEditor save status indicators', () => {
       const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       mockBookClient.saveChapterContent.mockImplementation(() =>
-        new Promise((resolve) => setTimeout(resolve, 1000))
+        new Promise((resolve) => setTimeout(() => resolve({} as never), 1000))
       );
 
       render(<ChapterEditor {...defaultProps} />);
@@ -125,7 +125,7 @@ describe('ChapterEditor save status indicators', () => {
       const user = userEvent.setup({ delay: null });
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       mockBookClient.saveChapterContent.mockImplementation(() =>
-        new Promise((resolve) => setTimeout(resolve, 1000))
+        new Promise((resolve) => setTimeout(() => resolve({} as never), 1000))
       );
 
       render(<ChapterEditor {...defaultProps} />);
@@ -400,7 +400,7 @@ describe('ChapterEditor save status indicators', () => {
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       // Add delay to save to catch "Saving..." state
       mockBookClient.saveChapterContent.mockImplementation(() =>
-        new Promise((resolve) => setTimeout(resolve, 100))
+        new Promise((resolve) => setTimeout(() => resolve({} as never), 100))
       );
 
       render(<ChapterEditor {...defaultProps} />);
@@ -456,7 +456,7 @@ describe('ChapterEditor save status indicators', () => {
       mockBookClient.getChapterContent.mockResolvedValue({ content: '<p>Initial</p>' });
       // Add delay to save to allow time for UI to update
       mockBookClient.saveChapterContent.mockImplementation(() =>
-        new Promise((resolve) => setTimeout(resolve, 100))
+        new Promise((resolve) => setTimeout(() => resolve({} as never), 100))
       );
 
       render(<ChapterEditor {...defaultProps} />);
