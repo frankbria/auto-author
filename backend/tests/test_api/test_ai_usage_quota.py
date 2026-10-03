@@ -233,8 +233,8 @@ async def test_restricted_and_unknown_plans_get_zero(motor_reinit_db, real_ai_qu
         checker = real_ai_quota()
         with pytest.raises(HTTPException) as exc:
             await checker(current_user={"auth_id": "zero", "plan": plan})
-    assert exc.value.status_code == 429
-    assert exc.value.headers["X-AI-Quota-Limit"] == "0"
+    assert exc.value.status_code == 402
+    assert exc.value.headers["X-Entitlement-Plan"] == plan
 
 
 @pytest.mark.asyncio

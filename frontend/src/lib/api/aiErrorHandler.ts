@@ -35,7 +35,7 @@ export interface AIServiceResult<T> {
  * and waiting a few minutes cannot help.
  */
 export function isQuotaCapMessage(message: string | undefined): boolean {
-  return /^(AI usage limit reached|Your \w+ plan has no AI generations)/.test(message ?? '');
+  return /^AI usage limit reached/.test(message ?? '');
 }
 
 /**

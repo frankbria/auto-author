@@ -210,15 +210,12 @@ def get_ai_usage_quota():
 
         plan = current_user.get("plan") or DEFAULT_PLAN
         caps = ai_quota_for_plan(plan)
-        if caps is None:  # restricted / unknown plan: zero allowance
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=(
-                    f"Your {plan} plan has no AI generations available. "
-                    "Upgrade to Pro to restore access."
-                ),
-                headers={"X-AI-Quota-Limit": "0", "X-AI-Quota-Period": "day"},
-            )
+        if caps is None:
+            # restricted / unknown plan: zero allowance. 402 (not 429) so the
+            # client shows the upgrade panel, same as the entitlement gate.
+            from app.utils.error_handlers import handle_entitlement_denied
+
+            raise handle_entitlement_denied(feature="ai_generation", plan=plan)
         daily, monthly = caps
 
         now = datetime.now(timezone.utc)
