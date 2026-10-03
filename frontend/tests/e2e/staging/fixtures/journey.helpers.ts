@@ -35,8 +35,10 @@ async function describeAiResponse(res: Response): Promise<string> {
   const detail = body?.detail;
   const line: Record<string, unknown> = { path, status: res.status() };
   if (res.status() >= 400) {
-    line.error_code = detail?.error_code;
-    line.message = typeof detail === 'string' ? detail : detail?.message;
+    // Two error shapes: {error_code, message} and the structured ErrorResponse
+    // {error, details: [{code}]} that chapter generate-questions returns.
+    line.error_code = detail?.error_code ?? detail?.details?.[0]?.code;
+    line.message = typeof detail === 'string' ? detail : (detail?.message ?? detail?.error);
   } else if (body && typeof body === 'object') {
     line.keys = Object.keys(body);
     line.meets_minimum_requirements = body.meets_minimum_requirements;
@@ -169,7 +171,7 @@ export async function completeTocWizard(page: Page): Promise<void> {
   // step will never turn into questions, so waiting out the timeout only hides
   // which one it was. The failure names the step's heading and every AI response.
   const deadEnd = page.getByRole('heading', {
-    name: /something went wrong|summary needs more detail/i,
+    name: /something went wrong|summary needs more detail|ai usage limit reached|upgrade required/i,
   });
   await answerBox
     .or(deadEnd)
