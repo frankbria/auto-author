@@ -21,8 +21,8 @@ function fulfilledParams<T>(value: T): Promise<T> {
 // #861: the backend writes status "in-progress" once a chapter passes 100 words.
 // The frontend enum used "in_progress", so the indicator threw and the error
 // boundary replaced the whole page.
-const tocWith = (chapters: unknown[]) =>
-  ({ toc: { chapters, total_chapters: chapters.length, estimated_pages: 15, structure_notes: '' } }) as never;
+const tocWith = (chapters: unknown[], version?: number) =>
+  ({ toc: { chapters, total_chapters: chapters.length, estimated_pages: 15, structure_notes: '' }, version }) as never;
 
 const chapter = (id: string, title: string, order: number, status: string) => ({
   id, title, description: '', level: 1, order, status, word_count: 10, subchapters: [],
@@ -129,5 +129,66 @@ describe('Edit TOC page: editing a TOC that has in-progress chapters (#861)', ()
     mockBookClient.getToc.mockResolvedValue({ toc: null } as never);
     renderPage();
     expect(await screen.findByText(/no chapters yet/i)).toBeInTheDocument();
+  });
+});
+
+describe('Edit TOC page: optimistic lock (#750)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useSession as jest.Mock).mockReturnValue({ data: { user: { id: 'u1' } } });
+    mockBookClient.getToc.mockResolvedValue(tocWith([chapter('c1', 'One', 1, 'draft')], 4));
+    mockBookClient.updateToc.mockResolvedValue(undefined as never);
+  });
+
+  it('sends the version read from GET /toc as expected_version', async () => {
+    renderPage();
+    await screen.findByDisplayValue('One');
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    await waitFor(() => expect(mockBookClient.updateToc).toHaveBeenCalled());
+    expect(mockBookClient.updateToc.mock.calls[0][1]).toEqual(expect.objectContaining({ expected_version: 4 }));
+  });
+
+  it('omits expected_version when no TOC exists yet (version 0)', async () => {
+    mockBookClient.getToc.mockResolvedValue(tocWith([chapter('c1', 'One', 1, 'draft')], 0));
+    renderPage();
+    await screen.findByDisplayValue('One');
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    await waitFor(() => expect(mockBookClient.updateToc).toHaveBeenCalled());
+    expect(mockBookClient.updateToc.mock.calls[0][1]).not.toHaveProperty('expected_version');
+  });
+
+  it('on a 409 says the TOC changed elsewhere and Reload refetches the new version', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockBookClient.updateToc.mockRejectedValue(Object.assign(new Error('modified by another user'), { statusCode: 409 }));
+    renderPage();
+    await screen.findByDisplayValue('One');
+    fireEvent.change(screen.getByDisplayValue('One'), { target: { value: 'Mine' } });
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    expect(await screen.findByText(/changed elsewhere/i)).toBeInTheDocument();
+    expect(screen.queryByText(/failed to save the table of contents/i)).not.toBeInTheDocument();
+
+    mockBookClient.getToc.mockResolvedValue(tocWith([chapter('c1', 'Theirs', 1, 'draft')], 5));
+    fireEvent.click(screen.getByRole('button', { name: /reload/i }));
+    expect(await screen.findByDisplayValue('Theirs')).toBeInTheDocument();
+    expect(screen.queryByText(/changed elsewhere/i)).not.toBeInTheDocument();
+
+    mockBookClient.updateToc.mockResolvedValue(undefined as never);
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    await waitFor(() => expect(mockBookClient.updateToc).toHaveBeenCalledTimes(2));
+    expect(mockBookClient.updateToc.mock.calls[1][1]).toEqual(expect.objectContaining({ expected_version: 5 }));
+  });
+
+  it('drops the Reload button when a later save fails for a non-conflict reason', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockBookClient.updateToc.mockRejectedValueOnce(Object.assign(new Error('conflict'), { statusCode: 409 }));
+    renderPage();
+    await screen.findByDisplayValue('One');
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    expect(await screen.findByRole('button', { name: /reload/i })).toBeInTheDocument();
+
+    mockBookClient.updateToc.mockRejectedValueOnce(Object.assign(new Error('boom'), { statusCode: 500 }));
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    expect(await screen.findByText(/failed to save the table of contents/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /reload/i })).not.toBeInTheDocument();
   });
 });
