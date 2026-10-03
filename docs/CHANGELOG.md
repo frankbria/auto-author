@@ -4,6 +4,11 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **TOC generation no longer truncates typical TOCs into an always-failing retryable error (#774, P0.26)**:
+  - **The bug.** `generate_toc_from_summary_and_responses` asked for `max_tokens=1500`, but the prompt requests 6-12 chapters x 2-4 subchapters as pretty JSON (about 2k tokens at 8x3, 3.7k at 12x4). The cut-off JSON could not parse and the user got `AI_INVALID_RESPONSE retryable=true`; every retry failed identically and spent quota.
+  - **The fix.** Budget is now `TOC_MAX_COMPLETION_TOKENS = 6000`. A `finish_reason == "length"` response raises `AI_RESPONSE_TRUNCATED` with `retryable=false` (one API call, no retries).
+  - **Verified.** Through the real `generate-toc` endpoint against an OpenAI-compatible wire stub that truncates when `max_tokens` is below what the TOC needs: main returned `AI_INVALID_RESPONSE` (stub saw 1500), the branch returned the full 10x3 TOC (stub saw 6000), and an oversized 25x4 TOC returned `AI_RESPONSE_TRUNCATED retryable=false`. Tests in `test_toc_token_budget.py`.
+
 - **A background TOC refresh or a session refetch no longer remounts the chapter editor (#758, P0.10)**:
   - **The bugs.**
     - `useChapterTabs.refreshChapters` set `is_loading`, and `ChapterTabs` shows its skeleton while loading. Every `tocUpdated` event and every cross-tab `toc-updated-<book>` storage event (a TOC saved on the Edit TOC page, a chapter created or deleted) unmounted the editor. The cursor, focus and undo history were lost, and the remount fetched the chapter content again.
