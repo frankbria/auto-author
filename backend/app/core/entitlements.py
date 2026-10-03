@@ -75,6 +75,24 @@ SUBSCRIPTION_STATUS_PLAN: dict[str, str] = {
 }
 
 
+# A subscription Stripe is still billing (#768): the paid statuses plus past_due,
+# which is mid-retry. Checkout refuses a second one while it exists, and the
+# webhook won't let another subscription's events replace it as current.
+LIVE_SUBSCRIPTION_STATUSES = frozenset(
+    status for status, policy in SUBSCRIPTION_STATUS_PLAN.items() if policy in (PRICED, KEEP)
+)
+
+
+def has_live_subscription(user: dict) -> bool:
+    """Whether the user's current Stripe subscription is still being billed."""
+    status = user.get("stripe_subscription_status")
+    if status is None and user.get("stripe_subscription_id"):
+        # Written before #768 recorded the status: pro is only ever granted by
+        # an active/trialing subscription, so take it as the live signal.
+        return user.get("plan") == "pro"
+    return status in LIVE_SUBSCRIPTION_STATUSES
+
+
 def plan_for_subscription(status: Optional[str], price_ids: list) -> Optional[str]:
     """Plan a subscription in ``status`` with these line-item prices grants.
 
