@@ -147,7 +147,7 @@ jobs:
              # An empty or wrong read would pass the leak check vacuously.
              printf '%s\n' \"\$names\" | grep -qx DATABASE_URL \
                || { echo '::error::could not read the frontend container env'; exit 1; }
-             leaked=\$(printf '%s\n' \"\$names\" | grep -E '^(OPENAI|STRIPE|AWS|CLOUDINARY)|^SENTRY_DSN\$' || true)
+             leaked=\$(printf '%s\n' \"\$names\" | grep -E '^(OPENAI|STRIPE|AWS|CLOUDINARY)|^SENTRY_DSN\$' | tr '\n' ' ' || true)
              if [ -n \"\$leaked\" ]; then
                echo \"::error::frontend container holds backend-only variables: \$leaked\"
                exit 1
