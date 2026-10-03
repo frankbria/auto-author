@@ -18,10 +18,48 @@ from app.api.dependencies import audit_request, get_rate_limiter
 from app.core.config import settings
 from app.core.entitlements import ai_quota_for_plan, has_live_subscription
 from app.core.security import get_current_user_from_session
-from app.db.user import update_user
+from app.db.user import get_user_by_auth_id, update_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def cancel_subscription_for_deletion(auth_id: str) -> None:
+    """Cancel ``auth_id``'s Stripe subscription before their account is deleted (#764).
+
+    Runs before anything is deleted: on a StripeError it raises a 502 and the
+    account stays as it was, so the user can retry. Read from the DB, not the
+    session dict, so the admin route cancels the target's subscription.
+    """
+    user = await get_user_by_auth_id(auth_id)
+    subscription_id = (user or {}).get("stripe_subscription_id")
+    if not subscription_id:
+        return
+    try:
+        await asyncio.to_thread(
+            stripe.Subscription.cancel,
+            subscription_id,
+            api_key=settings.STRIPE_SECRET_KEY,
+            idempotency_key=f"account-delete-{subscription_id}",
+        )
+    except stripe.StripeError:
+        logger.error(
+            "Stripe cancel of %s failed; not deleting user %s",
+            subscription_id, auth_id, exc_info=True,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Couldn't cancel your subscription, so your account was not "
+            "deleted. Please try again.",
+        ) from None
+    # Forget the cancelled id: if a later deletion step fails, the retry must not
+    # depend on how Stripe answers a second cancel once the 24h key has expired.
+    await update_user(
+        auth_id,
+        {"stripe_subscription_id": None},
+        extra_filter={"stripe_subscription_id": subscription_id},
+    )
+
 
 # Only paying plans block a new checkout — "restricted" users (lapsed/revoked)
 # are deliberately allowed through as the re-upgrade path.
