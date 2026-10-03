@@ -19,6 +19,7 @@ from app.db.base import get_collection
 pytestmark = pytest.mark.asyncio
 
 SUB_ID = "sub_test_764"
+CANCELED_AT = 1_900_000_000  # the stub's canceled_at for every cancel
 OWNER = "test-auth-id-123"  # the conftest test_user's auth_id
 # (path, success status): /me answers 200 with a message, /{auth_id} 204.
 ROUTES = [("/api/v1/users/me", 200), (f"/api/v1/users/{OWNER}", 204)]
@@ -45,7 +46,8 @@ def stripe_stub(monkeypatch):
             else:
                 sub_id = self.path.rsplit("/", 1)[-1]
                 status, body = 200, {
-                    "id": sub_id, "object": "subscription", "status": "canceled"
+                    "id": sub_id, "object": "subscription", "status": "canceled",
+                    "canceled_at": CANCELED_AT,
                 }
             payload = json.dumps(body).encode()
             self.send_response(status)
@@ -181,3 +183,57 @@ async def test_cancelled_subscription_leaves_no_live_billing_state(
     assert doc["stripe_subscription_id"] is None
     assert doc["plan"] == "free"
     assert not has_live_subscription(doc)
+
+
+async def test_late_pre_cancel_event_cannot_regrant_pro(
+    auth_client_factory, stripe_stub, monkeypatch
+):
+    """The cancel stamps the watermark the ignored ``deleted`` event would have.
+
+    Cancel succeeds, the cascade fails, and the account survives. Stripe's
+    ``deleted`` is then ignored as not-current, so without a watermark a
+    retried pre-cancel ``updated(active)`` for the dead subscription would
+    re-establish it and grant pro with no later event to undo it.
+    """
+    import app.api.endpoints.users as users_endpoint
+    from tests.test_api.test_stripe_webhook import (
+        TEST_PRO_PRICE_ID,
+        TEST_WEBHOOK_SECRET,
+        sign,
+        subscription_event,
+    )
+
+    monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
+    monkeypatch.setattr(settings, "STRIPE_PRICE_ID_PRO", TEST_PRO_PRICE_ID)
+    client = await auth_client_factory(
+        overrides={
+            "plan": "pro",
+            "stripe_customer_id": "cus_764",
+            "stripe_subscription_id": SUB_ID,
+            "stripe_subscription_status": "active",
+            "stripe_event_created": CANCELED_AT - 1000,
+        }
+    )
+
+    async def _boom(auth_id):
+        raise RuntimeError("simulated mongo failure")
+
+    monkeypatch.setattr(users_endpoint, "delete_all_user_books", _boom)
+    assert (await client.delete("/api/v1/users/me")).status_code == 500
+
+    late = json.loads(
+        subscription_event(
+            event_id="evt_late_active", customer="cus_764", subscription_id=SUB_ID
+        ).decode()
+    )
+    late["created"] = CANCELED_AT - 10  # newer than the old watermark, before the cancel
+    payload = json.dumps(late).encode()
+    resp = await client.post(
+        "/api/v1/webhooks/stripe", content=payload, headers={"stripe-signature": sign(payload)}
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "stale_event"
+    doc = await (await get_collection("users")).find_one({"auth_id": OWNER})
+    assert (doc["plan"], doc["stripe_subscription_id"]) == ("free", None)
+    assert doc["stripe_event_created"] == CANCELED_AT

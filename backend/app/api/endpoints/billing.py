@@ -8,6 +8,7 @@ establishes the user<->Stripe linkage the webhook reconciles on.
 import asyncio
 import hashlib
 import logging
+import time
 from typing import Dict, Literal, Optional
 
 import stripe
@@ -36,7 +37,7 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
     if not subscription_id:
         return
     try:
-        await asyncio.to_thread(
+        cancelled = await asyncio.to_thread(
             stripe.Subscription.cancel,
             subscription_id,
             api_key=settings.STRIPE_SECRET_KEY,
@@ -55,10 +56,17 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
     # Forget the cancelled id: if a later deletion step fails, the retry must not
     # depend on how Stripe answers a second cancel once the 24h key has expired.
     # With the id gone, the webhook treats Stripe's subscription.deleted for it
-    # as another subscription's and ignores it (#768), so apply its effect here.
+    # as another subscription's and ignores it (#768), so apply its effect here,
+    # watermark included: a late pre-cancel event for the dead subscription must
+    # land as stale_event, not re-establish it and grant pro.
     await update_user(
         auth_id,
-        {"stripe_subscription_id": None, "stripe_subscription_status": None, "plan": DEFAULT_PLAN},
+        {
+            "stripe_subscription_id": None,
+            "stripe_subscription_status": None,
+            "plan": DEFAULT_PLAN,
+            "stripe_event_created": getattr(cancelled, "canceled_at", None) or int(time.time()),
+        },
         extra_filter={"stripe_subscription_id": subscription_id},
     )
 
