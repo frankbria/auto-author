@@ -110,7 +110,10 @@ class TestNonCurrentSubscriptionIsIgnored:
         # Duplicate sub B is ignored while A is current. The user then cancels A;
         # an operator's dashboard Resend of B's event (same id) must apply now.
         await _seed_pro_on("sub_A")
-        b_active = event(event_id="evt_B_active", subscription_id="sub_B")
+        # B's event is newer than A's deletion but delivered first (Stripe does
+        # not order deliveries). One older than the deletion would be
+        # stale_event: the watermark is per user (see #768's known limits).
+        b_active = event(event_id="evt_B_active", subscription_id="sub_B", created=3_000)
         assert (await _post_signed(webhook_client, b_active)).json()["status"] == (
             "not_current_subscription"
         )
@@ -118,7 +121,7 @@ class TestNonCurrentSubscriptionIsIgnored:
         await _post_signed(
             webhook_client,
             event(event_id="evt_A_del", event_type="customer.subscription.deleted",
-                  subscription_id="sub_A", status="canceled"),
+                  subscription_id="sub_A", status="canceled", created=2_000),
         )
         user = await get_user_by_auth_id("auth-stripe-1")
         assert (user["plan"], user["stripe_subscription_id"]) == ("free", None)

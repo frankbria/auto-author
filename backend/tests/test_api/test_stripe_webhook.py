@@ -11,6 +11,7 @@ unauthenticated — the signature is the auth.
 
 import hashlib
 import hmac
+import itertools
 import json
 import time
 
@@ -28,6 +29,10 @@ pytestmark = pytest.mark.asyncio
 TEST_WEBHOOK_SECRET = "whsec_test_secret_for_issue_220"
 TEST_PRO_PRICE_ID = "price_test_pro_123"
 WEBHOOK_URL = "/api/v1/webhooks/stripe"
+# Each event built gets a strictly later `created`, like events Stripe emits
+# in sequence. A counter, not the clock: two events built across a second
+# boundary must not flip a test between processed and stale_event.
+_event_clock = itertools.count(1_700_000_000)
 
 
 def sign(payload: bytes, secret: str = TEST_WEBHOOK_SECRET, timestamp: int = None) -> str:
@@ -48,14 +53,14 @@ def subscription_event(
     status: str = "active",
     created: int | None = None,
 ) -> bytes:
-    """A signed-ready event. ``created`` defaults to now, as on every real Stripe
+    """A signed-ready event. ``created`` is always set, as on every real Stripe
     event, so the out-of-order guard runs in every test that posts one (#769)."""
     return json.dumps(
         {
             "id": event_id,
             "object": "event",
             "type": event_type,
-            "created": int(time.time()) if created is None else created,
+            "created": next(_event_clock) if created is None else created,
             "data": {
                 "object": {
                     "id": subscription_id,
