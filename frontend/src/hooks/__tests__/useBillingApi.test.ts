@@ -12,35 +12,37 @@ describe('useBillingApi', () => {
     (useAuthFetch as jest.Mock).mockReturnValue({ authFetch });
   });
 
-  it('startCheckout POSTs to /billing/checkout with the plan and returns the url', async () => {
+  it('startCheckout POSTs the plan with consent to the exact disclosure shown (#770)', async () => {
     authFetch.mockResolvedValue({ url: 'https://checkout.stripe.com/session/abc' });
     const { result } = renderHook(() => useBillingApi());
 
-    const response = await result.current.startCheckout('pro');
+    const response = await result.current.startCheckout('pro', 'abc123');
 
-    expect(authFetch).toHaveBeenCalledWith('/billing/checkout', {
-      method: 'POST',
-      body: JSON.stringify({ plan: 'pro' }),
+    const [path, opts] = authFetch.mock.calls[0];
+    expect(path).toBe('/billing/checkout');
+    expect(opts.method).toBe('POST');
+    expect(JSON.parse(opts.body)).toEqual({
+      plan: 'pro',
+      accept_renewal_terms: true,
+      disclosure_sha256: 'abc123',
     });
     expect(response).toEqual({ url: 'https://checkout.stripe.com/session/abc' });
   });
 
-  it('defaults to the pro plan when no argument is given', async () => {
-    authFetch.mockResolvedValue({ url: 'https://checkout.stripe.com/session/def' });
+  it('getRenewalDisclosure GETs /billing/disclosure', async () => {
+    const disclosure = { version: 'v1', text: 'renews', sha256: 'h', price_id: 'price_1' };
+    authFetch.mockResolvedValue(disclosure);
     const { result } = renderHook(() => useBillingApi());
 
-    await result.current.startCheckout();
-
-    const [path, opts] = authFetch.mock.calls[0];
-    expect(path).toBe('/billing/checkout');
-    expect(JSON.parse(opts.body)).toEqual({ plan: 'pro' });
+    await expect(result.current.getRenewalDisclosure()).resolves.toEqual(disclosure);
+    expect(authFetch).toHaveBeenCalledWith('/billing/disclosure');
   });
 
   it('propagates errors from the backend', async () => {
     authFetch.mockRejectedValue(new Error('You are already on this plan.'));
     const { result } = renderHook(() => useBillingApi());
 
-    await expect(result.current.startCheckout('pro')).rejects.toThrow(
+    await expect(result.current.startCheckout('pro', 'abc123')).rejects.toThrow(
       'You are already on this plan.'
     );
   });
