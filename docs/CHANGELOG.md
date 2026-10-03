@@ -4,6 +4,8 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **Scheduled staging E2E failures now open a GitHub issue (#776, P0.28)**: the old notify step only fired when a Slack or Discord secret existed, and neither does, so the suite sat red from 2026-09-20 with nobody told. That step is gone. A new `alert` job in `e2e-staging-tests.yml` (scheduled runs only, `issues: write` on that job alone, no new secret) calls `scripts/ci-alert-issue.sh`: a failure opens one `ci-alert:staging-e2e` issue or comments on the one already open, and the next green run comments and closes it. The helper takes `ALERT_LABEL`/`ALERT_TITLE`/`RUN_URL`, so P1.29 can reuse it unchanged. `scripts/test_ci_alert_issue.py` covers create, dedupe, close, no-op recovery and the job's permissions. Caveat: a just-created issue takes a second or two to appear in the label lookup, irrelevant for 6-hourly runs.
+
 - **`Permissions-Policy` no longer blocks the shipped voice input (#772, P0.24)**: `next.config.ts` sent `microphone=()` on every route, an empty allowlist that refuses `getUserMedia` and SpeechRecognition for the app's own origin with no browser-side fix. It is now `camera=(), microphone=(self), geolocation=()`; camera and geolocation stay off and third-party frames still get no mic. It was the only place the header is set (middleware, backend and deploy config checked). `src/__tests__/nextConfigHeaders.test.ts` pins the value from the real `headers()` export. CI could not catch this before because Jest mocks media and the E2E specs skip the microphone.
 - **A background TOC refresh or a session refetch no longer remounts the chapter editor (#758, P0.10)**:
   - **The bugs.**
