@@ -834,6 +834,99 @@ describe('QuestionDisplay - auto-save', () => {
 
     jest.useRealTimers();
   });
+
+  // #761: the effect re-armed on saveStatus and had no unchanged-text check,
+  // so an idle answer was re-saved every ~3s and a COMPLETED one became draft.
+  describe('idle and completed answers (#761)', () => {
+    afterEach(() => jest.useRealTimers());
+
+    // One act per second: effects must re-run between ticks for a re-armed
+    // timer to be observed, as it would be in a real browser.
+    const idle = async (ms: number) => {
+      for (let t = 0; t < ms; t += 1000) {
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(1000);
+        });
+      }
+    };
+
+    it('never saves a loaded COMPLETED answer while idle, and never as draft', async () => {
+      jest.useFakeTimers();
+      mockedBookClient.getQuestionResponse.mockResolvedValue({
+        has_response: true,
+        success: true,
+        response: { response_text: 'Finished answer', status: ResponseStatus.COMPLETED },
+      } as any);
+
+      render(<QuestionDisplay {...defaultProps} />);
+      await idle(60000);
+
+      expect(screen.getByLabelText(/your response/i)).toHaveValue('Finished answer');
+      expect(mockedBookClient.saveQuestionResponse).not.toHaveBeenCalled();
+    });
+
+    it('saves a typed draft exactly once, then stays quiet while idle', async () => {
+      jest.useFakeTimers();
+      render(<QuestionDisplay {...defaultProps} />);
+      await idle(0);
+
+      fireEvent.change(screen.getByLabelText(/your response/i), { target: { value: 'typed once' } });
+      await idle(60000);
+
+      expect(mockedBookClient.saveQuestionResponse).toHaveBeenCalledTimes(1);
+      expect(mockedBookClient.saveQuestionResponse).toHaveBeenCalledWith(
+        'book-1', 'chapter-1', 'q-1',
+        { response_text: 'typed once', status: ResponseStatus.DRAFT }
+      );
+    });
+
+    it('does not re-save a loaded draft that has not been edited', async () => {
+      jest.useFakeTimers();
+      mockedBookClient.getQuestionResponse.mockResolvedValue({
+        has_response: true,
+        success: true,
+        response: { response_text: 'Old draft', status: ResponseStatus.DRAFT },
+      } as any);
+
+      render(<QuestionDisplay {...defaultProps} />);
+      await idle(60000);
+
+      expect(mockedBookClient.saveQuestionResponse).not.toHaveBeenCalled();
+    });
+
+    it('queues no draft on top of an offline Complete Response', async () => {
+      const { useOnlineStatus } = require('@/hooks/useOnlineStatus');
+      useOnlineStatus.mockReturnValue({ isOnline: false, wasOffline: false });
+      try {
+        jest.useFakeTimers();
+        render(<QuestionDisplay {...defaultProps} />);
+        await idle(0);
+
+        fireEvent.change(screen.getByLabelText(/your response/i), { target: { value: 'done offline' } });
+        fireEvent.click(screen.getByText('Complete Response'));
+        await idle(30000);
+
+        const queued = mockedRetryQueue.add.mock.calls.map((c) => c[0] as string);
+        expect(queued).toHaveLength(1);
+        expect(queued[0]).toMatch(/^complete-/);
+      } finally {
+        useOnlineStatus.mockReturnValue({ isOnline: true, wasOffline: false });
+      }
+    });
+
+    it('does not re-save after the user marks the answer completed', async () => {
+      jest.useFakeTimers();
+      render(<QuestionDisplay {...defaultProps} />);
+      await idle(0);
+
+      fireEvent.change(screen.getByLabelText(/your response/i), { target: { value: 'done now' } });
+      fireEvent.click(screen.getByText('Complete Response'));
+      await idle(60000);
+
+      const statuses = mockedBookClient.saveQuestionResponse.mock.calls.map(c => c[3].status);
+      expect(statuses).toEqual([ResponseStatus.COMPLETED]);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

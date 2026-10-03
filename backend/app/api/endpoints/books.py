@@ -45,7 +45,9 @@ from app.schemas.book import (
     RegenerateQuestionRequest,
     QuestionListResponse,
     QuestionProgressResponse,
+    ChapterContentUpdate,
 )
+from app.db.book import NO_PRECONDITION
 from app.db.database import (
     create_book, get_book_by_id, get_book_owner_id, get_book_metadata_by_id,
     get_books_by_user,
@@ -1448,6 +1450,45 @@ async def update_book_toc(
 # Enhanced Chapter Content Integration Endpoints
 
 
+def _last_modified_token(value: Any) -> Optional[str]:
+    """The chapter's save token (#759) as clients see it. The content PATCH
+    stores an ISO string, but the bulk-status endpoint and the tab migration
+    store a BSON Date, so both are rendered as one string. Motor decodes a Date
+    as naive UTC; the offset is added so both kinds read the same way. Clients
+    must echo it verbatim: it is compared, not parsed."""
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=value.tzinfo or timezone.utc).isoformat()
+    return value
+
+
+async def _chapter_save_rejected(book_id: str, chapter_id: str) -> HTTPException:
+    """Why a content save didn't land: 404 if the chapter is gone, else 409
+    carrying what the editor needs to offer reload-or-overwrite (#760) without
+    another GET. Overwrite = resend with ``current_last_modified``."""
+    book = await get_book_by_id(book_id) or {}
+    chapters = (book.get("table_of_contents") or {}).get("chapters", [])
+    # One level of subchapters: the depth apply_chapter_content_update writes.
+    chapter = next(
+        (
+            c
+            for top in chapters
+            for c in [top, *(top.get("subchapters") or [])]
+            if c.get("id") == chapter_id
+        ),
+        None,
+    )
+    if chapter is None:
+        return HTTPException(status_code=404, detail="Chapter not found")
+    return HTTPException(
+        status_code=409,
+        detail={
+            "message": "This chapter was saved from somewhere else since you opened it.",
+            "current_last_modified": _last_modified_token(chapter.get("last_modified")),
+            "current_content": chapter.get("content", ""),
+        },
+    )
+
+
 @router.get("/{book_id}/chapters/{chapter_id}/content", response_model=dict)
 async def get_chapter_content(
     book_id: str,
@@ -1508,6 +1549,7 @@ async def get_chapter_content(
         "chapter_id": chapter_id,
         "title": chapter.get("title", ""),
         "content": chapter.get("content", ""),
+        "last_modified": _last_modified_token(chapter.get("last_modified")),
         "success": True,
     }
 
@@ -1525,7 +1567,7 @@ async def get_chapter_content(
             "status": chapter.get("status", "draft"),
             "word_count": chapter.get("word_count", 0),
             "estimated_reading_time": reading_time,
-            "last_modified": chapter.get("last_modified"),
+            "last_modified": _last_modified_token(chapter.get("last_modified")),
             "is_active_tab": chapter.get("is_active_tab", False),
             "has_subchapters": bool(chapter.get("subchapters")),
             "subchapter_count": len(chapter.get("subchapters", [])),
@@ -1538,13 +1580,17 @@ async def get_chapter_content(
 async def update_chapter_content(
     book_id: str,
     chapter_id: str,
-    content: str = Body(..., embed=True),
-    auto_update_metadata: bool = Body(True, embed=True),
+    body: ChapterContentUpdate,
     current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
     Update chapter content with automatic metadata updates.
+
+    With ``expected_last_modified`` in the body the save is conditional (#759):
+    409 if the chapter was saved elsewhere since the client read it.
     """
+    content = body.content
+    auto_update_metadata = body.auto_update_metadata
     # Verify ownership and read the TOC *structure*. The projection drops every
     # chapter's draft HTML, which this handler never reads — it only walks the
     # tree to find the target chapter, its parent, and its current status, then
@@ -1569,11 +1615,15 @@ async def update_chapter_content(
     def compute_chapter_update(chapter_list, parent_id=None):
         for chapter in chapter_list:
             if chapter.get("id") == chapter_id:
-                fields = {"content": content}
+                # last_modified moves on every content write, metadata or not:
+                # it is the token the precondition compares against.
+                fields = {
+                    "content": content,
+                    "last_modified": datetime.now(timezone.utc).isoformat(),
+                }
                 if auto_update_metadata:
                     word_count = len(content.split()) if content else 0
                     fields["word_count"] = word_count
-                    fields["last_modified"] = datetime.now(timezone.utc).isoformat()
                     # ~200 words per minute
                     fields["estimated_reading_time"] = max(1, word_count // 200)
                     # Status transition based on content length (simple heuristic)
@@ -1582,7 +1632,7 @@ async def update_chapter_content(
                         fields["status"] = "in-progress"
                     elif word_count > 500 and current_status == "in-progress":
                         fields["status"] = "completed"
-                return fields, parent_id
+                return fields, parent_id, chapter.get("last_modified")
             # Recursively search subchapters (parent is this chapter's id)
             if chapter.get("subchapters"):
                 result = compute_chapter_update(
@@ -1597,7 +1647,14 @@ async def update_chapter_content(
         raise HTTPException(
             status_code=404, detail="Chapter not found"
         )  # Log chapter access
-    chapter_fields, parent_chapter_id = computed
+    chapter_fields, parent_chapter_id, stored_last_modified = computed
+    precondition = NO_PRECONDITION
+    if "expected_last_modified" in body.model_fields_set:
+        if body.expected_last_modified != _last_modified_token(stored_last_modified):
+            raise await _chapter_save_rejected(book_id, chapter_id)
+        # Match the raw stored value (string or Date) in the write itself, so a
+        # save committed after the read above still makes this one a no-match.
+        precondition = stored_last_modified
     try:
         await chapter_access_service.log_access(
             user_id=current_user.get("auth_id"),
@@ -1621,10 +1678,11 @@ async def update_chapter_content(
         parent_chapter_id=parent_chapter_id,
         chapter_fields=chapter_fields,
         user_auth_id=current_user.get("auth_id"),
+        expected_last_modified=precondition,
     )
     if not persisted:
-        # The chapter was deleted/moved between the read above and this write.
-        raise HTTPException(status_code=404, detail="Chapter not found")
+        # Deleted/moved since the read above (404), or saved elsewhere (409).
+        raise await _chapter_save_rejected(book_id, chapter_id)
 
     return {
         "book_id": book_id,
@@ -1632,6 +1690,7 @@ async def update_chapter_content(
         "success": True,
         "message": "Chapter content updated successfully",
         "metadata_updated": auto_update_metadata,
+        "last_modified": chapter_fields["last_modified"],
     }
 
 
@@ -1753,7 +1812,7 @@ async def batch_get_chapter_content(
                     "status": chapter.get("status", "draft"),
                     "word_count": chapter.get("word_count", 0),
                     "estimated_reading_time": reading_time,
-                    "last_modified": chapter.get("last_modified"),
+                    "last_modified": _last_modified_token(chapter.get("last_modified")),
                     "is_active_tab": chapter.get("is_active_tab", False),
                 }
 
