@@ -300,8 +300,10 @@ class TestGetCurrentUserFromSession:
     async def test_get_current_user_from_session_auto_create_race_missing_winner(
         self, mock_settings, mock_create_user, mock_get_user, mock_get_auth_user, mock_validate
     ):
-        """If the duplicate was on some other key (no auth_id winner to re-fetch),
-        the race handler surfaces a 500 rather than returning None."""
+        """A duplicate on a key that is neither an auth_id race nor an email
+        collision has no winner to re-fetch, so it surfaces a 500 rather than
+        returning None. (An email collision no longer 500s — #765, covered on
+        real Mongo in test_email_ownership.py.)"""
         from pymongo.errors import DuplicateKeyError
 
         mock_settings.BYPASS_AUTH = False
@@ -312,7 +314,9 @@ class TestGetCurrentUserFromSession:
             "name": "Test User",
         }
         mock_get_user.side_effect = [None, None]  # pre-check + re-fetch both empty
-        mock_create_user.side_effect = DuplicateKeyError("dup email")
+        mock_create_user.side_effect = DuplicateKeyError(
+            "dup", details={"keyPattern": {"stripe_customer_id": 1}}
+        )
 
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user_from_session(Mock(spec=Request))
