@@ -4,6 +4,18 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **The Stripe webhook records an event as processed only after applying it (#769, P0.21)**:
+  - **The bug.** The handler inserted the event's idempotency marker first and deleted it again only on `Exception`. A crash, a redeploy or a `CancelledError` between the claim and the user write left the marker behind, so Stripe's retry got `replay` and the plan change was lost until the marker's 30-day TTL expired.
+  - **The fix.** `stripe_events.is_event_processed` checks for a replay, the event is applied, and only then does `mark_event_processed` record it. That happens for `processed` and `stale_event`; `stale_event` is final because the watermark only rises. A worker that dies anywhere before that line leaves no marker, so the retry re-applies. Re-applying is safe: the write is a plain `$set` guarded by the `stripe_event_created` filter, so a retry that arrives after a newer event is rejected as stale. `no_matching_user` and `not_current_subscription` record nothing, as before, so a dashboard Resend still reprocesses them. `unmark_event` is gone because nothing releases a marker any more.
+  - **Tests on real Mongo.** The fixture `subscription_event` now stamps `created` (it defaults to now, as Stripe always does), so every signed-webhook test runs the ordering guard. Before, none did. The new `test_stripe_webhook_delivery.py` covers these cases:
+    - A `BaseException` raised by the user write. This is the redeploy shape that `except Exception` never caught. Stripe's retry applies pro.
+    - A crash after the write but before the marker re-applies, and the next duplicate is a `replay`.
+    - `evt_old` after `evt_new` returns `stale_event` and leaves the plan and watermark alone.
+    - A same-second event still applies.
+    - A newer event landing between the lookup and the write still wins.
+    The two fake-DAO ordering tests in `test_hardening_352.py` were replaced by these.
+  - **Known limit.** Two concurrent deliveries of the same event id can both pass the check and both apply. The write is identical, so the only trace is a second audit-log row.
+
 - **Only the user's current Stripe subscription moves the plan, and checkout refuses a second one (#768, P0.20)**:
   - **The bug.** The webhook never compared an event's subscription id with the stored `stripe_subscription_id`. A user paying on subscription A who cancelled a duplicate B was downgraded to free. Checkout blocked only `plan == "pro"`, so two tabs, or a past_due subscriber on free, could open a second subscription.
   - **The rule.** The webhook now stores `stripe_subscription_status` beside the id. "Live" means `active`, `trialing` or `past_due`: `entitlements.LIVE_SUBSCRIPTION_STATUSES` derives it from `SUBSCRIPTION_STATUS_PLAN`, and `has_live_subscription(user)` reads it. A pre-#768 doc with a subscription id but no status counts as live when it is on pro, since only an active or trialing subscription ever granted pro. Without this, a duplicate's cancellation would still downgrade existing subscribers on deploy day (raised by the opencode/GLM review).

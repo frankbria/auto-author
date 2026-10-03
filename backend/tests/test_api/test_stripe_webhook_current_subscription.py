@@ -7,8 +7,6 @@ subscription that isn't the stored ``stripe_subscription_id`` must not downgrade
 someone who is still paying on the current one.
 """
 
-import json
-
 import pytest
 
 from app.db.user import get_user_by_auth_id
@@ -20,11 +18,7 @@ webhook_client = base.webhook_client  # same fixture: bare webhook app, fresh Mo
 pytestmark = pytest.mark.asyncio
 
 
-def event(created: int | None = None, **kwargs) -> bytes:
-    payload = json.loads(subscription_event(**kwargs).decode())
-    if created is not None:
-        payload["created"] = created
-    return json.dumps(payload).encode()
+event = subscription_event
 
 
 async def _seed_pro_on(sub_id: str = "sub_A", status: str = "active", plan: str = "pro"):
