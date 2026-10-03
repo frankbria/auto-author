@@ -1254,3 +1254,23 @@ gate stopped the same failure twice more in #715.
   typed. When a criterion is about what a run posted, read the PR comments. On a workflow with
   `cancel-in-progress`, treat a cancelled run as a supersession until its timing says otherwise:
   compare its end time with the next run on the same branch.
+
+## Phase 0 launch-blocker run (2026-10-02)
+
+### TipTap v3 setContent fires onUpdate (#756, 2026-10-02)
+Unlike v2, TipTap v3's `editor.commands.setContent()` emits an update by default, so any "dirty"/"autoSavePending" flag set in `onUpdate` goes true on every programmatic load. On main this left `autoSavePending` stuck after a no-op autosave and silently disabled autosave for users who paused >3s before typing. Pass `{ emitUpdate: false }` or compare content before marking dirty, and clear pending flags on every exit path of the save timer.
+
+### Parallel agents: no broad pkill, opencode unusable today (2026-10-02)
+Three parallel worktree agents each stopped their own stuck opencode review with `pkill -f "ask-opencode[.]sh"`, a pattern that matches every slot's reviewer. opencode gave 0 bytes on 4 of 4 runs and codex `--base main` once ran 40 minutes with no verdict. In multi-slot runs, kill only captured PIDs and cap reviewers with `timeout`; the PR's `glm-review` workflow is the dependable cross-family pass.
+
+### Never pipe `git commit` into `head` (2026-10-02, PR #881)
+`git commit ... 2>&1 | grep ... | head` closed the pipe after 10 lines of pre-commit output. SIGPIPE killed `git commit` after every hook had passed, so no commit was written, a stale `index.lock` was left behind, and the next `git push` pushed the old HEAD while reporting success. Redirect commit output to a file, check `$?`, and compare `git log -1` with the expected subject before pushing.
+
+### Ordering tests need a counter, not the clock (#769, 2026-10-02)
+A webhook test fixture that left `created` out (or defaulted it to `time.time()`) meant no signed-webhook test exercised the ordering guard, and a #768 test passed only because its events had no timestamp. Once real stamps arrived, it failed whenever two events straddled a second boundary. Stamp event times from a monotonic counter in fixtures, so the ordering filter runs in every test.
+
+### Read every bot finding, not the newest summary (2026-10-02, #898)
+A green PR's latest glm-review comment said "no new defects", while two inline findings from the previous run (a Build Images breakage on main and a runbook gap) were still unfixed. "No new defects" is scoped to the latest commit. Before merging, list every inline review comment on the PR (`gh api repos/<o>/<r>/pulls/<N>/comments`), not just the last summary.
+
+### Check how staging deploys before holding a PR for a deploy-time effect (2026-10-02)
+Two PRs (#900, #903) were held because merging "would break staging". `deploy-staging-containers.yml` is `workflow_dispatch`-only, and staging had not been deployed since 2026-08-28. The real constraint was a pre-deploy checklist, not a merge block. Read the deploy workflow's trigger, and `gh run list` for its last run, before deciding merge order.
