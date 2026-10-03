@@ -4,6 +4,7 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **`Permissions-Policy` no longer blocks the shipped voice input (#772, P0.24)**: `next.config.ts` sent `microphone=()` on every route, an empty allowlist that refuses `getUserMedia` and SpeechRecognition for the app's own origin with no browser-side fix. It is now `camera=(), microphone=(self), geolocation=()`; camera and geolocation stay off and third-party frames still get no mic. It was the only place the header is set (middleware, backend and deploy config checked). `src/__tests__/nextConfigHeaders.test.ts` pins the value from the real `headers()` export. CI could not catch this before because Jest mocks media and the E2E specs skip the microphone.
 - **A background TOC refresh or a session refetch no longer remounts the chapter editor (#758, P0.10)**:
   - **The bugs.**
     - `useChapterTabs.refreshChapters` set `is_loading`, and `ChapterTabs` shows its skeleton while loading. Every `tocUpdated` event and every cross-tab `toc-updated-<book>` storage event (a TOC saved on the Edit TOC page, a chapter created or deleted) unmounted the editor. The cursor, focus and undo history were lost, and the remount fetched the chapter content again.
