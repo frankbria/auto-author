@@ -561,6 +561,7 @@ export default function QuestionContainer({
       {/* Question display */}
       {currentQuestion && (
         <QuestionDisplay
+          key={currentQuestion.id}
           bookId={bookId}
           chapterId={chapterId}
           question={currentQuestion}
