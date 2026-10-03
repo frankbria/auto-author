@@ -61,6 +61,9 @@ class UserBase(BaseModel):
     # so no user can set their own plan/billing ids via PATCH /users/me.
     stripe_customer_id: Optional[str] = None
     stripe_subscription_id: Optional[str] = None
+    # That subscription's Stripe status (#768): checkout and the webhook decide
+    # from it whether the user already has a subscription being billed.
+    stripe_subscription_status: Optional[str] = None
 
 
 class UserCreate(UserBase):

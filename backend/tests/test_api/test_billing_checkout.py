@@ -101,6 +101,52 @@ async def test_checkout_rejects_already_paid_plan(
     assert stripe_stub["customer"] == [] and stripe_stub["session"] == []
 
 
+@pytest.mark.parametrize(
+    "status,plan",
+    [("active", "pro"), ("trialing", "pro"), ("past_due", "free"), ("active", "free")],
+)
+async def test_checkout_rejects_a_user_with_a_live_subscription(
+    auth_client_factory, stripe_configured, stripe_stub, status, plan
+):
+    """A second subscription double-bills; send the user to the portal instead (#768).
+
+    Gated on the subscription, not the plan: a past_due subscriber whose first
+    payment never landed is on free but already has a subscription to fix.
+    """
+    client = await auth_client_factory(
+        overrides={
+            "plan": plan,
+            "stripe_customer_id": "cus_live",
+            "stripe_subscription_id": "sub_live",
+            "stripe_subscription_status": status,
+        }
+    )
+    resp = await client.post("/api/v1/billing/checkout", json={"plan": "pro"})
+
+    assert resp.status_code == 409
+    assert "Manage billing" in resp.json()["detail"]
+    assert stripe_stub["customer"] == [] and stripe_stub["session"] == []
+
+
+@pytest.mark.parametrize("status", ["unpaid", "incomplete", "incomplete_expired", "canceled"])
+async def test_checkout_allows_a_new_subscription_over_a_dead_one(
+    auth_client_factory, stripe_configured, stripe_stub, status
+):
+    """Lapsed or never-paid subscriptions are the re-upgrade path, not a block."""
+    client = await auth_client_factory(
+        overrides={
+            "plan": "restricted" if status == "unpaid" else "free",
+            "stripe_customer_id": "cus_dead",
+            "stripe_subscription_id": "sub_dead",
+            "stripe_subscription_status": status,
+        }
+    )
+    resp = await client.post("/api/v1/billing/checkout", json={"plan": "pro"})
+
+    assert resp.status_code == 200, resp.text
+    assert stripe_stub["session"][0]["customer"] == "cus_dead"
+
+
 async def test_checkout_fails_closed_when_unconfigured(
     auth_client_factory, stripe_stub, monkeypatch
 ):

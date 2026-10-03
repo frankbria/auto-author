@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from app.api.dependencies import get_rate_limiter
 from app.core.config import settings
-from app.core.entitlements import ai_quota_for_plan
+from app.core.entitlements import ai_quota_for_plan, has_live_subscription
 from app.core.security import get_current_user_from_session
 from app.db.user import update_user
 
@@ -69,6 +69,13 @@ async def create_checkout_session(
         # Fail closed, mirroring the webhook: never talk to Stripe half-configured.
         raise HTTPException(status_code=503, detail="Stripe checkout is not configured")
 
+    # The subscription, not the plan: a past_due subscriber on free (first
+    # payment never landed) already has one, and a second would double-bill (#768).
+    if has_live_subscription(current_user):
+        raise HTTPException(
+            status_code=409,
+            detail="You already have a subscription. Use Manage billing to update or cancel it.",
+        )
     if current_user.get("plan") in PAID_PLANS:
         raise HTTPException(status_code=409, detail="You are already on a paid plan")
 
