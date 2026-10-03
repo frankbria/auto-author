@@ -4,6 +4,23 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **Only the user's current Stripe subscription moves the plan, and checkout refuses a second one (#768, P0.20)**:
+  - **The bug.** The webhook never compared an event's subscription id with the stored `stripe_subscription_id`. A user paying on subscription A who cancelled a duplicate B was downgraded to free. Checkout blocked only `plan == "pro"`, so two tabs, or a past_due subscriber on free, could open a second subscription.
+  - **The rule.** The webhook now stores `stripe_subscription_status` beside the id. "Live" means `active`, `trialing` or `past_due`: `entitlements.LIVE_SUBSCRIPTION_STATUSES` derives it from `SUBSCRIPTION_STATUS_PLAN`, and `has_live_subscription(user)` reads it.
+    - An event for another subscription is a logged no-op if it is a deletion, or if the current subscription is still live. The response is `status: not_current_subscription`.
+    - If the current subscription is not live (none yet, `unpaid`, `incomplete_expired`, `canceled`, or a doc from before #768 with no status), the other subscription becomes current. This is the re-upgrade path.
+    - A second live subscription is logged at ERROR, because the user is being double-billed and needs a refund.
+    - An ignored event releases its replay marker, as `no_matching_user` already did, so a dashboard Resend still applies once its subscription becomes current.
+  - **#902 GLM finding folded in.** A `past_due` (keep) write sets no plan, and it no longer advances the `stripe_event_created` watermark. Before, a resent older `active` event whose first delivery was lost was rejected as `stale_event`, and the paying user stayed on free. The ordering filter still guards the keep write itself, so a late past_due cannot overwrite newer state.
+  - **Checkout.** Returns 409 "You already have a subscription. Use Manage billing to update or cancel it." while a live subscription exists. `unpaid`, `incomplete`, `incomplete_expired` and `canceled` still pass, since that is the re-upgrade path.
+  - **Verified.**
+    - 18 signed-webhook tests on real Mongo in the new `test_stripe_webhook_current_subscription.py`, plus 8 checkout cases. Branch diff coverage is 100%.
+    - Nine mutations, each caught by at least one test: a deletion establishing, a live current subscription not blocking, the keep write advancing the watermark, the marker kept on ignore, the missing duplicate ERROR, status not stored, past_due not live, the checkout guard removed, and a deletion keeping its status.
+    - Real-HTTP demo against the backend, using a local Stripe wire stub. A stale `sub_B` deletion left a sub_A subscriber on pro. Checkout returned 409 while sub_A was active, and the stub logged zero calls. past_due followed by a resent older active gave pro.
+  - **Known limits.**
+    - The watermark is still per user. A new subscription's event that is older than the previous subscription's deletion is rejected until that subscription's next event. Bypassing the watermark instead would let a late event from a dead subscription grant pro permanently.
+    - Two checkout tabs opened before any webhook lands can still produce two subscriptions. The second is ignored and logged at ERROR.
+
 - **The Stripe webhook reads the subscription's status, so lapsed subscriptions stop granting Pro (#767, P0.19)**:
   - **The bug.** `_apply_subscription_event` mapped the price to a plan and never read `subscription["status"]`. An `incomplete`, `past_due`, `unpaid`, `paused` or `incomplete_expired` subscription with the Pro price kept granting Pro, and nothing ever wrote `restricted`, so the billing page's "subscription inactive" branch could not be reached. An unknown price, or an unset `STRIPE_PRICE_ID_PRO`, quietly moved a paying user to free with an INFO log.
   - **The policy.** One table, `entitlements.SUBSCRIPTION_STATUS_PLAN`, read by the pure `plan_for_subscription(status, price_ids)`. `active` and `trialing` get the plan the price buys. `past_due` leaves the plan as it is: a Pro user keeps Pro while Stripe retries the renewal, and a free user is not upgraded. `unpaid` sets `restricted`. `incomplete`, `incomplete_expired`, `paused` and `canceled` set `free`, and so does any status Stripe adds later. `incomplete_expired` deviates from the issue's proposed `restricted` for the owner to confirm: the first payment never went through, so the user was never Pro, and restricting them would leave a declined checkout worse off than never trying. The `subscription.deleted` event still sets free.
