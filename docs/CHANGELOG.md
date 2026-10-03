@@ -13,13 +13,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
   - **The fix.**
     - `onUpdate` records the latest unsaved edit as `{bookId, chapterId, content}` at edit time. It is cleared when the HTML matches the saved copy or a load replaces it.
     - A cleanup keyed on `[bookId, chapterId]` flushes that edit to its own chapter. It uses the new `keepalive` option on `saveChapterContent`, which falls back to a normal request above the browser's 64KB keepalive limit. If the flush fails, the edit becomes the chapter's localStorage backup.
+    - The flush waits for any save still in flight. Otherwise the older PATCH could land last, and its success handler could delete the flush's backup. Internal review caught this.
     - Autosave and manual save clear the pending flags only when `editor.getHTML()` still equals what was sent. Otherwise the effect re-arms for the trailing edit.
     - A failed load sets `loadFailed`. The editor becomes read-only, the alert gains a Retry button, and the toolbar, Restore Backup and Save are withheld. Autosave, manual save and the flush all refuse to write.
     - The three copy-pasted backup blocks are now one helper in `chapterContentSave.ts`.
   - **Verified.**
-    - Eight new real-TipTap jest tests and one bookClient keepalive test were added. Six of the editor tests fail against main's `ChapterEditor.tsx`.
-    - 12 mutations were checked and 10 were caught. The two survivors are a flush that reads the cleanup's own `chapterId`, which is equivalent because that closure belongs to the chapter being left, and the autosave `loadFailed` gate. That gate only matters for a draft inserted from the Questions tab, which the tests do not drive.
-    - The browser demo, run before and after, stored the right text in Mongo for all three scenarios.
+    - Nine new real-TipTap jest tests and one bookClient keepalive test were added. Seven of the editor tests fail against main's `ChapterEditor.tsx`. The other two pin what the flush must not do: send a reverted edit, or save a chapter nobody edited.
+    - 13 mutations were checked and 11 were caught. The two survivors are a flush that reads the cleanup's own `chapterId`, which is equivalent because that closure belongs to the chapter being left, and the autosave `loadFailed` gate. That gate only matters for a draft inserted from the Questions tab, which the tests do not drive.
+    - The browser demo, run before and after, stored the right text in Mongo for all three scenarios, plus a fourth: typing during a held save and then switching tabs.
   - **Left for later.** A `pagehide` flush is out of scope: React does not unmount on unload, and the `beforeunload` warning is accurate again. Remounts on a background TOC refresh are #758, and save conflicts are #760.
 
 - **The chapter editor no longer saves one chapter's text into another (#756, P0.8)**:
