@@ -5,6 +5,7 @@ from fastapi.security import HTTPBearer
 from typing import List, Dict
 from datetime import datetime, timezone
 
+from app.api.endpoints.billing import cancel_subscription_for_deletion
 from app.core.security import get_current_user_from_session, SessionRoleChecker
 from app.schemas.user import UserUpdate, UserResponse
 from app.db.database import (
@@ -173,8 +174,10 @@ async def delete_profile(
     Cascades the user's books (and their questions/responses/ratings/access
     logs, via the atomic per-book delete) BEFORE soft-deleting the user record,
     so a mid-cascade failure leaves the account active and retryable (#179).
-    The user document itself is retained with is_active=False.
+    The user document itself is retained with is_active=False. The Stripe
+    subscription is cancelled before any of that (#764).
     """
+    await cancel_subscription_for_deletion(current_user["auth_id"])
     try:
         deleted_books = await delete_all_user_books(current_user["auth_id"])
     except Exception:
@@ -386,7 +389,8 @@ async def delete_user_account(
             detail="Not enough permissions to delete this user",
         )
 
-    # Delete the user (cascade owned books first — same ordering as /me, #179)
+    # Same ordering as /me: cancel billing (#764), cascade books (#179), delete.
+    await cancel_subscription_for_deletion(auth_id)
     try:
         await delete_all_user_books(auth_id)
         result = await delete_user(auth_id)

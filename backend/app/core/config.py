@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field, ValidationInfo
 from dotenv import dotenv_values
 from typing import List, Union
+import hashlib
 import logging
 import os
 
@@ -50,6 +51,18 @@ def is_deployed_env() -> bool:
         (os.getenv("NODE_ENV") or "").lower(),
     }
     return bool(markers & {"production", "staging", "prod"})
+
+
+# SHA-256 of BETTER_AUTH_SECRET values that were published in this public repo (#780).
+# Hashes, never the literals: the point is to stop shipping the secret, so the
+# deny-list must not contain it. Keep in sync with frontend/src/lib/auth-secret.ts.
+PUBLISHED_SECRET_SHA256 = frozenset({
+    "fb89705a13a017d46d0df597a15f0e7d4e5470bb331805dd91db4da49dd6ddfe",
+})
+
+
+def is_published_secret(value: str) -> bool:
+    return hashlib.sha256(value.encode()).hexdigest() in PUBLISHED_SECRET_SHA256
 
 
 class Settings(BaseSettings):
@@ -251,6 +264,15 @@ class Settings(BaseSettings):
                 )
             return v  # Allow in local development and test/CI only
 
+        # A secret published in this public repo is compromised everywhere it
+        # is deployed (#780). Local dev/CI may still use it.
+        if is_published_secret(v) and is_deployed_env():
+            raise ValueError(
+                "FATAL: BETTER_AUTH_SECRET is a value that was published in this "
+                "public repository. Rotate it: "
+                "python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+
         # Reject known weak/test secrets (except our specific CI secret)
         weak_secrets = [
             "test-better-auth-secret-key",
@@ -310,7 +332,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
-        extra="ignore"
+        extra="ignore",
+        # Validation errors must not echo secrets (BETTER_AUTH_SECRET, Stripe keys) into logs.
+        hide_input_in_errors=True,
     )
 
 
