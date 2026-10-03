@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Page, Response, expect } from '@playwright/test';
 
 /**
  * Shared, web-first helpers for the staging authoring journey (Issue #105).
@@ -17,6 +17,53 @@ const BOOK_DETAIL_RE = /\/dashboard\/books\/[a-f0-9]+(?:[/?#]|$)/;
 
 // AI-backed steps on staging can take a while (readiness + generation chains).
 const AI_TIMEOUT = 90_000;
+
+// The wizard's AI round-trips. Chapter-level generate-questions matches too.
+const AI_ENDPOINT_RE = /\/(analyze-summary|toc-readiness|generate-questions)$/;
+
+const aiResponses = new WeakMap<Page, string[]>();
+
+/**
+ * One log line per AI response: status plus the fields that explain a verdict
+ * or an error, never the whole body (#775). These endpoints carry no
+ * credentials or account email, and the line goes to the job log, which
+ * GitHub masks; the results JSON that also captures stdout is never uploaded.
+ */
+async function describeAiResponse(res: Response): Promise<string> {
+  const path = new URL(res.url()).pathname.replace(/[a-f0-9]{24}/g, ':id');
+  const body = await res.json().catch(() => null);
+  const detail = body?.detail;
+  const line: Record<string, unknown> = { path, status: res.status() };
+  if (res.status() >= 400) {
+    // Two error shapes: {error_code, message} and the structured ErrorResponse
+    // {error, details: [{code}]} that chapter generate-questions returns.
+    line.error_code = detail?.error_code ?? detail?.details?.[0]?.code;
+    line.detail_code = detail?.details?.[0]?.code;
+    line.message = typeof detail === 'string' ? detail : (detail?.message ?? detail?.error);
+  } else if (body && typeof body === 'object') {
+    line.keys = Object.keys(body);
+    line.meets_minimum_requirements = body.meets_minimum_requirements;
+    if (Array.isArray(body.questions)) line.questions = body.questions.length;
+  }
+  return JSON.stringify(line);
+}
+
+function watchAiResponses(page: Page): void {
+  if (aiResponses.has(page)) return;
+  const lines: string[] = [];
+  aiResponses.set(page, lines);
+  page.on('response', async (res) => {
+    if (!AI_ENDPOINT_RE.test(new URL(res.url()).pathname)) return;
+    const line = await describeAiResponse(res);
+    lines.push(line);
+    console.log(`[staging-ai] ${line}`);
+  });
+}
+
+function aiResponseLog(page: Page): string {
+  const lines = aiResponses.get(page) ?? [];
+  return lines.length ? lines.join('\n') : '(no AI responses recorded)';
+}
 
 /**
  * A detailed, well-structured summary that the AI readiness analyzer reliably
@@ -108,6 +155,8 @@ export async function addSummary(page: Page, bookId: string, summary: string): P
     await expect(continueBtn).toBeEnabled({ timeout: 2_000 });
   }).toPass({ timeout: 20_000 });
 
+  // The wizard fires its AI calls on mount, so listen before navigating.
+  watchAiResponses(page);
   await continueBtn.click();
   await page.waitForURL(/\/generate-toc/, { timeout: 20_000 });
 }
@@ -119,10 +168,22 @@ export async function addSummary(page: Page, bookId: string, summary: string): P
  */
 export async function completeTocWizard(page: Page): Promise<void> {
   const answerBox = page.getByPlaceholder(/type your answer here/i);
-  await expect(
-    answerBox,
-    'Clarifying questions never appeared (summary may have been judged NOT_READY)'
-  ).toBeVisible({ timeout: AI_TIMEOUT });
+  // Stop at whichever terminal step the wizard reaches; an error or NOT_READY
+  // step will never turn into questions, so waiting out the timeout only hides
+  // which one it was. The failure names the step's heading and every AI response.
+  const deadEnd = page.getByRole('heading', {
+    name: /something went wrong|summary needs more detail|ai usage limit reached|upgrade required/i,
+  });
+  await answerBox
+    .or(deadEnd)
+    .waitFor({ timeout: AI_TIMEOUT })
+    .catch(() => {}); // the assertion below reports the timeout with context
+  const reached = (await deadEnd.isVisible()) ? await deadEnd.textContent() : 'neither';
+  expect(
+    await answerBox.isVisible(),
+    `Clarifying questions never appeared (wizard step: ${reached}).\n` +
+      `AI responses:\n${aiResponseLog(page)}`
+  ).toBe(true);
 
   // ClarifyingQuestions shows one question at a time with a Q1..Qn overview.
   const overview = page.getByRole('button', { name: /^Q\d+$/ });
