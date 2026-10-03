@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from app.core import config
 from app.core.config import Settings
 
-STAND_IN = "Zx9-stand-in-published-secret-value-0123456789abcdef"
+STAND_IN = "Zx9-stand-in-published-secret-0123456789ab"
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 

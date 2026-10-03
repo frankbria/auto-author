@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import { assertSecretNotPublished, PUBLISHED_SECRET_SHA256 } from '@/lib/auth-secret';
 
 // Only hashes of published secrets exist in the code; use a synthetic stand-in.
-const STAND_IN = 'Zx9-stand-in-published-secret-value-0123456789abcdef';
+const STAND_IN = 'Zx9-stand-in-published-secret-0123456789ab';
 
 const run = (env: Record<string, string>) =>
   assertSecretNotPublished({ BETTER_AUTH_SECRET: STAND_IN, ...env } as unknown as NodeJS.ProcessEnv);

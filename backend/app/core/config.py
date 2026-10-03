@@ -297,7 +297,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
-        extra="ignore"
+        extra="ignore",
+        # Validation errors must not echo secrets (BETTER_AUTH_SECRET, Stripe keys) into logs.
+        hide_input_in_errors=True,
     )
 
 
