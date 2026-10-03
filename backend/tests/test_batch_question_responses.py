@@ -315,13 +315,10 @@ async def test_batch_save_edit_history_tracking(motor_reinit_db):
     assert saved_response is not None
     assert "metadata" in saved_response
     assert "edit_history" in saved_response["metadata"]
-    assert len(saved_response["metadata"]["edit_history"]) == 1
-
-    # Check that edit history contains the previous word count
-    edit_entry = saved_response["metadata"]["edit_history"][0]
-    assert "timestamp" in edit_entry
-    assert "word_count" in edit_entry
-    assert edit_entry["word_count"] == 3  # "Initial short response"
+    # One entry per save, each carrying that save's word count (#762).
+    history = saved_response["metadata"]["edit_history"]
+    assert [entry["word_count"] for entry in history] == [3, 7]
+    assert all("timestamp" in entry for entry in history)
 
 
 @pytest.mark.asyncio

@@ -173,6 +173,22 @@ describe('BookClient', () => {
       expect(result).toEqual(mockResponse);
     });
 
+    // #757: the editor flushes on leaving a chapter with keepalive, which
+    // browsers refuse for bodies over 64KB; a long chapter must still be sent.
+    it('sends keepalive only when asked and the body fits the 64KB keepalive limit', async () => {
+      const ok = { ok: true, json: async () => ({}) };
+      (global.fetch as jest.Mock).mockResolvedValue(ok);
+      const keepaliveOf = (call: number) => (global.fetch as jest.Mock).mock.calls[call][1].keepalive;
+
+      await bookClient.saveChapterContent('b', 'c', '<p>short</p>');
+      await bookClient.saveChapterContent('b', 'c', '<p>short</p>', true, { keepalive: true });
+      await bookClient.saveChapterContent('b', 'c', `<p>${'x'.repeat(70 * 1024)}</p>`, true, {
+        keepalive: true,
+      });
+
+      expect([keepaliveOf(0), keepaliveOf(1), keepaliveOf(2)]).toEqual([undefined, true, undefined]);
+    });
+
     it('should handle error when getting chapter content', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
