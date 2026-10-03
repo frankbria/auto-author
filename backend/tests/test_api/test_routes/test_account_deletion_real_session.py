@@ -203,6 +203,31 @@ async def test_admin_user_list_still_serialises_a_deleted_account(motor_reinit_d
 
 
 @pytest.mark.asyncio
+async def test_admin_delete_revokes_a_user_who_never_reached_the_backend(
+    motor_reinit_db,
+):
+    """A better-auth user with no app record (signed up, never called the API)
+    still gets every session and credential revoked; the 404 only reports the
+    missing app record."""
+    never_seen = await _seed_better_auth_user("never@example.com")
+    admin = await _seed_better_auth_user("root@example.com")
+    async with _client(admin["tokens"][0]) as c:
+        assert (await c.get("/api/v1/users/me")).status_code == 200
+        await (await get_collection("users")).update_one(
+            {"auth_id": admin["user_id"]}, {"$set": {"role": "admin"}}
+        )
+        resp = await c.delete(f"/api/v1/users/{never_seen['user_id']}")
+        assert resp.status_code == 404
+
+    assert await _better_auth_docs(never_seen["oid"]) == {
+        "session": 0,
+        "account": 0,
+        "twoFactor": 0,
+        "user": 0,
+    }
+
+
+@pytest.mark.asyncio
 async def test_delete_by_auth_id_revokes_better_auth_docs_too(motor_reinit_db):
     seeded = await _seed_better_auth_user("byid@example.com")
     async with _client(seeded["tokens"][0]) as c:

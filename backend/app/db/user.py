@@ -170,9 +170,12 @@ async def delete_user(
         result = await users_collection.delete_one({"auth_id": auth_id})
         success = result.deleted_count > 0
 
+    # Unconditional: a better-auth user who never reached the backend has no
+    # app record, but their sessions and credentials must still go.
+    await delete_better_auth_identity(auth_id)
+
     # Log the deletion
     if success:
-        await delete_better_auth_identity(auth_id)
         await create_audit_log(
             action="user_delete",
             actor_id=actor_id
