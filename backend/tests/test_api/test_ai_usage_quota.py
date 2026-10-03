@@ -251,3 +251,21 @@ async def test_missing_plan_is_metered_as_free(motor_reinit_db, real_ai_quota):
         await checker(current_user={"auth_id": "legacy"})
         with pytest.raises(HTTPException):
             await checker(current_user={"auth_id": "legacy"})
+
+
+@pytest.mark.asyncio
+async def test_restricted_is_metered_like_free_when_plan_enforcement_is_off(
+    motor_reinit_db, real_ai_quota
+):
+    """PLAN_ENFORCEMENT_ENABLED=false is the documented kill switch for plan gating."""
+    with patch.object(deps.settings, "BYPASS_AUTH", False), \
+         patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
+         patch.object(deps.settings, "PLAN_ENFORCEMENT_ENABLED", False), \
+         patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
+         patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0):
+        checker = real_ai_quota()
+        user = {"auth_id": "lapsed", "plan": "restricted"}
+        await checker(current_user=user)  # metered, not 402
+        with pytest.raises(HTTPException) as exc:
+            await checker(current_user=user)
+    assert exc.value.status_code == 429

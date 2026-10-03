@@ -14,6 +14,8 @@ interface BillingSettingsFormProps {
   hasBillingAccount?: boolean;
 }
 
+const limit = (n: number | null) => (n === null ? 'unlimited' : String(n));
+
 /**
  * Billing tab: current plan + Stripe checkout entry point (issue #221)
  * + billing-portal access for paid users (issue #222).
@@ -81,7 +83,7 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
             <p className="text-sm text-muted-foreground">
               Thanks for supporting Auto Author.
               {quotas &&
-                ` Your plan includes ${quotas.pro.daily} AI generations per day (${quotas.pro.monthly} per month).`}
+                ` Your plan includes ${limit(quotas.pro.daily)} AI generations per day (${limit(quotas.pro.monthly)} per month).`}
             </p>
           </div>
         ) : (
@@ -94,7 +96,7 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
                 {plan === 'restricted'
                   ? 'Fix your payment method below, or start a new upgrade to restore full access.'
                   : quotas
-                    ? `Free: ${quotas.free.daily} AI generations per day (${quotas.free.monthly} per month). Pro: ${quotas.pro.daily} per day (${quotas.pro.monthly} per month).`
+                    ? `Free: ${limit(quotas.free.daily)} AI generations per day (${limit(quotas.free.monthly)} per month). Pro: ${limit(quotas.pro.daily)} per day (${limit(quotas.pro.monthly)} per month).`
                     : 'Upgrade to Pro for a higher daily and monthly AI generation limit.'}
               </p>
             </div>

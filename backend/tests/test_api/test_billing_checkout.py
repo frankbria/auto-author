@@ -198,3 +198,25 @@ async def test_quotas_endpoint_reports_each_plans_caps(auth_client_factory):
         "free": {"daily": settings.AI_QUOTA_FREE_DAILY, "monthly": settings.AI_QUOTA_FREE_MONTHLY},
         "pro": {"daily": settings.AI_QUOTA_PRO_DAILY, "monthly": settings.AI_QUOTA_PRO_MONTHLY},
     }
+
+
+async def test_quotas_endpoint_reports_disabled_windows_as_unlimited(
+    auth_client_factory, monkeypatch
+):
+    """A <=0 window is 'disabled' to the enforcer; never advertise it as 0 (#766)."""
+    monkeypatch.setattr(settings, "AI_QUOTA_FREE_DAILY", 0)
+    client = await auth_client_factory()
+    body = (await client.get("/api/v1/billing/quotas")).json()
+    assert body["free"] == {"daily": None, "monthly": settings.AI_QUOTA_FREE_MONTHLY}
+
+
+async def test_quotas_endpoint_all_unlimited_when_quota_disabled(
+    auth_client_factory, monkeypatch
+):
+    monkeypatch.setattr(settings, "AI_QUOTA_ENABLED", False)
+    client = await auth_client_factory()
+    body = (await client.get("/api/v1/billing/quotas")).json()
+    assert body == {
+        "free": {"daily": None, "monthly": None},
+        "pro": {"daily": None, "monthly": None},
+    }

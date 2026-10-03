@@ -59,6 +59,20 @@ describe('BillingSettingsForm', () => {
     expect(screen.queryByText(/full access to every/i)).not.toBeInTheDocument();
   });
 
+  it('says "unlimited" for a disabled (null) window instead of 0', async () => {
+    mockGetPlanQuotas.mockResolvedValue({
+      free: { daily: null, monthly: 100 },
+      pro: { daily: null, monthly: null },
+    });
+    render(<BillingSettingsForm plan="free" />);
+
+    expect(
+      await screen.findByText(
+        /free: unlimited AI generations per day \(100 per month\)\. pro: unlimited per day \(unlimited per month\)/i
+      )
+    ).toBeInTheDocument();
+  });
+
   it('tells a Pro user their own cap', async () => {
     render(<BillingSettingsForm plan="pro" />);
 

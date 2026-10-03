@@ -161,7 +161,10 @@ def _quota_exceeded_detail(plan: str, limit: int, period: str) -> str:
     if plan != "pro":
         pro_daily, pro_monthly = ai_quota_for_plan("pro")
         pro = pro_daily if period == "day" else pro_monthly
-        msg += f" Upgrade to Pro for {pro} per {period}."
+        if pro > 0:  # a disabled (<=0) Pro window is unlimited, not "0 per day"
+            msg += f" Upgrade to Pro for {pro} per {period}."
+        else:
+            msg += f" Pro has no {period} limit."
     return msg
 
 
@@ -210,12 +213,16 @@ def get_ai_usage_quota():
 
         plan = current_user.get("plan") or DEFAULT_PLAN
         caps = ai_quota_for_plan(plan)
-        if caps is None:
+        if caps is None and settings.PLAN_ENFORCEMENT_ENABLED:
             # restricted / unknown plan: zero allowance. 402 (not 429) so the
             # client shows the upgrade panel, same as the entitlement gate.
             from app.utils.error_handlers import handle_entitlement_denied
 
             raise handle_entitlement_denied(feature="ai_generation", plan=plan)
+        if caps is None:
+            # Plan gate switched off: meter as the default plan, like pre-#766.
+            plan = DEFAULT_PLAN
+            caps = ai_quota_for_plan(plan)
         daily, monthly = caps
 
         now = datetime.now(timezone.utc)

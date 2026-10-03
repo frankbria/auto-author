@@ -12,7 +12,8 @@ export type PortalSession = {
   url: string;
 };
 
-export type PlanQuotas = Record<'free' | 'pro', { daily: number; monthly: number }>;
+/** A null window is unlimited. */
+export type PlanQuotas = Record<'free' | 'pro', { daily: number | null; monthly: number | null }>;
 
 /**
  * Hook for billing operations against the better-auth backend.
