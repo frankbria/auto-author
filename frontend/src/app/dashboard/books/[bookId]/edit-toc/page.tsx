@@ -190,7 +190,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   };
 
   const addNewChapter = () => {
-    const newId = `ch${toc.length + 1}`;    const newChapter: Chapter = {
+    const newId = crypto.randomUUID();    const newChapter: Chapter = {
       id: newId,
       title: 'New Chapter',
       description: 'Description of the new chapter',
@@ -211,7 +211,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     const findAndAddSubchapter = (chapters: Chapter[]) => {
       for (let i = 0; i < chapters.length; i++) {
         if (chapters[i].id === parentId) {
-          const newId = `${parentId}-${chapters[i].children.length + 1}`;          const newSubchapter: Chapter = {
+          const newId = crypto.randomUUID();          const newSubchapter: Chapter = {
             id: newId,
             title: 'New Subchapter',
             parent: parentId,
