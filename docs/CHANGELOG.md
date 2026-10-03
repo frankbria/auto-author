@@ -4,6 +4,8 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **Support/privacy/2FA-recovery address moved off the parked autoauthor.com domain (#773, P0.25)**: every published address was `support@autoauthor.com`, a parked domain with no MX record, so privacy/data requests and 2FA-recovery mail bounced. Now one constant (`frontend/src/lib/constants/contact.ts`, `SUPPORT_EMAIL`) = `support@autoauthor.app`, used by `/privacy`, `/terms`, `/dashboard/help`, `verify-2fa` and their tests; the user manual and troubleshooting doc updated. `SupportAddressGate.test.ts` fails if `autoauthor.com` reappears in `frontend/src` or the address is hardcoded outside the constant. Historic changelog/demo/archive text left as written. **Owner homework (issue stays open):** provision the `support@autoauthor.app` mailbox + MX record, then send a test message.
+
 - **A background TOC refresh or a session refetch no longer remounts the chapter editor (#758, P0.10)**:
   - **The bugs.**
     - `useChapterTabs.refreshChapters` set `is_loading`, and `ChapterTabs` shows its skeleton while loading. Every `tocUpdated` event and every cross-tab `toc-updated-<book>` storage event (a TOC saved on the Edit TOC page, a chapter created or deleted) unmounted the editor. The cursor, focus and undo history were lost, and the remount fetched the chapter content again.

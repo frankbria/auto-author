@@ -1,3 +1,5 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
+
 export default function HelpPage() {
   return (
     <div className="container max-w-4xl py-8">
@@ -40,10 +42,10 @@ export default function HelpPage() {
           <p className="text-muted-foreground">
             If you need additional assistance, please contact our support team at{' '}
             <a
-              href="mailto:support@autoauthor.com"
+              href={SUPPORT_MAILTO}
               className="text-primary underline-offset-4 hover:underline"
             >
-              support@autoauthor.com
+              {SUPPORT_EMAIL}
             </a>
           </p>
         </section>
