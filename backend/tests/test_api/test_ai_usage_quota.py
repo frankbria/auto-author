@@ -219,6 +219,9 @@ async def test_pro_at_cap_is_shown_the_cap_not_told_to_contact_support(
             await checker(current_user=user)
 
     detail = exc.value.detail
+    # The client tells a quota cap from a transient rate limit by this prefix
+    # (frontend isQuotaCapMessage) — keep the two in step.
+    assert detail.startswith("AI usage limit reached")
     assert "1 generations per day on the pro plan" in detail
     assert "resets at midnight UTC" in detail
     assert "support" not in detail.lower()
