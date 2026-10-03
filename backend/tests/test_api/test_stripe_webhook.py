@@ -330,7 +330,7 @@ class TestSubscriptionStatus:
     async def test_unset_pro_price_logs_error(self, webhook_client, monkeypatch, caplog):
         # A paying user silently resolving to free must page someone.
         monkeypatch.setattr(settings, "STRIPE_PRICE_ID_PRO", "")
-        await _seed_user(stripe_customer_id="cus_test_1")
+        await _seed_user(stripe_customer_id="cus_test_1", plan="pro")
         with caplog.at_level("ERROR", logger="app.api.endpoints.webhooks"):
             await _post_signed(webhook_client, subscription_event())
         assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "free"
