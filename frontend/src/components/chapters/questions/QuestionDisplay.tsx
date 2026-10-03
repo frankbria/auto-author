@@ -60,6 +60,10 @@ export default function QuestionDisplay({
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'queued'>('idle');
   const [saveError, setSaveError] = useState('');
+  // Text the server last accepted (or already holds). Auto-save only fires for
+  // text that differs from it, so an idle answer is never re-saved and a loaded
+  // COMPLETED answer is never rewritten as a draft (#761).
+  const lastSavedTextRef = useRef('');
   // State for response completion
   const [isCompleted, setIsCompleted] = useState(false);
   // State for word count
@@ -89,6 +93,7 @@ export default function QuestionDisplay({
       try {
         const result = await bookClient.getQuestionResponse(bookId, chapterId, question.id);
         if (result && result.response) {
+          lastSavedTextRef.current = result.response.response_text || '';
           setResponseText(result.response.response_text || '');
           setIsCompleted(result.response.status === ResponseStatus.COMPLETED);
         }
@@ -103,6 +108,7 @@ export default function QuestionDisplay({
 
     // Reset states when question changes
     return () => {
+      lastSavedTextRef.current = '';
       setResponseText('');
       setIsCompleted(false);
       setSaveStatus('idle');
@@ -244,6 +250,7 @@ export default function QuestionDisplay({
 
         // Queue the save operation
         const queueId = `save-draft-${question.id}-${Date.now()}`;
+        lastSavedTextRef.current = responseText;
         retryQueue.add(
           queueId,
           () => saveOperation(ResponseStatus.DRAFT),
@@ -273,6 +280,7 @@ export default function QuestionDisplay({
 
       // Execute with retry logic
       await saveOperation(ResponseStatus.DRAFT);
+      lastSavedTextRef.current = responseText;
 
       setSaveStatus('saved');
       setSaveError('');
@@ -314,7 +322,12 @@ export default function QuestionDisplay({
   useEffect(() => {
     let autoSaveTimer: NodeJS.Timeout;
 
-    if (responseText.trim() && !isSaving && saveStatus !== 'error') {
+    if (
+      responseText.trim() &&
+      responseText !== lastSavedTextRef.current &&
+      !isSaving &&
+      saveStatus !== 'error'
+    ) {
       autoSaveTimer = setTimeout(() => {
         handleSaveDraft();
       }, 3000); // Auto-save after 3 seconds of inactivity
@@ -358,6 +371,7 @@ export default function QuestionDisplay({
 
         // Queue the save operation
         const queueId = `complete-${question.id}-${Date.now()}`;
+        lastSavedTextRef.current = responseText;
         retryQueue.add(
           queueId,
           () => saveOperation(ResponseStatus.COMPLETED),
@@ -387,6 +401,7 @@ export default function QuestionDisplay({
 
       // Execute with retry logic
       await saveOperation(ResponseStatus.COMPLETED);
+      lastSavedTextRef.current = responseText;
 
       setIsCompleted(true);
       setSaveStatus('saved');

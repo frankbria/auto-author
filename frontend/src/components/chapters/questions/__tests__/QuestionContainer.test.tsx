@@ -69,7 +69,12 @@ jest.mock('../QuestionGenerator', () => ({
 
 jest.mock('../QuestionDisplay', () => ({
   __esModule: true,
-  default: ({ question, onResponseSaved, onRegenerateQuestion }: any) => (
+  default: function MockQuestionDisplay({ question, onResponseSaved, onRegenerateQuestion }: any) {
+    // Count mounts so a test can prove each question gets a fresh instance (#761)
+    require('react').useEffect(() => {
+      (globalThis as any).__questionDisplayMounts = ((globalThis as any).__questionDisplayMounts ?? 0) + 1;
+    }, []);
+    return (
     <div data-testid="question-display" data-question-id={question?.id}>
       <span>{question?.question_text}</span>
       <button data-testid="response-saved-btn" onClick={onResponseSaved}>
@@ -79,7 +84,8 @@ jest.mock('../QuestionDisplay', () => ({
         Regenerate
       </button>
     </div>
-  ),
+    );
+  },
 }));
 
 jest.mock('../QuestionNavigation', () => ({
@@ -502,6 +508,25 @@ describe('QuestionContainer - handleNextQuestion and handlePreviousQuestion', ()
     await waitFor(() => {
       expect(screen.getByTestId('question-navigation')).toHaveAttribute('data-current-index', '1');
     });
+  });
+
+  // #761: an instance reused across questions let a stale in-flight save write
+  // the previous question's text into the new question's last-saved ref.
+  it('mounts a fresh QuestionDisplay per question', async () => {
+    (globalThis as any).__questionDisplayMounts = 0;
+    setupTwoQuestions();
+
+    render(<QuestionContainer {...defaultProps} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('question-navigation')).toBeInTheDocument();
+    });
+    expect((globalThis as any).__questionDisplayMounts).toBe(1);
+
+    fireEvent.click(screen.getByTestId('nav-next-btn'));
+    await waitFor(() => {
+      expect(screen.getByTestId('question-navigation')).toHaveAttribute('data-current-index', '1');
+    });
+    expect((globalThis as any).__questionDisplayMounts).toBe(2);
   });
 
   it('handlePreviousQuestion decrements currentIndex back to 0', async () => {
