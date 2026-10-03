@@ -85,7 +85,9 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """Schema for updating an existing user"""
 
-    email: Optional[EmailStr] = None
+    # email is deliberately absent (#765): better-auth owns the verified email
+    # and the session path mirrors it onto the users doc. A writable email let
+    # one user squat another's address on the unique index and lock them out.
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
     display_name: Optional[str] = Field(None, max_length=100)
@@ -106,7 +108,6 @@ class UserUpdate(BaseModel):
         extra="forbid",
         json_schema_extra={
             "example": {
-                "email": "updated@example.com",
                 "first_name": "Updated",
                 "last_name": "Name",
                 "display_name": "Updated Name",
