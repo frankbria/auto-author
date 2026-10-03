@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import PrivacyPage from '@/app/privacy/page';
@@ -21,8 +22,8 @@ describe('Privacy Policy page', () => {
   it('gives a contact address for data requests', () => {
     render(<PrivacyPage />);
     expect(
-      screen.getByRole('link', { name: /support@autoauthor\.com/i })
-    ).toHaveAttribute('href', 'mailto:support@autoauthor.com');
+      screen.getByRole('link', { name: SUPPORT_EMAIL })
+    ).toHaveAttribute('href', SUPPORT_MAILTO);
   });
 
   it('carries a visible legal-review notice', () => {
