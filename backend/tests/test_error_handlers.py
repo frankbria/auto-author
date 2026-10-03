@@ -190,6 +190,20 @@ class TestQuestionGenerationErrorHandler:
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
+    def test_provider_quota_outage_is_503_though_not_retryable(self):
+        """OpenAI out of credit is an outage, not a server bug (#775)."""
+        from app.services.ai_errors import AIProviderQuotaError
+
+        with pytest.raises(HTTPException) as exc_info:
+            raise handle_question_generation_error(
+                error=AIProviderQuotaError(),
+                book_id="book-123",
+                chapter_id="chapter-456",
+            )
+
+        assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert exc_info.value.detail["details"][0]["code"] == "AI_PROVIDER_QUOTA_EXHAUSTED"
+
     def test_handles_generic_exception(self):
         """Test handling generic exceptions"""
         generic_error = Exception("Something went wrong")
