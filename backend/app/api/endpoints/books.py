@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+import uuid
 from fastapi import (
     APIRouter,
     Depends,
@@ -1204,6 +1205,13 @@ async def generate_table_of_contents(
         # the only writer. `base_version` is the version read before the AI call
         # (PUT's default is 1 for a book with no TOC); the client sends it back
         # as expected_version so a TOC that changed meanwhile is a 409.
+        # The AI numbers chapters positionally (ch1, ch1-1). On accept, PUT
+        # /toc keeps the id and draft of any stored chapter with the same id,
+        # so a positional id would hand an old draft to an unrelated chapter
+        # (#754). The proposal carries fresh ids instead.
+        for item in _walk_toc(toc_result["toc"].get("chapters") or []):
+            item["id"] = str(uuid.uuid4())
+
         stored_toc = book.get("table_of_contents") or {}
         base_version = stored_toc.get("version", 1)
         # What accepting this proposal would replace, so the wizard can say so.

@@ -100,6 +100,31 @@ describe('Edit TOC page: editing a TOC that has in-progress chapters (#861)', ()
     expect(saved.chapters[0].subchapters).toHaveLength(1);
   });
 
+  it('gives added chapters and subchapters ids no other item has (#754)', async () => {
+    // Positional ids (`ch${toc.length + 1}`) repeated an existing id after a
+    // delete, and one autosave then overwrote both chapters.
+    mockBookClient.getToc.mockResolvedValue(
+      tocWith([chapter('ch1', 'One', 1, 'draft'), chapter('ch2', 'Two', 2, 'draft'), chapter('ch3', 'Three', 3, 'draft')])
+    );
+    renderPage();
+    await screen.findByDisplayValue('Two');
+    fireEvent.click(screen.getAllByTitle('Delete Chapter')[1]); // Two
+    fireEvent.click(screen.getByRole('button', { name: /add chapter/i }));
+    fireEvent.click(screen.getAllByTitle('Add Subchapter')[0]);
+    fireEvent.click(screen.getAllByTitle('Add Subchapter')[0]);
+    fireEvent.click(screen.getAllByTitle('Delete Chapter')[1]); // One's first subchapter
+    fireEvent.click(screen.getAllByTitle('Add Subchapter')[0]);
+
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    await waitFor(() => expect(mockBookClient.updateToc).toHaveBeenCalled());
+    const saved = mockBookClient.updateToc.mock.calls[0][1] as {
+      chapters: { id: string; subchapters: { id: string }[] }[];
+    };
+    const ids = saved.chapters.flatMap((c) => [c.id, ...c.subchapters.map((s) => s.id)]);
+    expect(ids).toHaveLength(5);
+    expect(new Set(ids).size).toBe(5);
+  });
+
   it('reorders by drag and drop', async () => {
     renderPage();
     const first = (await screen.findByDisplayValue('One')).closest('[draggable]') as HTMLElement;

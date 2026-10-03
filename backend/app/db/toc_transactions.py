@@ -125,11 +125,40 @@ def _walk_toc(chapters):
     # Stored TOCs can hold AI JSON verbatim (generate-toc validates only chapter
     # titles), so subchapters may be null or non-objects. Skip them rather than
     # 500 every later edit of that book.
+    # Recursive, so id checks and draft carry cover any depth a client sends.
     for chapter in chapters:
         yield chapter
         subchapters = chapter.get("subchapters")
         if isinstance(subchapters, list):
-            yield from (sub for sub in subchapters if isinstance(sub, dict))
+            yield from _walk_toc(sub for sub in subchapters if isinstance(sub, dict))
+
+
+def _require_unique_ids(chapters) -> None:
+    # The autosave writes with array_filters on the id, which updates every
+    # element carrying it, so one duplicate lets one save overwrite two
+    # chapters (#754). The message must avoid "not found"/"not authorized":
+    # the endpoints map those substrings to 404/403.
+    seen = set()
+    for item in _walk_toc(chapters):
+        cid = item.get("id")
+        if isinstance(cid, str) and cid:
+            if cid in seen:
+                raise ValueError(f"Chapter ids must be unique; duplicate id: {cid}")
+            seen.add(cid)
+
+
+def _assign_chapter_ids(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]) -> None:
+    """Reject duplicate ids, then give every item the server has not stored a
+    fresh uuid4 (#754). A client id only ever names a stored chapter, so a new
+    chapter cannot reuse a removed chapter's id and inherit its draft or
+    questions, and AI positional ids (``ch1``) cannot collide."""
+    chapters = updated_toc.get("chapters", [])
+    _require_unique_ids(chapters)
+    stored_ids = {c.get("id") for c in _walk_toc(stored_toc.get("chapters", []))}
+    for item in _walk_toc(chapters):
+        cid = item.get("id")
+        if not (isinstance(cid, str) and cid in stored_ids):
+            item["id"] = str(uuid.uuid4())
 
 
 def _carry_server_fields(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]) -> None:
@@ -215,6 +244,8 @@ async def _update_toc_internal(
         "version": current_version + 1
     }
 
+    # Ids first: the carry below matches on them.
+    _assign_chapter_ids(current_toc, updated_toc)
     _carry_server_fields(current_toc, updated_toc)
 
     # Derived, never trusted from the client (#496). Every other producer in the
@@ -222,10 +253,6 @@ async def _update_toc_internal(
     # flat chapter listing, and the frontend's own edit-TOC page — so accepting a
     # client value only created a way for the two to disagree.
     updated_toc["total_chapters"] = len(updated_toc.get("chapters", []))
-
-    for item in _walk_toc(updated_toc.get("chapters", [])):
-        if not item.get("id"):
-            item["id"] = str(uuid.uuid4())
 
     # Update the book with the new TOC
     # For new books without TOC, don't check version
@@ -339,9 +366,9 @@ async def _add_chapter_internal(
     version_guard = _version_guard(toc)  # snapshot before mutating `toc`
     chapters = toc.get("chapters", [])
 
-    # Generate chapter ID if not provided
-    if not chapter_data.get("id"):
-        chapter_data["id"] = str(uuid.uuid4())
+    _require_unique_ids(chapters)
+    # Always server-minted (#754): a caller id could repeat a stored one.
+    chapter_data["id"] = str(uuid.uuid4())
 
     # Add timestamps
     now = datetime.now(timezone.utc).isoformat()
