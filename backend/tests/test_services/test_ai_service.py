@@ -732,7 +732,7 @@ SUGGESTIONS: None needed
         mock_request.assert_called_once()
         call_args = mock_request.call_args
         assert call_args[1]["temperature"] == 0.4
-        assert call_args[1]["max_tokens"] == 1500
+        assert call_args[1]["max_tokens"] == 6000
 
         # Verify result structure
         assert result["success"]
