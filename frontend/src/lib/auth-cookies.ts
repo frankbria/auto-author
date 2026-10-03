@@ -8,8 +8,15 @@
 /**
  * Extract cookie domain from BETTER_AUTH_URL
  * - localhost → undefined (browser handles it)
- * - dev.autoauthor.app → .dev.autoauthor.app (subdomain sharing)
- * - autoauthor.app → .autoauthor.app (subdomain sharing)
+ * - dev.autoauthor.app → .dev.autoauthor.app (shared with api.dev.autoauthor.app)
+ * - app.autoauthor.app → .app.autoauthor.app (shared with api.app.autoauthor.app)
+ * - autoauthor.app → undefined, a host-only cookie (issue #778)
+ *
+ * An apex is never widened: `.autoauthor.app` domain-matches every subdomain,
+ * including the shared staging box at dev.autoauthor.app / api.dev.autoauthor.app,
+ * so a production session cookie would be sent there. A host-only cookie at the
+ * apex is not sent to any subdomain, which means the API must then be reached on
+ * the same host (or production moves to a subdomain, mirroring staging).
  */
 export function getCookieDomain(): string | undefined {
   const authUrl = process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_BETTER_AUTH_URL || "";
@@ -22,8 +29,16 @@ export function getCookieDomain(): string | undefined {
     const url = new URL(authUrl);
     const hostname = url.hostname;
 
-    // Extract base domain (e.g., dev.autoauthor.app → .dev.autoauthor.app)
-    // Leading dot makes cookie available to all subdomains
+    // ponytail: two labels = apex; a multi-label public suffix (example.co.uk)
+    // reads as a subdomain here. Switch to a public-suffix list if we ever host there.
+    if (hostname.split(".").length <= 2) {
+      console.warn(
+        `Auth cookie for apex host ${hostname} is host-only: it will not reach any subdomain, including an api.${hostname} backend.`
+      );
+      return undefined;
+    }
+
+    // Leading dot shares the cookie with this host's own subdomains (api.<host>)
     return `.${hostname}`;
   } catch (error) {
     console.error("Failed to parse BETTER_AUTH_URL for cookie domain:", error);
@@ -54,8 +69,7 @@ export function getDefaultCookieAttributes() {
     sameSite: "lax" as const,
     secure: true,
     httpOnly: true,
-    // Share cookies across subdomains by setting domain to base domain
-    // Automatically extracted from BETTER_AUTH_URL environment variable
+    // BETTER_AUTH_URL's host and its subdomains; never a whole apex (#778)
     domain: getCookieDomain(),
   };
 }
