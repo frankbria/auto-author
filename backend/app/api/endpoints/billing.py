@@ -7,6 +7,7 @@ establishes the user<->Stripe linkage the webhook reconciles on.
 
 import asyncio
 import logging
+import threading
 from typing import Dict, Literal, Optional
 
 import stripe
@@ -122,6 +123,9 @@ async def create_checkout_session(
 # the old one stops matching the lookup, so a new one is created.
 PORTAL_CONFIG_METADATA = {"app": "auto-author", "portal_config_version": "1"}
 _portal_config_id: Optional[str] = None  # per-process cache; Stripe is the source of truth
+# Serialises the cold-start lookup/create: Stripe answers a concurrent request
+# carrying the same in-flight idempotency key with a 409, not the shared result.
+_portal_config_lock = threading.Lock()
 
 
 def _get_or_create_portal_config(api_key: str) -> str:
@@ -129,6 +133,14 @@ def _get_or_create_portal_config(api_key: str) -> str:
     global _portal_config_id
     if _portal_config_id:
         return _portal_config_id
+    with _portal_config_lock:
+        if _portal_config_id:
+            return _portal_config_id
+        return _lookup_or_create_portal_config(api_key)
+
+
+def _lookup_or_create_portal_config(api_key: str) -> str:
+    global _portal_config_id
     existing = stripe.billing_portal.Configuration.list(
         api_key=api_key, active=True, limit=100
     )

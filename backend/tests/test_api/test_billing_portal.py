@@ -229,3 +229,25 @@ async def test_portal_reuses_existing_configuration_across_processes(
     assert posts == []
     assert len(lists) == 1
     assert {c["params"]["configuration"] for c in _session_calls(portal_stub)} == {"bpc_existing"}
+
+
+def test_concurrent_cold_start_creates_the_configuration_once(portal_stub, monkeypatch):
+    """Two cold-cache requests must not both POST the Configuration: Stripe answers
+    an in-flight duplicate idempotency key with a 409, which would 502 one user."""
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    real_create = stripe.billing_portal.Configuration.create
+
+    def slow_create(*args, **kwargs):
+        time.sleep(0.2)  # widen the window two cold requests race in
+        return real_create(*args, **kwargs)
+
+    monkeypatch.setattr(stripe.billing_portal.Configuration, "create", slow_create)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        ids = list(pool.map(lambda _: billing._get_or_create_portal_config("sk_test_x"), range(4)))
+
+    posts = [c for c in portal_stub.calls if c["method"] == "POST"
+             and c["path"].endswith("/configurations")]
+    assert len(posts) == 1
+    assert len(set(ids)) == 1
