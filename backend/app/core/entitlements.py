@@ -1,12 +1,9 @@
 """Plan / entitlement registry (issue #174, P0.2).
 
-Single source of truth for which plan is entitled to which AI feature. For the
-free-invite beta the only real plan is ``free`` (full access) — this module is
-the *hook* so per-user AI caps (P0.1) can key off plan and a paid launch adds a
-tier here instead of a rebuild. No payment provider is built yet.
-
-ponytail: today ``free`` allows everything, so no real beta user is ever denied;
-``restricted`` is the named deny path (e.g. invite revoked / trial expired).
+Single source of truth for which plan is entitled to which AI feature, and how
+many AI generations each plan may run per day/month. Free and pro may use every
+feature; what a paid plan buys is the larger quota (#766). ``restricted`` is the
+named deny path (e.g. lapsed subscription).
 """
 
 from typing import Optional
@@ -29,11 +26,10 @@ AI_FEATURES = frozenset(
 
 DEFAULT_PLAN = "free"
 
-# plan -> allowed feature set. "*" means "all features". A paid tier is added
-# here (e.g. "pro": frozenset({"*"})) with no code change at call sites.
+# plan -> allowed feature set. "*" means "all features".
 PLAN_ENTITLEMENTS: dict[str, frozenset[str]] = {
-    "free": frozenset({"*"}),  # beta: full AI access
-    "pro": frozenset({"*"}),  # paid tier (issue #220); differentiation at paid launch
+    "free": frozenset({"*"}),  # every feature, small quota
+    "pro": frozenset({"*"}),  # every feature, larger quota (see ai_quota_for_plan)
     "restricted": frozenset(),  # deny path: no AI features
 }
 
@@ -62,3 +58,21 @@ def is_feature_allowed(plan: Optional[str], feature: str) -> bool:
     if allowed is None:
         return False
     return "*" in allowed or feature in allowed
+
+
+def ai_quota_for_plan(plan: Optional[str]) -> Optional[tuple[int, int]]:
+    """Return ``(daily, monthly)`` AI-generation caps for ``plan`` (#766).
+
+    Read from settings on every call so the billing UI and the enforcing
+    dependency share one source. A missing plan is ``free`` (legacy docs).
+    ``None`` means no allowance at all: ``restricted`` and any unknown plan
+    (fails closed, like :func:`is_feature_allowed`).
+    """
+    from app.core.config import settings
+
+    plan = plan or DEFAULT_PLAN
+    if plan == "free":
+        return settings.AI_QUOTA_FREE_DAILY, settings.AI_QUOTA_FREE_MONTHLY
+    if plan == "pro":
+        return settings.AI_QUOTA_PRO_DAILY, settings.AI_QUOTA_PRO_MONTHLY
+    return None

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useBillingApi } from '@/hooks/useBillingApi';
+import { useBillingApi, type PlanQuotas } from '@/hooks/useBillingApi';
 import { toast } from '@/lib/toast';
 import { navigateTo } from '@/lib/navigation';
 
@@ -14,6 +14,8 @@ interface BillingSettingsFormProps {
   hasBillingAccount?: boolean;
 }
 
+const limit = (n: number | null) => (n === null ? 'unlimited' : String(n));
+
 /**
  * Billing tab: current plan + Stripe checkout entry point (issue #221)
  * + billing-portal access for paid users (issue #222).
@@ -21,9 +23,22 @@ interface BillingSettingsFormProps {
  * preferences Save button (mirrors SecuritySettingsForm's contract).
  */
 export default function BillingSettingsForm({ plan, hasBillingAccount }: BillingSettingsFormProps) {
-  const { startCheckout, openBillingPortal } = useBillingApi();
+  const { startCheckout, openBillingPortal, getPlanQuotas } = useBillingApi();
+  const [quotas, setQuotas] = useState<PlanQuotas | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const isPro = plan === 'pro';
+
+  // Limits are read from the backend so the copy can never drift from enforcement (#766).
+  // On failure the card still renders; it just omits the numbers.
+  useEffect(() => {
+    let active = true;
+    getPlanQuotas()
+      .then((q) => active && setQuotas(q))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [getPlanQuotas]);
 
   const handleUpgrade = async () => {
     setIsRedirecting(true);
@@ -66,7 +81,9 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
           <div className="space-y-1">
             <p className="font-medium">You&apos;re on the Pro plan</p>
             <p className="text-sm text-muted-foreground">
-              Thanks for supporting Auto Author — you have full access to every feature.
+              Thanks for supporting Auto Author.
+              {quotas &&
+                ` Your plan includes ${limit(quotas.pro.daily)} AI generations per day (${limit(quotas.pro.monthly)} per month).`}
             </p>
           </div>
         ) : (
@@ -78,7 +95,9 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
               <p className="text-sm text-muted-foreground">
                 {plan === 'restricted'
                   ? 'Fix your payment method below, or start a new upgrade to restore full access.'
-                  : 'Upgrade to Pro for full access to every AI writing feature.'}
+                  : quotas
+                    ? `Free: ${limit(quotas.free.daily)} AI generations per day (${limit(quotas.free.monthly)} per month). Pro: ${limit(quotas.pro.daily)} per day (${limit(quotas.pro.monthly)} per month).`
+                    : 'Upgrade to Pro for a higher daily and monthly AI generation limit.'}
               </p>
             </div>
             <Button onClick={handleUpgrade} disabled={isRedirecting} busy={isRedirecting}>

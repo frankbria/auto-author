@@ -7,7 +7,7 @@ establishes the user<->Stripe linkage the webhook reconciles on.
 
 import asyncio
 import logging
-from typing import Dict, Literal
+from typing import Dict, Literal, Optional
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.api.dependencies import get_rate_limiter
 from app.core.config import settings
+from app.core.entitlements import ai_quota_for_plan
 from app.core.security import get_current_user_from_session
 from app.db.user import update_user
 
@@ -24,6 +25,29 @@ router = APIRouter()
 # Only paying plans block a new checkout — "restricted" users (lapsed/revoked)
 # are deliberately allowed through as the re-upgrade path.
 PAID_PLANS = frozenset({"pro"})
+
+
+class PlanQuota(BaseModel):
+    """A ``None`` window is unlimited (disabled in settings, or quota off)."""
+
+    daily: Optional[int]
+    monthly: Optional[int]
+
+
+@router.get("/quotas", response_model=Dict[str, PlanQuota])
+async def get_plan_quotas(
+    current_user: Dict = Depends(get_current_user_from_session),
+):
+    """AI-generation caps per plan: the one source the billing copy reads (#766)."""
+    def window(limit: int) -> Optional[int]:
+        # The enforcer treats <=0 as "window disabled"; never advertise it as 0.
+        return limit if settings.AI_QUOTA_ENABLED and limit > 0 else None
+
+    quotas = {plan: ai_quota_for_plan(plan) for plan in ("free", "pro")}
+    return {
+        plan: PlanQuota(daily=window(daily), monthly=window(monthly))
+        for plan, (daily, monthly) in quotas.items()
+    }
 
 
 class CheckoutRequest(BaseModel):
