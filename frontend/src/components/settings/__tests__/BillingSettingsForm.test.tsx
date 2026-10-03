@@ -110,6 +110,17 @@ describe('BillingSettingsForm', () => {
     expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeDisabled();
   });
 
+  it('lets the user retry loading the renewal terms after a failure', async () => {
+    mockGetRenewalDisclosure.mockRejectedValueOnce(new Error('Payment provider error'));
+    render(<BillingSettingsForm plan="free" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /try again/i }));
+
+    expect(await screen.findByRole('checkbox', { name: /i agree/i })).not.toBeChecked();
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    expect(mockGetRenewalDisclosure).toHaveBeenCalledTimes(2);
+  });
+
   it('reloads changed terms and clears the agreement when checkout reports them stale', async () => {
     mockStartCheckout.mockRejectedValue(new Error('The subscription terms have changed'));
     render(<BillingSettingsForm plan="free" />);

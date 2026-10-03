@@ -31,6 +31,7 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
   const [quotas, setQuotas] = useState<PlanQuotas | null>(null);
   const [disclosure, setDisclosure] = useState<RenewalDisclosure | null>(null);
   const [disclosureFailed, setDisclosureFailed] = useState(false);
+  const [disclosureAttempt, setDisclosureAttempt] = useState(0);
   const [agreed, setAgreed] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const isPro = plan === 'pro';
@@ -46,7 +47,12 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
     return () => {
       active = false;
     };
-  }, [getRenewalDisclosure, isPro]);
+  }, [getRenewalDisclosure, isPro, disclosureAttempt]);
+
+  const retryDisclosure = () => {
+    setDisclosureFailed(false);
+    setDisclosureAttempt((n) => n + 1);
+  };
 
   // Limits are read from the backend so the copy can never drift from enforcement (#766).
   // On failure the card still renders; it just omits the numbers.
@@ -156,11 +162,18 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground" role="status">
-                  {disclosureFailed
-                    ? 'Subscription terms are unavailable right now, so upgrading is paused. Please try again later.'
-                    : 'Loading subscription terms…'}
-                </p>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground" role="status">
+                    {disclosureFailed
+                      ? 'Subscription terms are unavailable right now, so upgrading is paused.'
+                      : 'Loading subscription terms…'}
+                  </p>
+                  {disclosureFailed && (
+                    <Button variant="outline" size="sm" onClick={retryDisclosure}>
+                      Try again
+                    </Button>
+                  )}
+                </div>
               )}
               <Button
                 onClick={handleUpgrade}
