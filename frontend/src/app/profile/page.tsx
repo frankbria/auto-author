@@ -366,6 +366,7 @@ export default function UserProfile() {
               <DialogTitle>Delete account</DialogTitle>
               <DialogDescription>
                 This permanently deletes your account and all your books. This cannot be undone.
+                Any paid subscription is cancelled immediately, so you won&apos;t be billed again.
               </DialogDescription>
             </DialogHeader>
             {/* Form wrapper so Enter submits once the confirmation matches
