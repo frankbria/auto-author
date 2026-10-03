@@ -294,14 +294,18 @@ class TestGetCurrentUserFromSession:
 
     @patch("app.core.security.validate_better_auth_session")
     @patch("app.core.security.get_better_auth_user")
+    @patch("app.db.user.release_email")
     @patch("app.db.user.get_user_by_auth_id")
     @patch("app.db.user.create_user")
     @patch("app.core.config.settings")
-    async def test_get_current_user_from_session_auto_create_race_missing_winner(
-        self, mock_settings, mock_create_user, mock_get_user, mock_get_auth_user, mock_validate
+    async def test_get_current_user_from_session_auto_create_unresolvable_duplicate(
+        self, mock_settings, mock_create_user, mock_get_user, mock_release,
+        mock_get_auth_user, mock_validate
     ):
-        """If the duplicate was on some other key (no auth_id winner to re-fetch),
-        the race handler surfaces a 500 rather than returning None."""
+        """No auth_id winner, the email released, and the retry still collides
+        with no winner to reuse: surface a 500 rather than returning None. (An
+        ordinary email collision no longer 500s — #765, covered on real Mongo in
+        test_email_ownership.py.)"""
         from pymongo.errors import DuplicateKeyError
 
         mock_settings.BYPASS_AUTH = False
@@ -311,14 +315,17 @@ class TestGetCurrentUserFromSession:
             "email": "test@example.com",
             "name": "Test User",
         }
-        mock_get_user.side_effect = [None, None]  # pre-check + re-fetch both empty
-        mock_create_user.side_effect = DuplicateKeyError("dup email")
+        mock_get_user.return_value = None  # pre-check, winner check, re-fetch
+        mock_release.return_value = 0
+        mock_create_user.side_effect = DuplicateKeyError("dup")
 
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user_from_session(Mock(spec=Request))
 
         assert exc_info.value.status_code == 500
         assert "Failed to create user account" in exc_info.value.detail
+        assert mock_create_user.call_count == 2  # one release-and-retry, no loop
+        mock_release.assert_awaited_once_with("test@example.com", "user_123")
 
 
 @pytest.mark.asyncio
@@ -460,7 +467,7 @@ class TestProductionSecurityValidation:
         from app.core.config import Settings
 
         monkeypatch.delenv("NODE_ENV", raising=False)
-        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "test")  # required since #777
         monkeypatch.setenv(env_var, env_value)
         monkeypatch.setenv("BYPASS_AUTH", "true")
         monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
@@ -469,12 +476,13 @@ class TestProductionSecurityValidation:
         settings = Settings()
         assert settings.BYPASS_AUTH is True
 
-    def test_bypass_auth_allowed_with_e2e_flag_when_env_not_set(self, monkeypatch):
-        """With E2E_ALLOW_BYPASS=1 the bypass stays allowed when no env marker is set (#307)."""
+    def test_bypass_auth_allowed_with_e2e_flag_when_node_env_not_set(self, monkeypatch):
+        """With E2E_ALLOW_BYPASS=1 the bypass stays allowed when NODE_ENV is unset (#307).
+        ENVIRONMENT itself can no longer be unset — that refuses to start (#777)."""
         from app.core.config import Settings
 
         monkeypatch.delenv("NODE_ENV", raising=False)
-        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "development")
         monkeypatch.setenv("BYPASS_AUTH", "true")
         monkeypatch.setenv("E2E_ALLOW_BYPASS", "1")
 
@@ -647,7 +655,7 @@ class TestProductionSecurityValidation:
         from pydantic import ValidationError as PydanticValidationError
         from app.core.config import Settings
 
-        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        monkeypatch.setenv("ENVIRONMENT", "development")  # NODE_ENV alone must still trip it
         monkeypatch.setenv("NODE_ENV", "Production")
         monkeypatch.setenv("BYPASS_AUTH", "false")
         monkeypatch.setenv(

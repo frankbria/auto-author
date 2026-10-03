@@ -64,6 +64,43 @@ class SessionRoleChecker:
         return user
 
 
+async def _resolve_auto_create_conflict(user_data: Dict) -> Dict:
+    """Resolve a DuplicateKeyError from the auto-create insert.
+
+    An auth_id winner exists: a concurrent first load won the insert (#178);
+    reuse it. No winner: the email index fired (#765) — a stale doc holds this
+    user's better-auth email. better-auth guarantees the address is this user's,
+    so release it from the stale doc and retry once, instead of a 500 on every
+    request forever. Keyed on the winner, not the error's keyPattern, so a
+    differently shaped error can't fall back into the lockout.
+    """
+    from app.db.user import create_user, get_user_by_auth_id, release_email
+
+    auth_id = user_data["auth_id"]
+    user = await get_user_by_auth_id(auth_id)
+    if user:
+        logger.info(f"Concurrent auto-create race for {auth_id}; using the existing record")
+        return user
+
+    released = await release_email(user_data["email"], auth_id)
+    logger.warning(
+        f"Auto-create for {auth_id} collided on email; "
+        f"released it from {released} stale record(s)"
+    )
+    try:
+        return await create_user(user_data)
+    except DuplicateKeyError:
+        # A concurrent first load won the retry; reuse its record.
+        user = await get_user_by_auth_id(auth_id)
+    if user is None:
+        logger.error(f"Auto-create for {auth_id} failed after releasing the email")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user account. Please try signing in again or contact support."
+        )
+    return user
+
+
 async def get_current_user_from_session(request: Request) -> Dict:
     """Get the current authenticated user from better-auth session cookies.
 
@@ -120,8 +157,15 @@ async def get_current_user_from_session(request: Request) -> Dict:
     # Convert ObjectId to string (better-auth stores userId as ObjectId)
     user_id = str(user_id)
 
-    # Get better-auth user to extract email/name for auto-creation
+    # The better-auth user row must still exist: a session outliving its user
+    # (deleted account, #763) is not a credential.
     better_auth_user = await get_better_auth_user(user_id)
+    if not better_auth_user:
+        logger.warning(f"Session for user {user_id} has no better-auth user")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found. Please sign up again."
+        )
 
     # Try to find user in application database
     try:
@@ -135,15 +179,28 @@ async def get_current_user_from_session(request: Request) -> Dict:
             detail="Error fetching user",
         )
 
+    # Explicit False: records predating the field are active (schema default).
+    if user and user.get("is_active") is False:
+        logger.warning(f"Rejected session for deactivated user {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This account is no longer active."
+        )
+
+    # better-auth owns the verified email; the users doc mirrors it (#765).
+    ba_email = (better_auth_user or {}).get("email")
+    if user and ba_email and user.get("email") != ba_email:
+        try:
+            from app.db.user import release_email, update_user
+
+            await release_email(ba_email, user_id)
+            user = await update_user(user_id, {"email": ba_email}, actor_id=user_id) or user
+        except Exception:
+            # Not an auth failure: serve the stale doc, retry next request.
+            logger.error(f"Failed to mirror email for {user_id}", exc_info=True)
+
     # Auto-create user if they have a valid session but no backend record
     if not user:
-        if not better_auth_user:
-            logger.error(f"User {user_id} not found in better-auth or application database")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found. Please sign up again."
-            )
-
         logger.info(
             f"User {user_id} authenticated with valid session but not found in backend. "
             "Auto-creating user record from better-auth data."
@@ -189,19 +246,7 @@ async def get_current_user_from_session(request: Request) -> Dict:
         except HTTPException:
             raise
         except DuplicateKeyError:
-            # A concurrent first-load request won the insert (issue #178). Re-fetch
-            # so both requests resolve to the one shared record instead of erroring.
-            logger.info(
-                f"Concurrent auto-create race for {user_id}; using the existing record"
-            )
-            from app.db.user import get_user_by_auth_id
-
-            user = await get_user_by_auth_id(user_id)
-            if user is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to create user account. Please try signing in again or contact support."
-                )
+            user = await _resolve_auto_create_conflict(user_data)
         except Exception as e:
             logger.error(f"Failed to auto-create user {user_id}: {str(e)}")
             raise HTTPException(

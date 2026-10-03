@@ -172,7 +172,7 @@ class TestStripeOrderingIsEnforcedByTheQuery:
             return {"auth_id": auth_id, **data}
 
         async def _fake_lookup(_customer_id):
-            return {"auth_id": "u1", "stripe_event_created": 500}
+            return {"auth_id": "u1", "stripe_subscription_id": "sub_1", "stripe_event_created": 500}
 
         monkeypatch.setattr(webhooks, "update_user", _fake_update_user)
         monkeypatch.setattr(
@@ -201,7 +201,7 @@ class TestStripeOrderingIsEnforcedByTheQuery:
             return None  # Mongo matched nothing: a newer event already applied
 
         async def _fake_lookup(_customer_id):
-            return {"auth_id": "u1", "stripe_event_created": 900}
+            return {"auth_id": "u1", "stripe_subscription_id": "sub_1", "stripe_event_created": 900}
 
         monkeypatch.setattr(webhooks, "update_user", _fake_update_user)
         monkeypatch.setattr(

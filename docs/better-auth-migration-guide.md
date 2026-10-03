@@ -174,7 +174,7 @@ def validate_jwt_secret(cls, v: str) -> str:
 python -c 'import secrets; print(secrets.token_urlsafe(32))'
 
 # Add to .env
-BETTER_AUTH_SECRET=SeAY0LEYEt16ZyQu-rSEwCcr5cJsawqTgr5-YVrAoE4
+BETTER_AUTH_SECRET=<generated-secret-from-the-command-above>
 ```
 
 ### 2. Client-Exposed Test Mode (HIGH)

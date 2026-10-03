@@ -62,9 +62,25 @@ query:
 MONGODB_URI, DATABASE_NAME, BETTER_AUTH_SECRET, OPENAI_API_KEY
 ```
 
-Everything else in the file is passed through wholesale via `env_file:` — the app
+The **backend** gets everything else in the file wholesale via `env_file:` — it
 also needs `AWS_*`, `CLOUDINARY_*`, `BETTER_AUTH_ISSUER` and
 `BACKEND_CORS_ORIGINS`, which an explicit allowlist would have silently dropped.
+
+The **frontend does not** (#781). It takes an explicit `environment:` list in
+`docker-compose.yml` — the Mongo connection, `BETTER_AUTH_*`, the `EMAIL_*`
+password-reset settings, `NEXT_PUBLIC_SENTRY_DSN`/`NEXT_PUBLIC_ENVIRONMENT` —
+with values still read from this same `.env` by compose interpolation, so there
+is one file on the box and no second one to keep in step. OpenAI, Stripe, AWS
+and Cloudinary keys never enter the Next.js process. Consequences:
+
+- **A new server-side variable the frontend reads must be added to that list**,
+  or it is silently absent in the container. `scripts/test_frontend_env_allowlist.py`
+  fails CI if the list names anything `frontend/src` does not read, or anything
+  backend-only.
+- The deploy checks the running container: **Frontend carries no backend secret**
+  runs `env` inside `auto-author-frontend-1` and fails on any `OPENAI*`,
+  `STRIPE*`, `AWS*`, `CLOUDINARY*` or `SENTRY_DSN` name (names only are logged).
+  By hand: `docker exec auto-author-frontend-1 env | cut -d= -f1 | sort`.
 
 Editing a value requires **recreating** the containers, not restarting them:
 
@@ -77,6 +93,9 @@ cd /opt/auto-author
 # env-only change does not also move the release:
 export IMAGE_TAG="$(docker ps --format '{{.Image}}' | sed -n 's#.*auto-author-backend:##p' | head -1)"
 echo "$IMAGE_TAG"   # expect sha-xxxxxxx; if empty, pass the tag explicitly
+# docker-compose.yml also requires ENVIRONMENT with no default (#777); the
+# workflows export it the same way, so a manual shell must too.
+export ENVIRONMENT=staging
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
 ```
 
@@ -205,7 +224,7 @@ Re-run the deploy with an earlier tag. That is the whole procedure:
 
 ```bash
 cd /opt/auto-author
-IMAGE_TAG=sha-<previous> docker compose \
+IMAGE_TAG=sha-<previous> ENVIRONMENT=staging docker compose \
   -f docker-compose.yml -f docker-compose.staging.yml up -d
 ```
 
@@ -216,6 +235,11 @@ IMAGE_TAG=sha-<previous> docker compose \
 **Compose exits with `MONGODB_URI is required`** — the box `.env` is missing that
 key, or the deploy is running from a directory without it. This is the assertion
 working; check `/opt/auto-author/.env`.
+
+**Compose exits with `ENVIRONMENT is required`** — the shell running compose
+did not export `ENVIRONMENT`. There is deliberately no default (#777): the
+backend's production guards key off it. The workflows export `staging`; a manual
+shell must do the same.
 
 **Backend health 503** — read the `checks` object in the response body; it names
 the failing component. Mongo failures are usually a rotated password not yet
@@ -231,6 +255,8 @@ confirm the holder is ours before killing anything.
 
 ```bash
 cd /opt/auto-author
+# Every compose command interpolates the files: export IMAGE_TAG and
+# ENVIRONMENT=staging first, as in the recreate snippet above.
 docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=100 backend
 docker compose -f docker-compose.yml -f docker-compose.staging.yml ps
 ```

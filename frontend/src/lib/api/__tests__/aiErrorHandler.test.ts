@@ -226,6 +226,25 @@ describe('aiErrorHandler', () => {
       );
     });
 
+    it('shows the quota cap itself, not a generic retry-in-minutes message (#766)', async () => {
+      const detail =
+        'AI usage limit reached (50 generations per day on the pro plan). It resets at midnight UTC.';
+      const error = Object.assign(new Error(detail), { statusCode: 429 });
+
+      const result = await handleAIServiceError(error);
+
+      expect(result.error).toBe(detail);
+      expect(result.canRetry).toBe(false);
+      expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'AI usage limit reached',
+          details: detail,
+          retryable: false,
+        }),
+        expect.any(Object)
+      );
+    });
+
     it('should show estimated wait time for rate limits', async () => {
       const error = new Error(
         `Failed: 429 ${JSON.stringify({

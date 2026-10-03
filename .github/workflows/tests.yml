@@ -309,6 +309,8 @@ jobs:
         env:
           MONGODB_URI: mongodb://localhost:27017
           DATABASE_NAME: auto_author_e2e_test
+          # Required since #777 — the backend refuses to start without it.
+          ENVIRONMENT: test
           BYPASS_AUTH: 'true'
           # Required alongside BYPASS_AUTH in every environment since #307 —
           # without it the backend coerces the bypass off and E2E gets 401s.

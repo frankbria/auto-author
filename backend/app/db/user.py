@@ -2,7 +2,7 @@
 
 import logging
 
-from .base import users_collection, books_collection
+from .base import users_collection, books_collection, get_collection
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
@@ -92,6 +92,20 @@ async def create_user(user_data: Dict) -> Dict:
     return await get_user_by_id(str(result.inserted_id))
 
 
+async def release_email(email: str, auth_id: str) -> int:
+    """Unset ``email`` on every users doc except ``auth_id``'s (#765).
+
+    better-auth keeps emails unique and owns their verification, so when
+    ``auth_id``'s better-auth user holds ``email``, any other backend doc holding
+    it is stale (squatted through the old PATCH /users/me, or left over from a
+    deleted account). Returns how many docs were released.
+    """
+    result = await users_collection.update_many(
+        {"email": email, "auth_id": {"$ne": auth_id}}, {"$unset": {"email": ""}}
+    )
+    return result.modified_count
+
+
 async def update_user(
     auth_id: str, user_data: Dict, actor_id: str = None,
     extra_filter: Optional[Dict] = None,
@@ -129,21 +143,50 @@ async def update_user(
     return updated_user
 
 
+async def delete_better_auth_identity(auth_id: str) -> None:
+    """Remove the better-auth user and everything that authenticates as it:
+    sessions (every device), credential/OAuth accounts (the old password) and
+    the twoFactor secret (#763).
+
+    better-auth's MongoDB adapter stores ``_id`` and ``userId`` as ObjectIds;
+    the string form is matched too so a legacy string-keyed row can't survive.
+    """
+    ids: List = [auth_id]
+    if ObjectId.is_valid(auth_id):
+        ids.append(ObjectId(auth_id))
+    for name in ("session", "account", "twoFactor"):
+        collection = await get_collection(name)
+        await collection.delete_many({"userId": {"$in": ids}})
+    better_auth_users = await get_collection("user")
+    await better_auth_users.delete_many({"$or": [{"_id": {"$in": ids}}, {"id": auth_id}]})
+
+
 async def delete_user(
     auth_id: str, actor_id: str = None, soft_delete: bool = True
 ) -> bool:
-    """Delete a user (soft delete by default)"""
+    """Delete a user (soft delete by default) and revoke their better-auth identity.
+
+    The soft-deleted record keeps is_active=False (which the session resolver
+    rejects) but drops its email: the unique email index would otherwise make
+    a later sign-up with the same address fail to auto-create (#763).
+    """
     if soft_delete:
-        # Mark user as inactive instead of deleting
         result = await users_collection.update_one(
             {"auth_id": auth_id},
-            {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}},
+            {
+                "$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)},
+                "$unset": {"email": ""},
+            },
         )
         success = result.modified_count > 0
     else:
         # Hard delete
         result = await users_collection.delete_one({"auth_id": auth_id})
         success = result.deleted_count > 0
+
+    # Unconditional: a better-auth user who never reached the backend has no
+    # app record, but their sessions and credentials must still go.
+    await delete_better_auth_identity(auth_id)
 
     # Log the deletion
     if success:

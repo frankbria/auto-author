@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+import uuid
 from fastapi import (
     APIRouter,
     Depends,
@@ -1199,6 +1200,13 @@ async def generate_table_of_contents(
         toc_result = await ai_service.generate_toc_from_summary_and_responses(
             summary, responses, book_metadata
         )
+
+        # The AI numbers chapters positionally (ch1, ch1-1). On accept, PUT
+        # /toc keeps the id and draft of any stored chapter with the same id,
+        # so a positional id would hand an old draft to an unrelated chapter
+        # (#754). The proposal carries fresh ids instead.
+        for item in _walk_toc(toc_result["toc"].get("chapters") or []):
+            item["id"] = str(uuid.uuid4())
 
         # Propose only; never persist (#753). The old unguarded $set replaced the
         # stored TOC and every chapter draft before the user saw the result, and
