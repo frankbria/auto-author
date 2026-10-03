@@ -4,6 +4,22 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **A background TOC refresh or a session refetch no longer remounts the chapter editor (#758, P0.10)**:
+  - **The bugs.**
+    - `useChapterTabs.refreshChapters` set `is_loading`, and `ChapterTabs` shows its skeleton while loading. Every `tocUpdated` event and every cross-tab `toc-updated-<book>` storage event (a TOC saved on the Edit TOC page, a chapter created or deleted) unmounted the editor. The cursor, focus and undo history were lost, and the remount fetched the chapter content again.
+    - `refreshChapters` read the active tab from its render closure, so a tab picked while a refresh was in flight was switched back when the refresh landed. A failed refresh set `error`, which replaced the editor with the error panel.
+    - The book page keyed its load on the `session` object. better-auth hands out a new object on every session refetch for the same user, including on window focus, so the page went back to its skeleton and unmounted `ChapterTabs`.
+    - Both were reproduced in a real browser on main. After a TOC save in a second tab, or a `visibilitychange`, the skeleton showed, the editor's DOM node was replaced, the chapter content was fetched 3 more times, and keystrokes typed afterwards were lost.
+  - **The fix.**
+    - `refreshChapters` is a background refresh. It never touches `is_loading`, and it merges the new chapter list into `prev` inside the state updater, so its deps are just `[bookId]`.
+    - A failed refresh keeps the chapters already loaded. The error panel, with its Retry, appears only when nothing is loaded.
+    - The book page keys its load and its settled check on `session?.user?.id`. A different user still reloads the page.
+  - **Verified.**
+    - `ChapterTabs.backgroundRefresh.test.tsx` runs the real `ChapterTabs`, hook, `useTocSync` and TipTap editor. Four of its five tests fail on main. The fifth pins the error panel when nothing is loaded.
+    - `page.sessionIdentity.test.tsx` checks two cases: a new session object for the same user does not refetch the book or remount `ChapterTabs` (fails on main), and a different user does reload.
+    - Mutating the active tab back to the render closure fails the mid-refresh test.
+    - Browser demo against a real backend, Mongo and better-auth, run before and after the fix. With the fix the same editor node survived both triggers, with no skeleton, no content GET and no book GET. Keystrokes typed afterwards landed, and Mongo stored them.
+  - **Left for later.** A single mount still requests the chapter content more than once. The first request starts before TipTap's instance exists, and its result is discarded. That predates this issue. Save conflicts are #760.
 - **The chapter editor no longer drops edits or saves over a chapter it failed to load (#757, P0.9)**:
   - **The bugs.**
     - Effect cleanup only cleared the autosave timer. Since #756 keys the editor per chapter, text typed inside the 3s debounce before a tab switch was dropped on unmount.
