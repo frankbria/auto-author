@@ -9,6 +9,7 @@ import asyncio
 import hashlib
 import logging
 import threading
+import time
 from typing import Dict, Literal, Optional
 
 import stripe
@@ -17,7 +18,7 @@ from pydantic import BaseModel
 
 from app.api.dependencies import audit_request, get_rate_limiter
 from app.core.config import settings
-from app.core.entitlements import ai_quota_for_plan
+from app.core.entitlements import DEFAULT_PLAN, ai_quota_for_plan, has_live_subscription
 from app.core.security import get_current_user_from_session
 from app.db.user import get_user_by_auth_id, update_user
 
@@ -37,7 +38,7 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
     if not subscription_id:
         return
     try:
-        await asyncio.to_thread(
+        cancelled = await asyncio.to_thread(
             stripe.Subscription.cancel,
             subscription_id,
             api_key=settings.STRIPE_SECRET_KEY,
@@ -55,9 +56,18 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
         ) from None
     # Forget the cancelled id: if a later deletion step fails, the retry must not
     # depend on how Stripe answers a second cancel once the 24h key has expired.
+    # With the id gone, the webhook treats Stripe's subscription.deleted for it
+    # as another subscription's and ignores it (#768), so apply its effect here,
+    # watermark included: a late pre-cancel event for the dead subscription must
+    # land as stale_event, not re-establish it and grant pro.
     await update_user(
         auth_id,
-        {"stripe_subscription_id": None},
+        {
+            "stripe_subscription_id": None,
+            "stripe_subscription_status": None,
+            "plan": DEFAULT_PLAN,
+            "stripe_event_created": getattr(cancelled, "canceled_at", None) or int(time.time()),
+        },
         extra_filter={"stripe_subscription_id": subscription_id},
     )
 
@@ -196,6 +206,13 @@ async def create_checkout_session(
     """Create a Stripe Checkout session for upgrading to a paid plan."""
     _require_stripe_checkout()
 
+    # The subscription, not the plan: a past_due subscriber on free (first
+    # payment never landed) already has one, and a second would double-bill (#768).
+    if has_live_subscription(current_user):
+        raise HTTPException(
+            status_code=409,
+            detail="You already have a subscription. Use Manage billing to update or cancel it.",
+        )
     if current_user.get("plan") in PAID_PLANS:
         raise HTTPException(status_code=409, detail="You are already on a paid plan")
 
