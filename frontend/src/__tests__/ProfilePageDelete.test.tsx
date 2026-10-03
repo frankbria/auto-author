@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import UserProfile from '@/app/profile/page';
-import { useSession } from '@/lib/auth-client';
+import { authClient, useSession } from '@/lib/auth-client';
 
 // Type-to-confirm tests for account deletion (issue #216): the Delete-account
 // button must stay disabled until the user types the account email, matching
@@ -104,6 +104,36 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     await waitFor(() => expect(deleteCall()).toBeDefined());
     expect(deleteCall()![0]).toBe('/users/me');
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'));
+  });
+
+  it('signs out after the DELETE succeeds and before redirecting (#763)', async () => {
+    const signOut = authClient.signOut as jest.Mock;
+    signOut.mockClear();
+    const { input, confirmButton } = await openDeleteDialog();
+    fireEvent.change(input, { target: { value: SESSION_EMAIL } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'));
+    expect(signOut).toHaveBeenCalledTimes(1);
+    const deleteOrder = mockAuthFetch.mock.invocationCallOrder[
+      mockAuthFetch.mock.calls.findIndex(([, opts]) => opts?.method === 'DELETE')
+    ];
+    expect(deleteOrder).toBeLessThan(signOut.mock.invocationCallOrder[0]);
+    expect(signOut.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPush.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('still redirects when signOut fails after a successful delete (#763)', async () => {
+    const signOut = authClient.signOut as jest.Mock;
+    signOut.mockRejectedValueOnce(new Error('network'));
+    const { toast } = jest.requireMock('@/lib/toast');
+    const { input, confirmButton } = await openDeleteDialog();
+    fireEvent.change(input, { target: { value: SESSION_EMAIL } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'));
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('submits on Enter when the confirmation matches', async () => {
