@@ -225,6 +225,31 @@ describe('ChapterEditor save conflict (#760)', () => {
     expect(sentTokens()[1]).toBe('T9');
   });
 
+  it('keeps the text dropped on Reload restorable after later saves and leaving', async () => {
+    const view = await openIntoConflict();
+    await act(async () => view.getByRole('button', { name: 'Reload their version' }).click());
+    mockBookClient.saveChapterContent.mockResolvedValue(saved('T10'));
+
+    view.type(' edit');
+    await flushTimers(3000);
+    view.type(' again');
+    view.unmount();
+    await flushTimers(0);
+
+    expect(sentContent().slice(1)).toEqual(['<p>Theirs edit</p>', '<p>Theirs edit again</p>']);
+    expect(backup()).toBe('<p>Alpha mine</p>');
+  });
+
+  it('does not carry a conflict over to another chapter shown in the same editor', async () => {
+    const view = await openIntoConflict();
+    mockBookClient.saveChapterContent.mockResolvedValue(saved('T2'));
+
+    view.rerender(<ChapterEditor bookId="bk" chapterId="C" />);
+    await waitFor(() => expect(view.getByRole('button', { name: 'Save' })).toBeEnabled());
+
+    expect(view.queryByRole('button', { name: 'Overwrite with mine' })).toBeNull();
+  });
+
   it('backs up edits made during the conflict when the editor is left unresolved', async () => {
     const view = await openIntoConflict();
     mockBookClient.saveChapterContent.mockRejectedValue(conflict('<p>Theirs</p>', 'T9'));

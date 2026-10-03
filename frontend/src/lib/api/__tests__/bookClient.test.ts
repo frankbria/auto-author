@@ -1771,6 +1771,16 @@ describe('BookClient core CRUD – success paths', () => {
     });
   });
 
+  // Without the token a resend would be unconditional, so it is not a conflict the editor can act on.
+  it('saveChapterContent reports a 409 missing current_last_modified as a plain failure', async () => {
+    const detail = { message: 'Saved elsewhere', current_content: '<p>Theirs</p>' };
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(409, JSON.stringify({ detail })));
+
+    const err = await bookClient.saveChapterContent(BOOK_ID, CHAPTER_ID, 'x').catch((e) => e);
+
+    expect(err.statusCode).toBeUndefined();
+  });
+
   it('saveChapterContent reports a 409 without a server copy as a plain failure', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(409, 'Conflict', { detail: 'Conflict' }));
 

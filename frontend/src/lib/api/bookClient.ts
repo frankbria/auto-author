@@ -34,7 +34,12 @@ function chapterConflictDetail(
 ): { message: string; current_last_modified: string | null; current_content: string } | null {
   try {
     const detail = JSON.parse(body)?.detail;
-    return typeof detail?.current_content === 'string' ? detail : null;
+    // Without a token (string, or null for a never-saved chapter) a resend
+    // would be unconditional, so the editor could not offer a safe overwrite.
+    const token = detail?.current_last_modified;
+    return typeof detail?.current_content === 'string' && (typeof token === 'string' || token === null)
+      ? detail
+      : null;
   } catch {
     return null;
   }

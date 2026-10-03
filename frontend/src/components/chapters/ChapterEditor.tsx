@@ -54,6 +54,8 @@ import {
 import {
   backupChapterContent,
   chapterBackupKey,
+  clearChapterBackup,
+  DROPPED_ON_RELOAD,
   flushChapterContent,
   isChapterConflict,
   PendingChapterEdit,
@@ -253,6 +255,8 @@ export function ChapterEditor({
     const loadChapterContent = async () => {
       setIsLoading(true);
       setError(null);
+      // A conflict belongs to the chapter it was raised on.
+      setConflict(null);
       try {
         const contentData = await bookClient.getChapterContent(bookId, chapterId);
         if (ignore) return;
@@ -349,7 +353,7 @@ export function ChapterEditor({
       return;
     }
     // The dropped text, including edits made since the conflict, stays restorable.
-    backupChapterContent({ bookId, chapterId, content: editor.getHTML() }, conflict);
+    backupChapterContent({ bookId, chapterId, content: editor.getHTML() }, new Error(DROPPED_ON_RELOAD));
     noteBackupWrite();
     editor.commands.setContent(conflict.currentContent);
     unsavedRef.current = null;
@@ -384,7 +388,7 @@ export function ChapterEditor({
         markSaved(content);
 
         // Clear backup after successful save
-        localStorage.removeItem(chapterBackupKey(bookId, chapterId));
+        clearChapterBackup(bookId, chapterId);
         noteBackupWrite();
       } catch (err) {
         console.error('Failed to auto-save chapter:', err);
@@ -420,7 +424,7 @@ export function ChapterEditor({
       markSaved(content);
 
       // Clear backup after successful save
-      localStorage.removeItem(chapterBackupKey(bookId, chapterId));
+      clearChapterBackup(bookId, chapterId);
       noteBackupWrite();
 
       if (onSave) {
