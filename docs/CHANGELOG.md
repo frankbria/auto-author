@@ -4,6 +4,19 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **The chapter editor sends its save token and asks reload-or-overwrite on a conflict (#760, P0.12)**:
+  - **The bug.** Every content save was unconditional. Two tabs or devices on one chapter silently overwrote each other, last write wins. #759 gave the PATCH an optional `expected_last_modified` precondition, and no client sent it.
+  - **The fix.**
+    - `saveChapterContent` takes `expectedLastModified`. When it is `undefined` the key is left out and the save is unconditional. `null`, for a chapter never saved, is sent. A 409 with the backend's detail throws an error carrying `currentLastModified` and `currentContent`.
+    - Debounced autosave, manual Save and the keepalive flush on leaving all go through one helper, `saveChapterEdit`. It sends the token last seen for that chapter verbatim, then records the token from the 200 before resolving. That means a flush waiting on an in-flight save sends the newer token. Tokens come from GET content only, never `/chapters/metadata`.
+    - On a 409 the editor keeps the writer's text and backs it up to localStorage. It stops autosaving, disables Save, and asks in the existing `role="alert"` region. **Overwrite with mine** resends the current text on `current_last_modified`, only on click. **Reload their version** backs the local text up again, edits made since the conflict included, then loads the server copy. The Restore Backup banner then offers the dropped text.
+    - A flush on leaving during an unresolved conflict still sends the old token. It gets a 409 and lands in the backup, so leaving never overwrites the other copy.
+    - The bulk-status endpoint moves `last_modified` without touching content. A 409 whose `current_content` equals the text this editor last saw is therefore resent once on the new token, with no prompt. Without that, every status change from the tab menu would raise a false conflict.
+  - **Verified.**
+    - 12 real-TipTap jest tests in `ChapterEditor.conflict.test.tsx` and 3 bookClient tests were added. All of the editor tests and two of the bookClient tests fail on main. The third pins a non-conflict 409 as a plain failure.
+    - Five mutations were checked and all five were caught: dropping the token, autosaving during a conflict, removing the status-only resend, resending on every conflict, and skipping the backup on Reload.
+    - Browser demo with two contexts against a real backend and Mongo. A saved, then B typed. B got a 409, showed the choice, and kept its text and a backup, while Mongo still held A's text after 5 more seconds of typing in B. Overwrite put B's text in Mongo. A, now stale, got a conflict, and Reload showed B's text with A's text in the backup, leaving Mongo unchanged. A status change followed by typing saved with no prompt.
+  - **Left for later.** `ChapterEditor.tsx` was already over the 500-line limit before this change and is now at 788 lines.
 - **A background TOC refresh or a session refetch no longer remounts the chapter editor (#758, P0.10)**:
   - **The bugs.**
     - `useChapterTabs.refreshChapters` set `is_loading`, and `ChapterTabs` shows its skeleton while loading. Every `tocUpdated` event and every cross-tab `toc-updated-<book>` storage event (a TOC saved on the Edit TOC page, a chapter created or deleted) unmounted the editor. The cursor, focus and undo history were lost, and the remount fetched the chapter content again.
