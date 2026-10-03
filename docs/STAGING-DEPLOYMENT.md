@@ -28,9 +28,21 @@ Shared VPS
 └── MongoDB: Atlas (external, IP-allowlisted)
 ```
 
-Images are built in CI by `build-images.yml` and published to GHCR as
-`sha-<short>` and `staging`. The **image tag is the release identifier** — there
-is no release directory.
+Images are built in CI by `build-images.yml` and published to GHCR. The **image
+tag is the release identifier** — there is no release directory.
+
+- **Backend**: `sha-<short>` and `staging`. Configured at run time, so one image
+  serves every environment.
+- **Frontend**: one image per environment (#779), because Next inlines
+  `NEXT_PUBLIC_*` into the bundle at build time — `sha-<short>-staging` (also
+  floated as `staging`) and `sha-<short>-production`. The values come from each
+  GitHub environment's **variables** (`NEXT_PUBLIC_API_URL`,
+  `NEXT_PUBLIC_BETTER_AUTH_URL`, optional `NEXT_PUBLIC_SENTRY_DSN`); a main build
+  fails if a required one is unset rather than baking in another environment's
+  hosts. `NEXT_PUBLIC_ENVIRONMENT` is the environment's name.
+
+The deploy's `image_tag` input is the backend's `sha-<short>`; the staging
+overlay pulls `<image_tag>-staging` for the frontend.
 
 ### Network exposure (#189)
 
@@ -208,6 +220,10 @@ cd /opt/auto-author
 IMAGE_TAG=sha-<previous> docker compose \
   -f docker-compose.yml -f docker-compose.staging.yml up -d
 ```
+
+Builds from before #779 have no `-staging` frontend tag, so the current overlay
+cannot roll back past that change; pin the frontend image by hand
+(`auto-author-frontend:sha-<previous>`) for such a rollback.
 
 ---
 

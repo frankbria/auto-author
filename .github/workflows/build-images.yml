@@ -39,22 +39,56 @@ env:
 
 jobs:
   build:
-    name: Build ${{ matrix.app }} image
+    name: Build ${{ matrix.app }}${{ matrix.environment && format(' ({0})', matrix.environment) || '' }} image
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    # NEXT_PUBLIC_* is inlined into the client bundle at build time, so a frontend
+    # image is only valid for one environment (#779). Each frontend variant runs
+    # in its GitHub environment, which is what scopes `vars.*` to that
+    # environment's values. `deployment: false`: borrowing an environment for its
+    # vars is not a deployment, and must not show up as one.
+    #
+    # Pull requests name no environment. They only prove the Dockerfile builds and
+    # publish nothing, and a production environment restricted to main would
+    # otherwise reject every PR job.
+    environment:
+      name: ${{ github.event_name != 'pull_request' && matrix.environment || '' }}
+      deployment: false
 
     strategy:
       fail-fast: false
       matrix:
         include:
+          # The backend reads its configuration at run time, so one image serves
+          # every environment.
           - app: backend
-            context: ./backend
           - app: frontend
-            context: ./frontend
+            environment: staging
+          - app: frontend
+            environment: production
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Fail closed. An unset var would build a bundle pointing at localhost (the
+      # source fallback) or, before #779, at staging — either way an image that
+      # boots, passes the smoke test and talks to the wrong API.
+      - name: Require ${{ matrix.environment }} build vars
+        if: matrix.app == 'frontend' && github.event_name != 'pull_request'
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_BETTER_AUTH_URL: ${{ vars.NEXT_PUBLIC_BETTER_AUTH_URL }}
+        run: |
+          missing=0
+          for name in NEXT_PUBLIC_API_URL NEXT_PUBLIC_BETTER_AUTH_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set on the '${{ matrix.environment }}' environment (Settings > Environments > ${{ matrix.environment }} > Variables)"
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ] || exit 1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
@@ -75,30 +109,39 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/auto-author-${{ matrix.app }}
+          # The sha- tag is the release id. Frontend variants carry their
+          # environment (sha-abc1234-staging / -production) so a deploy cannot
+          # pull the other environment's bundle; the backend keeps the bare
+          # sha-abc1234 the deploy's IMAGE_TAG input names. The floating `staging`
+          # tag never lands on a production build.
           tags: |
-            type=sha,format=short,prefix=sha-
-            type=raw,value=staging,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-,suffix=${{ matrix.environment && format('-{0}', matrix.environment) || '' }}
+            type=raw,value=staging,enable=${{ matrix.environment != 'production' && '{{is_default_branch}}' || 'false' }}
 
       - name: Build and push
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
-          context: ${{ matrix.context }}
+          context: ./${{ matrix.app }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.app }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
-          # NEXT_PUBLIC_* is inlined into the client bundle at build time, so the
-          # frontend image is environment-specific and these must be present here
-          # rather than injected at run time. Harmless no-ops for the backend.
+          cache-from: type=gha,scope=${{ matrix.app }}${{ matrix.environment }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}${{ matrix.environment }}
+          # From the job's environment only — no fallbacks (#779). Harmless no-ops
+          # for the backend. NEXT_PUBLIC_SENTRY_DSN is optional: Sentry stays inert
+          # without it.
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://api.dev.autoauthor.app/api/v1' }}
-            NEXT_PUBLIC_BETTER_AUTH_URL=${{ vars.NEXT_PUBLIC_BETTER_AUTH_URL || 'https://dev.autoauthor.app' }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_BETTER_AUTH_URL=${{ vars.NEXT_PUBLIC_BETTER_AUTH_URL }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_ENVIRONMENT=${{ matrix.environment }}
 
       # A built image that cannot start is worse than a failed build: it publishes
       # a tag the deploy would happily pull. Boot each image before it is trusted.
       - name: Smoke test the built image
         if: github.event_name != 'pull_request'
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
         run: |
           TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
           echo "Booting $TAG"
@@ -113,6 +156,12 @@ jobs:
               "$TAG"
             URL=http://localhost:8000/api/v1/health
           else
+            # The bundle must carry this environment's API host, not another's.
+            if ! docker run --rm --entrypoint grep "$TAG" -rqF "$NEXT_PUBLIC_API_URL" .next/static; then
+              echo "::error::$TAG: .next/static does not contain $NEXT_PUBLIC_API_URL"
+              exit 1
+            fi
+            echo "OK: .next/static contains $NEXT_PUBLIC_API_URL"
             docker run -d --name smoke -p 3002:3002 \
               -e DATABASE_URL=mongodb://127.0.0.1:27017/smoke \
               -e DATABASE_NAME=smoke \
@@ -122,7 +171,7 @@ jobs:
             # renders without it, which is enough to prove the image boots.
             URL=http://localhost:3002/
           fi
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$URL" || true)
             [ "$code" = "200" ] && echo "OK: $URL -> 200" && exit 0
             sleep 4
@@ -134,4 +183,4 @@ jobs:
       - name: Report published tags
         if: github.event_name != 'pull_request'
         run: |
-          { echo "## ${{ matrix.app }} image"; echo '```'; echo '${{ steps.meta.outputs.tags }}'; echo '```'; } >> $GITHUB_STEP_SUMMARY
+          { echo "## ${{ matrix.app }} ${{ matrix.environment }} image"; echo '```'; echo '${{ steps.meta.outputs.tags }}'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

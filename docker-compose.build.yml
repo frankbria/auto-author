@@ -14,6 +14,11 @@ services:
       args:
         # NEXT_PUBLIC_* is inlined into the client bundle at build time, so these
         # are build args rather than runtime env. Changing one needs a rebuild,
-        # not a restart.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.dev.autoauthor.app/api/v1}
-        NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL:-https://dev.autoauthor.app}
+        # not a restart, and the image only serves the environment they name
+        # (#779). Required, not defaulted: a default would silently bake one
+        # environment's hosts into another's image.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required (the target environment's API, e.g. https://api.example.com/api/v1)}
+        NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL:?NEXT_PUBLIC_BETTER_AUTH_URL is required (the target environment's frontend origin)}
+        NEXT_PUBLIC_ENVIRONMENT: ${NEXT_PUBLIC_ENVIRONMENT:?NEXT_PUBLIC_ENVIRONMENT is required (staging or production)}
+        # Optional: Sentry stays inert without a DSN.
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
