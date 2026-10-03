@@ -503,7 +503,9 @@ export function ChapterEditor({
 
   return (
     <div className="h-full flex flex-col">
-      {hasBackup && (
+      {/* Restoring or AI-editing a chapter that failed to load would put text in
+          an editor that can never save it (#757), so those controls wait for Retry. */}
+      {hasBackup && !loadFailed && (
         <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-700 dark:text-yellow-400 px-4 py-2 text-sm flex items-center justify-between">
           <span>A local backup of your content is available. Would you like to restore it?</span>
           <div className="flex gap-2">
@@ -586,6 +588,7 @@ export function ChapterEditor({
         <TabsContent value="editor" className="flex-1 min-h-0 mt-0">
         <div className="h-full flex flex-col min-h-0">
       {/* Editor Toolbar */}
+      {!loadFailed && (
       <div className="border-b border-border p-1 bg-muted/30 flex flex-wrap gap-1 items-center justify-between">
         {/* Formatting controls live in a memoized child so a keystroke does
             not reconcile fourteen buttons and their icons (#347). It also
@@ -649,6 +652,7 @@ export function ChapterEditor({
           </Button>
         )}
       </div>
+      )}
 
       {/* Editor Content */}
       <div className="flex-1 p-4 bg-white overflow-auto">

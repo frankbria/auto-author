@@ -265,33 +265,66 @@ describe('ChapterEditor pending edits (#757)', () => {
     ]);
   });
 
-  it('keeps a chapter that failed to load read-only and unsaved until Retry loads it', async () => {
-    let serverDown = true;
-    mockBookClient.getChapterContent.mockImplementation(async () => {
-      if (serverDown) throw new Error('Failed to get chapter content: 500');
-      return { content: '<p>Real chapter</p>', chapter_id: 'A', book_id: 'bk' };
-    });
+  it('does not save on leaving a chapter the user never edited', async () => {
+    const load = deferred('A');
+    mockBookClient.getChapterContent.mockReturnValue(load.promise);
     const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
-
-    const retry = await view.findByRole('button', { name: 'Retry' });
-    const editor = editorIn(view.container);
-    expect(editor.isEditable).toBe(false);
-
-    // Programmatic edits (AI tools, restoring a backup) bypass read-only.
-    act(() => {
-      editor.commands.setContent('<p>should never be saved</p>');
-    });
-    await flushTimers(5000);
-    expect(mockBookClient.saveChapterContent).not.toHaveBeenCalled();
-
-    serverDown = false;
-    await act(async () => retry.click());
-    await waitFor(() => expect(editorIn(view.container).getHTML()).toBe('<p>Real chapter</p>'));
-    expect(editorIn(view.container).isEditable).toBe(true);
-    expect(view.queryByRole('button', { name: 'Retry' })).toBeNull();
+    await act(async () => load.resolve('<p>Alpha</p>'));
+    await waitFor(() => expect(view.container.querySelector('.ProseMirror')).not.toBeNull());
 
     view.unmount();
     await flushTimers(0);
+
     expect(mockBookClient.saveChapterContent).not.toHaveBeenCalled();
+  });
+
+  describe('when the chapter fails to load', () => {
+    let serverDown: boolean;
+    beforeEach(() => {
+      serverDown = true;
+      mockBookClient.getChapterContent.mockImplementation(async () => {
+        if (serverDown) throw new Error('Failed to get chapter content: 500');
+        return { content: '<p>Real chapter</p>', chapter_id: 'A', book_id: 'bk' };
+      });
+    });
+
+    it('is read-only, offers no editing tools, and never saves over the chapter', async () => {
+      localStorage.setItem(
+        'chapter-backup-bk-A',
+        JSON.stringify({ content: '<p>old backup</p>', timestamp: Date.now() })
+      );
+      const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
+
+      await view.findByRole('button', { name: 'Retry' });
+      const editor = editorIn(view.container);
+      expect(editor.isEditable).toBe(false);
+      expect(view.queryByRole('toolbar')).toBeNull();
+      expect(view.queryByRole('button', { name: 'Restore Backup' })).toBeNull();
+      expect(view.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+      // A programmatic edit bypasses read-only; it must still never be saved,
+      // neither by autosave nor by the flush on leaving.
+      act(() => {
+        editor.commands.setContent('<p>should never be saved</p>');
+      });
+      await flushTimers(5000);
+      view.unmount();
+      await flushTimers(0);
+
+      expect(mockBookClient.saveChapterContent).not.toHaveBeenCalled();
+    });
+
+    it('loads the chapter, editable, when Retry succeeds', async () => {
+      const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
+      const retry = await view.findByRole('button', { name: 'Retry' });
+
+      serverDown = false;
+      await act(async () => retry.click());
+
+      await waitFor(() => expect(editorIn(view.container).getHTML()).toBe('<p>Real chapter</p>'));
+      expect(editorIn(view.container).isEditable).toBe(true);
+      expect(view.queryByRole('button', { name: 'Retry' })).toBeNull();
+      expect(view.getByRole('toolbar')).toBeInTheDocument();
+    });
   });
 });
