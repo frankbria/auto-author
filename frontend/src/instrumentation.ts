@@ -4,11 +4,11 @@
 // Next.js runs register() once per server/edge runtime; onRequestError routes
 // server-side (incl. React Server Component) errors to Sentry.
 import * as Sentry from '@sentry/nextjs';
-import { assertSecretNotPublished } from '@/lib/auth-secret';
 
 export async function register() {
   // Refuse to boot a deployed server on a secret published in the repo (#780).
-  if (process.env.NEXT_RUNTIME === 'nodejs') assertSecretNotPublished();
+  // Dynamic import: auth-secret uses node:crypto, which the edge bundle must not evaluate.
+  if (process.env.NEXT_RUNTIME === 'nodejs') (await import('@/lib/auth-secret')).assertSecretNotPublished();
 
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
   if (!dsn) return;
