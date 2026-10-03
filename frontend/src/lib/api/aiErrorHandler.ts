@@ -30,6 +30,15 @@ export interface AIServiceResult<T> {
 }
 
 /**
+ * True for the backend's per-plan quota 429 (#766), as opposed to the transient
+ * per-endpoint rate limit: its detail already states the cap and when it resets,
+ * and waiting a few minutes cannot help.
+ */
+export function isQuotaCapMessage(message: string | undefined): boolean {
+  return /^(AI usage limit reached|Your \w+ plan has no AI generations)/.test(message ?? '');
+}
+
+/**
  * Extract error details from various error types
  */
 function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
@@ -198,6 +207,28 @@ export async function handleAIServiceError<T>(
     );
 
     return { error: userMessage, canRetry: false };
+  }
+
+  // Quota cap (#766): the backend detail already states the cap, when it resets and
+  // what Pro raises it to. Waiting a few minutes cannot help, so show it verbatim
+  // and don't offer a retry.
+  if (errorDetails.status_code === 429 && isQuotaCapMessage(errorDetails.message)) {
+    showErrorNotification(
+      {
+        type: ErrorType.PERMANENT,
+        severity: ErrorSeverity.HIGH,
+        message: 'AI usage limit reached',
+        details: errorDetails.message,
+        statusCode: 429,
+        retryable: false,
+        correlationId: `ai-quota-${Date.now()}`,
+        timestamp: new Date(),
+        suggestedActions: [],
+      },
+      { duration: 12000 }
+    );
+
+    return { error: errorDetails.message, canRetry: false };
   }
 
   // Check if cached content is available

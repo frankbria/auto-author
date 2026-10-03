@@ -12,6 +12,8 @@ export type PortalSession = {
   url: string;
 };
 
+export type PlanQuotas = Record<'free' | 'pro', { daily: number; monthly: number }>;
+
 /**
  * Hook for billing operations against the better-auth backend.
  * All requests are cookie-authenticated via useAuthFetch (credentials: 'include').
@@ -35,9 +37,16 @@ export const useBillingApi = () => {
     });
   }, [authFetch]);
 
+  /** Per-plan AI generation caps, straight from the backend's quota settings (#766). */
+  const getPlanQuotas = useCallback(
+    (): Promise<PlanQuotas> => authFetch<PlanQuotas>('/billing/quotas'),
+    [authFetch]
+  );
+
   return {
     startCheckout,
     openBillingPortal,
+    getPlanQuotas,
   };
 };
 

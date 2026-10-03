@@ -149,6 +149,22 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
     return rate_limiter
 
 
+def _quota_exceeded_detail(plan: str, limit: int, period: str) -> str:
+    """Say what the cap is, when it resets, and (for free) what Pro raises it to."""
+    from app.core.entitlements import ai_quota_for_plan
+
+    resets = "midnight UTC" if period == "day" else "the 1st of next month (UTC)"
+    msg = (
+        f"AI usage limit reached ({limit} generations per {period} on the {plan} plan). "
+        f"It resets at {resets}."
+    )
+    if plan != "pro":
+        pro_daily, pro_monthly = ai_quota_for_plan("pro")
+        pro = pro_daily if period == "day" else pro_monthly
+        msg += f" Upgrade to Pro for {pro} per {period}."
+    return msg
+
+
 def get_ai_usage_quota():
     """Create a per-user AI-generation quota dependency (issue #173, cost control).
 
@@ -156,8 +172,8 @@ def get_ai_usage_quota():
     raises 429 once the configured cap is exceeded — enforced *before* the AI
     call so a leaked cookie or runaway client can't rack up unbounded spend.
 
-    Counts off the user's ``auth_id`` today; swap to plan/entitlement when P0.2
-    lands. ponytail: rejected calls still increment (matches the in-memory
+    Counts off the user's ``auth_id``; the cap comes from the user's ``plan``
+    (``app.core.entitlements.ai_quota_for_plan``, #766). ponytail: rejected calls still increment (matches the in-memory
     limiter) — the counter tracks attempts, which is fine for a spend cap.
     """
 
@@ -190,10 +206,25 @@ def get_ai_usage_quota():
                 detail="Unable to identify user for AI usage metering.",
             )
 
+        from app.core.entitlements import DEFAULT_PLAN, ai_quota_for_plan
+
+        plan = current_user.get("plan") or DEFAULT_PLAN
+        caps = ai_quota_for_plan(plan)
+        if caps is None:  # restricted / unknown plan: zero allowance
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"Your {plan} plan has no AI generations available. "
+                    "Upgrade to Pro to restore access."
+                ),
+                headers={"X-AI-Quota-Limit": "0", "X-AI-Quota-Period": "day"},
+            )
+        daily, monthly = caps
+
         now = datetime.now(timezone.utc)
         windows = (
-            ("day", now.strftime("%Y-%m-%d"), settings.AI_QUOTA_DAILY_LIMIT, 2 * 86400),
-            ("month", now.strftime("%Y-%m"), settings.AI_QUOTA_MONTHLY_LIMIT, 40 * 86400),
+            ("day", now.strftime("%Y-%m-%d"), daily, 2 * 86400),
+            ("month", now.strftime("%Y-%m"), monthly, 40 * 86400),
         )
         for period, bucket, limit, ttl in windows:
             if limit <= 0:  # window disabled
@@ -207,10 +238,7 @@ def get_ai_usage_quota():
                 )
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=(
-                        f"AI usage limit reached ({limit} generations per {period}). "
-                        "Try again later or contact support to raise your limit."
-                    ),
+                    detail=_quota_exceeded_detail(plan, limit, period),
                     headers={"X-AI-Quota-Limit": str(limit), "X-AI-Quota-Period": period},
                 )
 

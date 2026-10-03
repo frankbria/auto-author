@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **AI quotas are now per plan, so Pro buys something (#766, P0.18)**:
+  - **The bug.** `free` and `pro` had identical entitlements and `get_ai_usage_quota` used one global 50/day, 500/month cap and never read `plan`, while the billing page sold "full access to every AI writing feature" that Free already had. A Pro user at the cap was told to contact support.
+  - **The fix.** New settings `AI_QUOTA_FREE_DAILY/MONTHLY` (10/100) and `AI_QUOTA_PRO_DAILY/MONTHLY` (50/500) replace `AI_QUOTA_DAILY_LIMIT/MONTHLY_LIMIT`. `entitlements.ai_quota_for_plan` is the one lookup: a missing plan is `free`, and `restricted` or any unknown plan gets no allowance (429, limit 0). The 429 detail now states the cap, the reset time and, for non-Pro, what Pro raises it to; "contact support" is gone. Stale "no payment provider yet" / "swap to plan when P0.2 lands" comments removed.
+  - **One source for the copy.** New `GET /billing/quotas` returns the per-plan caps from the same settings; `BillingSettingsForm` renders "Free: 10 ... Pro: 50 ..." from it (and the Pro user's own cap). The TOC wizard no longer swallows a quota 429 on analyze: `ErrorDisplay` shows the cap with a link to the billing tab and no retry. A plain per-endpoint rate-limit 429 keeps its retry path.
+  - **Not here.** Mapping Stripe subscription statuses to plans is #767.
+
 - **Question autosave no longer loops while idle or downgrades a completed answer (#761, P0.13)**:
   - **The bug.** The autosave effect in `QuestionDisplay` re-armed on every `saveStatus` change and never compared the text to what the server held. Every save is `DRAFT`, so merely opening a completed answer re-saved it as a draft every ~3s, each time costing a PUT, a verification GET and a parent callback. A jest probe (one act per second, as a browser re-runs effects between ticks) counted 13 saves in 60s of idle on main.
   - **The fix.** A `lastSavedTextRef` holds the text the server last accepted (set on load, and after a successful draft save, complete, or an offline-queued draft). Autosave arms only when the text differs from it. A loaded completed answer therefore never auto-saves; editing it still requires "Edit Response", which is the user's own downgrade.

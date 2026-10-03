@@ -18,6 +18,7 @@ import ClarifyingQuestions from './ClarifyingQuestions';
 import TocGenerating from './TocGenerating';
 import TocReview from './TocReview';
 import ErrorDisplay from './ErrorDisplay';
+import { isQuotaCapMessage } from '@/lib/api/aiErrorHandler';
 
 interface TocGenerationWizardProps {
   bookId: string;
@@ -85,6 +86,14 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         // An entitlement denial is a paywall, not a transient analysis
         // failure — surface the upgrade path instead of swallowing it (#247).
         if (statusCodeOf(analysisError) === 402) {
+          throw analysisError;
+        }
+        // Same for a plan quota cap (#766): show the cap, don't carry on as if analysis ran.
+        if (
+          statusCodeOf(analysisError) === 429 &&
+          analysisError instanceof Error &&
+          isQuotaCapMessage(analysisError.message)
+        ) {
           throw analysisError;
         }
         console.warn('Summary analysis failed, proceeding with basic check:', analysisError);
