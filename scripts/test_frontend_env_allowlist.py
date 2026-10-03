@@ -18,7 +18,7 @@ FRONTEND_SRC = REPO / "frontend" / "src"
 # Read by a library rather than by our code, so no `process.env.X` names them.
 LIBRARY_READ = {"BETTER_AUTH_SECRET", "NODE_ENV"}
 # The frontend reads these, but they disable auth and must never reach a deploy.
-NEVER_FORWARDED = {"BYPASS_AUTH", "E2E_ALLOW_BYPASS"}
+NEVER_FORWARDED = {"BYPASS_AUTH", "E2E_ALLOW_BYPASS", "NEXT_PUBLIC_BYPASS_AUTH"}
 BACKEND_ONLY = re.compile(r"^(OPENAI|STRIPE|AWS|CLOUDINARY)|^SENTRY_DSN$")
 
 
@@ -53,7 +53,7 @@ def test_frontend_takes_no_env_file():
 
 def test_frontend_env_is_only_what_the_frontend_reads():
     read = read_by_frontend()
-    assert "DATABASE_URL" in read, "process.env scan found nothing; guard is vacuous"
+    assert {"DATABASE_URL", "EMAIL_SERVICE_PROVIDER"} <= read, "process.env scan missed known reads; guard is vacuous"
     allowed = (read | LIBRARY_READ) - NEVER_FORWARDED
     for name, service in frontend_services():
         assert env_names(service) <= allowed, (name, env_names(service) - allowed)
