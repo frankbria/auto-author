@@ -1,10 +1,21 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field, ValidationInfo
+from dotenv import dotenv_values
 from typing import List, Union
 import logging
 import os
 
 logger = logging.getLogger(__name__)
+
+ALLOWED_ENVIRONMENTS = ("development", "test", "staging", "production")
+
+# Settings reads .env, but every guard below reads os.environ. Lift ENVIRONMENT
+# out of .env so a value set only there reaches both — otherwise
+# ENVIRONMENT=production in .env would pass validation with the guards off (#777).
+if "ENVIRONMENT" not in os.environ:
+    _dotenv_environment = dotenv_values(".env").get("ENVIRONMENT")
+    if _dotenv_environment is not None:
+        os.environ["ENVIRONMENT"] = _dotenv_environment
 
 
 def is_production_env() -> bool:
@@ -42,6 +53,28 @@ def is_deployed_env() -> bool:
 
 
 class Settings(BaseSettings):
+    # Required, but defaulted to None and validated: a plain required field's
+    # "missing" error prints every other setting (Mongo URI, API keys) as its
+    # input_value into the startup log.
+    ENVIRONMENT: str | None = Field(default=None, validate_default=True)
+
+    @field_validator("ENVIRONMENT")
+    @classmethod
+    def require_known_environment(cls, v: str | None) -> str:
+        """Refuse to start without an explicit, known ENVIRONMENT (#777).
+
+        is_production_env() matches only "production", so a missing marker, a
+        typo or "prod" silently disabled every production guard. Lower-cased to
+        match the guards' own normalization (#309) and nothing more: " production"
+        would pass a strip() here and still miss the guards.
+        """
+        if v is None or v.lower() not in ALLOWED_ENVIRONMENTS:
+            raise ValueError(
+                f"ENVIRONMENT must be one of {', '.join(ALLOWED_ENVIRONMENTS)}; "
+                f"got {v!r}. Set it explicitly: there is no default."
+            )
+        return v.lower()
+
     # MongoDB connection - MONGODB_URI takes precedence over DATABASE_URL
     MONGODB_URI: str = ""  # Standard env var name (e.g., for Atlas)
     DATABASE_URL: str = "mongodb://localhost:27017"  # Fallback/legacy

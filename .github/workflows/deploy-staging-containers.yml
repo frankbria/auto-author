@@ -112,6 +112,9 @@ jobs:
             "set -euo pipefail
              cd /opt/auto-author
              export IMAGE_TAG='${{ inputs.image_tag }}'
+             # docker-compose.yml requires ENVIRONMENT with no default (#777).
+             # This workflow only ever targets staging, so it says so here.
+             export ENVIRONMENT=staging
              # --pull always so a re-run of the same tag still fetches a rebuilt
              # image; compose would otherwise reuse a stale local layer.
              docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
@@ -132,6 +135,9 @@ jobs:
              done
              echo 'Health check failed; recent logs:'
              cd /opt/auto-author
+             # \`logs\` interpolates the compose files too, so it needs the same
+             # required vars as \`up\` or it aborts instead of printing anything.
+             export IMAGE_TAG='${{ inputs.image_tag }}' ENVIRONMENT=staging
              docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=60
              exit 1"
 

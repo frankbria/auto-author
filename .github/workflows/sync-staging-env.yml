@@ -169,6 +169,8 @@ jobs:
              IMAGE_TAG=\$(docker inspect --format '{{.Config.Image}}' auto-author-backend-1 | sed 's/.*://')
              [ -n \"\$IMAGE_TAG\" ] || { echo 'could not determine the running image tag'; exit 1; }
              export IMAGE_TAG
+             # Required by docker-compose.yml with no default (#777).
+             export ENVIRONMENT=staging
              echo \"recreating on the running tag: \$IMAGE_TAG\"
              # --force-recreate because compose injects env at container CREATION.
              # Without it a container started before the .env edit keeps the old
