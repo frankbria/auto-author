@@ -217,7 +217,14 @@ async def create_checkout_session(
             # client_reference_id + subscription metadata are what the #220
             # webhook uses to find this user before the customer id is linked.
             client_reference_id=auth_id,
-            subscription_data={"metadata": {"auth_id": auth_id}},
+            # The disclosure keys tie sub_X to its consent record in audit_logs.
+            subscription_data={
+                "metadata": {
+                    "auth_id": auth_id,
+                    "renewal_disclosure_version": disclosure.version,
+                    "renewal_disclosure_sha256": disclosure.sha256,
+                }
+            },
             # Stripe's own checkbox + record, and the renewal terms repeated
             # beside the Subscribe button (#770). Requires a Terms of Service
             # URL in the Stripe Dashboard's public details.

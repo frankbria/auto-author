@@ -392,5 +392,12 @@ async def test_checkout_records_consent_and_carries_it_to_stripe(
     # Stripe's hosted page repeats the renewal terms and requires ToS consent.
     sess = stripe_stub["session"][0]
     assert sess["consent_collection"] == {"terms_of_service": "required"}
+    # The subscription carries which terms were agreed to, so a dispute over
+    # sub_X can be matched to its consent record without timestamp forensics.
+    assert sess["subscription_data"]["metadata"] == {
+        "auth_id": user["auth_id"],
+        "renewal_disclosure_version": billing.RENEWAL_DISCLOSURE_VERSION,
+        "renewal_disclosure_sha256": disclosure["sha256"],
+    }
     assert sess["custom_text"]["submit"]["message"] == disclosure["text"]
     assert "/terms" in sess["custom_text"]["terms_of_service_acceptance"]["message"]
