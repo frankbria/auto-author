@@ -42,6 +42,11 @@ DRAFT_GENERATION_MODEL = "gpt-4o"
 DRAFT_WORDS_TO_TOKENS_FACTOR = 1.6
 DRAFT_MAX_COMPLETION_TOKENS = 8000
 
+# A TOC (6-12 chapters x 2-4 subchapters as pretty JSON) measures ~2k tokens at
+# 8x3 and ~3.7k at 12x4; 1500 truncated every typical one (#774). 6000 leaves
+# headroom over the largest shape the prompt asks for.
+TOC_MAX_COMPLETION_TOKENS = 6000
+
 
 class AIService:
     """
@@ -522,11 +527,25 @@ Make questions specific, actionable, and focused on content structure rather tha
             response = await self._make_openai_request(
                 messages=messages,
                 temperature=0.4,
-                max_tokens=1500,
+                max_tokens=TOC_MAX_COMPLETION_TOKENS,
                 correlation_id=correlation_id,
             )
 
-            toc_text = response.choices[0].message.content
+            choice = response.choices[0]
+            # Truncated JSON can never parse, and a retry hits the same limit
+            # while spending quota: fail clearly and non-retryably (#774).
+            if getattr(choice, "finish_reason", None) == "length":
+                raise AIServiceError(
+                    message=(
+                        "The generated table of contents was cut off before it "
+                        "finished. Try a shorter summary or fewer chapters."
+                    ),
+                    error_code="AI_RESPONSE_TRUNCATED",
+                    retryable=False,
+                    correlation_id=correlation_id,
+                )
+
+            toc_text = choice.message.content
             toc_result = self._parse_toc_response(toc_text)
 
             logger.info(
