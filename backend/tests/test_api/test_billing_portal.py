@@ -4,9 +4,15 @@ Same harness as test_billing_checkout.py: real MongoDB via auth_client_factory,
 only the Stripe SDK boundary (stripe.billing_portal.Session.create) is stubbed.
 """
 
+import json
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
+
 import pytest
 import stripe
-from types import SimpleNamespace
+
+from app.api.endpoints import billing
 
 from app.core.config import settings
 from tests.conftest import _sync_users
@@ -21,19 +27,78 @@ def stripe_configured(monkeypatch):
     monkeypatch.setattr(settings, "STRIPE_SECRET_KEY", SECRET_KEY)
 
 
-@pytest.fixture
-def portal_stub(monkeypatch):
-    """Capture outbound billing-portal SDK calls; return a canned session."""
-    calls = []
+class _StripeWire(BaseHTTPRequestHandler):
+    """Wire-level Stripe stub: the real SDK talks HTTP to it via stripe.api_base."""
 
-    def fake_portal_create(**kwargs):
-        calls.append(kwargs)
-        return SimpleNamespace(
-            id="bps_test_001", url="https://billing.stripe.com/p/session/bps_test_001"
+    def _reply(self, body, status=200):
+        raw = json.dumps(body).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def _record(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        form = parse_qs(self.rfile.read(n).decode()) if n else {}
+        query = parse_qs(urlparse(self.path).query)
+        rec = {
+            "method": self.command,
+            "path": urlparse(self.path).path,
+            "params": {k: v[0] for k, v in {**query, **form}.items()},
+        }
+        self.server.calls.append(rec)
+        return rec
+
+    def do_GET(self):
+        self._record()
+        self._reply({"object": "list", "data": list(self.server.configs), "has_more": False})
+
+    def do_POST(self):
+        rec = self._record()
+        if rec["path"].endswith("/billing_portal/configurations"):
+            if self.server.fail_config:
+                return self._reply({"error": {"type": "api_error", "message": "boom sk_live_abc"}}, 500)
+            cfg = {
+                "id": "bpc_test_001",
+                "object": "billing_portal.configuration",
+                "active": True,
+                "metadata": {
+                    k[len("metadata["):-1]: v
+                    for k, v in rec["params"].items()
+                    if k.startswith("metadata[")
+                },
+            }
+            self.server.configs.append(cfg)
+            return self._reply(cfg)
+        self._reply(
+            {
+                "id": "bps_test_001",
+                "object": "billing_portal.session",
+                "url": "https://billing.stripe.com/p/session/bps_test_001",
+            }
         )
 
-    monkeypatch.setattr(stripe.billing_portal.Session, "create", fake_portal_create)
-    return calls
+    def log_message(self, *a):
+        pass
+
+
+@pytest.fixture
+def portal_stub(monkeypatch):
+    """Serve a Stripe wire stub; returns the recorded HTTP calls."""
+    server = HTTPServer(("127.0.0.1", 0), _StripeWire)
+    server.calls, server.configs, server.fail_config = [], [], False
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setattr(stripe, "api_base", f"http://127.0.0.1:{server.server_port}")
+    monkeypatch.setattr(stripe, "max_network_retries", 0)
+    monkeypatch.setattr(billing, "_portal_config_id", None)
+    yield server
+    server.shutdown()
+    server.server_close()
+
+
+def _session_calls(stub):
+    return [c for c in stub.calls if c["path"].endswith("/billing_portal/sessions")]
 
 
 async def test_portal_returns_session_url(
@@ -48,8 +113,9 @@ async def test_portal_returns_session_url(
     assert resp.status_code == 200, resp.text
     assert resp.json()["url"] == "https://billing.stripe.com/p/session/bps_test_001"
 
-    assert len(portal_stub) == 1
-    kwargs = portal_stub[0]
+    sessions = _session_calls(portal_stub)
+    assert len(sessions) == 1
+    kwargs = sessions[0]["params"]
     assert kwargs["customer"] == "cus_paid_001"
     assert (
         kwargs["return_url"]
@@ -72,7 +138,7 @@ async def test_portal_allows_lapsed_restricted_user(
     resp = await client.post("/api/v1/billing/portal")
 
     assert resp.status_code == 200, resp.text
-    assert portal_stub[0]["customer"] == "cus_lapsed_001"
+    assert _session_calls(portal_stub)[0]["params"]["customer"] == "cus_lapsed_001"
 
 
 async def test_portal_rejects_user_without_stripe_customer(
@@ -83,7 +149,7 @@ async def test_portal_rejects_user_without_stripe_customer(
     resp = await client.post("/api/v1/billing/portal")
 
     assert resp.status_code == 409
-    assert portal_stub == []
+    assert portal_stub.calls == []
 
 
 async def test_portal_fails_closed_when_unconfigured(
@@ -96,7 +162,7 @@ async def test_portal_fails_closed_when_unconfigured(
     resp = await client.post("/api/v1/billing/portal")
 
     assert resp.status_code == 503
-    assert portal_stub == []
+    assert portal_stub.calls == []
 
 
 async def test_portal_requires_auth(auth_client_factory, stripe_configured):
@@ -106,12 +172,9 @@ async def test_portal_requires_auth(auth_client_factory, stripe_configured):
 
 
 async def test_portal_stripe_failure_returns_502_without_leaking(
-    auth_client_factory, stripe_configured, monkeypatch
+    auth_client_factory, stripe_configured, portal_stub
 ):
-    def boom(**kwargs):
-        raise stripe.StripeError("secret internal detail sk_live_abc")
-
-    monkeypatch.setattr(stripe.billing_portal.Session, "create", boom)
+    portal_stub.fail_config = True  # Stripe 500s with a secret-looking message
     client = await auth_client_factory(
         overrides={"plan": "pro", "stripe_customer_id": "cus_paid_001"}
     )
@@ -119,4 +182,50 @@ async def test_portal_stripe_failure_returns_502_without_leaking(
 
     assert resp.status_code == 502
     assert "sk_live" not in resp.text
-    assert "secret internal detail" not in resp.text
+    assert "boom" not in resp.text
+
+
+async def test_portal_session_pins_a_cancel_at_period_end_configuration(
+    auth_client_factory, stripe_configured, portal_stub
+):
+    """#771: cancellation must not depend on unversioned dashboard settings.
+    The Configuration is created in code (cancel enabled, at period end — what
+    the #770 disclosure promises) and the session is bound to it."""
+    client = await auth_client_factory(
+        overrides={"plan": "pro", "stripe_customer_id": "cus_paid_001"}
+    )
+    resp = await client.post("/api/v1/billing/portal")
+    assert resp.status_code == 200, resp.text
+
+    creates = [
+        c for c in portal_stub.calls
+        if c["method"] == "POST" and c["path"].endswith("/billing_portal/configurations")
+    ]
+    assert len(creates) == 1
+    p = creates[0]["params"]
+    assert p["features[subscription_cancel][enabled]"] == "true"
+    assert p["features[subscription_cancel][mode]"] == "at_period_end"
+    assert _session_calls(portal_stub)[0]["params"]["configuration"] == "bpc_test_001"
+
+
+async def test_portal_reuses_existing_configuration_across_processes(
+    auth_client_factory, stripe_configured, portal_stub
+):
+    """Idempotent: with the config already in Stripe (found by metadata) and a
+    cold cache, nothing new is created; the cache then avoids even the lookup."""
+    portal_stub.configs.append(
+        {"id": "bpc_existing", "object": "billing_portal.configuration",
+         "active": True, "metadata": dict(billing.PORTAL_CONFIG_METADATA)}
+    )
+    client = await auth_client_factory(
+        overrides={"plan": "pro", "stripe_customer_id": "cus_paid_001"}
+    )
+    for _ in range(2):
+        assert (await client.post("/api/v1/billing/portal")).status_code == 200
+
+    posts = [c for c in portal_stub.calls if c["method"] == "POST"
+             and c["path"].endswith("/configurations")]
+    lists = [c for c in portal_stub.calls if c["method"] == "GET"]
+    assert posts == []
+    assert len(lists) == 1
+    assert {c["params"]["configuration"] for c in _session_calls(portal_stub)} == {"bpc_existing"}

@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **The billing portal is pinned to a cancel-at-period-end Configuration made in code (#771, P0.23)**:
+  - **The bug.** `POST /billing/portal` passed no `configuration`, so whether a subscriber could cancel at all depended on unversioned Stripe dashboard settings, and the #770 disclosure ("cancellation takes effect at the end of the current period") had nothing enforcing it.
+  - **The fix.** `_get_or_create_portal_config` finds our active portal Configuration by metadata (`app` + `portal_config_version`) or creates it with `features.subscription_cancel` enabled in `at_period_end` mode, plus payment-method update and invoice history. Creation carries a fixed idempotency key, and the id is cached per process. Every portal session now passes `configuration=`. Bump `portal_config_version` to roll out a changed Configuration.
+  - **Verified.** `test_billing_portal.py` now runs the real Stripe SDK against a local HTTP wire stub (`stripe.api_base`), replacing the SDK monkeypatch. It asserts the create call's form fields, the `configuration` on the session call, and reuse without re-creating. The stub caught an SDK trap (`StripeObject.metadata` has no `.get`) that a monkeypatch would have hidden.
+  - **Owner homework.** Confirm in the Stripe dashboard (test, then live) that the portal shows the Configuration and cancelling in it leaves the subscription active until period end.
+
 - **The chapter editor sends its save token and asks reload-or-overwrite on a conflict (#760, P0.12)**:
   - **The bug.** Every content save was unconditional. Two tabs or devices on one chapter silently overwrote each other, last write wins. #759 gave the PATCH an optional `expected_last_modified` precondition, and no client sent it.
   - **The fix.**

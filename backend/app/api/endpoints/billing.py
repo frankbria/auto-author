@@ -117,6 +117,44 @@ async def create_checkout_session(
     return CheckoutResponse(url=session.url)
 
 
+# #771: the portal's behaviour is pinned in code, not in unversioned dashboard
+# settings. Bump "portal_config_version" to roll out a changed Configuration:
+# the old one stops matching the lookup, so a new one is created.
+PORTAL_CONFIG_METADATA = {"app": "auto-author", "portal_config_version": "1"}
+_portal_config_id: Optional[str] = None  # per-process cache; Stripe is the source of truth
+
+
+def _get_or_create_portal_config(api_key: str) -> str:
+    """Return the id of our pinned portal Configuration, creating it if absent."""
+    global _portal_config_id
+    if _portal_config_id:
+        return _portal_config_id
+    existing = stripe.billing_portal.Configuration.list(
+        api_key=api_key, active=True, limit=100
+    )
+    for cfg in existing.auto_paging_iter():
+        meta = cfg.to_dict().get("metadata") or {}
+        if all(meta.get(k) == v for k, v in PORTAL_CONFIG_METADATA.items()):
+            _portal_config_id = cfg.id
+            return cfg.id
+    cfg = stripe.billing_portal.Configuration.create(
+        api_key=api_key,
+        # Fixed key: concurrent first calls collapse to one Configuration.
+        idempotency_key=f"portal-config-v{PORTAL_CONFIG_METADATA['portal_config_version']}",
+        metadata=PORTAL_CONFIG_METADATA,
+        business_profile={"headline": "Manage your Auto Author subscription"},
+        features={
+            # at_period_end matches the #770 disclosure: access continues to the
+            # end of the paid period, then the plan drops.
+            "subscription_cancel": {"enabled": True, "mode": "at_period_end"},
+            "payment_method_update": {"enabled": True},
+            "invoice_history": {"enabled": True},
+        },
+    )
+    _portal_config_id = cfg.id
+    return cfg.id
+
+
 class PortalResponse(BaseModel):
     url: str
 
@@ -143,10 +181,14 @@ async def create_portal_session(
 
     frontend_base = settings.BETTER_AUTH_URL.rstrip("/")
     try:
+        config_id = await asyncio.to_thread(
+            _get_or_create_portal_config, settings.STRIPE_SECRET_KEY
+        )
         session = await asyncio.to_thread(
             stripe.billing_portal.Session.create,
             api_key=settings.STRIPE_SECRET_KEY,
             customer=customer_id,
+            configuration=config_id,
             return_url=f"{frontend_base}/dashboard/settings?tab=billing",
         )
     except stripe.StripeError:
