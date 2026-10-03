@@ -148,3 +148,36 @@ async def test_user_without_subscription_makes_no_stripe_call(
 
     assert resp.status_code == ok_status, resp.text
     assert stripe_stub["requests"] == []
+
+
+async def test_cancelled_subscription_leaves_no_live_billing_state(
+    auth_client_factory, stripe_stub, monkeypatch
+):
+    """Cancel succeeded, then the cascade failed (#768 x #764).
+
+    The id is cleared, so Stripe's ``subscription.deleted`` for it is no longer
+    the current subscription's and the webhook ignores it. The cancel itself
+    must therefore leave the user as that event would: free, with no live
+    status that would still block a checkout.
+    """
+    import app.api.endpoints.users as users_endpoint
+    from app.core.entitlements import has_live_subscription
+
+    client = await auth_client_factory(
+        overrides={
+            "plan": "pro",
+            "stripe_subscription_id": SUB_ID,
+            "stripe_subscription_status": "active",
+        }
+    )
+
+    async def _boom(auth_id):
+        raise RuntimeError("simulated mongo failure")
+
+    monkeypatch.setattr(users_endpoint, "delete_all_user_books", _boom)
+    assert (await client.delete("/api/v1/users/me")).status_code == 500
+
+    doc = await (await get_collection("users")).find_one({"auth_id": OWNER})
+    assert doc["stripe_subscription_id"] is None
+    assert doc["plan"] == "free"
+    assert not has_live_subscription(doc)

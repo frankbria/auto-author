@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from app.api.dependencies import audit_request, get_rate_limiter
 from app.core.config import settings
-from app.core.entitlements import ai_quota_for_plan, has_live_subscription
+from app.core.entitlements import DEFAULT_PLAN, ai_quota_for_plan, has_live_subscription
 from app.core.security import get_current_user_from_session
 from app.db.user import get_user_by_auth_id, update_user
 
@@ -54,9 +54,11 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
         ) from None
     # Forget the cancelled id: if a later deletion step fails, the retry must not
     # depend on how Stripe answers a second cancel once the 24h key has expired.
+    # With the id gone, the webhook treats Stripe's subscription.deleted for it
+    # as another subscription's and ignores it (#768), so apply its effect here.
     await update_user(
         auth_id,
-        {"stripe_subscription_id": None},
+        {"stripe_subscription_id": None, "stripe_subscription_status": None, "plan": DEFAULT_PLAN},
         extra_filter={"stripe_subscription_id": subscription_id},
     )
 
