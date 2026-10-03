@@ -82,6 +82,15 @@ class TestNonCurrentSubscriptionIsIgnored:
         assert resp.json()["status"] == "not_current_subscription"
         assert (await get_user_by_auth_id("auth-stripe-1"))["stripe_subscription_id"] == "sub_A"
 
+    async def test_pre_768_pro_document_counts_as_live(self, webhook_client):
+        # Written before the status field existed: id + pro, no status. Treat
+        # it as live, or a duplicate's cancellation downgrades on deploy day.
+        await _seed_user(stripe_customer_id="cus_test_1", stripe_subscription_id="sub_A", plan="pro")
+        resp = await _post_signed(webhook_client, event(subscription_id="sub_B", status="canceled"))
+        assert resp.json()["status"] == "not_current_subscription"
+        user = await get_user_by_auth_id("auth-stripe-1")
+        assert (user["plan"], user["stripe_subscription_id"]) == ("pro", "sub_A")
+
     async def test_a_second_live_subscription_is_logged_as_an_error(self, webhook_client, caplog):
         # Two paid subscriptions = the user is being double-billed. Needs a human.
         await _seed_pro_on("sub_A")
