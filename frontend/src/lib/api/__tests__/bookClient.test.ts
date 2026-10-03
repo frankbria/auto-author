@@ -1740,6 +1740,46 @@ describe('BookClient core CRUD – success paths', () => {
     );
   });
 
+  // #760: the editor's save precondition. The token is echoed verbatim; leaving
+  // it out keeps the save unconditional, and null (never-saved chapter) is sent.
+  it('saveChapterContent sends expected_last_modified only when given, null included', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(okJson({ last_modified: 'T2' }));
+    const bodyOf = (call: number) => JSON.parse((global.fetch as jest.Mock).mock.calls[call][1].body);
+
+    await bookClient.saveChapterContent(BOOK_ID, CHAPTER_ID, 'a');
+    await bookClient.saveChapterContent(BOOK_ID, CHAPTER_ID, 'b', true, { expectedLastModified: 'T1+00:00' });
+    await bookClient.saveChapterContent(BOOK_ID, CHAPTER_ID, 'c', true, { expectedLastModified: null });
+
+    expect('expected_last_modified' in bodyOf(0)).toBe(false);
+    expect(bodyOf(1).expected_last_modified).toBe('T1+00:00');
+    expect(bodyOf(2)).toHaveProperty('expected_last_modified', null);
+  });
+
+  it('saveChapterContent turns a 409 into a conflict carrying the server copy', async () => {
+    const detail = { message: 'Saved elsewhere', current_last_modified: 'T9', current_content: '<p>Theirs</p>' };
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(409, JSON.stringify({ detail })));
+
+    const err = await bookClient
+      .saveChapterContent(BOOK_ID, CHAPTER_ID, 'x', true, { expectedLastModified: 'T1' })
+      .catch((e) => e);
+
+    expect(err).toMatchObject({
+      statusCode: 409,
+      message: 'Saved elsewhere',
+      currentLastModified: 'T9',
+      currentContent: '<p>Theirs</p>',
+    });
+  });
+
+  it('saveChapterContent reports a 409 without a server copy as a plain failure', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(409, 'Conflict', { detail: 'Conflict' }));
+
+    const err = await bookClient.saveChapterContent(BOOK_ID, CHAPTER_ID, 'x').catch((e) => e);
+
+    expect(err.message).toBe('Failed to save chapter content: 409 Conflict');
+    expect(err.statusCode).toBeUndefined();
+  });
+
   // getChapterContent – success and error
   it('getChapterContent GETs and returns the chapter content', async () => {
     const data = { content: '<p>Hello</p>', chapter_id: CHAPTER_ID, book_id: BOOK_ID };

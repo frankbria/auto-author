@@ -29,7 +29,7 @@ declare module '@tiptap/react' {
 }
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import bookClient from '@/lib/api/bookClient';
+import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   CheckmarkCircle01Icon,
@@ -55,7 +55,10 @@ import {
   backupChapterContent,
   chapterBackupKey,
   flushChapterContent,
+  isChapterConflict,
   PendingChapterEdit,
+  saveChapterEdit,
+  SeenChapters,
 } from './chapterContentSave';
 
 type ChapterView = 'questions' | 'editor';
@@ -128,6 +131,11 @@ export function ChapterEditor({
   const unsavedRef = useRef<PendingChapterEdit | null>(null);
   // The save request in flight, which a flush waits for so it cannot land last.
   const inFlightSaveRef = useRef<Promise<unknown> | null>(null);
+  // Save tokens (#760), from GET content and each save, never chapter metadata.
+  const seenRef = useRef<SeenChapters>(new Map());
+  // A save the server rejected because the chapter changed elsewhere. Saving
+  // stops until the writer reloads the server copy or overwrites it.
+  const [conflict, setConflict] = useState<ChapterSaveConflict | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [autoSavePending, setAutoSavePending] = useState(false);
@@ -250,6 +258,10 @@ export function ChapterEditor({
         if (ignore) return;
         if (editor) {
           editor.commands.setContent(contentData.content || '');
+          seenRef.current.set(chapterBackupKey(bookId, chapterId), {
+            lastModified: contentData.last_modified,
+            content: contentData.content || '',
+          });
           // Loading is not an edit.
           unsavedRef.current = null;
           setLastAutoSavedContent(contentData.content || '');
@@ -282,7 +294,7 @@ export function ChapterEditor({
     () => () => {
       const edit = unsavedRef.current;
       unsavedRef.current = null;
-      if (edit) void flushChapterContent(edit, inFlightSaveRef.current);
+      if (edit) void flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
     },
     [bookId, chapterId]
   );
@@ -313,9 +325,42 @@ export function ChapterEditor({
     setHasUnsavedChanges(false);
   };
 
+  // The local text stays in the editor and in a backup; nothing else saves
+  // until the writer picks a version, and neither choice is ever made for them.
+  const handleConflict = (content: string, err: ChapterSaveConflict) => {
+    backupChapterContent({ bookId, chapterId, content }, err);
+    noteBackupWrite();
+    setConflict(err);
+    setError(
+      'This chapter was changed somewhere else since you opened it. Your text is still here and backed up on this device. Which version do you want to keep?'
+    );
+  };
+
+  const resolveConflict = (keep: 'mine' | 'theirs') => {
+    if (!conflict || !editor) return;
+    seenRef.current.set(backupKey, {
+      lastModified: conflict.currentLastModified,
+      content: conflict.currentContent,
+    });
+    setConflict(null);
+    setError(null);
+    if (keep === 'mine') {
+      void handleSave(false);
+      return;
+    }
+    // The dropped text, including edits made since the conflict, stays restorable.
+    backupChapterContent({ bookId, chapterId, content: editor.getHTML() }, conflict);
+    noteBackupWrite();
+    editor.commands.setContent(conflict.currentContent);
+    unsavedRef.current = null;
+    setLastAutoSavedContent(conflict.currentContent);
+    setAutoSavePending(false);
+    setHasUnsavedChanges(false);
+  };
+
   // Auto-save functionality with localStorage backup
   useEffect(() => {
-    if (!autoSavePending || !editor || isSaving || loadFailed) return;
+    if (!autoSavePending || !editor || isSaving || loadFailed || conflict) return;
 
     const timer = setTimeout(async () => {
       const content = editor.getHTML();
@@ -333,7 +378,7 @@ export function ChapterEditor({
       setError(null);
       try {
         await (inFlightSaveRef.current = trackOperation('auto-save', async () => {
-          return await bookClient.saveChapterContent(bookId, chapterId, content);
+          return await saveChapterEdit({ bookId, chapterId, content }, seenRef.current);
         }, { bookId, chapterId, contentLength: content.length }));
         setLastSaved(new Date());
         markSaved(content);
@@ -344,7 +389,9 @@ export function ChapterEditor({
       } catch (err) {
         console.error('Failed to auto-save chapter:', err);
 
-        if (backupChapterContent({ bookId, chapterId, content }, err)) {
+        if (isChapterConflict(err)) {
+          handleConflict(content, err);
+        } else if (backupChapterContent({ bookId, chapterId, content }, err)) {
           noteBackupWrite();
           setError('Failed to auto-save. Content backed up locally.');
         } else {
@@ -356,7 +403,7 @@ export function ChapterEditor({
     }, autoSaveDelayMs);
 
     return () => clearTimeout(timer);
-  }, [autoSavePending, autoSaveDelayMs, bookId, chapterId, editor, isSaving, lastAutoSavedContent, loadFailed]);
+  }, [autoSavePending, autoSaveDelayMs, bookId, chapterId, conflict, editor, isSaving, lastAutoSavedContent, loadFailed]);
 
   const handleSave = async (isAutoSave: boolean = false) => {
     if (isSaving || !editor || loadFailed) return;
@@ -367,7 +414,7 @@ export function ChapterEditor({
 
     try {
       await (inFlightSaveRef.current = trackOperation('manual-save', async () => {
-        return await bookClient.saveChapterContent(bookId, chapterId, content);
+        return await saveChapterEdit({ bookId, chapterId, content }, seenRef.current);
       }, { bookId, chapterId, contentLength: content.length }));
       setLastSaved(new Date());
       markSaved(content);
@@ -384,6 +431,10 @@ export function ChapterEditor({
       }
     } catch (err) {
       console.error('Failed to save chapter:', err);
+      if (isChapterConflict(err)) {
+        handleConflict(content, err);
+        return;
+      }
       setError('Failed to save chapter content');
 
       // Backup to localStorage on manual save failure too
@@ -507,7 +558,7 @@ export function ChapterEditor({
     <div className="h-full flex flex-col">
       {/* Restoring or AI-editing a chapter that failed to load would put text in
           an editor that can never save it (#757), so those controls wait for Retry. */}
-      {hasBackup && !loadFailed && (
+      {hasBackup && !loadFailed && !conflict && (
         <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-700 dark:text-yellow-400 px-4 py-2 text-sm flex items-center justify-between">
           <span>A local backup of your content is available. Would you like to restore it?</span>
           <div className="flex gap-2">
@@ -543,6 +594,16 @@ export function ChapterEditor({
             <Button size="sm" variant="outline" onClick={() => setLoadAttempt((n) => n + 1)}>
               Retry
             </Button>
+          )}
+          {conflict && (
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" variant="outline" onClick={() => resolveConflict('theirs')}>
+                Reload their version
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => resolveConflict('mine')}>
+                Overwrite with mine
+              </Button>
+            </div>
           )}
         </div>
       )}
@@ -713,7 +774,7 @@ export function ChapterEditor({
         </div>
         <Button
           onClick={() => handleSave(false)}
-          disabled={isSaving || loadFailed}
+          disabled={isSaving || loadFailed || !!conflict}
           busy={isSaving}
         >
           {isSaving ? 'Saving...' : 'Save'}
