@@ -45,6 +45,7 @@ def subscription_event(
     subscription_id: str = "sub_test_1",
     price_id: str = TEST_PRO_PRICE_ID,
     metadata: dict = None,
+    status: str = "active",
 ) -> bytes:
     return json.dumps(
         {
@@ -56,7 +57,7 @@ def subscription_event(
                     "id": subscription_id,
                     "object": "subscription",
                     "customer": customer,
-                    "status": "active",
+                    "status": status,
                     "metadata": metadata or {},
                     "items": {
                         "object": "list",
@@ -255,6 +256,98 @@ class TestEventRouting:
         user = await get_user_by_auth_id("auth-stripe-1")
         assert user["plan"] == "pro"
         assert user["stripe_customer_id"] == "cus_test_1"
+
+
+async def _post_signed(client, payload: bytes):
+    return await client.post(
+        WEBHOOK_URL, content=payload, headers={"stripe-signature": sign(payload)}
+    )
+
+
+class TestSubscriptionStatus:
+    """The plan follows the subscription's status, not just its price (#767)."""
+
+    @pytest.mark.parametrize(
+        "status,expected_plan",
+        [
+            ("active", "pro"),
+            ("trialing", "pro"),
+            ("past_due", "pro"),  # kept through Stripe's retry window
+            ("unpaid", "restricted"),
+            ("incomplete", "free"),
+            ("incomplete_expired", "free"),
+            ("paused", "free"),
+            ("canceled", "free"),
+            ("some_future_status", "free"),  # unknown: fail closed below paid
+        ],
+    )
+    async def test_status_decides_plan_for_a_pro_subscriber(
+        self, webhook_client, status, expected_plan
+    ):
+        await _seed_user(stripe_customer_id="cus_test_1", plan="pro")
+        resp = await _post_signed(
+            webhook_client, subscription_event(event_id=f"evt_{status}", status=status)
+        )
+        assert resp.status_code == 200
+        user = await get_user_by_auth_id("auth-stripe-1")
+        assert user["plan"] == expected_plan
+        # Ids still sync whatever the status.
+        assert user["stripe_subscription_id"] == "sub_test_1"
+
+    @pytest.mark.parametrize("seeded_plan", ["free", "restricted"])
+    async def test_past_due_never_grants_pro(self, webhook_client, seeded_plan):
+        # Only active/trialing grant pro; past_due only *keeps* it.
+        await _seed_user(stripe_customer_id="cus_test_1", plan=seeded_plan)
+        resp = await _post_signed(webhook_client, subscription_event(status="past_due"))
+        assert resp.status_code == 200
+        assert resp.json()["plan"] == seeded_plan  # reports the kept plan
+        user = await get_user_by_auth_id("auth-stripe-1")
+        assert user["plan"] == seeded_plan
+        assert user["stripe_subscription_id"] == "sub_test_1"
+
+    async def test_dunning_cycle_restricts_then_restores(self, webhook_client):
+        await _seed_user(stripe_customer_id="cus_test_1")
+        expected = [
+            ("active", "pro"),
+            ("past_due", "pro"),
+            ("unpaid", "restricted"),
+            ("active", "pro"),  # paid the open invoice: access back
+        ]
+        for i, (status, plan) in enumerate(expected):
+            payload = subscription_event(event_id=f"evt_cycle_{i}", status=status)
+            assert (await _post_signed(webhook_client, payload)).status_code == 200
+            assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == plan, status
+
+    async def test_unmatched_price_on_active_subscription_logs_error(
+        self, webhook_client, caplog
+    ):
+        await _seed_user(stripe_customer_id="cus_test_1")
+        with caplog.at_level("ERROR", logger="app.api.endpoints.webhooks"):
+            await _post_signed(webhook_client, subscription_event(price_id="price_unknown_9"))
+        errors = [r for r in caplog.records if r.levelname == "ERROR"]
+        assert any("price_unknown_9" in r.getMessage() for r in errors)
+
+    async def test_unset_pro_price_logs_error(self, webhook_client, monkeypatch, caplog):
+        # A paying user silently resolving to free must page someone.
+        monkeypatch.setattr(settings, "STRIPE_PRICE_ID_PRO", "")
+        await _seed_user(stripe_customer_id="cus_test_1")
+        with caplog.at_level("ERROR", logger="app.api.endpoints.webhooks"):
+            await _post_signed(webhook_client, subscription_event())
+        assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "free"
+        assert any(r.levelname == "ERROR" for r in caplog.records)
+
+    async def test_matched_price_logs_no_error(self, webhook_client, caplog):
+        await _seed_user(stripe_customer_id="cus_test_1")
+        with caplog.at_level("ERROR", logger="app.api.endpoints.webhooks"):
+            await _post_signed(webhook_client, subscription_event())
+        assert not [r for r in caplog.records if r.levelname == "ERROR"]
+
+    async def test_unknown_status_logs_error(self, webhook_client, caplog):
+        await _seed_user(stripe_customer_id="cus_test_1", plan="pro")
+        with caplog.at_level("ERROR", logger="app.api.endpoints.webhooks"):
+            await _post_signed(webhook_client, subscription_event(status="some_future_status"))
+        errors = [r for r in caplog.records if r.levelname == "ERROR"]
+        assert any("some_future_status" in r.getMessage() for r in errors)
 
 
 class TestReplayIdempotency:
