@@ -1,53 +1,11 @@
 import { Page, expect } from '@playwright/test';
 import { test } from './fixtures/auth.fixture';
-import { addSummary, createBook, READY_SUMMARY } from './fixtures/journey.helpers';
-
-const API_BASE_URL =
-  process.env.STAGING_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://api.dev.autoauthor.app/api/v1';
+import { addSummary, createBook, READY_SUMMARY, seedToc } from './fixtures/journey.helpers';
 
 async function createBookOnPage(page: Page, title: string): Promise<string> {
   const id = await createBook(page, title);
   expect(id).toMatch(/^[a-f0-9]+$/);
   return id;
-}
-
-async function updateToc(page: Page, bookId: string, chapterCount: number): Promise<void> {
-  const toc = {
-    chapters: Array.from({ length: chapterCount }, (_, index) => ({
-      id: `edge-ch-${index + 1}`,
-      title: `Edge Case Chapter ${index + 1}`,
-      description: `Generated staging edge-case chapter ${index + 1}`,
-      level: 1,
-      order: index + 1,
-      status: 'draft',
-      word_count: 0,
-      estimated_reading_time: 0,
-      subchapters: [],
-    })),
-    total_chapters: chapterCount,
-    estimated_pages: chapterCount * 10,
-    structure_notes: 'Staging edge-case large TOC smoke data',
-  };
-
-  // The endpoint reads data.get("toc"), so the payload must be wrapped. Sent flat,
-  // it resolves to {} -> chapters [] -> an empty TOC saved with a 200, which is why
-  // this test asserted a successful PUT and then found 0 chapters on the edit
-  // screen. The endpoint accepting that silently is tracked separately.
-  const response = await page.request.put(`${API_BASE_URL}/books/${bookId}/toc`, {
-    data: { toc },
-  });
-
-  expect(response.status(), await response.text()).toBeLessThan(400);
-
-  // A 200 is not proof of persistence here — verify the chapters actually landed.
-  const saved = await page.request.get(`${API_BASE_URL}/books/${bookId}/toc`);
-  expect(saved.status(), await saved.text()).toBeLessThan(400);
-  const savedBody = await saved.json();
-  const savedChapters =
-    savedBody?.toc?.chapters ?? savedBody?.table_of_contents?.chapters ?? savedBody?.chapters ?? [];
-  expect(savedChapters, 'TOC PUT returned 2xx but persisted no chapters').toHaveLength(chapterCount);
 }
 
 async function expectAuthenticatedDashboard(page: Page): Promise<void> {
@@ -120,11 +78,11 @@ test.describe('Staging edge cases', () => {
     authenticatedPage: page,
   }) => {
     const bookId = await createBookOnPage(page, `Large TOC Edge Book ${Date.now()}`);
-    await updateToc(page, bookId, 50);
+    await seedToc(page, bookId, 50);
 
     await page.goto(`/dashboard/books/${bookId}/edit-toc`);
     await expect(page.getByRole('heading', { name: /edit table of contents/i })).toBeVisible();
-    await expect(page.locator('input[value^="Edge Case Chapter"]')).toHaveCount(50, {
+    await expect(page.locator('input[value^="Seeded Chapter"]')).toHaveCount(50, {
       timeout: 20_000,
     });
 

@@ -26,6 +26,11 @@ import {
  */
 
 test.describe('Complete Authoring Journey', () => {
+  // No retries (#916): this is the live-AI journey, about five OpenAI calls per
+  // attempt, and its failures are mostly deterministic (quota, key, #775). A
+  // retry re-spends the calls to reach the same verdict.
+  test.describe.configure({ retries: 0 });
+
   test('create book → summary → TOC → chapter questions → persistence', async ({
     authenticatedPage: page,
   }) => {

@@ -1,12 +1,9 @@
 import { test, expect } from './fixtures/auth.fixture';
 import {
-  createBook,
-  addSummary,
-  completeTocWizard,
+  seedBookWithToc,
   openChapterEditor,
   answerFirstChapterQuestion,
   readFirstChapterAnswer,
-  READY_SUMMARY,
 } from './fixtures/journey.helpers';
 
 /**
@@ -110,26 +107,32 @@ test.describe('Issue #83 regressions', () => {
 
   /**
    * Regression (Issue #54): chapter question answers were lost on page refresh.
-   * Full chain: create book -> summary -> TOC -> chapter -> answer -> reload.
+   * Chain: seeded book + TOC -> chapter -> generate questions -> answer -> reload.
    *
-   * Reachable now that the interview-questions panel is mounted in the chapter
-   * editor (Write / Interview Questions tabs). Every step uses web-first
-   * assertions and real save round-trips — see journey.helpers.ts.
+   * The book, summary and TOC are seeded through the API (#916): this test is
+   * about answer persistence, and driving the AI TOC wizard to get chapters cost
+   * about five live OpenAI calls. The one live AI call left is the chapter
+   * question generation, because an answer is saved against a real question id
+   * the server issued. The answer and the reload go through the UI, with
+   * web-first assertions and real save round-trips (journey.helpers.ts).
    */
-  test('Issue #54: chapter question answers persist after refresh', async ({
-    authenticatedPage: page,
-  }) => {
-    test.setTimeout(300_000);
+  test.describe('one live AI call', () => {
+    // No retries: the question generation is a live AI call (see the journey spec).
+    test.describe.configure({ retries: 0 });
 
-    const answer = `Persistence check ${Date.now()}`;
-    const bookId = await createBook(page, `E2E #54 Book ${Date.now()}`);
-    await addSummary(page, bookId, READY_SUMMARY);
-    await completeTocWizard(page);
-    await openChapterEditor(page, bookId);
-    await answerFirstChapterQuestion(page, answer);
+    test('Issue #54: chapter question answers persist after refresh', async ({
+      authenticatedPage: page,
+    }) => {
+      test.setTimeout(180_000);
 
-    await page.reload();
-    const reloaded = await readFirstChapterAnswer(page);
-    expect(reloaded, 'Answer was lost after refresh (Issue #54 regression)').toContain(answer);
+      const answer = `Persistence check ${Date.now()}`;
+      const bookId = await seedBookWithToc(page, `E2E #54 Book ${Date.now()}`);
+      await openChapterEditor(page, bookId);
+      await answerFirstChapterQuestion(page, answer);
+
+      await page.reload();
+      const reloaded = await readFirstChapterAnswer(page);
+      expect(reloaded, 'Answer was lost after refresh (Issue #54 regression)').toContain(answer);
+    });
   });
 });
