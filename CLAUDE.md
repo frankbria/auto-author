@@ -58,7 +58,7 @@ cp tests/e2e/staging/.env.test.example tests/e2e/staging/.env.test   # set STAGI
 npm run test:e2e:staging
 ```
 
-Specs: `tests/e2e/staging/complete-user-journey.spec.ts`, `regressions.spec.ts` (#83 session/401, ObjectId, #54 answer persistence). CI: `.github/workflows/e2e-staging-tests.yml` — 6h schedule, manual dispatch, or PRs labeled `e2e-staging`; needs GitHub Secrets `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`. See `tests/e2e/staging/README.md`.
+Specs: `tests/e2e/staging/complete-user-journey.spec.ts`, `regressions.spec.ts` (#83 session/401, ObjectId, #54 answer persistence). CI: `.github/workflows/e2e-staging-tests.yml` — after each successful "Deploy Staging (Containers)" run (on the deployed commit), manual dispatch, or PRs labeled `e2e-staging`; no schedule (#916), `staging-health.yml` probes `/api/v1/health` + frontend every 6h instead; needs GitHub Secrets `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`. See `tests/e2e/staging/README.md`.
 
 ---
 

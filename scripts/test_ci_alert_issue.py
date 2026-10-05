@@ -68,11 +68,21 @@ def test_recovery_with_nothing_open_does_nothing(tmp_path):
     assert writes(run(tmp_path, "recovery")) == []
 
 
-def test_workflow_alert_job_is_least_privilege_and_scheduled_only():
+def test_workflow_alert_job_is_least_privilege_and_fires_after_deploy():
     wf = yaml.safe_load(WORKFLOW.read_text())
     assert wf["permissions"] == {"contents": "read"}
     job = wf["jobs"]["alert"]
     assert job["permissions"] == {"contents": "read", "issues": "write"}
     assert "e2e-staging" in job["needs"]
-    assert "schedule" in job["if"] and "always()" in job["if"]
+    cond = " ".join(job["if"].split())
+    # #916: post-deploy runs replaced the schedule; a manual dispatch from the
+    # default branch also reports, so a green rerun closes the issue.
+    assert "github.event_name == 'workflow_run'" in cond and "always()" in cond
+    assert "github.event_name == 'workflow_dispatch'" in cond
+    assert "github.ref_name == github.event.repository.default_branch" in cond
+    assert "schedule" not in cond
+    # Labelled-PR runs never alert: a red feature branch is not a staging outage.
+    assert "pull_request" not in cond
+    step = next(s for s in job["steps"] if "ci-alert-issue.sh" in s.get("run", ""))
+    assert step["env"]["ALERT_LABEL"] == "ci-alert:staging-e2e"
     assert "issues" not in wf["jobs"]["e2e-staging"].get("permissions", {})

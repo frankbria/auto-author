@@ -169,18 +169,38 @@ Two consequences worth knowing before you write a spec:
 
 ## CI/CD Integration
 
-These tests run automatically on:
-- Every push to `main`
-- Every pull request
-- Scheduled runs every 6 hours
+`.github/workflows/e2e-staging-tests.yml` runs the suite (#916):
+- After each **successful** "Deploy Staging (Containers)" run (`workflow_run`),
+  on the commit that deploy ran from. A failed or cancelled deploy runs nothing.
+- On manual `workflow_dispatch`.
+- On PRs labelled `e2e-staging` whose branch is in this repository (#191).
 
-See `.github/workflows/e2e-staging-tests.yml` for CI configuration.
+There is no schedule. Staging deploys are manual, so a schedule only re-tested
+the same build and spent live OpenAI calls doing it. A failed post-deploy run
+(or a failed dispatch from `main`) opens or comments on one
+`ci-alert:staging-e2e` issue, and the next green one closes it (#776).
+
+Between deploys, `.github/workflows/staging-health.yml` probes
+`/api/v1/health` and the frontend root every 6 hours, with no AI and no auth
+(`scripts/staging_health_probe.py`). A failure opens one
+`ci-alert:staging-health` issue, closed by the next healthy run. Run it locally
+with `python3 scripts/staging_health_probe.py`.
+
+### AI calls per run
+
+Two tests call live OpenAI, and neither retries (`test.describe.configure({ retries: 0 })`):
+- `complete-user-journey.spec.ts`: the full wizard, about five calls.
+- `regressions.spec.ts` #54: one call (chapter question generation). Its book,
+  summary and TOC are seeded through the API (`seedBookWithToc` in
+  `fixtures/journey.helpers.ts`), because an answer needs a real question id.
+
+Use `seedBookWithToc` for any new spec that only needs a book with chapters.
 
 ### GitHub Secrets Required
 
-Add these secrets to GitHub repository settings:
-- `STAGING_TEST_EMAIL` - Test user email
-- `STAGING_TEST_PASSWORD` - Test user password
+In the `staging` GitHub environment:
+- `TEST_USER_EMAIL` - Test user email
+- `TEST_USER_PASSWORD` - Test user password
 
 ## Debugging Failed Tests
 
@@ -301,7 +321,9 @@ test('Issue #54: Question answers persist after page refresh', async ({ authenti
 **The job fails on flaky.** `failOnFlakyTests` is on under CI, so a test that
 fails its first attempt and passes on retry turns the run red instead of
 reporting `1 flaky` and exiting `success`. Retries (`retries: 2`) stay on so the
-retry still produces a trace — they buy diagnostics, not a green tick.
+retry still produces a trace — they buy diagnostics, not a green tick. The two
+live-AI tests are the exception: they run once (#916), since their failures are
+mostly deterministic (quota, key) and a retry re-spends the calls.
 
 This was decided in #551. The `regressions.spec.ts` #83 session canary is the
 spec most likely to catch an auth-path break; while `flaky` counted as success, a
