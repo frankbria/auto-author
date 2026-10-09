@@ -268,6 +268,23 @@ class AIService:
 
         return await self._retry_with_backoff(_async_wrapper, correlation_id=correlation_id)
 
+    def _untruncated_text(self, response, correlation_id: Optional[str] = None) -> str:
+        """The completion's text, refusing one that hit max_tokens.
+
+        A reasoning model can spend the whole budget thinking and return empty
+        content (Nemotron did on analysis, 4 of 4 runs). Parsed anyway, that
+        reads as a real "not ready" verdict or a parse failure (#917).
+        """
+        choice = response.choices[0]
+        if getattr(choice, "finish_reason", None) == "length":
+            raise AIServiceError(
+                message="The AI response was cut off before it finished. Please try again.",
+                error_code="AI_RESPONSE_TRUNCATED",
+                retryable=False,
+                correlation_id=correlation_id,
+            )
+        return choice.message.content
+
     async def analyze_summary_for_toc(
         self, summary: str, book_metadata: Optional[Dict] = None
     ) -> Dict:
@@ -298,7 +315,7 @@ class AIService:
             )
 
             # Parse the response
-            analysis_text = response.choices[0].message.content
+            analysis_text = self._untruncated_text(response)
             logger.info(
                 f"Summary analysis completed for summary of {len(summary)} characters"
             )
@@ -356,7 +373,7 @@ class AIService:
                 correlation_id=correlation_id,
             )
 
-            questions_text = response.choices[0].message.content
+            questions_text = self._untruncated_text(response, correlation_id)
             questions = self._parse_questions_response(questions_text)
 
             logger.info(
@@ -803,7 +820,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 max_tokens=2000
             )
 
-            questions_text = response.choices[0].message.content
+            questions_text = self._untruncated_text(response)
             questions = self._parse_chapter_questions_response(questions_text)
 
             logger.info(f"Generated {len(questions)} questions for chapter")

@@ -128,13 +128,13 @@ Things that differ by provider:
   billing some other way surfaces as `AI_UNEXPECTED_ERROR`; check the backend
   log for its message. A retired or unknown model name is the same.
 - **Reasoning models** (Nemotron, Qwen3, GLM thinking modes) spend part of
-  `max_tokens` on hidden reasoning. If the budget runs out before any answer,
-  the content comes back empty with `finish_reason: length`. Drafts, TOC,
-  enhance, transform and transcription cleanup report that as truncation.
-  Summary analysis, clarifying questions and chapter questions never checked
-  `finish_reason`: analysis reads as "not ready", clarifying questions fail as
-  `AI_INVALID_RESPONSE`, and chapter questions fall back to templates. Raise the
-  caps, or pick a non-reasoning model for `AI_MODEL_DEFAULT`.
+  `max_tokens` on hidden reasoning. Each flow's budget is fixed in code
+  (analysis 1000, clarifying questions 800, chapter questions 2000, TOC 6000),
+  and the `AI_MAX_OUTPUT_TOKENS_*` caps only ever lower it. Measured live,
+  `nemotron-3-nano:30b` spent all 1000 analysis tokens thinking and returned
+  empty content in 4 of 4 runs, while its TOC (6000) worked. Every flow reports
+  an exhausted budget as `AI_RESPONSE_TRUNCATED` rather than parsing the
+  empty answer. **Use a non-reasoning model for `AI_MODEL_DEFAULT`.**
 - **Output format.** The parsers are pinned against real `nemotron-3-nano:30b`
   output (`backend/tests/fixtures/ai_provider_outputs/`). Capture another
   model's fixtures the same way before relying on it in production.

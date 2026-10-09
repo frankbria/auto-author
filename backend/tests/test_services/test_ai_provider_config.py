@@ -189,3 +189,21 @@ class TestAlternateProviderOnTheWire:
             await stub_service.generate_toc_from_summary_and_responses(SUMMARY, RESPONSES)
 
         assert exc.value.error_code == "AI_RESPONSE_TRUNCATED"
+
+    @pytest.mark.asyncio
+    async def test_exhausted_budget_is_never_parsed_as_an_answer(self, stub, stub_service):
+        """A reasoning model that spends max_tokens thinking returns empty
+        content with finish_reason=length (seen live from Nemotron on analysis,
+        4 of 4 runs). That must be an error, not a "not ready" verdict."""
+        stub.finish_reason, stub.content = "length", ""
+
+        analysis = await stub_service.analyze_summary_for_toc(SUMMARY)
+        assert "cut off" in analysis["error"]
+
+        for call in (
+            stub_service.generate_clarifying_questions(SUMMARY),
+            stub_service.generate_chapter_questions("Write questions.", 5),
+        ):
+            with pytest.raises(AIServiceError) as exc:
+                await call
+            assert exc.value.error_code == "AI_RESPONSE_TRUNCATED"
