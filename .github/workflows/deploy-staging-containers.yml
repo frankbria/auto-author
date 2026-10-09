@@ -153,12 +153,12 @@ jobs:
              # An empty or wrong read would pass the leak check vacuously.
              printf '%s\n' \"\$names\" | grep -qx DATABASE_URL \
                || { echo '::error::could not read the frontend container env'; exit 1; }
-             leaked=\$(printf '%s\n' \"\$names\" | grep -E '^(OPENAI|STRIPE|AWS|CLOUDINARY)|^SENTRY_DSN\$' | tr '\n' ' ' || true)
+             leaked=\$(printf '%s\n' \"\$names\" | grep -E '^(OPENAI|STRIPE|AWS|CLOUDINARY)|^(SENTRY_DSN|AI_API_KEY)\$' | tr '\n' ' ' || true)
              if [ -n \"\$leaked\" ]; then
                echo \"::error::frontend container holds backend-only variables: \$leaked\"
                exit 1
              fi
-             echo 'frontend env holds no OPENAI/STRIPE/AWS/CLOUDINARY/SENTRY_DSN variables'"
+             echo 'frontend env holds no OPENAI/STRIPE/AWS/CLOUDINARY/SENTRY_DSN/AI_API_KEY variables'"
 
       # Deliberately last and deliberately conservative: pruning before the
       # health check would delete the image a rollback needs.

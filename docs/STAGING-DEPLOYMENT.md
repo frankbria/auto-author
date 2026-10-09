@@ -78,7 +78,7 @@ and Cloudinary keys never enter the Next.js process. Consequences:
   fails CI if the list names anything `frontend/src` does not read, or anything
   backend-only.
 - The deploy checks the running container: **Frontend carries no backend secret**
-  runs `env` inside `auto-author-frontend-1` and fails on any `OPENAI*`,
+  runs `env` inside `auto-author-frontend-1` and fails on any `OPENAI*`, `AI_API_KEY`,
   `STRIPE*`, `AWS*`, `CLOUDINARY*` or `SENTRY_DSN` name (names only are logged).
   By hand: `docker exec auto-author-frontend-1 env | cut -d= -f1 | sort`.
 
@@ -103,6 +103,44 @@ Database values have their own rules (no db name in the URI, percent-encode the
 password, rotation runbook): `docs/DATABASE_CONNECTION_STANDARD.md`.
 
 ---
+
+### AI provider settings (#917)
+
+All optional. With none set, the backend calls api.openai.com with `gpt-4` and
+`gpt-4o`, the same as before #917. They reach the backend through `env_file:`,
+so adding a line to the box `.env` and recreating the containers is the whole
+change.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AI_BASE_URL` | empty (api.openai.com) | Any OpenAI-compatible endpoint, such as z.ai, OpenRouter, vLLM or Ollama (`…/v1`). This is the only routing switch: the SDK's own `OPENAI_BASE_URL` is ignored |
+| `AI_API_KEY` | empty | That provider's key, which takes precedence over `OPENAI_API_KEY`. **Required whenever `AI_BASE_URL` is set**, because the OpenAI key is never sent to another endpoint and `/health` reports `AI_API_KEY` as missing. A keyless local server (Ollama) still needs a non-empty value, any string will do. Compose still requires `OPENAI_API_KEY`, so leave the existing value |
+| `AI_MODEL_DEFAULT` | `gpt-4` | Summary analysis, clarifying and chapter questions, enhance, transform, transcription cleanup |
+| `AI_MODEL_LONG_OUTPUT` | `gpt-4o` | Chapter drafts and TOC generation (needs ≥ 6000 output tokens for TOC) |
+| `AI_MAX_OUTPUT_TOKENS_DEFAULT` | `4000` | Cap on every default-class request's `max_tokens` |
+| `AI_MAX_OUTPUT_TOKENS_LONG` | `8000` | Cap on drafts and TOC. Lowering it below 6000 truncates large TOCs, which then fail cleanly as `AI_RESPONSE_TRUNCATED` |
+
+Things that differ by provider:
+
+- **Out of credit.** OpenAI's 429 `insufficient_quota` and the HTTP 402 that
+  OpenAI-compatible providers send (Ollama cloud, OpenRouter) both map to
+  `AI_PROVIDER_QUOTA_EXHAUSTED` (503, not retried). A provider that signals
+  billing some other way surfaces as `AI_UNEXPECTED_ERROR`; check the backend
+  log for its message. A retired or unknown model name is the same.
+- **Reasoning models** (Nemotron, Qwen3, GLM thinking modes) spend part of
+  `max_tokens` on hidden reasoning. Each flow's budget is fixed in code
+  (analysis 1000, clarifying questions 800, chapter questions 2000, TOC 6000),
+  and the `AI_MAX_OUTPUT_TOKENS_*` caps only ever lower it. Measured live,
+  `nemotron-3-nano:30b` spent all 1000 analysis tokens thinking and returned
+  empty content in 4 of 4 runs, while its TOC (6000) worked. Every flow reports
+  an exhausted budget as `AI_RESPONSE_TRUNCATED` rather than parsing the
+  empty answer. **Use a non-reasoning model for `AI_MODEL_DEFAULT`.**
+- **Output format.** The parsers are pinned against real `nemotron-3-nano:30b`
+  output (`backend/tests/fixtures/ai_provider_outputs/`). Capture another
+  model's fixtures the same way before relying on it in production.
+- **Nothing is OpenAI-only.** Voice input uses the browser's speech
+  recognition. Its server-side cleanup is an ordinary chat call on
+  `AI_MODEL_DEFAULT`. There is no Whisper, embeddings or image call.
 
 ## One-time setup on the box
 

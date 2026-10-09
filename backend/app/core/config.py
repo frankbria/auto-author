@@ -105,8 +105,27 @@ class Settings(BaseSettings):
 
     @property
     def openai_api_key(self) -> str:
-        """Resolve the OpenAI key, preferring the standard OPENAI_API_KEY."""
-        return self.OPENAI_API_KEY or self.OPENAI_AUTOAUTHOR_API_KEY
+        """Resolve the AI provider key: AI_API_KEY, then OPENAI_API_KEY, then the legacy name.
+
+        With AI_BASE_URL set only AI_API_KEY counts, so the OpenAI key is never
+        sent to another provider's endpoint (#917).
+        """
+        if self.AI_BASE_URL:
+            return self.AI_API_KEY
+        return self.AI_API_KEY or self.OPENAI_API_KEY or self.OPENAI_AUTOAUTHOR_API_KEY
+
+    # AI provider (#917). Any OpenAI-compatible endpoint works (z.ai, OpenRouter,
+    # vLLM, Ollama); empty AI_BASE_URL means api.openai.com. Flows split into
+    # two classes: DEFAULT (analysis, questions, enhance/transform) and
+    # LONG_OUTPUT (drafts, TOC). The token caps clamp each class's requests so
+    # a model with a smaller output limit isn't sent a max_tokens it rejects.
+    # The defaults reproduce the pre-#917 requests exactly.
+    AI_BASE_URL: str = ""
+    AI_API_KEY: str = ""
+    AI_MODEL_DEFAULT: str = "gpt-4"
+    AI_MODEL_LONG_OUTPUT: str = "gpt-4o"
+    AI_MAX_OUTPUT_TOKENS_DEFAULT: int = Field(default=4000, ge=1)
+    AI_MAX_OUTPUT_TOKENS_LONG: int = Field(default=8000, ge=1)
 
     # Better Auth Settings
     # CRITICAL: BETTER_AUTH_SECRET must be set in .env file

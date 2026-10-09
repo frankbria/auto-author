@@ -1,5 +1,16 @@
 # Environment Variable Refactoring Summary
 
+## AI Provider and Models (2026-10-09)
+
+Issue #917: point the OpenAI client at any OpenAI-compatible endpoint and choose models per flow class. All are optional, and with none set the requests are unchanged.
+
+- **AI_BASE_URL**: an OpenAI-compatible base URL (`…/v1`). Empty means api.openai.com.
+- **AI_API_KEY**: takes precedence over `OPENAI_API_KEY`, and is the only key used when `AI_BASE_URL` is set.
+- **AI_MODEL_DEFAULT** (`gpt-4`) / **AI_MODEL_LONG_OUTPUT** (`gpt-4o`, drafts and TOC).
+- **AI_MAX_OUTPUT_TOKENS_DEFAULT** (4000) / **AI_MAX_OUTPUT_TOKENS_LONG** (8000): caps on each class's `max_tokens`.
+
+Details: `docs/STAGING-DEPLOYMENT.md` → "AI provider settings (#917)".
+
 ## Stripe Checkout (2026-07-09)
 
 ### Overview

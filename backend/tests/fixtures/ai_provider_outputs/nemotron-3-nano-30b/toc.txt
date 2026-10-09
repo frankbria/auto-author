@@ -1,0 +1,247 @@
+{
+  "chapters": [
+    {
+      "id": "ch1",
+      "title": "Transitioning from Engineer to Manager",
+      "description": "Explores the mindset shift, building trust, and setting clear expectations as engineers move into their first leadership role.",
+      "level": 1,
+      "order": 1,
+      "subchapters": [
+        {
+          "id": "ch1-1",
+          "title": "The Mindset Shift",
+          "description": "Understanding the psychological and cultural changes required when moving from individual contributor to leader.",
+          "level": 2,
+          "order": 1
+        },
+        {
+          "id": "ch1-2",
+          "title": "Building Trust Quickly",
+          "description": "Practical steps to earn credibility and establish strong relationships with direct reports.",
+          "level": 2,
+          "order": 2
+        },
+        {
+          "id": "ch1-3",
+          "title": "Setting Clear Expectations",
+          "description": "Defining roles, responsibilities, and success metrics to align the team.",
+          "level": 2,
+          "order": 3
+        }
+      ]
+    },
+    {
+      "id": "ch2",
+      "title": "Mastering One‑on‑Ones",
+      "description": "Provides a practical framework for designing, conducting, and following up on effective one‑on‑one meetings.",
+      "level": 1,
+      "order": 2,
+      "subchapters": [
+        {
+          "id": "ch2-1",
+          "title": "Preparing an Agenda",
+          "description": "How to structure meeting topics and set objectives before the conversation.",
+          "level": 2,
+          "order": 1
+        },
+        {
+          "id": "ch2-2",
+          "title": "Active Listening Techniques",
+          "description": "Tools for hearing, reflecting, and validating employee input.",
+          "level": 2,
+          "order": 2
+        },
+        {
+          "id": "ch2-3",
+          "title": "Documenting Outcomes",
+          "description": "Creating action items and follow‑up mechanisms to track progress.",
+          "level": 2,
+          "order": 3
+        }
+      ]
+    },
+    {
+      "id": "ch3",
+      "title": "Giving Effective Feedback",
+      "description": "Covers feedback models, how to deliver praise, and delivering constructive criticism in a way that drives growth.",
+      "level": 1,
+      "order": 3,
+      "subchapters": [
+        {
+          "id": "ch3-1",
+          "title": "Feedback Frameworks",
+          "description": "Using models like SBI and STAR to structure feedback conversations.",
+          "level": 2,
+          "order": 1
+        },
+        {
+          "id": "ch3-2",
+          "title": "Delivering Praise Effectively",
+          "description": "Timing, specificity, and public vs private considerations for recognition.",
+          "level": 2,
+          "order": 2
+        },
+        {
+          "id": "ch3-3",
+          "title": "Addressing Performance Gaps",
+          "description": "Constructive approaches to give critical feedback without demotivating the recipient.",
+          "level": 2,
+          "order": 3
+        }
+      ]
+    },
+    {
+      "id": "ch4",
+      "title": "Hiring and Onboarding",
+      "description": "Details hiring strategy, interview loops, calibration, and an onboarding checklist for new engineers.",
+      "level": 1,
+      "order": 4,
+      "subchapters": [
+        {
+          "id": "ch4-1",
+          "title": "Defining Role Profiles",
+          "description": "Crafting clear job descriptions and success criteria for hiring.",
+          "level": 2,
+          "order": 1
+        },
+        {
+          "id": "ch4-2",
+          "title": "Structured Interview Loops",
+          "description": "Designing consistent interview processes and calibration sessions.",
+          "level": 2,
+          "order": 2
+        },
+        {
+          "id": "ch4-3",
+          "title": "Onboarding Checklist",
+          "description": "Step‑by‑step guide to integrate new hires into the team and organization.",
+          "level": 2,
+          "order": 3
+        }
+      ]
+    },
+    {
+      "id": "ch5",
+      "title": "Managing Performance and Underperformance",
+      "description": "Guides managers through performance management, coaching underperformers, and escalation processes.",
+      "level": 1,
+      "order": 5,
+      "subchapters": [
+        {
+          "id": "ch5-1",
+          "title": "Performance Ladder",
+          "description": "Creating measurable goals and a transparent performance framework.",
+          "level": 2,
+          "order": 1
+        },
+        {
+          "id": "ch5-2",
+          "title": "Coaching Plans",
+          "description": "Developing short‑term action plans to uplift underperforming engineers.",
+          "level": 2,
+          "order": 2
+        },
+        {
+          "id": "ch5-3",
+          "title": "Escalation Paths",
+          "description": "When and how to involve HR or senior leadership in performance issues.",
+          "level": 2,
+          "order": 3
+        }
+      ]
+    },
+    {
+      "id": "ch6",
+      "title": "Aligning with Product and Stakeholders",
+      "description": "Explains collaboration with product partners, roadmap alignment, prioritization, and communicating trade‑offs.",
+      "level": 1,
+      "order": 6,
+      "subchapters": [
+        {
+          "id": "ch6-1",
+          "title": "Roadmap Collaboration",
+          "description": "Techniques for aligning engineering work with product vision.",
+          "level": 2,
+          "order": 1
+        },
+        {
+          "id": "ch6-2",
+          "title": "Prioritization Techniques",
+          "description": "Using frameworks like RICE or WSJF to decide what to build next.",
+          "level": 2,
+          "order": 2
+        },
+        {
+          "id": "ch6-3",
+          "title": "Communicating Trade‑offs",
+          "description": "Articulating technical constraints and business impacts to stakeholders.",
+          "level": 2,
+          "order": 3
+        }
+      ]
+    },
+    {
+      "id": "ch7",
+      "title": "Building Healthy Team Culture",
+      "description": "Focuses on cultivating psychological safety, inclusion, and team rituals that sustain engagement.",
+      "level": 1,
+      "order": 7,
+      "subchapters": [
+        {
+          "id": "ch7-1",
+          "title": "Psychological Safety",
+          "description": "Building an environment where team members feel safe to speak up.",
+          "level": 2,
+          "order": 1
+        },
+        {
+          "id": "ch7-2",
+          "title": "Diversity & Inclusion Practices",
+          "description": "Strategies to attract, retain, and empower a diverse engineering team.",
+          "level": 2,
+          "order": 2
+        },
+        {
+          "id": "ch7-3",
+          "title": "Rituals and Celebrations",
+          "description": "Implementing regular team ceremonies and recognition events.",
+          "level": 2,
+          "order": 3
+        }
+      ]
+    },
+    {
+      "id": "ch8",
+      "title": "Preventing Burnout and Sustaining Energy",
+      "description": "Offers tactics to detect and prevent burnout, manage workload, and keep the team energized long‑term.",
+      "level": 1,
+      "order": 8,
+      "subchapters": [
+        {
+          "id": "ch8-1",
+          "title": "Workload Visibility",
+          "description": "Using metrics and dashboards to monitor capacity and prevent overload.",
+          "level": 2,
+          "order": 1
+        },
+        {
+          "id": "ch8-2",
+          "title": "Boundary Setting",
+          "description": "Encouraging sustainable work habits and protecting personal time.",
+          "level": 2,
+          "order": 2
+        },
+        {
+          "id": "ch8-3",
+          "title": "Continuous Learning Culture",
+          "description": "Promoting skill growth and knowledge sharing to keep the team energized.",
+          "level": 2,
+          "order": 3
+        }
+      ]
+    }
+  ],
+  "total_chapters": 8,
+  "estimated_pages": 200,
+  "structure_notes": "The TOC is organized to move the reader from the foundational shift in identity (Chapter 1) through practical daily tools (Chapters 2‑3), into core operational areas—hiring, performance, and stakeholder alignment (Chapters 4‑6)—then to culture and sustainability (Chapters 7‑8). Each main chapter contains 3 subchapters, providing a clear, actionable progression from beginner to advanced management skills while keeping the content practical and checklist‑driven."
+}

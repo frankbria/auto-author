@@ -19,7 +19,7 @@ FRONTEND_SRC = REPO / "frontend" / "src"
 LIBRARY_READ = {"BETTER_AUTH_SECRET", "NODE_ENV"}
 # The frontend reads these, but they disable auth and must never reach a deploy.
 NEVER_FORWARDED = {"BYPASS_AUTH", "E2E_ALLOW_BYPASS", "NEXT_PUBLIC_BYPASS_AUTH"}
-BACKEND_ONLY = re.compile(r"^(OPENAI|STRIPE|AWS|CLOUDINARY)|^SENTRY_DSN$")
+BACKEND_ONLY = re.compile(r"^(OPENAI|STRIPE|AWS|CLOUDINARY)|^(SENTRY_DSN|AI_API_KEY)$")
 
 
 def frontend_services():
