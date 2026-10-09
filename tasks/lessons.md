@@ -1274,3 +1274,14 @@ A green PR's latest glm-review comment said "no new defects", while two inline f
 
 ### Check how staging deploys before holding a PR for a deploy-time effect (2026-10-02)
 Two PRs (#900, #903) were held because merging "would break staging". `deploy-staging-containers.yml` is `workflow_dispatch`-only, and staging had not been deployed since 2026-08-28. The real constraint was a pre-deploy checklist, not a merge block. Read the deploy workflow's trigger, and `gh run list` for its last run, before deciding merge order.
+
+## #917 configurable AI provider (2026-10-09)
+
+### A live model call finds what the wire stub can't (#921)
+The stub tests were green, and a demo against a real model through local Ollama (`localhost:11434/v1`, `nemotron-3-nano:30b-cloud`) still found two bugs. First, `AI_BASE_URL` with an empty `AI_API_KEY` passed `api_key=""` to the OpenAI SDK, which raises at `AIService()` import, so the backend never booted. Second, the reasoning model spent all 1000 analysis tokens thinking and returned empty content with `finish_reason: length`, which the parser turned into a confident "not ready, 0.5" verdict. A stub returns only what you thought to script. For any AI-flow change, run one live call through local Ollama after the stub tests; `glm-5.2:cloud` also gives a real 402.
+
+### A green `main` can be stale for the advisory gate (#923)
+`main`'s last `tests.yml` run was green but 4 days old. Eight advisories had landed since, so the first CI run of an unrelated PR went red on the required Security Audit. A green run only covers the advisory gate as of the day it ran. If `main`'s last run is over a day old, run `scripts/audit_gate.py` locally (with `NO_COLOR=1`) before branching, so the advisory fix ships first in its own PR.
+
+### Stale `index.lock` with no git process, twice in one run
+`.git/index.lock` appeared twice (21:46 and 12:56), each time with no live git process and no piped `git commit`. The first broke a commit and the second a merge. The cause is unconfirmed: `.beads/metadata.json` is modified in the background throughout, so a beads hook is the suspect. Before removing a lock, confirm with `pgrep -x git` and the lock's mtime, then retry and verify with `git log -1`.
