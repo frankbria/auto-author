@@ -60,3 +60,18 @@ def test_chapter_questions_json(svc):
     for q in questions:
         assert q["question_text"].endswith("?")
         assert q["question_type"] and q["difficulty"] and q["help_text"]
+
+
+def test_suggestion_list_ends_at_the_first_non_item(svc):
+    text = "READINESS: Ready\nSUGGESTIONS:\n1. Add a chapter count.\n- Name the framework.\n\nLet me know if you need more."
+
+    assert svc._parse_analysis_response(text, "s")["suggestions"] == [
+        "Add a chapter count.",
+        "Name the framework.",
+    ]
+
+
+def test_list_markers_need_a_list_item(svc):
+    text = "* Who reads it?\n1.5x growth, but why?\n-5% of readers quit, why?\n2) What comes first?"
+
+    assert svc._parse_questions_response(text) == ["Who reads it?", "What comes first?"]

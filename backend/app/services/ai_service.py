@@ -31,7 +31,7 @@ from app.services.transcription_enhancement import (
 logger = logging.getLogger(__name__)
 
 # A list item's leading "1." / "2)" / "-" / "•" / "*" marker.
-LIST_MARKER = re.compile(r"^(?:\d+[.)]|[-•*])\s*")
+LIST_MARKER = re.compile(r"^(?:\d+[.)](?!\d)\s*|[-•*]\s+)")
 
 # Drafts and TOCs run on the long-output model class (settings.AI_MODEL_LONG_OUTPUT,
 # default gpt-4o: 128k context / 16k output) so the UI's top length options stay
@@ -465,7 +465,7 @@ Make questions specific, actionable, and focused on content structure rather tha
                 ]
                 # Open models put them on the following lines as a list (#917).
                 in_suggestion_list = not suggestions
-            elif line and in_suggestion_list:
+            elif in_suggestion_list and LIST_MARKER.match(line):
                 suggestions.append(LIST_MARKER.sub("", line))
         # Additional metadata
         word_count = len(original_summary.split())
@@ -487,9 +487,9 @@ Make questions specific, actionable, and focused on content structure rather tha
         questions = []
 
         for line in lines:
-            # Open models wrap items in markdown bold: "1. **Why...?**" (#917).
-            line = line.strip().lstrip("*_")
+            line = line.strip()
             if LIST_MARKER.match(line):
+                # Open models wrap items in markdown bold: "1. **Why...?**" (#917).
                 cleaned = LIST_MARKER.sub("", line).strip().strip("*_").strip()
                 if cleaned and cleaned.endswith("?"):
                     questions.append(cleaned)

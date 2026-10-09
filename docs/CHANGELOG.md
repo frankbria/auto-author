@@ -2,6 +2,15 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-09
+
+- **AI provider and models are configuration (#917, P0.35)**: the backend can call any OpenAI-compatible endpoint, and each class of flow gets its own model. With nothing set, requests are byte-for-byte what they were before.
+  - **Settings.** `AI_BASE_URL` (empty means api.openai.com), `AI_API_KEY`, `AI_MODEL_DEFAULT` (`gpt-4`: analysis, questions, enhance, transform, transcription cleanup), `AI_MODEL_LONG_OUTPUT` (`gpt-4o`: drafts and TOC), plus `AI_MAX_OUTPUT_TOKENS_DEFAULT`/`_LONG` (4000/8000). The caps clamp each class's `max_tokens` in `_make_openai_request`, so a model with a smaller output limit is never sent a value it rejects. They replace the `DRAFT_GENERATION_MODEL`/`DRAFT_MAX_COMPLETION_TOKENS` constants. They reach the container through the backend's `env_file:`.
+  - **Key handling.** `AI_API_KEY` takes precedence over `OPENAI_API_KEY`. When `AI_BASE_URL` is set it is the only key used, so the OpenAI key is never sent to a third-party endpoint, and `/health` reports `AI_API_KEY` if it is missing. `AI_API_KEY` joins the frontend backend-secret leak guards (`scripts/test_frontend_env_allowlist.py` and the deploy's container `env` check).
+  - **Billing errors.** HTTP 402, which Ollama cloud and OpenRouter send when credit runs out, maps to `AI_PROVIDER_QUOTA_EXHAUSTED` like OpenAI's 429 `insufficient_quota` (#775).
+  - **Parsers on real open-model output.** Fixtures in `backend/tests/fixtures/ai_provider_outputs/nemotron-3-nano-30b/` were captured from NVIDIA's Nemotron 3 Nano through the app's own prompts. They exposed two bugs that would also hit gpt-4 output formatted the same way. A `SUGGESTIONS:` block written as a list on the following lines was dropped. Markdown-bold numbered questions (`1. **Why...?**`) turned into five junk questions, one of them `**?`. Both parsers now strip list markers (`LIST_MARKER`) and emphasis, and `1.5x` is no longer read as item 1.
+  - **Verified.** `test_ai_provider_config.py` pins the default request params. It also runs a real local HTTP stub to check the configured models, key and path, the per-class caps, 402 handling and `finish_reason: length` truncation. Mutation-checked. Provider differences (reasoning models spending `max_tokens`, error shapes) are in `docs/STAGING-DEPLOYMENT.md` under "AI provider settings".
+
 ### 2026-10-04
 
 - **Staging E2E runs after each staging deploy instead of every 6 hours (#916, P0.27.1)**: the schedule re-tested a build last deployed 2026-08-28 and spent about 10 live OpenAI calls per run (up to 3x on a red run through CI retries), so a scheduled run could only fail on something outside the code, such as #775's empty quota.

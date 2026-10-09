@@ -105,7 +105,13 @@ class Settings(BaseSettings):
 
     @property
     def openai_api_key(self) -> str:
-        """Resolve the AI provider key: AI_API_KEY, then OPENAI_API_KEY, then the legacy name."""
+        """Resolve the AI provider key: AI_API_KEY, then OPENAI_API_KEY, then the legacy name.
+
+        With AI_BASE_URL set only AI_API_KEY counts, so the OpenAI key is never
+        sent to another provider's endpoint (#917).
+        """
+        if self.AI_BASE_URL:
+            return self.AI_API_KEY
         return self.AI_API_KEY or self.OPENAI_API_KEY or self.OPENAI_AUTOAUTHOR_API_KEY
 
     # AI provider (#917). Any OpenAI-compatible endpoint works (z.ai, OpenRouter,

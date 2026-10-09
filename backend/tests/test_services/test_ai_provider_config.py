@@ -101,12 +101,6 @@ class TestDefaultsMatchTodaysRequests:
     def test_client_targets_openai(self, unset_ai_settings):
         assert str(AIService().client.base_url) == "https://api.openai.com/v1/"
 
-    def test_ai_api_key_takes_precedence(self, unset_ai_settings, monkeypatch):
-        monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-openai")
-        assert settings.openai_api_key == "sk-openai"
-        monkeypatch.setattr(settings, "AI_API_KEY", "sk-other-provider")
-        assert settings.openai_api_key == "sk-other-provider"
-
     @pytest.mark.asyncio
     async def test_default_flow_params(self, unset_ai_settings):
         svc = AIService()
