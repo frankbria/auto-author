@@ -33,7 +33,6 @@ def unset_ai_settings(monkeypatch):
     """Every AI_* setting at its declared default, whatever the local .env says."""
     for name in AI_SETTINGS:
         monkeypatch.setattr(settings, name, Settings.model_fields[name].default)
-    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
 
 
 @pytest.fixture
@@ -98,7 +97,10 @@ def _sent(svc):
 class TestDefaultsMatchTodaysRequests:
     """With nothing configured, every flow sends exactly what it sent before #917."""
 
-    def test_client_targets_openai(self, unset_ai_settings):
+    def test_client_targets_openai(self, unset_ai_settings, monkeypatch):
+        # The SDK's own OPENAI_BASE_URL fallback would carry the OpenAI key
+        # elsewhere; AI_BASE_URL is the only routing switch.
+        monkeypatch.setenv("OPENAI_BASE_URL", "https://other.example/v1")
         assert str(AIService().client.base_url) == "https://api.openai.com/v1/"
 
     @pytest.mark.asyncio
@@ -142,6 +144,20 @@ class TestAlternateProviderOnTheWire:
         ]
         assert {r["path"] for r in stub.requests} == {"/v1/chat/completions"}
         assert {r["auth"] for r in stub.requests} == {"Bearer stub-key"}
+
+    @pytest.mark.asyncio
+    async def test_missing_provider_key_sends_no_openai_key(self, stub, stub_service, monkeypatch):
+        """The backend still boots (/health names the key) and the OpenAI key,
+        from settings or the SDK's own env fallback, never reaches the stub."""
+        monkeypatch.setattr(settings, "AI_API_KEY", "")
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-openai")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
+        svc = AIService()
+
+        await svc.analyze_summary_for_toc(SUMMARY)
+
+        assert len(stub.requests) == 1
+        assert "sk-openai" not in stub.requests[0]["auth"]
 
     @pytest.mark.asyncio
     async def test_output_budgets_cap_each_class(self, stub, stub_service, monkeypatch):

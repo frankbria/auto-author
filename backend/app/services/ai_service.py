@@ -61,8 +61,14 @@ class AIService:
         # (observed 3x3=9 on the wire). Retry ownership lives in
         # _retry_with_backoff only (#188).
         self.client = OpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.AI_BASE_URL or None,
+            # Never "" or None: the SDK raises on "" (the backend would not
+            # boot) and falls back to the OPENAI_API_KEY env var on None, which
+            # would send the OpenAI key to another AI_BASE_URL (#917). /health
+            # reports the missing key instead.
+            api_key=settings.openai_api_key or "missing-ai-api-key",
+            # Explicit, so the SDK's OPENAI_BASE_URL env fallback can't route the
+            # OpenAI key elsewhere: AI_BASE_URL is the only switch (#917).
+            base_url=settings.AI_BASE_URL or "https://api.openai.com/v1",
             max_retries=0,
         )
         self.model = settings.AI_MODEL_DEFAULT
