@@ -151,7 +151,8 @@ class AIServiceUnavailableError(AIServiceError):
 
 class AIProviderQuotaError(AIServiceUnavailableError):
     """
-    Raised when OpenAI refuses for billing (429 ``insufficient_quota``).
+    Raised when the provider refuses for billing: OpenAI's 429
+    ``insufficient_quota``, or the 402 OpenAI-compatible providers send (#917).
 
     It arrives as a 429 like a rate limit, but waiting never clears it: only
     the operator adding credit does (#775). Not retryable, and a 503 rather

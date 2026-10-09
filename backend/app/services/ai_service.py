@@ -1,6 +1,7 @@
 # backend/app/services/ai_service.py
 import openai
 import logging
+import re
 import asyncio
 import time
 import uuid
@@ -29,25 +30,21 @@ from app.services.transcription_enhancement import (
 )
 logger = logging.getLogger(__name__)
 
-# Draft generation runs on a larger-output model so the UI's top length options
-# stay serviceable (#232). gpt-4's 8192-token shared context capped completions
-# at ~4000 tokens (~2500-3000 words), below the UI's "5,000 words (Extended)"
-# option; gpt-4o (128k context / 16k max output) has the headroom. Scoped to
-# drafts only — other AI flows stay on gpt-4 (self.model) to avoid unvetted
-# cost/behavior changes. ponytail: module constants beside the sibling DRAFT_
-# knobs; promote to config only if ops need per-env tuning.
-DRAFT_GENERATION_MODEL = "gpt-4o"
-# Draft-generation token budget (#181): ~1.6 tokens per English word, clamped to
-# a ceiling that covers 5,000 words (5000 * 1.6 = 8000) with headroom under
-# gpt-4o's 16,384-token output limit.
+# A list item's leading "1." / "2)" / "-" / "•" / "*" marker.
+LIST_MARKER = re.compile(r"^(?:\d+[.)]|[-•*])\s*")
+
+# Drafts and TOCs run on the long-output model class (settings.AI_MODEL_LONG_OUTPUT,
+# default gpt-4o: 128k context / 16k output) so the UI's top length options stay
+# serviceable (#232): gpt-4's 8192-token shared context capped completions at
+# ~4000 tokens. Every other flow uses settings.AI_MODEL_DEFAULT (#917).
+# Draft-generation token budget (#181): ~1.6 tokens per English word, clamped by
+# AI_MAX_OUTPUT_TOKENS_LONG (default 8000 covers 5,000 words).
 DRAFT_WORDS_TO_TOKENS_FACTOR = 1.6
-DRAFT_MAX_COMPLETION_TOKENS = 8000
 
 # A TOC (6-12 chapters x 2-4 subchapters as pretty JSON) measures ~2k tokens at
 # 8x3 and ~3.7k at 12x4; 1500 truncated every typical one (#774). 6000 leaves
-# headroom over the largest shape the prompt asks for. Runs on the draft model
-# (gpt-4o, 128k context) because gpt-4's 8192-token context is shared with the
-# prompt: a 6000-token completion would leave ~2k for the summary and answers.
+# headroom over the largest shape the prompt asks for. Runs on the long-output
+# model because gpt-4's 8192-token context is shared with the prompt.
 TOC_MAX_COMPLETION_TOKENS = 6000
 
 
@@ -63,8 +60,13 @@ class AIService:
         # top of _retry_with_backoff, multiplying real API calls per failure
         # (observed 3x3=9 on the wire). Retry ownership lives in
         # _retry_with_backoff only (#188).
-        self.client = OpenAI(api_key=settings.openai_api_key, max_retries=0)
-        self.model = "gpt-4"  # Using GPT-4 for better analysis capabilities
+        self.client = OpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.AI_BASE_URL or None,
+            max_retries=0,
+        )
+        self.model = settings.AI_MODEL_DEFAULT
+        self.long_output_model = settings.AI_MODEL_LONG_OUTPUT
         self.max_retries = settings.AI_MAX_RETRIES
         self.base_delay = 1.0  # Base delay for exponential backoff
         self.max_delay = 60.0  # Maximum delay between retries
@@ -183,6 +185,15 @@ class AIService:
                 raise
 
             except Exception as e:
+                # 402 is how OpenAI-compatible providers (Ollama cloud,
+                # OpenRouter) refuse for billing; same meaning as #775's 429 (#917).
+                if isinstance(e, openai.APIStatusError) and e.status_code == 402:
+                    logger.error(
+                        f"AI provider refused for billing (402) [correlation_id={correlation_id}]"
+                    )
+                    raise AIProviderQuotaError(
+                        original_exception=e, correlation_id=correlation_id
+                    )
                 logger.error(
                     f"Unexpected error in AI service: {str(e)} [correlation_id={correlation_id}]"
                 )
@@ -208,7 +219,7 @@ class AIService:
         temperature: float = 0.3,
         max_tokens: int = 1000,
         correlation_id: Optional[str] = None,
-        model: Optional[str] = None,
+        long_output: bool = False,
     ):
         """
         Make an OpenAI API request with retry logic.
@@ -223,19 +234,24 @@ class AIService:
             max_tokens: Maximum tokens for the response
             correlation_id: Optional correlation ID so retry logs stay
                 correlated with the calling request
-            model: Optional per-call model override; defaults to self.model so
-                non-draft callers are unaffected (#232)
+            long_output: Use the long-output model class (drafts, TOC) and
+                its token cap instead of the default class (#232, #917)
 
         Returns:
             OpenAI response object
         """
 
+        if long_output:
+            model, cap = self.long_output_model, settings.AI_MAX_OUTPUT_TOKENS_LONG
+        else:
+            model, cap = self.model, settings.AI_MAX_OUTPUT_TOKENS_DEFAULT
+
         def _sync_request():
             return self.client.chat.completions.create(
-                model=model or self.model,
+                model=model,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_tokens=min(max_tokens, cap),
             )
 
         async def _async_wrapper():
@@ -426,6 +442,7 @@ Make questions specific, actionable, and focused on content structure rather tha
         confidence = 0.5
         analysis = "Analysis completed"
         suggestions = []
+        in_suggestion_list = False
 
         # Parse the response
         for line in lines:
@@ -446,6 +463,10 @@ Make questions specific, actionable, and focused on content structure rather tha
                 suggestions = [
                     s.strip() for s in suggestions_text.split(".") if s.strip()
                 ]
+                # Open models put them on the following lines as a list (#917).
+                in_suggestion_list = not suggestions
+            elif line and in_suggestion_list:
+                suggestions.append(LIST_MARKER.sub("", line))
         # Additional metadata
         word_count = len(original_summary.split())
         char_count = len(original_summary)
@@ -466,13 +487,10 @@ Make questions specific, actionable, and focused on content structure rather tha
         questions = []
 
         for line in lines:
-            line = line.strip()
-            # Remove numbering and clean up
-            if line and (
-                line[0].isdigit() or line.startswith("-") or line.startswith("•")
-            ):
-                # Remove number prefix (1., 2), etc.)
-                cleaned = line.split(".", 1)[-1].strip()
+            # Open models wrap items in markdown bold: "1. **Why...?**" (#917).
+            line = line.strip().lstrip("*_")
+            if LIST_MARKER.match(line):
+                cleaned = LIST_MARKER.sub("", line).strip().strip("*_").strip()
                 if cleaned and cleaned.endswith("?"):
                     questions.append(cleaned)
 
@@ -541,7 +559,7 @@ Make questions specific, actionable, and focused on content structure rather tha
                 temperature=0.4,
                 max_tokens=TOC_MAX_COMPLETION_TOKENS,
                 correlation_id=correlation_id,
-                model=DRAFT_GENERATION_MODEL,
+                long_output=True,
             )
 
             choice = response.choices[0]
@@ -918,15 +936,12 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
 
             # Floor of 500 gives small targets headroom so a modest overshoot
             # can't spuriously trip the truncation guard below.
-            max_tokens = min(
-                max(int(target_length * DRAFT_WORDS_TO_TOKENS_FACTOR), 500),
-                DRAFT_MAX_COMPLETION_TOKENS,
-            )
+            max_tokens = max(int(target_length * DRAFT_WORDS_TO_TOKENS_FACTOR), 500)
             response = await self._make_openai_request(
                 messages,
                 temperature=0.8,
                 max_tokens=max_tokens,
-                model=DRAFT_GENERATION_MODEL,
+                long_output=True,
             )
 
             choice = response.choices[0]
@@ -961,7 +976,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     "word_count": word_count,
                     "estimated_reading_time": estimated_reading_time,
                     "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "model_used": DRAFT_GENERATION_MODEL,
+                    "model_used": self.long_output_model,
                     "writing_style": writing_style or "default",
                     "target_length": target_length,
                     "actual_length": word_count
