@@ -1,5 +1,9 @@
 # Environment Variable Refactoring Summary
 
+## Stripe Tax (2026-10-09)
+
+Issue #783: **STRIPE_AUTOMATIC_TAX** (bool, default `false`) sets `automatic_tax.enabled` on Checkout Sessions. Set it to `true` only after Stripe Tax is activated in the Dashboard (origin address and registrations), or Stripe rejects every checkout. A billing address and tax IDs are collected either way.
+
 ## AI Provider and Models (2026-10-09)
 
 Issue #917: point the OpenAI client at any OpenAI-compatible endpoint and choose models per flow class. All are optional, and with none set the requests are unchanged.
