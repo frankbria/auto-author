@@ -28,7 +28,6 @@ COMPOSE_BUILD = ROOT / "docker-compose.build.yml"
 COMPOSE_STAGING = ROOT / "docker-compose.staging.yml"
 DOCKERFILE = ROOT / "frontend" / "Dockerfile"
 
-ENVIRONMENTS = {"staging", "production"}
 BAKED = (
     "NEXT_PUBLIC_API_URL",
     "NEXT_PUBLIC_BETTER_AUTH_URL",
@@ -60,7 +59,10 @@ def _build_args(step: dict) -> dict[str, str]:
 
 def test_frontend_is_built_once_per_environment(job: dict) -> None:
     frontends = [e for e in job["strategy"]["matrix"]["include"] if e["app"] == "frontend"]
-    assert {e.get("environment") for e in frontends} == ENVIRONMENTS
+    names = [e.get("environment") for e in frontends]
+    # Staging is the only environment today (production arrives with #782). An
+    # entry with no environment would build with no vars at all.
+    assert "staging" in names and all(names) and len(names) == len(set(names)), names
 
 
 def test_each_variant_reads_its_own_environments_vars(job: dict) -> None:

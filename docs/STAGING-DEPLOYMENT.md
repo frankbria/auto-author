@@ -35,7 +35,8 @@ tag is the release identifier** — there is no release directory.
   serves every environment.
 - **Frontend**: one image per environment (#779), because Next inlines
   `NEXT_PUBLIC_*` into the bundle at build time — `sha-<short>-staging` (also
-  floated as `staging`) and `sha-<short>-production`. The values come from each
+  floated as `staging`). Staging is the only environment built today; production
+  becomes a second matrix entry with its deploy (#782). The values come from the
   GitHub environment's **variables** (`NEXT_PUBLIC_API_URL`,
   `NEXT_PUBLIC_BETTER_AUTH_URL`, optional `NEXT_PUBLIC_SENTRY_DSN`); a main build
   fails if a required one is unset rather than baking in another environment's

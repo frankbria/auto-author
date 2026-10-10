@@ -50,8 +50,7 @@ jobs:
     # vars is not a deployment, and must not show up as one.
     #
     # Pull requests name no environment. They only prove the Dockerfile builds and
-    # publish nothing, and a production environment restricted to main would
-    # otherwise reject every PR job.
+    # publish nothing, so they get no environment's vars or secrets.
     environment:
       name: ${{ github.event_name != 'pull_request' && matrix.environment || '' }}
       deployment: false
@@ -63,10 +62,10 @@ jobs:
           # The backend reads its configuration at run time, so one image serves
           # every environment.
           - app: backend
+          # One frontend entry per environment that exists. Staging is the only
+          # one today; production is added with its deploy (#782).
           - app: frontend
             environment: staging
-          - app: frontend
-            environment: production
 
     steps:
       - name: Checkout repository
@@ -110,8 +109,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/auto-author-${{ matrix.app }}
           # The sha- tag is the release id. Frontend variants carry their
-          # environment (sha-abc1234-staging / -production) so a deploy cannot
-          # pull the other environment's bundle; the backend keeps the bare
+          # environment (sha-abc1234-staging) so a deploy cannot pull another
+          # environment's bundle; the backend keeps the bare
           # sha-abc1234 the deploy's IMAGE_TAG input names. The floating `staging`
           # tag never lands on a production build.
           tags: |

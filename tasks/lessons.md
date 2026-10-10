@@ -1302,3 +1302,7 @@ The review prompt passes the diff inline with no `--auto`, and the phase file ca
 ### A mutation that fails to apply cleanly reads as a survivor
 The mutation script moved a code block by slicing between two comment markers found with `str.index`. The end marker, `# Create audit log entry`, appears four times in `book.py`, so the slice was empty, the file became a syntax error, pytest collected nothing, and the script printed "killed by: NOTHING". That is the same output as a real survivor. A mutation harness must assert that the run collected tests (a `passed` or `failed` count in the summary) before it reports a result, and must find a marker from the start position (`src.index(end, start)`), not from the top of the file.
 
+## #779 per-environment frontend image (2026-10-10)
+
+### Do not build for an environment that does not exist (#899)
+The first version of #899 added a `frontend (production)` build to the main matrix, with a fail-closed check on that environment's variables. No production exists, so the PR could only merge after the owner created a GitHub `production` environment, and I reported that as a blocker for two rounds. The owner's correction: nothing may block on production before there is one. The issue asked for a per-environment build mechanism, not for a second environment. Ship the mechanism with the environments that exist (staging), and let the production entry arrive in the PR that deploys to production (#782). Before reporting "blocked on the owner", check whether the blocker is something the change itself introduced.
