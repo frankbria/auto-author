@@ -142,6 +142,21 @@ Things that differ by provider:
   recognition. Its server-side cleanup is an ordinary chat call on
   `AI_MODEL_DEFAULT`. There is no Whisper, embeddings or image call.
 
+### Stripe Tax (#783)
+
+Checkout always collects a billing address and tax IDs. Tax **calculation** stays
+off until `STRIPE_AUTOMATIC_TAX=true` is in the box `.env`. Turn it on in this order:
+
+1. In the Stripe Dashboard (in the same mode, test or live, as `STRIPE_SECRET_KEY`):
+   Tax → set the origin address and add a registration for each place you must
+   collect in.
+2. Add `STRIPE_AUTOMATIC_TAX=true` to `/opt/auto-author/.env` and **recreate** the
+   containers (see above).
+3. Start a checkout and confirm Stripe's page shows a tax line.
+
+Doing step 2 before step 1 makes Stripe reject every checkout (the API returns 502
+"Payment provider error"). To undo, set it back to `false` and recreate.
+
 ## One-time setup on the box
 
 1. **Ports.** Confirm 8000 and 3002 are free, or held only by this app:

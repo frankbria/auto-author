@@ -222,6 +222,10 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRICE_ID_PRO: str = ""
     STRIPE_SECRET_KEY: str = ""
+    # Stripe Tax on checkout (#783). Off by default: Stripe rejects every
+    # checkout with automatic_tax on an account where Stripe Tax isn't activated,
+    # so the operator turns this on after registering tax settings in Stripe.
+    STRIPE_AUTOMATIC_TAX: bool = False
 
     # Error tracking (issue #334). Unset => Sentry is inert (no events sent), so
     # CI/local/tests get no new behavior. Set the DSN secret in staging/prod to
