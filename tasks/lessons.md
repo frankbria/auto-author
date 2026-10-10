@@ -1285,3 +1285,11 @@ The stub tests were green, and a demo against a real model through local Ollama 
 
 ### Stale `index.lock` with no git process, twice in one run
 `.git/index.lock` appeared twice (21:46 and 12:56), each time with no live git process and no piped `git commit`. The first broke a commit and the second a merge. The cause is unconfirmed: `.beads/metadata.json` is modified in the background throughout, so a beads hook is the suspect. Before removing a lock, confirm with `pgrep -x git` and the lock's mtime, then retry and verify with `git log -1`.
+
+## #784 account-deletion tombstone (2026-10-09)
+
+### A test inserted by text anchor can land where pytest never collects it (#934)
+The new webhook test was inserted before `class TestSubscriptionStatus:` with class-level indentation, on the assumption that the preceding block was a test class. It was a module-level helper, so the test became a nested function inside `_post_signed` and was never collected. The file stayed green and nothing warned. It surfaced only because the RED run listed nine failures where ten were expected. After adding a test, check that its name appears in the failing list before writing the implementation; a passing or absent new test in RED means it is not testing anything yet.
+
+### The issue's evidence can be half-shipped already (#784 vs #763)
+#784 cited `user.py:131-145` as leaving the better-auth `user` and `account` docs untouched. #763 had already deleted them, six days after the audit that filed #784. Reading the cited lines first cut the work to the `users` doc and a proving test. For any issue from the 2026-10-01 audit, read the evidence lines at HEAD before planning: the audit ran at 34ebf94 and earlier P0 fixes overlap later P1 issues.
