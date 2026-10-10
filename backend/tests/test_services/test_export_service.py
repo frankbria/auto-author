@@ -703,3 +703,40 @@ class TestPdfMarkupEscaping:
         from reportlab import rl_config
         assert list(rl_config.trustedSchemes) == ["data"]
         assert list(rl_config.trustedHosts) == []
+
+
+class TestNonPdfFormatsKeepTextRaw:
+    """#752 review: _pdf_text is ReportLab-only. python-docx escapes for itself
+    and Markdown has nothing to escape, so escaping there shows up as a literal
+    "&amp;" in the exported file."""
+
+    BOOK = {
+        "title": "Raw",
+        "genre": "Sci-Fi & Fantasy",
+        "target_audience": "Parents & <teens>",
+        "table_of_contents": {"chapters": [
+            {"id": "1", "title": "One", "content": "<p>Body</p>", "order": 1},
+        ]},
+    }
+
+    @pytest.mark.asyncio
+    async def test_docx_metadata_is_not_html_escaped(self):
+        from io import BytesIO
+        from docx import Document
+
+        chapters = self.BOOK["table_of_contents"]["chapters"]
+        docx_bytes = await export_service.generate_docx(self.BOOK, chapters)
+
+        text = "\n".join(p.text for p in Document(BytesIO(docx_bytes)).paragraphs)
+        assert "Genre: Sci-Fi & Fantasy" in text
+        assert "Target Audience: Parents & <teens>" in text
+        assert "&amp;" not in text and "&lt;" not in text
+
+    @pytest.mark.asyncio
+    async def test_markdown_metadata_is_not_html_escaped(self):
+        chapters = self.BOOK["table_of_contents"]["chapters"]
+        text = (await export_service.generate_markdown(self.BOOK, chapters)).decode("utf-8")
+
+        assert "Genre: Sci-Fi & Fantasy" in text
+        assert "Target Audience: Parents & <teens>" in text
+        assert "&amp;" not in text and "&lt;" not in text

@@ -594,9 +594,9 @@ class ExportService:
         # Metadata
         metadata_parts = []
         if book_data.get('genre'):
-            metadata_parts.append(f"Genre: {_pdf_text(book_data['genre'])}")
+            metadata_parts.append(f"Genre: {book_data['genre']}")
         if book_data.get('target_audience'):
-            metadata_parts.append(f"Target Audience: {_pdf_text(book_data['target_audience'])}")
+            metadata_parts.append(f"Target Audience: {book_data['target_audience']}")
 
         if metadata_parts:
             doc.add_paragraph()
@@ -878,9 +878,9 @@ class ExportService:
             lines.append(f"by {author}")
         metadata_parts = []
         if book_data.get('genre'):
-            metadata_parts.append(f"Genre: {_pdf_text(book_data['genre'])}")
+            metadata_parts.append(f"Genre: {book_data['genre']}")
         if book_data.get('target_audience'):
-            metadata_parts.append(f"Target Audience: {_pdf_text(book_data['target_audience'])}")
+            metadata_parts.append(f"Target Audience: {book_data['target_audience']}")
         if metadata_parts:
             lines.append(' • '.join(metadata_parts))
         if book_data.get('description'):
