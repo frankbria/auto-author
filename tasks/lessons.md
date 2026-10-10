@@ -1315,3 +1315,18 @@ Asked to resolve conflicts on #865, Copilot merged main and then pushed a second
 
 ### Do not build for an environment that does not exist (#899)
 The first version of #899 added a `frontend (production)` build to the main matrix, with a fail-closed check on that environment's variables. No production exists, so the PR could only merge after the owner created a GitHub `production` environment, and I reported that as a blocker for two rounds. The owner's correction: nothing may block on production before there is one. The issue asked for a per-environment build mechanism, not for a second environment. Ship the mechanism with the environments that exist (staging), and let the production entry arrive in the PR that deploys to production (#782). Before reporting "blocked on the owner", check whether the blocker is something the change itself introduced.
+
+## #797 server-written image URLs, owner-scoped deletes (2026-10-10)
+
+### A stub exception class of `Exception` hides what the code really catches (#942)
+The S3 unit fixture set `service.ClientError = Exception`, copied from an older test. A new case fed the delete helper a URL that makes `urlparse` raise `ValueError`, and it passed before the fix: `except self.ClientError` was catching everything. With the real `botocore.exceptions.ClientError` in the fixture the case failed, and the fix (`except (self.ClientError, ValueError)`) made it pass. When a stand-in replaces an exception type, use the real class, or the test cannot tell a narrow handler from a blanket one.
+
+### Fixture files must carry the names the service writes
+The #785 tests created covers called `a.jpg` and avatars called `<auth_id>.jpg`. They passed because deletion trusted any name inside the directory. #797 made the helpers refuse names the service did not write, and 13 of those tests had to be rewritten around `<owner>_<uuid hex>[_thumb].<ext>`. A fixture that invents its own shape for server-written data tests a looser contract than production has.
+
+### An issue's "make the field server-written" can remove a feature's only entry point
+#797's criteria said `cover_image_url` must be server-written. The only UI that set a cover was a text input for that field; the upload route has no UI. Reading the frontend before planning turned up three more facts that shaped the change: the form sent `''` on every save (clearing uploaded covers), an external URL never rendered (no remote image host; staging's optimizer answers 400), and a 422 would have broken saves for cached bundles. Before closing a write path, list every client that uses it and say in the PR what stops working. The missing upload UI is #941.
+
+### Cutting a block out of JSX by searching for its closing tag cuts the wrong one
+A scripted removal of a `<FormField ... />` block searched for the first `            />` after the opening line. `str.index` matches substrings, so a deeper-indented `/>` of a child matched first and left half the block behind. `tsc` caught it. Match the closing line exactly (leading newline plus the indent), and run the typecheck before moving on.
+
