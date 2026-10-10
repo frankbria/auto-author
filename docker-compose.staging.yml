@@ -12,4 +12,9 @@ services:
   frontend:
     # The frontend bakes NEXT_PUBLIC_* in at build time, so each environment has
     # its own variant of every sha- tag (#779). Staging pulls `-staging`.
+    # IMAGE_TAG must be a post-#779 sha- tag. The floating `staging` tag would
+    # resolve to `staging-staging`, which does not exist, and a pre-#779 tag has
+    # no `-staging` frontend variant. That includes sync-staging-env.yml, which
+    # derives the tag from the running backend: after a rollback past #779 its
+    # recreate step fails at pull instead of applying the new .env.
     image: ghcr.io/frankbria/auto-author-frontend:${IMAGE_TAG:?IMAGE_TAG is required (e.g. sha-abc1234)}-staging
