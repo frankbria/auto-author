@@ -40,7 +40,10 @@ export function TabContent({
   return (
     <div className="flex-1 overflow-hidden" data-testid={testId}>
       <ErrorBoundary fallback={<div>Something went wrong with this chapter</div>}>
+        {/* Keyed so a tab switch mounts a fresh editor: one editor reused across
+            chapters saved the previous chapter's text under the new id (#756). */}
         <ChapterEditor
+          key={activeChapterId}
           bookId={bookId}
           chapterId={activeChapterId}
           chapterTitle={chapterTitle}

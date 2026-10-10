@@ -72,9 +72,9 @@ const page = (bookId: string) => (
 );
 
 // The session comes from `src/__mocks__/better-auth-react.ts`, which returns one
-// stable object as better-auth does. This page lists `session` in its loader's
-// deps, so a mock that built a fresh object per call made it refetch in a loop
-// and these tests time out. They are the tripwire for that mock.
+// stable object. This page used to list `session` in its loader's deps, so a mock
+// that built a fresh object per call made it refetch in a loop; it keys on the
+// user id since #758, and page.sessionIdentity.test.tsx covers a new object.
 
 describe('BookPage loading (#584)', () => {
   beforeEach(() => {

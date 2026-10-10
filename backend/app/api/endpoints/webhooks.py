@@ -6,8 +6,15 @@ from fastapi import APIRouter, HTTPException, Request
 from stripe import SignatureVerificationError
 
 from app.core.config import settings
-from app.core.entitlements import DEFAULT_PLAN, resolve_plan_for_price
-from app.db.stripe_events import mark_event_processed, unmark_event
+from app.core.entitlements import (
+    DEFAULT_PLAN,
+    LIVE_SUBSCRIPTION_STATUSES,
+    PRICED,
+    SUBSCRIPTION_STATUS_PLAN,
+    has_live_subscription,
+    plan_for_subscription,
+)
+from app.db.stripe_events import is_event_processed, mark_event_processed
 from app.db.user import (
     get_user_by_auth_id,
     get_user_by_stripe_customer_id,
@@ -39,7 +46,8 @@ async def stripe_webhook(request: Request):
     Deliberately unauthenticated — the Stripe signature over the raw body IS the
     auth (the /api/v1/webhooks prefix is session-exempt, and no middleware
     consumes the body). On ``customer.subscription.*`` events, maps the
-    subscription's price to a plan (app.core.entitlements) and persists plan +
+    subscription's status and price to a plan (app.core.entitlements
+    ``SUBSCRIPTION_STATUS_PLAN``, #767) and persists plan +
     Stripe ids on the matching user. Replays (same event id) are no-ops.
     """
     if not settings.STRIPE_WEBHOOK_SECRET:
@@ -68,9 +76,8 @@ async def stripe_webhook(request: Request):
     if not event_type.startswith("customer.subscription.") or not event_id:
         return {"status": "ignored", "event_type": event_type}
 
-    # Atomic claim: Stripe retries deliveries, so the same event id may arrive
-    # more than once (or concurrently on two workers).
-    if not await mark_event_processed(event_id):
+    # Stripe retries deliveries, so the same event id may arrive more than once.
+    if await is_event_processed(event_id):
         logger.info("Stripe event %s already processed (replay) — skipping", event_id)
         return {"status": "replay", "event_id": event_id}
 
@@ -80,13 +87,20 @@ async def stripe_webhook(request: Request):
         # so an older update that arrives late cannot overwrite a newer plan
         # (#352) — idempotency above only stops the *same* event twice.
         event_created = event.get("created")
-        return await _apply_subscription_event(
+        result = await _apply_subscription_event(
             event_type, subscription, event_id, event_created
         )
+        # Marker AFTER the apply (#769): a crash, redeploy or CancelledError
+        # before this line leaves none, so Stripe's retry re-applies instead of
+        # being dropped as a replay. Re-applying is safe: the write is a plain
+        # $set guarded by the ordering filter. Only an applied event is recorded:
+        # an ignored one must reprocess on a dashboard Resend once its user or
+        # subscription matches, and a stale one just re-checks the watermark.
+        if result["status"] == "processed":
+            await mark_event_processed(event_id)
+        return result
     except Exception:
-        # Release the claim so Stripe's retry of this failure isn't treated as
-        # a replay, then surface a 500 (Stripe retries non-2xx).
-        await unmark_event(event_id)
+        # Nothing was recorded, so Stripe's retry (it retries non-2xx) reprocesses.
         logger.error("Failed to process Stripe event %s", event_id, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to process Stripe event")
 
@@ -105,19 +119,8 @@ async def _apply_subscription_event(
     """
     customer_id = subscription.get("customer")
     subscription_id = subscription.get("id")
-
-    if event_type == "customer.subscription.deleted":
-        plan = DEFAULT_PLAN
-        subscription_id = None  # the subscription is gone; don't retain a dead id
-    else:
-        # Scan every line item — a multi-item subscription may not list the
-        # plan-bearing price first.
-        plan = DEFAULT_PLAN
-        for item in (subscription.get("items") or {}).get("data") or []:
-            resolved = resolve_plan_for_price(((item or {}).get("price") or {}).get("id"))
-            if resolved != DEFAULT_PLAN:
-                plan = resolved
-                break
+    status = subscription.get("status")
+    deleted = event_type == "customer.subscription.deleted"
 
     user = await get_user_by_stripe_customer_id(customer_id) if customer_id else None
     if user is None:
@@ -125,17 +128,64 @@ async def _apply_subscription_event(
         # subscription metadata with our auth_id.
         auth_id = (subscription.get("metadata") or {}).get("auth_id")
         user = await get_user_by_auth_id(auth_id) if auth_id else None
-    if user is None:
+    if user is None or user.get("deleted_at"):
         # Ack with 200 so Stripe stops retrying — there is no user to update
-        # (e.g. deleted account, or a customer created outside this app). But
-        # RELEASE the replay marker: once the user is linked later, an operator
+        # (e.g. deleted account, or a customer created outside this app). No
+        # replay marker is recorded: once the user is linked later, an operator
         # can "Resend" the event from the Stripe dashboard (same event id) and
-        # it must reprocess instead of being swallowed as a replay.
-        await unmark_event(event_id)
+        # it reprocesses.
         logger.warning(
             "Stripe %s for customer %s matches no user", event_type, customer_id
         )
         return {"status": "no_matching_user"}
+
+    # Only the user's current subscription moves the plan (#768). A customer can
+    # hold several (two checkout tabs, a re-upgrade after a lapse): cancelling a
+    # duplicate must not downgrade someone still paying on the current one.
+    # Another subscription becomes current only while the stored one is no
+    # longer billed (none yet, unpaid, never paid, canceled), and a deletion
+    # never establishes anything.
+    current_id = user.get("stripe_subscription_id")
+    if subscription_id != current_id and (deleted or has_live_subscription(user)):
+        # No marker, as for no_matching_user: if this subscription becomes
+        # current later, a dashboard Resend must reprocess the event.
+        if not deleted and status in LIVE_SUBSCRIPTION_STATUSES:
+            logger.error(
+                "User %s has a second live Stripe subscription %s (%s) besides "
+                "current %s — likely double-billed; ignoring it",
+                user["auth_id"], subscription_id, status, current_id,
+            )
+        else:
+            logger.info(
+                "Stripe %s for subscription %s is not user %s's current %s — ignoring",
+                event_type, subscription_id, user["auth_id"], current_id,
+            )
+        return {"status": "not_current_subscription", "event_id": event_id}
+
+    if deleted:
+        plan = DEFAULT_PLAN
+        subscription_id = status = None  # the subscription is gone; don't retain a dead id
+    else:
+        # Status first, then price: see SUBSCRIPTION_STATUS_PLAN for the policy.
+        price_ids = [
+            ((item or {}).get("price") or {}).get("id")
+            for item in (subscription.get("items") or {}).get("data") or []
+        ]
+        plan = plan_for_subscription(status, price_ids)
+        policy = SUBSCRIPTION_STATUS_PLAN.get(status)
+        if policy is None:
+            logger.error(
+                "Stripe subscription %s has unknown status %r — treating as %s",
+                subscription_id, status, plan,
+            )
+        elif policy == PRICED and plan == DEFAULT_PLAN:
+            # A paying subscriber is about to land on free: the pro price is
+            # unset or Stripe sent one we don't know. Needs a human.
+            logger.error(
+                "Stripe subscription %s is %s but no price %s matches "
+                "STRIPE_PRICE_ID_PRO — user resolves to %s",
+                subscription_id, status, price_ids, plan,
+            )
 
     # Out-of-order guard. Stripe does not order deliveries, so an older
     # subscription.updated can arrive after a newer one and overwrite the plan
@@ -153,9 +203,9 @@ async def _apply_subscription_event(
     # mode when Stripe is unreachable) for exactness, and is the upgrade path if
     # same-second races ever show up in practice.
     # Enforced by Mongo as part of the write, not by a read here. Two deliveries
-    # for the same customer carry DIFFERENT event ids, so mark_event_processed
-    # does not serialize them: a read-then-write check lets both pass and the
-    # older one land last. The condition goes in the query instead.
+    # for the same customer carry DIFFERENT event ids, so nothing serializes
+    # them: a read-then-write check lets both pass and the older one land last.
+    # The condition goes in the query instead.
     ordering_filter = None
     if event_created is not None:
         ordering_filter = {
@@ -178,11 +228,21 @@ async def _apply_subscription_event(
     updated = await update_user(
         user["auth_id"],
         {
-            "plan": plan,
+            # None = keep the current plan (past_due): don't write it at all.
+            **({"plan": plan} if plan is not None else {}),
             "stripe_customer_id": customer_id,
             "stripe_subscription_id": subscription_id,
-            # Watermark the ordering filter above compares against.
-            **({"stripe_event_created": event_created} if event_created is not None else {}),
+            "stripe_subscription_status": status,
+            # Watermark the ordering filter above compares against. A keep
+            # (past_due) write sets no plan, so it doesn't advance it: otherwise
+            # a resent older `active` (its first delivery lost) would be
+            # rejected as stale and a paying user left on free (#768). The
+            # filter still guards the keep write itself.
+            **(
+                {"stripe_event_created": event_created}
+                if event_created is not None and plan is not None
+                else {}
+            ),
         },
         actor_id=f"stripe:{event_id}",
         extra_filter=ordering_filter,
@@ -200,7 +260,7 @@ async def _apply_subscription_event(
         )
         return {"status": "stale_event", "event_id": event_id}
 
-    logger.info(
-        "Stripe %s: user %s plan set to %s", event_type, user["auth_id"], plan
-    )
+    # Report the stored plan, whether this event wrote it or kept it.
+    plan = (updated or {}).get("plan", plan) or DEFAULT_PLAN
+    logger.info("Stripe %s: user %s plan is %s", event_type, user["auth_id"], plan)
     return {"status": "processed", "plan": plan}

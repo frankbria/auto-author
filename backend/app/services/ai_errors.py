@@ -149,6 +149,31 @@ class AIServiceUnavailableError(AIServiceError):
         )
 
 
+class AIProviderQuotaError(AIServiceUnavailableError):
+    """
+    Raised when the provider refuses for billing: OpenAI's 429
+    ``insufficient_quota``, or the 402 OpenAI-compatible providers send (#917).
+
+    It arrives as a 429 like a rate limit, but waiting never clears it: only
+    the operator adding credit does (#775). Not retryable, and a 503 rather
+    than a 429, because the user is not the one over a limit.
+    """
+
+    def __init__(
+        self,
+        original_exception: Optional[Exception] = None,
+        correlation_id: Optional[str] = None
+    ):
+        super().__init__(
+            message="The AI service is unavailable right now. Please try again later.",
+            original_exception=original_exception,
+            correlation_id=correlation_id
+        )
+        self.error_code = "AI_PROVIDER_QUOTA_EXHAUSTED"
+        self.retryable = False
+        self.retry_after = None
+
+
 class AIInvalidRequestError(AIServiceError):
     """
     Raised when the request to the AI service is invalid.

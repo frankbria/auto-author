@@ -34,7 +34,9 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
 
         # Associate the book with the user
         await users_collection.update_one(
-            {"auth_id": user_auth_id}, {"$push": {"book_ids": str(book_obj.id)}}
+            # Never onto a tombstone (deleted account, #784).
+            {"auth_id": user_auth_id, "deleted_at": {"$exists": False}},
+            {"$push": {"book_ids": str(book_obj.id)}},
         )
 
         # Create audit log entry
@@ -169,12 +171,18 @@ async def update_book(
     return updated_book
 
 
+# Default for ``expected_last_modified``: no precondition. ``None`` can't be the
+# default because it is a real precondition ("never saved").
+NO_PRECONDITION = object()
+
+
 async def apply_chapter_content_update(
     book_id: str,
     chapter_id: str,
     parent_chapter_id: Optional[str],
     chapter_fields: Dict,
     user_auth_id: str,
+    expected_last_modified=NO_PRECONDITION,
 ) -> bool:
     """Concurrency-safe, targeted update of a SINGLE chapter's fields.
 
@@ -194,22 +202,34 @@ async def apply_chapter_content_update(
     to still exist, so a chapter deleted/moved since the caller's read is a clean
     no-match rather than a false success that only bumps the version. Returns
     True when the update matched (and thus applied), False otherwise.
+
+    ``expected_last_modified`` (#759) is the chapter's *stored* ``last_modified``
+    as the caller read it (string, Date, or ``None`` for never saved). When
+    given, the filter also requires the stored value to still equal it, so a
+    write committed since the caller's read makes this a no-match too.
     """
     now = datetime.now(timezone.utc)
     query = {"_id": ObjectId(book_id), "owner_id": user_auth_id}
+    target = {"id": chapter_id}
+    if expected_last_modified is not NO_PRECONDITION:
+        target["last_modified"] = expected_last_modified
     if parent_chapter_id:
         prefix = "table_of_contents.chapters.$[p].subchapters.$[c]."
-        array_filters = [{"p.id": parent_chapter_id}, {"c.id": chapter_id}]
+        array_filters = [{"p.id": parent_chapter_id}]
         # Require the parent+child to exist so a chapter deleted/moved since the
         # caller's read makes this a clean no-match (returns False) instead of a
         # false success that only bumps the version.
         query["table_of_contents.chapters"] = {
-            "$elemMatch": {"id": parent_chapter_id, "subchapters.id": chapter_id}
+            "$elemMatch": {
+                "id": parent_chapter_id,
+                "subchapters": {"$elemMatch": target},
+            }
         }
     else:
         prefix = "table_of_contents.chapters.$[c]."
-        array_filters = [{"c.id": chapter_id}]
-        query["table_of_contents.chapters.id"] = chapter_id
+        array_filters = []
+        query["table_of_contents.chapters"] = {"$elemMatch": target}
+    array_filters.append({f"c.{key}": value for key, value in target.items()})
 
     set_doc = {prefix + key: value for key, value in chapter_fields.items()}
     set_doc["table_of_contents.updated_at"] = now.isoformat()

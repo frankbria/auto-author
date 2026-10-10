@@ -1,7 +1,7 @@
 {
   "_comment": "Known-and-accepted advisories. CI fails on anything NOT listed here, so this file is the repo's dependency-debt ledger, not an ignore-list to grow casually. Shrink it: each entry names its package and fix version. Started at 91 entries (#342); pruned to 1 in #647 once the tree caught up — a fixed advisory left ledgered here silently absorbs the NEXT advisory on the same package, so prune whatever the gate reports under 'Resolved'. Regenerate wholesale with: python scripts/audit_gate.py --pip-audit <json> --npm-audit <json> --baseline security-baseline.json --write-baseline",
-  "pypi": {
-    "PYSEC-2026-2132": "click; fix: 8.3.3"
-  },
-  "npm": {}
+  "pypi": {},
+  "npm": {
+    "GHSA-vfj7-8cjw-p6xm": "braces 3.0.3 (no patched version, all <=3.0.3 affected); build-time only via @tailwindcss/cli > @parcel/watcher > micromatch, globs are repo-controlled, not user input. Prune when braces ships a fix."
+  }
 }

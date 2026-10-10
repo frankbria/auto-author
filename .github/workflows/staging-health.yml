@@ -1,0 +1,57 @@
+name: Staging Health Probe
+
+# Cheap infra-drift check for staging (#916). The E2E suite runs only after a
+# staging deploy now, so this covers the time in between: the API health check
+# (MongoDB reachable, required secrets present) and the frontend root. No AI
+# calls, no auth, no secrets. scripts/staging_health_probe.py does the checking
+# with retries; a failure opens or comments on one `ci-alert:staging-health`
+# issue (scripts/ci-alert-issue.sh, #776) and the next healthy run closes it.
+#
+# Every 6 hours at :23 (off the top of the hour, when scheduled runs queue).
+# The alert comments once per failing run, so a tighter cadence would mostly
+# add comments to an issue that is already open.
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-health
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Probe staging health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # One job: the probe runs only this repo's stdlib script, so there is no
+    # third-party code to keep away from `issues: write`.
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Probe API health and frontend root
+        id: probe
+        run: python3 scripts/staging_health_probe.py
+
+      # Only on a real verdict: if checkout failed (probe skipped) or the run was
+      # cancelled, "recovery" would wrongly close an open alert.
+      - name: Open, update or close the alert issue
+        if: always() && (steps.probe.outcome == 'failure' || steps.probe.outcome == 'success')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ALERT_LABEL: ci-alert:staging-health
+          ALERT_TITLE: '[P0.27.1] Staging health probe is failing'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTCOME: ${{ steps.probe.outcome }}
+        run: |
+          if [ "$OUTCOME" = "failure" ]; then mode=failure; else mode=recovery; fi
+          sh scripts/ci-alert-issue.sh "$mode"

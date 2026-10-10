@@ -1,0 +1,54 @@
+[
+  {
+    "question_text": "What are the key objectives you want to achieve in your first one‑on‑one with each direct report, and how can you align those goals with the team's overall mission?",
+    "question_type": "theme",
+    "difficulty": "easy",
+    "help_text": "Think about what success looks like for you, the employee, and the team. Consider listening, feedback, and future planning.",
+    "examples": [
+      "Discuss career aspirations",
+      "Clarify expectations for the next quarter",
+      "Identify any immediate blockers"
+    ]
+  },
+  {
+    "question_text": "How should you structure the agenda of a one‑on‑one to ensure it covers both personal development and project updates without becoming a status meeting?",
+    "question_type": "theme",
+    "difficulty": "medium",
+    "help_text": "Balance a brief project check‑in with a longer conversation about growth, challenges, and motivation. Use a consistent template.",
+    "examples": [
+      "Project progress → Roadblocks → Feedback",
+      "Development discussion → Learning goals → Support needed"
+    ]
+  },
+  {
+    "question_text": "What are the most common mistakes new engineering managers make during one‑on‑ones, and how can you recover if a meeting veers off track?",
+    "question_type": "theme",
+    "difficulty": "hard",
+    "help_text": "Identify pitfalls such as micromanaging, dominating the conversation, or skipping follow‑ups, and think of concrete corrective actions.",
+    "examples": [
+      "Realize you’re giving unsolicited advice → Ask the employee for their perspective first",
+      "Notice silence → Prompt with a specific question about their workload"
+    ]
+  },
+  {
+    "question_text": "Which practical tools or templates can help you consistently run effective one‑on‑ones, and how can you adapt them to fit your team's culture?",
+    "question_type": "theme",
+    "difficulty": "easy",
+    "help_text": "Explore agenda formats, shared documents, or digital tools that foster transparency and accountability.",
+    "examples": [
+      "Google Docs agenda shared ahead of time",
+      "One‑on‑One template from the book’s appendix"
+    ]
+  },
+  {
+    "question_text": "How can you measure the effectiveness of your one‑on‑ones on individual performance and overall team dynamics over time?",
+    "question_text": "How can you measure the effectiveness of your one‑on‑ones on individual performance and overall team dynamics over time?",
+    "question_type": "research",
+    "difficulty": "medium",
+    "help_text": "Consider qualitative feedback, observable behavior changes, and quantitative metrics such as project delivery speed or employee engagement scores.",
+    "examples": [
+      "Survey team members quarterly about manager support",
+      "Track completion rates of agreed‑upon development actions"
+    ]
+  }
+]

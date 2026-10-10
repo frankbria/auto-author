@@ -58,7 +58,7 @@ cp tests/e2e/staging/.env.test.example tests/e2e/staging/.env.test   # set STAGI
 npm run test:e2e:staging
 ```
 
-Specs: `tests/e2e/staging/complete-user-journey.spec.ts`, `regressions.spec.ts` (#83 session/401, ObjectId, #54 answer persistence). CI: `.github/workflows/e2e-staging-tests.yml` — 6h schedule, manual dispatch, or PRs labeled `e2e-staging`; needs GitHub Secrets `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`. See `tests/e2e/staging/README.md`.
+Specs: `tests/e2e/staging/complete-user-journey.spec.ts`, `regressions.spec.ts` (#83 session/401, ObjectId, #54 answer persistence). CI: `.github/workflows/e2e-staging-tests.yml` — after each successful "Deploy Staging (Containers)" run (on the deployed commit), manual dispatch, or PRs labeled `e2e-staging`; no schedule (#916), `staging-health.yml` probes `/api/v1/health` + frontend every 6h instead; needs GitHub Secrets `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`. See `tests/e2e/staging/README.md`.
 
 ---
 
@@ -73,7 +73,7 @@ Standards, checklists, and E2E requirements: **`docs/references/quality-standard
   pre-commit run backend-lint --all-files         # one hook, whole tree
   ```
   Watch for a stale `.git/hooks/pre-commit.legacy` shadowing behavior.
-- **Backend lint is `ruff`, pinned.** `ruff==0.16.7` is in the `test` extra and `[tool.ruff.lint]` selects `E4,E7,E9,F` explicitly, so the gate checks the same thing across ruff upgrades rather than growing with each release (ruff's own default set reports 1522 findings here; the pinned one reports 0). It runs in pre-commit **and** in CI's `Security Audit` job — the hook is bypassable with `--no-verify`, CI is not. **No formatter is enforced**: `black` and `ruff format` disagree with the tree on 36 and 42 files respectively, so adopting either is its own mechanical PR, not a drive-by.
+- **Backend lint is `ruff`, pinned.** `ruff` is pinned to an exact version in the `test` extra and `[tool.ruff.lint]` selects `E4,E7,E9,F` explicitly, so the gate checks the same thing across ruff upgrades rather than growing with each release (ruff's own default set reports 1522 findings here; the pinned one reports 0). It runs in pre-commit **and** in CI's `Security Audit` job — the hook is bypassable with `--no-verify`, CI is not. **No formatter is enforced**: `black` and `ruff format` disagree with the tree on 36 and 42 files respectively, so adopting either is its own mechanical PR, not a drive-by.
 - Coverage floor is 85% (frontend thresholds 85/85/75/85 lines/statements/branches/functions).
 - **`uv.lock` is the only backend dependency source of truth.** The generated `backend/requirements.txt` export was deleted in #534 — nothing installed from it, and it cost a manual regen on every backend dep PR. Those PRs are now mergeable as they arrive. Procedure: `docs/references/quality-standards.md` → Backend Dependency Updates.
 - Never commit to `main` directly — `feature/<name>`, PR, conventional commits.
@@ -99,6 +99,7 @@ Files under 500 lines. Never hardcode secrets. Tests before implementation. WCAG
 
 - Python: `uv`. Node: `npm`.
 - `BYPASS_AUTH=true` only takes effect alongside `E2E_ALLOW_BYPASS=1` in **every** environment (frontend middleware #272, backend FastAPI #307). Backend production is hard-blocked regardless. Never use in production.
+- **`ENVIRONMENT` is required by the backend** (`development|test|staging|production`, #777): missing or unknown refuses to start, and compose has no default. Local runs need it in `backend/.env` or the shell; the staging workflows export `staging`.
 - Otherwise standard Next.js / FastAPI vars — see `.env.example`.
 - `CURRENT_SPRINT.md` and `IMPLEMENTATION_PLAN.md` are auto-generated bd snapshots; edit bd, not the markdown.
 

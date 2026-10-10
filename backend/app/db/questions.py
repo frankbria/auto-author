@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from bson.errors import InvalidId
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 import logging
 import math
 
@@ -24,6 +25,9 @@ logger = logging.getLogger(__name__)
 # never validated `status`, and an unrecognised value has always fallen through to
 # an unfiltered result.
 RESPONSE_STATUS_FILTERS = frozenset({"completed", "draft", "not_answered"})
+
+# A response keeps only its newest edit_history entries (#762).
+EDIT_HISTORY_LIMIT = 50
 
 
 def serialize_datetime(obj: Any) -> Any:
@@ -48,9 +52,9 @@ _QUESTION_INDEXES = [
     # Sorting by order within a chapter.
     ("questions", [("book_id", 1), ("chapter_id", 1), ("order", 1)],
      "chapter_order_idx", False),
-    # Response lookups: get_question_response, save_question_response. Unique
-    # because save_question_response's find-then-insert isn't atomic — the index
-    # is what actually enforces one response per (question, user) (#242).
+    # Response lookups: get_question_response, save_question_response. Unique so
+    # the database enforces one response per (question, user) (#242); the saves
+    # upsert against it atomically and retry the one race they can lose (#762).
     ("question_responses", [("question_id", 1), ("user_id", 1)],
      "question_user_idx", True),
     ("question_responses", [("user_id", 1), ("created_at", -1)],
@@ -285,6 +289,51 @@ async def get_questions_for_chapter(
     )
 
 
+async def _upsert_one(
+    collection,
+    key: Dict[str, Any],
+    fields: Dict[str, Any],
+    push: Optional[Dict[str, Any]] = None,
+) -> tuple:
+    """Create or update the single document matching ``key`` in one atomic write (#762).
+
+    Replaces read-then-insert, where concurrent first saves all saw "nothing
+    there", all inserted, and every loser hit the unique index as a 500. Two
+    upserts can still race to insert; the loser's DuplicateKeyError means the
+    document now exists, so one retry lands as a plain update. (MongoDB >= 4.2
+    already retries a pure-equality filter like ours server-side; this covers
+    servers or filters where it does not.)
+
+    Returns ``(document_after_write, is_update)``.
+    """
+    new_id = ObjectId()
+    update = {
+        "$set": fields,
+        "$setOnInsert": {"_id": new_id, "created_at": datetime.now(timezone.utc)},
+    }
+    if push:
+        update["$push"] = push
+    try:
+        doc = await collection.find_one_and_update(
+            key, update, upsert=True, return_document=ReturnDocument.AFTER
+        )
+    except DuplicateKeyError:
+        doc = await collection.find_one_and_update(
+            key, update, upsert=True, return_document=ReturnDocument.AFTER
+        )
+    return doc, doc["_id"] != new_id
+
+
+def _edit_history_push(word_count: int) -> Dict[str, Any]:
+    """One edit_history entry per save, keeping only the newest EDIT_HISTORY_LIMIT."""
+    return {
+        "metadata.edit_history": {
+            "$each": [{"timestamp": datetime.now(timezone.utc), "word_count": word_count}],
+            "$slice": -EDIT_HISTORY_LIMIT,
+        }
+    }
+
+
 async def save_question_response(
     question_id: str,
     response_data: QuestionResponseCreate,
@@ -293,57 +342,26 @@ async def save_question_response(
     """Save or update a question response."""
     responses_collection = await get_collection("question_responses")
 
-    # Check if response already exists
-    existing_response = await responses_collection.find_one({
-        "question_id": question_id,
-        "user_id": user_id
-    })
-
-    # Calculate word count
     word_count = len(response_data.response_text.split()) if response_data.response_text else 0
+    now = datetime.now(timezone.utc)
 
-    # Prepare response data
     response_dict = response_data.model_dump()
     response_dict.update({
         "question_id": question_id,
         "user_id": user_id,
         "word_count": word_count,
-        "updated_at": datetime.now(timezone.utc),
-        "last_edited_at": datetime.now(timezone.utc),
+        "updated_at": now,
+        "last_edited_at": now,
     })
 
-    if existing_response:
-        # Update existing response
-        # Add to edit history
-        edit_history = existing_response.get("metadata", {}).get("edit_history", [])
-        edit_history.append({
-            "timestamp": datetime.now(timezone.utc),
-            "word_count": existing_response.get("word_count", 0)
-        })
-
-        response_dict["metadata"] = response_dict.get("metadata", {})
-        response_dict["metadata"]["edit_history"] = edit_history
-
-        await responses_collection.update_one(
-            {"_id": existing_response["_id"]},
-            {"$set": response_dict}
-        )
-
-        response_dict["id"] = str(existing_response["_id"])
-        return response_dict
-    else:
-        # Create new response
-        response_dict.update({
-            "_id": ObjectId(),
-            "created_at": datetime.now(timezone.utc),
-            "metadata": {"edit_history": []}
-        })
-
-        result = await responses_collection.insert_one(response_dict)
-        response_dict["id"] = str(result.inserted_id)
-        response_dict.pop("_id", None)
-
-        return response_dict
+    doc, _ = await _upsert_one(
+        responses_collection,
+        {"question_id": question_id, "user_id": user_id},
+        response_dict,
+        push=_edit_history_push(word_count),
+    )
+    doc["id"] = str(doc.pop("_id"))
+    return doc
 
 
 async def get_question_response(question_id: str, user_id: str) -> Optional[Dict[str, Any]]:
@@ -370,41 +388,21 @@ async def save_question_rating(
     """Save or update a question rating."""
     ratings_collection = await get_collection("question_ratings")
 
-    # Check if rating already exists
-    existing_rating = await ratings_collection.find_one({
-        "question_id": question_id,
-        "user_id": user_id
-    })
-
-    # Prepare rating data
-    rating_dict = rating_data.model_dump()
+    # created_at is set once, on insert; a re-rate must not overwrite it.
+    rating_dict = rating_data.model_dump(exclude={"created_at"})
     rating_dict.update({
         "question_id": question_id,
         "user_id": user_id,
         "updated_at": datetime.now(timezone.utc),
     })
 
-    if existing_rating:
-        # Update existing rating
-        await ratings_collection.update_one(
-            {"_id": existing_rating["_id"]},
-            {"$set": rating_dict}
-        )
-
-        rating_dict["id"] = str(existing_rating["_id"])
-        return rating_dict
-    else:
-        # Create new rating
-        rating_dict.update({
-            "_id": ObjectId(),
-            "created_at": datetime.now(timezone.utc),
-        })
-
-        result = await ratings_collection.insert_one(rating_dict)
-        rating_dict["id"] = str(result.inserted_id)
-        rating_dict.pop("_id", None)
-
-        return rating_dict
+    doc, _ = await _upsert_one(
+        ratings_collection,
+        {"question_id": question_id, "user_id": user_id},
+        rating_dict,
+    )
+    doc["id"] = str(doc.pop("_id"))
+    return doc
 
 
 async def get_ratings_for_chapter(
@@ -540,6 +538,33 @@ async def delete_questions_for_book(
     logger.info(f"Cascade delete: Removed {result.deleted_count} questions and their responses for book {book_id}")
 
     return result.deleted_count
+
+
+async def delete_questions_for_chapters(
+    book_id: str,
+    chapter_ids: Iterable[str],
+    user_id: str,
+) -> int:
+    """Delete the questions, responses and ratings of chapters removed from the
+    TOC (#755), so none of them re-attach to a later chapter with the same id.
+    Returns the number of questions deleted."""
+    chapter_ids = list(chapter_ids)
+    if not chapter_ids:
+        return 0
+    questions_collection = await get_collection("questions")
+    scope = {"book_id": book_id, "user_id": user_id, "chapter_id": {"$in": chapter_ids}}
+
+    question_ids = [
+        str(q["_id"])
+        for q in await questions_collection.find(scope, {"_id": 1}).to_list(length=None)
+    ]
+    # Children first, so a failure part-way leaves no answer without its question.
+    if question_ids:
+        for name in ("question_responses", "question_ratings"):
+            await (await get_collection(name)).delete_many(
+                {"question_id": {"$in": question_ids}}
+            )
+    return (await questions_collection.delete_many(scope)).deleted_count
 
 
 async def count_questions_without_responses(
@@ -836,34 +861,6 @@ async def save_question_responses_batch(
             # Calculate word count
             word_count = len(response_text.split()) if response_text else 0
 
-            # Same question answered twice in one batch: last write wins, exactly
-            # as two sequential saves would end up. Retarget the write already
-            # prepared for this question instead of preparing a second one — two
-            # inserts would either store a duplicate document (no unique index) or
-            # trip question_user_idx and lose the newer answer. Deduping here, after
-            # validation, keeps each item's own validation error attributable.
-            prior_op = ops_by_question.get(question_id)
-            if prior_op is not None:
-                payload = (
-                    prior_op["update"]["$set"] if prior_op["is_update"]
-                    else prior_op["insert"]
-                )
-                payload["response_text"] = response_text
-                payload["status"] = response_status
-                payload["word_count"] = word_count
-                payload["updated_at"] = datetime.now(timezone.utc)
-                payload["last_edited_at"] = datetime.now(timezone.utc)
-                # Both items report this single write's outcome.
-                prior_op["indexes"].append(idx)
-                continue
-
-            # Check if response already exists
-            existing_response = await responses_collection.find_one({
-                "question_id": question_id,
-                "user_id": user_id
-            })
-
-            # Prepare response data
             response_dict = {
                 "question_id": question_id,
                 "user_id": user_id,
@@ -874,43 +871,19 @@ async def save_question_responses_batch(
                 "last_edited_at": datetime.now(timezone.utc),
             }
 
-            if existing_response:
-                # Update existing response
-                edit_history = existing_response.get("metadata", {}).get("edit_history", [])
-                edit_history.append({
-                    "timestamp": datetime.now(timezone.utc),
-                    "word_count": existing_response.get("word_count", 0)
-                })
+            # Same question answered twice in one batch: last write wins, exactly
+            # as two sequential saves would end up. Retarget the write already
+            # prepared for this question instead of preparing a second one, so the
+            # batch writes each question once. Deduping here, after validation,
+            # keeps each item's own validation error attributable.
+            prior_op = ops_by_question.get(question_id)
+            if prior_op is not None:
+                prior_op["fields"] = response_dict
+                # Both items report this single write's outcome.
+                prior_op["indexes"].append(idx)
+                continue
 
-                response_dict["metadata"] = {
-                    "edit_history": edit_history
-                }
-
-                op = {
-                    "filter": {"_id": existing_response["_id"]},
-                    "update": {"$set": response_dict},
-                    "is_update": True,
-                    "question_id": question_id,
-                    "response_id": str(existing_response["_id"]),
-                    "indexes": [idx]
-                }
-            else:
-                # Create new response
-                response_dict.update({
-                    "_id": ObjectId(),
-                    "created_at": datetime.now(timezone.utc),
-                    "metadata": {"edit_history": []}
-                })
-
-                op = {
-                    "filter": None,
-                    "insert": response_dict,
-                    "is_update": False,
-                    "question_id": question_id,
-                    "response_id": str(response_dict["_id"]),
-                    "indexes": [idx]
-                }
-
+            op = {"question_id": question_id, "fields": response_dict, "indexes": [idx]}
             successful_ops.append(op)
             ops_by_question[question_id] = op
 
@@ -931,21 +904,20 @@ async def save_question_responses_batch(
     saved_count = 0
     for op in successful_ops:
         try:
-            if op.get("is_update"):
-                await responses_collection.update_one(
-                    op["filter"],
-                    op["update"]
-                )
-            else:
-                await responses_collection.insert_one(op["insert"])
+            doc, is_update = await _upsert_one(
+                responses_collection,
+                {"question_id": op["question_id"], "user_id": user_id},
+                op["fields"],
+                push=_edit_history_push(op["fields"]["word_count"]),
+            )
 
             for idx in op["indexes"]:
                 results.append({
                     "index": idx,
                     "question_id": op["question_id"],
-                    "response_id": op["response_id"],
+                    "response_id": str(doc["_id"]),
                     "success": True,
-                    "is_update": op["is_update"]
+                    "is_update": is_update
                 })
                 saved_count += 1
         except Exception as e:

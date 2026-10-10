@@ -5,6 +5,7 @@ from fastapi.security import HTTPBearer
 from typing import List, Dict
 from datetime import datetime, timezone
 
+from app.api.endpoints.billing import cancel_subscription_for_deletion
 from app.core.security import get_current_user_from_session, SessionRoleChecker
 from app.schemas.user import UserUpdate, UserResponse
 from app.db.database import (
@@ -134,12 +135,7 @@ async def update_profile(
     except Exception as e:
         msg = str(e).lower()
         logger.error("Failed to update user", exc_info=True)
-        if "duplicate key error" in msg:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already exists",
-            )
-        elif "operation timed out" in msg:
+        if "operation timed out" in msg:
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 detail="Database operation timed out",
@@ -176,10 +172,12 @@ async def delete_profile(
     """Delete the current user's account.
 
     Cascades the user's books (and their questions/responses/ratings/access
-    logs, via the atomic per-book delete) BEFORE soft-deleting the user record,
+    logs, via the atomic per-book delete) BEFORE erasing the user record,
     so a mid-cascade failure leaves the account active and retryable (#179).
-    The user document itself is retained with is_active=False.
+    Only a tombstone of auth_id and deleted_at is retained (#784). The Stripe
+    subscription is cancelled before any of that (#764).
     """
+    await cancel_subscription_for_deletion(current_user["auth_id"])
     try:
         deleted_books = await delete_all_user_books(current_user["auth_id"])
     except Exception:
@@ -198,7 +196,7 @@ async def delete_profile(
         deleted_books,
     )
 
-    # Delete user (soft delete by default)
+    # Erase the user to a tombstone
     success = await delete_user(
         auth_id=current_user["auth_id"], actor_id=current_user["auth_id"]
     )
@@ -391,7 +389,8 @@ async def delete_user_account(
             detail="Not enough permissions to delete this user",
         )
 
-    # Delete the user (cascade owned books first — same ordering as /me, #179)
+    # Same ordering as /me: cancel billing (#764), cascade books (#179), delete.
+    await cancel_subscription_for_deletion(auth_id)
     try:
         await delete_all_user_books(auth_id)
         result = await delete_user(auth_id)

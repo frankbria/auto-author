@@ -36,7 +36,7 @@ def _misconfigured_secrets() -> list[str]:
     prod = is_production_env()
     bad: list[str] = []
     if not settings.openai_api_key or (prod and settings.openai_api_key == "test-key"):
-        bad.append("OPENAI_API_KEY")
+        bad.append("AI_API_KEY" if settings.AI_BASE_URL else "OPENAI_API_KEY")
     if not settings.BETTER_AUTH_SECRET or (prod and settings.BETTER_AUTH_SECRET == _CI_SECRET):
         bad.append("BETTER_AUTH_SECRET")
     return bad

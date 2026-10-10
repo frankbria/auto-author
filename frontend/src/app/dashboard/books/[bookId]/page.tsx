@@ -84,6 +84,10 @@ const convertTocToChapters = (tocData: TocData | null): Chapter[] => {
 
 export default function BookPage({ params }: { params: Promise<{ bookId: string }> }) {
   const { data: session } = useSession();
+  // Not `session`: better-auth hands out a new object on every session refetch
+  // (window focus included) for the same user, and reloading on that swapped the
+  // page for its skeleton, unmounting the open chapter editor (#758).
+  const userId = session?.user?.id;
   const searchParams = useSearchParams();
   const initialChapter = searchParams.get('chapter');
 
@@ -97,12 +101,12 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   // The app router keeps this page mounted across a `[bookId]` change, so each
   // load owns its result: a response for a book the user has left is dropped,
   // or its details would render, and save, under the next book (#584). Try Again
-  // starts a new attempt. A load is settled for one book, attempt and session,
-  // and anything else is loading, derived rather than flagged from the effect.
+  // starts a new attempt. A load is settled for one book, attempt and user, and
+  // anything else is loading, derived rather than flagged from the effect.
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const loadKey = `${bookId}:${loadAttempt}`;
-  const [settledLoad, setSettledLoad] = useState<{ key: string; session: typeof session } | null>(null);
-  const isLoading = !(settledLoad && settledLoad.key === loadKey && settledLoad.session === session);
+  const loadKey = `${bookId}:${loadAttempt}:${userId}`;
+  const [settledLoadKey, setSettledLoadKey] = useState<string | null>(null);
+  const isLoading = settledLoadKey !== loadKey;
 
   useEffect(() => {
     let ignore = false;
@@ -153,14 +157,14 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
         console.error('Error fetching book details:', err);
         setError('Failed to load book details. Please try again.');
       } finally {
-        if (!ignore) setSettledLoad({ key: `${bookId}:${loadAttempt}`, session });
+        if (!ignore) setSettledLoadKey(`${bookId}:${loadAttempt}:${userId}`);
       }
     };
     loadBook();
     return () => {
       ignore = true;
     };
-  }, [bookId, session, loadAttempt]);
+  }, [bookId, userId, loadAttempt]);
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {

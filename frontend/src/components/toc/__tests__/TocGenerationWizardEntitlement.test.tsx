@@ -121,6 +121,7 @@ const TOC_RESULT = {
       { title: 'Chapter 2' },
     ],
   },
+  base_version: 7,
 } as never;
 
 /** Drive the wizard to the REVIEW step (questions answered, TOC generated). */
@@ -163,6 +164,36 @@ describe('TocGenerationWizard entitlement routing (issue #247)', () => {
     // No raw payload fragments anywhere.
     expect(screen.queryByText(/"detail"/)).not.toBeInTheDocument();
     expect(screen.queryByText(/402/)).not.toBeInTheDocument();
+  });
+
+  it('shows a quota cap (429) verbatim: no Try Again, no contact-support (#766)', async () => {
+    const CAP =
+      'AI usage limit reached (50 generations per day on the pro plan). It resets at midnight UTC.';
+    mockedBookClient.analyzeSummary.mockRejectedValue(errorWithStatus(CAP, 429));
+
+    render(<TocGenerationWizard bookId="book-1" />);
+
+    expect(await screen.findByText(CAP)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/contact support/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /plan limits/i })).toHaveAttribute(
+      'href',
+      '/dashboard/settings?tab=billing'
+    );
+    expect(mockedBookClient.checkTocReadiness).not.toHaveBeenCalled();
+  });
+
+  it('a plain rate-limit 429 on analyze is still swallowed (not a quota cap)', async () => {
+    mockedBookClient.analyzeSummary.mockRejectedValue(
+      errorWithStatus('Rate limit exceeded. Try again in 5 seconds.', 429)
+    );
+    mockedBookClient.checkTocReadiness.mockResolvedValue({
+      data: { meets_minimum_requirements: false },
+    } as never);
+
+    render(<TocGenerationWizard bookId="book-1" />);
+
+    await waitFor(() => expect(mockedBookClient.checkTocReadiness).toHaveBeenCalled());
   });
 
   it('routes a readiness-check 402 (outer catch) to the entitlement panel', async () => {
@@ -263,9 +294,11 @@ describe('TocGenerationWizard step flow', () => {
     await user.click(screen.getByRole('button', { name: 'accept-toc' }));
 
     await waitFor(() => {
+      // The version read before the AI call rides back, so a TOC changed in
+      // the meantime is a 409 instead of a silent overwrite (#753).
       expect(mockedBookClient.updateToc).toHaveBeenCalledWith(
         'book-1',
-        expect.objectContaining({ chapters: expect.any(Array) })
+        expect.objectContaining({ chapters: expect.any(Array), expected_version: 7 })
       );
     });
     expect(push).toHaveBeenCalledWith('/dashboard/books/book-1/edit-toc');
@@ -284,6 +317,9 @@ describe('TocGenerationWizard step flow', () => {
     });
     expect(push).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'accept-toc' })).toBeInTheDocument();
+    // The failure must be visible, not just held in state: a 409 from the
+    // version guard (#753) is otherwise a button that silently does nothing.
+    expect(screen.getByRole('alert')).toHaveTextContent('save failed');
   });
 
   it('regenerating the TOC calls generateToc again and returns to review', async () => {

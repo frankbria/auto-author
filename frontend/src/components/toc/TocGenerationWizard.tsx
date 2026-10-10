@@ -18,6 +18,7 @@ import ClarifyingQuestions from './ClarifyingQuestions';
 import TocGenerating from './TocGenerating';
 import TocReview from './TocReview';
 import ErrorDisplay from './ErrorDisplay';
+import { isQuotaCapMessage } from '@/lib/api/aiErrorHandler';
 
 interface TocGenerationWizardProps {
   bookId: string;
@@ -85,6 +86,14 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
         // An entitlement denial is a paywall, not a transient analysis
         // failure — surface the upgrade path instead of swallowing it (#247).
         if (statusCodeOf(analysisError) === 402) {
+          throw analysisError;
+        }
+        // Same for a plan quota cap (#766): show the cap, don't carry on as if analysis ran.
+        if (
+          statusCodeOf(analysisError) === 429 &&
+          analysisError instanceof Error &&
+          isQuotaCapMessage(analysisError.message)
+        ) {
           throw analysisError;
         }
         console.warn('Summary analysis failed, proceeding with basic check:', analysisError);
@@ -179,10 +188,13 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
     try {
       if (!wizardState.generatedToc?.toc) return;
 
-      setWizardState(prev => ({ ...prev, isLoading: true }));
+      setWizardState(prev => ({ ...prev, isLoading: true, error: undefined }));
 
       // Save the TOC to the backend
-      await bookClient.updateToc(bookId, wizardState.generatedToc.toc);
+      await bookClient.updateToc(bookId, {
+        ...wizardState.generatedToc.toc,
+        expected_version: wizardState.generatedToc.base_version,
+      });
 
       // Navigate to the edit TOC page
       router.push(`/dashboard/books/${bookId}/edit-toc`);
@@ -285,12 +297,22 @@ export default function TocGenerationWizard({ bookId }: TocGenerationWizardProps
 
       case WizardStep.REVIEW:
         return (
-          <TocReview
-            tocResult={wizardState.generatedToc!}
-            onAccept={handleAcceptToc}
-            onRegenerate={handleRegenerateToc}
-            isLoading={wizardState.isLoading}
-          />
+          <>
+            {wizardState.error && (
+              <div
+                role="alert"
+                className="mb-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-700 dark:bg-red-950 dark:text-red-100"
+              >
+                {wizardState.error}
+              </div>
+            )}
+            <TocReview
+              tocResult={wizardState.generatedToc!}
+              onAccept={handleAcceptToc}
+              onRegenerate={handleRegenerateToc}
+              isLoading={wizardState.isLoading}
+            />
+          </>
         );
 
       case WizardStep.ERROR:

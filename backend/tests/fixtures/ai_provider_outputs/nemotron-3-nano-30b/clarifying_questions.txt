@@ -1,0 +1,7 @@
+1. **How should the chapters be sequenced to mirror the typical progression a new engineering manager experiences—from transitioning from IC to managing people, to day‑to‑day operations, to longer‑term strategic responsibilities—so that each section builds on the previous one without redundancy?**
+
+2. **Which core competencies (e.g., feedback delivery, hiring, performance management, burnout prevention) require dedicated sub‑sections or stand‑alone chapters, and how can we allocate page depth to balance depth of explanation with concise, actionable checklists?**
+
+3. **What specific case studies or real‑world scenarios should be embedded at key transition points (such as the first one‑on‑one, handling underperformance, or negotiating with product partners) to illustrate concepts, and how can these be organized to reinforce learning objectives?**
+
+4. **For each major topic, what level of granularity is appropriate for the target audience (engineers promoted from IC roles at 20‑500‑person companies), and how can we structure supplemental resources (templates, checklists, decision trees) to provide immediate, week‑by‑week applicability without overwhelming the main narrative?**

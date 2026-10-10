@@ -147,36 +147,50 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   const [toc, setToc] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  // TOC version read from GET /toc, sent back as expected_version so a save over
+  // someone else's change is a 409 instead of a silent overwrite (#750).
+  const [tocVersion, setTocVersion] = useState<number | undefined>(undefined);
+  const [conflict, setConflict] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
-  const [dragOverItem, setDragOverItem] = useState<string | null>(null);    // Fetch the TOC when component mounts
+  const [dragOverItem, setDragOverItem] = useState<string | null>(null);
+  // Fetch the TOC on mount and on Reload
   useEffect(() => {
     const fetchTOC = async () => {
       try {
-
         // Fetch TOC from the backend API
         const response = await bookClient.getToc(bookId);
 
         if (response.toc) {
           // Convert API format (TocData) to local format (Chapter[])
-          const convertedToc = convertTocDataToChapters(response.toc);
-          setToc(convertedToc);
+          setToc(convertTocDataToChapters(response.toc));
         } else {
           // No TOC exists yet - start with empty state
           setToc([]);
         }
+        // 0 means "no TOC stored yet"; the backend treats that as version 1, so
+        // there is nothing to lock against.
+        setTocVersion(response.version && response.version > 0 ? response.version : undefined);
+        setError('');
+        setConflict(false);
       } catch (err) {
         console.error('Error fetching TOC:', err);
         setError('Failed to load the table of contents. Please try again.');
       } finally {
         setIsLoading(false);
       }
-    };
+      };
 
     fetchTOC();
-  }, [bookId, session]);
+  }, [bookId, session, reloadKey]);
+
+  const reloadTOC = () => {
+    setIsLoading(true);
+    setReloadKey((k) => k + 1);
+  };
 
   const addNewChapter = () => {
-    const newId = `ch${toc.length + 1}`;    const newChapter: Chapter = {
+    const newId = crypto.randomUUID();    const newChapter: Chapter = {
       id: newId,
       title: 'New Chapter',
       description: 'Description of the new chapter',
@@ -197,7 +211,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     const findAndAddSubchapter = (chapters: Chapter[]) => {
       for (let i = 0; i < chapters.length; i++) {
         if (chapters[i].id === parentId) {
-          const newId = `${parentId}-${chapters[i].children.length + 1}`;          const newSubchapter: Chapter = {
+          const newId = crypto.randomUUID();          const newSubchapter: Chapter = {
             id: newId,
             title: 'New Subchapter',
             parent: parentId,
@@ -415,7 +429,10 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       logger.debug('TOC to save:', tocData);
 
       // Save TOC using the real API
-      await bookClient.updateToc(bookId, tocData);
+      await bookClient.updateToc(
+        bookId,
+        tocVersion === undefined ? tocData : { ...tocData, expected_version: tocVersion }
+      );
 
       // Trigger TOC synchronization event for chapter tabs
       triggerTocUpdateEvent(bookId);
@@ -424,7 +441,13 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       router.push(`/dashboard/books/${bookId}`);
     } catch (err) {
       console.error('Error saving TOC:', err);
-      setError('Failed to save the table of contents. Please try again.');
+      if ((err as { statusCode?: number }).statusCode === 409) {
+        setConflict(true);
+        setError('This table of contents changed elsewhere since you opened it. Reload to see the latest version; your unsaved edits here will be discarded.');
+      } else {
+        setConflict(false);
+        setError('Failed to save the table of contents. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -531,6 +554,14 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       {error && (
         <div className="p-4 mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400">
           {error}
+          {conflict && (
+            <button
+              onClick={reloadTOC}
+              className="ml-3 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md"
+            >
+              Reload
+            </button>
+          )}
         </div>
       )}
 
