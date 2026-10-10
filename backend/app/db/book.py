@@ -34,7 +34,9 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
 
         # Associate the book with the user
         await users_collection.update_one(
-            {"auth_id": user_auth_id}, {"$push": {"book_ids": str(book_obj.id)}}
+            # Never onto a tombstone (deleted account, #784).
+            {"auth_id": user_auth_id, "deleted_at": {"$exists": False}},
+            {"$push": {"book_ids": str(book_obj.id)}},
         )
 
         # Create audit log entry
