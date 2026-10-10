@@ -37,7 +37,6 @@ Creates a new book with the specified metadata.
   "description": "This book explores the creative writing process",
   "genre": "Non-fiction",
   "target_audience": "Writers and aspiring authors",
-  "cover_image_url": "https://example.com/cover.jpg",
   "metadata": { "draft_version": "1.0" }
 }
 ```
@@ -50,8 +49,10 @@ Creates a new book with the specified metadata.
 - `description`: String (up to 5000 characters)
 - `genre`: String (up to 100 characters)
 - `target_audience`: String (up to 100 characters)
-- `cover_image_url`: String (valid URL)
 - `metadata`: Object (for custom metadata)
+
+`cover_image_url` is not a request field (#797). It is written only by
+`POST /books/{book_id}/cover-image` and is ignored if sent here.
 
 **Response:** `201 Created`
 
@@ -173,9 +174,11 @@ Updates the metadata of a specific book.
 - `description`: String (up to 5000 characters)
 - `genre`: String (up to 100 characters)
 - `target_audience`: String (up to 100 characters)
-- `cover_image_url`: String (valid URL)
 - `metadata`: Object (for custom metadata)
 - `published`: Boolean
+
+`cover_image_url` is not a request field (#797) and is ignored if sent. The
+response still returns the stored value.
 
 **Response:** `200 OK`
 
@@ -197,6 +200,22 @@ Updates the metadata of a specific book.
   "collaborators": []
 }
 ```
+
+### Upload a Cover Image
+
+**Endpoint:** `POST /books/{book_id}/cover-image`
+
+**Rate Limit:** 5 requests per 60 seconds
+
+**Request:** `multipart/form-data` with one `file` part (JPEG, PNG, WebP or GIF,
+up to 5MB). Only the book's owner may upload.
+
+**Response:** `200 OK` with `cover_image_url`, `cover_thumbnail_url` and
+`book_id`. The new URLs are stored first; the previous cover and thumbnail are
+deleted afterwards. If storing the URLs fails, the new files are removed and
+the book keeps its old cover.
+
+This route is the only writer of `cover_image_url` (#797).
 
 ### Delete a Book
 
