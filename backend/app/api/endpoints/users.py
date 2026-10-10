@@ -172,9 +172,9 @@ async def delete_profile(
     """Delete the current user's account.
 
     Cascades the user's books (and their questions/responses/ratings/access
-    logs, via the atomic per-book delete) BEFORE soft-deleting the user record,
+    logs, via the atomic per-book delete) BEFORE erasing the user record,
     so a mid-cascade failure leaves the account active and retryable (#179).
-    The user document itself is retained with is_active=False. The Stripe
+    Only a tombstone of auth_id and deleted_at is retained (#784). The Stripe
     subscription is cancelled before any of that (#764).
     """
     await cancel_subscription_for_deletion(current_user["auth_id"])
@@ -196,7 +196,7 @@ async def delete_profile(
         deleted_books,
     )
 
-    # Delete user (soft delete by default)
+    # Erase the user to a tombstone
     success = await delete_user(
         auth_id=current_user["auth_id"], actor_id=current_user["auth_id"]
     )

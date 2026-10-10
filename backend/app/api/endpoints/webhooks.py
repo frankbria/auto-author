@@ -128,7 +128,7 @@ async def _apply_subscription_event(
         # subscription metadata with our auth_id.
         auth_id = (subscription.get("metadata") or {}).get("auth_id")
         user = await get_user_by_auth_id(auth_id) if auth_id else None
-    if user is None:
+    if user is None or user.get("deleted_at"):
         # Ack with 200 so Stripe stops retrying — there is no user to update
         # (e.g. deleted account, or a customer created outside this app). No
         # replay marker is recorded: once the user is linked later, an operator

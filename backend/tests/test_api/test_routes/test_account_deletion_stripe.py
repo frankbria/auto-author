@@ -90,7 +90,7 @@ async def test_delete_cancels_the_stored_subscription_once(
     assert call["idempotency_key"] == f"account-delete-{SUB_ID}"
     users = await get_collection("users")
     doc = await users.find_one({"auth_id": OWNER})
-    assert doc["is_active"] is False
+    assert set(doc) == {"_id", "auth_id", "deleted_at"}
 
 
 @pytest.mark.parametrize("path", ["/api/v1/users/me", f"/api/v1/users/{OWNER}"])

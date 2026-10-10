@@ -18,7 +18,9 @@ from app.db.user import ensure_user_indexes
 from app.main import app
 
 
-async def _seed_better_auth_user(email: str, sessions: int = 1) -> dict:
+async def _seed_better_auth_user(
+    email: str, sessions: int = 1, name: str = "Del Eted"
+) -> dict:
     """Insert a better-auth user with a credential account, a twoFactor row and
     ``sessions`` live sessions. Returns the user id and the session tokens."""
     now = datetime.now(timezone.utc)
@@ -27,7 +29,7 @@ async def _seed_better_auth_user(email: str, sessions: int = 1) -> dict:
         {
             "_id": user_oid,
             "email": email,
-            "name": "Del Eted",
+            "name": name,
             "emailVerified": False,
             "twoFactorEnabled": True,
             "createdAt": now,
@@ -74,6 +76,21 @@ def _client(token: str) -> AsyncClient:
         base_url="http://testserver",
         cookies={"better-auth.session_token": f"{token}.signature"},
     )
+
+
+TOMBSTONE_KEYS = {"_id", "auth_id", "deleted_at"}
+
+
+async def _docs_mentioning(*needles: str) -> list:
+    """"<collection>:<_id>" for every document in the test database that
+    contains one of ``needles`` anywhere, nested values included."""
+    db = (await get_collection("users")).database
+    hits = []
+    for name in await db.list_collection_names():
+        async for doc in db[name].find():
+            if any(needle in str(doc) for needle in needles):
+                hits.append(f"{name}:{doc['_id']}")
+    return hits
 
 
 async def _better_auth_docs(user_oid: ObjectId) -> dict:
@@ -126,8 +143,7 @@ async def test_deleted_account_is_locked_out_and_its_better_auth_docs_are_gone(
     app_user = await (await get_collection("users")).find_one(
         {"auth_id": victim["user_id"]}
     )
-    assert app_user["is_active"] is False
-    assert "email" not in app_user, "email released so the address can sign up again"
+    assert set(app_user) == TOMBSTONE_KEYS, "email released, profile erased (#784)"
 
     assert await _better_auth_docs(bystander["oid"]) == {
         "session": 1,
@@ -242,3 +258,60 @@ async def test_delete_by_auth_id_revokes_better_auth_docs_too(motor_reinit_db):
         "twoFactor": 0,
         "user": 0,
     }
+
+
+@pytest.mark.asyncio
+async def test_deletion_erases_the_account_to_a_tombstone(motor_reinit_db):
+    """#784: the Privacy Policy says deletion is permanent, so nothing that
+    identifies the person may survive DELETE /users/me — in any collection."""
+    email = "erase.me@example.com"
+    identifying = (email, "Zebedee", "Quillfeather", "cus_erase_me")
+    seeded = await _seed_better_auth_user(email, name="Zebedee Quillfeather")
+    users = await get_collection("users")
+
+    async with _client(seeded["tokens"][0]) as c:
+        assert (await c.get("/api/v1/users/me")).status_code == 200
+        patched = await c.patch(
+            "/api/v1/users/me",
+            json={
+                "display_name": "Zebedee Q.",
+                "bio": "Quillfeather writes about owls",
+                "avatar_url": "https://example.com/Zebedee.png",
+            },
+        )
+        assert patched.status_code == 200, patched.text
+        # Billing identity is webhook-written, not API-writable.
+        await users.update_one(
+            {"auth_id": seeded["user_id"]},
+            {"$set": {"stripe_customer_id": "cus_erase_me"}},
+        )
+        before = await _docs_mentioning(*identifying)
+        assert any(h.startswith("users:") for h in before), "scan must see the data"
+        assert any(h.startswith("account:") or h.startswith("user:") for h in before)
+
+        assert (await c.delete("/api/v1/users/me")).status_code == 200
+
+    assert await _docs_mentioning(*identifying) == []
+    tombstone = await users.find_one({"auth_id": seeded["user_id"]})
+    assert set(tombstone) == TOMBSTONE_KEYS
+    assert isinstance(tombstone["deleted_at"], datetime)
+
+
+@pytest.mark.asyncio
+async def test_tombstoned_user_is_rejected_even_if_the_better_auth_user_survives(
+    motor_reinit_db,
+):
+    """If erasing the better-auth identity fails after the tombstone is written,
+    the surviving session must not authenticate — and must not mirror the email
+    back onto the tombstone."""
+    seeded = await _seed_better_auth_user("halfway@example.com")
+    users = await get_collection("users")
+    async with _client(seeded["tokens"][0]) as c:
+        assert (await c.get("/api/v1/users/me")).status_code == 200
+        await users.replace_one(
+            {"auth_id": seeded["user_id"]},
+            {"auth_id": seeded["user_id"], "deleted_at": datetime.now(timezone.utc)},
+        )
+        assert (await c.get("/api/v1/users/me")).status_code == 401
+
+    assert set(await users.find_one({"auth_id": seeded["user_id"]})) == TOMBSTONE_KEYS

@@ -87,14 +87,29 @@ class TestUpdateUser:
 
 
 class TestDeleteUser:
-    async def test_soft_delete_marks_inactive(self, motor_reinit_db):
-        await _make_user(auth_id="auth-soft")
+    async def test_soft_delete_leaves_only_a_tombstone(self, motor_reinit_db):
+        await _make_user(auth_id="auth-soft", bio="about me", stripe_customer_id="cus_1")
         ok = await delete_user("auth-soft", actor_id="admin")
         assert ok is True
         doc = await get_user_by_auth_id("auth-soft")
-        assert doc["is_active"] is False
+        assert set(doc) == {"_id", "auth_id", "deleted_at"}
         log = await base.audit_logs_collection.find_one({"action": "user_delete"})
         assert log["details"]["soft_delete"] is True
+
+    async def test_deleting_a_tombstone_again_reports_not_found(self, motor_reinit_db):
+        await _make_user(auth_id="auth-twice")
+        assert await delete_user("auth-twice") is True
+        first = await get_user_by_auth_id("auth-twice")
+        assert await delete_user("auth-twice") is False
+        assert await get_user_by_auth_id("auth-twice") == first
+
+    async def test_update_cannot_write_onto_a_tombstone(self, motor_reinit_db):
+        await _make_user(auth_id="auth-gone")
+        await delete_user("auth-gone")
+        assert await update_user("auth-gone", {"bio": "back again"}) is None
+        assert set(await get_user_by_auth_id("auth-gone")) == {
+            "_id", "auth_id", "deleted_at",
+        }
 
     async def test_soft_delete_missing_returns_false(self, motor_reinit_db):
         assert await delete_user("absent") is False

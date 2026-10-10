@@ -180,7 +180,8 @@ async def get_current_user_from_session(request: Request) -> Dict:
         )
 
     # Explicit False: records predating the field are active (schema default).
-    if user and user.get("is_active") is False:
+    # deleted_at marks the tombstone of an erased account (#784).
+    if user and (user.get("is_active") is False or user.get("deleted_at")):
         logger.warning(f"Rejected session for deactivated user {user_id}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
