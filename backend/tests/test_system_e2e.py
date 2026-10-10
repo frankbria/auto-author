@@ -167,7 +167,7 @@ class SystemE2ETest:
         # generate-toc only proposes (#753); accepting it is the wizard's PUT /toc.
         accept = await self.client.put(
             f"/api/v1/books/{self.book_id}/toc",
-            json={"toc": {**toc["toc"], "expected_version": toc["base_version"]}},
+            json={"toc": toc["toc"], "expected_version": toc["base_version"]},
         )
         accept.raise_for_status()
         # The response contains toc.toc.chapters structure

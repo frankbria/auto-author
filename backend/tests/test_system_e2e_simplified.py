@@ -120,7 +120,7 @@ class SimplifiedSystemTest:
         # generate-toc only proposes (#753); accepting it is the wizard's PUT /toc.
         accept = await self.client.put(
             f"/api/v1/books/{self.book_id}/toc",
-            json={"toc": {**toc["toc"], "expected_version": toc["base_version"]}},
+            json={"toc": toc["toc"], "expected_version": toc["base_version"]},
         )
         accept.raise_for_status()
         chapters_count = len(toc.get("toc", {}).get("chapters", []))
