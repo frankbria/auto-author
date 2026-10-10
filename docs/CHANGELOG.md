@@ -11,7 +11,7 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
   - **Cover upload is rate limited** at 5 per 60 seconds.
   - **A side effect that was a bug.** The metadata form sent `cover_image_url: ''` on every save, and the update routes wrote any non-null value, so saving a book's title cleared the URL of an uploaded cover. Ignoring the field ends that.
   - **Frontend.** The two "Cover Image URL" inputs are removed. A typed URL never rendered: no remote image host is configured, and staging's image optimizer answers 400 for one.
-  - **Existing data.** A stored URL that is not the owner's own object is now left alone on replace and delete. That includes external URLs typed into the old field and OAuth avatar URLs.
+  - **Existing data.** A stored URL that is not the owner's own object is now left alone on replace and delete. That includes any external URL typed into the old field.
 
 - **Deleting a book or an account deletes its uploaded files (#785, P1.3)**: cover and thumbnail files were only ever removed when a new cover replaced them, and the avatar never, so every deleted book and account left its images in storage while the Privacy Policy calls deletion permanent.
   - **Two call sites, not five.** `delete_book` deletes the cover and thumbnail, which covers `DELETE /books/{id}` and the account cascade (`delete_all_user_books` calls it per book). `delete_user` deletes the avatar, which covers `DELETE /users/me` and the admin `DELETE /users/{auth_id}`. It now uses `find_one_and_replace` (and `find_one_and_delete` on the hard path) because #784's tombstone erases `avatar_url`: the returned pre-image is the last place the URL exists.
