@@ -2,6 +2,7 @@
 Test Export Service functionality
 """
 import asyncio
+import re
 import logging
 import threading
 import pytest
@@ -652,3 +653,90 @@ class TestCleanHtmlConcurrency:
             results = list(ex.map(work, range(8)))
         assert results == [None] * 8
         assert svc._clean_html_content("<p>hello</p>") == "hello"
+
+
+class TestPdfMarkupEscaping:
+    """Issue #752: user text is data, never ReportLab markup."""
+
+    @pytest.fixture
+    def hostile_book(self, tmp_path):
+        from PIL import Image
+        img = tmp_path / "server_only.png"
+        Image.new("RGB", (4, 4), "red").save(img)
+        tag = f'<img src="{img}"/>'
+        return {
+            "title": "A </i> B <b>x",
+            "subtitle": "Sub & <u>unbalanced",
+            "author_name": "Au <thor>",
+            "description": "Desc </b> & <para>",
+            "genre": "G <i>",
+            "target_audience": "T </i>",
+            "table_of_contents": {"chapters": [{
+                "id": "1",
+                "title": "Ch </i> & <b>",
+                "description": "CD </i> <b>",
+                "content": f"<p>body &lt;b&gt;bold&lt;/b&gt; &amp; &lt;/i&gt; &lt;</p><p>&lt;img src=\"{img}\"/&gt;</p>",
+                "order": 1,
+            }]},
+        }, tag
+
+    @pytest.mark.asyncio
+    async def test_hostile_text_exports_literally_without_images(
+        self, hostile_book, monkeypatch
+    ):
+        from reportlab import rl_config
+        monkeypatch.setattr(rl_config, "pageCompression", 0)
+        monkeypatch.setattr(rl_config, "useA85", 0)
+        book, tag = hostile_book
+        pdf = await export_service.export_book(book, format="pdf")
+        assert pdf.startswith(b"%PDF")
+        # ReportLab splits text into (..) Tj fragments and wraps lines: compare
+        # the concatenated text with whitespace removed.
+        text = b"".join(re.findall(rb"\(([^)]*)\) Tj", pdf))
+        text = re.sub(rb"\s+", b"", text)
+        for literal in ("A </i> B <b>x", "Ch </i> & <b>", "CD </i> <b>",
+                        "Desc </b> & <para>", "body <b>bold</b> & </i> <", tag):
+            assert re.sub(r"\s+", "", literal).encode() in text, literal
+        assert b"/Subtype /Image" not in pdf
+
+    def test_only_data_scheme_trusted(self):
+        from reportlab import rl_config
+        assert list(rl_config.trustedSchemes) == ["data"]
+        assert list(rl_config.trustedHosts) == []
+
+
+class TestNonPdfFormatsKeepTextRaw:
+    """#752 review: _pdf_text is ReportLab-only. python-docx escapes for itself
+    and Markdown has nothing to escape, so escaping there shows up as a literal
+    "&amp;" in the exported file."""
+
+    BOOK = {
+        "title": "Raw",
+        "genre": "Sci-Fi & Fantasy",
+        "target_audience": "Parents & <teens>",
+        "table_of_contents": {"chapters": [
+            {"id": "1", "title": "One", "content": "<p>Body</p>", "order": 1},
+        ]},
+    }
+
+    @pytest.mark.asyncio
+    async def test_docx_metadata_is_not_html_escaped(self):
+        from io import BytesIO
+        from docx import Document
+
+        chapters = self.BOOK["table_of_contents"]["chapters"]
+        docx_bytes = await export_service.generate_docx(self.BOOK, chapters)
+
+        text = "\n".join(p.text for p in Document(BytesIO(docx_bytes)).paragraphs)
+        assert "Genre: Sci-Fi & Fantasy" in text
+        assert "Target Audience: Parents & <teens>" in text
+        assert "&amp;" not in text and "&lt;" not in text
+
+    @pytest.mark.asyncio
+    async def test_markdown_metadata_is_not_html_escaped(self):
+        chapters = self.BOOK["table_of_contents"]["chapters"]
+        text = (await export_service.generate_markdown(self.BOOK, chapters)).decode("utf-8")
+
+        assert "Genre: Sci-Fi & Fantasy" in text
+        assert "Target Audience: Parents & <teens>" in text
+        assert "&amp;" not in text and "&lt;" not in text
