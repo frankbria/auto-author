@@ -2,6 +2,15 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-10
+
+- **Deleting a book or an account deletes its uploaded files (#785, P1.3)**: cover and thumbnail files were only ever removed when a new cover replaced them, and the avatar never, so every deleted book and account left its images in storage while the Privacy Policy calls deletion permanent.
+  - **Two call sites, not five.** `delete_book` deletes the cover and thumbnail, which covers `DELETE /books/{id}` and the account cascade (`delete_all_user_books` calls it per book). `delete_user` deletes the avatar, which covers `DELETE /users/me` and the admin `DELETE /users/{auth_id}`. It now uses `find_one_and_replace` (and `find_one_and_delete` on the hard path) because #784's tombstone erases `avatar_url`: the returned pre-image is the last place the URL exists.
+  - **Database first, file second.** A file cannot roll back, so it goes only after the delete has committed. A failed cascade or a non-owner request leaves the files alone.
+  - **Best-effort, and never silent.** A storage failure is logged and the delete still succeeds. `delete_cover_image` now handles each file on its own, so a failed cover delete no longer skips the thumbnail. S3 and Cloudinary answer `False` for a URL they don't recognise (a local-mode URL left from before cloud storage was configured, say); both helpers now log that as a warning with the URL instead of discarding it. A file left behind this way is unreferenced, and nothing sweeps it.
+  - **Not covered.** The stored URLs are still client-writable (#797), so these two paths delete whatever URL the record holds, exactly as the replace-on-upload paths already do.
+  - **Verified.** `test_deletion_removes_uploads.py` uses real files and real MongoDB, storage pinned to local mode: the three routes (the book one after a real upload), both DAOs, a failed cascade, a non-owner, and a storage root that cannot be created. The cloud branch runs against an in-test stand-in for the provider: both files deleted, a raising cover delete, and a refused URL.
+
 ### 2026-10-09
 
 - **Account deletion erases the user record to a tombstone (#784, P1.2)**: the Privacy Policy calls deletion permanent, but the soft-deleted `users` doc kept names, bio, avatar URL, preferences and Stripe ids (#763 had already removed the better-auth `user`/`account`/`session`/`twoFactor` docs and the email). `delete_user` now `replace_one`s the doc with `{auth_id, deleted_at}`. Replacing instead of unsetting means a field added later is erased without anyone remembering to list it.

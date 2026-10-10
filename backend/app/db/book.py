@@ -361,6 +361,19 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
     if counts is None:
         return False
 
+    # Only once the delete has committed: a removed file cannot roll back (#785).
+    cover_url = book.get("cover_image_url")
+    thumbnail_url = book.get("cover_thumbnail_url")
+    if cover_url or thumbnail_url:
+        try:
+            from app.services.file_upload_service import FileUploadService
+
+            await FileUploadService().delete_cover_image(cover_url, thumbnail_url)
+        except Exception:
+            logger.error(
+                "Failed to delete cover files for book %s", book_id, exc_info=True
+            )
+
     # Create audit log entry
     await create_audit_log(
         action="book_delete",

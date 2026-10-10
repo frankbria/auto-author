@@ -1293,3 +1293,12 @@ The new webhook test was inserted before `class TestSubscriptionStatus:` with cl
 
 ### The issue's evidence can be half-shipped already (#784 vs #763)
 #784 cited `user.py:131-145` as leaving the better-auth `user` and `account` docs untouched. #763, a P0 from the same audit, had already deleted them before this run started. Reading the cited lines first cut the work to the `users` doc and a proving test. For any issue from the 2026-10-01 audit, read the evidence lines at HEAD before planning: the audit ran at 34ebf94 and earlier P0 fixes overlap later P1 issues.
+
+## #785 uploads deleted with their book or account (2026-10-10)
+
+### The opencode reviewer is not read-only: it runs pytest on the shared test DB and creates git worktrees (#937)
+The review prompt passes the diff inline with no `--auto`, and the phase file calls that "strictly read-only". In practice the reviewer ran `pytest` against the default `auto-author-test` database and created two worktrees under `/tmp/opencode`. Its test runs dropped the database under the pre-commit hook's run, which failed on an unrelated test (`test_save_and_retrieve_response`) and then flaked 1 run in 3 until the review ended. The worktree creation is the likely source of the stale `.git/index.lock` that blocked the same commit, and of the two unexplained locks recorded above. While a reviewer is running, give your own runs and commits `TEST_MONGO_URI=mongodb://localhost:27017/auto-author-test-s<N>`. In the review prompt, tell the reviewer to use its own `TEST_MONGO_URI` and to run no git command that writes; the second pass followed both. Afterwards run `git worktree list` and remove what it left.
+
+### A mutation that fails to apply cleanly reads as a survivor
+The mutation script moved a code block by slicing between two comment markers found with `str.index`. The end marker, `# Create audit log entry`, appears four times in `book.py`, so the slice was empty, the file became a syntax error, pytest collected nothing, and the script printed "killed by: NOTHING". That is the same output as a real survivor. A mutation harness must assert that the run collected tests (a `passed` or `failed` count in the summary) before it reports a result, and must find a marker from the start position (`src.index(end, start)`), not from the top of the file.
+
