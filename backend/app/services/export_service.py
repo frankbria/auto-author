@@ -59,8 +59,11 @@ try:
     )
     from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
     from reportlab import rl_config
-    # Paragraph() can fetch/open <img src=...>; allow only inline data URIs so a
-    # future reportlab upgrade cannot turn that into SSRF or local-file reads (#752).
+    # Paragraph() resolves <img src=...>. reportlab 5.0.1 already refuses URL
+    # sources (http, file://, data:) with its defaults; this pins that so an
+    # upgrade that loosens them cannot turn <img> into SSRF. It does NOT stop a
+    # plain filesystem path, which reportlab opens before any scheme check:
+    # _pdf_text is the only guard against embedding a server-local file (#752).
     rl_config.trustedSchemes = ['data']
     rl_config.trustedHosts = []
     PDF_AVAILABLE = True
