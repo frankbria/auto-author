@@ -183,6 +183,35 @@ def test_summary_names_the_rollback_target(steps: list[dict]):
     assert "PREVIOUS_TAG" in summary["run"] and "rollback" in summary["run"]
 
 
+def _run_summary(steps: list[dict], tag: str, tmp_path: Path) -> str:
+    out = tmp_path / "summary.md"
+    subprocess.run(
+        ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", _step(steps, "Summary")["run"]],
+        env={"PATH": "/usr/bin:/bin", "IMAGE_TAG": tag, "PREVIOUS_TAG": "",
+             "STATUS": "failure", "GITHUB_STEP_SUMMARY": str(out)},
+        check=True,
+    )
+    return out.read_text()
+
+
+@pytest.mark.parametrize(
+    "tag",
+    ["sha-abc1234\n- result: success", 'sha-abc1234 <img src="https://x.example/p">', "latest"],
+)
+def test_summary_never_echoes_a_rejected_tag(steps: list[dict], tag: str, tmp_path: Path):
+    # The summary runs with `if: always()`, so it also runs after validation has
+    # rejected the tag. GitHub renders it as markdown: a rejected value must not
+    # reach the deploy record.
+    summary = _run_summary(steps, tag, tmp_path)
+    assert tag not in summary and "success" not in summary and "<img" not in summary
+    assert "rejected" in summary
+
+
+def test_summary_shows_a_valid_tag(steps: list[dict], tmp_path: Path):
+    summary = _run_summary(steps, "sha-abc1234", tmp_path)
+    assert "`sha-abc1234`" in summary and "`sha-abc1234-production`" in summary
+
+
 def test_overlay_pins_production_images():
     services = yaml.safe_load(OVERLAY.read_text())["services"]
     backend, frontend = services["backend"]["image"], services["frontend"]["image"]

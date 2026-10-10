@@ -235,7 +235,13 @@ jobs:
           STATUS: ${{ job.status }}
         run: |
           { echo '## Production container deploy';
-            echo "- tag: \`$IMAGE_TAG\` (frontend: \`$IMAGE_TAG-production\`)";
+            # always() also runs this after validation rejected the tag, and the
+            # summary renders as markdown: only a tag that passes may be echoed.
+            if [[ "$IMAGE_TAG" =~ ^sha-[0-9a-f]{7,40}$ ]]; then
+              echo "- tag: \`$IMAGE_TAG\` (frontend: \`$IMAGE_TAG-production\`)";
+            else
+              echo '- tag: rejected by validation, not shown';
+            fi
             echo "- result: $STATUS";
             if [ -n "$PREVIOUS_TAG" ]; then
               echo "- previously running: \`$PREVIOUS_TAG\`";
