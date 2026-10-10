@@ -175,6 +175,18 @@ def test_frontend_secret_check_cannot_pass_vacuously(steps: list[dict]):
     assert "OPENAI|STRIPE|AWS|CLOUDINARY" in run
 
 
+def test_frontend_secret_check_matches_staging():
+    # Two copies of one pattern: production's missed AI_API_KEY when staging
+    # gained it (#917). They must name the same backend-only variables.
+    def pattern(workflow: str) -> str:
+        text = (WORKFLOW.parent / workflow).read_text()
+        found = re.findall(r"leaked=.*grep -E '([^']+)'", text)
+        assert len(found) == 1, f"{workflow}: expected one leak pattern, got {found}"
+        return found[0]
+
+    assert pattern(WORKFLOW.name) == pattern("deploy-staging-containers.yml")
+
+
 def test_summary_names_the_rollback_target(steps: list[dict]):
     summary = _step(steps, "Summary")
     assert summary["if"] == "always()"
