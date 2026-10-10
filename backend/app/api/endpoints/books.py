@@ -529,6 +529,8 @@ async def upload_book_cover_image(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Book not found"
             )
+        # ObjectId() accepts uppercase hex; files are keyed by the canonical id.
+        book_id = str(book["_id"])
 
         # Process and save the cover image
         from app.services.file_upload_service import FileUploadService

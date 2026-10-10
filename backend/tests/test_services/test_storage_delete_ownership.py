@@ -11,6 +11,7 @@ parsing and the refusal are the real code. Local storage uses real files.
 from unittest.mock import Mock
 
 import pytest
+from botocore.exceptions import ClientError
 
 import app.services.file_upload_service as fus
 from app.services.cloud_storage_service import (
@@ -32,7 +33,7 @@ def s3():
     service = S3StorageService.__new__(S3StorageService)
     service.bucket_name = "bkt"
     service.region = "us-east-1"
-    service.ClientError = Exception
+    service.ClientError = ClientError
     service.s3_client = Mock()
     return service
 
@@ -78,6 +79,11 @@ async def test_s3_deletes_a_key_under_the_owners_prefix(s3):
         f"https://bkt.s3.us-east-1.amazonaws.com.evil.test/cover_images/{BOOK_A}/x.png",
         f"https://evil.test/bkt.s3.us-east-1.amazonaws.com/cover_images/{BOOK_A}/x.png",
         f"https://evil.test/?u=bkt.s3.us-east-1.amazonaws.com/cover_images/{BOOK_A}/x.png",
+        # the bucket host as userinfo: the real host is evil.test
+        f"https://bkt.s3.us-east-1.amazonaws.com@evil.test/cover_images/{BOOK_A}/x.png",
+        f"https://bkt.s3.us-east-1.amazonaws.com\\@evil.test/cover_images/{BOOK_A}/x.png",
+        # urlparse raises on this one; a stored value must never raise out of a delete
+        "http://[bad",
         "not a url",
         "",
     ],
@@ -94,6 +100,19 @@ async def test_s3_refuses_everything_for_an_empty_prefix(s3):
     assert await s3.delete_image(url, "") is False
 
     s3.s3_client.delete_object.assert_not_called()
+
+
+async def test_s3_deletes_what_its_own_upload_wrote(s3):
+    """The prefix the service passes must match the key upload_image builds,
+    or every real delete would be refused without a test noticing."""
+    for folder in (f"cover_images/{BOOK_A}", f"cover_images/{BOOK_A}/thumbnails"):
+        s3.s3_client.reset_mock()
+        url = await s3.upload_image(b"x", "c.png", "image/png", folder=folder)
+
+        assert await s3.delete_image(url, f"cover_images/{BOOK_A}/") is True
+
+        written = s3.s3_client.put_object.call_args.kwargs["Key"]
+        s3.s3_client.delete_object.assert_called_once_with(Bucket="bkt", Key=written)
 
 
 # --- Cloudinary --------------------------------------------------------------
@@ -119,6 +138,8 @@ async def test_cloudinary_destroys_a_public_id_under_the_owners_prefix(cloudinar
         # the right path on a host that is not Cloudinary's
         f"https://res.cloudinary.com.evil.test/demo/image/upload/v1/profile_pictures/user-a/{HEX}.png",
         f"https://evil.test/cloudinary.com/image/upload/v1/profile_pictures/user-a/{HEX}.png",
+        f"https://res.cloudinary.com@evil.test/demo/image/upload/v1/profile_pictures/user-a/{HEX}.png",
+        "http://[bad",
         "",
     ],
 )

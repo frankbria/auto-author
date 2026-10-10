@@ -290,3 +290,23 @@ async def test_an_update_that_matches_no_book_removes_the_new_files(
 
     assert response.status_code == 404, response.text
     assert _names(uploads.covers) == []
+
+
+async def test_an_uppercase_book_id_in_the_path_names_the_same_files(
+    auth_client_factory, uploads
+):
+    """ObjectId accepts uppercase hex. The id in the path must not become a
+    second owner prefix that the lowercase id can never delete."""
+    client = await auth_client_factory()
+    book_id = await _book(ME)
+
+    upload = await _upload(client, book_id.upper())
+
+    assert upload.status_code == 200, upload.text
+    names = _names(uploads.covers)
+    assert len(names) == 2 and all(n.startswith(f"{book_id}_") for n in names)
+
+    response = await client.delete(f"/api/v1/books/{book_id.upper()}")
+
+    assert response.status_code == 204, response.text
+    assert _names(uploads.covers) == []

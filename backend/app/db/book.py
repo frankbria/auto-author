@@ -334,6 +334,9 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
     )
     if not book:
         return False
+    # ObjectId() accepts uppercase hex; children and files are keyed by the
+    # canonical lowercase id (#797).
+    book_id = str(book["_id"])
 
     # Detect replica-set support; multi-document transactions require one.
     use_transaction = True

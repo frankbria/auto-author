@@ -278,6 +278,17 @@ class TestRateLimitDrivesReal429:
 
         _assert_429(sixth)
 
+    def test_cover_upload_declares_five_per_minute(self):
+        """The test above arms its own cap, as every test here does, so it
+        cannot see the declared numbers. #797 names them: 5 per 60 seconds."""
+        import inspect
+
+        from app.api.endpoints.books import upload_book_cover_image
+
+        assert "get_rate_limiter(limit=5, window=60)" in inspect.getsource(
+            upload_book_cover_image
+        )
+
 
 # --------------------------------------------------------------------------- #
 # Class 2: wiring completeness across the whole app

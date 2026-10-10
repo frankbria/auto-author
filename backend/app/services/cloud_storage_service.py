@@ -114,7 +114,8 @@ class S3StorageService:
             logger.info(f"Deleted image from S3: {key}")
             return True
 
-        except self.ClientError as e:
+        # ValueError: urlparse rejects some malformed stored values.
+        except (self.ClientError, ValueError) as e:
             logger.error(f"S3 delete failed: {str(e)}")
             return False
 
