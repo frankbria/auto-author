@@ -10,7 +10,7 @@ export const metadata = {
 // #335: template Terms of Service. Copy is a starting point — flag for legal
 // review before public launch. Static server component; owns its own
 // <main id="main-content"> so the layout skip-link resolves here.
-const LAST_UPDATED = 'October 2, 2026';
+const LAST_UPDATED = 'October 9, 2026';
 
 export default function TermsPage() {
   return (
@@ -115,6 +115,12 @@ export default function TermsPage() {
               The price and billing period are shown next to the subscribe button,
               and you must agree to them before checkout. Except where required by
               law, fees are non-refundable.
+            </p>
+            <p className="mt-2">
+              Prices exclude tax. Where we are required to collect sales tax, VAT
+              or GST, it is calculated based on your billing address (and any tax
+              ID you provide) and shown at checkout before you pay. Each renewal
+              is charged at the price plus the tax that applies at that time.
             </p>
             <p className="mt-2">
               Subscriptions renew automatically at the end of each billing period,
