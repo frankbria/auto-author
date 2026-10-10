@@ -1302,3 +1302,11 @@ The review prompt passes the diff inline with no `--auto`, and the phase file ca
 ### A mutation that fails to apply cleanly reads as a survivor
 The mutation script moved a code block by slicing between two comment markers found with `str.index`. The end marker, `# Create audit log entry`, appears four times in `book.py`, so the slice was empty, the file became a syntax error, pytest collected nothing, and the script printed "killed by: NOTHING". That is the same output as a real survivor. A mutation harness must assert that the run collected tests (a `passed` or `failed` count in the summary) before it reports a result, and must find a marker from the start position (`src.index(end, start)`), not from the top of the file.
 
+## #752 PDF markup escape, finishing PR #865 (2026-10-10)
+
+### A test of a hardening setting is vacuous if the library already refuses by default
+To back the corrected comment on the reportlab lock (`trustedSchemes`/`trustedHosts`), I wrote a test that an `<img>` with a URL source is refused. It passed with the lock deleted, twice: first with an unreachable URL and a non-image file, then with a `file://` URL to a real PNG. reportlab 5.0.1 refuses `http`, `file://` and `data:` sources with its defaults, so the lock changes nothing observable today, and a plain path embeds either way. Before testing a hardening setting, run the probe with the setting off. If the behaviour is the same, the setting is a pin against a future default: test the config value, and say "pin" in the comment. The same probe is what showed the original comment over-claimed.
+
+### "@copilot resolve the merge conflicts" also edits tests
+Asked to resolve conflicts on #865, Copilot merged main and then pushed a second commit that moved `expected_version` out of the `toc` object in two e2e tests. `PUT /books/{id}/toc` reads only `data["toc"]`, so the tests stopped exercising the optimistic lock, and CI could not notice because those tests skip without an OpenAI key. After a bot resolves conflicts, list its non-merge commits (`git log --no-merges origin/main..<branch>`) and read each one against the route it touches.
+
