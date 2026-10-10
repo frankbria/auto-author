@@ -123,6 +123,20 @@ class TestDeleteUser:
     async def test_hard_delete_missing_returns_false(self, motor_reinit_db):
         assert await delete_user("absent", soft_delete=False) is False
 
+    async def test_in_flight_book_create_adds_nothing_to_a_tombstone(
+        self, motor_reinit_db
+    ):
+        """A create_book that authenticated before the delete lands after it:
+        its book_ids $push must not grow the tombstone."""
+        from app.db.book import create_book
+
+        await _make_user(auth_id="auth-race")
+        await delete_user("auth-race")
+        await create_book({"title": "Late"}, "auth-race")
+        assert set(await get_user_by_auth_id("auth-race")) == {
+            "_id", "auth_id", "deleted_at",
+        }
+
     async def test_delete_defaults_actor_to_self(self, motor_reinit_db):
         await _make_user(auth_id="auth-self")
         await delete_user("auth-self")  # no actor_id -> actor defaults to auth_id
