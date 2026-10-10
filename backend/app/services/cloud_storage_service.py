@@ -5,12 +5,23 @@ Provides a unified interface for cloud storage operations.
 
 import asyncio
 import os
+import re
 import uuid
 from pathlib import Path
 from typing import Optional, Protocol
+from urllib.parse import urlparse
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _is_owned_key(key: str, key_prefix: str) -> bool:
+    """True when ``key`` sits under ``key_prefix``.
+
+    A stored URL is not proof of ownership (#797): it was once client-writable.
+    The caller names the owner's prefix and nothing outside it is deleted.
+    """
+    return bool(key_prefix) and key.startswith(key_prefix) and ".." not in key.split("/")
 
 
 class CloudStorageInterface(Protocol):
@@ -26,8 +37,8 @@ class CloudStorageInterface(Protocol):
         """Upload an image and return its URL."""
         ...
 
-    async def delete_image(self, url: str) -> bool:
-        """Delete an image by URL."""
+    async def delete_image(self, url: str, key_prefix: str) -> bool:
+        """Delete an image by URL, only if its key is under ``key_prefix``."""
         ...
 
 
@@ -83,25 +94,28 @@ class S3StorageService:
             logger.error(f"S3 upload failed: {str(e)}")
             raise Exception(f"Failed to upload to S3: {str(e)}")
 
-    async def delete_image(self, url: str) -> bool:
-        """Delete an image from S3 by URL."""
+    async def delete_image(self, url: str, key_prefix: str) -> bool:
+        """Delete an image from S3 by URL, only if its key is under ``key_prefix``."""
         try:
-            # Extract key from URL
             # Format: https://bucket.s3.region.amazonaws.com/folder/file.jpg
-            if f"{self.bucket_name}.s3" in url:
-                key = url.split(f"{self.bucket_name}.s3.{self.region}.amazonaws.com/")[-1]
+            parsed = urlparse(url)
+            if parsed.hostname != f"{self.bucket_name}.s3.{self.region}.amazonaws.com":
+                return False
+            key = parsed.path.lstrip("/")
+            if not _is_owned_key(key, key_prefix):
+                logger.warning("Refusing to delete S3 key outside %s", key_prefix)
+                return False
 
-                await asyncio.to_thread(
-                    self.s3_client.delete_object,
-                    Bucket=self.bucket_name,
-                    Key=key
-                )
-                logger.info(f"Deleted image from S3: {key}")
-                return True
+            await asyncio.to_thread(
+                self.s3_client.delete_object,
+                Bucket=self.bucket_name,
+                Key=key
+            )
+            logger.info(f"Deleted image from S3: {key}")
+            return True
 
-            return False
-
-        except self.ClientError as e:
+        # ValueError: urlparse rejects some malformed stored values.
+        except (self.ClientError, ValueError) as e:
             logger.error(f"S3 delete failed: {str(e)}")
             return False
 
@@ -157,25 +171,29 @@ class CloudinaryStorageService:
             logger.error(f"Cloudinary upload failed: {str(e)}")
             raise Exception(f"Failed to upload to Cloudinary: {str(e)}")
 
-    async def delete_image(self, url: str) -> bool:
-        """Delete an image from Cloudinary by URL."""
+    async def delete_image(self, url: str, key_prefix: str) -> bool:
+        """Delete an image from Cloudinary by URL, only if its public_id is
+        under ``key_prefix``."""
         try:
-            # Extract public_id from URL
-            # Cloudinary URLs contain the public_id in the path
-            if "cloudinary.com" in url and "/image/upload/" in url:
-                # Split by /image/upload/ and take the part after it
-                parts = url.split("/image/upload/")[-1].split("/")
-                # The public_id is usually after the version (v123456789)
-                if len(parts) >= 2:
-                    public_id = "/".join(parts[1:]).rsplit(".", 1)[0]  # Remove extension
+            # Format: https://res.cloudinary.com/<cloud>/image/upload/v123/<public_id>.<ext>
+            parsed = urlparse(url)
+            if parsed.hostname != "res.cloudinary.com" or "/image/upload/" not in parsed.path:
+                return False
+            parts = parsed.path.split("/image/upload/", 1)[1].split("/")
+            if re.fullmatch(r"v\d+", parts[0]):
+                parts = parts[1:]
+            public_id = "/".join(parts).rsplit(".", 1)[0]  # Remove extension
+            if not _is_owned_key(public_id, key_prefix):
+                logger.warning("Refusing to destroy Cloudinary id outside %s", key_prefix)
+                return False
 
-                    result = await asyncio.to_thread(
-                        self.cloudinary_uploader.destroy, public_id
-                    )
+            result = await asyncio.to_thread(
+                self.cloudinary_uploader.destroy, public_id
+            )
 
-                    if result.get('result') == 'ok':
-                        logger.info(f"Deleted image from Cloudinary: {public_id}")
-                        return True
+            if result.get('result') == 'ok':
+                logger.info(f"Deleted image from Cloudinary: {public_id}")
+                return True
 
             return False
 

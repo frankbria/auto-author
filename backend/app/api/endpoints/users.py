@@ -252,17 +252,23 @@ async def upload_profile_picture(
                 actor_id=current_user["auth_id"],
             )
         except Exception:
-            await upload_service.delete_profile_picture(avatar_url)
+            await upload_service.delete_profile_picture(
+                current_user["auth_id"], avatar_url
+            )
             raise
         if not updated_user:
-            await upload_service.delete_profile_picture(avatar_url)
+            await upload_service.delete_profile_picture(
+                current_user["auth_id"], avatar_url
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
 
         old_avatar = current_user.get("avatar_url")
         if old_avatar and old_avatar != avatar_url:
-            await upload_service.delete_profile_picture(old_avatar)
+            await upload_service.delete_profile_picture(
+                current_user["auth_id"], old_avatar
+            )
 
         if request:
             await audit_request(

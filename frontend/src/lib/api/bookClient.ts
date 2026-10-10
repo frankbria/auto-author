@@ -338,7 +338,6 @@ export class BookClient {
    * @param bookData.description - Optional description (max 5000 characters)
    * @param bookData.genre - Optional genre classification
    * @param bookData.target_audience - Optional target audience description
-   * @param bookData.cover_image_url - Optional URL to cover image
    * @returns Promise resolving to the created book project
    *
    * @throws {Error} When creation fails
@@ -360,8 +359,7 @@ export class BookClient {
    *   subtitle: 'Everything You Need to Know',
    *   description: 'A comprehensive guide covering all aspects...',
    *   genre: 'Non-fiction',
-   *   target_audience: 'Professionals and enthusiasts',
-   *   cover_image_url: 'https://example.com/cover.jpg'
+   *   target_audience: 'Professionals and enthusiasts'
    * });
    *
    * // With error handling
@@ -381,7 +379,6 @@ export class BookClient {
     description?: string;
     genre?: string;
     target_audience?: string;
-    cover_image_url?: string;
   }): Promise<BookProject> {
     const response = await fetch(`${this.baseUrl}/books/`, {
       method: 'POST',
@@ -410,7 +407,6 @@ export class BookClient {
    * @param bookData.description - New description
    * @param bookData.genre - New genre
    * @param bookData.target_audience - New target audience
-   * @param bookData.cover_image_url - New cover image URL
    * @returns Promise resolving to the updated book project
    *
    * @throws {Error} When update fails
@@ -450,7 +446,7 @@ export class BookClient {
    */
   public async updateBook(
     bookId: string,
-    bookData: { title?: string; description?: string; subtitle?: string; genre?: string; target_audience?: string; cover_image_url?: string }
+    bookData: { title?: string; description?: string; subtitle?: string; genre?: string; target_audience?: string }
   ): Promise<BookProject> {
     const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
       method: 'PATCH',

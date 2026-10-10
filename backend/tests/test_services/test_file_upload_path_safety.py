@@ -11,22 +11,30 @@ from app.services.file_upload_service import (
 )
 
 
+BOOK = "64b000000000000000000001"
+# A name the service writes for BOOK: <book_id>_<uuid hex>.<ext> (#797).
+OWN_URL = f"/uploads/cover_images/{BOOK}_0123456789abcdef0123456789abcdef.png"
+
+
 class TestResolveLocalCoverPath:
     """Unit tests for the containment helper."""
 
     def test_happy_path_resolves_inside_dir(self):
-        path = _resolve_local_cover_path("/uploads/cover_images/abc.png")
+        path = _resolve_local_cover_path(OWN_URL, BOOK)
         assert path is not None
         assert path.is_relative_to(COVER_IMAGES_DIR.resolve())
 
     def test_traversal_rejected(self):
-        assert _resolve_local_cover_path("/uploads/cover_images/../../etc/passwd") is None
+        assert (
+            _resolve_local_cover_path("/uploads/cover_images/../../etc/passwd", BOOK)
+            is None
+        )
 
     def test_wrong_prefix_rejected(self):
-        assert _resolve_local_cover_path("/etc/passwd") is None
+        assert _resolve_local_cover_path("/etc/passwd", BOOK) is None
 
     def test_empty_rejected(self):
-        assert _resolve_local_cover_path("") is None
+        assert _resolve_local_cover_path("", BOOK) is None
 
 
 class TestDeleteCoverImageContainment:
@@ -46,7 +54,7 @@ class TestDeleteCoverImageContainment:
         with patch("pathlib.Path.unlink") as mock_unlink, \
              patch("pathlib.Path.exists", return_value=True):
             await local_service.delete_cover_image(
-                "/uploads/cover_images/../../etc/passwd"
+                BOOK, "/uploads/cover_images/../../etc/passwd"
             )
         mock_unlink.assert_not_called()
 
@@ -54,7 +62,5 @@ class TestDeleteCoverImageContainment:
     async def test_normal_url_unlinks(self, local_service):
         with patch("pathlib.Path.unlink") as mock_unlink, \
              patch("pathlib.Path.exists", return_value=True):
-            await local_service.delete_cover_image(
-                "/uploads/cover_images/abc.png"
-            )
+            await local_service.delete_cover_image(BOOK, OWN_URL)
         mock_unlink.assert_called_once()

@@ -369,9 +369,6 @@ export interface BookBase {
   /** Optional target audience description (max 100 characters) */
   target_audience?: string;
 
-  /** Optional URL to book cover image (max 2083 characters) */
-  cover_image_url?: string;
-
   /** Additional flexible metadata */
   metadata: Record<string, unknown>;
 }
@@ -388,7 +385,6 @@ export interface BookBase {
  *   description: "This book explores the creative writing process",
  *   genre: "Non-fiction",
  *   target_audience: "Writers and aspiring authors",
- *   cover_image_url: "https://example.com/cover.jpg",
  *   metadata: { draft_version: "1.0" }
  * };
  * ```
@@ -416,7 +412,6 @@ export interface BookUpdate {
   description?: string;
   genre?: string;
   target_audience?: string;
-  cover_image_url?: string;
   metadata?: Record<string, unknown>;
   published?: boolean;
 }
@@ -445,6 +440,9 @@ export interface BookResponse extends BookBase {
 
   /** User ID of the book owner (Clerk ID) */
   owner_id: string;
+
+  /** Cover image URL. Written by the cover upload only; not a request field (#797). */
+  cover_image_url?: string;
 
   /** Table of contents items (chapters and sections) */
   toc_items: TocItem[];

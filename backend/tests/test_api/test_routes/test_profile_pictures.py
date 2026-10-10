@@ -78,7 +78,7 @@ async def test_avatar_upload_replaces_existing(auth_client_factory, test_image, 
         )
     assert response.status_code == 200
     mock_upload_service.delete_profile_picture.assert_called_once_with(
-        "/uploads/profile_pictures/old.jpg"
+        "test-auth-id-123", "/uploads/profile_pictures/old.jpg"
     )
 
 

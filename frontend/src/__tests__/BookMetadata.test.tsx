@@ -13,7 +13,6 @@ const mockBook = {
   description: 'Test Description',
   genre: 'fiction',
   target_audience: 'general',
-  cover_image_url: '',
   chapters: [],
 };
 

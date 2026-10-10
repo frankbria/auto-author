@@ -14,7 +14,6 @@ const book: BookFormData = {
   description: '',
   genre: 'fiction',
   target_audience: 'general',
-  cover_image_url: '',
 };
 
 describe('BookMetadataForm genre taxonomy (shared with BookCreationWizard, #205)', () => {

@@ -515,6 +515,7 @@ async def upload_book_cover_image(
     file: UploadFile = File(...),
     current_user: Dict = Depends(get_current_user_from_session),
     request: Request = None,
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=5, window=60)),
 ):
     """
     Upload a cover image for a book.
@@ -528,6 +529,8 @@ async def upload_book_cover_image(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Book not found"
             )
+        # ObjectId() accepts uppercase hex; files are keyed by the canonical id.
+        book_id = str(book["_id"])
 
         # Process and save the cover image
         from app.services.file_upload_service import FileUploadService
@@ -537,22 +540,38 @@ async def upload_book_cover_image(
             book_id
         )
 
-        # Delete old cover images if they exist
-        old_cover_url = book.get("cover_image_url")
-        old_thumbnail_url = book.get("cover_thumbnail_url")
-        if old_cover_url:
-            await file_upload_service.delete_cover_image(
-                old_cover_url,
-                old_thumbnail_url
-            )
-
-        # Update book with new cover image URLs
+        # Persist first; only remove the previous cover once the new URLs are
+        # safely stored (#797). If persistence fails, clean up the just-saved
+        # files so the book never points at a deleted image.
         update_data = {
             "cover_image_url": image_url,
             "cover_thumbnail_url": thumbnail_url,
             "updated_at": datetime.now(timezone.utc),
         }
-        await update_book(book_id, update_data, current_user.get("auth_id"))
+        try:
+            updated_book = await update_book(
+                book_id, update_data, current_user.get("auth_id")
+            )
+        except Exception:
+            await file_upload_service.delete_cover_image(
+                book_id, image_url, thumbnail_url
+            )
+            raise
+        if not updated_book:
+            await file_upload_service.delete_cover_image(
+                book_id, image_url, thumbnail_url
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Book not found"
+            )
+
+        old_cover_url = book.get("cover_image_url")
+        old_thumbnail_url = book.get("cover_thumbnail_url")
+        if old_cover_url or old_thumbnail_url:
+            await file_upload_service.delete_cover_image(
+                book_id, old_cover_url, old_thumbnail_url
+            )
 
         # Log the upload
         if request:

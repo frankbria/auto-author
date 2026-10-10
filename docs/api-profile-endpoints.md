@@ -118,6 +118,9 @@ Updates the authenticated user's profile information.
 
 All fields are optional. Only include fields you want to update.
 
+`avatar_url` is not writable here (#797): sending it returns `422`. It is
+written only by `POST /users/me/avatar`.
+
 **Response Format**: Same as GET /users/me (returns updated user object)
 
 **Status Codes**:

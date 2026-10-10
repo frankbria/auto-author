@@ -515,7 +515,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
                 description: book.description || '',
                 genre: book.genre || '',
                 target_audience: book.target_audience || '',
-                cover_image_url: book.cover_image_url || '',
               }}
               onUpdate={async (values) => {
                 setIsSaving(true);

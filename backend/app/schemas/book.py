@@ -155,7 +155,9 @@ class BookBase(BaseModel):
     description: Optional[str] = Field(None, max_length=5000)
     genre: Optional[str] = Field(None, max_length=100)
     target_audience: Optional[str] = Field(None, max_length=100)
-    cover_image_url: Optional[str] = Field(None, max_length=2083)
+    # cover_image_url is deliberately absent here and in BookUpdate (#797): the
+    # stored value is what storage is asked to delete, so only the cover upload
+    # route writes it. A client that still sends it is ignored.
     metadata: Dict[str, Any] = {}
 
 
@@ -170,7 +172,6 @@ class BookCreate(BookBase):
                 "description": "This book explores the creative writing process",
                 "genre": "Non-fiction",
                 "target_audience": "Writers and aspiring authors",
-                "cover_image_url": "https://example.com/cover.jpg",
                 "metadata": {"draft_version": "1.0"},
             }
         }
@@ -185,7 +186,6 @@ class BookUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=5000)
     genre: Optional[str] = Field(None, max_length=100)
     target_audience: Optional[str] = Field(None, max_length=100)
-    cover_image_url: Optional[str] = Field(None, max_length=2083)
     metadata: Optional[Dict[str, Any]] = None
     published: Optional[bool] = None
 
@@ -237,6 +237,7 @@ class BookResponse(BookBase):
     created_at: datetime
     updated_at: datetime
     owner_id: str
+    cover_image_url: Optional[str] = None
     toc_items: List[TocItemSchema] = []
     published: bool = False
     collaborators: List[Dict[str, Any]] = []

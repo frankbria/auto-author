@@ -4,6 +4,7 @@ Currently uses local storage, but designed to be easily extended for cloud stora
 """
 
 import asyncio
+import re
 import uuid
 from pathlib import Path
 from typing import Optional, Tuple
@@ -43,27 +44,42 @@ COVER_IMAGE_URL_PREFIX = "/uploads/cover_images/"
 PROFILE_IMAGE_URL_PREFIX = "/uploads/profile_pictures/"
 
 
-def _resolve_local_path(image_url: str, prefix: str, base_dir: Path) -> Optional[Path]:
-    """Resolve a <prefix><name> URL to a path INSIDE base_dir, or None if it
-    would escape the directory (path-traversal guard)."""
-    if not image_url or not image_url.startswith(prefix):
+def _resolve_local_path(
+    image_url: str, prefix: str, base_dir: Path, owner_id: str
+) -> Optional[Path]:
+    """Resolve a <prefix><name> URL to ``owner_id``'s file INSIDE base_dir.
+
+    Returns None if the path would escape the directory (path-traversal guard)
+    or the name is not one this service writes for that owner (#797):
+    ``<owner_id>_<uuid hex>[_thumb].<ext>``. The stored URL was once
+    client-writable, so it cannot be trusted to name the caller's own file.
+    """
+    if not owner_id or not image_url or not image_url.startswith(prefix):
         return None
     filename = image_url[len(prefix):]
     base = base_dir.resolve()
     candidate = (base / filename).resolve()
-    if not candidate.is_relative_to(base):
+    if candidate.parent != base:
+        return None
+    if not re.fullmatch(
+        rf"{re.escape(owner_id)}_[0-9a-f]{{32}}(_thumb)?\.[a-z]+", candidate.name
+    ):
         return None
     return candidate
 
 
-def _resolve_local_cover_path(image_url: str) -> Optional[Path]:
-    """Resolve a /uploads/cover_images/<name> URL to a path inside COVER_IMAGES_DIR."""
-    return _resolve_local_path(image_url, COVER_IMAGE_URL_PREFIX, COVER_IMAGES_DIR)
+def _resolve_local_cover_path(image_url: str, book_id: str) -> Optional[Path]:
+    """Resolve a /uploads/cover_images/<name> URL to that book's file."""
+    return _resolve_local_path(
+        image_url, COVER_IMAGE_URL_PREFIX, COVER_IMAGES_DIR, book_id
+    )
 
 
-def _resolve_local_profile_path(image_url: str) -> Optional[Path]:
-    """Resolve a /uploads/profile_pictures/<name> URL to a path inside PROFILE_PICTURES_DIR."""
-    return _resolve_local_path(image_url, PROFILE_IMAGE_URL_PREFIX, PROFILE_PICTURES_DIR)
+def _resolve_local_profile_path(image_url: str, user_id: str) -> Optional[Path]:
+    """Resolve a /uploads/profile_pictures/<name> URL to that user's file."""
+    return _resolve_local_path(
+        image_url, PROFILE_IMAGE_URL_PREFIX, PROFILE_PICTURES_DIR, user_id
+    )
 
 
 # --- Blocking PIL work, isolated so it can be pushed off the event loop (#346).
@@ -271,7 +287,9 @@ class FileUploadService:
                     # reference or clean up. Roll it back, but never let the
                     # cleanup failure mask the upload failure.
                     try:
-                        await self.cloud_storage.delete_image(image_url)
+                        await self.cloud_storage.delete_image(
+                            image_url, f"cover_images/{book_id}/"
+                        )
                     except Exception:
                         logger.error(
                             "Failed to roll back orphaned cover image %s",
@@ -299,20 +317,27 @@ class FileUploadService:
                 detail="Failed to process image"
             )
 
-    async def delete_cover_image(self, image_url: str, thumbnail_url: Optional[str] = None):
-        """Delete a cover image and its thumbnail."""
+    async def delete_cover_image(
+        self, book_id: str, image_url: Optional[str], thumbnail_url: Optional[str] = None
+    ):
+        """Delete ``book_id``'s cover image and thumbnail. A URL that does not
+        name one of that book's own files is refused (#797)."""
         # One try per file: a failed cover delete must not skip the thumbnail.
         for url in (image_url, thumbnail_url):
             if not url:
                 continue
             try:
                 if self.cloud_storage:
-                    if not await self.cloud_storage.delete_image(url):
+                    if not await self.cloud_storage.delete_image(
+                        url, f"cover_images/{book_id}/"
+                    ):
                         logger.warning("Cloud storage did not delete cover image %s", url)
                     continue
-                path = _resolve_local_cover_path(url)
+                path = _resolve_local_cover_path(url, book_id)
                 if path is None:
-                    logger.warning("Refusing to delete cover image outside uploads dir")
+                    logger.warning(
+                        "Refusing to delete a cover image that is not book %s's", book_id
+                    )
                     continue
                 if path.exists():
                     path.unlink()
@@ -371,20 +396,25 @@ class FileUploadService:
                 detail="Failed to process image",
             )
 
-    async def delete_profile_picture(self, image_url: str):
-        """Delete a previously-stored avatar (cloud or local). Never raises."""
+    async def delete_profile_picture(self, user_id: str, image_url: Optional[str]):
+        """Delete ``user_id``'s stored avatar (cloud or local). Never raises. A
+        URL that does not name one of that user's own files is refused (#797)."""
         try:
             if not image_url:
                 return
             if self.cloud_storage:
-                if not await self.cloud_storage.delete_image(image_url):
+                if not await self.cloud_storage.delete_image(
+                    image_url, f"profile_pictures/{user_id}/"
+                ):
                     logger.warning(
                         "Cloud storage did not delete profile picture %s", image_url
                     )
                 return
-            path = _resolve_local_profile_path(image_url)
+            path = _resolve_local_profile_path(image_url, user_id)
             if path is None:
-                logger.warning("Refusing to delete profile picture outside uploads dir")
+                logger.warning(
+                    "Refusing to delete a profile picture that is not user %s's", user_id
+                )
                 return
             if path.exists():
                 path.unlink()

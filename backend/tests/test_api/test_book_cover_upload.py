@@ -3,9 +3,12 @@ Test Book Cover Upload API endpoint
 """
 import pytest
 from unittest.mock import patch, AsyncMock
+from bson import ObjectId
 from fastapi import HTTPException
 from PIL import Image
 from io import BytesIO
+
+from app.db.base import get_collection
 
 
 class TestBookCoverUpload:
@@ -88,15 +91,17 @@ class TestBookCoverUpload:
         """Test that uploading a new cover deletes the old one."""
         client, book_id = test_book_with_auth
 
-        # First, update the book to have an existing cover
-        # Need to include title for PATCH request
-        await client.patch(
-            f"/api/v1/books/{book_id}",
-            json={
-                "title": "Test Book",  # Required field
-                "cover_image_url": "https://old.example.com/old_cover.jpg",
-                "cover_thumbnail_url": "https://old.example.com/old_thumb.jpg"
-            }
+        # Give the book an existing cover the way the server stores one: the
+        # URLs are not writable through the API (#797).
+        books = await get_collection("books")
+        await books.update_one(
+            {"_id": ObjectId(book_id)},
+            {
+                "$set": {
+                    "cover_image_url": "https://old.example.com/old_cover.jpg",
+                    "cover_thumbnail_url": "https://old.example.com/old_thumb.jpg",
+                }
+            },
         )
 
         with patch('app.services.file_upload_service.FileUploadService', return_value=mock_file_upload_service):
@@ -112,11 +117,12 @@ class TestBookCoverUpload:
 
             assert response.status_code == 200
 
-            # Verify old images were deleted
-            # Note: The API might not have the thumbnail URL in the database
-            mock_file_upload_service.delete_cover_image.assert_called_once()
-            call_args = mock_file_upload_service.delete_cover_image.call_args[0]
-            assert call_args[0] == "https://old.example.com/old_cover.jpg"
+            # Verify the old images were handed to the service, scoped to this book
+            mock_file_upload_service.delete_cover_image.assert_called_once_with(
+                book_id,
+                "https://old.example.com/old_cover.jpg",
+                "https://old.example.com/old_thumb.jpg",
+            )
 
     @pytest.mark.asyncio
     async def test_upload_book_cover_wrong_owner(self, auth_client_factory, test_image):

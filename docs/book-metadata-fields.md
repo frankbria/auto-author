@@ -11,7 +11,7 @@ This document outlines all metadata fields available for books in the Auto Autho
 | `description` | No | String | Max: 1000 chars (frontend), 5000 chars (backend) | A detailed summary of your book's content. The frontend enforces a 1000 character limit while the backend allows up to 5000 characters for API compatibility. |
 | `genre` | No | String | Max: 50 chars (frontend), 100 chars (backend) | The literary category or style of your book. Select from predefined options or specify a custom genre. |
 | `target_audience` | No | String | Max: 100 chars | The intended reader demographic for your book, such as "Young Adult" or "Academic". |
-| `cover_image_url` | No | String | Must be a valid URL, Max: 300 chars (frontend), 2083 chars (backend) | A link to the book's cover image. Must be a valid URL pointing to an accessible image file. |
+| `cover_image_url` | n/a | String | Read-only | The stored cover image URL. It is not a form field or a request field (#797): only `POST /books/{book_id}/cover-image` writes it. |
 
 ## Predefined Genre Options
 
