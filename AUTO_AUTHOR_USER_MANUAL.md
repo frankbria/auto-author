@@ -595,7 +595,7 @@ Auto Author is fully responsive and works on devices from 320px (iPhone SE) to d
 
 ### Support Channels
 
-📧 **Email Support**: support@autoauthor.com
+📧 **Email Support**: support@autoauthor.app
 💬 **Live Chat**: Available during business hours
 📞 **Phone Support**: +1 (555) 123-4567
 🐦 **Twitter**: @AutoAuthorApp

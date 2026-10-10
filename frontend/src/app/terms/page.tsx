@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import SiteFooter from '@/components/SiteFooter';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
 
 export const metadata = {
   title: 'Terms of Service · Auto Author',
@@ -9,7 +10,7 @@ export const metadata = {
 // #335: template Terms of Service. Copy is a starting point — flag for legal
 // review before public launch. Static server component; owns its own
 // <main id="main-content"> so the layout skip-link resolves here.
-const LAST_UPDATED = 'July 23, 2026';
+const LAST_UPDATED = 'October 9, 2026';
 
 export default function TermsPage() {
   return (
@@ -111,9 +112,23 @@ export default function TermsPage() {
             </h2>
             <p>
               Paid plans, where offered, are billed through our payment processor.
-              Fees, billing cycles, and cancellation terms are presented at the
-              point of purchase. Except where required by law, fees are
-              non-refundable.
+              The price and billing period are shown next to the subscribe button,
+              and you must agree to them before checkout. Except where required by
+              law, fees are non-refundable.
+            </p>
+            <p className="mt-2">
+              Prices exclude tax. Where we are required to collect sales tax, VAT
+              or GST, it is calculated based on your billing address (and any tax
+              ID you provide) and shown at checkout before you pay. Each renewal
+              is charged at the price plus the tax that applies at that time.
+            </p>
+            <p className="mt-2">
+              Subscriptions renew automatically at the end of each billing period,
+              and your payment method is charged the subscription price, until you
+              cancel. You can cancel at any time, online, under Settings → Billing →
+              Manage billing. Cancelling stops future renewals; it takes effect at
+              the end of the current billing period, and you keep paid access until
+              then.
             </p>
           </section>
 
@@ -165,10 +180,10 @@ export default function TermsPage() {
             <p>
               Questions about these terms? Contact us at{' '}
               <a
-                href="mailto:support@autoauthor.com"
+                href={SUPPORT_MAILTO}
                 className="text-primary underline-offset-4 hover:underline"
               >
-                support@autoauthor.com
+                {SUPPORT_EMAIL}
               </a>
               . See also our{' '}
               <Link

@@ -1,10 +1,12 @@
 # backend/app/db/stripe_events.py
 """Stripe webhook replay/idempotency tracking (issue #220).
 
-One tiny document per processed Stripe event, keyed ``_id = event.id`` — the
-unique ``_id`` guard makes the "have we seen this event?" check atomic across
-workers and restarts (same idiom as app/db/usage.py). A TTL index reaps old
-markers; Stripe stops retrying an event after ~3 days, so 30 days is generous.
+One tiny document per processed Stripe event, keyed ``_id = event.id``. The
+marker is written only AFTER the event's effect is applied (#769): a worker that
+dies mid-apply leaves no marker, so Stripe's retry re-applies instead of being
+swallowed as a replay. A duplicate that races past the check re-applies the
+same idempotent write. A TTL index reaps old markers; Stripe stops retrying an
+event after ~3 days, so 30 days is generous.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -28,10 +30,15 @@ async def _events_collection():
     return coll
 
 
+async def is_event_processed(event_id: str) -> bool:
+    coll = await _events_collection()
+    return await coll.find_one({"_id": event_id}, {"_id": 1}) is not None
+
+
 async def mark_event_processed(
     event_id: str, ttl_seconds: int = EVENT_MARKER_TTL_SECONDS
-) -> bool:
-    """Atomically claim ``event_id``. True = fresh (process it); False = replay."""
+) -> None:
+    """Record ``event_id`` as applied. Call only after its effect is persisted."""
     coll = await _events_collection()
     try:
         await coll.insert_one(
@@ -40,13 +47,5 @@ async def mark_event_processed(
                 "expires_at": datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds),
             }
         )
-        return True
     except DuplicateKeyError:
-        return False
-
-
-async def unmark_event(event_id: str) -> None:
-    """Release a claimed event id so Stripe's retry of a failed processing
-    attempt isn't misclassified as a replay."""
-    coll = await _events_collection()
-    await coll.delete_one({"_id": event_id})
+        pass  # a concurrent duplicate delivery recorded it first

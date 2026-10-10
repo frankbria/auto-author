@@ -53,7 +53,7 @@ jobs:
       # over Tailscale. Both tags are required — Tailscale matches the OAuth
       # client's FULL tag set, not a subset. See deploy-staging-containers.yml.
       - name: Connect to Tailscale
-        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
         with:
           oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
@@ -169,6 +169,8 @@ jobs:
              IMAGE_TAG=\$(docker inspect --format '{{.Config.Image}}' auto-author-backend-1 | sed 's/.*://')
              [ -n \"\$IMAGE_TAG\" ] || { echo 'could not determine the running image tag'; exit 1; }
              export IMAGE_TAG
+             # Required by docker-compose.yml with no default (#777).
+             export ENVIRONMENT=staging
              echo \"recreating on the running tag: \$IMAGE_TAG\"
              # --force-recreate because compose injects env at container CREATION.
              # Without it a container started before the .env edit keeps the old

@@ -47,6 +47,70 @@ def resolve_plan_for_price(price_id: Optional[str]) -> str:
     return DEFAULT_PLAN
 
 
+# Stripe subscription status -> plan (#767). The price only decides the plan
+# while the subscription is actually paid for:
+#   active, trialing    -> PRICED: the plan the price buys (resolve_plan_for_price)
+#   past_due            -> KEEP: plan unchanged. Stripe is retrying the renewal,
+#                          so a pro user keeps pro meanwhile, but past_due never
+#                          *grants* pro (a free user stays free).
+#   unpaid              -> restricted: retries exhausted on a lapsed subscriber
+#   incomplete          -> free: first payment not confirmed yet
+#   incomplete_expired  -> free: the first payment never succeeded, so the user
+#                          was never pro. Not restricted (the #767 proposal):
+#                          that would leave someone whose card was declined at
+#                          checkout worse off than if they had never tried.
+#   paused, canceled    -> free
+# Any status not listed (Stripe adds them) is free: below paid, not locked out.
+PRICED = "priced"
+KEEP = "keep"
+SUBSCRIPTION_STATUS_PLAN: dict[str, str] = {
+    "active": PRICED,
+    "trialing": PRICED,
+    "past_due": KEEP,
+    "unpaid": "restricted",
+    "incomplete": "free",
+    "incomplete_expired": "free",
+    "paused": "free",
+    "canceled": "free",
+}
+
+
+# A subscription Stripe is still billing (#768): the paid statuses plus past_due,
+# which is mid-retry. Checkout refuses a second one while it exists, and the
+# webhook won't let another subscription's events replace it as current.
+LIVE_SUBSCRIPTION_STATUSES = frozenset(
+    status for status, policy in SUBSCRIPTION_STATUS_PLAN.items() if policy in (PRICED, KEEP)
+)
+
+
+def has_live_subscription(user: dict) -> bool:
+    """Whether the user's current Stripe subscription is still being billed."""
+    status = user.get("stripe_subscription_status")
+    if status is None and user.get("stripe_subscription_id"):
+        # Written before #768 recorded the status: pro is only ever granted by
+        # an active/trialing subscription, so take it as the live signal.
+        return user.get("plan") == "pro"
+    return status in LIVE_SUBSCRIPTION_STATUSES
+
+
+def plan_for_subscription(status: Optional[str], price_ids: list) -> Optional[str]:
+    """Plan a subscription in ``status`` with these line-item prices grants.
+
+    ``None`` means leave the user's plan as it is (past_due). Pure — no I/O.
+    """
+    policy = SUBSCRIPTION_STATUS_PLAN.get(status or "", DEFAULT_PLAN)
+    if policy == KEEP:
+        return None
+    if policy != PRICED:
+        return policy
+    # Scan every line item: the plan-bearing price need not be listed first.
+    for price_id in price_ids:
+        plan = resolve_plan_for_price(price_id)
+        if plan != DEFAULT_PLAN:
+            return plan
+    return DEFAULT_PLAN
+
+
 def is_feature_allowed(plan: Optional[str], feature: str) -> bool:
     """Return whether ``plan`` may use ``feature``.
 

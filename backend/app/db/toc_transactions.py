@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorClientSession
 
 from .base import books_collection
 from .audit_log import create_audit_log
+from .questions import delete_questions_for_chapters
 
 
 def _version_guard(current_toc: Dict[str, Any]) -> Any:
@@ -182,6 +183,38 @@ def _carry_server_fields(stored_toc: Dict[str, Any], updated_toc: Dict[str, Any]
                 item[field] = source[field]
 
 
+def _chapter_ids(toc: Dict[str, Any]) -> set:
+    return {
+        c["id"] for c in _walk_toc(toc.get("chapters") or []) if isinstance(c.get("id"), str)
+    }
+
+
+async def _cascade_removed_chapters(
+    book_id: str, user_auth_id: str, removed_ids: set
+) -> None:
+    """Delete the questions, responses and ratings of chapters a committed TOC
+    write removed (#755). Call it only after the guarded write succeeds, so a
+    409 deletes nothing.
+
+    Best-effort, like the audit row: the TOC write has committed, so raising
+    would report failure for an edit that succeeded, and a retry cannot redo
+    the cascade. What a failure leaves behind cannot re-attach, because the
+    server re-mints any chapter id it has not stored (#754).
+    """
+    if not removed_ids:
+        return
+    try:
+        await delete_questions_for_chapters(book_id, removed_ids, user_auth_id)
+    except Exception:
+        logging.getLogger(__name__).error(
+            "TOC updated but chapter Q&A cascade failed: book=%s actor=%s chapters=%s",
+            book_id,
+            user_auth_id,
+            sorted(removed_ids),
+            exc_info=True,
+        )
+
+
 async def _update_toc_internal(
     book_id: str,
     toc_data: Dict[str, Any],
@@ -288,6 +321,10 @@ async def _update_toc_internal(
             if current_v != current_version:
                 raise ValueError("Version conflict: TOC was updated by another process")
         raise ValueError("Failed to update TOC")
+
+    await _cascade_removed_chapters(
+        book_id, user_auth_id, _chapter_ids(current_toc) - _chapter_ids(updated_toc)
+    )
 
     # Best-effort audit, explicitly. The TOC write above has already committed,
     # so raising here would report failure for an edit that succeeded — and the
@@ -534,6 +571,8 @@ async def _delete_chapter_internal(
     version_guard = _version_guard(toc)  # snapshot before mutating `toc`
     chapters = toc.get("chapters", [])
 
+    ids_before = _chapter_ids(toc)  # before the in-place delete below
+
     # Find and delete the chapter
     chapter_found = False
 
@@ -562,6 +601,9 @@ async def _delete_chapter_internal(
     await _set_toc_guarded(
         ObjectId(book_id), user_auth_id, toc, version_guard, session
     )
+
+    # The whole subtree went with it, so diff ids rather than cascade one.
+    await _cascade_removed_chapters(book_id, user_auth_id, ids_before - _chapter_ids(toc))
 
     return True
 

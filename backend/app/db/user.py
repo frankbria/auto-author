@@ -2,7 +2,7 @@
 
 import logging
 
-from .base import users_collection, books_collection
+from .base import users_collection, books_collection, get_collection
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
@@ -121,7 +121,9 @@ async def update_user(
     # Add updated_at timestamp
     user_data["updated_at"] = datetime.now(timezone.utc)
 
-    query: Dict = {"auth_id": auth_id}
+    # A tombstone (deleted account, #784) never matches, so a late Stripe event
+    # or an admin edit can't write personal data back onto it.
+    query: Dict = {"auth_id": auth_id, "deleted_at": {"$exists": False}}
     if extra_filter:
         query.update(extra_filter)
 
@@ -143,21 +145,58 @@ async def update_user(
     return updated_user
 
 
+async def delete_better_auth_identity(auth_id: str) -> None:
+    """Remove the better-auth user and everything that authenticates as it:
+    sessions (every device), credential/OAuth accounts (the old password) and
+    the twoFactor secret (#763).
+
+    better-auth's MongoDB adapter stores ``_id`` and ``userId`` as ObjectIds;
+    the string form is matched too so a legacy string-keyed row can't survive.
+    """
+    ids: List = [auth_id]
+    if ObjectId.is_valid(auth_id):
+        ids.append(ObjectId(auth_id))
+    for name in ("session", "account", "twoFactor"):
+        collection = await get_collection(name)
+        await collection.delete_many({"userId": {"$in": ids}})
+    better_auth_users = await get_collection("user")
+    await better_auth_users.delete_many({"$or": [{"_id": {"$in": ids}}, {"id": auth_id}]})
+
+
 async def delete_user(
     auth_id: str, actor_id: str = None, soft_delete: bool = True
 ) -> bool:
-    """Delete a user (soft delete by default)"""
+    """Delete a user (soft delete by default) and revoke their better-auth identity.
+
+    A soft delete replaces the record with a tombstone of auth_id and deleted_at
+    (#784): replacing, not unsetting, erases every field, including ones added
+    later. The tombstone keeps the session resolver rejecting that id and stops
+    the auto-create path from reviving it; the email is gone, so the same
+    address can sign up again (#763).
+    """
     if soft_delete:
-        # Mark user as inactive instead of deleting
-        result = await users_collection.update_one(
-            {"auth_id": auth_id},
-            {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}},
+        previous = await users_collection.find_one_and_replace(
+            {"auth_id": auth_id, "deleted_at": {"$exists": False}},
+            {"auth_id": auth_id, "deleted_at": datetime.now(timezone.utc)},
         )
-        success = result.modified_count > 0
     else:
         # Hard delete
-        result = await users_collection.delete_one({"auth_id": auth_id})
-        success = result.deleted_count > 0
+        previous = await users_collection.find_one_and_delete({"auth_id": auth_id})
+    success = previous is not None
+
+    # The returned pre-image is the last place the avatar URL exists (#785).
+    avatar_url = (previous or {}).get("avatar_url")
+    if avatar_url:
+        try:
+            from app.services.file_upload_service import FileUploadService
+
+            await FileUploadService().delete_profile_picture(avatar_url)
+        except Exception:
+            logger.error("Failed to delete avatar for user %s", auth_id, exc_info=True)
+
+    # Unconditional: a better-auth user who never reached the backend has no
+    # app record, but their sessions and credentials must still go.
+    await delete_better_auth_identity(auth_id)
 
     # Log the deletion
     if success:

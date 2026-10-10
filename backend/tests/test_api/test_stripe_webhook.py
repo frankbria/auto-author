@@ -11,6 +11,7 @@ unauthenticated — the signature is the auth.
 
 import hashlib
 import hmac
+import itertools
 import json
 import time
 
@@ -28,6 +29,10 @@ pytestmark = pytest.mark.asyncio
 TEST_WEBHOOK_SECRET = "whsec_test_secret_for_issue_220"
 TEST_PRO_PRICE_ID = "price_test_pro_123"
 WEBHOOK_URL = "/api/v1/webhooks/stripe"
+# Each event built gets a strictly later `created`, like events Stripe emits
+# in sequence. A counter, not the clock: two events built across a second
+# boundary must not flip a test between processed and stale_event.
+_event_clock = itertools.count(1_700_000_000)
 
 
 def sign(payload: bytes, secret: str = TEST_WEBHOOK_SECRET, timestamp: int = None) -> str:
@@ -45,18 +50,23 @@ def subscription_event(
     subscription_id: str = "sub_test_1",
     price_id: str = TEST_PRO_PRICE_ID,
     metadata: dict = None,
+    status: str = "active",
+    created: int | None = None,
 ) -> bytes:
+    """A signed-ready event. ``created`` is always set, as on every real Stripe
+    event, so the out-of-order guard runs in every test that posts one (#769)."""
     return json.dumps(
         {
             "id": event_id,
             "object": "event",
             "type": event_type,
+            "created": next(_event_clock) if created is None else created,
             "data": {
                 "object": {
                     "id": subscription_id,
                     "object": "subscription",
                     "customer": customer,
-                    "status": "active",
+                    "status": status,
                     "metadata": metadata or {},
                     "items": {
                         "object": "list",
@@ -257,6 +267,116 @@ class TestEventRouting:
         assert user["stripe_customer_id"] == "cus_test_1"
 
 
+async def _post_signed(client, payload: bytes):
+    return await client.post(
+        WEBHOOK_URL, content=payload, headers={"stripe-signature": sign(payload)}
+    )
+
+
+async def test_late_event_writes_nothing_onto_a_deleted_account(webhook_client):
+    """#784: the customer id is erased with the account, so Stripe's late events
+    reach it through the metadata fallback — and must not put the billing
+    identity back on the tombstone."""
+    from app.db.user import delete_user
+
+    await _seed_user(stripe_customer_id="cus_test_1")
+    await delete_user("auth-stripe-1")
+    resp = await _post_signed(
+        webhook_client, subscription_event(metadata={"auth_id": "auth-stripe-1"})
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "no_matching_user"}
+    assert set(await get_user_by_auth_id("auth-stripe-1")) == {
+        "_id", "auth_id", "deleted_at",
+    }
+
+
+class TestSubscriptionStatus:
+    """The plan follows the subscription's status, not just its price (#767)."""
+
+    @pytest.mark.parametrize(
+        "status,expected_plan",
+        [
+            ("active", "pro"),
+            ("trialing", "pro"),
+            ("past_due", "pro"),  # kept through Stripe's retry window
+            ("unpaid", "restricted"),
+            ("incomplete", "free"),
+            ("incomplete_expired", "free"),
+            ("paused", "free"),
+            ("canceled", "free"),
+            ("some_future_status", "free"),  # unknown: fail closed below paid
+        ],
+    )
+    async def test_status_decides_plan_for_a_pro_subscriber(
+        self, webhook_client, status, expected_plan
+    ):
+        await _seed_user(stripe_customer_id="cus_test_1", plan="pro")
+        resp = await _post_signed(
+            webhook_client, subscription_event(event_id=f"evt_{status}", status=status)
+        )
+        assert resp.status_code == 200
+        user = await get_user_by_auth_id("auth-stripe-1")
+        assert user["plan"] == expected_plan
+        # Ids still sync whatever the status.
+        assert user["stripe_subscription_id"] == "sub_test_1"
+
+    @pytest.mark.parametrize("seeded_plan", ["free", "restricted"])
+    async def test_past_due_never_grants_pro(self, webhook_client, seeded_plan):
+        # Only active/trialing grant pro; past_due only *keeps* it.
+        await _seed_user(stripe_customer_id="cus_test_1", plan=seeded_plan)
+        resp = await _post_signed(webhook_client, subscription_event(status="past_due"))
+        assert resp.status_code == 200
+        assert resp.json()["plan"] == seeded_plan  # reports the kept plan
+        user = await get_user_by_auth_id("auth-stripe-1")
+        assert user["plan"] == seeded_plan
+        assert user["stripe_subscription_id"] == "sub_test_1"
+
+    async def test_dunning_cycle_restricts_then_restores(self, webhook_client):
+        await _seed_user(stripe_customer_id="cus_test_1")
+        expected = [
+            ("active", "pro"),
+            ("past_due", "pro"),
+            ("unpaid", "restricted"),
+            ("active", "pro"),  # paid the open invoice: access back
+        ]
+        for i, (status, plan) in enumerate(expected):
+            payload = subscription_event(event_id=f"evt_cycle_{i}", status=status)
+            assert (await _post_signed(webhook_client, payload)).status_code == 200
+            assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == plan, status
+
+    async def test_unmatched_price_on_active_subscription_logs_error(
+        self, webhook_client, caplog
+    ):
+        await _seed_user(stripe_customer_id="cus_test_1")
+        with caplog.at_level("ERROR", logger="app.api.endpoints.webhooks"):
+            await _post_signed(webhook_client, subscription_event(price_id="price_unknown_9"))
+        errors = [r for r in caplog.records if r.levelname == "ERROR"]
+        assert any("price_unknown_9" in r.getMessage() for r in errors)
+
+    async def test_unset_pro_price_logs_error(self, webhook_client, monkeypatch, caplog):
+        # A paying user silently resolving to free must page someone.
+        monkeypatch.setattr(settings, "STRIPE_PRICE_ID_PRO", "")
+        await _seed_user(stripe_customer_id="cus_test_1", plan="pro")
+        with caplog.at_level("ERROR", logger="app.api.endpoints.webhooks"):
+            await _post_signed(webhook_client, subscription_event())
+        assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "free"
+        assert any(r.levelname == "ERROR" for r in caplog.records)
+
+    async def test_matched_price_logs_no_error(self, webhook_client, caplog):
+        await _seed_user(stripe_customer_id="cus_test_1")
+        with caplog.at_level("ERROR", logger="app.api.endpoints.webhooks"):
+            await _post_signed(webhook_client, subscription_event())
+        assert not [r for r in caplog.records if r.levelname == "ERROR"]
+
+    async def test_unknown_status_logs_error(self, webhook_client, caplog):
+        await _seed_user(stripe_customer_id="cus_test_1", plan="pro")
+        with caplog.at_level("ERROR", logger="app.api.endpoints.webhooks"):
+            await _post_signed(webhook_client, subscription_event(status="some_future_status"))
+        errors = [r for r in caplog.records if r.levelname == "ERROR"]
+        assert any("some_future_status" in r.getMessage() for r in errors)
+
+
 class TestReplayIdempotency:
     async def test_replayed_event_id_is_noop(self, webhook_client):
         from app.db.user import update_user
@@ -294,11 +414,11 @@ class TestReplayIdempotency:
         assert resp.status_code == 200
         assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
 
-    async def test_processing_failure_releases_marker_so_retry_works(
+    async def test_processing_failure_records_no_marker_so_retry_works(
         self, webhook_client, monkeypatch
     ):
         # Failure injection at our own persistence seam: if the user update
-        # blows up, the endpoint must 500 AND release the replay marker so
+        # blows up, the endpoint must 500 AND leave no replay marker so
         # Stripe's automatic retry reprocesses instead of hitting a "replay".
         from app.api.endpoints import webhooks as webhooks_module
 
@@ -321,12 +441,11 @@ class TestReplayIdempotency:
         assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
 
     async def test_mark_event_processed_dao(self, motor_reinit_db):
-        from app.db.stripe_events import mark_event_processed, unmark_event
+        from app.db.stripe_events import is_event_processed, mark_event_processed
 
-        assert await mark_event_processed("evt_dao_1") is True
-        assert await mark_event_processed("evt_dao_1") is False  # replay
-        assert await mark_event_processed("evt_dao_2") is True  # independent id
-        # Unmark releases the id (used when processing fails, so Stripe's retry
-        # isn't misclassified as a replay).
-        await unmark_event("evt_dao_1")
-        assert await mark_event_processed("evt_dao_1") is True
+        assert await is_event_processed("evt_dao_1") is False
+        await mark_event_processed("evt_dao_1")
+        assert await is_event_processed("evt_dao_1") is True
+        # A concurrent duplicate recording it again is not an error (#769).
+        await mark_event_processed("evt_dao_1")
+        assert await is_event_processed("evt_dao_2") is False  # independent id

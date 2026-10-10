@@ -6,6 +6,10 @@
 import * as Sentry from '@sentry/nextjs';
 
 export async function register() {
+  // Refuse to boot a deployed server on a secret published in the repo (#780).
+  // Dynamic import: auth-secret uses node:crypto, which the edge bundle must not evaluate.
+  if (process.env.NEXT_RUNTIME === 'nodejs') (await import('@/lib/auth-secret')).assertSecretNotPublished();
+
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
   if (!dsn) return;
 

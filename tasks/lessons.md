@@ -1254,3 +1254,51 @@ gate stopped the same failure twice more in #715.
   typed. When a criterion is about what a run posted, read the PR comments. On a workflow with
   `cancel-in-progress`, treat a cancelled run as a supersession until its timing says otherwise:
   compare its end time with the next run on the same branch.
+
+## Phase 0 launch-blocker run (2026-10-02)
+
+### TipTap v3 setContent fires onUpdate (#756, 2026-10-02)
+Unlike v2, TipTap v3's `editor.commands.setContent()` emits an update by default, so any "dirty"/"autoSavePending" flag set in `onUpdate` goes true on every programmatic load. On main this left `autoSavePending` stuck after a no-op autosave and silently disabled autosave for users who paused >3s before typing. Pass `{ emitUpdate: false }` or compare content before marking dirty, and clear pending flags on every exit path of the save timer.
+
+### Parallel agents: no broad pkill, opencode unusable today (2026-10-02)
+Three parallel worktree agents each stopped their own stuck opencode review with `pkill -f "ask-opencode[.]sh"`, a pattern that matches every slot's reviewer. opencode gave 0 bytes on 4 of 4 runs and codex `--base main` once ran 40 minutes with no verdict. In multi-slot runs, kill only captured PIDs and cap reviewers with `timeout`; the PR's `glm-review` workflow is the dependable cross-family pass.
+
+### Never pipe `git commit` into `head` (2026-10-02, PR #881)
+`git commit ... 2>&1 | grep ... | head` closed the pipe after 10 lines of pre-commit output. SIGPIPE killed `git commit` after every hook had passed, so no commit was written, a stale `index.lock` was left behind, and the next `git push` pushed the old HEAD while reporting success. Redirect commit output to a file, check `$?`, and compare `git log -1` with the expected subject before pushing.
+
+### Ordering tests need a counter, not the clock (#769, 2026-10-02)
+A webhook test fixture that left `created` out (or defaulted it to `time.time()`) meant no signed-webhook test exercised the ordering guard, and a #768 test passed only because its events had no timestamp. Once real stamps arrived, it failed whenever two events straddled a second boundary. Stamp event times from a monotonic counter in fixtures, so the ordering filter runs in every test.
+
+### Read every bot finding, not the newest summary (2026-10-02, #898)
+A green PR's latest glm-review comment said "no new defects", while two inline findings from the previous run (a Build Images breakage on main and a runbook gap) were still unfixed. "No new defects" is scoped to the latest commit. Before merging, list every inline review comment on the PR (`gh api repos/<o>/<r>/pulls/<N>/comments`), not just the last summary.
+
+### Check how staging deploys before holding a PR for a deploy-time effect (2026-10-02)
+Two PRs (#900, #903) were held because merging "would break staging". `deploy-staging-containers.yml` is `workflow_dispatch`-only, and staging had not been deployed since 2026-08-28. The real constraint was a pre-deploy checklist, not a merge block. Read the deploy workflow's trigger, and `gh run list` for its last run, before deciding merge order.
+
+## #917 configurable AI provider (2026-10-09)
+
+### A live model call finds what the wire stub can't (#921)
+The stub tests were green, and a demo against a real model through local Ollama (`localhost:11434/v1`, `nemotron-3-nano:30b-cloud`) still found two bugs. First, `AI_BASE_URL` with an empty `AI_API_KEY` passed `api_key=""` to the OpenAI SDK, which raises at `AIService()` import, so the backend never booted. Second, the reasoning model spent all 1000 analysis tokens thinking and returned empty content with `finish_reason: length`, which the parser turned into a confident "not ready, 0.5" verdict. A stub returns only what you thought to script. For any AI-flow change, run one live call through local Ollama after the stub tests; `glm-5.2:cloud` also gives a real 402.
+
+### A green `main` can be stale for the advisory gate (#923)
+`main`'s last `tests.yml` run was green but 4 days old. Eight advisories had landed since, so the first CI run of an unrelated PR went red on the required Security Audit. A green run only covers the advisory gate as of the day it ran. If `main`'s last run is over a day old, run `scripts/audit_gate.py` locally (with `NO_COLOR=1`) before branching, so the advisory fix ships first in its own PR.
+
+### Stale `index.lock` with no git process, twice in one run
+`.git/index.lock` appeared twice (21:46 and 12:56), each time with no live git process and no piped `git commit`. The first broke a commit and the second a merge. The cause is unconfirmed: `.beads/metadata.json` is modified in the background throughout, so a beads hook is the suspect. Before removing a lock, confirm with `pgrep -x git` and the lock's mtime, then retry and verify with `git log -1`.
+
+## #784 account-deletion tombstone (2026-10-09)
+
+### A test inserted by text anchor can land where pytest never collects it (#934)
+The new webhook test was inserted before `class TestSubscriptionStatus:` with class-level indentation, on the assumption that the preceding block was a test class. It was a module-level helper, so the test became a nested function inside `_post_signed` and was never collected. The file stayed green and nothing warned. It surfaced only because the RED run listed nine failures where ten were expected. After adding a test, check that its name appears in the failing list before writing the implementation; a passing or absent new test in RED means it is not testing anything yet.
+
+### The issue's evidence can be half-shipped already (#784 vs #763)
+#784 cited `user.py:131-145` as leaving the better-auth `user` and `account` docs untouched. #763, a P0 from the same audit, had already deleted them before this run started. Reading the cited lines first cut the work to the `users` doc and a proving test. For any issue from the 2026-10-01 audit, read the evidence lines at HEAD before planning: the audit ran at 34ebf94 and earlier P0 fixes overlap later P1 issues.
+
+## #785 uploads deleted with their book or account (2026-10-10)
+
+### The opencode reviewer is not read-only: it runs pytest on the shared test DB and creates git worktrees (#937)
+The review prompt passes the diff inline with no `--auto`, and the phase file calls that "strictly read-only". In practice the reviewer ran `pytest` against the default `auto-author-test` database and created two worktrees under `/tmp/opencode`. Its test runs dropped the database under the pre-commit hook's run, which failed on an unrelated test (`test_save_and_retrieve_response`) and then flaked 1 run in 3 until the review ended. The worktree creation is the likely source of the stale `.git/index.lock` that blocked the same commit, and of the two unexplained locks recorded above. While a reviewer is running, give your own runs and commits `TEST_MONGO_URI=mongodb://localhost:27017/auto-author-test-s<N>`. In the review prompt, tell the reviewer to use its own `TEST_MONGO_URI` and to run no git command that writes; the second pass followed both. Afterwards run `git worktree list` and remove what it left.
+
+### A mutation that fails to apply cleanly reads as a survivor
+The mutation script moved a code block by slicing between two comment markers found with `str.index`. The end marker, `# Create audit log entry`, appears four times in `book.py`, so the slice was empty, the file became a syntax error, pytest collected nothing, and the script printed "killed by: NOTHING". That is the same output as a real survivor. A mutation harness must assert that the run collected tests (a `passed` or `failed` count in the summary) before it reports a result, and must find a marker from the start position (`src.index(end, start)`), not from the top of the file.
+

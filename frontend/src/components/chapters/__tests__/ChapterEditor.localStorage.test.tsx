@@ -212,7 +212,9 @@ describe('ChapterEditor localStorage backup', () => {
         expect(mockBookClient.saveChapterContent).toHaveBeenCalledWith(
           'book-1',
           'chapter-1',
-          expect.stringContaining('Backed up content from previous session')
+          expect.stringContaining('Backed up content from previous session'),
+          true,
+          expect.anything()
         );
       });
     }, 10000);

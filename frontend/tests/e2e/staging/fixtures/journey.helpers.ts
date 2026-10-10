@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Page, Response, expect } from '@playwright/test';
 
 /**
  * Shared, web-first helpers for the staging authoring journey (Issue #105).
@@ -12,11 +12,64 @@ import { Page, expect } from '@playwright/test';
  *   - chapter Q&A  -> ChapterEditor "Interview Questions" tab -> QuestionContainer
  */
 
+// Staging API host. Seeding calls go here with the page's own session cookie.
+export const API_BASE_URL =
+  process.env.STAGING_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://api.dev.autoauthor.app/api/v1';
+
 // Book detail URL after creation, e.g. /dashboard/books/<objectId>
 const BOOK_DETAIL_RE = /\/dashboard\/books\/[a-f0-9]+(?:[/?#]|$)/;
 
 // AI-backed steps on staging can take a while (readiness + generation chains).
 const AI_TIMEOUT = 90_000;
+
+// The wizard's AI round-trips. Chapter-level generate-questions matches too.
+const AI_ENDPOINT_RE = /\/(analyze-summary|toc-readiness|generate-questions)$/;
+
+const aiResponses = new WeakMap<Page, string[]>();
+
+/**
+ * One log line per AI response: status plus the fields that explain a verdict
+ * or an error, never the whole body (#775). These endpoints carry no
+ * credentials or account email, and the line goes to the job log, which
+ * GitHub masks; the results JSON that also captures stdout is never uploaded.
+ */
+async function describeAiResponse(res: Response): Promise<string> {
+  const path = new URL(res.url()).pathname.replace(/[a-f0-9]{24}/g, ':id');
+  const body = await res.json().catch(() => null);
+  const detail = body?.detail;
+  const line: Record<string, unknown> = { path, status: res.status() };
+  if (res.status() >= 400) {
+    // Two error shapes: {error_code, message} and the structured ErrorResponse
+    // {error, details: [{code}]} that chapter generate-questions returns.
+    line.error_code = detail?.error_code ?? detail?.details?.[0]?.code;
+    line.detail_code = detail?.details?.[0]?.code;
+    line.message = typeof detail === 'string' ? detail : (detail?.message ?? detail?.error);
+  } else if (body && typeof body === 'object') {
+    line.keys = Object.keys(body);
+    line.meets_minimum_requirements = body.meets_minimum_requirements;
+    if (Array.isArray(body.questions)) line.questions = body.questions.length;
+  }
+  return JSON.stringify(line);
+}
+
+function watchAiResponses(page: Page): void {
+  if (aiResponses.has(page)) return;
+  const lines: string[] = [];
+  aiResponses.set(page, lines);
+  page.on('response', async (res) => {
+    if (!AI_ENDPOINT_RE.test(new URL(res.url()).pathname)) return;
+    const line = await describeAiResponse(res);
+    lines.push(line);
+    console.log(`[staging-ai] ${line}`);
+  });
+}
+
+function aiResponseLog(page: Page): string {
+  const lines = aiResponses.get(page) ?? [];
+  return lines.length ? lines.join('\n') : '(no AI responses recorded)';
+}
 
 /**
  * A detailed, well-structured summary that the AI readiness analyzer reliably
@@ -73,6 +126,68 @@ export async function createBook(page: Page, title: string): Promise<string> {
 }
 
 /**
+ * Save a TOC of `chapterCount` chapters through the API and verify it persisted.
+ * No AI: this is how a spec gets chapters without driving the TOC wizard.
+ */
+export async function seedToc(page: Page, bookId: string, chapterCount: number): Promise<void> {
+  const toc = {
+    chapters: Array.from({ length: chapterCount }, (_, index) => ({
+      id: `seed-ch-${index + 1}`,
+      title: `Seeded Chapter ${index + 1}`,
+      description: `Seeded staging chapter ${index + 1}`,
+      level: 1,
+      order: index + 1,
+      status: 'draft',
+      word_count: 0,
+      estimated_reading_time: 0,
+      subchapters: [],
+    })),
+    total_chapters: chapterCount,
+    estimated_pages: chapterCount * 10,
+    structure_notes: 'Seeded by the staging E2E suite',
+  };
+
+  // The endpoint reads data.get("toc"), so the payload must be wrapped. Sent flat,
+  // it resolves to {} -> chapters [] -> an empty TOC saved with a 200, which is why
+  // a spec once asserted a successful PUT and then found 0 chapters on the edit
+  // screen.
+  const response = await page.request.put(`${API_BASE_URL}/books/${bookId}/toc`, {
+    data: { toc },
+  });
+
+  expect(response.status(), await response.text()).toBeLessThan(400);
+
+  // A 200 is not proof of persistence here — verify the chapters actually landed.
+  const saved = await page.request.get(`${API_BASE_URL}/books/${bookId}/toc`);
+  expect(saved.status(), await saved.text()).toBeLessThan(400);
+  const savedBody = await saved.json();
+  const savedChapters =
+    savedBody?.toc?.chapters ?? savedBody?.table_of_contents?.chapters ?? savedBody?.chapters ?? [];
+  expect(savedChapters, 'TOC PUT returned 2xx but persisted no chapters').toHaveLength(chapterCount);
+}
+
+/**
+ * Create a book with a summary and a TOC entirely through the API (#916) and
+ * return its id. Zero AI calls: specs that only need "a book with chapters"
+ * use this instead of the dashboard modal + TOC wizard, which cost about five
+ * live OpenAI calls per run.
+ */
+export async function seedBookWithToc(page: Page, title: string, chapterCount = 3): Promise<string> {
+  const created = await page.request.post(`${API_BASE_URL}/books/`, { data: { title } });
+  expect(created.status(), await created.text()).toBe(201);
+  const bookId: string = (await created.json()).id;
+  expect(bookId).toMatch(/^[a-f0-9]+$/);
+
+  const summary = await page.request.put(`${API_BASE_URL}/books/${bookId}/summary`, {
+    data: { summary: READY_SUMMARY },
+  });
+  expect(summary.status(), await summary.text()).toBeLessThan(400);
+
+  await seedToc(page, bookId, chapterCount);
+  return bookId;
+}
+
+/**
  * Add a summary and advance to the TOC wizard.
  *
  * The summary page loads the existing summary on mount (GET) and a localStorage
@@ -108,6 +223,8 @@ export async function addSummary(page: Page, bookId: string, summary: string): P
     await expect(continueBtn).toBeEnabled({ timeout: 2_000 });
   }).toPass({ timeout: 20_000 });
 
+  // The wizard fires its AI calls on mount, so listen before navigating.
+  watchAiResponses(page);
   await continueBtn.click();
   await page.waitForURL(/\/generate-toc/, { timeout: 20_000 });
 }
@@ -119,10 +236,22 @@ export async function addSummary(page: Page, bookId: string, summary: string): P
  */
 export async function completeTocWizard(page: Page): Promise<void> {
   const answerBox = page.getByPlaceholder(/type your answer here/i);
-  await expect(
-    answerBox,
-    'Clarifying questions never appeared (summary may have been judged NOT_READY)'
-  ).toBeVisible({ timeout: AI_TIMEOUT });
+  // Stop at whichever terminal step the wizard reaches; an error or NOT_READY
+  // step will never turn into questions, so waiting out the timeout only hides
+  // which one it was. The failure names the step's heading and every AI response.
+  const deadEnd = page.getByRole('heading', {
+    name: /something went wrong|summary needs more detail|ai usage limit reached|upgrade required/i,
+  });
+  await answerBox
+    .or(deadEnd)
+    .waitFor({ timeout: AI_TIMEOUT })
+    .catch(() => {}); // the assertion below reports the timeout with context
+  const reached = (await deadEnd.isVisible()) ? await deadEnd.textContent() : 'neither';
+  expect(
+    await answerBox.isVisible(),
+    `Clarifying questions never appeared (wizard step: ${reached}).\n` +
+      `AI responses:\n${aiResponseLog(page)}`
+  ).toBe(true);
 
   // ClarifyingQuestions shows one question at a time with a Q1..Qn overview.
   const overview = page.getByRole('button', { name: /^Q\d+$/ });
@@ -159,6 +288,8 @@ export async function openChapterEditor(page: Page, bookId: string): Promise<voi
  * first one, and wait for the save PUT to land. Returns the saved answer text.
  */
 export async function answerFirstChapterQuestion(page: Page, answer: string): Promise<void> {
+  // A seeded book skips addSummary, which is where logging otherwise starts.
+  watchAiResponses(page);
   await page.getByRole('tab', { name: /interview questions/i }).click();
 
   // Fresh chapter -> the generator is shown; generate the interview questions.

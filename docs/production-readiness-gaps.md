@@ -69,7 +69,7 @@ The Auto-Author application demonstrates **solid architectural foundations** wit
 #### GAP-CRIT-001: CORS Configuration for Production Environment
 - **Category:** Security / Deployment
 - **Current State:** `BACKEND_CORS_ORIGINS` defaults to `["http://localhost:3000", "http://localhost:8000"]`
-- **Required State:** Production origins `["https://autoauthor.app", "https://api.autoauthor.app"]` with validation
+- **Required State:** Production origins with validation, e.g. `["https://app.autoauthor.app"]` with the API at `https://api.app.autoauthor.app`. An apex frontend with the API at `api.autoauthor.app` no longer works: since #778 an apex gets a host-only session cookie (`.autoauthor.app` would also reach the shared staging box), so that API would never receive it. See `.github/DEPLOYMENT.md`.
 - **Impact:** Application completely unusable without correct CORS - all API calls blocked by browser
 - **Source Reports:** Security Audit (CRITICAL-1), Deployment Review (CRITICAL-1)
 - **File References:**

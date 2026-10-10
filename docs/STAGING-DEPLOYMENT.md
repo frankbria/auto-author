@@ -74,9 +74,25 @@ query:
 MONGODB_URI, DATABASE_NAME, BETTER_AUTH_SECRET, OPENAI_API_KEY
 ```
 
-Everything else in the file is passed through wholesale via `env_file:` — the app
+The **backend** gets everything else in the file wholesale via `env_file:` — it
 also needs `AWS_*`, `CLOUDINARY_*`, `BETTER_AUTH_ISSUER` and
 `BACKEND_CORS_ORIGINS`, which an explicit allowlist would have silently dropped.
+
+The **frontend does not** (#781). It takes an explicit `environment:` list in
+`docker-compose.yml` — the Mongo connection, `BETTER_AUTH_*`, the `EMAIL_*`
+password-reset settings, `NEXT_PUBLIC_SENTRY_DSN`/`NEXT_PUBLIC_ENVIRONMENT` —
+with values still read from this same `.env` by compose interpolation, so there
+is one file on the box and no second one to keep in step. OpenAI, Stripe, AWS
+and Cloudinary keys never enter the Next.js process. Consequences:
+
+- **A new server-side variable the frontend reads must be added to that list**,
+  or it is silently absent in the container. `scripts/test_frontend_env_allowlist.py`
+  fails CI if the list names anything `frontend/src` does not read, or anything
+  backend-only.
+- The deploy checks the running container: **Frontend carries no backend secret**
+  runs `env` inside `auto-author-frontend-1` and fails on any `OPENAI*`, `AI_API_KEY`,
+  `STRIPE*`, `AWS*`, `CLOUDINARY*` or `SENTRY_DSN` name (names only are logged).
+  By hand: `docker exec auto-author-frontend-1 env | cut -d= -f1 | sort`.
 
 Editing a value requires **recreating** the containers, not restarting them:
 
@@ -89,6 +105,9 @@ cd /opt/auto-author
 # env-only change does not also move the release:
 export IMAGE_TAG="$(docker ps --format '{{.Image}}' | sed -n 's#.*auto-author-backend:##p' | head -1)"
 echo "$IMAGE_TAG"   # expect sha-xxxxxxx; if empty, pass the tag explicitly
+# docker-compose.yml also requires ENVIRONMENT with no default (#777); the
+# workflows export it the same way, so a manual shell must too.
+export ENVIRONMENT=staging
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
 ```
 
@@ -96,6 +115,59 @@ Database values have their own rules (no db name in the URI, percent-encode the
 password, rotation runbook): `docs/DATABASE_CONNECTION_STANDARD.md`.
 
 ---
+
+### AI provider settings (#917)
+
+All optional. With none set, the backend calls api.openai.com with `gpt-4` and
+`gpt-4o`, the same as before #917. They reach the backend through `env_file:`,
+so adding a line to the box `.env` and recreating the containers is the whole
+change.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AI_BASE_URL` | empty (api.openai.com) | Any OpenAI-compatible endpoint, such as z.ai, OpenRouter, vLLM or Ollama (`…/v1`). This is the only routing switch: the SDK's own `OPENAI_BASE_URL` is ignored |
+| `AI_API_KEY` | empty | That provider's key, which takes precedence over `OPENAI_API_KEY`. **Required whenever `AI_BASE_URL` is set**, because the OpenAI key is never sent to another endpoint and `/health` reports `AI_API_KEY` as missing. A keyless local server (Ollama) still needs a non-empty value, any string will do. Compose still requires `OPENAI_API_KEY`, so leave the existing value |
+| `AI_MODEL_DEFAULT` | `gpt-4` | Summary analysis, clarifying and chapter questions, enhance, transform, transcription cleanup |
+| `AI_MODEL_LONG_OUTPUT` | `gpt-4o` | Chapter drafts and TOC generation (needs ≥ 6000 output tokens for TOC) |
+| `AI_MAX_OUTPUT_TOKENS_DEFAULT` | `4000` | Cap on every default-class request's `max_tokens` |
+| `AI_MAX_OUTPUT_TOKENS_LONG` | `8000` | Cap on drafts and TOC. Lowering it below 6000 truncates large TOCs, which then fail cleanly as `AI_RESPONSE_TRUNCATED` |
+
+Things that differ by provider:
+
+- **Out of credit.** OpenAI's 429 `insufficient_quota` and the HTTP 402 that
+  OpenAI-compatible providers send (Ollama cloud, OpenRouter) both map to
+  `AI_PROVIDER_QUOTA_EXHAUSTED` (503, not retried). A provider that signals
+  billing some other way surfaces as `AI_UNEXPECTED_ERROR`; check the backend
+  log for its message. A retired or unknown model name is the same.
+- **Reasoning models** (Nemotron, Qwen3, GLM thinking modes) spend part of
+  `max_tokens` on hidden reasoning. Each flow's budget is fixed in code
+  (analysis 1000, clarifying questions 800, chapter questions 2000, TOC 6000),
+  and the `AI_MAX_OUTPUT_TOKENS_*` caps only ever lower it. Measured live,
+  `nemotron-3-nano:30b` spent all 1000 analysis tokens thinking and returned
+  empty content in 4 of 4 runs, while its TOC (6000) worked. Every flow reports
+  an exhausted budget as `AI_RESPONSE_TRUNCATED` rather than parsing the
+  empty answer. **Use a non-reasoning model for `AI_MODEL_DEFAULT`.**
+- **Output format.** The parsers are pinned against real `nemotron-3-nano:30b`
+  output (`backend/tests/fixtures/ai_provider_outputs/`). Capture another
+  model's fixtures the same way before relying on it in production.
+- **Nothing is OpenAI-only.** Voice input uses the browser's speech
+  recognition. Its server-side cleanup is an ordinary chat call on
+  `AI_MODEL_DEFAULT`. There is no Whisper, embeddings or image call.
+
+### Stripe Tax (#783)
+
+Checkout always collects a billing address and tax IDs. Tax **calculation** stays
+off until `STRIPE_AUTOMATIC_TAX=true` is in the box `.env`. Turn it on in this order:
+
+1. In the Stripe Dashboard (in the same mode, test or live, as `STRIPE_SECRET_KEY`):
+   Tax → set the origin address and add a registration for each place you must
+   collect in.
+2. Add `STRIPE_AUTOMATIC_TAX=true` to `/opt/auto-author/.env` and **recreate** the
+   containers (see above).
+3. Start a checkout and confirm Stripe's page shows a tax line.
+
+Doing step 2 before step 1 makes Stripe reject every checkout (the API returns 502
+"Payment provider error"). To undo, set it back to `false` and recreate.
 
 ## One-time setup on the box
 
@@ -217,7 +289,7 @@ Re-run the deploy with an earlier tag. That is the whole procedure:
 
 ```bash
 cd /opt/auto-author
-IMAGE_TAG=sha-<previous> docker compose \
+IMAGE_TAG=sha-<previous> ENVIRONMENT=staging docker compose \
   -f docker-compose.yml -f docker-compose.staging.yml up -d
 ```
 
@@ -233,6 +305,11 @@ cannot roll back past that change; pin the frontend image by hand
 key, or the deploy is running from a directory without it. This is the assertion
 working; check `/opt/auto-author/.env`.
 
+**Compose exits with `ENVIRONMENT is required`** — the shell running compose
+did not export `ENVIRONMENT`. There is deliberately no default (#777): the
+backend's production guards key off it. The workflows export `staging`; a manual
+shell must do the same.
+
 **Backend health 503** — read the `checks` object in the response body; it names
 the failing component. Mongo failures are usually a rotated password not yet
 written to the box `.env`, or a VPS IP that left the Atlas allowlist.
@@ -247,6 +324,8 @@ confirm the holder is ours before killing anything.
 
 ```bash
 cd /opt/auto-author
+# Every compose command interpolates the files: export IMAGE_TAG and
+# ENVIRONMENT=staging first, as in the recreate snippet above.
 docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=100 backend
 docker compose -f docker-compose.yml -f docker-compose.staging.yml ps
 ```
