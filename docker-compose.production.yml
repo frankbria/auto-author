@@ -1,0 +1,17 @@
+# Production overlay (#782). Used as:
+#   docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+#
+# Mirrors docker-compose.staging.yml: both images pinned to an immutable sha- tag,
+# which is the rollback mechanism. The backend image serves every environment;
+# the frontend bakes NEXT_PUBLIC_* in at build time, so production pulls the
+# `-production` variant of the same build (#779).
+services:
+  backend:
+    image: ghcr.io/frankbria/auto-author-backend:${IMAGE_TAG:?IMAGE_TAG is required (e.g. sha-abc1234)}
+  frontend:
+    image: ghcr.io/frankbria/auto-author-frontend:${IMAGE_TAG:?IMAGE_TAG is required (e.g. sha-abc1234)}-production
+    environment:
+      # Required here: the base file defaults it to the staging origin, and the
+      # session cookie's domain is derived from it (#778). A production box whose
+      # .env forgot it must refuse to start, not issue staging-scoped cookies.
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?BETTER_AUTH_URL is required (the production frontend origin)}

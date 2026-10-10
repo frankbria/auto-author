@@ -35,7 +35,7 @@ Configure at: `Settings` → `Secrets and variables` → `Actions`.
 | `build-images.yml` | **live** | `GITHUB_TOKEN` (automatic) |
 | `glm-review.yml` | **live** | `ZHIPU_API_KEY` |
 | `deploy-staging.yml.disabled` | retired (rollback) | everything in the "Required/Recommended/Optional" sections below |
-| `deploy-production.yml.disabled` | retired | — |
+| `deploy-production-containers.yml` | **ready, not yet run** (no production host yet) | `production` environment only — see [Production deploy](#production-deploy) |
 
 **Server access** below is live — the container deploy reads those secrets from
 GitHub on every run. Everything after it documents **application** values: for
@@ -43,6 +43,39 @@ the live deploy those belong in the box's `.env`, and the GitHub secret of the
 same name feeds only the disabled PM2 path.
 
 ---
+
+## Production deploy
+
+`deploy-production-containers.yml` (#782) is manual-dispatch only and takes the
+same `sha-` tag staging does; the box pulls `auto-author-backend:<tag>` and
+`auto-author-frontend:<tag>-production` (#779) through
+`docker-compose.production.yml`. Every value below is set on the **`production`
+environment** (`Settings` → `Environments` → `production`), never at repository
+level. The names are deliberately distinct from staging's: an unset environment
+secret falls back to the repository secret of the same name, and the repo-level
+`SSH_KEY`/`USER`/`HOST` point at staging.
+
+| Kind | Name | Value |
+|---|---|---|
+| secret | `PRODUCTION_HOST` | Tailscale hostname of the production box |
+| secret | `PRODUCTION_SSH_USER` | SSH user on that box |
+| secret | `PRODUCTION_SSH_KEY` | Private key for that user |
+| secret | `PRODUCTION_SSH_KNOWN_HOSTS` | The box's `known_hosts` line(s); the host key is pinned, not trusted on first use |
+| secret | `PRODUCTION_TS_CLIENT_ID` | Tailscale OAuth client id (its own client, not staging's) |
+| secret | `PRODUCTION_TS_AUTH_SECRET` | Tailscale OAuth client secret |
+| variable | `PRODUCTION_TS_TAGS` | That client's **full** tag set, comma-separated (#490: a subset is rejected) |
+| variable | `PRODUCTION_DEPLOY_PATH` | Directory on the box holding the compose files and `.env` |
+
+The environment itself also needs, configured by the owner: **required
+reviewers** (the deploy waits for an approval) and a **deployment branch policy
+of `main` only**. The workflow refuses a non-`main` ref as well, but only the
+branch policy stops a branch from editing that check away.
+
+On the box, the `.env` holds the application secrets exactly as staging's does,
+plus `BETTER_AUTH_URL`, which the production overlay requires instead of
+inheriting the base file's staging default. Run the frontend on a subdomain with
+the API at `api.<that subdomain>` (#778). Rollback: re-run the workflow with the
+tag the run summary lists as "previously running".
 
 ## Required Secrets
 
