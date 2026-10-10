@@ -121,7 +121,9 @@ async def update_user(
     # Add updated_at timestamp
     user_data["updated_at"] = datetime.now(timezone.utc)
 
-    query: Dict = {"auth_id": auth_id}
+    # A tombstone (deleted account, #784) never matches, so a late Stripe event
+    # or an admin edit can't write personal data back onto it.
+    query: Dict = {"auth_id": auth_id, "deleted_at": {"$exists": False}}
     if extra_filter:
         query.update(extra_filter)
 
@@ -166,23 +168,31 @@ async def delete_user(
 ) -> bool:
     """Delete a user (soft delete by default) and revoke their better-auth identity.
 
-    The soft-deleted record keeps is_active=False (which the session resolver
-    rejects) but drops its email: the unique email index would otherwise make
-    a later sign-up with the same address fail to auto-create (#763).
+    A soft delete replaces the record with a tombstone of auth_id and deleted_at
+    (#784): replacing, not unsetting, erases every field, including ones added
+    later. The tombstone keeps the session resolver rejecting that id and stops
+    the auto-create path from reviving it; the email is gone, so the same
+    address can sign up again (#763).
     """
     if soft_delete:
-        result = await users_collection.update_one(
-            {"auth_id": auth_id},
-            {
-                "$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)},
-                "$unset": {"email": ""},
-            },
+        previous = await users_collection.find_one_and_replace(
+            {"auth_id": auth_id, "deleted_at": {"$exists": False}},
+            {"auth_id": auth_id, "deleted_at": datetime.now(timezone.utc)},
         )
-        success = result.modified_count > 0
     else:
         # Hard delete
-        result = await users_collection.delete_one({"auth_id": auth_id})
-        success = result.deleted_count > 0
+        previous = await users_collection.find_one_and_delete({"auth_id": auth_id})
+    success = previous is not None
+
+    # The returned pre-image is the last place the avatar URL exists (#785).
+    avatar_url = (previous or {}).get("avatar_url")
+    if avatar_url:
+        try:
+            from app.services.file_upload_service import FileUploadService
+
+            await FileUploadService().delete_profile_picture(avatar_url)
+        except Exception:
+            logger.error("Failed to delete avatar for user %s", auth_id, exc_info=True)
 
     # Unconditional: a better-auth user who never reached the backend has no
     # app record, but their sessions and credentials must still go.

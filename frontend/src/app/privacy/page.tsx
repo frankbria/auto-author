@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import SiteFooter from '@/components/SiteFooter';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
 
 export const metadata = {
   title: 'Privacy Policy · Auto Author',
@@ -165,10 +166,10 @@ export default function PrivacyPage() {
             <p>
               For privacy questions or data requests, contact us at{' '}
               <a
-                href="mailto:support@autoauthor.com"
+                href={SUPPORT_MAILTO}
                 className="text-primary underline-offset-4 hover:underline"
               >
-                support@autoauthor.com
+                {SUPPORT_EMAIL}
               </a>
               . See also our{' '}
               <Link

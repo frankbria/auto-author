@@ -9,7 +9,7 @@ endpoints with consistent formatting and detailed debugging information.
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException, status
 from app.schemas.errors import ErrorCode, ErrorDetail, create_error_response
-from app.services.ai_errors import AIServiceError
+from app.services.ai_errors import AIServiceError, AIServiceUnavailableError
 import logging
 import uuid
 
@@ -180,10 +180,16 @@ def handle_question_generation_error(
 
     # Handle AI service errors specially
     if isinstance(error, AIServiceError):
+        # An outage is 503 even when retrying won't help, e.g. no OpenAI credit (#775).
+        status_code = (
+            status.HTTP_503_SERVICE_UNAVAILABLE
+            if error.retryable or isinstance(error, AIServiceUnavailableError)
+            else status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
         error_response = create_error_response(
             error_code=ErrorCode.QUESTION_GENERATION_FAILED,
             message=f"Question generation failed: {error.message}",
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE if error.retryable else status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status_code,
             details=[
                 ErrorDetail(
                     message=error.message,
@@ -197,7 +203,6 @@ def handle_question_generation_error(
             ],
             request_id=request_id
         )
-        status_code = status.HTTP_503_SERVICE_UNAVAILABLE if error.retryable else status.HTTP_500_INTERNAL_SERVER_ERROR
     else:
         error_response = create_error_response(
             error_code=ErrorCode.QUESTION_GENERATION_FAILED,

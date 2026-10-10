@@ -8,6 +8,8 @@ establishes the user<->Stripe linkage the webhook reconciles on.
 import asyncio
 import hashlib
 import logging
+import threading
+import time
 from typing import Dict, Literal, Optional
 
 import stripe
@@ -16,7 +18,7 @@ from pydantic import BaseModel
 
 from app.api.dependencies import audit_request, get_rate_limiter
 from app.core.config import settings
-from app.core.entitlements import ai_quota_for_plan
+from app.core.entitlements import DEFAULT_PLAN, ai_quota_for_plan, has_live_subscription
 from app.core.security import get_current_user_from_session
 from app.db.user import get_user_by_auth_id, update_user
 
@@ -36,7 +38,7 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
     if not subscription_id:
         return
     try:
-        await asyncio.to_thread(
+        cancelled = await asyncio.to_thread(
             stripe.Subscription.cancel,
             subscription_id,
             api_key=settings.STRIPE_SECRET_KEY,
@@ -54,9 +56,18 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
         ) from None
     # Forget the cancelled id: if a later deletion step fails, the retry must not
     # depend on how Stripe answers a second cancel once the 24h key has expired.
+    # With the id gone, the webhook treats Stripe's subscription.deleted for it
+    # as another subscription's and ignores it (#768), so apply its effect here,
+    # watermark included: a late pre-cancel event for the dead subscription must
+    # land as stale_event, not re-establish it and grant pro.
     await update_user(
         auth_id,
-        {"stripe_subscription_id": None},
+        {
+            "stripe_subscription_id": None,
+            "stripe_subscription_status": None,
+            "plan": DEFAULT_PLAN,
+            "stripe_event_created": getattr(cancelled, "canceled_at", None) or int(time.time()),
+        },
         extra_filter={"stripe_subscription_id": subscription_id},
     )
 
@@ -94,10 +105,11 @@ async def get_plan_quotas(
 # to the subscribe action, Stripe's hosted page repeats it, and the consent
 # record stores it. Wording is plain-language pending counsel review (#791);
 # bump the version whenever the template changes.
-RENEWAL_DISCLOSURE_VERSION = "2026-10-02"
+RENEWAL_DISCLOSURE_VERSION = "2026-10-09"
 RENEWAL_DISCLOSURE_TEMPLATE = (
-    "Auto Author Pro is {price} per {period}, charged to your payment method "
-    "today and again at the start of each billing period. Your subscription "
+    "Auto Author Pro is {price} per {period} plus any applicable tax, charged "
+    "to your payment method today and again at the start of each billing period. "
+    "Your subscription "
     "renews automatically until you cancel. Cancel anytime in Auto Author under "
     "Settings → Billing → Manage billing; cancelling stops future renewals and "
     "takes effect at the end of the current billing period. Fees are "
@@ -195,6 +207,13 @@ async def create_checkout_session(
     """Create a Stripe Checkout session for upgrading to a paid plan."""
     _require_stripe_checkout()
 
+    # The subscription, not the plan: a past_due subscriber on free (first
+    # payment never landed) already has one, and a second would double-bill (#768).
+    if has_live_subscription(current_user):
+        raise HTTPException(
+            status_code=409,
+            detail="You already have a subscription. Use Manage billing to update or cancel it.",
+        )
     if current_user.get("plan") in PAID_PLANS:
         raise HTTPException(status_code=409, detail="You are already on a paid plan")
 
@@ -274,6 +293,14 @@ async def create_checkout_session(
                     "including automatic renewal until I cancel."
                 },
             },
+            # Tax (#783). The address and tax IDs are collected regardless, so
+            # turning STRIPE_AUTOMATIC_TAX on later changes nothing else. Stripe
+            # refuses both on an existing Customer unless Checkout may write the
+            # collected name and address back to it.
+            automatic_tax={"enabled": settings.STRIPE_AUTOMATIC_TAX},
+            billing_address_collection="required",
+            tax_id_collection={"enabled": True},
+            customer_update={"address": "auto", "name": "auto"},
             success_url=f"{frontend_base}/dashboard/settings?checkout=success",
             cancel_url=f"{frontend_base}/dashboard/settings?checkout=cancel",
         )
@@ -286,6 +313,55 @@ async def create_checkout_session(
         ) from None
 
     return CheckoutResponse(url=session.url)
+
+
+# #771: the portal's behaviour is pinned in code, not in unversioned dashboard
+# settings. Bump "portal_config_version" to roll out a changed Configuration:
+# the old one stops matching the lookup, so a new one is created.
+PORTAL_CONFIG_METADATA = {"app": "auto-author", "portal_config_version": "1"}
+_portal_config_id: Optional[str] = None  # per-process cache; Stripe is the source of truth
+# Serialises the cold-start lookup/create: Stripe answers a concurrent request
+# carrying the same in-flight idempotency key with a 409, not the shared result.
+_portal_config_lock = threading.Lock()
+
+
+def _get_or_create_portal_config(api_key: str) -> str:
+    """Return the id of our pinned portal Configuration, creating it if absent."""
+    global _portal_config_id
+    if _portal_config_id:
+        return _portal_config_id
+    with _portal_config_lock:
+        if _portal_config_id:
+            return _portal_config_id
+        return _lookup_or_create_portal_config(api_key)
+
+
+def _lookup_or_create_portal_config(api_key: str) -> str:
+    global _portal_config_id
+    existing = stripe.billing_portal.Configuration.list(
+        api_key=api_key, active=True, limit=100
+    )
+    for cfg in existing.auto_paging_iter():
+        meta = cfg.to_dict().get("metadata") or {}
+        if all(meta.get(k) == v for k, v in PORTAL_CONFIG_METADATA.items()):
+            _portal_config_id = cfg.id
+            return cfg.id
+    cfg = stripe.billing_portal.Configuration.create(
+        api_key=api_key,
+        # Fixed key: concurrent first calls collapse to one Configuration.
+        idempotency_key=f"portal-config-v{PORTAL_CONFIG_METADATA['portal_config_version']}",
+        metadata=PORTAL_CONFIG_METADATA,
+        business_profile={"headline": "Manage your Auto Author subscription"},
+        features={
+            # at_period_end matches the #770 disclosure: access continues to the
+            # end of the paid period, then the plan drops.
+            "subscription_cancel": {"enabled": True, "mode": "at_period_end"},
+            "payment_method_update": {"enabled": True},
+            "invoice_history": {"enabled": True},
+        },
+    )
+    _portal_config_id = cfg.id
+    return cfg.id
 
 
 class PortalResponse(BaseModel):
@@ -314,10 +390,14 @@ async def create_portal_session(
 
     frontend_base = settings.BETTER_AUTH_URL.rstrip("/")
     try:
+        config_id = await asyncio.to_thread(
+            _get_or_create_portal_config, settings.STRIPE_SECRET_KEY
+        )
         session = await asyncio.to_thread(
             stripe.billing_portal.Session.create,
             api_key=settings.STRIPE_SECRET_KEY,
             customer=customer_id,
+            configuration=config_id,
             return_url=f"{frontend_base}/dashboard/settings?tab=billing",
         )
     except stripe.StripeError:

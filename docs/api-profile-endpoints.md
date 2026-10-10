@@ -146,9 +146,14 @@ curl -X PATCH "http://localhost:8000/api/users/me" \
 
 Deletes the authenticated user's account. All owned content — books and their
 questions, responses, ratings, and chapter access logs — is permanently
-cascade-deleted (issue #179); the user record itself is retained but
-deactivated (`is_active: false`). If the content cascade fails, the request
-returns 500 and the account stays active so it can be retried.
+cascade-deleted (issue #179). The better-auth identity (user, credential
+accounts, sessions, 2FA secret) is removed (#763), and the user record is
+replaced by a tombstone holding only `auth_id` and `deleted_at` (#784): no
+email, name, bio, avatar URL or Stripe id survives. The uploaded avatar and
+every book's cover and thumbnail file are deleted as well (#785); a storage
+failure there is logged and does not fail the request. If the content cascade
+fails, the request returns 500 and the account stays active so it can be
+retried.
 
 **Endpoint**: `DELETE /users/me`
 

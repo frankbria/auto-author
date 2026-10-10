@@ -87,8 +87,8 @@ def test_account_deletion_user_not_found(auth_client_factory, fake_user):
 @pytest.mark.asyncio
 async def test_account_deletion_with_data_cleanup(auth_client_factory):
     """DELETE /users/me cascades the user's books and their questions,
-    responses, ratings and access logs; the user record itself is soft-deleted
-    (retained with is_active False). Issue #179."""
+    responses, ratings and access logs; the user record itself is erased to a
+    tombstone (#784). Issue #179."""
     client = await auth_client_factory()
     owner_id = "test-auth-id-123"  # conftest test_user auth_id
 
@@ -120,8 +120,8 @@ async def test_account_deletion_with_data_cleanup(auth_client_factory):
     ), "another user's data must not be touched"
 
     user_doc = await users.find_one({"auth_id": owner_id})
-    assert user_doc is not None, "user record is soft-deleted, not removed"
-    assert user_doc["is_active"] is False
+    assert user_doc is not None, "a tombstone is retained, not removed"
+    assert set(user_doc) == {"_id", "auth_id", "deleted_at"}
 
 
 @pytest.mark.asyncio

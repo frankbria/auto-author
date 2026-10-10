@@ -103,6 +103,14 @@ tag the run summary lists as "previously running".
 `NEXT_PUBLIC_BETTER_AUTH_URL`, and the `__BETTER_AUTH_URL__` substitution in
 `ecosystem.config.template.js`. Getting it wrong breaks auth and CORS together.
 
+The session cookie's domain is derived from `FRONTEND_URL`'s host: `dev.autoauthor.app`
+yields `.dev.autoauthor.app`, which the API at `api.dev.autoauthor.app` also receives.
+**Production must not put the frontend on the apex with the API at `api.<apex>`**
+(#778). `.autoauthor.app` would also match the shared staging box, so an apex gets
+a host-only cookie that `api.autoauthor.app` never receives. Use a subdomain for
+production (`app.autoauthor.app` + `api.app.autoauthor.app`), or serve the API from
+the frontend's own host.
+
 ### Database (MongoDB)
 
 | Secret | Description | Example |

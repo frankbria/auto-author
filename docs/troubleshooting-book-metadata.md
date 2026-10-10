@@ -186,6 +186,6 @@ If none of these troubleshooting steps resolve your issue:
 1. Take a screenshot of the error
 2. Note the steps to reproduce the problem
 3. Include your browser and operating system information
-4. Contact support at support@autoauthor.com
+4. Contact support at support@autoauthor.app
 
 Our support team typically responds within 24 business hours.

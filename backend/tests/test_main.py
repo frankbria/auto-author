@@ -84,6 +84,19 @@ class TestHealthCheckDependencies:
         assert data["checks"]["mongodb"] == "ok"
         assert "OPENAI_API_KEY" in data["checks"]["config"]
 
+    def test_health_names_ai_api_key_when_another_provider_has_none(
+        self, client: TestClient, monkeypatch
+    ):
+        """With AI_BASE_URL set the OpenAI key no longer counts (#917)."""
+        monkeypatch.setattr(settings, "AI_BASE_URL", "https://other.example/v1")
+        monkeypatch.setattr(settings, "AI_API_KEY", "")
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-openai", raising=False)
+        with patch("app.api.endpoints.router.get_database", return_value=_ok_db()):
+            response = client.get("/api/v1/health")
+        assert response.status_code == 503
+        config = response.json()["checks"]["config"]
+        assert "AI_API_KEY" in config and "OPENAI_API_KEY" not in config
+
     def test_health_503_when_production_still_has_placeholder_key(
         self, client: TestClient, monkeypatch
     ):

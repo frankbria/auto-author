@@ -11,6 +11,7 @@ unauthenticated — the signature is the auth.
 
 import hashlib
 import hmac
+import itertools
 import json
 import time
 
@@ -28,6 +29,10 @@ pytestmark = pytest.mark.asyncio
 TEST_WEBHOOK_SECRET = "whsec_test_secret_for_issue_220"
 TEST_PRO_PRICE_ID = "price_test_pro_123"
 WEBHOOK_URL = "/api/v1/webhooks/stripe"
+# Each event built gets a strictly later `created`, like events Stripe emits
+# in sequence. A counter, not the clock: two events built across a second
+# boundary must not flip a test between processed and stale_event.
+_event_clock = itertools.count(1_700_000_000)
 
 
 def sign(payload: bytes, secret: str = TEST_WEBHOOK_SECRET, timestamp: int = None) -> str:
@@ -46,12 +51,16 @@ def subscription_event(
     price_id: str = TEST_PRO_PRICE_ID,
     metadata: dict = None,
     status: str = "active",
+    created: int | None = None,
 ) -> bytes:
+    """A signed-ready event. ``created`` is always set, as on every real Stripe
+    event, so the out-of-order guard runs in every test that posts one (#769)."""
     return json.dumps(
         {
             "id": event_id,
             "object": "event",
             "type": event_type,
+            "created": next(_event_clock) if created is None else created,
             "data": {
                 "object": {
                     "id": subscription_id,
@@ -264,6 +273,24 @@ async def _post_signed(client, payload: bytes):
     )
 
 
+async def test_late_event_writes_nothing_onto_a_deleted_account(webhook_client):
+    """#784: the customer id is erased with the account, so Stripe's late events
+    reach it through the metadata fallback — and must not put the billing
+    identity back on the tombstone."""
+    from app.db.user import delete_user
+
+    await _seed_user(stripe_customer_id="cus_test_1")
+    await delete_user("auth-stripe-1")
+    resp = await _post_signed(
+        webhook_client, subscription_event(metadata={"auth_id": "auth-stripe-1"})
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "no_matching_user"}
+    assert set(await get_user_by_auth_id("auth-stripe-1")) == {
+        "_id", "auth_id", "deleted_at",
+    }
+
+
 class TestSubscriptionStatus:
     """The plan follows the subscription's status, not just its price (#767)."""
 
@@ -387,11 +414,11 @@ class TestReplayIdempotency:
         assert resp.status_code == 200
         assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
 
-    async def test_processing_failure_releases_marker_so_retry_works(
+    async def test_processing_failure_records_no_marker_so_retry_works(
         self, webhook_client, monkeypatch
     ):
         # Failure injection at our own persistence seam: if the user update
-        # blows up, the endpoint must 500 AND release the replay marker so
+        # blows up, the endpoint must 500 AND leave no replay marker so
         # Stripe's automatic retry reprocesses instead of hitting a "replay".
         from app.api.endpoints import webhooks as webhooks_module
 
@@ -414,12 +441,11 @@ class TestReplayIdempotency:
         assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
 
     async def test_mark_event_processed_dao(self, motor_reinit_db):
-        from app.db.stripe_events import mark_event_processed, unmark_event
+        from app.db.stripe_events import is_event_processed, mark_event_processed
 
-        assert await mark_event_processed("evt_dao_1") is True
-        assert await mark_event_processed("evt_dao_1") is False  # replay
-        assert await mark_event_processed("evt_dao_2") is True  # independent id
-        # Unmark releases the id (used when processing fails, so Stripe's retry
-        # isn't misclassified as a replay).
-        await unmark_event("evt_dao_1")
-        assert await mark_event_processed("evt_dao_1") is True
+        assert await is_event_processed("evt_dao_1") is False
+        await mark_event_processed("evt_dao_1")
+        assert await is_event_processed("evt_dao_1") is True
+        # A concurrent duplicate recording it again is not an error (#769).
+        await mark_event_processed("evt_dao_1")
+        assert await is_event_processed("evt_dao_2") is False  # independent id

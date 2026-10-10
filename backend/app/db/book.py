@@ -34,7 +34,9 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
 
         # Associate the book with the user
         await users_collection.update_one(
-            {"auth_id": user_auth_id}, {"$push": {"book_ids": str(book_obj.id)}}
+            # Never onto a tombstone (deleted account, #784).
+            {"auth_id": user_auth_id, "deleted_at": {"$exists": False}},
+            {"$push": {"book_ids": str(book_obj.id)}},
         )
 
         # Create audit log entry
@@ -358,6 +360,19 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
     # The book vanished between the ownership check and the delete.
     if counts is None:
         return False
+
+    # Only once the delete has committed: a removed file cannot roll back (#785).
+    cover_url = book.get("cover_image_url")
+    thumbnail_url = book.get("cover_thumbnail_url")
+    if cover_url or thumbnail_url:
+        try:
+            from app.services.file_upload_service import FileUploadService
+
+            await FileUploadService().delete_cover_image(cover_url, thumbnail_url)
+        except Exception:
+            logger.error(
+                "Failed to delete cover files for book %s", book_id, exc_info=True
+            )
 
     # Create audit log entry
     await create_audit_log(

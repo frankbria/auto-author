@@ -59,7 +59,7 @@ jobs:
       # OAuth client rather than a static auth key: the node is ephemeral and
       # re-tagged per run, so there is no long-lived key to rotate or leak.
       - name: Connect to Tailscale
-        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
         with:
           oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
@@ -112,6 +112,9 @@ jobs:
             "set -euo pipefail
              cd /opt/auto-author
              export IMAGE_TAG='${{ inputs.image_tag }}'
+             # docker-compose.yml requires ENVIRONMENT with no default (#777).
+             # This workflow only ever targets staging, so it says so here.
+             export ENVIRONMENT=staging
              # --pull always so a re-run of the same tag still fetches a rebuilt
              # image; compose would otherwise reuse a stale local layer.
              docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
@@ -132,8 +135,30 @@ jobs:
              done
              echo 'Health check failed; recent logs:'
              cd /opt/auto-author
+             # \`logs\` interpolates the compose files too, so it needs the same
+             # required vars as \`up\` or it aborts instead of printing anything.
+             export IMAGE_TAG='${{ inputs.image_tag }}' ENVIRONMENT=staging
              docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=60
              exit 1"
+
+      # #781: the frontend gets an explicit env list, not the shared .env. Check
+      # the running container rather than trusting the compose file. Prints
+      # variable NAMES only — never values — since this log is public.
+      - name: Frontend carries no backend secret
+        run: |
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            "set -euo pipefail
+             names=\$(docker exec auto-author-frontend-1 env | cut -d= -f1)
+             # An empty or wrong read would pass the leak check vacuously.
+             printf '%s\n' \"\$names\" | grep -qx DATABASE_URL \
+               || { echo '::error::could not read the frontend container env'; exit 1; }
+             leaked=\$(printf '%s\n' \"\$names\" | grep -E '^(OPENAI|STRIPE|AWS|CLOUDINARY)|^(SENTRY_DSN|AI_API_KEY)\$' | tr '\n' ' ' || true)
+             if [ -n \"\$leaked\" ]; then
+               echo \"::error::frontend container holds backend-only variables: \$leaked\"
+               exit 1
+             fi
+             echo 'frontend env holds no OPENAI/STRIPE/AWS/CLOUDINARY/SENTRY_DSN/AI_API_KEY variables'"
 
       # Deliberately last and deliberately conservative: pruning before the
       # health check would delete the image a rollback needs.
