@@ -175,15 +175,24 @@ async def delete_user(
     address can sign up again (#763).
     """
     if soft_delete:
-        result = await users_collection.replace_one(
+        previous = await users_collection.find_one_and_replace(
             {"auth_id": auth_id, "deleted_at": {"$exists": False}},
             {"auth_id": auth_id, "deleted_at": datetime.now(timezone.utc)},
         )
-        success = result.modified_count > 0
     else:
         # Hard delete
-        result = await users_collection.delete_one({"auth_id": auth_id})
-        success = result.deleted_count > 0
+        previous = await users_collection.find_one_and_delete({"auth_id": auth_id})
+    success = previous is not None
+
+    # The returned pre-image is the last place the avatar URL exists (#785).
+    avatar_url = (previous or {}).get("avatar_url")
+    if avatar_url:
+        try:
+            from app.services.file_upload_service import FileUploadService
+
+            await FileUploadService().delete_profile_picture(avatar_url)
+        except Exception:
+            logger.error("Failed to delete avatar for user %s", auth_id, exc_info=True)
 
     # Unconditional: a better-auth user who never reached the backend has no
     # app record, but their sessions and credentials must still go.
