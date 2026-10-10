@@ -54,7 +54,6 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
       description: '',
       genre: '',
       target_audience: '',
-      cover_image_url: '',
     },
   });
 
@@ -69,7 +68,6 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
         description: data.description,
         genre: data.genre,
         target_audience: data.target_audience, // pass as targetAudience for API compatibility
-        cover_image_url: data.cover_image_url,
       });
       toast.success({ title: 'Book created successfully!' });
       form.reset();
@@ -161,28 +159,6 @@ export function BookCreationWizard({ isOpen, onOpenChange, onSuccess }: BookCrea
                   </FormControl>
                   <FormDescription className="text-muted-foreground dark:text-gray-400">
                     Provide a short summary or description of your book project.
-                  </FormDescription>
-                  <FormMessage className="text-destructive dark:text-red-400" />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="cover_image_url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-foreground dark:text-gray-200">Cover Image URL</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="https://example.com/cover.jpg"
-                      className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-                      {...field}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormDescription className="text-muted-foreground dark:text-gray-400">
-                    Optional: Add a URL to your book&apos;s cover image.
                   </FormDescription>
                   <FormMessage className="text-destructive dark:text-red-400" />
                 </FormItem>

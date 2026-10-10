@@ -47,7 +47,6 @@ describe('BookCreationWizard', () => {
     description: 'A description of my test book',
     genre: 'business',
     target_audience: 'adult',
-    cover_image_url: 'https://example.com/cover.jpg',
   };
 
   const minimalBookData = {
@@ -76,7 +75,8 @@ describe('BookCreationWizard', () => {
       expect(screen.getByLabelText(/Book Title/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/Subtitle/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/Description/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Cover Image URL/i)).toBeInTheDocument();
+      // The cover is set by upload only; the URL is not a form field (#797).
+      expect(screen.queryByLabelText(/Cover Image URL/i)).not.toBeInTheDocument();
       expect(screen.getByLabelText(/Genre/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/Target Audience/i)).toBeInTheDocument();
     });
@@ -398,7 +398,6 @@ describe('BookCreationWizard', () => {
       await user.type(screen.getByLabelText(/Book Title/i), validBookData.title);
       await user.type(screen.getByLabelText(/Subtitle/i), validBookData.subtitle!);
       await user.type(screen.getByLabelText(/Description/i), validBookData.description!);
-      await user.type(screen.getByLabelText(/Cover Image URL/i), validBookData.cover_image_url!);
       await selectOption(user, /Genre/i, 'Business');
       await selectOption(user, /Target Audience/i, 'Adult');
 
@@ -412,9 +411,9 @@ describe('BookCreationWizard', () => {
             description: validBookData.description,
             genre: validBookData.genre,
             target_audience: validBookData.target_audience,
-            cover_image_url: validBookData.cover_image_url,
           })
         );
+        expect(mockBookClient.createBook.mock.calls[0][0]).not.toHaveProperty('cover_image_url');
       });
     });
 
@@ -553,7 +552,6 @@ describe('BookCreationWizard', () => {
             title: minimalBookData.title,
             subtitle: '',
             description: '',
-            cover_image_url: '',
           })
         );
       });
@@ -612,7 +610,6 @@ describe('BookCreationWizard', () => {
       expect(screen.getByLabelText(/Description/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/Genre/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/Target Audience/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Cover Image URL/i)).toBeInTheDocument();
 
       // Check for dialog role
       expect(screen.getByRole('dialog')).toBeInTheDocument();

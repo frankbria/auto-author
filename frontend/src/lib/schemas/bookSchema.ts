@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { sanitizeText, sanitizeUrl } from '../security';
+import { sanitizeText } from '../security';
 
 export const bookCreationSchema = z.object({
   title: z
@@ -29,12 +29,6 @@ export const bookCreationSchema = z.object({
     .string()
     .transform(sanitizeText)
     .refine(val => val.length <= 100, { message: 'Target audience must be 100 characters or less' })
-    .optional()
-    .or(z.literal('')),
-  cover_image_url: z
-    .string()
-    .transform(sanitizeUrl)
-    .refine(val => val === '' || val.startsWith('http'), { message: 'Cover image must be a valid URL' })
     .optional()
     .or(z.literal('')),
 });

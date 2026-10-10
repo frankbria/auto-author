@@ -26,7 +26,7 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
 
   // Use a hash of the book fields as a unique key for reset detection
   const getBookKey = (b: BookFormData) =>
-    [b.title, b.subtitle, b.description, b.genre, b.target_audience, b.cover_image_url].join('||');
+    [b.title, b.subtitle, b.description, b.genre, b.target_audience].join('||');
   const [lastBookKey, setLastBookKey] = React.useState(getBookKey(book));
   const [lastSaved, setLastSaved] = React.useState(book);
 
@@ -49,7 +49,6 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
         description: values.description ?? '',
         genre: values.genre ?? '',
         target_audience: values.target_audience ?? '',
-        cover_image_url: values.cover_image_url ?? '',
       };
       if (
         JSON.stringify(safeValues) !== JSON.stringify(lastSaved) &&
@@ -160,19 +159,6 @@ export const BookMetadataForm: React.FC<BookMetadataFormProps> = ({ book, onUpda
             )}
           />
         </div>
-        <FormField
-          control={form.control}
-          name="cover_image_url"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Cover Image URL</FormLabel>
-              <FormControl>
-                <Input {...field} maxLength={300} disabled={isSaving} className="text-gray-100 placeholder:text-gray-300" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         {isSaving && (
           <div className="flex items-center text-gray-400" role="status" aria-live="polite">
             <HugeiconsIcon icon={Loading03Icon} size={12} className="mr-2 animate-spin text-blue-600 dark:text-blue-400" />
