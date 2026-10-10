@@ -301,28 +301,24 @@ class FileUploadService:
 
     async def delete_cover_image(self, image_url: str, thumbnail_url: Optional[str] = None):
         """Delete a cover image and its thumbnail."""
-        try:
-            if self.cloud_storage:
-                # Delete from cloud storage
-                if image_url:
-                    await self.cloud_storage.delete_image(image_url)
-                if thumbnail_url:
-                    await self.cloud_storage.delete_image(thumbnail_url)
-            else:
-                # Delete from local storage
-                for url in (image_url, thumbnail_url):
-                    if not url:
-                        continue
-                    path = _resolve_local_cover_path(url)
-                    if path is None:
-                        logger.warning("Refusing to delete cover image outside uploads dir")
-                        continue
-                    if path.exists():
-                        path.unlink()
-
-        except Exception as e:
-            # Log error but don't fail the operation
-            logger.error(f"Error deleting image files: {e}")
+        # One try per file: a failed cover delete must not skip the thumbnail.
+        for url in (image_url, thumbnail_url):
+            if not url:
+                continue
+            try:
+                if self.cloud_storage:
+                    if not await self.cloud_storage.delete_image(url):
+                        logger.warning("Cloud storage did not delete cover image %s", url)
+                    continue
+                path = _resolve_local_cover_path(url)
+                if path is None:
+                    logger.warning("Refusing to delete cover image outside uploads dir")
+                    continue
+                if path.exists():
+                    path.unlink()
+            except Exception as e:
+                # Log error but don't fail the operation
+                logger.error(f"Error deleting image file {url}: {e}")
 
     async def process_and_save_profile_picture(
         self,
@@ -381,7 +377,10 @@ class FileUploadService:
             if not image_url:
                 return
             if self.cloud_storage:
-                await self.cloud_storage.delete_image(image_url)
+                if not await self.cloud_storage.delete_image(image_url):
+                    logger.warning(
+                        "Cloud storage did not delete profile picture %s", image_url
+                    )
                 return
             path = _resolve_local_profile_path(image_url)
             if path is None:

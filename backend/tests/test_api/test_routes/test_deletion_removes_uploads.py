@@ -169,6 +169,91 @@ async def test_avatar_storage_failure_is_logged_and_the_user_is_still_erased(
     assert any("gone-2" in record.getMessage() for record in caplog.records)
 
 
+# --- cloud storage -----------------------------------------------------------
+
+
+class _FakeCloud:
+    """Stands in for S3/Cloudinary, the one dependency here with no local form."""
+
+    def __init__(self):
+        self.deleted = []
+
+    async def delete_image(self, url: str) -> bool:
+        if "unreachable" in url:
+            raise ConnectionError("storage unreachable")
+        if "foreign" in url:
+            return False  # what both providers return for a URL they don't own
+        self.deleted.append(url)
+        return True
+
+
+@pytest.fixture
+def cloud(monkeypatch):
+    fake = _FakeCloud()
+    monkeypatch.setattr(fus, "get_cloud_storage_service", lambda: fake)
+    return fake
+
+
+async def _cloud_book(owner_id: str, cover: str, thumbnail: str) -> str:
+    books = await get_collection("books")
+    result = await books.insert_one(
+        {
+            "title": "Doomed",
+            "owner_id": owner_id,
+            "cover_image_url": f"https://cdn.example.com/{cover}",
+            "cover_thumbnail_url": f"https://cdn.example.com/{thumbnail}",
+        }
+    )
+    return str(result.inserted_id)
+
+
+async def test_cloud_book_delete_removes_cover_and_thumbnail(motor_reinit_db, cloud):
+    book_id = await _cloud_book("owner-5", "c.jpg", "c_thumb.jpg")
+
+    assert await delete_book(book_id, "owner-5") is True
+
+    assert cloud.deleted == [
+        "https://cdn.example.com/c.jpg",
+        "https://cdn.example.com/c_thumb.jpg",
+    ]
+
+
+async def test_cloud_thumbnail_is_deleted_even_when_the_cover_delete_raises(
+    motor_reinit_db, cloud, caplog
+):
+    book_id = await _cloud_book("owner-6", "unreachable.jpg", "t_thumb.jpg")
+
+    with caplog.at_level(logging.ERROR, logger="app.services.file_upload_service"):
+        assert await delete_book(book_id, "owner-6") is True
+
+    assert cloud.deleted == ["https://cdn.example.com/t_thumb.jpg"]
+    assert any("unreachable" in record.getMessage() for record in caplog.records)
+
+
+async def test_cloud_refusing_a_cover_is_logged(motor_reinit_db, cloud, caplog):
+    """A False from the provider is a file left behind; it must not be silent."""
+    book_id = await _cloud_book("owner-7", "foreign.jpg", "foreign_thumb.jpg")
+
+    with caplog.at_level(logging.WARNING, logger="app.services.file_upload_service"):
+        assert await delete_book(book_id, "owner-7") is True
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("foreign.jpg" in m for m in messages)
+    assert any("foreign_thumb.jpg" in m for m in messages)
+
+
+async def test_cloud_refusing_an_avatar_is_logged(motor_reinit_db, cloud, caplog):
+    users = await get_collection("users")
+    await users.insert_one(
+        {"auth_id": "gone-3", "avatar_url": "https://cdn.example.com/foreign-a.jpg"}
+    )
+
+    with caplog.at_level(logging.WARNING, logger="app.services.file_upload_service"):
+        assert await delete_user("gone-3") is True
+
+    assert any("foreign-a.jpg" in r.getMessage() for r in caplog.records)
+
+
 # --- routes ------------------------------------------------------------------
 
 
