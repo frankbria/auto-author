@@ -24,6 +24,8 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
+        # The backend's tag. The staging overlay pulls the frontend's staging
+        # variant of the same build, <tag>-staging (#779).
         description: 'Image tag to deploy (e.g. sha-3931169). Use an older tag to roll back.'
         required: true
         type: string
@@ -173,7 +175,7 @@ jobs:
         if: always()
         run: |
           { echo '## Staging container deploy';
-            echo "- tag: \`${{ inputs.image_tag }}\`";
+            echo "- tag: \`${{ inputs.image_tag }}\` (frontend: \`${{ inputs.image_tag }}-staging\`)";
             echo "- result: ${{ job.status }}";
             echo '- rollback: re-run this workflow with an earlier `sha-` tag';
-          } >> $GITHUB_STEP_SUMMARY
+          } >> "$GITHUB_STEP_SUMMARY"

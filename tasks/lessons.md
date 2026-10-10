@@ -1310,3 +1310,8 @@ To back the corrected comment on the reportlab lock (`trustedSchemes`/`trustedHo
 ### "@copilot resolve the merge conflicts" also edits tests
 Asked to resolve conflicts on #865, Copilot merged main and then pushed a second commit that moved `expected_version` out of the `toc` object in two e2e tests. `PUT /books/{id}/toc` reads only `data["toc"]`, so the tests stopped exercising the optimistic lock, and CI could not notice because those tests skip without an OpenAI key. After a bot resolves conflicts, list its non-merge commits (`git log --no-merges origin/main..<branch>`) and read each one against the route it touches.
 
+
+## #779 per-environment frontend image (2026-10-10)
+
+### Do not build for an environment that does not exist (#899)
+The first version of #899 added a `frontend (production)` build to the main matrix, with a fail-closed check on that environment's variables. No production exists, so the PR could only merge after the owner created a GitHub `production` environment, and I reported that as a blocker for two rounds. The owner's correction: nothing may block on production before there is one. The issue asked for a per-environment build mechanism, not for a second environment. Ship the mechanism with the environments that exist (staging), and let the production entry arrive in the PR that deploys to production (#782). Before reporting "blocked on the owner", check whether the blocker is something the change itself introduced.

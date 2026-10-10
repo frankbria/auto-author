@@ -26,11 +26,17 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Next inlines NEXT_PUBLIC_* into the client bundle at build time, so anything the
-# browser needs must be present here rather than only at runtime.
+# browser needs must be present here rather than only at runtime — and the image
+# is only valid for the environment these came from (#779). No defaults: CI and
+# docker-compose.build.yml supply each environment's own values.
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_BETTER_AUTH_URL
+ARG NEXT_PUBLIC_SENTRY_DSN
+ARG NEXT_PUBLIC_ENVIRONMENT
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     NEXT_PUBLIC_BETTER_AUTH_URL=${NEXT_PUBLIC_BETTER_AUTH_URL} \
+    NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
+    NEXT_PUBLIC_ENVIRONMENT=${NEXT_PUBLIC_ENVIRONMENT} \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

@@ -40,6 +40,17 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-02
 
+- **One frontend image per environment, with no staging fallbacks (#779, P0.31)**:
+  - **The bug.** Next inlines `NEXT_PUBLIC_*` into the client bundle at build time. `build-images.yml` baked repo-level vars with staging hostnames as the `||` fallback and tagged the one result `sha-*` and `staging`. A production frontend could not be built without repointing staging, and an unset var shipped staging hosts silently. No repo or environment vars existed, so every image so far came from those fallbacks.
+  - **The fix.**
+    - The matrix builds one frontend per environment. Staging is the only one today; production is one more matrix entry, added with its deploy (#782). Each job runs in its GitHub environment with `deployment: false`, so `vars.*` are that environment's values and no fake deployment is recorded.
+    - Build args have no fallbacks, and a publishing run fails closed if `NEXT_PUBLIC_API_URL` or `NEXT_PUBLIC_BETTER_AUTH_URL` is unset. `NEXT_PUBLIC_SENTRY_DSN` (optional) and `NEXT_PUBLIC_ENVIRONMENT` (the environment's name) are now build args too.
+    - Frontend tags are `sha-<short>-staging` (also floated as `staging`). The backend keeps `sha-<short>`, which stays the deploy's `image_tag`, and the staging overlay pulls `<tag>-staging`.
+    - The smoke test greps the image's `.next/static` for its own API host. `docker-compose.build.yml` requires the values instead of defaulting to staging.
+    - PR builds name no environment. They prove the Dockerfile builds and publish nothing.
+  - **Verified.** `scripts/test_frontend_image_per_environment.py` has 9 tests. Restoring a fallback, re-enabling deployments, dropping a variant's environment, defaulting the compose arg, un-suffixing the overlay or removing a Dockerfile ARG each fails a test. Two local `docker build`s were checked: each `.next/static` holds its own API host in 7 files and the other environment's in 0. The workflow's own fail-closed script exits 1 per missing var. `actionlint` is clean on both touched workflows.
+  - **Setup.** `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_BETTER_AUTH_URL` are set on the `staging` environment. Nothing here needs a `production` environment.
+
 - **PDF export no longer parses author text as ReportLab markup (#752, P0.4)**:
   - **The bug.** Title, subtitle, author name, description, genre, audience, chapter title and description, and every body paragraph went to `Paragraph()` unescaped (only `author_bio` was escaped). Text like `A </i> B` crashed the export, and `<img src="/server/path">` embedded a server-local file, with an `UnidentifiedImageError` that doubled as a file-existence oracle.
   - **The fix.** One helper, `_pdf_text`, escapes every user-derived string before `Paragraph()`. At import, `rl_config.trustedSchemes = ['data']` and `trustedHosts = []`, a pin, not a fix: reportlab 5.0.1 already refuses URL image sources (`http`, `file://`, `data:`) with its defaults, measured both ways, and the lock keeps an upgrade that loosens them from turning `<img>` into SSRF. It does not cover a plain filesystem path, which reportlab opens before any scheme check, so the escape is the sole guard against embedding a server-local file. Any new `Paragraph()` call must go through `_pdf_text`. It is PDF-only: python-docx escapes for itself and Markdown has nothing to escape, so the DOCX and Markdown builders pass raw values (escaping there exported `Sci-Fi & Fantasy` as `Sci-Fi &amp; Fantasy`).
