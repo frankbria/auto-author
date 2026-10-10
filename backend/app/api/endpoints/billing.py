@@ -105,10 +105,11 @@ async def get_plan_quotas(
 # to the subscribe action, Stripe's hosted page repeats it, and the consent
 # record stores it. Wording is plain-language pending counsel review (#791);
 # bump the version whenever the template changes.
-RENEWAL_DISCLOSURE_VERSION = "2026-10-02"
+RENEWAL_DISCLOSURE_VERSION = "2026-10-09"
 RENEWAL_DISCLOSURE_TEMPLATE = (
-    "Auto Author Pro is {price} per {period}, charged to your payment method "
-    "today and again at the start of each billing period. Your subscription "
+    "Auto Author Pro is {price} per {period} plus any applicable tax, charged "
+    "to your payment method today and again at the start of each billing period. "
+    "Your subscription "
     "renews automatically until you cancel. Cancel anytime in Auto Author under "
     "Settings → Billing → Manage billing; cancelling stops future renewals and "
     "takes effect at the end of the current billing period. Fees are "
@@ -292,6 +293,14 @@ async def create_checkout_session(
                     "including automatic renewal until I cancel."
                 },
             },
+            # Tax (#783). The address and tax IDs are collected regardless, so
+            # turning STRIPE_AUTOMATIC_TAX on later changes nothing else. Stripe
+            # refuses both on an existing Customer unless Checkout may write the
+            # collected name and address back to it.
+            automatic_tax={"enabled": settings.STRIPE_AUTOMATIC_TAX},
+            billing_address_collection="required",
+            tax_id_collection={"enabled": True},
+            customer_update={"address": "auto", "name": "auto"},
             success_url=f"{frontend_base}/dashboard/settings?checkout=success",
             cancel_url=f"{frontend_base}/dashboard/settings?checkout=cancel",
         )
