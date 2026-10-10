@@ -276,14 +276,19 @@ async def test_deletion_erases_the_account_to_a_tombstone(motor_reinit_db):
             json={
                 "display_name": "Zebedee Q.",
                 "bio": "Quillfeather writes about owls",
-                "avatar_url": "https://example.com/Zebedee.png",
             },
         )
         assert patched.status_code == 200, patched.text
-        # Billing identity is webhook-written, not API-writable.
+        # Billing identity is webhook-written and the avatar URL upload-written;
+        # neither is API-writable (#797).
         await users.update_one(
             {"auth_id": seeded["user_id"]},
-            {"$set": {"stripe_customer_id": "cus_erase_me"}},
+            {
+                "$set": {
+                    "stripe_customer_id": "cus_erase_me",
+                    "avatar_url": "https://example.com/Zebedee.png",
+                }
+            },
         )
         before = await _docs_mentioning(*identifying)
         assert any(h.startswith("users:") for h in before), "scan must see the data"

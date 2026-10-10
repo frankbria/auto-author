@@ -91,7 +91,8 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
     display_name: Optional[str] = Field(None, max_length=100)
-    avatar_url: Optional[str] = None
+    # avatar_url is deliberately absent (#797): the stored value is what storage
+    # is asked to delete, so only the avatar upload route writes it.
     bio: Optional[str] = Field(None, max_length=1000)
     preferences: Optional[UserPreferences] = None
     metadata: Optional[Dict[str, Any]] = None
@@ -111,7 +112,6 @@ class UserUpdate(BaseModel):
                 "first_name": "Updated",
                 "last_name": "Name",
                 "display_name": "Updated Name",
-                "avatar_url": "https://example.com/new-avatar.jpg",
                 "bio": "Author and educator with 10+ years experience",
                 "preferences": {
                     "theme": "dark",

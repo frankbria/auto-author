@@ -84,7 +84,7 @@ class TestS3StorageService:
         s3_service.s3_client.delete_object.return_value = {}
 
         url = "https://test-bucket.s3.us-east-1.amazonaws.com/folder/image.jpg"
-        result = await s3_service.delete_image(url)
+        result = await s3_service.delete_image(url, "folder/")
 
         assert result is True
         s3_service.s3_client.delete_object.assert_called_once_with(
@@ -95,7 +95,7 @@ class TestS3StorageService:
     @pytest.mark.asyncio
     async def test_s3_delete_image_invalid_url(self, s3_service):
         """Test deletion with invalid URL."""
-        result = await s3_service.delete_image("https://wrong-bucket.com/image.jpg")
+        result = await s3_service.delete_image("https://wrong-bucket.com/image.jpg", "")
         assert result is False
         s3_service.s3_client.delete_object.assert_not_called()
 
@@ -178,7 +178,7 @@ class TestCloudinaryStorageService:
         }
 
         url = "https://res.cloudinary.com/test/image/upload/v123/folder/subfolder/image.jpg"
-        result = await cloudinary_service.delete_image(url)
+        result = await cloudinary_service.delete_image(url, "folder/")
 
         assert result is True
         cloudinary_service.cloudinary_uploader.destroy.assert_called_once_with('folder/subfolder/image')
@@ -186,7 +186,7 @@ class TestCloudinaryStorageService:
     @pytest.mark.asyncio
     async def test_cloudinary_delete_image_invalid_url(self, cloudinary_service):
         """Test deletion with invalid URL."""
-        result = await cloudinary_service.delete_image("https://wrongsite.com/image.jpg")
+        result = await cloudinary_service.delete_image("https://wrongsite.com/image.jpg", "")
         assert result is False
         cloudinary_service.cloudinary_uploader.destroy.assert_not_called()
 

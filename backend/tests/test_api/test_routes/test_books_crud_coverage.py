@@ -334,7 +334,7 @@ class _FakeUploadService:
             f"/uploads/cover_images/{book_id}_thumb.png",
         )
 
-    async def delete_cover_image(self, image_url, thumbnail_url):
+    async def delete_cover_image(self, book_id, image_url, thumbnail_url=None):
         self.deleted.append((image_url, thumbnail_url))
         return None
 

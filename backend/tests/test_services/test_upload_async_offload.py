@@ -163,7 +163,9 @@ class TestCloudStorageOffload:
         )
 
         url = "https://b.s3.us-east-1.amazonaws.com/cover_images/x.jpg"
-        (ok, ticks) = await _count_ticks_while(service.delete_image(url))
+        (ok, ticks) = await _count_ticks_while(
+            service.delete_image(url, "cover_images/")
+        )
 
         assert ok is True
         assert ticks > 0
@@ -204,7 +206,9 @@ class TestCloudStorageOffload:
         service.cloudinary_uploader = uploader
 
         url = "https://res.cloudinary.com/demo/image/upload/v1234/cover_images/a.jpg"
-        (ok, ticks) = await _count_ticks_while(service.delete_image(url))
+        (ok, ticks) = await _count_ticks_while(
+            service.delete_image(url, "cover_images/")
+        )
 
         assert ok is True
         assert ticks > 0
@@ -234,7 +238,9 @@ class TestCoverUploadRollback:
         with pytest.raises(Exception):
             await service.process_and_save_cover_image(_make_upload(), "book1")
 
-        cloud.delete_image.assert_awaited_once_with("https://cdn/main.jpg")
+        cloud.delete_image.assert_awaited_once_with(
+            "https://cdn/main.jpg", "cover_images/book1/"
+        )
 
     @pytest.mark.asyncio
     async def test_rollback_failure_does_not_mask_the_upload_failure(self):

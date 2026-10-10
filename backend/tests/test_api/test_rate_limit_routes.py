@@ -249,6 +249,35 @@ class TestRateLimitDrivesReal429:
 
         _assert_429(r3)
 
+    @pytest.mark.asyncio
+    async def test_cover_upload_rate_limited(
+        self, auth_client_factory, arm_real_rate_limiter, tmp_path, monkeypatch
+    ):
+        """#797: five cover uploads fit in a 60s window and the 6th is refused.
+        Each upload decodes, resizes and stores two images, and the route had
+        no limiter at all.
+        """
+        import app.services.file_upload_service as fus
+
+        monkeypatch.setattr(fus, "COVER_IMAGES_DIR", tmp_path)
+        monkeypatch.setattr(fus, "get_cloud_storage_service", lambda: None)
+        api = await auth_client_factory()
+        book_id = await _create_book(api)
+
+        arm_real_rate_limiter(5, 60)
+
+        url = f"/api/v1/books/{book_id}/cover-image"
+        for attempt in range(1, 6):
+            ok = await api.post(
+                url, files={"file": ("cover.jpg", _jpeg_bytes(), "image/jpeg")}
+            )
+            assert ok.status_code == 200, f"upload {attempt}: {ok.text}"
+        sixth = await api.post(
+            url, files={"file": ("cover.jpg", _jpeg_bytes(), "image/jpeg")}
+        )
+
+        _assert_429(sixth)
+
 
 # --------------------------------------------------------------------------- #
 # Class 2: wiring completeness across the whole app
@@ -281,6 +310,7 @@ EXPECTED_RATE_LIMITED_ROUTES = {
     ("PUT", "/api/v1/books/{book_id}"),
     ("PATCH", "/api/v1/books/{book_id}"),
     ("DELETE", "/api/v1/books/{book_id}"),
+    ("POST", "/api/v1/books/{book_id}/cover-image"),
     ("POST", "/api/v1/books/{book_id}/analyze-summary"),
     ("POST", "/api/v1/books/{book_id}/generate-questions"),
     ("POST", "/api/v1/books/{book_id}/generate-toc"),
@@ -296,7 +326,7 @@ EXPECTED_RATE_LIMITED_ROUTES = {
     ("POST", "/api/v1/books/{book_id}/chapters/{chapter_id}/enhance-transcription"),
 }
 
-assert len(EXPECTED_RATE_LIMITED_ROUTES) == 26
+assert len(EXPECTED_RATE_LIMITED_ROUTES) == 27
 
 
 class TestRateLimiterWiringCompleteness:
@@ -304,7 +334,7 @@ class TestRateLimiterWiringCompleteness:
         """Regression guard for issue #199: walks the live app and confirms
         every route in EXPECTED_RATE_LIMITED_ROUTES still carries
         Depends(get_rate_limiter(...)). If a future change drops the
-        dependency from any one of these 26 routes, this test names exactly
+        dependency from any one of these 27 routes, this test names exactly
         which (method, path) lost it.
         """
         calls_by_route = route_dependency_calls()

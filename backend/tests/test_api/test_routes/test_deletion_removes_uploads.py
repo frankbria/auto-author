@@ -37,30 +37,46 @@ def _names(directory):
     return sorted(p.name for p in directory.iterdir())
 
 
-async def _book_with_cover(uploads, owner_id: str, stem: str) -> str:
+# Files are named the way the upload service names them, <owner>_<uuid hex>:
+# the delete helpers refuse anything else (#797).
+_HEX = "0" * 32
+
+
+def _cover_files(book_id: str) -> list:
+    return [f"{book_id}_{_HEX}.jpg", f"{book_id}_{_HEX}_thumb.jpg"]
+
+
+def _avatar_file(auth_id: str) -> str:
+    return f"{auth_id}_{_HEX}.jpg"
+
+
+async def _book_with_cover(uploads, owner_id: str) -> str:
     """Insert a book whose cover and thumbnail exist on disk. Returns its id."""
-    (uploads.covers / f"{stem}.jpg").write_bytes(b"cover")
-    (uploads.covers / f"{stem}_thumb.jpg").write_bytes(b"thumb")
+    book_id = str(ObjectId())
+    cover, thumb = _cover_files(book_id)
+    (uploads.covers / cover).write_bytes(b"cover")
+    (uploads.covers / thumb).write_bytes(b"thumb")
     books = await get_collection("books")
-    result = await books.insert_one(
+    await books.insert_one(
         {
+            "_id": ObjectId(book_id),
             "title": "Doomed",
             "owner_id": owner_id,
-            "cover_image_url": f"/uploads/cover_images/{stem}.jpg",
-            "cover_thumbnail_url": f"/uploads/cover_images/{stem}_thumb.jpg",
+            "cover_image_url": f"/uploads/cover_images/{cover}",
+            "cover_thumbnail_url": f"/uploads/cover_images/{thumb}",
         }
     )
-    return str(result.inserted_id)
+    return book_id
 
 
 async def _user_with_avatar(uploads, auth_id: str) -> None:
-    (uploads.avatars / f"{auth_id}.jpg").write_bytes(b"avatar")
+    (uploads.avatars / _avatar_file(auth_id)).write_bytes(b"avatar")
     users = await get_collection("users")
     await users.insert_one(
         {
             "auth_id": auth_id,
             "email": f"{auth_id}@example.com",
-            "avatar_url": f"/uploads/profile_pictures/{auth_id}.jpg",
+            "avatar_url": f"/uploads/profile_pictures/{_avatar_file(auth_id)}",
         }
     )
 
@@ -83,7 +99,7 @@ def _jpeg() -> BytesIO:
 
 
 async def test_delete_book_removes_cover_and_thumbnail(motor_reinit_db, uploads):
-    book_id = await _book_with_cover(uploads, "owner-1", "a")
+    book_id = await _book_with_cover(uploads, "owner-1")
 
     assert await delete_book(book_id, "owner-1") is True
 
@@ -94,7 +110,7 @@ async def test_failed_cascade_keeps_the_cover_files(
     motor_reinit_db, uploads, monkeypatch
 ):
     """The book survives a failed cascade, so its cover has to survive too."""
-    book_id = await _book_with_cover(uploads, "owner-2", "b")
+    book_id = await _book_with_cover(uploads, "owner-2")
 
     async def _boom(*args):
         raise RuntimeError("simulated mongo failure")
@@ -104,21 +120,21 @@ async def test_failed_cascade_keeps_the_cover_files(
     with pytest.raises(RuntimeError):
         await delete_book(book_id, "owner-2")
 
-    assert _names(uploads.covers) == ["b.jpg", "b_thumb.jpg"]
+    assert _names(uploads.covers) == _cover_files(book_id)
 
 
 async def test_non_owner_delete_keeps_the_cover_files(motor_reinit_db, uploads):
-    book_id = await _book_with_cover(uploads, "owner-3", "c")
+    book_id = await _book_with_cover(uploads, "owner-3")
 
     assert await delete_book(book_id, "someone-else") is False
 
-    assert _names(uploads.covers) == ["c.jpg", "c_thumb.jpg"]
+    assert _names(uploads.covers) == _cover_files(book_id)
 
 
 async def test_storage_failure_is_logged_and_the_book_is_still_deleted(
     motor_reinit_db, uploads, monkeypatch, caplog
 ):
-    book_id = await _book_with_cover(uploads, "owner-4", "d")
+    book_id = await _book_with_cover(uploads, "owner-4")
     _block_storage(uploads, monkeypatch, "COVER_IMAGES_DIR")
 
     with caplog.at_level(logging.ERROR, logger="app.db.book"):
@@ -132,13 +148,13 @@ async def test_storage_failure_is_logged_and_the_book_is_still_deleted(
 async def test_delete_all_user_books_removes_every_cover_of_that_owner(
     motor_reinit_db, uploads
 ):
-    await _book_with_cover(uploads, "victim", "v1")
-    await _book_with_cover(uploads, "victim", "v2")
-    await _book_with_cover(uploads, "bystander", "kept")
+    await _book_with_cover(uploads, "victim")
+    await _book_with_cover(uploads, "victim")
+    kept = await _book_with_cover(uploads, "bystander")
 
     assert await delete_all_user_books("victim") == 2
 
-    assert _names(uploads.covers) == ["kept.jpg", "kept_thumb.jpg"]
+    assert _names(uploads.covers) == _cover_files(kept)
 
 
 # --- account deletion --------------------------------------------------------
@@ -151,7 +167,7 @@ async def test_delete_user_removes_the_avatar(motor_reinit_db, uploads, soft_del
 
     assert await delete_user("gone", soft_delete=soft_delete) is True
 
-    assert _names(uploads.avatars) == ["bystander.jpg"]
+    assert _names(uploads.avatars) == [_avatar_file("bystander")]
 
 
 async def test_avatar_storage_failure_is_logged_and_the_user_is_still_erased(
@@ -177,8 +193,10 @@ class _FakeCloud:
 
     def __init__(self):
         self.deleted = []
+        self.prefixes = set()
 
-    async def delete_image(self, url: str) -> bool:
+    async def delete_image(self, url: str, key_prefix: str) -> bool:
+        self.prefixes.add(key_prefix)
         if "unreachable" in url:
             raise ConnectionError("storage unreachable")
         if "foreign" in url:
@@ -216,6 +234,7 @@ async def test_cloud_book_delete_removes_cover_and_thumbnail(motor_reinit_db, cl
         "https://cdn.example.com/c.jpg",
         "https://cdn.example.com/c_thumb.jpg",
     ]
+    assert cloud.prefixes == {f"cover_images/{book_id}/"}
 
 
 async def test_cloud_thumbnail_is_deleted_even_when_the_cover_delete_raises(
@@ -252,6 +271,7 @@ async def test_cloud_refusing_an_avatar_is_logged(motor_reinit_db, cloud, caplog
         assert await delete_user("gone-3") is True
 
     assert any("foreign-a.jpg" in r.getMessage() for r in caplog.records)
+    assert cloud.prefixes == {"profile_pictures/gone-3/"}
 
 
 # --- routes ------------------------------------------------------------------
@@ -284,12 +304,13 @@ async def test_book_delete_route_removes_an_uploaded_cover(
 async def test_account_delete_route_removes_avatar_and_covers(
     auth_client_factory, test_user, uploads
 ):
-    (uploads.avatars / "me.jpg").write_bytes(b"avatar")
+    mine = _avatar_file(test_user["auth_id"])
+    (uploads.avatars / mine).write_bytes(b"avatar")
     client = await auth_client_factory(
-        overrides={"avatar_url": "/uploads/profile_pictures/me.jpg"}
+        overrides={"avatar_url": f"/uploads/profile_pictures/{mine}"}
     )
-    await _book_with_cover(uploads, test_user["auth_id"], "mine-1")
-    await _book_with_cover(uploads, test_user["auth_id"], "mine-2")
+    await _book_with_cover(uploads, test_user["auth_id"])
+    await _book_with_cover(uploads, test_user["auth_id"])
 
     response = await client.delete("/api/v1/users/me")
 
@@ -302,19 +323,19 @@ async def test_admin_delete_route_removes_the_target_users_files(
     auth_client_factory, uploads
 ):
     """The admin's own session carries the admin's avatar_url, not the target's."""
-    (uploads.avatars / "admin.jpg").write_bytes(b"avatar")
+    (uploads.avatars / _avatar_file("admin-1")).write_bytes(b"avatar")
     client = await auth_client_factory(
         overrides={
             "auth_id": "admin-1",
             "role": "admin",
-            "avatar_url": "/uploads/profile_pictures/admin.jpg",
+            "avatar_url": f"/uploads/profile_pictures/{_avatar_file('admin-1')}",
         }
     )
     await _user_with_avatar(uploads, "target-1")
-    await _book_with_cover(uploads, "target-1", "theirs")
+    await _book_with_cover(uploads, "target-1")
 
     response = await client.delete("/api/v1/users/target-1")
 
     assert response.status_code == 204, response.text
-    assert _names(uploads.avatars) == ["admin.jpg"]
+    assert _names(uploads.avatars) == [_avatar_file("admin-1")]
     assert _names(uploads.covers) == []

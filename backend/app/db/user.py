@@ -190,7 +190,7 @@ async def delete_user(
         try:
             from app.services.file_upload_service import FileUploadService
 
-            await FileUploadService().delete_profile_picture(avatar_url)
+            await FileUploadService().delete_profile_picture(auth_id, avatar_url)
         except Exception:
             logger.error("Failed to delete avatar for user %s", auth_id, exc_info=True)
 

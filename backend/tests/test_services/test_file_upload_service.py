@@ -74,7 +74,7 @@ class TestProfilePictureUpload:
             url = await service.process_and_save_profile_picture(self._make_file(), "user-1")
             saved = PROFILE_PICTURES_DIR / url[len(PROFILE_IMAGE_URL_PREFIX):]
             assert saved.exists()
-            await service.delete_profile_picture(url)
+            await service.delete_profile_picture("user-1", url)
             assert not saved.exists()
 
     @pytest.mark.asyncio
@@ -95,7 +95,9 @@ class TestProfilePictureUpload:
         with patch("app.services.file_upload_service.get_cloud_storage_service", return_value=None):
             service = FileUploadService()
             # Must not raise, must not touch anything outside the dir.
-            await service.delete_profile_picture("/uploads/profile_pictures/../../etc/passwd")
+            await service.delete_profile_picture(
+                "user-1", "/uploads/profile_pictures/../../etc/passwd"
+            )
 
 
 class TestFileUploadService:
@@ -265,6 +267,7 @@ class TestFileUploadService:
             service.cloud_storage = mock_cloud_storage
 
             await service.delete_cover_image(
+                "book_123",
                 "https://cdn.example.com/image.jpg",
                 "https://cdn.example.com/thumb.jpg"
             )
@@ -276,8 +279,10 @@ class TestFileUploadService:
     async def test_delete_cover_image_local_storage(self, cleanup_local_files):
         """Test image deletion from local storage."""
         # Create test files
-        test_image = COVER_IMAGES_DIR / "test_image.jpg"
-        test_thumb = COVER_IMAGES_DIR / "test_thumb.jpg"
+        # Names as the service writes them for this book (#797).
+        stem = "book_123_" + "0" * 32
+        test_image = COVER_IMAGES_DIR / f"{stem}.jpg"
+        test_thumb = COVER_IMAGES_DIR / f"{stem}_thumb.jpg"
         test_image.touch()
         test_thumb.touch()
 
@@ -285,8 +290,9 @@ class TestFileUploadService:
             service = FileUploadService()
 
             await service.delete_cover_image(
-                "/uploads/cover_images/test_image.jpg",
-                "/uploads/cover_images/test_thumb.jpg"
+                "book_123",
+                f"/uploads/cover_images/{stem}.jpg",
+                f"/uploads/cover_images/{stem}_thumb.jpg"
             )
 
             # Verify files were deleted
@@ -303,7 +309,9 @@ class TestFileUploadService:
             service.cloud_storage = mock_cloud_storage
 
             # Should not raise exception
-            await service.delete_cover_image("https://cdn.example.com/image.jpg")
+            await service.delete_cover_image(
+                "book_123", "https://cdn.example.com/image.jpg"
+            )
 
     def test_get_upload_stats(self, cleanup_local_files):
         """Test upload statistics calculation."""
