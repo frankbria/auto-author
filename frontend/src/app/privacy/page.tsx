@@ -124,6 +124,15 @@ export default function PrivacyPage() {
               </strong>
               . This action cannot be undone.
             </p>
+            <p className="mt-3">
+              We keep an audit log of actions taken on your account (for example
+              creating, updating or deleting a book), which can include the IP
+              address and browser user-agent of the request. Audit log entries are deleted
+              automatically 90 days after they are written; deleting your account
+              does not remove them sooner. The one exception is the record of your
+              agreement to the automatic-renewal terms when you subscribe, which we
+              keep for as long as we need to demonstrate that agreement.
+            </p>
           </section>
 
           <section>

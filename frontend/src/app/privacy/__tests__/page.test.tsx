@@ -35,4 +35,10 @@ describe('Privacy Policy page', () => {
     const { container } = render(<PrivacyPage />);
     expect(container.querySelector('main#main-content')).toBeInTheDocument();
   });
+
+  it('states the 90-day audit log retention and the renewal-consent exception (#787)', () => {
+    render(<PrivacyPage />);
+    expect(screen.getByText(/audit log.*90 days/i)).toBeInTheDocument();
+    expect(screen.getByText(/automatic-renewal terms/i)).toBeInTheDocument();
+  });
 });
