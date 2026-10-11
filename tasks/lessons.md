@@ -1373,3 +1373,9 @@ The deactivated record copies allowlisted fields with `{field: "$field"}` inside
 
 ### Running the app's lifespan in a test shuts down pools the rest of the session needs (#792)
 A test that entered `lifespan(app)` to check a startup step passed, and 33 later tests failed: shutdown calls `export_executor.shutdown()`, and that executor is a module-level object shared by every export test. Patch the module attribute with a throwaway executor for that one test. A targeted run of the new file showed nothing; only the full suite did.
+
+### CI type-checks the test sources; the commit hooks do not (#792)
+`npm run typecheck:tests` runs only in CI's Frontend Tests job, against a per-file ledger of known errors that may shrink but not grow. Three new `process.env.NODE_ENV = ...` lines in `email.test.ts` copied the file's existing pattern, each one a read-only assignment, and took the file from 8 to 11. Every local hook was green and the PR went red a minute into CI. Run `npm run typecheck:tests` before pushing whenever a test file changed, and do not copy a pattern out of a ledgered file without checking why it is ledgered.
+
+### Do not run a demo stack while the commit hooks are running (#792)
+The frontend coverage hook failed on tests the change never touched: a performance test measured 127ms against a 100ms limit, and two suites took over a minute each. The demo's dev server, browser and its own test runs were competing for the same machine. With nothing else running the same commit passed. Let the hooks finish, or record the demo first.

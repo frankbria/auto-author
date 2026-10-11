@@ -5,6 +5,11 @@ import { sendPasswordResetEmail, sendVerificationEmail } from '../email';
  * These pins cover the observability branch (unconfigured/unknown provider =>
  * loud [email] error + throw) plus the real send paths and the dev convenience.
  */
+// NODE_ENV is typed read-only; the tests switch it per case.
+const setNodeEnv = (value: string) => {
+  (process.env as Record<string, string | undefined>).NODE_ENV = value;
+};
+
 describe('sendPasswordResetEmail', () => {
   const ENV_KEYS = [
     'NODE_ENV',
@@ -43,14 +48,14 @@ describe('sendPasswordResetEmail', () => {
   afterEach(() => {
     ENV_KEYS.forEach((k) => {
       if (original[k] === undefined) delete process.env[k];
-      else process.env[k] = original[k];
+      else (process.env as Record<string, string | undefined>)[k] = original[k];
     });
     jest.restoreAllMocks();
     global.fetch = realFetch;
   });
 
   it('throws and logs a loud [email] error when no provider is configured (not a fake success)', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
 
     await expect(sendPasswordResetEmail(params)).rejects.toThrow(
       /EMAIL_SERVICE_PROVIDER is not configured/
@@ -63,7 +68,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('is observable in non-production environments too (no silent warn-and-return)', async () => {
-    process.env.NODE_ENV = 'test';
+    setNodeEnv('test');
 
     await expect(sendPasswordResetEmail(params)).rejects.toThrow(/not sent/);
     expect(errorSpy).toHaveBeenCalled();
@@ -71,7 +76,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('throws naming an unknown provider', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     process.env.EMAIL_SERVICE_PROVIDER = 'mailgun';
 
     await expect(sendPasswordResetEmail(params)).rejects.toThrow(/mailgun/);
@@ -79,7 +84,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('sends via Resend when configured', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     process.env.EMAIL_SERVICE_PROVIDER = 'resend';
     process.env.EMAIL_SERVICE_API_KEY = 'test-key';
 
@@ -94,7 +99,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('throws when Resend is selected without an API key', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     process.env.EMAIL_SERVICE_PROVIDER = 'resend';
 
     await expect(sendPasswordResetEmail(params)).rejects.toThrow(/EMAIL_SERVICE_API_KEY/);
@@ -102,7 +107,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('sends via SendGrid when configured', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     process.env.EMAIL_SERVICE_PROVIDER = 'sendgrid';
     process.env.EMAIL_SERVICE_API_KEY = 'sg-key';
 
@@ -114,7 +119,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('dumps to console in development with no provider (dev convenience, no send, no throw)', async () => {
-    process.env.NODE_ENV = 'development';
+    setNodeEnv('development');
 
     await expect(sendPasswordResetEmail(params)).resolves.toBeUndefined();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -131,7 +136,7 @@ describe('sendPasswordResetEmail', () => {
     };
 
     it('throws and logs a loud [email] error when no provider is configured', async () => {
-      process.env.NODE_ENV = 'production';
+      setNodeEnv('production');
 
       await expect(sendVerificationEmail(verification)).rejects.toThrow(
         /Verification email not sent: EMAIL_SERVICE_PROVIDER is not configured/
@@ -142,7 +147,7 @@ describe('sendPasswordResetEmail', () => {
     });
 
     it('sends the link to the address via Resend, in both the text and the HTML part', async () => {
-      process.env.NODE_ENV = 'production';
+      setNodeEnv('production');
       process.env.EMAIL_SERVICE_PROVIDER = 'resend';
       process.env.EMAIL_SERVICE_API_KEY = 'test-key';
 
@@ -158,7 +163,7 @@ describe('sendPasswordResetEmail', () => {
     });
 
     it('dumps the link to the console in development with no provider', async () => {
-      process.env.NODE_ENV = 'development';
+      setNodeEnv('development');
 
       await expect(sendVerificationEmail(verification)).resolves.toBeUndefined();
 
