@@ -19,6 +19,8 @@ RETENTION = timedelta(days=548)
 RETAINED_FIELDS = (
     "email", "first_name", "last_name", "display_name", "created_at",
     "plan", "stripe_customer_id", "cancelled_subscription",
+    # Owner decision 2026-10-11 (#960): answers "I never agreed to the Terms".
+    "terms_version", "terms_accepted_at",
 )
 
 # What an erased account is replaced with (#784), as a $replaceWith expression.
@@ -202,8 +204,12 @@ async def delete_user(
                         "auth_id": "$auth_id",
                         "deleted_at": now,
                         "purge_at": now + RETENTION,
-                        # A field the record lacks is left out, not set to null.
-                        "retained": {field: f"${field}" for field in RETAINED_FIELDS},
+                        # A field the record lacks, or holds as null (an
+                        # account with no Terms record), is left out.
+                        "retained": {
+                            field: {"$ifNull": [f"${field}", "$$REMOVE"]}
+                            for field in RETAINED_FIELDS
+                        },
                     }
                 }
             ],

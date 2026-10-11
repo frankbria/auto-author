@@ -102,6 +102,7 @@ class TestDeleteUser:
             auth_id="auth-soft", last_name="Doe", display_name="JD", plan="pro",
             bio="about me", stripe_customer_id="cus_1", preferences={"theme": "dark"},
             cancelled_subscription={"id": "sub_1", "plan": "pro", "status": "active"},
+            terms_version="2026-10-10", terms_accepted_at=datetime(2026, 10, 11, 12, 0),
         )
         ok = await delete_user("auth-soft", actor_id="admin")
         assert ok is True
@@ -115,6 +116,8 @@ class TestDeleteUser:
             "plan": "pro",
             "stripe_customer_id": "cus_1",
             "cancelled_subscription": {"id": "sub_1", "plan": "pro", "status": "active"},
+            "terms_version": "2026-10-10",
+            "terms_accepted_at": datetime(2026, 10, 11, 12, 0),
         }
         assert doc["purge_at"] - doc["deleted_at"] == timedelta(days=548)
         log = await base.audit_logs_collection.find_one({"action": "user_delete"})
