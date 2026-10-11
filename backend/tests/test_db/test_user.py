@@ -7,6 +7,8 @@ delete_user_books tests rebind it explicitly to the fresh per-test collection.
 """
 
 import pytest
+from datetime import datetime, timedelta, timezone
+
 from bson import ObjectId
 
 import app.db.user as user_dao
@@ -19,9 +21,14 @@ from app.db.user import (
     update_user,
     delete_user,
     delete_user_books,
+    erase_deactivated_user,
+    purge_expired_users,
 )
 
 pytestmark = pytest.mark.asyncio
+
+TOMBSTONE_KEYS = {"_id", "auth_id", "deleted_at"}
+DEACTIVATED_KEYS = TOMBSTONE_KEYS | {"purge_at", "retained"}
 
 
 @pytest.fixture
@@ -87,12 +94,29 @@ class TestUpdateUser:
 
 
 class TestDeleteUser:
-    async def test_soft_delete_leaves_only_a_tombstone(self, motor_reinit_db):
-        await _make_user(auth_id="auth-soft", bio="about me", stripe_customer_id="cus_1")
+    async def test_soft_delete_keeps_only_the_account_and_billing_record(
+        self, motor_reinit_db
+    ):
+        """#954: deactivation keeps an allowlist under ``retained`` for 18 months."""
+        await _make_user(
+            auth_id="auth-soft", last_name="Doe", display_name="JD", plan="pro",
+            bio="about me", stripe_customer_id="cus_1", preferences={"theme": "dark"},
+            cancelled_subscription={"id": "sub_1", "plan": "pro", "status": "active"},
+        )
         ok = await delete_user("auth-soft", actor_id="admin")
         assert ok is True
         doc = await get_user_by_auth_id("auth-soft")
-        assert set(doc) == {"_id", "auth_id", "deleted_at"}
+        assert set(doc) == DEACTIVATED_KEYS
+        assert doc["retained"] == {
+            "email": "user1@example.com",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "display_name": "JD",
+            "plan": "pro",
+            "stripe_customer_id": "cus_1",
+            "cancelled_subscription": {"id": "sub_1", "plan": "pro", "status": "active"},
+        }
+        assert doc["purge_at"] - doc["deleted_at"] == timedelta(days=548)
         log = await base.audit_logs_collection.find_one({"action": "user_delete"})
         assert log["details"]["soft_delete"] is True
 
@@ -107,9 +131,7 @@ class TestDeleteUser:
         await _make_user(auth_id="auth-gone")
         await delete_user("auth-gone")
         assert await update_user("auth-gone", {"bio": "back again"}) is None
-        assert set(await get_user_by_auth_id("auth-gone")) == {
-            "_id", "auth_id", "deleted_at",
-        }
+        assert set(await get_user_by_auth_id("auth-gone")) == DEACTIVATED_KEYS
 
     async def test_soft_delete_missing_returns_false(self, motor_reinit_db):
         assert await delete_user("absent") is False
@@ -133,15 +155,76 @@ class TestDeleteUser:
         await _make_user(auth_id="auth-race")
         await delete_user("auth-race")
         await create_book({"title": "Late"}, "auth-race")
-        assert set(await get_user_by_auth_id("auth-race")) == {
-            "_id", "auth_id", "deleted_at",
-        }
+        assert set(await get_user_by_auth_id("auth-race")) == DEACTIVATED_KEYS
 
     async def test_delete_defaults_actor_to_self(self, motor_reinit_db):
         await _make_user(auth_id="auth-self")
         await delete_user("auth-self")  # no actor_id -> actor defaults to auth_id
         log = await base.audit_logs_collection.find_one({"action": "user_delete"})
         assert log["actor_id"] == "auth-self"
+
+
+class TestEraseAndPurge:
+    """#954: a deactivated record ends as the #784 tombstone, early or on time."""
+
+    async def test_erase_turns_a_deactivated_record_into_a_tombstone(
+        self, motor_reinit_db
+    ):
+        await _make_user(auth_id="auth-erase")
+        await delete_user("auth-erase")
+        deleted_at = (await get_user_by_auth_id("auth-erase"))["deleted_at"]
+
+        assert await erase_deactivated_user("auth-erase", actor_id="admin-1") is True
+
+        doc = await get_user_by_auth_id("auth-erase")
+        assert set(doc) == TOMBSTONE_KEYS
+        assert doc["deleted_at"] == deleted_at
+        log = await base.audit_logs_collection.find_one({"action": "user_erase"})
+        assert (log["actor_id"], log["target_id"]) == ("admin-1", "auth-erase")
+
+    async def test_erase_matches_only_a_deactivated_record(self, motor_reinit_db):
+        await _make_user(auth_id="auth-active")
+        tombstone = {"auth_id": "auth-old", "deleted_at": datetime(2026, 9, 1)}
+        await user_dao.users_collection.insert_one(dict(tombstone))
+
+        for auth_id in ("auth-active", "auth-old", "absent"):
+            assert await erase_deactivated_user(auth_id, actor_id="admin-1") is False
+
+        assert (await get_user_by_auth_id("auth-active"))["email"] == "user1@example.com"
+        old = await get_user_by_auth_id("auth-old")
+        assert {k: old[k] for k in tombstone} == tombstone and set(old) == TOMBSTONE_KEYS
+
+    async def test_purge_erases_only_records_whose_purge_date_has_passed(
+        self, motor_reinit_db
+    ):
+        users = user_dao.users_collection
+        now = datetime.now(timezone.utc)
+        await _make_user(auth_id="auth-due", email="due@example.com")
+        await _make_user(auth_id="auth-waiting", email="waiting@example.com")
+        await _make_user(auth_id="auth-active", email="active@example.com")
+        await delete_user("auth-due")
+        await delete_user("auth-waiting")
+        # 18 months and a day ago.
+        long_ago = now - timedelta(days=549)
+        await users.update_one(
+            {"auth_id": "auth-due"},
+            {"$set": {"deleted_at": long_ago, "purge_at": long_ago + timedelta(days=548)}},
+        )
+        # An account erased before #954: a tombstone with no purge date.
+        await users.insert_one({"auth_id": "auth-old", "deleted_at": long_ago})
+        untouched = {
+            auth_id: await get_user_by_auth_id(auth_id)
+            for auth_id in ("auth-waiting", "auth-active", "auth-old")
+        }
+
+        assert await purge_expired_users() == 1
+
+        due = await get_user_by_auth_id("auth-due")
+        assert set(due) == TOMBSTONE_KEYS
+        assert abs(due["deleted_at"] - long_ago.replace(tzinfo=None)) < timedelta(seconds=1)
+        for auth_id, before in untouched.items():
+            assert await get_user_by_auth_id(auth_id) == before
+        assert await purge_expired_users() == 0
 
 
 class TestDeleteUserBooks:

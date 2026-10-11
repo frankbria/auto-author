@@ -63,6 +63,12 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
     await update_user(
         auth_id,
         {
+            # What the user was paying for, kept on the deactivated record (#954).
+            "cancelled_subscription": {
+                "id": subscription_id,
+                "plan": user.get("plan"),
+                "status": user.get("stripe_subscription_status"),
+            },
             "stripe_subscription_id": None,
             "stripe_subscription_status": None,
             "plan": DEFAULT_PLAN,

@@ -4,6 +4,9 @@ ChapterTabIndexManager held the book owner_id indexes and the 90-day
 access-log TTL but ran nowhere at runtime. These tests pin that the manager
 creates them and that the app lifespan actually invokes it.
 """
+import asyncio
+from datetime import datetime
+
 import pytest
 
 from app.db import base
@@ -94,6 +97,29 @@ async def test_lifespan_creates_owner_and_ttl_indexes(motor_reinit_db):
     access_indexes = await _index_map(base._db.chapter_access_logs)
     assert "access_logs_ttl_idx" in access_indexes
     assert access_indexes["access_logs_ttl_idx"]["expireAfterSeconds"] == NINETY_DAYS
+
+
+@pytest.mark.asyncio
+async def test_lifespan_purges_expired_deactivated_accounts(motor_reinit_db):
+    """#954: the 18-month purge needs no one to act. A running app does it."""
+    users = base._db.users
+    await users.insert_one(
+        {
+            "auth_id": "expired",
+            "deleted_at": datetime(2025, 4, 1),
+            "purge_at": datetime(2026, 10, 1),
+            "retained": {"email": "old@example.com"},
+        }
+    )
+    async with app.router.lifespan_context(app):
+        for _ in range(100):
+            if "retained" not in await users.find_one({"auth_id": "expired"}):
+                break
+            await asyncio.sleep(0.05)
+
+    assert set(await users.find_one({"auth_id": "expired"})) == {
+        "_id", "auth_id", "deleted_at",
+    }
 
 
 def _assert_audit_indexes(indexes):

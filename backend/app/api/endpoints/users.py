@@ -12,6 +12,7 @@ from app.db.database import (
     get_user_by_auth_id,
     update_user,
     delete_user,
+    erase_deactivated_user,
     delete_all_user_books,
     get_collection,  # Added missing import
 )
@@ -160,13 +161,13 @@ async def delete_profile(
     current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=3, window=300)),
 ):
-    """Delete the current user's account.
+    """Deactivate the current user's account.
 
     Cascades the user's books (and their questions/responses/ratings/access
-    logs, one bulk delete per collection, #786) BEFORE erasing the user record,
-    so a mid-cascade failure leaves the account active and retryable (#179).
-    Only a tombstone of auth_id and deleted_at is retained (#784). The Stripe
-    subscription is cancelled before any of that (#764).
+    logs, one bulk delete per collection, #786) BEFORE deactivating the user
+    record, so a mid-cascade failure leaves the account active and retryable
+    (#179). The account and billing record is kept for 18 months, then erased
+    (#954). The Stripe subscription is cancelled before any of that (#764).
     """
     await cancel_subscription_for_deletion(current_user["auth_id"])
     try:
@@ -187,7 +188,6 @@ async def delete_profile(
         deleted_books,
     )
 
-    # Erase the user to a tombstone
     success = await delete_user(
         auth_id=current_user["auth_id"], actor_id=current_user["auth_id"]
     )
@@ -207,7 +207,7 @@ async def delete_profile(
         target_id=current_user["auth_id"],
     )
 
-    return {"message": "Account successfully deleted"}
+    return {"message": "Account deactivated"}
 
 
 @router.post("/me/avatar", status_code=status.HTTP_200_OK)
@@ -374,10 +374,11 @@ async def get_all_users(
 async def delete_user_account(
     auth_id: str, current_user: Dict = Depends(get_current_user_from_session)
 ):
-    """Delete a user account
+    """Deactivate a user account, or erase one that is already deactivated
 
-    Regular users can only delete their own account
-    Admin users can delete any user account
+    Regular users can only deactivate their own account
+    Admin users can deactivate any user account, and erase a deactivated one
+    before its purge date when its owner asks support to (#954)
     """
     # Check permissions - users can only delete their own account unless they're admins
     if current_user["auth_id"] != auth_id and current_user["role"] != "admin":
@@ -390,7 +391,10 @@ async def delete_user_account(
     await cancel_subscription_for_deletion(auth_id)
     try:
         await delete_all_user_books(auth_id)
-        result = await delete_user(auth_id)
+        actor_id = current_user["auth_id"]
+        result = await delete_user(auth_id, actor_id=actor_id)
+        if not result and current_user["role"] == "admin":
+            result = await erase_deactivated_user(auth_id, actor_id=actor_id)
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"

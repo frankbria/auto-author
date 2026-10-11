@@ -273,22 +273,28 @@ async def _post_signed(client, payload: bytes):
     )
 
 
-async def test_late_event_writes_nothing_onto_a_deleted_account(webhook_client):
-    """#784: the customer id is erased with the account, so Stripe's late events
-    reach it through the metadata fallback — and must not put the billing
-    identity back on the tombstone."""
+@pytest.mark.parametrize("metadata", [{"auth_id": "auth-stripe-1"}, {}])
+async def test_late_event_writes_nothing_onto_a_deactivated_account(
+    webhook_client, metadata
+):
+    """#954: the customer id moves under ``retained`` with the account, so
+    Stripe's late events find the record through the metadata fallback or not at
+    all. Either way they are acknowledged and change nothing: the plan is not
+    put back, and no second record is created for the customer."""
+    from app.db import base
     from app.db.user import delete_user
 
     await _seed_user(stripe_customer_id="cus_test_1")
     await delete_user("auth-stripe-1")
-    resp = await _post_signed(
-        webhook_client, subscription_event(metadata={"auth_id": "auth-stripe-1"})
-    )
+    before = await get_user_by_auth_id("auth-stripe-1")
+    assert before["retained"]["stripe_customer_id"] == "cus_test_1"
+
+    resp = await _post_signed(webhook_client, subscription_event(metadata=metadata))
+
     assert resp.status_code == 200
     assert resp.json() == {"status": "no_matching_user"}
-    assert set(await get_user_by_auth_id("auth-stripe-1")) == {
-        "_id", "auth_id", "deleted_at",
-    }
+    assert await get_user_by_auth_id("auth-stripe-1") == before
+    assert await base.users_collection.count_documents({}) == 1
 
 
 class TestSubscriptionStatus:
