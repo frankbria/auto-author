@@ -7,6 +7,7 @@ creates them and that the app lifespan actually invokes it.
 import pytest
 
 from app.db import base
+from app.db.audit_log import ensure_audit_log_indexes
 from app.db.indexing_strategy import ChapterTabIndexManager
 from app.main import app
 
@@ -18,6 +19,7 @@ async def _warm_collections():
     real write on each collection so the index builds land."""
     await base._db.books.insert_one({"warm": True})
     await base._db.chapter_access_logs.insert_one({"warm": True})
+    await base._db.audit_logs.insert_one({"warm": True, "action": "warm"})
 
 
 async def _index_map(collection):
@@ -92,3 +94,26 @@ async def test_lifespan_creates_owner_and_ttl_indexes(motor_reinit_db):
     access_indexes = await _index_map(base._db.chapter_access_logs)
     assert "access_logs_ttl_idx" in access_indexes
     assert access_indexes["access_logs_ttl_idx"]["expireAfterSeconds"] == NINETY_DAYS
+
+
+def _assert_audit_indexes(indexes):
+    ttl = indexes["audit_logs_ttl_idx"]
+    assert ttl["key"] == {"expires_at": 1}
+    assert ttl["expireAfterSeconds"] == 0
+    assert indexes["actor_timestamp_idx"]["key"] == {"actor_id": 1, "timestamp": -1}
+
+
+@pytest.mark.asyncio
+async def test_ensure_audit_log_indexes_creates_ttl_and_actor_indexes(motor_reinit_db):
+    await _warm_collections()
+    await ensure_audit_log_indexes()
+    await ensure_audit_log_indexes()  # idempotent
+    _assert_audit_indexes(await _index_map(base._db.audit_logs))
+
+
+@pytest.mark.asyncio
+async def test_lifespan_creates_audit_log_indexes(motor_reinit_db):
+    await _warm_collections()
+    async with app.router.lifespan_context(app):
+        pass
+    _assert_audit_indexes(await _index_map(base._db.audit_logs))

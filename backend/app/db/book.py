@@ -45,7 +45,6 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
             actor_id=user_auth_id,
             target_id=str(book_obj.id),
             resource_type="book",
-            details={"title": book_obj.title},
         )
         return payload
     except Exception:
@@ -381,7 +380,7 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
         actor_id=user_auth_id,
         target_id=book_id,
         resource_type="book",
-        details={"title": book.get("title", "Untitled"), "cascade_deleted": counts},
+        details={"cascade_deleted": counts},
     )
     return True
 

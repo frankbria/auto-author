@@ -50,15 +50,6 @@ async def read_users_me(
 ):
     """Get the current authenticated user's information"""
     try:
-        # Log the profile view as an audit event
-        await audit_request(
-            request=request,
-            current_user=current_user,
-            action="profile_view",
-            resource_type="user",
-            target_id=current_user.get("auth_id", "unknown"),  # Use get() with default
-        )
-
         # Extract preferences or use defaults
         preferences = current_user.get("preferences", {})
         if not preferences:
