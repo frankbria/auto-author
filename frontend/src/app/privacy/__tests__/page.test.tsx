@@ -94,6 +94,13 @@ describe('Privacy Policy page', () => {
     expect(section(/your rights/i)).toHaveTextContent(/erased sooner/i);
   });
 
+  it('says a copy of the account data can be downloaded from the profile page (#790)', () => {
+    render(<PrivacyPage />);
+    const rights = section(/your rights/i);
+    expect(rights).toHaveTextContent(/download a copy of your profile, your books/i);
+    expect(rights).toHaveTextContent(/does not include/i);
+  });
+
   it('says billing records stay with the payment processor after deletion (#784)', () => {
     render(<PrivacyPage />);
     expect(screen.getByText(/records of past payments.*stay with our payment processor/i)).toBeInTheDocument();

@@ -36,6 +36,7 @@ Profile endpoints implement rate limiting to prevent abuse:
 - `/users/me` (GET): 20 requests per minute
 - `/users/me` (PATCH): 5 requests per minute
 - `/users/me` (DELETE): 3 requests per 5 minutes
+- `/users/me/export` (GET): 10 requests per hour
 
 Responses include rate limit headers:
 ```
@@ -142,6 +143,26 @@ curl -X PATCH "http://localhost:8000/api/users/me" \
     }
   }'
 ```
+
+---
+
+### Export Account Data
+
+`GET /users/me/export` returns the authenticated user's data as one JSON
+document, sent as an attachment (`auto-author-data.json`) (#790). It takes no
+id: every query is scoped to the session's own account.
+
+| Key | Holds |
+|---|---|
+| `exported_at` | when the export was built |
+| `profile` | `email`, `first_name`, `last_name`, `display_name`, `bio`, `avatar_url`, `preferences`, `plan`, `stripe_subscription_status`, `created_at`, `updated_at`, `terms_version`, `terms_accepted_at`, each only if the account has it |
+| `books` | every book the account owns, as stored, with chapter content |
+| `questions`, `question_responses`, `question_ratings` | every row that carries the account's id |
+
+Ids are strings and dates are ISO 8601. Not included: the audit log, chapter
+access log and usage counters, uploaded image files (their URLs are), and
+anything better-auth or the payment processor holds (password hash, sessions,
+two-factor secrets, payment records). The response is built in memory.
 
 ---
 

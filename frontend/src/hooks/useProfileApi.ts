@@ -4,6 +4,9 @@ import { useAuthFetch } from '@/hooks/useAuthFetch';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+/** The account data download (#790): the backend answers with a JSON attachment. */
+export const ACCOUNT_EXPORT_URL = `${API_BASE_URL}/users/me/export`;
+
 export type UserPreferences = {
   theme: 'light' | 'dark' | 'system';
   email_notifications: boolean;

@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { authClient, useSession } from '@/lib/auth-client';
-import useProfileApi, { type UserPreferences } from '@/hooks/useProfileApi';
+import useProfileApi, { ACCOUNT_EXPORT_URL, type UserPreferences } from '@/hooks/useProfileApi';
 import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
 import { FormField } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -345,13 +345,17 @@ export default function UserProfile() {
             </p>
           )}
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Button
               type="button"
               variant="destructive"
               onClick={() => handleDeleteOpenChange(true)}
             >
               Delete Account
+            </Button>
+            {/* shortcut: a plain link, so an error shows as the API's JSON page; fetch it if that needs a toast */}
+            <Button asChild variant="outline">
+              <a href={ACCOUNT_EXPORT_URL}>Download my data</a>
             </Button>
             <Button type="submit" disabled={loadState !== 'loaded'} busy={loadState === 'loading'}>
               {loadState === 'loading' ? 'Loading…' : 'Save Changes'}

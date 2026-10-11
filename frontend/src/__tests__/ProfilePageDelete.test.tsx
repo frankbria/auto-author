@@ -277,3 +277,15 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     expect(confirmButton).toBeEnabled();
   });
 });
+
+describe('ProfilePage data export (#790)', () => {
+  it('links to the account export endpoint', async () => {
+    mockAuthFetch.mockResolvedValue(profile());
+    render(<UserProfile />);
+    const link = await screen.findByRole('link', { name: /download my data/i });
+    expect(link).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/api\/v1\/users\/me\/export$/)
+    );
+  });
+});

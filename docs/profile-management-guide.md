@@ -96,7 +96,8 @@ Your preferences are found in the "Preferences" section:
 In the "Account Settings" section, you can:
 
 1. **Change Password**: Click "Change Password" to update your credentials through Clerk
-2. **Delete Account**:
+2. **Download my data**: Click "Download my data" to save a JSON file with your profile, your books and the questions, answers and ratings in them
+3. **Delete Account**:
    - Click "Delete Account"
    - Confirm by typing your email address in the prompt
    - Click "Deactivate account and delete books" in the confirmation dialog
