@@ -51,9 +51,9 @@ async def test_read_me_uses_id_when_no_mongo_id(auth_client_factory):
 
 async def test_read_me_internal_error_returns_500(auth_client_factory):
     """An unexpected error inside read_users_me maps to 500 (lines 86-91)."""
-    client = await auth_client_factory()
-    with patch(f"{USERS}.audit_request", side_effect=RuntimeError("boom")):
-        resp = await client.get("/api/v1/users/me")
+    # An email UserResponse rejects makes the response build raise.
+    client = await auth_client_factory(overrides={"email": "not-an-email"})
+    resp = await client.get("/api/v1/users/me")
     assert resp.status_code == 500
     assert resp.json()["detail"] == "Error retrieving user profile"
 

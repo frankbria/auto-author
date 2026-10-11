@@ -132,7 +132,6 @@ async def create_new_book(
             action="book_create",
             resource_type="book",
             target_id=str(new_book.get("_id")),
-            metadata={"title": book_data.get("title")}
         )
 
         # Convert ObjectId to str for the response
@@ -237,15 +236,6 @@ async def get_book(
         # Convert ObjectId to str
         if "_id" in book:
             book["id"] = str(book["_id"])
-
-        # Log the book view
-        await audit_request(
-            request=request,
-            current_user=current_user,
-            action="book_view",
-            resource_type="book",
-            target_id=book_id,
-        )
 
         return book
 
@@ -493,7 +483,6 @@ async def delete_book_endpoint(
             action="book_delete",
             resource_type="book",
             target_id=book_id,
-            metadata={"title": book.get("title", "Untitled")}
         )
 
         return None
@@ -2753,7 +2742,6 @@ async def generate_chapter_draft(
             target_id=chapter_id,
             metadata={
                 "book_id": book_id,
-                "chapter_title": chapter_info.get("title"),
                 "question_count": len(question_responses),
                 "target_length": target_length,
                 "actual_length": result["metadata"].get("word_count", 0),
