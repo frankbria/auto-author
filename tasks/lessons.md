@@ -1351,3 +1351,12 @@ The full frontend suite ran in the background with its output piped through `gre
 
 ### Demo harness: indexes come from startup, and showboat records the path you give it
 Dropping the demo database also drops its unique indexes, which the backend only creates when it starts. A same-email sign-up demo run without restarting the backend would have proved nothing about the index. Also, `showboat image` writes the path it is given into the document, so an absolute scratch path ends up in a committed file: copy the screenshot into `docs/demos/` first and pass the repo-relative path.
+
+### `showboat exec` takes a language before the code, and waits on stdin without it (#789)
+`showboat exec <file> <lang> [code]`. Called as `showboat exec doc.md 'curl ...'`, it reads the command as the language and blocks on stdin for the code, with no output and no error. A chained demo command sat until the tool timeout. Pass `bash` explicitly, or feed the code on stdin with a quoted heredoc, which also removes the quoting problem for `agent-browser eval` expressions that need both quote characters.
+
+### "No lines with coverage information" from diff-cover has two different causes (#789)
+The backend report was empty because the only changed lines were entries inside a multi-line dict literal: coverage records the statement's first line, so the diff has no measurable line and there is nothing to gate. The frontend report was empty for a different reason: Jest writes `SF:src/...` paths relative to `frontend/`, while the diff is relative to the repository root, so no file matches. Prefix the paths first (`sed 's#^SF:#SF:frontend/#' coverage/lcov.info`) and run diff-cover from the root; that gave 11 of 11 changed lines. diff-cover also refuses a Cobertura file and an LCOV file in one call.
+
+### Check the main checkout for a stale index.lock before the post-merge pull (#789)
+All the work happened in a worktree, yet a zero-byte `.git/index.lock` appeared in the main checkout 25 minutes before the merge, and the post-merge `git pull` failed on it. What wrote it was not found. The squash merge itself had already happened on GitHub, so the output of the chained command read like a failed merge when only the pull had failed. Before the post-merge steps, look for the lock, confirm no git process is running (`pgrep -ax git`), and only then remove it. Run the merge and the pull as separate commands so each result is read on its own.
