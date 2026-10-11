@@ -17,7 +17,7 @@ export const SUBPROCESSORS: readonly Subprocessor[] = [
     name: 'OpenAI',
     purpose: 'Generating tables of contents, interview questions, chapter drafts and text enhancements',
     data: 'The book details, answers and chapter text you submit to an AI feature',
-    envKeys: ['OPENAI_API_KEY', 'OPENAI_AUTOAUTHOR_API_KEY', 'AI_API_KEY'],
+    envKeys: ['OPENAI_API_KEY', 'OPENAI_AUTOAUTHOR_API_KEY', 'AI_API_KEY', 'AI_BASE_URL'],
   },
   {
     name: 'Stripe',
@@ -29,7 +29,7 @@ export const SUBPROCESSORS: readonly Subprocessor[] = [
     name: 'MongoDB Atlas',
     purpose: 'Hosting our database',
     data: 'Your account details and everything you create in the Service',
-    envKeys: ['MONGODB_URI'],
+    envKeys: ['MONGODB_URI', 'DATABASE_URL'],
   },
   {
     name: 'Sentry',

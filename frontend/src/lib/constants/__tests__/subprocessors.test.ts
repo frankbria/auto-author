@@ -5,14 +5,21 @@ import { FRONTEND_ROOT, shippedSources } from '@/__tests__/theme/helpers/sources
 
 /**
  * #788: the privacy policy named no recipients while the app sent data to seven
- * of them. Tripwire: a third-party integration arrives with a credential, so
- * every credential-shaped setting must be claimed by a subprocessor entry. A new
- * one fails here until the policy names who receives the data.
+ * of them. Tripwire: a third-party integration arrives with a credential or an
+ * endpoint, so every setting shaped like one must be claimed by a subprocessor
+ * entry. A new one fails here until the policy names who receives the data.
  */
-const CREDENTIAL = /_(KEY|KEY_ID|SECRET|DSN|URI|TOKEN)$/;
+const CREDENTIAL = /_(KEY|KEY_ID|SECRET|DSN|URI|URL|TOKEN|PASSWORD)$/;
 
-// Our own signing secret: shared between our frontend and backend, sent to no one.
-const FIRST_PARTY = ['BETTER_AUTH_SECRET'];
+// Sent to no one: our own signing secret, our own origins, and the password
+// the dev seed script gives its user.
+const FIRST_PARTY = [
+  'BETTER_AUTH_SECRET',
+  'BETTER_AUTH_URL',
+  'NEXT_PUBLIC_BETTER_AUTH_URL',
+  'NEXT_PUBLIC_API_URL',
+  'SEED_USER_PASSWORD',
+];
 
 const BACKEND_APP = join(FRONTEND_ROOT, '..', 'backend/app');
 

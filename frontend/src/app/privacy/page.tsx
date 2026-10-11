@@ -202,18 +202,21 @@ export default function PrivacyPage() {
               7. Cookies and Local Storage
             </h2>
             <p>
-              We use only cookies that are strictly necessary: a session cookie
-              that keeps you signed in and, if you choose to trust a device
-              during two-factor sign-in, a cookie that remembers that device.
-              We do not use advertising or analytics cookies.
+              We use only cookies that are strictly necessary: the cookies our
+              sign-in system sets to keep you signed in (a session cookie and
+              short-lived companions that cache your session) and, if you
+              choose to trust a device during two-factor sign-in, a cookie that
+              remembers that device. We do not use advertising or analytics
+              cookies.
             </p>
             <p className="mt-3">
               The Service also keeps some data in your browser&rsquo;s local
               and session storage: your theme, which chapter tabs and views you
               have open, and backup copies of text you are editing (chapter
               text and book summaries) so that work is not lost if a save
-              fails. This data stays on your device until you clear it in your
-              browser settings; signing out does not remove it.
+              fails. Local storage stays on your device until you clear it in
+              your browser settings, and session storage until you close the
+              tab; signing out removes neither.
             </p>
           </section>
 
