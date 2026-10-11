@@ -1339,3 +1339,15 @@ The two ways past the #947 hook failure were to move `frontend/node_modules` asi
 ### Teardown chained after a measurement destroys the evidence when the measurement fails
 A mutation worktree was created, used, then measured for diff coverage and removed, all in one command joined with `;`. The pytest step named a test file that does not exist, wrote no `coverage.xml`, and the next step removed the worktree anyway. Run the measurement, read its result, and tear down in a later command. The same run showed why `git add -A -- backend` is the wrong tool in a tree where tools write reports: it staged an untracked 6,000-line `backend/coverage.xml`, which is now gitignored. Add files by name.
 
+
+### A record kept as evidence must sit outside the indexes and resolvers that reuse its keys (#954)
+The deactivated account keeps the user's email. Left at the top level it sits on the unique `email` index, and when the same address signs up again the #765 conflict resolver (`release_email`) unsets it on the old record: the sign-up works and the retained record quietly loses the field it exists to hold. The mutation check showed how well that hides. With the email put back at the top level, `test_same_email_can_sign_up_again_after_deletion` still passed, because the resolver repaired the collision; only the tests that assert the exact field set failed. When a record is kept for later, nest what it keeps, and assert the whole shape rather than the one behaviour the feature is named after.
+
+### A step that resets a field before the record is saved must leave what it reset (#954)
+`cancel_subscription_for_deletion` sets the plan to free and clears the subscription id before the user record is written, for retry safety (#764). A retention record built from the user document afterwards would have shown every paying user as "free" with no subscription. Nothing failed; the record was just wrong. Before snapshotting a document, read the code that runs ahead of the snapshot in the same request and check what it has already overwritten.
+
+### A filtered log of a background gate loses the one line you need
+The full frontend suite ran in the background with its output piped through `grep` for the summary lines. It reported `1 failed`, and the filter had dropped the test's name. A second run passed everything, so the failure was never identified. Write the whole log to a file and grep the file afterwards.
+
+### Demo harness: indexes come from startup, and showboat records the path you give it
+Dropping the demo database also drops its unique indexes, which the backend only creates when it starts. A same-email sign-up demo run without restarting the backend would have proved nothing about the index. Also, `showboat image` writes the path it is given into the document, so an absolute scratch path ends up in a committed file: copy the screenshot into `docs/demos/` first and pass the repo-relative path.
