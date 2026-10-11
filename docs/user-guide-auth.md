@@ -153,7 +153,7 @@ If you lose access to your authentication method:
 **Email verification not received**:
 - Check your spam/junk folder
 - Ensure you entered the correct email address
-- Click "Resend verification email" on the verification page
+- Sign in with your email and password: a new link is sent each time an unverified account tries to sign in. Links expire after one hour
 
 **Social login issues**:
 - Ensure pop-ups aren't blocked by your browser

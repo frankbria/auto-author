@@ -44,7 +44,7 @@ describe("SignUpPage (#198)", () => {
     mockSignUpEmail.mockResolvedValue({ data: { user: {} }, error: null });
   });
 
-  it("signs up with name/email/password and redirects to /dashboard", async () => {
+  it("signs up, then asks the user to check their email instead of entering the app (#792)", async () => {
     const { push } = setup();
     const user = await fillForm();
     await user.click(submitButton());
@@ -53,8 +53,19 @@ describe("SignUpPage (#198)", () => {
       email: "test@example.com",
       password: VALID_PW,
       name: "Test User",
+      // Where the emailed link lands once the address is verified.
+      callbackURL: "/dashboard",
     });
-    expect(push).toHaveBeenCalledWith("/dashboard");
+    expect(
+      await screen.findByRole("heading", { name: /check your email/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/test@example\.com/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute(
+      "href",
+      "/auth/sign-in"
+    );
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /sign up/i })).not.toBeInTheDocument();
   });
 
   it("renders the mapped message and does not navigate when the account already exists", async () => {

@@ -29,6 +29,11 @@ function getErrorMessage(error: { message?: string; code?: string } | null): str
   const message = error.message?.toLowerCase() || "";
   const code = error.code?.toLowerCase() || "";
 
+  // An unverified address (#792); better-auth has just mailed a new link.
+  if (code.includes("email_not_verified") || message.includes("not verified")) {
+    return "Verify your email address to sign in. We have sent you a new link.";
+  }
+
   // Check for specific error patterns
   if (
     message.includes("invalid") ||

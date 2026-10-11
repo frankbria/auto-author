@@ -40,7 +40,9 @@ function createAuthInstance(database: Db) {
     databaseHooks: { user: { create: { before: stampTermsAcceptance } } },
     emailAndPassword: {
       enabled: true,
-      autoSignIn: true,
+      // No session until the address is verified (#792): sign-up returns none
+      // and sign-in answers 403 EMAIL_NOT_VERIFIED.
+      requireEmailVerification: true,
       // Password reset configuration
       sendResetPassword: async ({ user, url }) => {
         // Send password reset email
@@ -59,6 +61,19 @@ function createAuthInstance(database: Db) {
             console.error("Failed to send password reset email:", error);
           }
         })();
+      },
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      // A refused sign-in mails a fresh link, which is how a user gets another one.
+      sendOnSignIn: true,
+      autoSignInAfterVerification: true,
+      expiresIn: 60 * 60, // the email says one hour
+      // Awaited, so a failed send rejects here. better-auth catches that and
+      // logs it; the response is the same whether or not the email went out.
+      sendVerificationEmail: async ({ user, url }) => {
+        const { sendVerificationEmail } = await import("@/lib/email");
+        await sendVerificationEmail({ to: user.email, verifyUrl: url });
       },
     },
     session: {

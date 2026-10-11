@@ -1,10 +1,15 @@
-import { sendPasswordResetEmail } from '../email';
+import { sendPasswordResetEmail, sendVerificationEmail } from '../email';
 
 /**
  * #332 — password reset must never silently no-op and report fake success.
  * These pins cover the observability branch (unconfigured/unknown provider =>
  * loud [email] error + throw) plus the real send paths and the dev convenience.
  */
+// NODE_ENV is typed read-only; the tests switch it per case.
+const setNodeEnv = (value: string) => {
+  (process.env as Record<string, string | undefined>).NODE_ENV = value;
+};
+
 describe('sendPasswordResetEmail', () => {
   const ENV_KEYS = [
     'NODE_ENV',
@@ -43,14 +48,14 @@ describe('sendPasswordResetEmail', () => {
   afterEach(() => {
     ENV_KEYS.forEach((k) => {
       if (original[k] === undefined) delete process.env[k];
-      else process.env[k] = original[k];
+      else (process.env as Record<string, string | undefined>)[k] = original[k];
     });
     jest.restoreAllMocks();
     global.fetch = realFetch;
   });
 
   it('throws and logs a loud [email] error when no provider is configured (not a fake success)', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
 
     await expect(sendPasswordResetEmail(params)).rejects.toThrow(
       /EMAIL_SERVICE_PROVIDER is not configured/
@@ -63,7 +68,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('is observable in non-production environments too (no silent warn-and-return)', async () => {
-    process.env.NODE_ENV = 'test';
+    setNodeEnv('test');
 
     await expect(sendPasswordResetEmail(params)).rejects.toThrow(/not sent/);
     expect(errorSpy).toHaveBeenCalled();
@@ -71,7 +76,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('throws naming an unknown provider', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     process.env.EMAIL_SERVICE_PROVIDER = 'mailgun';
 
     await expect(sendPasswordResetEmail(params)).rejects.toThrow(/mailgun/);
@@ -79,7 +84,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('sends via Resend when configured', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     process.env.EMAIL_SERVICE_PROVIDER = 'resend';
     process.env.EMAIL_SERVICE_API_KEY = 'test-key';
 
@@ -94,7 +99,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('throws when Resend is selected without an API key', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     process.env.EMAIL_SERVICE_PROVIDER = 'resend';
 
     await expect(sendPasswordResetEmail(params)).rejects.toThrow(/EMAIL_SERVICE_API_KEY/);
@@ -102,7 +107,7 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('sends via SendGrid when configured', async () => {
-    process.env.NODE_ENV = 'production';
+    setNodeEnv('production');
     process.env.EMAIL_SERVICE_PROVIDER = 'sendgrid';
     process.env.EMAIL_SERVICE_API_KEY = 'sg-key';
 
@@ -114,12 +119,56 @@ describe('sendPasswordResetEmail', () => {
   });
 
   it('dumps to console in development with no provider (dev convenience, no send, no throw)', async () => {
-    process.env.NODE_ENV = 'development';
+    setNodeEnv('development');
 
     await expect(sendPasswordResetEmail(params)).resolves.toBeUndefined();
     expect(fetchSpy).not.toHaveBeenCalled();
     // The dev dump includes the reset URL so a developer can follow it locally.
     const logged = logSpy.mock.calls.flat().join(' ');
     expect(logged).toContain(params.resetUrl);
+  });
+
+  // #792: the verification email goes through the same delivery path.
+  describe('sendVerificationEmail', () => {
+    const verification = {
+      to: 'new@example.com',
+      verifyUrl: 'https://app/api/auth/verify-email?token=abc',
+    };
+
+    it('throws and logs a loud [email] error when no provider is configured', async () => {
+      setNodeEnv('production');
+
+      await expect(sendVerificationEmail(verification)).rejects.toThrow(
+        /Verification email not sent: EMAIL_SERVICE_PROVIDER is not configured/
+      );
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(errorSpy.mock.calls.flat().join(' ')).toContain('[email] Verification email NOT sent');
+    });
+
+    it('sends the link to the address via Resend, in both the text and the HTML part', async () => {
+      setNodeEnv('production');
+      process.env.EMAIL_SERVICE_PROVIDER = 'resend';
+      process.env.EMAIL_SERVICE_API_KEY = 'test-key';
+
+      await sendVerificationEmail(verification);
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toBe('https://api.resend.com/emails');
+      const body = JSON.parse((opts as RequestInit).body as string);
+      expect(body.to).toEqual(['new@example.com']);
+      expect(body.subject).toMatch(/verify your email/i);
+      expect(body.text).toContain(verification.verifyUrl);
+      expect(body.html).toContain(verification.verifyUrl);
+    });
+
+    it('dumps the link to the console in development with no provider', async () => {
+      setNodeEnv('development');
+
+      await expect(sendVerificationEmail(verification)).resolves.toBeUndefined();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(logSpy.mock.calls.flat().join(' ')).toContain(verification.verifyUrl);
+    });
   });
 });

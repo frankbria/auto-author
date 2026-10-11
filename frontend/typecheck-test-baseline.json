@@ -25,10 +25,6 @@
       "errors": 8,
       "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2741 ×6 — object literal missing required properties (partial fixture)."
     },
-    "src/lib/__tests__/email.test.ts": {
-      "errors": 8,
-      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2540 ×8 — assigns to a read-only property (mocking a getter or a frozen global)."
-    },
     "src/__tests__/TabOverflowScroll.test.tsx": {
       "errors": 7,
       "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2339 ×7 — property does not exist on the type — a fixture or mock narrower than the real object."

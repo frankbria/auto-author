@@ -1360,3 +1360,22 @@ The backend report was empty because the only changed lines were entries inside 
 
 ### Check the main checkout for a stale index.lock before the post-merge pull (#789)
 All the work happened in a worktree, yet a zero-byte `.git/index.lock` appeared in the main checkout 25 minutes before the merge, and the post-merge `git pull` failed on it. What wrote it was not found. The squash merge itself had already happened on GitHub, so the output of the chained command read like a failed merge when only the pull had failed. Before the post-merge steps, look for the lock, confirm no git process is running (`pgrep -ax git`), and only then remove it. Run the merge and the pull as separate commands so each result is read on its own.
+
+
+### A null written at creation defeats an "only if the account had it" allowlist (#960)
+The deactivated record copies allowlisted fields with `{field: "$field"}` inside `$replaceWith`, which leaves out a missing field but keeps a null one. #789 writes `None` for the Terms fields on an account that has no record, so adding those fields to the allowlist would have stored two nulls for every such account. The exact-equality test on the retained record caught it. Wrap each field in `{"$ifNull": ["$field", "$$REMOVE"]}` when the source can hold null, and keep at least one test that compares the whole stored document.
+
+### A new route fails a ledger test that a targeted run never touches (#790)
+`tests/test_api/test_rate_limit_routes.py` lists every rate-limited route and its count. The new export route passed its own tests and failed that ledger in the commit hook. The first commit attempt then hid the failing test name, because the command piped the hook output through a filter for "Passed" and "Failed" lines. Run the whole backend suite once before the first commit when a route is added, and write hook output to a file instead of filtering it.
+
+### A probe that discards stderr reports a missing tool as an empty answer (#792)
+`dig +short ... 2>/dev/null` printed nothing for six DNS queries, which read as "the domain has no mail records". `dig` is not installed on this machine. The same queries over DNS-over-HTTPS (`curl https://dns.google/resolve?name=...&type=...`) showed the provider's DKIM key, feedback MX and DMARC record. Keep stderr on a probe, and confirm the tool answers a query whose result is already known before reading an empty result as a fact.
+
+### Running the app's lifespan in a test shuts down pools the rest of the session needs (#792)
+A test that entered `lifespan(app)` to check a startup step passed, and 33 later tests failed: shutdown calls `export_executor.shutdown()`, and that executor is a module-level object shared by every export test. Patch the module attribute with a throwaway executor for that one test. A targeted run of the new file showed nothing; only the full suite did.
+
+### CI type-checks the test sources; the commit hooks do not (#792)
+`npm run typecheck:tests` runs only in CI's Frontend Tests job, against a per-file ledger of known errors that may shrink but not grow. Three new `process.env.NODE_ENV = ...` lines in `email.test.ts` copied the file's existing pattern, each one a read-only assignment, and took the file from 8 to 11. Every local hook was green and the PR went red a minute into CI. Run `npm run typecheck:tests` before pushing whenever a test file changed, and do not copy a pattern out of a ledgered file without checking why it is ledgered.
+
+### Do not run a demo stack while the commit hooks are running (#792)
+The frontend coverage hook failed on tests the change never touched: a performance test measured 127ms against a 100ms limit, and two suites took over a minute each. The demo's dev server, browser and its own test runs were competing for the same machine. With nothing else running the same commit passed. Let the hooks finish, or record the demo first.

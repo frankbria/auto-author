@@ -58,6 +58,9 @@ be read back, so you cannot copy them out: ask the maintainer, or rotate the
 account password and update both this file and the secret
 (`gh secret set TEST_USER_PASSWORD --env staging`).
 
+A new account must open the verification link mailed to it before it can sign
+in (#792), so the address has to be a mailbox you can read.
+
 Creating your own throwaway account on https://dev.autoauthor.app also works for
 most specs, but the suite shares one account across all tests in a worker, so use
 a dedicated one rather than an account you care about.

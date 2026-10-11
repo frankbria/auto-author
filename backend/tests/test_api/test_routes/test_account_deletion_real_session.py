@@ -30,7 +30,7 @@ async def _seed_better_auth_user(
             "_id": user_oid,
             "email": email,
             "name": name,
-            "emailVerified": False,
+            "emailVerified": True,
             "twoFactorEnabled": True,
             "createdAt": now,
             "updatedAt": now,
