@@ -26,6 +26,7 @@ async def _seed_content(owner_id: str, marker: str) -> None:
                     "title": f"{marker} book",
                     "owner_id": owner_id,
                     "created_at": datetime(2026, 10, 1, tzinfo=timezone.utc),
+                    "collaborators": [{"user_id": f"{marker}-invitee"}],
                     "table_of_contents": {
                         "chapters": [
                             {"id": "ch1", "title": "One", "content": f"<p>{marker} chapter</p>"}
@@ -64,6 +65,7 @@ async def test_export_returns_the_callers_profile_books_and_answers(motor_reinit
 
     assert response.status_code == 200, response.text
     assert "attachment" in response.headers["content-disposition"]
+    assert response.headers["cache-control"] == "no-store"
     assert response.headers["content-type"].startswith("application/json")
     data = response.json()
     assert data["profile"]["email"] == "exporter@example.com"
@@ -73,7 +75,10 @@ async def test_export_returns_the_callers_profile_books_and_answers(motor_reinit
     assert book["title"] == "MINE book"
     assert book["table_of_contents"]["chapters"][0]["content"] == "<p>MINE chapter</p>"
     assert ObjectId.is_valid(book["_id"])
-    assert datetime.fromisoformat(book["created_at"])
+    # Mongo hands dates back naive; the file marks every one as UTC.
+    assert book["created_at"] == "2026-10-01T00:00:00+00:00"
+    assert data["profile"]["created_at"].endswith("+00:00")
+    assert "collaborators" not in book and "invitee" not in response.text
     assert [q["question_text"] for q in data["questions"]] == ["MINE question"]
     assert [r["response_text"] for r in data["question_responses"]] == ["MINE answer"]
     assert [r["feedback"] for r in data["question_ratings"]] == ["MINE rating"]
@@ -110,7 +115,9 @@ async def test_export_holds_no_credential_and_no_internal_field(motor_reinit_db)
     response = await _export(seeded["tokens"][0])
 
     assert response.status_code == 200
-    # The seed's password hash, TOTP secret, backup codes and session token.
+    # The seed's password hash, TOTP secret, backup codes and session token. The
+    # endpoint reads no better-auth collection, so this half is a tripwire for
+    # the day one is added; the planted users-doc fields test the allowlist.
     for secret in ('"hash"', "totp-secret", '"codes"', seeded["tokens"][0]):
         assert secret not in response.text
     profile = response.json()["profile"]

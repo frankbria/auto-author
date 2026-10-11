@@ -159,7 +159,9 @@ id: every query is scoped to the session's own account.
 | `books` | every book the account owns, as stored, with chapter content |
 | `questions`, `question_responses`, `question_ratings` | every row that carries the account's id |
 
-Ids are strings and dates are ISO 8601. Not included: the audit log, chapter
+Ids are strings and dates are ISO 8601 in UTC. The response is sent with
+`Cache-Control: no-store`. A book's `collaborators` list is left out, because it
+would name other accounts. Not included: the audit log, chapter
 access log and usage counters, uploaded image files (their URLs are), and
 anything better-auth or the payment processor holds (password hash, sessions,
 two-factor secrets, payment records). The response is built in memory.

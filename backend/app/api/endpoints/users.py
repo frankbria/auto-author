@@ -198,10 +198,23 @@ async def export_my_data(
     for name, owner_field in EXPORTED_COLLECTIONS.items():
         # shortcut: built in memory, stream it when an account's books outgrow one response
         collection = await get_collection(name)
-        data[name] = await collection.find({owner_field: auth_id}).to_list(None)
+        # collaborators would name other accounts; no document here has another use for the key.
+        data[name] = await collection.find(
+            {owner_field: auth_id}, {"collaborators": 0}
+        ).to_list(None)
     return JSONResponse(
-        jsonable_encoder(data, custom_encoder={ObjectId: str}),
-        headers={"Content-Disposition": 'attachment; filename="auto-author-data.json"'},
+        jsonable_encoder(
+            data,
+            custom_encoder={
+                ObjectId: str,
+                # Mongo returns naive UTC; say so, so every date in the file reads the same.
+                datetime: lambda d: d.replace(tzinfo=d.tzinfo or timezone.utc).isoformat(),
+            },
+        ),
+        headers={
+            "Content-Disposition": 'attachment; filename="auto-author-data.json"',
+            "Cache-Control": "no-store",
+        },
     )
 
 
