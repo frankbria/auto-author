@@ -43,6 +43,7 @@ describe('Terms of Service page', () => {
     expect(section).toHaveTextContent(/deletes your books/i);
     expect(section).toHaveTextContent(/deactivates the account/i);
     expect(section).toHaveTextContent(/for 18 months/i);
+    expect(section).toHaveTextContent(/cancels a paid subscription immediately/i);
   });
 
   it('provides the #main-content landmark (skip-link target)', () => {

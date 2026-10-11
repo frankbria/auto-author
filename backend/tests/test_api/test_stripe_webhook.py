@@ -273,9 +273,12 @@ async def _post_signed(client, payload: bytes):
     )
 
 
-@pytest.mark.parametrize("metadata", [{"auth_id": "auth-stripe-1"}, {}])
+@pytest.mark.parametrize(
+    "metadata,status",
+    [({"auth_id": "auth-stripe-1"}, "account_closed"), ({}, "no_matching_user")],
+)
 async def test_late_event_writes_nothing_onto_a_deactivated_account(
-    webhook_client, metadata
+    webhook_client, metadata, status
 ):
     """#954: the customer id moves under ``retained`` with the account, so
     Stripe's late events find the record through the metadata fallback or not at
@@ -292,7 +295,7 @@ async def test_late_event_writes_nothing_onto_a_deactivated_account(
     resp = await _post_signed(webhook_client, subscription_event(metadata=metadata))
 
     assert resp.status_code == 200
-    assert resp.json() == {"status": "no_matching_user"}
+    assert resp.json() == {"status": status}
     assert await get_user_by_auth_id("auth-stripe-1") == before
     assert await base.users_collection.count_documents({}) == 1
 

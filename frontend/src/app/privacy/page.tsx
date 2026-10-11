@@ -10,7 +10,8 @@ export const metadata = {
 
 // #335: template Privacy Policy. Copy is a starting point — flag for legal
 // review before public launch. References the account-deletion / cascade-delete
-// path (#179): deleting your account permanently removes it and all your books.
+// path (#179) and the 18-month deactivated record (#954): deleting your account
+// deletes your books at once and keeps the account and billing record.
 const LAST_UPDATED = 'October 10, 2026';
 
 export default function PrivacyPage() {
@@ -247,13 +248,14 @@ export default function PrivacyPage() {
             <p className="mt-3">
               The account itself is deactivated rather than erased at once. We
               keep a record of it for 18 months so that we can answer a
-              complaint or a payment dispute: your name, your email address,
-              the date the account was created, your plan, the reference that
-              links the account to our payment processor, and the reference,
-              plan and status of any subscription that was cancelled when you
-              deleted the account. After 18 months the record is erased
-              automatically, leaving only an internal account identifier and
-              the date of deletion. You can ask us to erase it sooner by
+              complaint or a payment dispute: an internal account identifier,
+              your name, your email address, the dates the account was created
+              and deleted, your plan, the reference that links the account to
+              our payment processor, and the reference, plan and status of any
+              subscription that was cancelled when you deleted the account.
+              After 18 months the record is erased automatically, down to the
+              account identifier and the date of deletion. You can ask us to
+              erase it sooner by
               contacting us using the details below. You can sign up again with
               the same email address at any time; a new account is not connected
               to the old record.

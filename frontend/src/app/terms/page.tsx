@@ -154,8 +154,10 @@ export default function TermsPage() {
               >
                 Privacy Policy
               </Link>{' '}
-              describes. We may suspend or terminate access for violations of
-              these terms.
+              describes. Deleting your account cancels a paid subscription
+              immediately; you do not keep paid access for the rest of the
+              billing period. We may suspend or terminate access for violations
+              of these terms.
             </p>
           </section>
 

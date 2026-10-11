@@ -83,6 +83,8 @@ describe('Privacy Policy page', () => {
     expect(retention).toHaveTextContent(/deactivated/i);
     expect(retention).toHaveTextContent(/for 18 months/i);
     expect(retention).toHaveTextContent(/erased automatically/i);
+    expect(retention).toHaveTextContent(/internal account identifier/i);
+    expect(retention).toHaveTextContent(/dates the account was created and deleted/i);
     expect(retention).toHaveTextContent(/erase it sooner/i);
     expect(retention).not.toHaveTextContent(/permanent|cannot be undone/i);
     expect(section(/lawful bas/i)).toHaveTextContent(/complaints and payment disputes/i);

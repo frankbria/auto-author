@@ -128,9 +128,16 @@ async def _apply_subscription_event(
         # subscription metadata with our auth_id.
         auth_id = (subscription.get("metadata") or {}).get("auth_id")
         user = await get_user_by_auth_id(auth_id) if auth_id else None
-    if user is None or user.get("deleted_at"):
+    if user is not None and user.get("deleted_at"):
+        # A deactivated or erased account (#954, #784): acknowledged, never
+        # written to, so a late event cannot put a plan back on it.
+        logger.info(
+            "Stripe %s for closed account %s — ignoring", event_type, user["auth_id"]
+        )
+        return {"status": "account_closed"}
+    if user is None:
         # Ack with 200 so Stripe stops retrying — there is no user to update
-        # (e.g. deleted account, or a customer created outside this app). No
+        # (e.g. a customer created outside this app). No
         # replay marker is recorded: once the user is linked later, an operator
         # can "Resend" the event from the Stripe dashboard (same event id) and
         # it reprocesses.
