@@ -54,7 +54,13 @@ def problems():
         configured = json.loads(body)["email"]["configured"]
     except (ValueError, KeyError, TypeError):
         configured = None
-    if status != 200 or configured is not True:
+    if status != 200 or configured is None:
+        # e.g. a build from before the route existed: say so, not "no provider".
+        found.append(
+            f"{FRONTEND_HEALTH} -> {status} {body[:200]!r}: the frontend health"
+            " route did not answer, so whether sign-up email can be sent is unknown"
+        )
+    elif configured is not True:
         found.append(
             f"{FRONTEND_HEALTH} -> {status} {body[:200]!r}: no email provider is"
             " configured, so no new account can verify its address"

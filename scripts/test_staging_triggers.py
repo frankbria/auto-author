@@ -149,17 +149,28 @@ def test_probe_fails_when_frontend_root_is_not_200(staging):
     assert "502" in result.stdout
 
 
+NO_PROVIDER = "no email provider is configured"
+NO_ANSWER = "health route did not answer"
+
+
 @pytest.mark.parametrize(
-    "answer",
-    [EMAIL_MISSING, (404, "Not Found"), (200, "<html>not json</html>"), (200, json.dumps({"status": "ok"}))],
-    ids=["not configured", "route missing", "not json", "no email key"],
+    "answer, reason",
+    [
+        (EMAIL_MISSING, NO_PROVIDER),
+        ((200, json.dumps({"status": "ok", "email": {"configured": "yes"}})), NO_PROVIDER),
+        # A build from before the route existed must not be reported as a lost provider.
+        ((404, "Not Found"), NO_ANSWER),
+        ((200, "<html>not json</html>"), NO_ANSWER),
+        ((200, json.dumps({"status": "ok"})), NO_ANSWER),
+    ],
+    ids=["not configured", "not a boolean true", "route missing", "not json", "no email key"],
 )
-def test_probe_fails_unless_the_frontend_says_email_is_configured(staging, answer):
+def test_probe_fails_unless_the_frontend_says_email_is_configured(staging, answer, reason):
     # #968: without a provider no new account can verify its address (#792),
     # and nothing else outside the container shows it.
     result = probe(staging, [HEALTHY], [PAGE], email=[answer])
     assert result.returncode == 1
-    assert "/api/health" in result.stdout and "email provider" in result.stdout
+    assert "/api/health" in result.stdout and reason in result.stdout
 
 
 def test_probe_rides_out_one_transient_failure(staging):
