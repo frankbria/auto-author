@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import SiteFooter from '@/components/SiteFooter';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
+import { SUBPROCESSORS } from '@/lib/constants/subprocessors';
 
 export const metadata = {
   title: 'Privacy Policy · Auto Author',
@@ -10,7 +11,7 @@ export const metadata = {
 // #335: template Privacy Policy. Copy is a starting point — flag for legal
 // review before public launch. References the account-deletion / cascade-delete
 // path (#179): deleting your account permanently removes it and all your books.
-const LAST_UPDATED = 'July 23, 2026';
+const LAST_UPDATED = 'October 10, 2026';
 
 export default function PrivacyPage() {
   return (
@@ -82,7 +83,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="mb-2 text-xl font-semibold text-foreground">
-              3. How We Use Your Information
+              3. How We Use Your Information and Our Lawful Bases
             </h2>
             <p>
               We use your information to provide and improve the Service,
@@ -90,22 +91,138 @@ export default function PrivacyPage() {
               payments, and communicate with you about your account. We do not
               sell your personal data.
             </p>
+            <p className="mt-3">
+              Where data-protection law requires a lawful basis, we rely on:
+            </p>
+            <ul className="mt-2 list-inside list-disc space-y-1">
+              <li>
+                <strong>Contract</strong> — to run your account, store your
+                content, provide the AI features you invoke, and take payment
+                for a paid plan.
+              </li>
+              <li>
+                <strong>Legitimate interests</strong> — to keep the Service
+                secure, prevent abuse, keep the audit log described below, and
+                diagnose errors.
+              </li>
+              <li>
+                <strong>Legal obligation</strong> — to keep billing and tax
+                records and the record of your agreement to automatic renewal.
+              </li>
+              <li>
+                <strong>Consent</strong> — for voice input, which uses your
+                microphone only after you allow it in your browser. You can
+                withdraw consent at any time by revoking that permission.
+              </li>
+            </ul>
           </section>
 
           <section>
             <h2 className="mb-2 text-xl font-semibold text-foreground">
-              4. AI Processing
+              4. AI Processing and Training Use
             </h2>
             <p>
               To generate tables of contents, questions, and drafts, the content
               you submit is sent to our AI provider for processing on your behalf.
               Review AI-generated output for accuracy before relying on it.
             </p>
+            <p className="mt-3">
+              We do not use your content to train AI models. Our AI provider
+              receives it through its API only to produce the output you asked
+              for; under its API terms, content submitted that way is not used
+              to train its models by default. The provider may keep it for a
+              limited period to monitor for abuse, as described in its own
+              policies.
+            </p>
           </section>
 
           <section>
             <h2 className="mb-2 text-xl font-semibold text-foreground">
-              5. Data Retention and Deletion
+              5. Who We Share Your Data With
+            </h2>
+            <p>
+              We share personal data only with the service providers
+              (subprocessors) below, and only as far as each needs it to do its
+              job. Where two providers are listed for the same purpose, one is
+              in use at a time.
+            </p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full border-collapse text-left text-sm">
+                <caption className="sr-only">Subprocessors</caption>
+                <thead>
+                  <tr className="border-b border-border text-foreground">
+                    <th scope="col" className="py-2 pr-4 font-semibold">
+                      Provider
+                    </th>
+                    <th scope="col" className="py-2 pr-4 font-semibold">
+                      Purpose
+                    </th>
+                    <th scope="col" className="py-2 font-semibold">
+                      Data it receives
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SUBPROCESSORS.map(({ name, purpose, data }) => (
+                    <tr key={name} className="border-b border-border align-top">
+                      <th
+                        scope="row"
+                        className="py-2 pr-4 font-medium text-foreground"
+                      >
+                        {name}
+                      </th>
+                      <td className="py-2 pr-4">{purpose}</td>
+                      <td className="py-2">{data}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-xl font-semibold text-foreground">
+              6. International Transfers
+            </h2>
+            <p>
+              We are based in the United States, and the providers listed above
+              process data in the United States and in other countries where
+              they operate. If you use the Service from elsewhere, your data is
+              transferred to and processed in those countries, whose
+              data-protection laws may differ from yours. Where the law
+              requires a safeguard for such a transfer (for example from the
+              EEA, the United Kingdom or Switzerland), we rely on the Standard
+              Contractual Clauses or an equivalent mechanism in our
+              providers&rsquo; data processing terms.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-xl font-semibold text-foreground">
+              7. Cookies and Local Storage
+            </h2>
+            <p>
+              We use only cookies that are strictly necessary: the cookies our
+              sign-in system sets to keep you signed in (a session cookie and
+              short-lived companions that cache your session) and, if you
+              choose to trust a device during two-factor sign-in, a cookie that
+              remembers that device. We do not use advertising or analytics
+              cookies.
+            </p>
+            <p className="mt-3">
+              The Service also keeps some data in your browser&rsquo;s local
+              and session storage: your theme, which chapter tabs and views you
+              have open, and backup copies of text you are editing (chapter
+              text and book summaries) so that work is not lost if a save
+              fails. Local storage stays on your device until you clear it in
+              your browser settings, and session storage until you close the
+              tab; signing out removes neither.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-xl font-semibold text-foreground">
+              8. Data Retention and Deletion
             </h2>
             <p>
               We retain your data for as long as your account is active. You can
@@ -125,6 +242,12 @@ export default function PrivacyPage() {
               . This action cannot be undone.
             </p>
             <p className="mt-3">
+              Deleting your account also cancels any active subscription.
+              Records of past payments (invoices, and the email address, billing
+              address and any tax ID attached to them) stay with our payment
+              processor, which keeps them to meet its own legal obligations.
+            </p>
+            <p className="mt-3">
               We keep an audit log of actions taken on your account (for example
               creating, updating or deleting a book), which can include the IP
               address and browser user-agent of the request. Audit log entries are deleted
@@ -137,19 +260,52 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="mb-2 text-xl font-semibold text-foreground">
-              6. Your Rights
+              9. Your Rights
             </h2>
             <p>
               Depending on your jurisdiction (for example, under GDPR or CCPA),
-              you may have rights to access, correct, export, or delete your
-              personal data. You can exercise deletion directly from your profile
-              page, or contact us for other requests using the details below.
+              you may have the right to:
+            </p>
+            <ul
+              aria-label="Your rights"
+              className="mt-2 list-inside list-disc space-y-1"
+            >
+              <li>access the personal data we hold about you;</li>
+              <li>correct data that is inaccurate or incomplete;</li>
+              <li>delete your data;</li>
+              <li>receive a copy of your data in a portable format;</li>
+              <li>restrict how we process your data;</li>
+              <li>
+                object to processing that we base on our legitimate interests;
+              </li>
+              <li>withdraw consent where we rely on it; and</li>
+              <li>
+                complain to the data-protection authority where you live or
+                work.
+              </li>
+            </ul>
+            <p className="mt-3">
+              You can exercise deletion directly from your profile page, or
+              contact us for other requests using the details below. We do not
+              charge for a request and will not treat you differently for
+              making one.
             </p>
           </section>
 
           <section>
             <h2 className="mb-2 text-xl font-semibold text-foreground">
-              7. Security
+              10. Children
+            </h2>
+            <p>
+              The Service is not directed to children under 16, and we do not
+              knowingly collect personal data from them. If you believe a child
+              has given us personal data, contact us and we will delete it.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-xl font-semibold text-foreground">
+              11. Security
             </h2>
             <p>
               We use reasonable technical and organizational measures to protect
@@ -160,7 +316,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="mb-2 text-xl font-semibold text-foreground">
-              8. Changes to This Policy
+              12. Changes to This Policy
             </h2>
             <p>
               We may update this policy from time to time. Material changes will
@@ -170,7 +326,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="mb-2 text-xl font-semibold text-foreground">
-              9. Contact
+              13. Contact
             </h2>
             <p>
               For privacy questions or data requests, contact us at{' '}
