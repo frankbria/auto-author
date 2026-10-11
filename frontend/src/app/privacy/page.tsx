@@ -102,8 +102,9 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong>Legitimate interests</strong> — to keep the Service
-                secure, prevent abuse, keep the audit log described below, and
-                diagnose errors.
+                secure, prevent abuse, keep the audit log described below,
+                diagnose errors, and handle complaints and payment disputes
+                after an account is closed (section 8).
               </li>
               <li>
                 <strong>Legal obligation</strong> — to keep billing and tax
@@ -233,13 +234,29 @@ export default function PrivacyPage() {
               >
                 profile page
               </Link>{' '}
-              (Delete Account). Deleting your account is permanent and{' '}
+              (Delete Account). Deleting your account{' '}
               <strong>
-                cascades to all of your books and their associated content —
-                chapters, questions, responses, and ratings are removed along with
-                the account
+                deletes all of your books and their associated content at once —
+                chapters, questions, responses, and ratings
               </strong>
-              . This action cannot be undone.
+              , along with your profile picture, bio and preferences. They
+              cannot be recovered. It also signs you out on every device and
+              removes your password and other sign-in details, so the account
+              can no longer be used.
+            </p>
+            <p className="mt-3">
+              The account itself is deactivated rather than erased at once. We
+              keep a record of it for 18 months so that we can answer a
+              complaint or a payment dispute: your name, your email address,
+              the date the account was created, your plan, the reference that
+              links the account to our payment processor, and the reference,
+              plan and status of any subscription that was cancelled when you
+              deleted the account. After 18 months the record is erased
+              automatically, leaving only an internal account identifier and
+              the date of deletion. You can ask us to erase it sooner by
+              contacting us using the details below. You can sign up again with
+              the same email address at any time; a new account is not connected
+              to the old record.
             </p>
             <p className="mt-3">
               Deleting your account also cancels any active subscription.
@@ -285,8 +302,10 @@ export default function PrivacyPage() {
               </li>
             </ul>
             <p className="mt-3">
-              You can exercise deletion directly from your profile page, or
-              contact us for other requests using the details below. We do not
+              You can delete your content and close your account directly from
+              your profile page. To have the account record we keep for 18
+              months (section 8) erased sooner, or for any other request,
+              contact us using the details below. We do not
               charge for a request and will not treat you differently for
               making one.
             </p>

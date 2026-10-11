@@ -99,9 +99,9 @@ In the "Account Settings" section, you can:
 2. **Delete Account**:
    - Click "Delete Account"
    - Confirm by typing your email address in the prompt
-   - Click "Delete Account" in the confirmation dialog
+   - Click "Deactivate account and delete books" in the confirmation dialog
 
-> ⚠️ **Warning**: Account deletion is permanent and will remove all your data from Auto Author.
+> ⚠️ **Warning**: Your books are deleted at once and cannot be recovered. The account is deactivated; its account and billing record is kept for 18 months for complaints and payment disputes, then erased. Email support to have it erased sooner.
 
 ---
 
@@ -194,7 +194,7 @@ http://localhost:8000
 
 **Endpoint**: `DELETE /users/me`
 
-**Description**: Permanently deletes the current user's account and all associated data
+**Description**: Deletes the current user's books and deactivates the account; the account and billing record is kept for 18 months (see `api-profile-endpoints.md`)
 
 **Authentication**: Required
 
@@ -203,12 +203,12 @@ http://localhost:8000
 **Response Format**:
 ```json
 {
-  "message": "Account successfully deleted"
+  "message": "Account deactivated"
 }
 ```
 
 **Status Codes**:
-- `200 OK`: Account deleted successfully
+- `200 OK`: Account deactivated
 - `401 Unauthorized`: Invalid or missing authentication token
 - `404 Not Found`: User not found or already deleted
 - `429 Too Many Requests`: Rate limit exceeded

@@ -35,6 +35,16 @@ describe('Terms of Service page', () => {
     expect(section).toHaveTextContent(/shown at checkout before you pay/i);
   });
 
+  it('section 7 says deleting deactivates the account and keeps its record 18 months (#954)', () => {
+    render(<TermsPage />);
+    const section = screen
+      .getByRole('heading', { level: 2, name: /termination/i })
+      .closest('section');
+    expect(section).toHaveTextContent(/deletes your books/i);
+    expect(section).toHaveTextContent(/deactivates the account/i);
+    expect(section).toHaveTextContent(/for 18 months/i);
+  });
+
   it('provides the #main-content landmark (skip-link target)', () => {
     const { container } = render(<TermsPage />);
     expect(container.querySelector('main#main-content')).toBeInTheDocument();

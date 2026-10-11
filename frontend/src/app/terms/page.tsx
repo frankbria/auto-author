@@ -10,7 +10,7 @@ export const metadata = {
 // #335: template Terms of Service. Copy is a starting point — flag for legal
 // review before public launch. Static server component; owns its own
 // <main id="main-content"> so the layout skip-link resolves here.
-const LAST_UPDATED = 'October 9, 2026';
+const LAST_UPDATED = 'October 10, 2026';
 
 export default function TermsPage() {
   return (
@@ -145,7 +145,17 @@ export default function TermsPage() {
               >
                 profile page
               </Link>
-              . We may suspend or terminate access for violations of these terms.
+              . Deleting your account deletes your books and deactivates the
+              account; we keep the account and billing record for 18 months, as
+              our{' '}
+              <Link
+                href="/privacy"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                Privacy Policy
+              </Link>{' '}
+              describes. We may suspend or terminate access for violations of
+              these terms.
             </p>
           </section>
 

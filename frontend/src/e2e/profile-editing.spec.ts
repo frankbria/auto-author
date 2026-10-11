@@ -132,7 +132,7 @@ test.describe('Profile editing (issue #63)', () => {
 
     await page.getByRole('button', { name: /^delete account$/i }).click();
 
-    const confirmButton = page.getByRole('button', { name: /delete account permanently/i });
+    const confirmButton = page.getByRole('button', { name: /deactivate account and delete books/i });
     const confirmInput = page.locator('#confirm-delete-account');
 
     // Disabled with no input, and stays disabled on a wrong phrase.
