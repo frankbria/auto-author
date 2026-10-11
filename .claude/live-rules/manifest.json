@@ -2,6 +2,23 @@
   "version": 1,
   "rules": [
     {
+      "path": "rules/backend-test-isolation.md",
+      "hash": "33859c33b814e61eadf4864cf089a9554d74a8f919bb8ec735e303635c8ea63c",
+      "description": "Backend test runs share one MongoDB database",
+      "globs": [
+        "backend/tests/**"
+      ],
+      "dirs": [],
+      "prompt": [
+        "pytest",
+        "opencode",
+        "cross-family review"
+      ],
+      "priority": 60,
+      "enabled": true,
+      "include": []
+    },
+    {
       "path": "rules/reuse-first.md",
       "hash": "c8db2b1620b1f74e5060bcd3b1987e2b5e722c67313c2c972dcf1025019ba0f7",
       "description": "Reuse-first implementation",
@@ -14,7 +31,7 @@
     },
     {
       "path": "rules/self-improvement.md",
-      "hash": "736a16a05138c67f1863053e00dce33742475102580779da4846fb27996cd2f6",
+      "hash": "79ff9275243e0ad772c4ce08506d1ddc988b498c4db94ad91097ed3196743f8a",
       "description": "Self-improvement: build the capability that makes the next goal cheaper",
       "globs": [],
       "dirs": [],
@@ -24,9 +41,29 @@
       "include": []
     },
     {
+      "path": "rules/staging-only.md",
+      "hash": "ea0f61a7cb6985a1f1af97c643048ead8d1efb4b8b23f87501c7ba1e6156d26c",
+      "description": "Staging is the only environment",
+      "globs": [
+        ".github/workflows/**",
+        "docker-compose*.yml",
+        "frontend/Dockerfile",
+        "backend/Dockerfile",
+        "docs/STAGING-DEPLOYMENT.md"
+      ],
+      "dirs": [],
+      "prompt": [
+        "production",
+        "deploy"
+      ],
+      "priority": 80,
+      "enabled": true,
+      "include": []
+    },
+    {
       "path": "rules/static-guard-invariants.md",
       "hash": "558d20ef2cb81a8f2321fc9ad70792babf27308979440006ebbdab6201998c81",
-      "description": "Static theme/contrast guards \u2014 what makes one real instead of decorative",
+      "description": "Static theme/contrast guards — what makes one real instead of decorative",
       "globs": [
         "frontend/src/__tests__/theme/**",
         "frontend/*baseline*.json",
