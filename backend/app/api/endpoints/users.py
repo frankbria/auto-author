@@ -1,6 +1,9 @@
 import logging
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Query
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
 from typing import List, Dict
 from datetime import datetime, timezone
@@ -153,6 +156,66 @@ async def update_profile(
     )
 
     return updated_user
+
+
+# The users-doc fields an account export carries (#790). An allowlist, so a
+# field added to users later is not exported until someone decides it should be.
+EXPORTED_PROFILE_FIELDS = (
+    "email", "first_name", "last_name", "display_name", "bio", "avatar_url",
+    "preferences", "plan", "stripe_subscription_status", "created_at",
+    "updated_at", "terms_version", "terms_accepted_at",
+)
+
+# The collections an export reads, and the field in each that holds the
+# owner's auth_id. Chapter content is embedded in the book document.
+EXPORTED_COLLECTIONS = {
+    "books": "owner_id",
+    "questions": "user_id",
+    "question_responses": "user_id",
+    "question_ratings": "user_id",
+}
+
+
+@router.get("/me/export")
+async def export_my_data(
+    current_user: Dict = Depends(get_current_user_from_session),
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),
+):
+    """Download the caller's profile, books, questions, answers and ratings (#790).
+
+    Takes no id: every query is scoped to the session's own auth_id. Activity
+    logs, uploaded files and anything better-auth or Stripe holds are not read.
+    """
+    auth_id = current_user["auth_id"]
+    data = {
+        "exported_at": datetime.now(timezone.utc),
+        "profile": {
+            field: current_user[field]
+            for field in EXPORTED_PROFILE_FIELDS
+            if field in current_user
+        },
+    }
+    for name, owner_field in EXPORTED_COLLECTIONS.items():
+        # shortcut: built in memory, stream it when an account's books outgrow one response
+        collection = await get_collection(name)
+        # collaborators would name other accounts; no document here has another use for the key.
+        data[name] = await collection.find(
+            {owner_field: auth_id}, {"collaborators": 0}
+        ).to_list(None)
+    return JSONResponse(
+        jsonable_encoder(
+            data,
+            custom_encoder={
+                ObjectId: str,
+                # Mongo returns naive UTC; say so, so every date in the file reads the same.
+                datetime: lambda d: d.replace(tzinfo=d.tzinfo or timezone.utc).isoformat(),
+            },
+        ),
+        headers={
+            "Content-Disposition": 'attachment; filename="auto-author-data.json"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.delete("/me")

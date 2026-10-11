@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-11
 
+- **An account can download its own data (#790, P1.8)**: `/privacy` section 9 lists "receive a copy of your data in a portable format" as a right, and nothing produced that copy.
+  - **Endpoint.** `GET /users/me/export` returns one JSON attachment: an allowlist of profile fields from the users doc, every book the account owns with its chapter content, and every question, answer and rating that carries the account's id. It takes no id, so there is nothing to tamper with; each query filters on the session's own `auth_id`. Limited to 10 per hour, sent with `Cache-Control: no-store`, every date marked as UTC. A book's `collaborators` list is left out, because it would name other accounts.
+  - **Profile page.** A "Download my data" link next to Delete Account points at the endpoint, and the browser saves the attachment.
+  - **Copy.** `/privacy` section 9 says the download exists, names what is in it and what is not, and that the rest is available on request.
+  - **Not covered.** The audit log, chapter access log and usage counters are not in the file, nor are uploaded image files (their URLs are), nor anything better-auth or Stripe holds. The response is built in memory, not streamed. A failed download shows the API's JSON error page, because the control is a plain link. The export is not written to the audit log. Counsel has not seen the new wording (#791).
+
 - **A deactivated account keeps its Terms acceptance record for the 18 months (#960, P1.7.1)**: #789 recorded which Terms version an account accepted and when, but the fields were not on the #954 retained list, so deleting the account erased them. A user who then disputed a charge saying they never agreed could not be answered. The owner decided on 2026-10-11 to keep them.
   - **What changed.** `terms_version` and `terms_accepted_at` joined `RETAINED_FIELDS` in `backend/app/db/user.py`. `/privacy` section 8 names them in its list of what is kept, and `docs/api-profile-endpoints.md` lists them.
   - **Nulls are left out.** The backend writes `None` for an account created before #789. The deactivation pipeline now drops a null field as well as a missing one, so such an account's retained record carries no empty acceptance entry.

@@ -306,10 +306,14 @@ export default function PrivacyPage() {
               </li>
             </ul>
             <p className="mt-3">
-              You can delete your content and close your account directly from
-              your profile page. To have the account record we keep for 18
-              months (section 8) erased sooner, or for any other request,
-              contact us using the details below. We do not
+              You can download a copy of your profile, your books and the
+              questions, answers and ratings in them as a JSON file (Download
+              my data), delete your content and close your account directly
+              from your profile page. The download does not include uploaded
+              images, activity and security logs, or payment records held by
+              our payment processor. To get those, to have the account record
+              we keep for 18 months (section 8) erased sooner, or for any other
+              request, contact us using the details below. We do not
               charge for a request and will not treat you differently for
               making one.
             </p>
