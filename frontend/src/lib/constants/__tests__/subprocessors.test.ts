@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { SUBPROCESSORS } from '@/lib/constants/subprocessors';
 import { FRONTEND_ROOT, shippedSources } from '@/__tests__/theme/helpers/sources';
@@ -14,25 +14,39 @@ const CREDENTIAL = /_(KEY|KEY_ID|SECRET|DSN|URI|TOKEN)$/;
 // Our own signing secret: shared between our frontend and backend, sent to no one.
 const FIRST_PARTY = ['BETTER_AUTH_SECRET'];
 
+const BACKEND_APP = join(FRONTEND_ROOT, '..', 'backend/app');
+
 const backendSettings = [
-  ...readFileSync(join(FRONTEND_ROOT, '..', 'backend/app/core/config.py'), 'utf8').matchAll(
-    /^ {4}([A-Z][A-Z0-9_]+):/gm
-  ),
+  ...readFileSync(join(BACKEND_APP, 'core/config.py'), 'utf8').matchAll(/^ {4}([A-Z][A-Z0-9_]+):/gm),
 ].map((m) => m[1]);
 
+// Reads that bypass Settings (cloud_storage_service.py does) are swept too.
+const backendEnv = (readdirSync(BACKEND_APP, { recursive: true }) as string[])
+  .filter((file) => file.endsWith('.py'))
+  .flatMap((file) =>
+    [
+      ...readFileSync(join(BACKEND_APP, file), 'utf8').matchAll(
+        /os\.(?:getenv\(|environ\.get\(|environ\[)\s*["']([A-Z0-9_]+)/g
+      ),
+    ].map((m) => m[1])
+  );
+
 const frontendEnv = shippedSources().flatMap((file) =>
-  [...readFileSync(join(FRONTEND_ROOT, file), 'utf8').matchAll(/process\.env\.([A-Z0-9_]+)/g)].map(
-    (m) => m[1]
-  )
+  [
+    ...readFileSync(join(FRONTEND_ROOT, file), 'utf8').matchAll(
+      /process\.env(?:\.|\[['"])([A-Z0-9_]+)/g
+    ),
+  ].map((m) => m[1])
 );
 
-const configured = [...new Set([...backendSettings, ...frontendEnv])];
+const configured = [...new Set([...backendSettings, ...backendEnv, ...frontendEnv])];
 const credentials = configured.filter((key) => CREDENTIAL.test(key));
 const claimed = SUBPROCESSORS.flatMap((s) => s.envKeys);
 
 describe('subprocessor inventory (#788)', () => {
   it('finds the settings it is meant to sweep', () => {
     expect(backendSettings).toContain('STRIPE_SECRET_KEY');
+    expect(backendEnv).toContain('CLOUDINARY_API_SECRET');
     expect(frontendEnv).toContain('EMAIL_SERVICE_API_KEY');
     expect(credentials.length).toBeGreaterThan(FIRST_PARTY.length);
   });

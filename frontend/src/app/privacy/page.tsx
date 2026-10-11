@@ -209,10 +209,11 @@ export default function PrivacyPage() {
             </p>
             <p className="mt-3">
               The Service also keeps some data in your browser&rsquo;s local
-              storage: your theme and layout preferences, which chapter tabs
-              you have open, and backup copies of text you are editing so that
-              work is not lost if a save fails. This data stays on your device
-              until you clear it in your browser settings.
+              and session storage: your theme, which chapter tabs and views you
+              have open, and backup copies of text you are editing (chapter
+              text and book summaries) so that work is not lost if a save
+              fails. This data stays on your device until you clear it in your
+              browser settings; signing out does not remove it.
             </p>
           </section>
 

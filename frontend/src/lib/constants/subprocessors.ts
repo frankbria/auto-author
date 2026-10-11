@@ -22,7 +22,7 @@ export const SUBPROCESSORS: readonly Subprocessor[] = [
   {
     name: 'Stripe',
     purpose: 'Taking payments and managing subscriptions',
-    data: 'Your email address, billing address, any tax ID you provide, and the card details you enter on Stripe’s own checkout page',
+    data: 'Your name, email address, billing address, any tax ID you provide, your account identifier, and the card details you enter on Stripe’s own checkout page',
     envKeys: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
   },
   {
