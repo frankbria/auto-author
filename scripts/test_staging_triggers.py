@@ -79,7 +79,7 @@ def test_health_probe_is_scheduled_ai_free_and_alerts_with_its_own_label():
 
 
 class Staging(BaseHTTPRequestHandler):
-    """Answers /health and / from the server's `answers` script, one per hit."""
+    """Answers /health, / and /api/health from the server's `answers` script, one per hit."""
 
     def do_GET(self):
         script = self.server.answers[self.path]
@@ -99,6 +99,8 @@ UNHEALTHY = (
     json.dumps({"status": "unhealthy", "checks": {"mongodb": "error: OperationFailure", "config": "ok"}}),
 )
 PAGE = (200, "<html>ok</html>")
+EMAIL_OK = (200, json.dumps({"status": "ok", "email": {"configured": True, "provider": "resend"}}))
+EMAIL_MISSING = (200, json.dumps({"status": "ok", "email": {"configured": False, "provider": None}}))
 
 
 @pytest.fixture
@@ -110,8 +112,8 @@ def staging():
     server.shutdown()
 
 
-def probe(server, health, frontend, attempts=2):
-    server.answers = {"/health": list(health), "/": list(frontend)}
+def probe(server, health, frontend, attempts=2, email=(EMAIL_OK,)):
+    server.answers = {"/health": list(health), "/": list(frontend), "/api/health": list(email)}
     base = f"http://127.0.0.1:{server.server_address[1]}"
     env = {
         **os.environ,
@@ -145,6 +147,19 @@ def test_probe_fails_when_frontend_root_is_not_200(staging):
     result = probe(staging, [HEALTHY], [(502, "Bad Gateway")])
     assert result.returncode == 1
     assert "502" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [EMAIL_MISSING, (404, "Not Found"), (200, "<html>not json</html>"), (200, json.dumps({"status": "ok"}))],
+    ids=["not configured", "route missing", "not json", "no email key"],
+)
+def test_probe_fails_unless_the_frontend_says_email_is_configured(staging, answer):
+    # #968: without a provider no new account can verify its address (#792),
+    # and nothing else outside the container shows it.
+    result = probe(staging, [HEALTHY], [PAGE], email=[answer])
+    assert result.returncode == 1
+    assert "/api/health" in result.stdout and "email provider" in result.stdout
 
 
 def test_probe_rides_out_one_transient_failure(staging):

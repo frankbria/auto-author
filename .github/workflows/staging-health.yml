@@ -2,7 +2,8 @@ name: Staging Health Probe
 
 # Cheap infra-drift check for staging (#916). The E2E suite runs only after a
 # staging deploy now, so this covers the time in between: the API health check
-# (MongoDB reachable, required secrets present) and the frontend root. No AI
+# (MongoDB reachable, required secrets present), the frontend root, and the
+# frontend's own /api/health saying an email provider is configured (#968). No AI
 # calls, no auth, no secrets. scripts/staging_health_probe.py does the checking
 # with retries; a failure opens or comments on one `ci-alert:staging-health`
 # issue (scripts/ci-alert-issue.sh, #776) and the next healthy run closes it.

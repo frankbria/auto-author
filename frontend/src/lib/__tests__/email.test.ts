@@ -1,4 +1,4 @@
-import { sendPasswordResetEmail, sendVerificationEmail } from '../email';
+import { emailProvider, sendPasswordResetEmail, sendVerificationEmail } from '../email';
 
 /**
  * #332 — password reset must never silently no-op and report fake success.
@@ -169,6 +169,30 @@ describe('sendPasswordResetEmail', () => {
 
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(logSpy.mock.calls.flat().join(' ')).toContain(verification.verifyUrl);
+    });
+  });
+
+  // #968: the health route reports this, so it must agree with what a send does.
+  describe('emailProvider', () => {
+    const cases: [string, Record<string, string>, string | null][] = [
+      ['production, nothing set', { NODE_ENV: 'production' }, null],
+      ['production, unknown provider', { NODE_ENV: 'production', EMAIL_SERVICE_PROVIDER: 'mailgun', EMAIL_SERVICE_API_KEY: 'k' }, null],
+      ['production, Resend without a key', { NODE_ENV: 'production', EMAIL_SERVICE_PROVIDER: 'resend' }, null],
+      ['production, Resend with a key', { NODE_ENV: 'production', EMAIL_SERVICE_PROVIDER: 'Resend', EMAIL_SERVICE_API_KEY: 'k' }, 'resend'],
+      ['production, SendGrid with a key', { NODE_ENV: 'production', EMAIL_SERVICE_PROVIDER: 'sendgrid', EMAIL_SERVICE_API_KEY: 'k' }, 'sendgrid'],
+      ['development, nothing set', { NODE_ENV: 'development' }, 'console'],
+      ['production, console', { NODE_ENV: 'production', EMAIL_SERVICE_PROVIDER: 'console' }, null],
+    ];
+
+    it.each(cases)('%s', async (_name, vars, expected) => {
+      Object.assign(process.env as Record<string, string | undefined>, vars);
+
+      expect(emailProvider()).toBe(expected);
+
+      // A send succeeds exactly when a provider is reported.
+      const send = sendVerificationEmail({ to: 'a@example.com', verifyUrl: 'https://app/v' });
+      if (expected === null) await expect(send).rejects.toThrow();
+      else await expect(send).resolves.toBeUndefined();
     });
   });
 });
