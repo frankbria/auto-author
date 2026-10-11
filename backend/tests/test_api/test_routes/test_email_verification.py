@@ -86,7 +86,7 @@ async def test_an_account_created_under_the_requirement_is_never_marked_verified
     """The first run fixes the moment; a later restart must not move it."""
     await grandfather_unverified_accounts()
     signed_up_later = await _seed_account(
-        emailVerified=False, createdAt=datetime.now(timezone.utc) + timedelta(seconds=1)
+        emailVerified=False, createdAt=datetime.now(timezone.utc)
     )
 
     assert await grandfather_unverified_accounts() == 0
