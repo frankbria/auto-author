@@ -5,7 +5,7 @@ import logging
 from .base import books_collection, users_collection, _client, get_collection
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from motor.motor_asyncio import AsyncIOMotorClientSession
 from .audit_log import create_audit_log
 from app.models.book import BookDB
@@ -315,6 +315,15 @@ async def update_book_summary_atomic(
     return updated_book
 
 
+# All a delete needs from a book. Unprojected, the read pulls every chapter's
+# HTML just to throw it away (#786).
+_DELETE_PROJECTION = {"title": 1, "cover_image_url": 1, "cover_thumbnail_url": 1}
+
+# One $in filter is a single BSON document, capped at 16MB; an id costs about
+# 35 bytes in it.
+_QUESTION_ID_CHUNK = 100_000
+
+
 async def delete_book(book_id: str, user_auth_id: str) -> bool:
     """Delete a book and cascade-delete all of its related data.
 
@@ -328,9 +337,8 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
     non-transactional deployment a mid-cascade failure leaves the book document
     (deleted last) intact, so it stays discoverable rather than orphaned.
     """
-    # First check if user owns the book
     book = await books_collection.find_one(
-        {"_id": ObjectId(book_id), "owner_id": user_auth_id}
+        {"_id": ObjectId(book_id), "owner_id": user_auth_id}, _DELETE_PROJECTION
     )
     if not book:
         return False
@@ -351,9 +359,11 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
         if use_transaction:
             async with await _client.start_session() as session:
                 async with session.start_transaction():
-                    counts = await _delete_book_internal(book_id, user_auth_id, session)
+                    deleted, counts = await _delete_books_internal(
+                        [book_id], user_auth_id, session
+                    )
         else:
-            counts = await _delete_book_internal(book_id, user_auth_id, None)
+            deleted, counts = await _delete_books_internal([book_id], user_auth_id, None)
     except Exception:
         # Transactional path rolls back; non-transactional path is contained by
         # children-first ordering (the book document is deleted last).
@@ -361,25 +371,11 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
         raise
 
     # The book vanished between the ownership check and the delete.
-    if counts is None:
+    if not deleted:
         return False
 
-    # Only once the delete has committed: a removed file cannot roll back (#785).
-    cover_url = book.get("cover_image_url")
-    thumbnail_url = book.get("cover_thumbnail_url")
-    if cover_url or thumbnail_url:
-        try:
-            from app.services.file_upload_service import FileUploadService
+    await _delete_cover_files(book)
 
-            await FileUploadService().delete_cover_image(
-                book_id, cover_url, thumbnail_url
-            )
-        except Exception:
-            logger.error(
-                "Failed to delete cover files for book %s", book_id, exc_info=True
-            )
-
-    # Create audit log entry
     await create_audit_log(
         action="book_delete",
         actor_id=user_auth_id,
@@ -393,84 +389,109 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
 async def delete_all_user_books(user_auth_id: str) -> int:
     """Cascade-delete every book the user owns (account deletion, issue #179).
 
-    Reuses ``delete_book`` per book, so each book's questions, responses,
-    ratings and access logs go with it — atomically per book on a replica set.
-    A failure propagates so the caller can abort before touching the user
-    record (children first, parent last). Returns the number of books deleted.
+    One command per collection however many books there are (#786): a per-book
+    loop timed out on a 2,649-book account. A failure propagates so the caller
+    can abort before touching the user record (children first, parents last),
+    leaving the books in place for a retry. Returns the number of books deleted.
 
+    Never a transaction, even on a replica set: one spanning a whole account
+    outlives the 60s transaction limit on exactly the accounts this is for.
     ponytail: the id list is a snapshot — a book created mid-cascade survives.
-    Benign here (the owner is being deactivated); don't "fix" it with a
-    multi-book transaction, which standalone Mongo doesn't support.
     """
-    ids = [
-        str(doc["_id"])
-        async for doc in books_collection.find(
-            {"owner_id": user_auth_id}, {"_id": 1}
-        )
-    ]
-    deleted = 0
-    for book_id in ids:
-        if await delete_book(book_id, user_auth_id):
-            deleted += 1
+    books = await books_collection.find(
+        {"owner_id": user_auth_id}, _DELETE_PROJECTION
+    ).to_list(length=None)
+    if not books:
+        return 0
+
+    deleted, counts = await _delete_books_internal(
+        [str(book["_id"]) for book in books], user_auth_id, None
+    )
+
+    # shortcut: one storage call per cover, in sequence; batch them if accounts
+    # with thousands of covers appear (cover upload has no UI yet, #941).
+    for book in books:
+        await _delete_cover_files(book)
+
+    # One row for the account, without the titles a per-book row would keep.
+    await create_audit_log(
+        action="delete_books",
+        actor_id=user_auth_id,
+        target_id=user_auth_id,
+        resource_type="books",
+        details={"deleted_count": deleted, "cascade_deleted": counts},
+    )
     return deleted
 
 
-async def _delete_book_internal(
-    book_id: str,
+async def _delete_cover_files(book: Dict) -> None:
+    """Remove a deleted book's cover and thumbnail. Only once the delete has
+    committed: a removed file cannot roll back (#785)."""
+    cover_url = book.get("cover_image_url")
+    thumbnail_url = book.get("cover_thumbnail_url")
+    if not (cover_url or thumbnail_url):
+        return
+    book_id = str(book["_id"])
+    try:
+        from app.services.file_upload_service import FileUploadService
+
+        await FileUploadService().delete_cover_image(book_id, cover_url, thumbnail_url)
+    except Exception:
+        logger.error("Failed to delete cover files for book %s", book_id, exc_info=True)
+
+
+async def _delete_books_internal(
+    book_ids: List[str],
     user_auth_id: str,
     session: Optional[AsyncIOMotorClientSession],
-) -> Optional[Dict[str, int]]:
-    """Run the cascade deletes, optionally inside a transaction ``session``.
-
-    Children are deleted first and the book document + user association last, so
-    a non-transactional partial failure leaves the book discoverable. Returns
-    per-collection delete counts, or ``None`` if the book document was already
-    gone (deleted between the ownership check and here).
+) -> Tuple[int, Dict[str, int]]:
+    """Run the cascade deletes for ``book_ids``, optionally inside a transaction
+    ``session``. Children go first and the book documents + user association
+    last, so a non-transactional partial failure leaves the books discoverable.
+    Returns the number of book documents deleted (0 if they vanished after the
+    ownership check) and the per-collection child delete counts.
     """
     chapter_access_logs = await get_collection("chapter_access_logs")
     questions_collection = await get_collection("questions")
     responses_collection = await get_collection("question_responses")
     ratings_collection = await get_collection("question_ratings")
+    in_books = {"$in": book_ids}
+    question_scope = {"book_id": in_books, "user_id": user_auth_id}
 
     access_logs_result = await chapter_access_logs.delete_many(
-        {"book_id": book_id}, session=session
+        {"book_id": in_books}, session=session
     )
 
     questions = await questions_collection.find(
-        {"book_id": book_id, "user_id": user_auth_id}, session=session
+        question_scope, {"_id": 1}, session=session
     ).to_list(length=None)
     question_ids = [str(q["_id"]) for q in questions]
 
-    responses_deleted = 0
-    ratings_deleted = 0
-    if question_ids:
-        responses_deleted = (
-            await responses_collection.delete_many(
-                {"question_id": {"$in": question_ids}}, session=session
-            )
+    responses_deleted = ratings_deleted = 0
+    for start in range(0, len(question_ids), _QUESTION_ID_CHUNK):
+        in_questions = {"question_id": {"$in": question_ids[start : start + _QUESTION_ID_CHUNK]}}
+        responses_deleted += (
+            await responses_collection.delete_many(in_questions, session=session)
         ).deleted_count
-        ratings_deleted = (
-            await ratings_collection.delete_many(
-                {"question_id": {"$in": question_ids}}, session=session
-            )
+        ratings_deleted += (
+            await ratings_collection.delete_many(in_questions, session=session)
         ).deleted_count
 
     questions_result = await questions_collection.delete_many(
-        {"book_id": book_id, "user_id": user_auth_id}, session=session
+        question_scope, session=session
     )
 
-    # Parent last: book document, then the user's book_ids association.
-    result = await books_collection.delete_one(
-        {"_id": ObjectId(book_id)}, session=session
+    # Parents last: book documents, then the user's book_ids association.
+    books_result = await books_collection.delete_many(
+        {"_id": {"$in": [ObjectId(b) for b in book_ids]}, "owner_id": user_auth_id},
+        session=session,
     )
-    if result.deleted_count == 0:
-        return None
+    if books_result.deleted_count:
+        await users_collection.update_one(
+            {"auth_id": user_auth_id}, {"$pull": {"book_ids": in_books}}, session=session
+        )
 
-    await users_collection.update_one(
-        {"auth_id": user_auth_id}, {"$pull": {"book_ids": book_id}}, session=session
-    )
-
-    return {
+    return books_result.deleted_count, {
         "chapter_access_logs": access_logs_result.deleted_count,
         "questions": questions_result.deleted_count,
         "question_responses": responses_deleted,

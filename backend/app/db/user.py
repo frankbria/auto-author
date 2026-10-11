@@ -218,7 +218,7 @@ async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
 
     NB: raw ``delete_many`` on the books collection only — questions, responses,
     ratings and access logs survive. For account deletion use
-    ``app.db.book.delete_all_user_books``, which cascades per book (#179).
+    ``app.db.book.delete_all_user_books``, which cascades (#179).
 
     Args:
         user_id: The user's ID (auth_id or MongoDB _id)

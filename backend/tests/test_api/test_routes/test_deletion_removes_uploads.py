@@ -106,8 +106,11 @@ async def test_delete_book_removes_cover_and_thumbnail(motor_reinit_db, uploads)
     assert _names(uploads.covers) == []
 
 
+@pytest.mark.parametrize(
+    "delete", [delete_book, lambda _book_id, owner: delete_all_user_books(owner)]
+)
 async def test_failed_cascade_keeps_the_cover_files(
-    motor_reinit_db, uploads, monkeypatch
+    motor_reinit_db, uploads, monkeypatch, delete
 ):
     """The book survives a failed cascade, so its cover has to survive too."""
     book_id = await _book_with_cover(uploads, "owner-2")
@@ -115,10 +118,10 @@ async def test_failed_cascade_keeps_the_cover_files(
     async def _boom(*args):
         raise RuntimeError("simulated mongo failure")
 
-    monkeypatch.setattr(book_dao, "_delete_book_internal", _boom)
+    monkeypatch.setattr(book_dao, "_delete_books_internal", _boom)
 
     with pytest.raises(RuntimeError):
-        await delete_book(book_id, "owner-2")
+        await delete(book_id, "owner-2")
 
     assert _names(uploads.covers) == _cover_files(book_id)
 
