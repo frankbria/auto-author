@@ -172,7 +172,7 @@ async def delete_profile(
     """Delete the current user's account.
 
     Cascades the user's books (and their questions/responses/ratings/access
-    logs, via the atomic per-book delete) BEFORE erasing the user record,
+    logs, one bulk delete per collection, #786) BEFORE erasing the user record,
     so a mid-cascade failure leaves the account active and retryable (#179).
     Only a tombstone of auth_id and deleted_at is retained (#784). The Stripe
     subscription is cancelled before any of that (#764).

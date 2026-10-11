@@ -10,19 +10,31 @@ discoverable rather than orphaned.
 Test Mongo is single-node, so these exercise the non-transactional path. The
 failure test therefore asserts *containment* (book survives, error logged);
 true rollback requires a replica set.
+
+Account deletion (``delete_all_user_books``) runs the same cascade once for the
+whole account, never in a transaction: one command per collection however many
+books there are (#786).
 """
 
+from collections import Counter
+
+import motor.motor_asyncio
 import pytest
 from bson.objectid import ObjectId
+from pymongo import monitoring
 
+import app.db.audit_log as audit_log_dao
 import app.db.book as book_dao
+from app.db import base
 from app.db.book import delete_book, delete_all_user_books
 from app.db.base import get_collection
+from tests.conftest import TEST_MONGO_URI
 
 
-async def _seed_book_with_children(owner_id: str) -> str:
-    """Create a book owned by ``owner_id`` with a question (+response, +rating),
-    a chapter access log, and the user association. Returns the book id."""
+async def _seed_account(owner_id: str, book_count: int) -> list[str]:
+    """Create ``book_count`` books owned by ``owner_id``, each with a question
+    (+response, +rating) and a chapter access log, plus the user association.
+    Returns the book ids."""
     books = await get_collection("books")
     users = await get_collection("users")
     questions = await get_collection("questions")
@@ -30,22 +42,93 @@ async def _seed_book_with_children(owner_id: str) -> str:
     ratings = await get_collection("question_ratings")
     access_logs = await get_collection("chapter_access_logs")
 
-    book_id = str((await books.insert_one(
-        {"title": "Doomed", "owner_id": owner_id}
-    )).inserted_id)
+    book_ids = [str(_id) for _id in (await books.insert_many(
+        [{"title": "Doomed", "owner_id": owner_id} for _ in range(book_count)]
+    )).inserted_ids]
 
-    await users.insert_one({"auth_id": owner_id, "book_ids": [book_id]})
+    await users.insert_one({"auth_id": owner_id, "book_ids": book_ids})
 
-    question_id = str((await questions.insert_one(
-        {"book_id": book_id, "user_id": owner_id, "text": "Q?"}
-    )).inserted_id)
-    await responses.insert_one(
-        {"question_id": question_id, "user_id": owner_id, "answer": "A"}
+    question_ids = [str(_id) for _id in (await questions.insert_many(
+        [{"book_id": b, "user_id": owner_id, "text": "Q?"} for b in book_ids]
+    )).inserted_ids]
+    await responses.insert_many(
+        [{"question_id": q, "user_id": owner_id, "answer": "A"} for q in question_ids]
     )
-    await ratings.insert_one({"question_id": question_id, "rating": 5})
-    await access_logs.insert_one({"book_id": book_id, "user_id": owner_id})
+    await ratings.insert_many([{"question_id": q, "rating": 5} for q in question_ids])
+    await access_logs.insert_many(
+        [{"book_id": b, "user_id": owner_id} for b in book_ids]
+    )
 
-    return book_id
+    return book_ids
+
+
+async def _seed_book_with_children(owner_id: str) -> str:
+    return (await _seed_account(owner_id, 1))[0]
+
+
+class _FailingDeleteMany:
+    """Proxies a real collection but raises on ``delete_many``."""
+
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+    async def delete_many(self, *args, **kwargs):
+        raise RuntimeError("simulated mongo failure")
+
+
+def _fail_response_deletes(monkeypatch):
+    real_get_collection = book_dao.get_collection
+
+    async def fake_get_collection(name):
+        coll = await real_get_collection(name)
+        if name == "question_responses":
+            return _FailingDeleteMany(coll)
+        return coll
+
+    monkeypatch.setattr(book_dao, "get_collection", fake_get_collection)
+
+
+class _CommandLog(monitoring.CommandListener):
+    """Counts every command sent to Mongo as ``(command, collection)``."""
+
+    def __init__(self):
+        self.commands = Counter()
+
+    def started(self, event):
+        # A getMore's own value is a cursor id; its collection is a separate key.
+        collection = event.command.get("collection") or event.command.get(
+            event.command_name
+        )
+        self.commands[(event.command_name, collection)] += 1
+
+    def succeeded(self, event):
+        pass
+
+    def failed(self, event):
+        pass
+
+
+@pytest.fixture
+def command_log(motor_reinit_db, monkeypatch):
+    """Rebind the DAOs to a client that logs its commands. Listeners can only be
+    attached when a client is built."""
+    log = _CommandLog()
+    client = motor.motor_asyncio.AsyncIOMotorClient(
+        TEST_MONGO_URI, event_listeners=[log]
+    )
+    db = client.get_default_database()
+    monkeypatch.setattr(base, "_db", db)
+    monkeypatch.setattr(book_dao, "_client", client)
+    monkeypatch.setattr(book_dao, "books_collection", db.get_collection("books"))
+    monkeypatch.setattr(book_dao, "users_collection", db.get_collection("users"))
+    monkeypatch.setattr(
+        audit_log_dao, "audit_logs_collection", db.get_collection("audit_logs")
+    )
+    yield log
+    client.close()
 
 
 @pytest.mark.asyncio
@@ -107,18 +190,104 @@ async def test_delete_all_user_books_only_touches_owner(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_all_user_books_propagates_failure(motor_reinit_db, monkeypatch):
-    """A per-book cascade failure propagates so the account-deletion caller can
-    abort before touching the user record."""
-    await _seed_book_with_children("victim-2")
-
-    async def _boom(book_id, user_auth_id):
-        raise RuntimeError("simulated mongo failure")
-
-    monkeypatch.setattr(book_dao, "delete_book", _boom)
+async def test_delete_all_user_books_failure_leaves_every_book(
+    motor_reinit_db, monkeypatch
+):
+    """A failed child delete propagates, so the account-deletion caller aborts
+    before touching the user record, and every book document survives it
+    (children first, parents last) for the retry."""
+    await _seed_account("victim-2", 3)
+    _fail_response_deletes(monkeypatch)
 
     with pytest.raises(RuntimeError, match="simulated mongo failure"):
         await delete_all_user_books("victim-2")
+
+    books = await get_collection("books")
+    assert await books.count_documents({"owner_id": "victim-2"}) == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("book_count", [3, 250])
+async def test_delete_all_user_books_commands_do_not_grow_with_books(
+    command_log, book_count
+):
+    """One command per collection whatever the size of the account (#786): the
+    per-book loop cost about ten round trips a book and timed out at 2,649."""
+    await _seed_account("victim", book_count)
+    kept = await _seed_book_with_children("bystander")
+    command_log.commands.clear()
+
+    assert await delete_all_user_books("victim") == book_count
+
+    commands = dict(command_log.commands)
+    # Reading 250 ids back takes a second batch; a batch holds thousands.
+    assert sum(
+        commands.pop(key) for key in list(commands) if key[0] == "getMore"
+    ) <= 2
+    assert commands == {
+        ("find", "books"): 1,
+        ("delete", "chapter_access_logs"): 1,
+        ("find", "questions"): 1,
+        ("delete", "question_responses"): 1,
+        ("delete", "question_ratings"): 1,
+        ("delete", "questions"): 1,
+        ("delete", "books"): 1,
+        ("update", "users"): 1,
+        ("insert", "audit_logs"): 1,
+    }
+
+    books = await get_collection("books")
+    users = await get_collection("users")
+    assert await books.count_documents({"owner_id": "victim"}) == 0
+    assert (await users.find_one({"auth_id": "victim"}))["book_ids"] == []
+    for name in ("questions", "question_responses", "chapter_access_logs"):
+        collection = await get_collection(name)
+        assert await collection.count_documents({"user_id": "victim"}) == 0
+        assert await collection.count_documents({"user_id": "bystander"}) == 1
+    ratings = await get_collection("question_ratings")
+    assert await ratings.count_documents({}) == 1
+    assert await books.find_one({"_id": ObjectId(kept)}) is not None
+
+
+@pytest.mark.asyncio
+async def test_delete_all_user_books_chunks_question_ids(command_log, monkeypatch):
+    """Responses and ratings are keyed by question id alone, and one ``$in`` is
+    capped at 16MB, so the ids go in chunks."""
+    monkeypatch.setattr(book_dao, "_QUESTION_ID_CHUNK", 2)
+    await _seed_account("victim", 5)
+    command_log.commands.clear()
+
+    assert await delete_all_user_books("victim") == 5
+
+    assert command_log.commands[("delete", "question_responses")] == 3
+    assert command_log.commands[("delete", "question_ratings")] == 3
+    for name in ("question_responses", "question_ratings"):
+        assert await (await get_collection(name)).count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_all_user_books_writes_one_audit_row(motor_reinit_db):
+    """One summary row for the account, carrying counts and no book titles."""
+    await _seed_account("victim", 2)
+
+    assert await delete_all_user_books("victim") == 2
+
+    rows = await base.audit_logs_collection.find({}, {"_id": 0}).to_list(None)
+    assert [(row["action"], row["actor_id"], row["details"]) for row in rows] == [
+        (
+            "delete_books",
+            "victim",
+            {
+                "deleted_count": 2,
+                "cascade_deleted": {
+                    "chapter_access_logs": 2,
+                    "questions": 2,
+                    "question_responses": 2,
+                    "question_ratings": 2,
+                },
+            },
+        )
+    ]
 
 
 @pytest.mark.asyncio
@@ -131,27 +300,7 @@ async def test_delete_book_failure_is_contained_and_logged(
     owner = "owner-3"
     book_id = await _seed_book_with_children(owner)
 
-    real_get_collection = book_dao.get_collection
-
-    class _FailingDeleteMany:
-        """Proxies a real collection but raises on ``delete_many``."""
-
-        def __init__(self, wrapped):
-            self._wrapped = wrapped
-
-        def __getattr__(self, name):
-            return getattr(self._wrapped, name)
-
-        async def delete_many(self, *args, **kwargs):
-            raise RuntimeError("simulated mongo failure")
-
-    async def fake_get_collection(name):
-        coll = await real_get_collection(name)
-        if name == "question_responses":
-            return _FailingDeleteMany(coll)
-        return coll
-
-    monkeypatch.setattr(book_dao, "get_collection", fake_get_collection)
+    _fail_response_deletes(monkeypatch)
 
     with pytest.raises(RuntimeError, match="simulated mongo failure"):
         await delete_book(book_id, owner)
