@@ -269,7 +269,7 @@ export default function SignUpPage() {
               )}
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
+          <CardFooter className="flex flex-col space-y-4 pt-4">
             {/* #335: legal docs must be reachable from the sign-up flow.
                 #789: above the button, so it is read before the account exists. */}
             <p className="text-xs text-center text-gray-500 dark:text-gray-400">
