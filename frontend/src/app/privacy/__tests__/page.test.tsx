@@ -74,6 +74,23 @@ describe('Privacy Policy page', () => {
     }
   });
 
+  const section = (name: RegExp) =>
+    screen.getByRole('heading', { level: 2, name }).closest('section');
+
+  it('says deletion deactivates the account and keeps its record for 18 months (#954)', () => {
+    render(<PrivacyPage />);
+    const retention = section(/data retention and deletion/i);
+    expect(retention).toHaveTextContent(/deactivated/i);
+    expect(retention).toHaveTextContent(/for 18 months/i);
+    expect(retention).toHaveTextContent(/erased automatically/i);
+    expect(retention).toHaveTextContent(/internal account identifier/i);
+    expect(retention).toHaveTextContent(/dates the account was created and deleted/i);
+    expect(retention).toHaveTextContent(/erase it sooner/i);
+    expect(retention).not.toHaveTextContent(/permanent|cannot be undone/i);
+    expect(section(/lawful bas/i)).toHaveTextContent(/complaints and payment disputes/i);
+    expect(section(/your rights/i)).toHaveTextContent(/erased sooner/i);
+  });
+
   it('says billing records stay with the payment processor after deletion (#784)', () => {
     render(<PrivacyPage />);
     expect(screen.getByText(/records of past payments.*stay with our payment processor/i)).toBeInTheDocument();

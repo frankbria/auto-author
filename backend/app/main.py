@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from contextlib import asynccontextmanager
 from app.api.endpoints.router import router as api_router
 from app.core.config import settings, is_production_env
+import asyncio
 import logging
 import os
 from app.api.request_validation import RequestValidationMiddleware
@@ -113,7 +114,7 @@ async def lifespan(app: FastAPI):
     from app.db.base import get_database
     from app.db.indexing_strategy import ChapterTabIndexManager
     from app.db.questions import ensure_question_indexes
-    from app.db.user import ensure_user_indexes
+    from app.db.user import ensure_user_indexes, purge_expired_users
 
     # Create indexes for question collections
     await ensure_question_indexes()
@@ -131,10 +132,26 @@ async def lifespan(app: FastAPI):
     if not result.get("success"):
         logger.error(f"Startup index creation failed: {result.get('message')}")
 
+    # Erase deactivated accounts whose 18 months are up (#954): now, then daily,
+    # so the purge does not wait for the next deploy.
+    async def purge_daily():
+        while True:
+            try:
+                purged = await purge_expired_users()
+                if purged:
+                    logger.info("Purged %d expired deactivated account(s)", purged)
+            except Exception:
+                logger.error("Purge of deactivated accounts failed", exc_info=True)
+            await asyncio.sleep(24 * 60 * 60)
+
+    purge_task = asyncio.create_task(purge_daily())
+
     logger.info("Startup tasks completed")
 
     # Application runs here
     yield
+
+    purge_task.cancel()
 
     # Shutdown tasks
     # Drop any export builds still queued on the dedicated pool (#345).

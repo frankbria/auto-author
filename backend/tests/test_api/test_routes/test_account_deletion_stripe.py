@@ -78,7 +78,11 @@ async def test_delete_cancels_the_stored_subscription_once(
     auth_client_factory, stripe_stub, path, ok_status
 ):
     client = await auth_client_factory(
-        overrides={"plan": "pro", "stripe_subscription_id": SUB_ID}
+        overrides={
+            "plan": "pro",
+            "stripe_subscription_id": SUB_ID,
+            "stripe_subscription_status": "active",
+        }
     )
 
     resp = await client.delete(path)
@@ -90,7 +94,13 @@ async def test_delete_cancels_the_stored_subscription_once(
     assert call["idempotency_key"] == f"account-delete-{SUB_ID}"
     users = await get_collection("users")
     doc = await users.find_one({"auth_id": OWNER})
-    assert set(doc) == {"_id", "auth_id", "deleted_at"}
+    assert set(doc) == {"_id", "auth_id", "deleted_at", "purge_at", "retained"}
+    # #954: the cancel resets the plan before the record is written, so the
+    # subscription the user was paying for is kept beside it.
+    assert doc["retained"]["plan"] == "free"
+    assert doc["retained"]["cancelled_subscription"] == {
+        "id": SUB_ID, "plan": "pro", "status": "active",
+    }
 
 
 @pytest.mark.parametrize("path", ["/api/v1/users/me", f"/api/v1/users/{OWNER}"])

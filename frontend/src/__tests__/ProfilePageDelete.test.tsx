@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
 import UserProfile from '@/app/profile/page';
 import { authClient, useSession } from '@/lib/auth-client';
 
@@ -55,7 +56,7 @@ const openDeleteDialog = async () => {
   fireEvent.click(screen.getByRole('button', { name: /^delete account$/i }));
   return {
     input: await screen.findByLabelText(/to confirm/i),
-    confirmButton: screen.getByRole('button', { name: /delete account permanently/i }),
+    confirmButton: screen.getByRole('button', { name: /deactivate account and delete books/i }),
   };
 };
 
@@ -152,6 +153,24 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     await waitFor(() => expect(deleteCall()).toBeDefined());
   });
 
+  it('says what happens: books deleted now, the account record kept 18 months (#954)', async () => {
+    await openDeleteDialog();
+    const dialog = screen.getByRole('dialog');
+
+    expect(dialog).toHaveTextContent(/your account is deactivated/i);
+    expect(dialog).toHaveTextContent(/books are deleted now/i);
+    expect(dialog).toHaveTextContent(/for 18 months/i);
+    expect(dialog).not.toHaveTextContent(/permanently/i);
+    expect(within(dialog).getByRole('link', { name: /privacy policy/i })).toHaveAttribute(
+      'href',
+      '/privacy'
+    );
+    expect(within(dialog).getByRole('link', { name: SUPPORT_EMAIL })).toHaveAttribute(
+      'href',
+      SUPPORT_MAILTO
+    );
+  });
+
   it('resets the confirmation when the dialog is cancelled and reopened', async () => {
     const { input, confirmButton } = await openDeleteDialog();
 
@@ -164,7 +183,7 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     const reopenedInput = await screen.findByLabelText(/to confirm/i);
     expect(reopenedInput).toHaveValue('');
     expect(
-      screen.getByRole('button', { name: /delete account permanently/i })
+      screen.getByRole('button', { name: /deactivate account and delete books/i })
     ).toBeDisabled();
     expect(deleteCall()).toBeUndefined();
   });

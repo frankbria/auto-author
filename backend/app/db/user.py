@@ -4,11 +4,25 @@ import logging
 
 from .base import users_collection, books_collection, get_collection
 from bson.objectid import ObjectId
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 from .audit_log import create_audit_log
 
 logger = logging.getLogger(__name__)
+
+# How long a deactivated account's record is kept for complaints and
+# chargebacks before it is erased (#954): 18 months.
+RETENTION = timedelta(days=548)
+
+# The account and billing record a deactivated account keeps. An allowlist, so
+# a field added to users later is erased by default.
+RETAINED_FIELDS = (
+    "email", "first_name", "last_name", "display_name", "created_at",
+    "plan", "stripe_customer_id", "cancelled_subscription",
+)
+
+# What an erased account is replaced with (#784), as a $replaceWith expression.
+_TOMBSTONE = {"_id": "$_id", "auth_id": "$auth_id", "deleted_at": "$deleted_at"}
 
 
 async def ensure_user_indexes() -> None:
@@ -166,18 +180,33 @@ async def delete_better_auth_identity(auth_id: str) -> None:
 async def delete_user(
     auth_id: str, actor_id: str = None, soft_delete: bool = True
 ) -> bool:
-    """Delete a user (soft delete by default) and revoke their better-auth identity.
+    """Deactivate a user (soft delete, the default) and revoke their better-auth
+    identity.
 
-    A soft delete replaces the record with a tombstone of auth_id and deleted_at
-    (#784): replacing, not unsetting, erases every field, including ones added
-    later. The tombstone keeps the session resolver rejecting that id and stops
-    the auto-create path from reviving it; the email is gone, so the same
-    address can sign up again (#763).
+    A soft delete replaces the record with auth_id, deleted_at, purge_at and the
+    RETAINED_FIELDS under ``retained`` (#954): replacing, not unsetting, erases
+    every other field, including ones added later. deleted_at keeps the session
+    resolver rejecting that id and stops the auto-create path, update_user and
+    the Stripe webhook from reviving it. The retained email is nested, off the
+    unique index, so the same address can sign up again (#763) without the new
+    account colliding with this record or release_email stripping it.
     """
     if soft_delete:
-        previous = await users_collection.find_one_and_replace(
+        now = datetime.now(timezone.utc)
+        previous = await users_collection.find_one_and_update(
             {"auth_id": auth_id, "deleted_at": {"$exists": False}},
-            {"auth_id": auth_id, "deleted_at": datetime.now(timezone.utc)},
+            [
+                {
+                    "$replaceWith": {
+                        "_id": "$_id",
+                        "auth_id": "$auth_id",
+                        "deleted_at": now,
+                        "purge_at": now + RETENTION,
+                        # A field the record lacks is left out, not set to null.
+                        "retained": {field: f"${field}" for field in RETAINED_FIELDS},
+                    }
+                }
+            ],
         )
     else:
         # Hard delete
@@ -210,6 +239,38 @@ async def delete_user(
         )
         return True
     return False
+
+
+async def erase_deactivated_user(auth_id: str, actor_id: str) -> bool:
+    """Erase a deactivated account's retained record before its purge date, for
+    a user who asks support to (#954). Matches nothing else: not an active
+    account, and not an account that is already erased."""
+    result = await users_collection.update_one(
+        {"auth_id": auth_id, "purge_at": {"$exists": True}},
+        [{"$replaceWith": _TOMBSTONE}],
+    )
+    if not result.modified_count:
+        return False
+    await create_audit_log(
+        action="user_erase",
+        actor_id=actor_id,
+        target_id=auth_id,
+        resource_type="user",
+    )
+    return True
+
+
+async def purge_expired_users() -> int:
+    """Erase every deactivated account whose purge date has passed (#954).
+
+    Not a TTL index: that would delete the document, and the tombstone is what
+    stops a surviving session from re-creating the account.
+    """
+    result = await users_collection.update_many(
+        {"purge_at": {"$lte": datetime.now(timezone.utc)}},
+        [{"$replaceWith": _TOMBSTONE}],
+    )
+    return result.modified_count
 
 
 async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:

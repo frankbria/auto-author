@@ -96,7 +96,7 @@ async def test_delete_me_happy_path(auth_client_factory):
     client = await auth_client_factory()
     resp = await client.delete("/api/v1/users/me")
     assert resp.status_code == 200
-    assert resp.json()["message"] == "Account successfully deleted"
+    assert resp.json()["message"] == "Account deactivated"
 
 
 async def test_delete_me_not_found_returns_404(auth_client_factory):

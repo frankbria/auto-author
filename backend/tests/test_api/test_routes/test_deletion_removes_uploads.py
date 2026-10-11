@@ -184,7 +184,7 @@ async def test_avatar_storage_failure_is_logged_and_the_user_is_still_erased(
 
     users = await get_collection("users")
     doc = await users.find_one({"auth_id": "gone-2"})
-    assert set(doc) == {"_id", "auth_id", "deleted_at"}
+    assert set(doc) == {"_id", "auth_id", "deleted_at", "purge_at", "retained"}
     assert any("gone-2" in record.getMessage() for record in caplog.records)
 
 

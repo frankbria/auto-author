@@ -30,6 +30,7 @@ from .user import (
     update_user,
     delete_user,
     delete_user_books,
+    erase_deactivated_user,
 )
 
 # Backward compatibility alias for migration period
@@ -83,6 +84,7 @@ __all__ += [
     "update_user",
     "delete_user",
     "delete_user_books",
+    "erase_deactivated_user",
     # Book DAOs
     "create_book",
     "get_book_by_id",

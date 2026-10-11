@@ -147,16 +147,34 @@ curl -X PATCH "http://localhost:8000/api/users/me" \
 
 ### Delete User Account
 
-Deletes the authenticated user's account. All owned content — books and their
+Deactivates the authenticated user's account. All owned content — books and their
 questions, responses, ratings, and chapter access logs — is permanently
 cascade-deleted (issue #179). The better-auth identity (user, credential
-accounts, sessions, 2FA secret) is removed (#763), and the user record is
-replaced by a tombstone holding only `auth_id` and `deleted_at` (#784): no
-email, name, bio, avatar URL or Stripe id survives. The uploaded avatar and
-every book's cover and thumbnail file are deleted as well (#785); a storage
-failure there is logged and does not fail the request. If the content cascade
-fails, the request returns 500 and the account stays active so it can be
-retried.
+accounts, sessions, 2FA secret) is removed (#763), so the account cannot sign
+in and the same email can sign up again as a new, unconnected account. The
+uploaded avatar and every book's cover and thumbnail file are deleted as well
+(#785); a storage failure there is logged and does not fail the request. If the
+content cascade fails, the request returns 500 and the account stays active
+(its subscription is already cancelled) so it can be retried.
+
+The user record is replaced by a deactivated record (#954):
+
+| Field | Holds |
+|---|---|
+| `auth_id` | the account id |
+| `deleted_at` | when the account was deactivated; every "is this account closed" check reads this field |
+| `purge_at` | `deleted_at` plus 548 days (18 months) |
+| `retained` | `email`, `first_name`, `last_name`, `display_name`, `created_at`, `plan`, `stripe_customer_id` and `cancelled_subscription` (`id`, `plan`, `status` of the subscription that account deletion cancelled), each only if the account had it |
+
+Nothing else survives: no bio, avatar URL, preferences or book list. The
+retained fields are nested so that they sit outside the unique indexes on
+`email` and `stripe_customer_id`.
+
+The backend erases a record whose `purge_at` has passed to a tombstone of
+`auth_id` and `deleted_at` (#784). It checks at startup and once a day. An
+admin erases one earlier with `DELETE /users/{auth_id}`: on an active account
+that call deactivates it, and on a deactivated one it erases it (404 once it is
+erased). This is how support honours a request for earlier erasure.
 
 **Endpoint**: `DELETE /users/me`
 
@@ -167,16 +185,17 @@ retried.
 **Response Format**:
 ```json
 {
-  "message": "Account successfully deleted"
+  "message": "Account deactivated"
 }
 ```
 
 **Status Codes**:
-- `200 OK`: Account deleted successfully
+- `200 OK`: Account deactivated
 - `401 Unauthorized`: Invalid or missing authentication token
 - `404 Not Found`: User not found or already deleted
 - `429 Too Many Requests`: Rate limit exceeded
 - `500 Internal Server Error`: Content cascade failed — account left active, retry
+- `502 Bad Gateway`: The subscription could not be cancelled — nothing was deleted, retry
 
 **Example Request**:
 ```bash
@@ -184,7 +203,7 @@ curl -X DELETE "http://localhost:8000/api/users/me" \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..."
 ```
 
-> ⚠️ **Warning**: This operation is irreversible. All books and related content are permanently deleted; the account record is deactivated.
+> ⚠️ **Warning**: This operation is irreversible. All books and related content are permanently deleted, and a deactivated account cannot be reactivated.
 
 ---
 
@@ -278,20 +297,25 @@ curl -X PUT "http://localhost:8000/api/users/user_2NxAa1pyy8THf937QUAhKR2tXCI" \
   }'
 ```
 
-#### Delete Any User
+#### Deactivate or Erase Any User
 
-**Endpoint**: `DELETE /users/{clerk_id}`
+Deactivates an active account exactly as `DELETE /users/me` does. For an admin,
+the same call on an account that is already deactivated erases its retained
+record to the tombstone (#954).
 
-**Authentication**: Required (admin only)
+**Endpoint**: `DELETE /users/{auth_id}`
+
+**Authentication**: Required (admin, or the user's own id)
 
 **Path Parameters**:
-- `clerk_id`: The Clerk user ID
+- `auth_id`: The better-auth user ID
 
 **Status Codes**:
-- `204 No Content`: User successfully deleted
+- `204 No Content`: Account deactivated, or a deactivated account erased
 - `401 Unauthorized`: Invalid or missing authentication token
 - `403 Forbidden`: Insufficient permissions
-- `404 Not Found`: User not found
+- `404 Not Found`: User not found or already erased
+- `502 Bad Gateway`: The subscription could not be cancelled — nothing was deleted, retry
 
 **Example Request**:
 ```bash

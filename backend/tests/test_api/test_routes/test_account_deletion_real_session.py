@@ -79,6 +79,7 @@ def _client(token: str) -> AsyncClient:
 
 
 TOMBSTONE_KEYS = {"_id", "auth_id", "deleted_at"}
+DEACTIVATED_KEYS = TOMBSTONE_KEYS | {"purge_at", "retained"}
 
 
 async def _docs_mentioning(*needles: str) -> list:
@@ -143,7 +144,7 @@ async def test_deleted_account_is_locked_out_and_its_better_auth_docs_are_gone(
     app_user = await (await get_collection("users")).find_one(
         {"auth_id": victim["user_id"]}
     )
-    assert set(app_user) == TOMBSTONE_KEYS, "email released, profile erased (#784)"
+    assert set(app_user) == DEACTIVATED_KEYS, "top-level email released (#954)"
 
     assert await _better_auth_docs(bystander["oid"]) == {
         "session": 1,
@@ -187,6 +188,10 @@ async def test_same_email_can_sign_up_again_after_deletion(motor_reinit_db):
         await ensure_user_indexes()
         indexes = await (await get_collection("users")).index_information()
         assert "email_unique_idx" in indexes
+        users = await get_collection("users")
+        await users.update_one(
+            {"auth_id": first["user_id"]}, {"$set": {"stripe_customer_id": "cus_first"}}
+        )
         assert (await c.delete("/api/v1/users/me")).status_code == 200
 
     # better-auth issues a brand-new user id on the second sign-up.
@@ -196,6 +201,14 @@ async def test_same_email_can_sign_up_again_after_deletion(motor_reinit_db):
         assert me.status_code == 200, me.text
         assert me.json()["auth_id"] == second["user_id"]
         assert me.json()["email"] == "again@example.com"
+
+    # #954: the deactivated record keeps its email and billing identity, and
+    # none of it is attached to the new account.
+    kept = await users.find_one({"auth_id": first["user_id"]})
+    assert kept["retained"]["email"] == "again@example.com"
+    assert kept["retained"]["stripe_customer_id"] == "cus_first"
+    fresh = await users.find_one({"auth_id": second["user_id"]})
+    assert "retained" not in fresh and "stripe_customer_id" not in fresh
 
 
 @pytest.mark.asyncio
@@ -261,9 +274,12 @@ async def test_delete_by_auth_id_revokes_better_auth_docs_too(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_deletion_erases_the_account_to_a_tombstone(motor_reinit_db):
-    """#784: the Privacy Policy says deletion is permanent, so nothing that
-    identifies the person may survive DELETE /users/me — in any collection."""
+async def test_deactivation_keeps_the_account_record_until_an_admin_erases_it(
+    motor_reinit_db,
+):
+    """#954: DELETE /users/me keeps the name, email and billing identity on the
+    users record and nowhere else. An admin's DELETE then erases that record to
+    the #784 tombstone, and nothing that identifies the person survives."""
     email = "erase.me@example.com"
     identifying = (email, "Zebedee", "Quillfeather", "cus_erase_me")
     seeded = await _seed_better_auth_user(email, name="Zebedee Quillfeather")
@@ -296,27 +312,73 @@ async def test_deletion_erases_the_account_to_a_tombstone(motor_reinit_db):
 
         assert (await c.delete("/api/v1/users/me")).status_code == 200
 
-    assert await _docs_mentioning(*identifying) == []
-    tombstone = await users.find_one({"auth_id": seeded["user_id"]})
-    assert set(tombstone) == TOMBSTONE_KEYS
-    assert isinstance(tombstone["deleted_at"], datetime)
+    deactivated = await users.find_one({"auth_id": seeded["user_id"]})
+    assert set(deactivated) == DEACTIVATED_KEYS
+    retained = deactivated["retained"]
+    assert {k: v for k, v in retained.items() if k != "created_at"} == {
+        "email": email,
+        "first_name": "Zebedee",
+        "last_name": "Quillfeather",
+        "display_name": "Zebedee Q.",
+        "plan": "free",
+        "stripe_customer_id": "cus_erase_me",
+    }
+    assert isinstance(retained["created_at"], datetime)
+    assert deactivated["purge_at"] - deactivated["deleted_at"] == timedelta(days=548)
+    assert "owls" not in str(deactivated) and "Zebedee.png" not in str(deactivated)
+    assert await _docs_mentioning(*identifying) == [f"users:{deactivated['_id']}"]
+
+    support = await _seed_better_auth_user("support@example.com")
+    async with _client(support["tokens"][0]) as c:
+        assert (await c.get("/api/v1/users/me")).status_code == 200
+        await users.update_one(
+            {"auth_id": support["user_id"]}, {"$set": {"role": "admin"}}
+        )
+        erase = await c.delete(f"/api/v1/users/{seeded['user_id']}")
+        assert erase.status_code == 204, erase.text
+        tombstone = await users.find_one({"auth_id": seeded["user_id"]})
+        assert set(tombstone) == TOMBSTONE_KEYS
+        assert tombstone["deleted_at"] == deactivated["deleted_at"]
+        assert await _docs_mentioning(*identifying) == []
+
+        # An erased account, as every account deleted before #954 is, stays
+        # exactly as it is.
+        again = await c.delete(f"/api/v1/users/{seeded['user_id']}")
+        assert again.status_code == 404
+        assert await users.find_one({"auth_id": seeded["user_id"]}) == tombstone
+
+    erased_by = await (await get_collection("audit_logs")).find_one(
+        {"action": "user_erase"}
+    )
+    assert erased_by["actor_id"] == support["user_id"]
 
 
+@pytest.mark.parametrize(
+    "extra",
+    [{}, {"purge_at": datetime(2028, 4, 10), "retained": {"email": "halfway@example.com"}}],
+    ids=["erased", "deactivated"],
+)
 @pytest.mark.asyncio
-async def test_tombstoned_user_is_rejected_even_if_the_better_auth_user_survives(
-    motor_reinit_db,
+async def test_closed_account_is_rejected_even_if_the_better_auth_user_survives(
+    motor_reinit_db, extra
 ):
-    """If erasing the better-auth identity fails after the tombstone is written,
+    """If erasing the better-auth identity fails after the record is replaced,
     the surviving session must not authenticate — and must not mirror the email
-    back onto the tombstone."""
+    back onto the top level of the record."""
     seeded = await _seed_better_auth_user("halfway@example.com")
     users = await get_collection("users")
     async with _client(seeded["tokens"][0]) as c:
         assert (await c.get("/api/v1/users/me")).status_code == 200
         await users.replace_one(
             {"auth_id": seeded["user_id"]},
-            {"auth_id": seeded["user_id"], "deleted_at": datetime.now(timezone.utc)},
+            {
+                "auth_id": seeded["user_id"],
+                "deleted_at": datetime.now(timezone.utc),
+                **extra,
+            },
         )
         assert (await c.get("/api/v1/users/me")).status_code == 401
 
-    assert set(await users.find_one({"auth_id": seeded["user_id"]})) == TOMBSTONE_KEYS
+    assert set(await users.find_one({"auth_id": seeded["user_id"]})) == (
+        TOMBSTONE_KEYS | set(extra)
+    )

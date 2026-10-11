@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,6 +25,7 @@ import {
 import { toast } from '@/lib/toast';
 import ProfilePictureUpload from '@/components/profile/ProfilePictureUpload';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
 
 const BIO_MAX = 1000;
 
@@ -180,7 +182,7 @@ export default function UserProfile() {
     setDeleting(true);
     try {
       await deleteUserAccount();
-      toast.success({ title: 'Account deleted' });
+      toast.success({ title: 'Account deactivated' });
       // The server already revoked every session (#763); this clears the
       // cookies and the client session cache. The account is gone either way,
       // so a sign-out failure must not surface as "Delete failed".
@@ -365,8 +367,18 @@ export default function UserProfile() {
             <DialogHeader>
               <DialogTitle>Delete account</DialogTitle>
               <DialogDescription>
-                This permanently deletes your account and all your books. This cannot be undone.
-                Any paid subscription is cancelled immediately, so you won&apos;t be billed again.
+                Your account is deactivated and all your books are deleted now. The books cannot
+                be recovered. Any paid subscription is cancelled immediately, so you won&apos;t be
+                billed again. We keep your account and billing record for 18 months to handle
+                complaints and payment disputes, then erase it. Our{' '}
+                <Link href="/privacy" className="text-primary underline-offset-4 hover:underline">
+                  Privacy Policy
+                </Link>{' '}
+                says what the record holds. To have it erased sooner, email{' '}
+                <a href={SUPPORT_MAILTO} className="text-primary underline-offset-4 hover:underline">
+                  {SUPPORT_EMAIL}
+                </a>
+                .
               </DialogDescription>
             </DialogHeader>
             {/* Form wrapper so Enter submits once the confirmation matches
@@ -428,7 +440,7 @@ export default function UserProfile() {
                   disabled={!deleteConfirmed || deleting}
                   busy={deleting}
                 >
-                  {deleting ? 'Deleting…' : 'Delete account permanently'}
+                  {deleting ? 'Deactivating…' : 'Deactivate account and delete books'}
                 </Button>
               </DialogFooter>
             </form>
