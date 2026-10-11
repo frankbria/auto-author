@@ -120,6 +120,8 @@ class Settings(BaseSettings):
     # LONG_OUTPUT (drafts, TOC). The token caps clamp each class's requests so
     # a model with a smaller output limit isn't sent a max_tokens it rejects.
     # The defaults reproduce the pre-#917 requests exactly.
+    # The privacy policy names OpenAI as the AI subprocessor (#788): pointing
+    # AI_BASE_URL at another provider means updating frontend subprocessors.ts.
     AI_BASE_URL: str = ""
     AI_API_KEY: str = ""
     AI_MODEL_DEFAULT: str = "gpt-4"
