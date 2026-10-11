@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import SiteFooter from '@/components/SiteFooter';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
+import { TERMS_VERSION } from '@/lib/constants/legal';
 
 export const metadata = {
   title: 'Terms of Service · Auto Author',
@@ -10,7 +11,10 @@ export const metadata = {
 // #335: template Terms of Service. Copy is a starting point — flag for legal
 // review before public launch. Static server component; owns its own
 // <main id="main-content"> so the layout skip-link resolves here.
-const LAST_UPDATED = 'October 10, 2026';
+const LAST_UPDATED = new Date(`${TERMS_VERSION}T00:00:00Z`).toLocaleDateString(
+  'en-US',
+  { dateStyle: 'long', timeZone: 'UTC' }
+);
 
 export default function TermsPage() {
   return (

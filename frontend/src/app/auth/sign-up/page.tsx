@@ -270,23 +270,8 @@ export default function SignUpPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading || !isPasswordValid(password) || !passwordsMatch}
-            >
-              {loading ? "Creating account..." : "Sign Up"}
-            </Button>
-            <p className="text-sm text-center text-gray-600 dark:text-gray-400">
-              Already have an account?{" "}
-              <Link
-                href="/auth/sign-in"
-                className="text-blue-600 hover:underline dark:text-blue-400"
-              >
-                Sign in
-              </Link>
-            </p>
-            {/* #335: legal docs must be reachable from the sign-up flow. */}
+            {/* #335: legal docs must be reachable from the sign-up flow.
+                #789: above the button, so it is read before the account exists. */}
             <p className="text-xs text-center text-gray-500 dark:text-gray-400">
               By creating an account, you agree to our{" "}
               <Link
@@ -303,6 +288,22 @@ export default function SignUpPage() {
                 Privacy Policy
               </Link>
               .
+            </p>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading || !isPasswordValid(password) || !passwordsMatch}
+            >
+              {loading ? "Creating account..." : "Sign Up"}
+            </Button>
+            <p className="text-sm text-center text-gray-600 dark:text-gray-400">
+              Already have an account?{" "}
+              <Link
+                href="/auth/sign-in"
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                Sign in
+              </Link>
             </p>
           </CardFooter>
         </form>

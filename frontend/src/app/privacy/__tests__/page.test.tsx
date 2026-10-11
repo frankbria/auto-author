@@ -96,6 +96,13 @@ describe('Privacy Policy page', () => {
     expect(screen.getByText(/records of past payments.*stay with our payment processor/i)).toBeInTheDocument();
   });
 
+  it('says the accepted Terms version and its time are recorded (#789)', () => {
+    render(<PrivacyPage />);
+    expect(section(/information we collect/i)).toHaveTextContent(
+      /version of our Terms of Service you accepted and when/i
+    );
+  });
+
   it('says content is not used to train AI models (#788)', () => {
     render(<PrivacyPage />);
     expect(screen.getByText(/do not use your content to train/i)).toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import TermsPage from '@/app/terms/page';
+import { TERMS_VERSION } from '@/lib/constants/legal';
 
 describe('Terms of Service page', () => {
   it('renders the Terms of Service heading', () => {
@@ -44,6 +45,13 @@ describe('Terms of Service page', () => {
     expect(section).toHaveTextContent(/deactivates the account/i);
     expect(section).toHaveTextContent(/for 18 months/i);
     expect(section).toHaveTextContent(/cancels a paid subscription immediately/i);
+  });
+
+  // #789: sign-up records TERMS_VERSION, so the date shown here must be it.
+  it('shows the recorded Terms version as its last-updated date', () => {
+    render(<TermsPage />);
+    const shown = screen.getByText(/last updated:/i).textContent!.replace(/last updated:\s*/i, '');
+    expect(new Date(`${shown} UTC`).toISOString().slice(0, 10)).toBe(TERMS_VERSION);
   });
 
   it('provides the #main-content landmark (skip-link target)', () => {

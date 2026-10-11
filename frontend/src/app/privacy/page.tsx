@@ -12,7 +12,7 @@ export const metadata = {
 // review before public launch. References the account-deletion / cascade-delete
 // path (#179) and the 18-month deactivated record (#954): deleting your account
 // deletes your books at once and keeps the account and billing record.
-const LAST_UPDATED = 'October 10, 2026';
+const LAST_UPDATED = 'October 11, 2026';
 
 export default function PrivacyPage() {
   return (
@@ -64,7 +64,8 @@ export default function PrivacyPage() {
             <ul className="list-inside list-disc space-y-1">
               <li>
                 <strong>Account information</strong> — your name, email address,
-                and profile details you provide.
+                and profile details you provide, and a record of which version
+                of our Terms of Service you accepted and when.
               </li>
               <li>
                 <strong>Your content</strong> — book summaries, interview answers,
