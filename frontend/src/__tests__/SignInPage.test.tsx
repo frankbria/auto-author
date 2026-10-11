@@ -87,6 +87,19 @@ describe("SignInPage error and 2FA handling (#198)", () => {
     jest.clearAllMocks();
   });
 
+  it("tells an unverified account to use the link it was just sent (#792)", async () => {
+    mockSignInEmail.mockResolvedValue({
+      data: null,
+      error: { code: "EMAIL_NOT_VERIFIED", message: "Email not verified", status: 403 },
+    });
+    const { push } = setup(null);
+    await signIn();
+    expect(
+      await screen.findByText(/verify your email address.*sent you a new link/i)
+    ).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("renders the mapped user-friendly message when credentials are rejected", async () => {
     mockSignInEmail.mockResolvedValue({
       data: null,

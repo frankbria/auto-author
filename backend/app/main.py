@@ -114,7 +114,11 @@ async def lifespan(app: FastAPI):
     from app.db.base import get_database
     from app.db.indexing_strategy import ChapterTabIndexManager
     from app.db.questions import ensure_question_indexes
-    from app.db.user import ensure_user_indexes, purge_expired_users
+    from app.db.user import (
+        ensure_user_indexes,
+        grandfather_unverified_accounts,
+        purge_expired_users,
+    )
 
     # Create indexes for question collections
     await ensure_question_indexes()
@@ -131,6 +135,15 @@ async def lifespan(app: FastAPI):
     result = await ChapterTabIndexManager(get_database()).create_all_indexes()
     if not result.get("success"):
         logger.error(f"Startup index creation failed: {result.get('message')}")
+
+    # Accounts older than the email-verification requirement count as verified
+    # (#792). Never fatal: the app must still boot.
+    try:
+        grandfathered = await grandfather_unverified_accounts()
+        if grandfathered:
+            logger.info("Marked %d existing account(s) as email-verified", grandfathered)
+    except Exception:
+        logger.error("Marking existing accounts as verified failed", exc_info=True)
 
     # Erase deactivated accounts whose 18 months are up (#954): now, then daily,
     # so the purge does not wait for the next deploy.

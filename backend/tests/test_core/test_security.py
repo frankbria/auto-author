@@ -157,7 +157,8 @@ class TestGetCurrentUserFromSession:
         mock_get_auth_user.return_value = {
             "id": "user_123",
             "email": "test@example.com",
-            "name": "Test User"
+            "name": "Test User",
+            "emailVerified": True,
         }
         mock_get_user.return_value = None  # User not in backend database
         created_user = {
@@ -249,6 +250,7 @@ class TestGetCurrentUserFromSession:
             "id": "user_123",
             "email": "test@example.com",
             "name": "Test User",
+            "emailVerified": True,
         }
         mock_create_user.side_effect = Exception("insert failed")
 
@@ -283,6 +285,7 @@ class TestGetCurrentUserFromSession:
             "id": "user_123",
             "email": "test@example.com",
             "name": "Test User",
+            "emailVerified": True,
         }
         # First call (pre-check) finds nothing; re-fetch after the race returns the winner.
         mock_get_user.side_effect = [None, winner]
@@ -314,6 +317,7 @@ class TestGetCurrentUserFromSession:
             "id": "user_123",
             "email": "test@example.com",
             "name": "Test User",
+            "emailVerified": True,
         }
         mock_get_user.return_value = None  # pre-check, winner check, re-fetch
         mock_release.return_value = 0

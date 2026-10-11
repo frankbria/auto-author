@@ -222,6 +222,15 @@ async def get_current_user_from_session(request: Request) -> Dict:
                     detail="Invalid user: missing email. Please sign up again."
                 )
 
+            # better-auth refuses to sign in an unverified address (#792).
+            # This is the second lock, for a session that exists anyway.
+            if better_auth_user.get("emailVerified") is not True:
+                logger.warning(f"Refused to create a record for unverified user {user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Verify your email address to use this account."
+                )
+
             # Split name into first/last (fallback to email username if no name)
             name_parts = name.split(" ", 1) if name else [email.split("@")[0]]
             first_name = name_parts[0]

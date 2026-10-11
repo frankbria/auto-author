@@ -1,4 +1,4 @@
-import { sendPasswordResetEmail } from '../email';
+import { sendPasswordResetEmail, sendVerificationEmail } from '../email';
 
 /**
  * #332 — password reset must never silently no-op and report fake success.
@@ -121,5 +121,49 @@ describe('sendPasswordResetEmail', () => {
     // The dev dump includes the reset URL so a developer can follow it locally.
     const logged = logSpy.mock.calls.flat().join(' ');
     expect(logged).toContain(params.resetUrl);
+  });
+
+  // #792: the verification email goes through the same delivery path.
+  describe('sendVerificationEmail', () => {
+    const verification = {
+      to: 'new@example.com',
+      verifyUrl: 'https://app/api/auth/verify-email?token=abc',
+    };
+
+    it('throws and logs a loud [email] error when no provider is configured', async () => {
+      process.env.NODE_ENV = 'production';
+
+      await expect(sendVerificationEmail(verification)).rejects.toThrow(
+        /Verification email not sent: EMAIL_SERVICE_PROVIDER is not configured/
+      );
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(errorSpy.mock.calls.flat().join(' ')).toContain('[email] Verification email NOT sent');
+    });
+
+    it('sends the link to the address via Resend, in both the text and the HTML part', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.EMAIL_SERVICE_PROVIDER = 'resend';
+      process.env.EMAIL_SERVICE_API_KEY = 'test-key';
+
+      await sendVerificationEmail(verification);
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toBe('https://api.resend.com/emails');
+      const body = JSON.parse((opts as RequestInit).body as string);
+      expect(body.to).toEqual(['new@example.com']);
+      expect(body.subject).toMatch(/verify your email/i);
+      expect(body.text).toContain(verification.verifyUrl);
+      expect(body.html).toContain(verification.verifyUrl);
+    });
+
+    it('dumps the link to the console in development with no provider', async () => {
+      process.env.NODE_ENV = 'development';
+
+      await expect(sendVerificationEmail(verification)).resolves.toBeUndefined();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(logSpy.mock.calls.flat().join(' ')).toContain(verification.verifyUrl);
+    });
   });
 });

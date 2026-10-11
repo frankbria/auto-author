@@ -4,6 +4,7 @@ import logging
 
 from .base import users_collection, books_collection, get_collection
 from bson.objectid import ObjectId
+from pymongo import ReturnDocument
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 from .audit_log import create_audit_log
@@ -159,6 +160,29 @@ async def update_user(
         )
 
     return updated_user
+
+
+async def grandfather_unverified_accounts() -> int:
+    """Mark better-auth users that predate the email-verification requirement
+    (#792) as verified. They never had a way to verify, so requiring it would
+    lock every one of them out at the next sign-in.
+
+    "Predate" means created before this backend first started with the
+    requirement. That moment is written once to ``app_meta`` and reused, so a
+    later restart never verifies an account created under the requirement.
+    Idempotent, and safe from two workers at once.
+    """
+    marker = await (await get_collection("app_meta")).find_one_and_update(
+        {"_id": "email_verification_required_from"},
+        {"$setOnInsert": {"at": datetime.now(timezone.utc)}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    result = await (await get_collection("user")).update_many(
+        {"emailVerified": {"$ne": True}, "createdAt": {"$lt": marker["at"]}},
+        {"$set": {"emailVerified": True}},
+    )
+    return result.modified_count
 
 
 async def delete_better_auth_identity(auth_id: str) -> None:

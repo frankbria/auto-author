@@ -101,8 +101,57 @@ async function fetchWithRetry(
   );
 }
 
+interface OutgoingEmail {
+  to: string;
+  subject: string;
+  htmlContent: string;
+  textContent: string;
+  /** Names the email in logs and errors, e.g. "Password reset". */
+  kind: string;
+  /** The link the email carries; the development console dump prints it. */
+  url: string;
+}
+
+/** Sends a password reset email to the user. */
+export async function sendPasswordResetEmail({
+  to,
+  name,
+  resetUrl,
+}: PasswordResetEmailParams): Promise<void> {
+  await deliver({
+    to,
+    subject: "Reset Your Password",
+    htmlContent: generatePasswordResetHtml({ name, resetUrl }),
+    textContent: generatePasswordResetText({ name, resetUrl }),
+    kind: "Password reset",
+    url: resetUrl,
+  });
+}
+
 /**
- * Sends a password reset email to the user.
+ * Sends the link that verifies a new account's email address (#792). It carries
+ * no name, so nothing the user typed is interpolated into the HTML.
+ */
+export async function sendVerificationEmail({
+  to,
+  verifyUrl,
+}: {
+  to: string;
+  verifyUrl: string;
+}): Promise<void> {
+  const closing = "The link expires in one hour. If you did not sign up, ignore this email.";
+  await deliver({
+    to,
+    subject: "Verify your email address",
+    htmlContent: `<p>Open this link to finish creating your Auto Author account:</p><p><a href="${verifyUrl}">Verify my email address</a></p><p>${closing}</p>`,
+    textContent: `Open this link to finish creating your Auto Author account:\n${verifyUrl}\n\n${closing}`,
+    kind: "Verification",
+    url: verifyUrl,
+  });
+}
+
+/**
+ * Delivers one email.
  *
  * Providers are selected via `EMAIL_SERVICE_PROVIDER`:
  * - `resend` (recommended for Next.js) — needs `EMAIL_SERVICE_API_KEY`
@@ -110,26 +159,25 @@ async function fetchWithRetry(
  *
  * In development with no provider (or `console`), the email is dumped to the
  * console instead of sent. In every other environment an unset/unknown provider
- * logs a loud `[email]` error and throws — the reset must never silently no-op
+ * logs a loud `[email]` error and throws — an email must never silently no-op
  * and report fake success (#332).
  */
-export async function sendPasswordResetEmail({
+async function deliver({
   to,
-  name,
-  resetUrl,
-}: PasswordResetEmailParams): Promise<void> {
+  subject,
+  htmlContent,
+  textContent,
+  kind,
+  url,
+}: OutgoingEmail): Promise<void> {
   const provider = process.env.EMAIL_SERVICE_PROVIDER?.toLowerCase();
   const fromAddress = process.env.EMAIL_FROM_ADDRESS || "noreply@autoauthor.app";
   const fromName = process.env.EMAIL_FROM_NAME || "Auto Author";
 
-  const subject = "Reset Your Password";
-  const htmlContent = generatePasswordResetHtml({ name, resetUrl });
-  const textContent = generatePasswordResetText({ name, resetUrl });
-
   // Development mode: log to console if no provider configured
   if (process.env.NODE_ENV === "development" && (!provider || provider === "console")) {
     console.log("=".repeat(60));
-    console.log("PASSWORD RESET EMAIL (Development Mode)");
+    console.log(`${kind.toUpperCase()} EMAIL (Development Mode)`);
     console.log("=".repeat(60));
     console.log(`To: ${to}`);
     console.log(`From: ${fromName} <${fromAddress}>`);
@@ -137,7 +185,7 @@ export async function sendPasswordResetEmail({
     console.log("-".repeat(60));
     console.log(textContent);
     console.log("=".repeat(60));
-    console.log(`Reset URL: ${resetUrl}`);
+    console.log(`URL: ${url}`);
     console.log("=".repeat(60));
     return;
   }
@@ -207,17 +255,18 @@ export async function sendPasswordResetEmail({
   // No provider configured, or an unrecognized one → the email dead-ends here.
   // Make it LOUD and observable in EVERY environment (not just production) so the
   // "provider unconfigured" failure never masquerades as a silent success (#332).
-  // The caller (auth.ts sendResetPassword) swallows this so the user-facing flow
-  // still shows a generic success — that anti-enumeration behavior is deliberate;
-  // the failure must be observable in server logs, not in the HTTP response.
+  // For a password reset the caller (auth.ts sendResetPassword) swallows this so
+  // the user-facing flow still shows a generic success — that anti-enumeration
+  // behavior is deliberate. better-auth catches and logs a verification email's
+  // failure in the same way, so in both cases the server log is the only trace.
   const reason = provider
     ? `unknown EMAIL_SERVICE_PROVIDER "${provider}" (expected 'resend' or 'sendgrid')`
     : "EMAIL_SERVICE_PROVIDER is not configured";
   console.error(
-    `[email] Password reset email NOT sent — ${reason}. ` +
+    `[email] ${kind} email NOT sent — ${reason}. ` +
       `Set EMAIL_SERVICE_PROVIDER, EMAIL_SERVICE_API_KEY, and EMAIL_FROM_ADDRESS to enable delivery.`
   );
-  throw new Error(`Password reset email not sent: ${reason}`);
+  throw new Error(`${kind} email not sent: ${reason}`);
 }
 
 function generatePasswordResetHtml({

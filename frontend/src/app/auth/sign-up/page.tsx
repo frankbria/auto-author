@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,8 +78,16 @@ function getErrorMessage(error: { message?: string; code?: string } | null): str
   return "Unable to create account. Please try again later";
 }
 
+/** The page background both views of this page sit on. */
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+      {children}
+    </div>
+  );
+}
+
 export default function SignUpPage() {
-  const router = useRouter();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -90,6 +97,8 @@ export default function SignUpPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Set once the account exists: there is no session until the link is opened (#792).
+  const [sentTo, setSentTo] = useState("");
 
   // Email validation
   const isEmailValid = email === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -127,6 +136,8 @@ export default function SignUpPage() {
         email,
         password,
         name,
+        // Where the emailed link lands once the address is verified.
+        callbackURL: "/dashboard",
       });
 
       if (signUpError) {
@@ -134,8 +145,7 @@ export default function SignUpPage() {
         return;
       }
 
-      // Success - redirect to dashboard
-      router.push("/dashboard");
+      setSentTo(email);
     } catch (err) {
       if (err instanceof Error) {
         if (err.message.includes("network") || err.message.includes("fetch")) {
@@ -151,8 +161,35 @@ export default function SignUpPage() {
     }
   }
 
+  if (sentTo) {
+    return (
+      <Shell>
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl">
+              <h1>Check your email</h1>
+            </CardTitle>
+            <CardDescription>
+              We sent a verification link to <strong>{sentTo}</strong>. Open it to
+              finish creating your account. The link expires in one hour.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              No email? Check your spam folder, or{" "}
+              <Link href="/auth/sign-in" className="text-primary hover:underline">
+                sign in
+              </Link>{" "}
+              with your email and password and we will send a new link.
+            </p>
+          </CardContent>
+        </Card>
+      </Shell>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+    <Shell>
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">Create Account</CardTitle>
@@ -308,6 +345,6 @@ export default function SignUpPage() {
           </CardFooter>
         </form>
       </Card>
-    </div>
+    </Shell>
   );
 }
