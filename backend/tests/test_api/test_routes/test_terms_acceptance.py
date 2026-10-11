@@ -51,3 +51,24 @@ async def test_an_account_with_no_recorded_acceptance_gets_none(motor_reinit_db)
 
     assert user["terms_version"] is None
     assert user["terms_accepted_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_deactivation_keeps_the_terms_acceptance_record(motor_reinit_db):
+    """#960: the 18-month record can answer "I never agreed to the Terms"."""
+    seeded = await _seed_better_auth_user("terms-kept@example.com")
+    accepted_at = datetime(2026, 10, 11, 12, 0, tzinfo=timezone.utc)
+    await (await get_collection("user")).update_one(
+        {"_id": seeded["oid"]},
+        {"$set": {"termsVersion": "2026-10-10", "termsAcceptedAt": accepted_at}},
+    )
+
+    async with _client(seeded["tokens"][0]) as c:
+        assert (await c.get("/api/v1/users/me")).status_code == 200
+        assert (await c.delete("/api/v1/users/me")).status_code == 200
+
+    retained = (
+        await (await get_collection("users")).find_one({"auth_id": seeded["user_id"]})
+    )["retained"]
+    assert retained["terms_version"] == "2026-10-10"
+    assert retained["terms_accepted_at"].replace(tzinfo=timezone.utc) == accepted_at

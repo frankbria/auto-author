@@ -164,7 +164,7 @@ The user record is replaced by a deactivated record (#954):
 | `auth_id` | the account id |
 | `deleted_at` | when the account was deactivated; every "is this account closed" check reads this field |
 | `purge_at` | `deleted_at` plus 548 days (18 months) |
-| `retained` | `email`, `first_name`, `last_name`, `display_name`, `created_at`, `plan`, `stripe_customer_id` and `cancelled_subscription` (`id`, `plan`, `status` of the subscription that account deletion cancelled), each only if the account had it |
+| `retained` | `email`, `first_name`, `last_name`, `display_name`, `created_at`, `plan`, `stripe_customer_id`, `cancelled_subscription` (`id`, `plan`, `status` of the subscription that account deletion cancelled), and `terms_version` and `terms_accepted_at` (#960), each only if the account had it |
 
 Nothing else survives: no bio, avatar URL, preferences or book list. The
 retained fields are nested so that they sit outside the unique indexes on

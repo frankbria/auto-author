@@ -251,7 +251,8 @@ export default function PrivacyPage() {
               keep a record of it for 18 months so that we can answer a
               complaint or a payment dispute: an internal account identifier,
               your name, your email address, the dates the account was created
-              and deleted, your plan, the reference that links the account to
+              and deleted, which version of our Terms of Service you accepted
+              and when, your plan, the reference that links the account to
               our payment processor, and the reference, plan and status of any
               subscription that was cancelled when you deleted the account.
               After 18 months the record is erased automatically, down to the

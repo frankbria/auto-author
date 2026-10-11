@@ -4,6 +4,11 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-11
 
+- **A deactivated account keeps its Terms acceptance record for the 18 months (#960, P1.7.1)**: #789 recorded which Terms version an account accepted and when, but the fields were not on the #954 retained list, so deleting the account erased them. A user who then disputed a charge saying they never agreed could not be answered. The owner decided on 2026-10-11 to keep them.
+  - **What changed.** `terms_version` and `terms_accepted_at` joined `RETAINED_FIELDS` in `backend/app/db/user.py`. `/privacy` section 8 names them in its list of what is kept, and `docs/api-profile-endpoints.md` lists them.
+  - **Nulls are left out.** The backend writes `None` for an account created before #789. The deactivation pipeline now drops a null field as well as a missing one, so such an account's retained record carries no empty acceptance entry.
+  - **Not covered.** An account deactivated between #789 and this change has already lost the record. The Terms did not change, so `TERMS_VERSION` is still `2026-10-10`. Counsel has not seen the new wording (#791).
+
 - **Sign-up records the Terms version accepted and when, and shows the notice above the button (#789, P1.7)**: the agreement line sat below the submit button, and nothing recorded that a user had agreed or to which text.
   - **Where it is written.** better-auth stamps `termsVersion` and `termsAcceptedAt` on the user row it creates, in the request that creates the account (`frontend/src/lib/auth-terms.ts`, wired in `auth.ts` as two `additionalFields` and a `user.create.before` hook). The backend copies them onto its own `users` doc as `terms_version` and `terms_accepted_at` when it creates that doc, the same way it already copies email and name.
   - **The browser cannot choose them.** Both fields are `input: false`: better-auth answers 400 "termsVersion is not allowed to be set" to a sign-up body that carries one, and the hook overwrites whatever reaches it.
