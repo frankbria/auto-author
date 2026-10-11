@@ -238,7 +238,11 @@ async def get_current_user_from_session(request: Request) -> Dict:
                 "is_active": True,
                 "created_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
-                "metadata": {}
+                "metadata": {},
+                # Stamped by better-auth at sign-up (#789); None for an
+                # account created before the record existed.
+                "terms_version": better_auth_user.get("termsVersion"),
+                "terms_accepted_at": better_auth_user.get("termsAcceptedAt"),
             }
 
             user = await create_user(user_data)

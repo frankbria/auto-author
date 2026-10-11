@@ -117,4 +117,14 @@ describe("SignUpPage (#198)", () => {
       screen.getByRole("link", { name: /privacy policy/i })
     ).toHaveAttribute("href", "/privacy");
   });
+
+  // #789: the agreement has to be read before the button that makes it.
+  it("shows the Terms notice above the submit button", () => {
+    setup();
+    const notice = screen.getByText(/by creating an account, you agree/i);
+    expect(
+      notice.compareDocumentPosition(submitButton()) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
 });

@@ -7,6 +7,7 @@ import { MongoClient, Db } from "mongodb";
 
 import { getDefaultCookieAttributes } from "./auth-cookies";
 import { getIpAddressConfig } from "./auth-ip";
+import { stampTermsAcceptance, termsAcceptanceFields } from "./auth-terms";
 
 const mongoUrl = process.env.DATABASE_URL || "mongodb://localhost:27017/auto_author";
 const dbName = process.env.DATABASE_NAME || "auto_author";
@@ -34,6 +35,9 @@ function createAuthInstance(database: Db) {
     // TOTP two-factor authentication (#64). The MongoDB adapter creates the
     // twoFactor collection on demand — no migration step required.
     plugins: [twoFactor()],
+    // Every new account records the Terms version it accepted and when (#789).
+    user: { additionalFields: termsAcceptanceFields },
+    databaseHooks: { user: { create: { before: stampTermsAcceptance } } },
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,

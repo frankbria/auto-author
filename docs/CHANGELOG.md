@@ -2,6 +2,16 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-11
+
+- **Sign-up records the Terms version accepted and when, and shows the notice above the button (#789, P1.7)**: the agreement line sat below the submit button, and nothing recorded that a user had agreed or to which text.
+  - **Where it is written.** better-auth stamps `termsVersion` and `termsAcceptedAt` on the user row it creates, in the request that creates the account (`frontend/src/lib/auth-terms.ts`, wired in `auth.ts` as two `additionalFields` and a `user.create.before` hook). The backend copies them onto its own `users` doc as `terms_version` and `terms_accepted_at` when it creates that doc, the same way it already copies email and name.
+  - **The browser cannot choose them.** Both fields are `input: false`: better-auth answers 400 "termsVersion is not allowed to be set" to a sign-up body that carries one, and the hook overwrites whatever reaches it.
+  - **One version constant.** `TERMS_VERSION` in `frontend/src/lib/constants/legal.ts` is the ISO date the Terms last changed. `/terms` builds its "Last updated" line from it, so the recorded version and the displayed date cannot drift. Changing the Terms copy means changing that constant.
+  - **Notice.** The "By creating an account, you agree to our Terms of Service and Privacy Policy" line now renders above the Sign Up button. The wording is unchanged.
+  - **Copy.** `/privacy` section 2 lists the acceptance record under account information; its date is now October 11, 2026. The Terms did not change, so `TERMS_VERSION` is still `2026-10-10`.
+  - **Not covered.** Accounts created before this change have no value in either place (`None` on a `users` doc created after it), and nothing is backfilled: there is no record that they accepted. Nothing asks an existing user to accept again when `TERMS_VERSION` changes. The two fields are not in the record a deactivated account keeps (#954), so they are erased with the rest. Jest cannot load better-auth's server build, so the unit test checks what `auth.ts` hands the library; the real sign-up is in the demo.
+
 ### 2026-10-10
 
 - **Deleting an account deactivates it and keeps the account and billing record for 18 months (#954, P1.6.1)**: deletion erased everything at once, so a complaint or chargeback arriving afterwards had nothing to be answered with. The owner decided on 2026-10-10 what is kept, for how long, and that support can erase earlier.

@@ -29,6 +29,8 @@ Auto Author provides a straightforward registration process with multiple option
 5. Fill in your profile information (name, etc.).
 6. You'll be redirected to the dashboard after successful registration.
 
+The line above the **Sign Up** button says that creating an account means you agree to the [Terms of Service](/terms) and [Privacy Policy](/privacy). We record which version of the Terms you accepted and when.
+
 ### Social Login Options
 
 You can also register using your existing accounts:
