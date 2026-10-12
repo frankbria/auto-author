@@ -4,6 +4,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **The API knows it is served over https; both hosts send HSTS; the frontend does not name its framework (#814, P1.32)**:
+  - **Problem.** `GET https://api.dev.autoauthor.app/api/v1/books` answered `307` to `http://…/api/v1/books/`, and the backend's log named the Docker gateway as every request's client. Neither host sent `Strict-Transport-Security`, and the frontend sent `X-Powered-By: Next.js`.
+  - **The cause is not a missing `--proxy-headers`.** That is uvicorn's default. What it believes the headers from is `FORWARDED_ALLOW_IPS`, by default loopback, and nginx on the host reaches the container as the Docker network's gateway (measured: `172.22.0.1` on a local network). `docker-compose.yml` now sets the list to the ranges Docker gives its networks, `172.16.0.0/12,192.168.0.0/16`. The image is unchanged: who the proxy is belongs to the deployment.
+  - **Not `*`.** With `*` uvicorn takes the first `X-Forwarded-For` address, which the caller writes. With a list it takes the last one that is not a proxy, which is the one nginx added.
+  - **HSTS.** `max-age=31536000` from the backend's security headers and from `next.config.ts`. No `includeSubDomains` and no `preload`: a browser keeps the header for the year, and those would cover names under the domain that have not been chosen yet.
+  - **`poweredByHeader: false`** in `next.config.ts`.
+  - **Depends on the box.** nginx has to send `X-Forwarded-Proto` and `X-Forwarded-For` to the API, and Docker there has to use its default address ranges. `docs/STAGING-DEPLOYMENT.md` says so and gives the one-line check.
+
 - **A session that cannot be checked is our outage, not a signed-out user (#1007, P1.31.2)**:
   - **Problem.** `validate_better_auth_session` caught any error from the session lookup and answered as for a session that does not exist. With the database away, a signed-in request waited the driver's thirty seconds and was answered 401 "Please sign in". Since #796 the frontend ends the session in the browser on a 401 from the API, so a database blip logged out everyone who made a request during it.
   - **Fix.** Each of the sign-in check's three lookups (the session, its user, the app's own record of the user) that fails with a database error, or does not finish in five seconds, raises `SessionStoreUnavailable`, and the app answers it 503 with `Retry-After`. The third used to wait thirty seconds and answer 500; a second way of finding the user used to swallow its own failure into a 401. Review found both. A session that is not there, has expired or makes no sense is still 401. The five seconds are the lookup's own limit; the driver's setting is unchanged, so other database work waits as before.
