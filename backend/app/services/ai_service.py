@@ -9,6 +9,12 @@ import uuid
 from typing import Dict, List, Optional, Any
 from openai import OpenAI
 from app.core.config import settings
+from app.schemas.ai_input import (
+    MAX_CHAPTER_DESCRIPTION_CHARS,
+    MAX_CHAPTER_TITLE_CHARS,
+    MAX_PROMPT_CHARS,
+    MAX_QUESTION_CHARS,
+)
 from app.services.ai_errors import (
     AIServiceError,
     AIRateLimitError,
@@ -273,6 +279,16 @@ class AIService:
             # generation must not stall health checks or other users' requests.
             return await asyncio.to_thread(_sync_request)
 
+        # The routes cap what they accept; this bounds whatever reaches a call by
+        # another road, such as text stored before the caps existed (#800).
+        prompt_chars = sum(len(message.get("content") or "") for message in messages)
+        if prompt_chars > MAX_PROMPT_CHARS:
+            raise AIInvalidRequestError(
+                f"The text for this AI request is {prompt_chars} characters; "
+                f"the limit is {MAX_PROMPT_CHARS}",
+                correlation_id=correlation_id,
+            )
+
         model_call_attempted.set(True)
         return await self._retry_with_backoff(_async_wrapper, correlation_id=correlation_id)
 
@@ -382,7 +398,11 @@ class AIService:
             )
 
             questions_text = self._untruncated_text(response, correlation_id)
-            questions = self._parse_questions_response(questions_text)
+            # The wizard sends each question back with its answer, where it is capped (#800).
+            questions = [
+                question[:MAX_QUESTION_CHARS]
+                for question in self._parse_questions_response(questions_text)
+            ]
 
             logger.info(
                 f"Generated {len(questions)} clarifying questions "
@@ -1328,8 +1348,8 @@ Book Context:
         return f"""
 Generate a compelling chapter draft based on the following information:
 
-Chapter Title: {chapter_title}
-Chapter Description: {chapter_description}
+Chapter Title: {chapter_title[:MAX_CHAPTER_TITLE_CHARS]}
+Chapter Description: {chapter_description[:MAX_CHAPTER_DESCRIPTION_CHARS]}
 {metadata_context}{style_instruction}
 Target Length: Approximately {target_length} words
 

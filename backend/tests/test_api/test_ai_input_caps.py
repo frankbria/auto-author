@@ -13,15 +13,22 @@ import logging
 
 import pytest
 
+from bson import ObjectId
+
+from app.db import base
 from app.schemas.ai_input import (
     MAX_AI_CONTENT_CHARS,
     MAX_ANSWER_CHARS,
+    MAX_CHAPTER_DESCRIPTION_CHARS,
+    MAX_CHAPTER_TITLE_CHARS,
+    MAX_PROMPT_CHARS,
     MAX_QA_PAIRS,
     MAX_QA_TOTAL_CHARS,
     MAX_QUESTION_CHARS,
     MAX_WRITING_STYLE_CHARS,
 )
-from app.services.ai_service import ai_service
+from app.services.ai_errors import AIInvalidRequestError
+from app.services.ai_service import ai_service, model_call_attempted
 from tests.test_api.test_ai_quota_charging import _charged
 from tests.test_api.test_rate_limit_routes import _create_book, _seed_toc, _small_toc
 from tests.test_services.openai_autospec import autospec_openai_client
@@ -66,6 +73,11 @@ OVERSIZE_AI_REQUESTS = [
     ("chapters/ch1/enhance-text", {"content": TOO_LONG, "enhancement_type": "clarity"}, "content"),
     ("chapters/ch1/enhance-transcription", {"content": TOO_LONG}, "content"),
 ]
+
+
+def _prompt(model_call) -> str:
+    """Everything the provider was sent in its one call."""
+    return "".join(m["content"] for m in model_call.call_args.kwargs["messages"])
 
 
 @pytest.fixture
@@ -123,7 +135,7 @@ class TestAnOversizeAIRequestIsRefusedBeforeItCostsAnything:
 
     async def test_answers_exactly_at_every_cap_reach_the_model(self, author):
         api, book, model_call = author
-        # 50 pairs whose questions and answers add up to the total exactly.
+        # A full list whose questions and answers add up to the total exactly.
         per_answer = MAX_QA_TOTAL_CHARS // MAX_QA_PAIRS - len(QA["question"])
         full = _pairs(count=MAX_QA_PAIRS, answer_chars=per_answer)
         longest = _pairs(question_chars=MAX_QUESTION_CHARS, answer_chars=MAX_ANSWER_CHARS)
@@ -186,3 +198,102 @@ class TestAnswersAreCappedWhereTheyAreSaved:
 
         assert response.status_code == 422, response.text
         assert f"limit of {MAX_ANSWER_CHARS} characters" in response.text
+
+
+class TestStoredTextIsBoundedOnItsWayIntoAPrompt:
+    """A request body is not the only road to the model: the book's own stored
+    text goes into prompts too, and some of it was stored without a limit."""
+
+    async def _store_chapter(self, book: str, **fields) -> None:
+        toc = _small_toc()
+        toc["chapters"][0].update(fields)
+        await _seed_toc(book.rsplit("/", 1)[-1], toc)
+
+    async def test_a_draft_uses_the_start_of_an_oversize_chapter_title_and_description(
+        self, author
+    ):
+        api, book, model_call = author
+        await self._store_chapter(book, title="t" * 5_000, description="d" * 300_000)
+
+        response = await api.post(
+            f"{book}/chapters/ch1/generate-draft", json={"question_responses": [QA]}
+        )
+
+        assert response.status_code == 200, response.text
+        prompt = _prompt(model_call)
+        assert "t" * MAX_CHAPTER_TITLE_CHARS in prompt
+        assert "t" * (MAX_CHAPTER_TITLE_CHARS + 1) not in prompt
+        assert "d" * MAX_CHAPTER_DESCRIPTION_CHARS in prompt
+        assert "d" * (MAX_CHAPTER_DESCRIPTION_CHARS + 1) not in prompt
+
+    async def test_chapter_questions_use_the_start_of_an_oversize_chapter_title(self, author):
+        api, book, model_call = author
+        await self._store_chapter(book, title="t" * 5_000)
+
+        await api.post(f"{book}/chapters/ch1/generate-questions", json={"count": 3})
+
+        prompt = _prompt(model_call)
+        assert "t" * MAX_CHAPTER_TITLE_CHARS in prompt
+        assert "t" * (MAX_CHAPTER_TITLE_CHARS + 1) not in prompt
+
+    async def test_answers_saved_before_the_caps_are_checked_when_the_contents_fall_back_to_them(
+        self, author
+    ):
+        api, book, model_call = author
+        await base.books_collection.update_one(
+            {"_id": ObjectId(book.rsplit("/", 1)[-1])},
+            {"$set": {"question_responses": {"responses": _pairs(60, answer_chars=10_000)}}},
+        )
+
+        response = await api.post(f"{book}/generate-toc", json={})
+
+        assert response.status_code == 422, response.text
+        assert not model_call.called
+        assert await _charged() == 0
+
+    async def test_a_generated_question_longer_than_an_answer_list_accepts_is_cut_when_stored(
+        self, author, monkeypatch
+    ):
+        api, book, _ = author
+        long_question = "Why " + "w" * (MAX_QUESTION_CHARS + 500) + "?"
+        provider = autospec_openai_client(
+            content=f"1. {long_question}\n2. Who is the reader?\n3. What should they do next?"
+        )
+        monkeypatch.setattr(ai_service, "client", provider)
+
+        response = await api.post(f"{book}/generate-questions", json={})
+
+        assert response.status_code == 200, response.text
+        questions = response.json()["questions"]
+        assert len(questions) == 3
+        assert max(len(q) for q in questions) == MAX_QUESTION_CHARS
+        # What the wizard sends back with an answer is accepted.
+        saved = await api.put(
+            f"{book}/question-responses",
+            json={"responses": [{"question": q, "answer": "An answer."} for q in questions]},
+        )
+        assert saved.status_code == 200, saved.text
+
+    async def test_no_prompt_over_the_ceiling_is_sent_whatever_road_it_came_by(self, author):
+        _, _, model_call = author
+        model_call_attempted.set(False)
+
+        with pytest.raises(AIInvalidRequestError, match=str(MAX_PROMPT_CHARS)):
+            await ai_service._make_openai_request(
+                messages=[
+                    {"role": "system", "content": "s"},
+                    {"role": "user", "content": "x" * MAX_PROMPT_CHARS},
+                ]
+            )
+
+        assert not model_call.called
+        assert not model_call_attempted.get()
+
+    async def test_a_prompt_at_the_ceiling_is_sent(self, author):
+        _, _, model_call = author
+
+        await ai_service._make_openai_request(
+            messages=[{"role": "user", "content": "x" * MAX_PROMPT_CHARS}]
+        )
+
+        assert model_call.called

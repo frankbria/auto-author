@@ -62,6 +62,7 @@ from app.api.dependencies import (
     audit_request, get_rate_limiter, get_ai_usage_quota,
     get_entitlement_checker
 )
+from pydantic import ValidationError
 from app.schemas.ai_input import (
     MAX_ANSWER_CHARS,
     EnhanceTextRequest,
@@ -1183,8 +1184,16 @@ async def generate_table_of_contents(
     # always failed with "Question responses are required".
     responses = [pair.model_dump() for pair in data.question_responses]
     if not responses:
-        persisted = book.get("question_responses", {})
-        responses = persisted.get("responses", [])
+        # Checked like a request body: these may have been saved before the caps (#800).
+        persisted = book.get("question_responses", {}).get("responses", [])
+        try:
+            fallback = GenerateTocRequest(question_responses=persisted)
+        except ValidationError:
+            raise HTTPException(
+                status_code=422,
+                detail="The saved answers are over the size limit. Save them again, shorter.",
+            )
+        responses = [pair.model_dump() for pair in fallback.question_responses]
     if not responses:
         raise HTTPException(
             status_code=400, detail="Question responses are required for TOC generation"

@@ -2,7 +2,7 @@
 
 The AI quota counts calls, not tokens, so the size of one call is bounded here:
 a length cap on each field, a count cap on each list, and a total for a list of
-answers, because fifty answers at the per-answer cap would still be 500,000
+answers, because a full list at the per-answer cap would still be a million
 characters. Anything over is answered 422 before a model call is attempted.
 """
 
@@ -10,7 +10,7 @@ from typing import Annotated, Any, List, Optional
 
 from pydantic import AfterValidator, BaseModel, Field
 
-MAX_QA_PAIRS = 50  # as many questions as one chapter can be asked for
+MAX_QA_PAIRS = 100  # as many answers as one batch save takes
 MAX_QUESTION_CHARS = 1000  # the cap a generated question already has
 MAX_ANSWER_CHARS = 10_000
 MAX_QA_TOTAL_CHARS = 100_000
@@ -18,6 +18,14 @@ MAX_QA_TOTAL_CHARS = 100_000
 # text could not come back whole anyway.
 MAX_AI_CONTENT_CHARS = 20_000
 MAX_WRITING_STYLE_CHARS = 100
+
+# Text the book already stores goes into prompts as well, and some of it was
+# stored without a limit, so it is cut to these where a prompt is built.
+MAX_CHAPTER_TITLE_CHARS = 500
+MAX_CHAPTER_DESCRIPTION_CHARS = 2000
+# The ceiling for one model call, whatever road its text came by. Above the
+# largest prompt the caps allow (a full list of answers plus its instructions).
+MAX_PROMPT_CHARS = 150_000
 
 
 class QuestionAnswer(BaseModel):
