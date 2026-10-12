@@ -1,7 +1,7 @@
 # Transform, enhance and cleanup work on a chapter of ordinary length (#801)
 
-*2026-10-12T07:08:59Z by Showboat 0.6.1*
-<!-- showboat-id: c83640b0-0d7e-4a44-9188-568fae35b6e6 -->
+*2026-10-12T07:36:04Z by Showboat 0.6.1*
+<!-- showboat-id: 311c7b3a-72a0-44f2-a61b-9dd02db8f46e -->
 
 The three rewrite flows ran on the default model class (gpt-4: an 8,192-token context shared by the prompt and the answer) with a fixed budget of 4,000 answer tokens, so a chapter over about 3,000 words could not come back whole. This demo sends the same chapters to two real backends, one running main and one running this branch. Both talk to a local stand-in provider that records the model asked for, the answer budget and the size of the prompt. A third backend runs this branch against a real model. Authentication is on, so the quota counts as it does for a real account.
 
@@ -14,7 +14,7 @@ main:   a58876a  {"status":"healthy","checks":{"mongodb":"ok","config":"ok"}}
 branch: feature/issue-801-ai-long-chapters  {"status":"healthy","checks":{"mongodb":"ok","config":"ok"}}
 ```
 
-The sample chapters are real English prose (this repository documentation with the markup removed), stored the way the editor stores a chapter: HTML paragraphs. Measured separately with the gpt-4o tokenizer, 5,000 words of this prose is about 5,900 tokens.
+The sample chapters are real English prose (this repository documentation with the markup removed), stored the way the editor stores a chapter: HTML paragraphs. They are words only, so they are lighter in tokens than prose with its punctuation; the next step measures real prose.
 
 ```bash
 source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo801/env.sh; for n in 1000 2900 5000; do python3 -c "import re; h=open('$D/chapter-$n.html').read(); print('$n-word chapter:', len(re.sub('<[^>]+>', ' ', h).split()), 'words,', len(h), 'characters')"; done
@@ -24,6 +24,19 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 1000-word chapter: 1000 words, 6772 characters
 2900-word chapter: 2900 words, 19539 characters
 5000-word chapter: 5000 words, 31844 characters
+```
+
+How many tokens is a chapter? Measured with the gpt-4o tokenizer on English prose with its punctuation kept (three license texts, the longest prose on this machine, and this repository documentation as an example of technical text). The limits in this change come from these numbers: about 4.9 characters a token for prose and 4.4 for technical text, so 5,000 words of prose is about 31,000 characters and 6,200 tokens.
+
+```bash
+cd /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/m801 && uvx --quiet --with tiktoken python measure2.py /usr/share/common-licenses/GPL-3 /usr/share/common-licenses/LGPL-2.1 /usr/share/common-licenses/Apache-2.0 /home/frankbria/projects/auto-author/docs 2>&1 | tail -4
+```
+
+```output
+GPL-3: 5000 words, 30769 characters, 6175 tokens, 4.98 characters per token, 1.24 tokens per word, 6.15 characters per word
+LGPL-2.1: 4350 words, 26034 characters, 5323 tokens, 4.89 characters per token, 1.22 tokens per word, 5.98 characters per word
+Apache-2.0: 1581 words, 10330 characters, 2070 tokens, 4.99 characters per token, 1.31 tokens per word, 6.53 characters per word
+project docs, punctuation kept: 5000 words, 35970 characters, 8172 tokens, 4.40 characters per token, 1.63 tokens per word, 7.19 characters per word
 ```
 
 Before. Main sends a 2,900-word chapter to gpt-4 with a 4,000-token budget, which just fits an 8,192-token context. A 5,000-word chapter is refused by the 20,000-character cap that #800 put where the old budget ended; before that cap it went to gpt-4 and failed there.
@@ -69,16 +82,16 @@ transform, answer cut off                HTTP 413 | provider received: gpt-4o, m
 }
 ```
 
-The cap on the text moved with the budget, from 20,000 to 35,000 characters. One character over is still refused before anything is sent or charged.
+The cap on the text moved with the budget, from 20,000 to 32,000 characters: at 4.9 characters a token that is about 6,500 tokens, which leaves a rewrite a fifth more room than its source inside the 8,000-token budget. One character over is still refused before anything is sent or charged.
 
 ```bash
-source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo801/env.sh; after 'transform 35,000 characters' POST chapters/ch1/transform-style "{'content': 'x' * 35000, 'target_style': 'professional'}"; after 'transform 35,001 characters' POST chapters/ch1/transform-style "{'content': 'x' * 35001, 'target_style': 'professional'}"; python3 -c "import json; print(' ', json.load(open('$D/last-body'))['error_summary'])"
+source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo801/env.sh; after 'transform 32,000 characters' POST chapters/ch1/transform-style "{'content': 'x' * 32000, 'target_style': 'professional'}"; after 'transform 32,001 characters' POST chapters/ch1/transform-style "{'content': 'x' * 32001, 'target_style': 'professional'}"; python3 -c "import json; print(' ', json.load(open('$D/last-body'))['error_summary'])"
 ```
 
 ```output
-transform 35,000 characters              HTTP 200 | provider received: gpt-4o, max_tokens 8000, 35766 chars                 | charged today: 7
-transform 35,001 characters              HTTP 422 | provider received: nothing                                              | charged today: 7
-  body -> content: String should have at most 35000 characters
+transform 32,000 characters              HTTP 200 | provider received: gpt-4o, max_tokens 8000, 32766 chars                 | charged today: 7
+transform 32,001 characters              HTTP 422 | provider received: nothing                                              | charged today: 7
+  body -> content: String should have at most 32000 characters
 ```
 
 This branch also fixes a regression that #800 put on main an hour earlier, found by the review bot after that merge. A chapter can be stored with a null description, and #800 cut the description to length without checking for one, so a draft for such a chapter failed. Main fails; this branch drafts.
@@ -102,15 +115,15 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 ```
 
 ```output
-live 1: transform 1,000 words            HTTP 200 | words in: 989 | words out: 1001
-live 2: transform 1,000 words            HTTP 200 | words in: 989 | words out: 984
-live 3: transform 1,000 words            HTTP 200 | words in: 989 | words out: 929
-live 1: transform 5,000 words            HTTP 200 | words in: 4945 | words out: 2433
-live 2: transform 5,000 words            HTTP 200 | words in: 4945 | words out: 2087
-live 3: transform 5,000 words            HTTP 200 | words in: 4945 | words out: 2114
+live 1: transform 1,000 words            HTTP 200 | words in: 989 | words out: 1079
+live 2: transform 1,000 words            HTTP 200 | words in: 989 | words out: 967
+live 3: transform 1,000 words            HTTP 413 | REWRITE_TRUNCATED
+live 1: transform 5,000 words            HTTP 200 | words in: 4945 | words out: 1682
+live 2: transform 5,000 words            HTTP 200 | words in: 4945 | words out: 1365
+live 3: transform 5,000 words            HTTP 200 | words in: 4945 | words out: 1655
 ```
 
-What the live runs show. The 1,000-word chapter came back at about its own length all three times. The 5,000-word chapter was accepted and answered all three times, which main cannot do, but each answer has well under half the words of the chapter, and the model reported a normal finish, so the backend passed it on as a success. A shortened chapter offered as a finished rewrite is a different defect from the one in this issue; it is filed as its own issue with these numbers. One more observation from an earlier recording of this step: the same model once spent the whole 4,000-token budget on a 1,000-word chapter and was answered with the 413 above. It is a reasoning model, and its hidden reasoning counts against the budget; #925 covers budgets for such models.
+What the live runs show. The 1,000-word chapter came back at about its own length twice. The third time the model stopped at the 4,000-token budget and the route answered the 413: it is a reasoning model, and its hidden reasoning counts against the budget (#925 covers budgets for such models). The 5,000-word chapter was accepted and answered all three times, which main cannot do, but each answer has about a third of the words of the chapter, and the model reported a normal finish, so the backend passed it on as a success. A shortened chapter offered as a finished rewrite is a different defect from the one in this issue; it is filed as #983 with these numbers.
 
 The same behaviour as tests: real routes and real MongoDB counters, with the provider stubbed at the wire.
 
@@ -119,5 +132,5 @@ cd /home/frankbria/projects/worktrees/issue-801-ai-long-chapters/backend && ENVI
 ```
 
 ```output
-============================= 41 passed ==============================
+============================== 42 passed ==============================
 ```

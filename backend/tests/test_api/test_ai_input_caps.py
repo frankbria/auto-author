@@ -256,6 +256,17 @@ class TestStoredTextIsBoundedOnItsWayIntoAPrompt:
 
         assert 'the chapter titled "Chapter"' in _prompt(model_call)
 
+    async def test_a_chapter_whose_stored_content_is_not_text_can_still_be_asked_questions(
+        self, author
+    ):
+        """``PUT /toc`` passes ``content`` through unchecked, so a number can be stored."""
+        api, book, model_call = author
+        await self._store_chapter(book, content=123)
+
+        await api.post(f"{book}/chapters/ch1/generate-questions", json={"count": 3})
+
+        assert "123" in _prompt(model_call)
+
     async def test_answers_saved_before_the_caps_are_checked_when_the_contents_fall_back_to_them(
         self, author
     ):

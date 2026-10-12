@@ -58,8 +58,9 @@ TOC_MAX_COMPLETION_TOKENS = 6000
 
 # Transform, enhance and transcription cleanup return a text about as long as
 # the one they were given, so their completion budget follows its length (#801).
-# A third of the characters is well over the measured rate for English (5.6
-# characters a token); the floor is the budget these flows always had, which
+# A third of the characters is well over the measured rate for English (4.9
+# characters a token for prose, 4.4 for technical text); the floor is the
+# budget these flows always had, which
 # keeps room for scripts that take a token or more per character. The request
 # method clamps the result to AI_MAX_OUTPUT_TOKENS_LONG.
 REWRITE_MIN_COMPLETION_TOKENS = 4000

@@ -1428,3 +1428,6 @@ A note said the 1,000-word chapter "comes back whole"; in that recording the rea
 ### One live call found what the stubbed tests could not (#801)
 With the provider stubbed, a 5,000-word chapter "succeeds". Against a real model it also returned 200, with 42% to 49% of the words. The stub returns what the test author scripted; only a live call shows what a model does with the larger input the change now allows. Filed as #983.
 
+### A measurement on a cleaned sample measures the cleaning (#801)
+To size a cap I counted gpt-4o tokens for 5,000 words of the repository's docs, after a filter that kept only alphabetic words. It gave 5.6 characters a token, and I set the cap from it. The filter had removed punctuation, numbers and identifiers, which are exactly what costs tokens: the same docs with punctuation kept are 4.4, and license prose is 4.9. The reviewer doubted the number without knowing why it was wrong. Measure the thing as it will arrive, on more than one source, and put the measuring command in the demo so the number can be re-run.
+

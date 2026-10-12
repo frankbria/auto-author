@@ -6,9 +6,10 @@ completion budget, so a chapter over about 3,000 words could not come back
 whole. They now run on the long-output class with a budget taken from the
 length of the text.
 
-Sizes are measured, not guessed: 5,000 words of English prose as the editor
-stores it (HTML paragraphs) is about 33,000 characters and 5,900 gpt-4o tokens.
-The sample chapter here has the same density.
+Sizes are measured, not guessed: 5,000 words of English prose with its
+punctuation, as the editor stores it (HTML paragraphs), is about 31,000
+characters and 6,200 gpt-4o tokens. The sample chapter here has about that many
+characters; it repeats one sentence, so its token count means nothing.
 
 Real routes, real MongoDB counters; the provider is stubbed at the wire.
 """
@@ -23,13 +24,13 @@ from tests.test_services.openai_autospec import autospec_openai_client
 
 pytestmark = pytest.mark.asyncio
 
-# A sentence with the density that was measured: 6.4 characters a word.
+# A sentence with about the density that was measured: 6 characters a word.
 SENTENCE = (
-    "A useful chapter states its argument early, supports it with concrete examples, "
-    "and leaves the reader with something practical to try."
+    "A useful chapter states its argument early, supports it with a few concrete examples, "
+    "and then leaves the reader with something practical to try."
 )
-PARAGRAPH = "<p>" + " ".join([SENTENCE] * 4) + "</p>"  # 84 words
-FIVE_THOUSAND_WORDS = PARAGRAPH * 60
+PARAGRAPH = "<p>" + " ".join([SENTENCE] * 4) + "</p>"  # 96 words
+FIVE_THOUSAND_WORDS = PARAGRAPH * 53
 
 REWRITES = [
     ("transform-style", {"target_style": "professional"}),
@@ -40,8 +41,8 @@ ROUTE_IDS = [route for route, _ in REWRITES]
 
 
 async def test_the_sample_chapter_is_the_size_that_was_measured():
-    assert len(FIVE_THOUSAND_WORDS.replace("</p><p>", " ").split()) == 5040
-    assert 32_000 <= len(FIVE_THOUSAND_WORDS) <= MAX_AI_CONTENT_CHARS
+    assert len(FIVE_THOUSAND_WORDS.replace("</p><p>", " ").split()) == 5088
+    assert 30_000 <= len(FIVE_THOUSAND_WORDS) <= MAX_AI_CONTENT_CHARS
 
 
 class TestAChapterOfOrdinaryLengthCanBeRewritten:
