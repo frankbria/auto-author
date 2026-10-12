@@ -1,4 +1,5 @@
 # backend/app/services/ai_service.py
+import html
 import openai
 import logging
 import re
@@ -81,16 +82,28 @@ REWRITE_MIN_PERCENT_KEPT = 60
 CLEANUP_MIN_PERCENT_KEPT = 40
 REWRITE_SHARE_CHECKED_FROM_CHARS = 1000
 
-MARKUP_OR_SPACE = re.compile(r"<[^>]+>|\s+")
+MARKUP = re.compile(r"<[^>]+>")
+
+
+def visible_text(text: str) -> str:
+    """The text a reader sees: tags become spaces and entities the characters
+    they stand for. The editor stores paragraphs side by side with nothing
+    between them, and pasted rich text is full of ``&nbsp;``."""
+    return html.unescape(MARKUP.sub(" ", text))
 
 
 def text_length(text: str) -> int:
-    """Characters of text, without markup or whitespace.
+    """Characters of visible text, without whitespace.
 
     Not words: Chinese, Japanese and Thai are written without spaces, and the
     same text marked up or spaced differently must measure the same.
     """
-    return len(MARKUP_OR_SPACE.sub("", text))
+    return len("".join(visible_text(text).split()))
+
+
+def word_count(text: str) -> int:
+    """Words of visible text, for the counts the preview shows."""
+    return len(visible_text(text).split())
 
 
 def shortened_rewrite_error(source: str, rewrite: str, min_percent: int) -> Optional[str]:
@@ -1192,8 +1205,8 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     "transformed": "",
                     "metadata": {},
                 }
-            original_words = len(content.split())
-            transformed_words = len(transformed.split())
+            original_words = word_count(content)
+            transformed_words = word_count(transformed)
 
             return {
                 "success": True,
@@ -1300,8 +1313,8 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     "enhanced": "",
                     "metadata": {},
                 }
-            original_words = len(content.split())
-            enhanced_words = len(enhanced.split())
+            original_words = word_count(content)
+            enhanced_words = word_count(enhanced)
 
             return {
                 "success": True,
@@ -1405,8 +1418,8 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 "metadata": {
                     "enhancement_type": "transcription",
                     "enhancement_label": TRANSCRIPTION_ENHANCEMENT_LABEL,
-                    "original_word_count": len(content.split()),
-                    "enhanced_word_count": len(enhanced.split()),
+                    "original_word_count": word_count(content),
+                    "enhanced_word_count": word_count(enhanced),
                     "model_used": self.long_output_model,
                     "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 },

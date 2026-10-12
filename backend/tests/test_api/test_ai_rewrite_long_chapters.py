@@ -198,6 +198,41 @@ class TestARewriteThatLostMostOfTheTextIsRefused:
 
         assert response.status_code == 200, response.text
 
+    async def test_entities_are_measured_as_the_characters_they_stand_for(self, author, monkeypatch):
+        """Pasted rich text is full of ``&nbsp;``. A rewrite that says the same
+        with ordinary spaces has lost nothing."""
+        api, book, _ = author
+        words = ["word"] * 300
+        monkeypatch.setattr(ai_service, "client", autospec_openai_client(content=" ".join(words)))
+
+        response = await api.post(
+            f"{book}/chapters/ch1/transform-style",
+            json={"content": "<p>" + "&nbsp;".join(words) + "</p>", "target_style": "professional"},
+        )
+
+        assert response.status_code == 200, response.text
+
+    async def test_the_word_counts_are_of_the_text_a_reader_sees(self, author, monkeypatch):
+        """The preview shows these counts. Paragraphs sit side by side in the
+        editor's HTML with nothing between them, and entities are not words."""
+        api, book, _ = author
+        chapter = "<p>One two&nbsp;three</p><p>Four five</p>" * 60  # 300 words
+        rewrite = "<h2>One</h2><p>two three four five.</p>" * 60  # 300 words
+        monkeypatch.setattr(ai_service, "client", autospec_openai_client(content=rewrite))
+
+        for route, options, counted in [
+            ("transform-style", {"target_style": "professional"}, "transformed_word_count"),
+            ("enhance-text", {"enhancement_type": "clarity"}, "enhanced_word_count"),
+            ("enhance-transcription", {}, "enhanced_word_count"),
+        ]:
+            response = await api.post(
+                f"{book}/chapters/ch1/{route}", json={"content": chapter, **options}
+            )
+
+            assert response.status_code == 200, response.text
+            metadata = response.json()["metadata"]
+            assert (metadata["original_word_count"], metadata[counted]) == (300, 300), route
+
     async def test_a_text_written_without_spaces_is_measured_too(self, author, monkeypatch):
         """Chinese, Japanese and Thai have no spaces between words, so words cannot be the measure."""
         api, book, _ = author

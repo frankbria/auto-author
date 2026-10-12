@@ -1,7 +1,7 @@
 # A rewrite that lost most of the text is refused, and the preview shows the word counts (#983)
 
-*2026-10-12T08:30:33Z by Showboat 0.6.1*
-<!-- showboat-id: 928bdf49-faf7-4ad7-8c02-6a98a0277c22 -->
+*2026-10-12T10:01:24Z by Showboat 0.6.1*
+<!-- showboat-id: ccdbc8e4-8c4e-4d3f-8917-18a40dbc3205 -->
 
 Transform, enhance and dictation cleanup already refuse an answer the model reports as cut off. A model can also condense a long text and report a normal finish; in live runs for #801 a 5,000-word chapter came back at 28% to 49% of its length as a success. This demo has three parts: the API on main and on this branch against a stand-in provider that returns a chosen share of the words it was sent, the real page in a browser, and this branch against a real model.
 
@@ -37,7 +37,7 @@ transform, 40% comes back                HTTP 413| charged today: 1
 enhance, 59% comes back                  HTTP 413| charged today: 2
   REWRITE_SHORTENED: The result came back at 59% of the length of the text it was given, so it was not used. Try a shorter section.
 transform, 80% comes back                HTTP 200| charged today: 3
-  words: 2868 in, 2320 out
+  words: 2900 in, 2320 out
 ```
 
 Dictation cleanup removes filler, so it may lose more: it is refused under 40% where transform and enhance are refused under 60%. A text under 1,000 characters is not checked at all, because tightening a paragraph can halve it. The measure is characters of text, with markup and whitespace left out, so a script written without spaces is measured like any other.
@@ -48,7 +48,7 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 
 ```output
 cleanup, 50% comes back                  HTTP 200| charged today: 4
-  words: 2868 in, 1450 out
+  words: 2900 in, 1450 out
 cleanup, 39% comes back                  HTTP 413| charged today: 5
   REWRITE_SHORTENED: The result came back at 39% of the length of the text it was given, so it was not used. Try a shorter section.
 enhance 150 words, 30% comes back        HTTP 200| charged today: 6
@@ -64,7 +64,7 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 ```
 
 ```output
-"2,868 words before, 2,320 after (19% shorter)"
+"2,900 words before, 2,320 after (20% shorter)"
 "Try Another Style | Cancel | Apply to Chapter | Close"
 ```
 
@@ -72,7 +72,7 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 ![The transform preview: before and after panes, and under them a line with the word counts before and after and the percentage shorter](preview-word-counts.png)
 ```
 
-![The transform preview: before and after panes, and under them a line with the word counts before and after and the percentage shorter](959ae287-2026-10-12.png)
+![The transform preview: before and after panes, and under them a line with the word counts before and after and the percentage shorter](1bcd5d12-2026-10-12.png)
 
 Now the provider keeps 40%. Try Another Style, then Transform again: the backend refuses the result, the dialog goes back to the options with the reason, and nothing is offered to apply. The message is shown raw, status and JSON included; these client methods show every error that way, which #803 covers.
 
@@ -89,7 +89,7 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 ![The transform dialog back on its options, showing the refusal: the result came back at 40% of the length of the text it was given, so it was not used](refused-rewrite.png)
 ```
 
-![The transform dialog back on its options, showing the refusal: the result came back at 40% of the length of the text it was given, so it was not used](40656a26-2026-10-12.png)
+![The transform dialog back on its options, showing the refusal: the result came back at 40% of the length of the text it was given, so it was not used](6cf7febb-2026-10-12.png)
 
 A real model. This branch against gpt-oss:120b through the local Ollama endpoint, set as the long-output model: the model that condensed the 5,000-word chapter in the #801 demo. Each request is sent three times, because a real model does not answer the same way twice.
 
@@ -98,18 +98,18 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 ```
 
 ```output
-live 1: transform 5,000 words            HTTP 413   REWRITE_SHORTENED: The result came back at 33% of the length of the text it was given, so it was not used. Try a shorter section.
-live 2: transform 5,000 words            HTTP 413   REWRITE_SHORTENED: The result came back at 36% of the length of the text it was given, so it was not used. Try a shorter section.
-live 3: transform 5,000 words            HTTP 413   REWRITE_SHORTENED: The result came back at 33% of the length of the text it was given, so it was not used. Try a shorter section.
-live 1: transform 1,000 words            HTTP 200   words: 989 in, 1063 out
-live 2: transform 1,000 words            HTTP 413   REWRITE_TRUNCATED: This chapter is too long to transform in one pass. Try transforming a shorter section.
-live 3: transform 1,000 words            HTTP 200   words: 989 in, 1004 out
-live 1: clean up a 1,359-word dictation  HTTP 200   words: 1359 in, 937 out
-live 2: clean up a 1,359-word dictation  HTTP 200   words: 1359 in, 820 out
-live 3: clean up a 1,359-word dictation  HTTP 200   words: 1359 in, 801 out
+live 1: transform 5,000 words            HTTP 413   REWRITE_TRUNCATED: This chapter is too long to transform in one pass. Try transforming a shorter section.
+live 2: transform 5,000 words            HTTP 413   REWRITE_SHORTENED: The result came back at 39% of the length of the text it was given, so it was not used. Try a shorter section.
+live 3: transform 5,000 words            HTTP 413   REWRITE_SHORTENED: The result came back at 50% of the length of the text it was given, so it was not used. Try a shorter section.
+live 1: transform 1,000 words            HTTP 413   REWRITE_TRUNCATED: This chapter is too long to transform in one pass. Try transforming a shorter section.
+live 2: transform 1,000 words            HTTP 200   words: 1000 in, 1026 out
+live 3: transform 1,000 words            HTTP 200   words: 1000 in, 965 out
+live 1: clean up a 1,359-word dictation  HTTP 200   words: 1359 in, 863 out
+live 2: clean up a 1,359-word dictation  HTTP 200   words: 1359 in, 775 out
+live 3: clean up a 1,359-word dictation  HTTP 200   words: 1359 in, 797 out
 ```
 
-What the live runs show. The model condensed the 5,000-word chapter all three times, to about a third of its length, and all three were refused; on main each would have been offered as the finished rewrite. The 1,000-word chapter was returned twice at about its own length; once the model spent its whole budget and the answer was cut off, which is the older refusal (it is a reasoning model, #925). The dictation, about a quarter filler, came back at 59% to 69% of its words and was returned each time: two of those are at or under the 60% that transform and enhance require, which is why cleanup has its own, lower share. A refused request still costs the author a generation, because the provider was called.
+What the live runs show. The 5,000-word chapter was never returned as a rewrite: twice the model condensed it, to 39% and 50% of its length, and was refused for that; once it ran out of budget and was refused as cut off. On main the two condensed answers would have been offered as the finished rewrite. The 1,000-word chapter was returned twice at about its own length and cut off at the budget once (a reasoning model spends part of its budget on hidden reasoning, #925). The dictation, about a quarter filler, came back at 57% to 64% of its words and was returned each time: two of those are under the 60% that transform and enhance require, which is why cleanup has its own, lower share. A refused request still costs the author a generation, because the provider was called.
 
 The same behaviour as tests. Backend: real routes and real MongoDB counters with the provider stubbed at the wire. Frontend: the three dialogs rendered with a mocked client.
 
@@ -118,6 +118,6 @@ cd /home/frankbria/projects/worktrees/issue-983-shortened-rewrites/backend && EN
 ```
 
 ```output
-============================== 19 passed ==============================
+============================== 21 passed ==============================
 Tests:       16 passed, 16 total
 ```
