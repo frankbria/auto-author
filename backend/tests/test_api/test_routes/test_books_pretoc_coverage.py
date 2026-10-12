@@ -417,34 +417,34 @@ class TestSaveQuestionResponses:
         assert r.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_400_responses_not_a_list(self, auth_client_factory):
+    async def test_422_responses_not_a_list(self, auth_client_factory):
         api = await auth_client_factory()
         book_id = await _create_book(api)
         r = await api.put(
             f"/api/v1/books/{book_id}/question-responses",
             json={"responses": {"not": "a list"}},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_400_response_not_an_object(self, auth_client_factory):
+    async def test_422_response_not_an_object(self, auth_client_factory):
         api = await auth_client_factory()
         book_id = await _create_book(api)
         r = await api.put(
             f"/api/v1/books/{book_id}/question-responses",
             json={"responses": ["just a string"]},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_400_missing_question_or_answer(self, auth_client_factory):
+    async def test_422_missing_question_or_answer(self, auth_client_factory):
         api = await auth_client_factory()
         book_id = await _create_book(api)
         r = await api.put(
             f"/api/v1/books/{book_id}/question-responses",
             json={"responses": [{"question": "only question"}]},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     @pytest.mark.asyncio
     async def test_400_empty_answer(self, auth_client_factory):

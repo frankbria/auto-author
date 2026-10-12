@@ -1394,3 +1394,25 @@ The repo's GLM review job ended in about a second with `is_error: true`, one tur
 
 ### Edit a PR comment by the id that was returned, never "the last comment" (#795)
 To fix a typo in a comment just posted, the command fetched the newest comment's id and patched it. A bot's tracking comment had landed nine seconds after mine, so the patch overwrote the bot's comment with my text. `gh pr comment` prints the URL of what it created; take the id from that.
+
+### A mutation script killed by a timeout leaves the mutation in the tree (#796)
+The script mutates a file, runs the suite, then reverts. A 400-second tool timeout killed it between the run and the revert, leaving a mutated component and two servers. Run a mutation script in the background with no timeout, and check `git diff --quiet HEAD --` and the ports before doing anything else afterwards.
+
+### A worktree without the `node_modules` link gets a stray install, not an error (#798)
+`npx next dev` in a worktree where the `frontend/node_modules` symlink was never created downloaded a private copy and then failed with module-not-found. Create the link when the worktree is created, and treat a real `node_modules` directory in a worktree as a mistake to delete.
+
+### A line that no test and no mutation can observe should be deleted (#798)
+A per-request reset of a `ContextVar` survived its own mutation check, because each request already starts with a fresh context. The choices were a comment defending it or removing it. Removing it was right: code that cannot be shown to do anything is a claim nobody can check.
+
+### The changelog's union merge joins two entries, and a broad repair damages the file (#799, #804)
+`docs/CHANGELOG.md` merges with the union driver, so two branches that add an entry at the same spot merge without conflict but lose the blank line between the entries. A regex that restored "a blank line before every entry" inserted 131 lines, because older entries were never separated that way. List the first few entries with their preceding line and fix the one that is wrong.
+
+### A 422 can be the right status for the wrong reason (#800)
+The test "an answer over the cap is refused" passed before the cap existed: the question id in the URL did not exist, and that route answers 422 for an unknown question. Reading the names of the tests that passed in the RED run caught it. When a status code has more than one cause on a route, assert the reason as well.
+
+### The auth bypass also bypasses the quota and the rate limiter (#800)
+A demo backend started with `BYPASS_AUTH` reported zero generations charged after a successful AI call, because the quota and the limiter both skip a bypassed request. To show either, seed a verified `user` and a `session` in the demo database and sign the cookie with the demo's own `BETTER_AUTH_SECRET`, the way `backend/tests/session_cookies.py` does.
+
+### A validation error carries the rejected input, into the response and the log (#800)
+FastAPI's `RequestValidationError` lists each error with its `input`, and its text form includes it. This app's handler returned the list and logged with `exc_info=True`, so a refused request came back whole and was written to the log, user text included. A dry run of the demo showed a 400 KB log after one request. Check what a refusal returns and logs, not only its status.
+

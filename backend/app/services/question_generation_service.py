@@ -16,6 +16,7 @@ from app.schemas.book import (
     ResponseStatus,
     QuestionMetadata
 )
+from app.schemas.ai_input import MAX_CHAPTER_TITLE_CHARS
 from app.services.ai_errors import AIServiceError
 from app.services.ai_service import AIService
 from app.utils.validators import validate_text_safety
@@ -82,7 +83,7 @@ class QuestionGenerationService:
         chapter = find_chapter(chapters)
 
         if chapter:
-            chapter_title = chapter.get("title", "Chapter")
+            chapter_title = chapter.get("title", "Chapter")[:MAX_CHAPTER_TITLE_CHARS]
             chapter_content = chapter.get("content", "")
 
         return {
