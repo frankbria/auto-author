@@ -174,6 +174,10 @@ class Settings(BaseSettings):
     # fail loudly — it just holds the request open past any sane client timeout
     # while occupying a worker. Both ends fail at config load instead (#352).
     AI_MAX_RETRIES: int = Field(default=3, ge=1, le=10)
+    # Per attempt, in seconds. The SDK's own default is 600, and the call
+    # holds a thread on the shared executor for as long as it waits (#799).
+    # 120 leaves room for a long draft; the retries multiply it.
+    AI_REQUEST_TIMEOUT_SECONDS: float = Field(default=120, gt=0, le=600)
 
     # Max times a single question may be regenerated (per-question abuse cap,
     # complementing the endpoint rate limit)

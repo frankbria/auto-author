@@ -174,6 +174,31 @@ class AIProviderQuotaError(AIServiceUnavailableError):
         self.retry_after = None
 
 
+class AIProviderAuthError(AIServiceUnavailableError):
+    """
+    Raised when the provider rejects our credential: a 401 for the API key, or a
+    403 because the key may not use the model (#799).
+
+    Like a billing refusal, waiting never clears it and the user did nothing
+    wrong: every AI feature is down until an operator fixes the key. Not
+    retryable, and a 503.
+    """
+
+    def __init__(
+        self,
+        original_exception: Optional[Exception] = None,
+        correlation_id: Optional[str] = None
+    ):
+        super().__init__(
+            message="The AI service is unavailable right now. Please try again later.",
+            original_exception=original_exception,
+            correlation_id=correlation_id
+        )
+        self.error_code = "AI_PROVIDER_AUTH_FAILED"
+        self.retryable = False
+        self.retry_after = None
+
+
 class AIInvalidRequestError(AIServiceError):
     """
     Raised when the request to the AI service is invalid.

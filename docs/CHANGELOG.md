@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **AI requests have a time budget, and a refused credential or billing refusal is treated as an outage (#799, P1.17)**:
+  - **Timeout.** The OpenAI client was built with no timeout, so the SDK's 600 seconds applied. With three attempts, a stalled provider could hold a worker thread for half an hour on the executor that also runs uploads and payments. `AI_REQUEST_TIMEOUT_SECONDS` (default 120, per attempt) is now passed to the client.
+  - **Rejected credential.** A 401 or 403 from the provider was retried and then reported as an unexpected error. It now raises `AIProviderAuthError` after one attempt: not retryable, logged CRITICAL, answered to the user as 503 with the code `AI_PROVIDER_AUTH_FAILED` and no mention of keys.
+  - **Billing refusal.** `insufficient_quota` and a 402 were already non-retryable since #775; their log line moved from ERROR to CRITICAL.
+  - **Not covered.** 120 seconds is a guess that leaves room for a long draft; it has not been measured against real generations. The model call still runs on the shared default executor.
+
 - **Rate limits are keyed on the route, and the AI quota charges only requests that may have reached the model (#798, P1.16)**:
   - **Rate-limit key.** The limiter's bucket was named for the concrete URL, so every book id (and every chapter id on transform-style) was a fresh bucket: "10 exports an hour" was 10 per book. It is now named for the route as declared, `/books/{book_id}/export/pdf`, with the URL as the fallback when no route matched. The 11th export across two books in a window is refused.
   - **Quota.** `get_ai_usage_quota` charged before validation, ownership, the plan gate and the rate limiter ran, and a refusal past the cap pushed the counter higher still. It is now a dependency with `yield`: it charges up front and refunds when the request fails without a model call having been attempted (the quota's own refusal, a validation error, a missing or foreign book, a rate limit). `AIService` marks the request the moment it hands a call to the provider, and from then on the charge stays whatever the outcome, including a 4xx such as a truncated draft: the provider may have billed for it.
