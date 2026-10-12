@@ -355,6 +355,20 @@ jobs:
           BETTER_AUTH_URL: 'http://localhost:3000'
         run: npx playwright test --project=chromium
 
+      # Everything above runs with the bypass on. This starts its own backend
+      # and frontend with it off, on other ports and another database, and
+      # signs up through the page (#843). It is part of this required job.
+      - name: Run real-auth E2E (no bypass)
+        working-directory: frontend
+        env:
+          BETTER_AUTH_SECRET: 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
+        run: npx playwright test --config=playwright.real-auth.config.ts
+
+      - name: Show real-auth server logs
+        if: failure()
+        working-directory: frontend
+        run: tail -n 80 test-results/real-auth-backend.log test-results/real-auth-frontend.log || true
+
       - name: Upload Playwright report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

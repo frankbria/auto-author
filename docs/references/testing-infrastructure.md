@@ -183,6 +183,26 @@ Validates automatic retry logic with exponential backoff for transient errors.
 
 **Execution Time**: ~60-90 seconds
 
+### 4. Real authentication, no bypass (`frontend/src/e2e/real-auth/`)
+
+The suites above run with `BYPASS_AUTH`. This one does not (#843). It has its own
+config, `frontend/playwright.real-auth.config.ts`, which starts a backend on port
+8001 and a frontend on port 3001 with the bypass off and their own database, so it
+can run next to the bypassed servers.
+
+```bash
+cd frontend && npx playwright test --config=playwright.real-auth.config.ts
+```
+
+- Needs MongoDB on `localhost:27017` and `uv`.
+- New accounts must verify their email. No provider is configured, so the
+  development server prints each email, and the spec reads the link from
+  `test-results/real-auth-frontend.log`.
+- Add auth flows that need a real server here (session revocation, password
+  reset, 2FA), not to the bypassed suite.
+- It runs in the required `E2E Tests (Playwright)` CI job;
+  `scripts/test_real_auth_e2e_is_required.py` keeps it there.
+
 ## Test Organization
 
 **Unit Tests**: `frontend/src/lib/**/*.test.ts`, `frontend/src/components/**/*.test.tsx`
