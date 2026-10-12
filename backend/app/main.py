@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -220,12 +221,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         errors.append(error_msg)
 
     error_details = "; ".join(errors)
-    logger.error(f"Validation error: {error_details}", exc_info=True)
+    # No traceback: the exception's text contains the rejected input, which is
+    # the user's writing and, for an oversize request, most of the request.
+    logger.error(f"Validation error: {error_details}")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "detail": "Validation error",
-            "errors": exc.errors(),
+            # Without the input, for the same reason. Encoded, because a custom
+            # validator's error carries the exception itself.
+            "errors": jsonable_encoder(
+                [{k: v for k, v in error.items() if k != "input"} for error in exc.errors()]
+            ),
             "error_summary": error_details,
         },
     )

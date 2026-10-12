@@ -3,6 +3,8 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from enum import Enum
 
+from app.schemas.ai_input import MAX_ANSWER_CHARS
+
 
 class ChapterStatus(str, Enum):
     """Valid chapter status values"""
@@ -123,6 +125,8 @@ class QuestionResponseCreate(QuestionResponseBase):
     """Schema for creating a new question response"""
 
     question_id: Optional[str] = None  # Made optional since it can come from URL path
+    # Capped on the way in only (#800): an answer saved before the cap must still read back.
+    response_text: str = Field(..., min_length=1, max_length=MAX_ANSWER_CHARS)
 
 
 class QuestionResponse(QuestionResponseBase):

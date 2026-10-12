@@ -62,6 +62,15 @@ from app.api.dependencies import (
     audit_request, get_rate_limiter, get_ai_usage_quota,
     get_entitlement_checker
 )
+from app.schemas.ai_input import (
+    MAX_ANSWER_CHARS,
+    EnhanceTextRequest,
+    EnhanceTranscriptionRequest,
+    GenerateDraftRequest,
+    GenerateTocRequest,
+    SaveQuestionResponsesRequest,
+    TransformStyleRequest,
+)
 from app.services.ai_service import ai_service
 from app.services.style_templates import available_styles, is_valid_style
 from app.services.content_enhancement import (
@@ -1009,7 +1018,7 @@ async def get_question_responses(
 @router.put("/{book_id}/question-responses", status_code=status.HTTP_200_OK)
 async def save_question_responses(
     book_id: str,
-    data: dict = Body(...),
+    data: SaveQuestionResponsesRequest,
     current_user: Dict = Depends(get_current_user_from_session),
 ):
     """
@@ -1025,25 +1034,10 @@ async def save_question_responses(
             status_code=403, detail="Not authorized to update responses for this book"
         )
 
-    # Validate responses data
-    responses = data.get("responses", [])
-    if not isinstance(responses, list):
-        raise HTTPException(
-            status_code=400, detail="Responses must be provided as a list"
-        )
-
-    # Validate each response
+    # Shape and size are checked by the request model (#800).
+    responses = [pair.model_dump() for pair in data.responses]
     for i, response in enumerate(responses):
-        if not isinstance(response, dict):
-            raise HTTPException(
-                status_code=400, detail=f"Response {i} must be an object"
-            )
-        if "question" not in response or "answer" not in response:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Response {i} must contain 'question' and 'answer' fields",
-            )
-        if not response["answer"] or not response["answer"].strip():
+        if not response["answer"].strip():
             raise HTTPException(
                 status_code=400, detail=f"Answer for question {i} cannot be empty"
             )
@@ -1156,7 +1150,7 @@ async def check_toc_generation_readiness(
 @router.post("/{book_id}/generate-toc", status_code=status.HTTP_200_OK, dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("generate_toc"))])
 async def generate_table_of_contents(
     book_id: str,
-    data: dict = Body(default={}),
+    data: GenerateTocRequest = Body(default=GenerateTocRequest()),
     current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(
         get_rate_limiter(limit=2, window=300)
@@ -1187,7 +1181,7 @@ async def generate_table_of_contents(
     # Fall back to any responses persisted on the book. Previously this only read
     # the persisted field, but the wizard never persists them, so TOC generation
     # always failed with "Question responses are required".
-    responses = data.get("question_responses") or []
+    responses = [pair.model_dump() for pair in data.question_responses]
     if not responses:
         persisted = book.get("question_responses", {})
         responses = persisted.get("responses", [])
@@ -2623,7 +2617,7 @@ async def regenerate_chapter_questions(
 async def generate_chapter_draft(
     book_id: str,
     chapter_id: str,
-    data: dict = Body(default={}),
+    data: GenerateDraftRequest = Body(default=GenerateDraftRequest()),
     current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(
         get_rate_limiter(limit=5, window=3600)
@@ -2662,7 +2656,7 @@ async def generate_chapter_draft(
         raise HTTPException(status_code=404, detail="Chapter not found in table of contents")
 
     # Get question responses from request or book data
-    question_responses = data.get("question_responses", [])
+    question_responses = [pair.model_dump() for pair in data.question_responses]
 
     # If no responses provided, try to get from stored chapter questions
     if not question_responses:
@@ -2673,17 +2667,9 @@ async def generate_chapter_draft(
             detail="Question responses are required for draft generation. Please provide Q&A pairs."
         )
 
-    # Validate question responses format
-    for response in question_responses:
-        if not isinstance(response, dict) or "question" not in response or "answer" not in response:
-            raise HTTPException(
-                status_code=400,
-                detail="Each question response must have 'question' and 'answer' fields"
-            )
-
     # Get optional parameters
-    writing_style = data.get("writing_style", None)
-    target_length = data.get("target_length", 2000)
+    writing_style = data.writing_style
+    target_length = data.target_length
 
     # Validate target length
     if not isinstance(target_length, int) or target_length < 100 or target_length > 10000:
@@ -2817,7 +2803,7 @@ async def generate_chapter_draft(
 async def transform_chapter_style(
     book_id: str,
     chapter_id: str,
-    data: dict = Body(default={}),
+    data: TransformStyleRequest = Body(default=TransformStyleRequest()),
     current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(
         get_rate_limiter(limit=10, window=3600)
@@ -2840,8 +2826,8 @@ async def transform_chapter_style(
             detail="Not authorized to transform content for this book",
         )
 
-    content = data.get("content", "")
-    target_style = data.get("target_style", "")
+    content = data.content
+    target_style = data.target_style
 
     if not content or not content.strip():
         raise HTTPException(
@@ -2881,7 +2867,7 @@ async def transform_chapter_style(
 async def enhance_chapter_text(
     book_id: str,
     chapter_id: str,
-    data: dict = Body(default={}),
+    data: EnhanceTextRequest = Body(default=EnhanceTextRequest()),
     current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(
         get_rate_limiter(limit=10, window=3600)
@@ -2921,8 +2907,8 @@ async def enhance_chapter_text(
     if not find_chapter(chapters):
         raise HTTPException(status_code=404, detail="Chapter not found")
 
-    content = data.get("content", "")
-    enhancement_type = data.get("enhancement_type", "")
+    content = data.content
+    enhancement_type = data.enhancement_type
 
     if not content or not content.strip():
         raise HTTPException(
@@ -2966,7 +2952,7 @@ async def enhance_chapter_text(
 async def enhance_chapter_transcription(
     book_id: str,
     chapter_id: str,
-    data: dict = Body(default={}),
+    data: EnhanceTranscriptionRequest = Body(default=EnhanceTranscriptionRequest()),
     current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(
         get_rate_limiter(limit=10, window=3600)
@@ -3006,7 +2992,7 @@ async def enhance_chapter_transcription(
     if not find_chapter(chapters):
         raise HTTPException(status_code=404, detail="Chapter not found")
 
-    content = data.get("content", "")
+    content = data.content
     if not content or not content.strip():
         raise HTTPException(
             status_code=400,
@@ -3096,6 +3082,14 @@ async def save_question_responses_batch_endpoint(
             field="responses",
             message="Batch size exceeds maximum of 100 responses",
             value=len(responses),
+            request_id=request_id
+        )
+
+    # The cap a single saved answer has (#800); an answer comes back as model input.
+    if any(len(str(item.get("response_text") or "")) > MAX_ANSWER_CHARS for item in responses):
+        raise handle_validation_error(
+            field="responses",
+            message=f"A response is longer than the limit of {MAX_ANSWER_CHARS} characters",
             request_id=request_id
         )
 

@@ -175,7 +175,7 @@ async def test_generate_draft_requires_responses_400(auth_client_factory):
 
 
 @pytest.mark.asyncio
-async def test_generate_draft_malformed_response_400(auth_client_factory):
+async def test_generate_draft_malformed_response_422(auth_client_factory):
     api = await auth_client_factory()
     book_id = await _create_book(api)
     chapter_id = await _seed_toc_chapter(book_id)
@@ -183,8 +183,9 @@ async def test_generate_draft_malformed_response_400(auth_client_factory):
         f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-draft",
         json={"question_responses": [{"question": "Missing the answer field"}]},
     )
-    assert r.status_code == 400
-    assert "must have 'question' and 'answer'" in r.json()["detail"]
+    # The request model owns the shape since #800, so this is a 422 naming the field.
+    assert r.status_code == 422
+    assert "question_responses -> 0 -> answer: Field required" in r.json()["error_summary"]
 
 
 @pytest.mark.asyncio
