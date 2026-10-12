@@ -16,6 +16,7 @@ Better-auth stores sessions in the 'session' collection with the following schem
 - userAgent: String (optional)
 """
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -25,12 +26,31 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import unquote
 
 from fastapi import Request
+from pymongo.errors import PyMongoError
 
 from app.core.config import is_deployed_env, settings
 from app.core.reporting import report_failure
 from app.db.base import get_collection
 
 logger = logging.getLogger(__name__)
+
+# How long a session lookup may wait for the database. The driver's own limit
+# is thirty seconds, which is how long a signed-in request used to hang (#1007).
+SESSION_LOOKUP_TIMEOUT_SECONDS = 5
+
+
+class SessionStoreUnavailable(Exception):
+    """The session could not be checked because the database could not be asked.
+
+    Not the same as a session that is not there: that one is the user's to fix
+    by signing in, this one is ours. The app answers it 503, not 401, because
+    the frontend ends the session in the browser on a 401 (#796, #1007).
+    """
+
+
+def _in_time(lookup):
+    """A database call for a session, given up on after the lookup's own limit."""
+    return asyncio.wait_for(lookup, SESSION_LOOKUP_TIMEOUT_SECONDS)
 
 # better-auth sets the __Secure- name over HTTPS and the bare one over plain
 # HTTP (local development).
@@ -123,7 +143,7 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
         session_collection = await get_collection("session")
 
         # Find session by token
-        session = await session_collection.find_one({"token": session_token})
+        session = await _in_time(session_collection.find_one({"token": session_token}))
 
         if not session:
             logger.warning("Session not found for provided token")
@@ -163,22 +183,25 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
             if expires_at < now:
                 logger.info(f"Session expired at {expires_at} (current time: {now})")
                 # Optionally clean up expired session
-                await session_collection.delete_one({"_id": session["_id"]})
+                await _in_time(session_collection.delete_one({"_id": session["_id"]}))
                 return None
 
         # Update last activity time
-        await session_collection.update_one(
+        await _in_time(session_collection.update_one(
             {"_id": session["_id"]},
             {"$set": {"updatedAt": datetime.now(timezone.utc)}}
-        )
+        ))
 
         logger.debug(f"Session validated for user: {session.get('userId')}")
         return session
 
-    except Exception as e:
-        logger.error(f"Error validating session: {str(e)}")
-        # The user is treated as signed out for what is our failure (#996).
+    except (PyMongoError, asyncio.TimeoutError) as e:
+        logger.error(f"Session could not be checked: {type(e).__name__}: {str(e)}")
         report_failure("session-validation", e)
+        raise SessionStoreUnavailable() from e
+    except Exception as e:
+        # The record itself makes no sense: refused, as a session that is not there.
+        logger.error(f"Error validating session: {str(e)}")
         return None
 
 
@@ -205,13 +228,13 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
         user_collection = await get_collection("user")
 
         # Find user by ID (better-auth stores ID as 'id' field, not '_id')
-        user = await user_collection.find_one({"id": user_id})
+        user = await _in_time(user_collection.find_one({"id": user_id}))
 
         if not user:
             # Try with _id as fallback (convert string to ObjectId)
             from bson import ObjectId
             try:
-                user = await user_collection.find_one({"_id": ObjectId(user_id)})
+                user = await _in_time(user_collection.find_one({"_id": ObjectId(user_id)}))
             except Exception:
                 logger.debug(f"Could not convert user_id to ObjectId: {user_id}")
 
@@ -220,9 +243,12 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
 
         return user
 
+    except (PyMongoError, asyncio.TimeoutError) as e:
+        logger.error(f"Better-auth user {user_id} could not be looked up: {type(e).__name__}: {str(e)}")
+        report_failure("session-validation", e)
+        raise SessionStoreUnavailable() from e
     except Exception as e:
         logger.error(f"Error fetching better-auth user {user_id}: {str(e)}")
-        report_failure("session-validation", e)
         return None
 
 

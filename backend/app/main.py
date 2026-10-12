@@ -13,6 +13,7 @@ import logging
 import os
 from pathlib import Path
 from app.api.request_validation import RequestValidationMiddleware
+from app.core.better_auth_session import SESSION_LOOKUP_TIMEOUT_SECONDS, SessionStoreUnavailable
 from app.core.reporting import report_failure
 from app.core.request_context import configure_logging
 
@@ -335,6 +336,19 @@ async def pydantic_validation_exception_handler(request: Request, exc: Validatio
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={"detail": "Validation error"},
+    )
+
+
+# A session that could not be checked (#1007). Answered 503 with when to come
+# back: a 401 here would end the session in the browser for what is our outage.
+# Its own exception with no status on it, so the Sentry SDK does not report
+# every such request; the lookup reports it once every few minutes.
+@app.exception_handler(SessionStoreUnavailable)
+async def session_store_unavailable_handler(request: Request, exc: SessionStoreUnavailable):
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"detail": "The service is temporarily unavailable. Please try again in a moment."},
+        headers={"Retry-After": str(SESSION_LOOKUP_TIMEOUT_SECONDS)},
     )
 
 

@@ -47,6 +47,17 @@ describe('apiFetch', () => {
     expect(go).not.toHaveBeenCalled();
   });
 
+  it('on a 503, leaves the session alone: the backend could not check it, which is not the same as it being gone (#1007)', async () => {
+    answer(503);
+
+    const response = await apiFetch('http://api/books');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(response.status).toBe(503);
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(go).not.toHaveBeenCalled();
+  });
+
   it('on a 401, signs out and sends the user to sign in, back to where they were', async () => {
     answer(401);
 
