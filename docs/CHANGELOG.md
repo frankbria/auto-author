@@ -4,6 +4,11 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **Staging's health is probed from outside every 15 minutes (#811, P1.29)**:
+  - **Already there.** `staging-health.yml` (#916) probed staging from a GitHub runner and opened, commented on and closed one labelled issue through `scripts/ci-alert-issue.sh` (#776). That is most of what this issue asks for. It ran every six hours, because the alert commented on every failing run and a tighter schedule would have filled the issue with comments.
+  - **Changed.** The schedule is `*/15`. `ci-alert-issue.sh` takes `ALERT_QUIET_HOURS`: with it set, a failing run comments on the open issue only when the issue has had no activity for that many hours. The probe sets 6, so a day-long outage is still about four comments, and recovery closes the issue at the next healthy run, within fifteen minutes. The post-deploy E2E alert does not set it and comments on every failing run as before.
+  - **Not covered.** There is no production host to probe yet. A staging that goes up and down opens a new issue each time it fails after a recovery. GitHub runs scheduled workflows late when it is busy, so fifteen minutes is the intent, not a guarantee.
+
 - **One id names a request, from the server log to the Reference ID the user is shown (#810, P1.28)**:
   - **Problem.** The request middleware minted an id, put it on successful responses and in two of its own log lines, and nothing else used it. A 500 carried no id. Structured errors carried a second, unrelated random one (`req_…`). The frontend's "Reference ID" was a value made in the browser, so quoting it to support matched nothing on the server.
   - **A 500 could not be read at all.** Measured before planning: an unhandled failure was answered outside the CORS middleware, so its response had no CORS headers and a page on the frontend's origin was refused it. The browser reported a failed fetch. The request middleware now answers the failure itself, by calling the global handler, and CORS is the outermost middleware, so a 500 is an answer the page can read.
