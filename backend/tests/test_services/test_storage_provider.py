@@ -82,8 +82,16 @@ class TestOneAnswerFromSettings:
 
     @pytest.mark.parametrize(
         "fields, kind",
-        [(CLOUDINARY, CloudinaryStorageService), (S3, S3StorageService), ({}, type(None))],
-        ids=["cloudinary", "s3", "local"],
+        [
+            (CLOUDINARY, CloudinaryStorageService),
+            (S3, S3StorageService),
+            ({}, type(None)),
+            # The original defect: with half a provider the service must agree
+            # with the mount that this is local disk.
+            ({"CLOUDINARY_CLOUD_NAME": "demo"}, type(None)),
+            ({"AWS_S3_BUCKET": "bucket"}, type(None)),
+        ],
+        ids=["cloudinary", "s3", "local", "half of cloudinary", "half of s3"],
     )
     def test_the_service_follows_the_settings_not_the_process_environment(
         self, configure, monkeypatch, fields, kind
