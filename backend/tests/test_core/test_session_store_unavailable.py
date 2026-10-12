@@ -95,8 +95,14 @@ class TestTheRequestIsToldToComeBackNotToSignIn:
         monkeypatch.setattr(sentry_sdk, "init", lambda **options: real_init(**options, transport=sent.append))
         monkeypatch.setattr(reporting, "_last_reported", {})
         main._init_sentry()
+        # The SDK wraps an app's exception handlers when the app's middleware is
+        # built, which for this shared app happened before the SDK was started
+        # here. Build it again, or the SDK's own reporting of a 5xx is not in
+        # play and this test could not see a report per request.
+        app.middleware_stack = None
         yield sent
         real_init()
+        app.middleware_stack = None
 
     async def test_a_signed_in_request_is_answered_503_with_when_to_retry(self, api, database_is_away):
         response = await api.get("/api/v1/books/", headers={"Cookie": COOKIE, **ORIGIN})
