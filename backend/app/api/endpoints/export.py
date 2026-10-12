@@ -24,6 +24,28 @@ from app.services.chapter_access_service import chapter_access_service
 from app.core.config import settings
 from datetime import datetime, timezone
 import io
+from urllib.parse import quote
+
+def _download_headers(title: str, suffix: str, size: int) -> Dict[str, str]:
+    """Headers for a download named after the book (#804).
+
+    Starlette encodes headers as latin-1, so a title outside it (CJK, Cyrillic)
+    raised a 500 after the whole export had been built. Per RFC 6266 the name
+    goes out twice: ``filename`` as an ASCII fallback, and ``filename*`` as the
+    real one in percent-encoded UTF-8, which every current browser prefers.
+    Only letters, digits, spaces, hyphens and underscores survive, so a title
+    cannot close the quotes or start a new header.
+    """
+    name = "".join(c for c in title if c.isalnum() or c in " -_").strip() or "untitled"
+    ascii_name = name.encode("ascii", "ignore").decode().strip() or "book"
+    return {
+        "Content-Disposition": (
+            f'attachment; filename="{ascii_name}{suffix}"; '
+            f"filename*=UTF-8''{quote(name + suffix)}"
+        ),
+        "Content-Length": str(size),
+    }
+
 
 router = APIRouter(
     prefix="/books/{book_id}/export",
@@ -138,21 +160,13 @@ async def export_book_pdf(
             custom_options=parsed_custom_options,
         )
 
-        # Create filename
-        safe_title = "".join(
-            c for c in book.get("title", "untitled")
-            if c.isalnum() or c in (' ', '-', '_')
-        ).rstrip()
-        filename = f"{safe_title}.pdf"
-
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(pdf_content),
             media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Content-Length": str(len(pdf_content)),
-            }
+            headers=_download_headers(
+                book.get("title", "untitled"), ".pdf", len(pdf_content)
+            ),
         )
 
     except ExportValidationError as e:
@@ -239,21 +253,13 @@ async def export_book_docx(
             custom_options=parsed_custom_options,
         )
 
-        # Create filename
-        safe_title = "".join(
-            c for c in book.get("title", "untitled")
-            if c.isalnum() or c in (' ', '-', '_')
-        ).rstrip()
-        filename = f"{safe_title}.docx"
-
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(docx_content),
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Content-Length": str(len(docx_content)),
-            }
+            headers=_download_headers(
+                book.get("title", "untitled"), ".docx", len(docx_content)
+            ),
         )
 
     except ExportValidationError as e:
@@ -329,21 +335,13 @@ async def export_book_epub(
             timeout_seconds=settings.EXPORT_TIMEOUT_SECONDS,
         )
 
-        # Create filename
-        safe_title = "".join(
-            c for c in book.get("title", "untitled")
-            if c.isalnum() or c in (' ', '-', '_')
-        ).rstrip()
-        filename = f"{safe_title}.epub"
-
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(epub_content),
             media_type="application/epub+zip",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Content-Length": str(len(epub_content)),
-            }
+            headers=_download_headers(
+                book.get("title", "untitled"), ".epub", len(epub_content)
+            ),
         )
 
     except ExportValidationError as e:
@@ -423,26 +421,17 @@ async def export_book_markdown(
             multi_file=multi_file,
         )
 
-        # Create filename
-        safe_title = "".join(
-            c for c in book.get("title", "untitled")
-            if c.isalnum() or c in (' ', '-', '_')
-        ).rstrip()
-        if multi_file:
-            filename = f"{safe_title}_chapters.zip"
-            media_type = "application/zip"
-        else:
-            filename = f"{safe_title}.md"
-            media_type = "text/markdown"
+        suffix, media_type = (
+            ("_chapters.zip", "application/zip") if multi_file else (".md", "text/markdown")
+        )
 
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(md_content),
             media_type=media_type,
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Content-Length": str(len(md_content)),
-            }
+            headers=_download_headers(
+                book.get("title", "untitled"), suffix, len(md_content)
+            ),
         )
 
     except ExportValidationError as e:

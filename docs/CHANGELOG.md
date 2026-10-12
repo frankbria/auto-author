@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **Exports work for any book title and are logged, and the download no longer races its own cleanup (#804, P1.22)**:
+  - **Title in the header.** The export routes put the title into `Content-Disposition` as written. Starlette encodes headers as latin-1, so a CJK or Cyrillic title raised a 500 after the whole file had been built, in all four formats. `_download_headers` in `backend/app/api/endpoints/export.py` now sends an ASCII fallback in `filename` and the real name in `filename*` (RFC 6266), for PDF, Word, EPUB and Markdown.
+  - **Access log.** Each export called `log_access(chapter_id=None)`, which failed validation because the model required a chapter, and the handler swallowed the error: no export was ever recorded. `chapter_id` is optional now, and an export writes one `export_<format>` row with no chapter.
+  - **Blob URL.** The download helper revoked the blob URL in the same tick as the click. It now waits 60 seconds. The export page used its own copy of that code and now calls the helper.
+  - **Download name.** The page names the file itself, with an ASCII-only filter that turned a CJK title into underscores (export page) or into no name at all (book page). Both builders keep letters and digits of any script, and fall back to "book" when nothing is left.
+  - **Not covered.** The account-level export (`/users/me/export`, #790) is still not logged. A real browser was not driven; the header and the names are covered by tests.
+
 - **The required Playwright job now runs one test with real authentication (#843, P1.61)**: every spec ran with `BYPASS_AUTH`, so nothing required exercised the chain a real user depends on: better-auth signs a cookie, the backend verifies it, finds the session, and scopes data to that user. That is the class of failure behind #556.
   - **Config.** `frontend/playwright.real-auth.config.ts` starts its own backend (port 8001) and frontend (port 3001, `next dev`) with the bypass explicitly off, against their own database (`auto_author_e2e_real_auth`).
   - **Spec.** `frontend/src/e2e/real-auth/sign-up-to-protected-api.spec.ts` signs up through the page, is refused a session until the address is verified, opens the verification link the server emailed (read from the development server's output, since no provider is configured), then calls protected endpoints: the profile carries the id better-auth gave the user, a created book is owned by that id, the bare session token without its signature is refused, and a second user signed up the same way sees none of the first user's books. It also sends a weak password straight to the server and expects 400.

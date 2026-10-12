@@ -319,6 +319,20 @@ describe('ExportBookPage download filenames', () => {
     await exportAndDownload('PDF Document');
     expect(anchors[anchors.length - 1].download).toBe('my_great_book.pdf');
   });
+
+  it('names the download after a non-Latin title instead of underscores (#804)', async () => {
+    mockBookClient.getBook = jest.fn().mockResolvedValue({ id: 'book-1', title: '書名' } as any);
+    renderPage();
+    await exportAndDownload('PDF Document');
+    expect(anchors[anchors.length - 1].download).toBe('書名.pdf');
+  });
+
+  it('does not revoke the blob URL in the same tick as the click (#804)', async () => {
+    renderPage();
+    await exportAndDownload('PDF Document');
+    expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(window.URL.revokeObjectURL).not.toHaveBeenCalled();
+  });
 });
 
 describe('ExportBookPage per-format options UI', () => {

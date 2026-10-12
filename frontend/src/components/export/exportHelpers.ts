@@ -5,6 +5,10 @@
 
 import { ExportFormat } from '@/types/export';
 
+// Long enough for a browser to start reading a large export; the blob is
+// held in memory until then.
+const BLOB_URL_LIFETIME_MS = 60_000;
+
 /**
  * Download a blob as a file
  *
@@ -35,7 +39,9 @@ export function downloadBlob(blob: Blob, filename: string): void {
 
   // Cleanup
   document.body.removeChild(link);
-  window.URL.revokeObjectURL(url);
+  // Not in this tick: the browser reads the blob after the click handler
+  // returns, and a URL revoked by then can fail the download (#804).
+  setTimeout(() => window.URL.revokeObjectURL(url), BLOB_URL_LIFETIME_MS);
 }
 
 /**
@@ -58,11 +64,14 @@ export function generateFilename(
   format: ExportFormat,
   extensionOverride?: string
 ): string {
-  // Sanitize title: lowercase, replace spaces/special chars with hyphens
-  const sanitized = bookTitle
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+  // Sanitize title: lowercase, replace spaces/special chars with hyphens.
+  // Letters and digits of any script are kept (#804): an ASCII-only filter
+  // left a CJK title with no name at all.
+  const sanitized =
+    bookTitle
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, '-')
+      .replace(/^-+|-+$/g, '') || 'book'; // Remove leading/trailing hyphens
 
   // 'markdown' uses the conventional .md extension; multi-file passes 'zip'.
   const extension = extensionOverride ?? (format === 'markdown' ? 'md' : format);
