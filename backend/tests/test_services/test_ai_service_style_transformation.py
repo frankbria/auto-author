@@ -5,6 +5,7 @@ The OpenAI boundary uses the autospec helper (issue #202) so every
 instead of a bare Mock that accepts anything.
 """
 import pytest
+from app.services.ai_errors import AIServiceError
 from app.services.ai_service import AIService
 from tests.test_services.openai_autospec import autospec_openai_client
 
@@ -51,10 +52,10 @@ class TestAIServiceStyleTransformation:
     @pytest.mark.asyncio
     async def test_openai_error_handled(self, ai_service):
         ai_service.client.chat.completions.create.side_effect = Exception("OpenAI down")
-        result = await ai_service.transform_text_style(content="Hello.", target_style="creative")
-        assert result["success"] is False
-        assert "OpenAI down" in result["error"]
-        assert result["transformed"] == ""
+        # Raised, not flattened into a dict: the route needs the kind of failure (#802).
+        with pytest.raises(AIServiceError) as exc:
+            await ai_service.transform_text_style(content="Hello.", target_style="creative")
+        assert "OpenAI down" not in exc.value.message
 
     @pytest.mark.asyncio
     async def test_truncated_output_is_rejected_not_saved(self, ai_service):

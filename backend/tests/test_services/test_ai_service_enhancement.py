@@ -1,6 +1,7 @@
 """Tests for AIService.enhance_text (issue #57)."""
 import pytest
 from unittest.mock import Mock, patch
+from app.services.ai_errors import AIServiceError
 from app.services.ai_service import AIService
 from openai import OpenAI
 
@@ -59,10 +60,10 @@ class TestAIServiceEnhancement:
     @pytest.mark.asyncio
     async def test_openai_error_handled(self, ai_service):
         ai_service.client.chat.completions.create.side_effect = Exception("OpenAI down")
-        result = await ai_service.enhance_text(content="Hello.", enhancement_type="tone")
-        assert result["success"] is False
-        assert "OpenAI down" in result["error"]
-        assert result["enhanced"] == ""
+        # Raised, not flattened into a dict: the route needs the kind of failure (#802).
+        with pytest.raises(AIServiceError) as exc:
+            await ai_service.enhance_text(content="Hello.", enhancement_type="tone")
+        assert "OpenAI down" not in exc.value.message
 
     @pytest.mark.asyncio
     async def test_truncated_output_is_rejected_not_saved(self, ai_service):

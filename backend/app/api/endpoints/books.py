@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 
 # Error handling utilities
 from app.utils.error_handlers import (
+    ai_error_http_exception,
     handle_book_not_found,
     handle_unauthorized_access,
     handle_validation_error,
@@ -79,11 +80,7 @@ from app.services.content_enhancement import (
     is_valid_enhancement,
 )
 from app.services.ai_errors import (
-    AIServiceError,
-    AIRateLimitError,
-    AINetworkError,
-    AIServiceUnavailableError,
-    AIInvalidRequestError
+    AIServiceError
 )
 from app.services.chapter_access_service import chapter_access_service
 from app.services.chapter_status_service import chapter_status_service
@@ -803,48 +800,8 @@ async def analyze_book_summary(
     except HTTPException:
         # Don't let the generic handler below turn our 4xx/5xx into an opaque 500.
         raise
-    except AIRateLimitError as e:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retry_after": e.retry_after,
-                "cached_content_available": e.cached_content_available,
-                "correlation_id": e.correlation_id,
-            },
-        )
-    except (AIServiceUnavailableError, AINetworkError) as e:
-        # Timeouts surface from ai_service as AINetworkError after retries.
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retry_after": getattr(e, "retry_after", None),
-                "retryable": getattr(e, "retryable", True),
-                "correlation_id": e.correlation_id,
-            },
-        )
-    except AIInvalidRequestError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "correlation_id": e.correlation_id,
-            },
-        )
     except AIServiceError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retryable": e.retryable,
-                "correlation_id": e.correlation_id,
-            },
-        )
+        raise ai_error_http_exception(e)
     except Exception:
         logger.error("Error analyzing summary", exc_info=True)
         raise HTTPException(
@@ -917,62 +874,8 @@ async def generate_clarifying_questions(
             "total_questions": len(questions),
         }
 
-    except AIRateLimitError as e:
-        # Rate limit error - return 429 with retry information
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retry_after": e.retry_after,
-                "cached_content_available": e.cached_content_available,
-                "correlation_id": e.correlation_id
-            }
-        )
-    except AIServiceUnavailableError as e:
-        # Service unavailable - return 503
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retry_after": e.retry_after,
-                "cached_content_available": e.cached_content_available,
-                "correlation_id": e.correlation_id
-            }
-        )
-    except AINetworkError as e:
-        # Network error - return 503
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retryable": e.retryable,
-                "correlation_id": e.correlation_id
-            }
-        )
-    except AIInvalidRequestError as e:
-        # Invalid request - return 400
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "correlation_id": e.correlation_id
-            }
-        )
     except AIServiceError as e:
-        # Generic AI service error - return 500 with structured info
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retryable": e.retryable,
-                "correlation_id": e.correlation_id
-            }
-        )
+        raise ai_error_http_exception(e)
     except Exception:
         logger.error("Unexpected error generating questions", exc_info=True)
         raise HTTPException(
@@ -1245,57 +1148,8 @@ async def generate_table_of_contents(
             "success": toc_result["success"],
         }
 
-    except AIRateLimitError as e:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retry_after": e.retry_after,
-                "cached_content_available": e.cached_content_available,
-                "correlation_id": e.correlation_id
-            }
-        )
-    except AIServiceUnavailableError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retry_after": e.retry_after,
-                "cached_content_available": e.cached_content_available,
-                "correlation_id": e.correlation_id
-            }
-        )
-    except AINetworkError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retryable": e.retryable,
-                "correlation_id": e.correlation_id
-            }
-        )
-    except AIInvalidRequestError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "correlation_id": e.correlation_id
-            }
-        )
     except AIServiceError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retryable": e.retryable,
-                "correlation_id": e.correlation_id
-            }
-        )
+        raise ai_error_http_exception(e)
     except Exception:
         logger.error("Unexpected error generating TOC", exc_info=True)
         raise HTTPException(
@@ -2760,47 +2614,8 @@ async def generate_chapter_draft(
     # only the generic handler below, so once ai_service stopped flattening
     # AIServiceError into a dict, a rate limit would have surfaced as an opaque
     # 500 with no retry_after (#352).
-    except AIRateLimitError as e:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retry_after": e.retry_after,
-                "cached_content_available": e.cached_content_available,
-                "correlation_id": e.correlation_id,
-            },
-        )
-    except (AIServiceUnavailableError, AINetworkError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retry_after": getattr(e, "retry_after", None),
-                "retryable": getattr(e, "retryable", True),
-                "correlation_id": e.correlation_id,
-            },
-        )
-    except AIInvalidRequestError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "correlation_id": e.correlation_id,
-            },
-        )
     except AIServiceError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "message": e.message,
-                "error_code": e.error_code,
-                "retryable": e.retryable,
-                "correlation_id": e.correlation_id,
-            },
-        )
+        raise ai_error_http_exception(e)
     except Exception:
         logger.error("Error generating draft", exc_info=True)
         raise HTTPException(
@@ -2875,9 +2690,12 @@ async def transform_chapter_style(
             ),
         )
 
-    result = await ai_service.transform_text_style(
-        content=content, target_style=target_style
-    )
+    try:
+        result = await ai_service.transform_text_style(
+            content=content, target_style=target_style
+        )
+    except AIServiceError as e:
+        raise ai_error_http_exception(e)
 
     if not result.get("success"):
         raise _rewrite_failure(result, "transform style")
@@ -2953,9 +2771,12 @@ async def enhance_chapter_text(
             ),
         )
 
-    result = await ai_service.enhance_text(
-        content=content, enhancement_type=enhancement_type
-    )
+    try:
+        result = await ai_service.enhance_text(
+            content=content, enhancement_type=enhancement_type
+        )
+    except AIServiceError as e:
+        raise ai_error_http_exception(e)
 
     if not result.get("success"):
         raise _rewrite_failure(result, "enhance text")
@@ -3025,7 +2846,10 @@ async def enhance_chapter_transcription(
             detail="Transcription is required for cleanup.",
         )
 
-    result = await ai_service.enhance_transcription(content=content)
+    try:
+        result = await ai_service.enhance_transcription(content=content)
+    except AIServiceError as e:
+        raise ai_error_http_exception(e)
 
     if not result.get("success"):
         raise _rewrite_failure(result, "clean up transcription")

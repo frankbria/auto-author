@@ -268,8 +268,8 @@ class AIService:
                 logger.error(
                     f"Invalid request to AI service: {str(e)} [correlation_id={correlation_id}]"
                 )
+                # The provider's text stays in the log line above (#802).
                 raise AIInvalidRequestError(
-                    message=f"Invalid request: {str(e)}",
                     original_exception=e,
                     correlation_id=correlation_id
                 )
@@ -292,7 +292,7 @@ class AIService:
                     f"Unexpected error in AI service: {str(e)} [correlation_id={correlation_id}]"
                 )
                 raise AIServiceError(
-                    message=f"Unexpected AI service error: {str(e)}",
+                    message="The AI service failed unexpectedly",
                     error_code="AI_UNEXPECTED_ERROR",
                     original_exception=e,
                     correlation_id=correlation_id
@@ -1221,11 +1221,14 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 },
             }
 
-        except Exception as e:
-            logger.error(f"Failed to transform text style: {str(e)}")
+        except AIServiceError:
+            # The route turns it into its status: a 429 stays a 429 (#802).
+            raise
+        except Exception:
+            logger.error("Failed to transform text style", exc_info=True)
             return {
                 "success": False,
-                "error": str(e),
+                "error": "The request could not be completed.",
                 "transformed": "",
                 "metadata": {},
             }
@@ -1331,11 +1334,14 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 },
             }
 
-        except Exception as e:
-            logger.error(f"Failed to enhance text: {str(e)}")
+        except AIServiceError:
+            # The route turns it into its status: a 429 stays a 429 (#802).
+            raise
+        except Exception:
+            logger.error("Failed to enhance text", exc_info=True)
             return {
                 "success": False,
-                "error": str(e),
+                "error": "The request could not be completed.",
                 "enhanced": "",
                 "metadata": {},
             }
@@ -1425,11 +1431,14 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 },
             }
 
-        except Exception as e:
-            logger.error(f"Failed to enhance transcription: {str(e)}")
+        except AIServiceError:
+            # The route turns it into its status: a 429 stays a 429 (#802).
+            raise
+        except Exception:
+            logger.error("Failed to enhance transcription", exc_info=True)
             return {
                 "success": False,
-                "error": str(e),
+                "error": "The request could not be completed.",
                 "enhanced": "",
                 "metadata": {},
             }
