@@ -120,10 +120,25 @@ export default function TwoFactorSetup() {
         setLocalEnabledOverride(false);
         setStep('idle');
         toast({ title: 'Two-factor authentication disabled' });
+        await signOutOtherDevices();
       }
     } finally {
       setIsSubmitting(false);
       setPassword('');
+    }
+  };
+
+  // A second-factor change ends every other session (#793): one an attacker
+  // already holds would otherwise outlive the change meant to lock them out.
+  // better-auth rotates only the session that made the change.
+  const signOutOtherDevices = async () => {
+    const { error } = await authClient.revokeOtherSessions();
+    if (error) {
+      toast({
+        title: 'Other devices are still signed in',
+        description: 'Use "Sign out other devices" under Active Sessions to end them.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -151,6 +166,7 @@ export default function TwoFactorSetup() {
         title: 'Two-factor authentication enabled',
         description: 'Store your backup codes somewhere safe.',
       });
+      await signOutOtherDevices();
     } finally {
       setIsSubmitting(false);
     }
