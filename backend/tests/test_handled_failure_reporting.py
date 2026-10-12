@@ -199,6 +199,19 @@ class TestADeletedUsersFilesStillInStorage:
         assert _kinds(reports) == ["delete-files"]
         assert SENTINEL not in _said(reports)
 
+    async def test_an_avatar_that_could_not_be_deleted_when_the_account_is_closed(self, motor_reinit_db, reports):
+        from app.services.file_upload_service import FileUploadService
+
+        await user_dao.create_user(
+            {"auth_id": "auth-closing", "email": "closing@example.com", "avatar_url": f"/uploads/{SENTINEL}.png"}
+        )
+        with patch.object(FileUploadService, "delete_profile_picture", AsyncMock(side_effect=RuntimeError("storage is down"))):
+            closed = await user_dao.delete_user("auth-closing")
+
+        assert closed is True, "the account is still closed; only the file was left behind"
+        assert _kinds(reports) == ["delete-files"]
+        assert SENTINEL not in _said(reports)
+
     async def test_books_that_could_not_be_deleted_for_a_user(self, reports):
         broken = MagicMock()
         broken.delete_many = AsyncMock(side_effect=RuntimeError("database is away"))
@@ -221,4 +234,23 @@ class TestACustomerBilledTwice:
         assert response.json()["status"] == "not_current_subscription"
         assert [r["fingerprint"] for r in reports] == [["stripe-webhook", "second-subscription"]]
         assert "evt_second_sub" in reports[0]["message"]
+        assert "auth-stripe-1" not in _said(reports) and "cus_test_1" not in _said(reports)
+
+    @pytest.mark.parametrize(
+        "delivery, kind",
+        [
+            ({"status": "a_status_stripe_added_later"}, "unknown-status"),
+            ({"price_id": "price_nobody_configured"}, "price-not-matched"),
+        ],
+        ids=["a status this app does not know", "a paying subscription that matches no price"],
+    )
+    async def test_so_are_the_two_ways_a_paying_user_ends_up_on_the_wrong_plan(self, webhook_client, reports, delivery, kind):
+        await stripe_tests._seed_pro_on("sub_A")
+
+        await stripe_tests._post_signed(
+            webhook_client, stripe_tests.event(event_id="evt_wrong_plan", subscription_id="sub_A", **delivery)
+        )
+
+        assert [r["fingerprint"] for r in reports] == [["stripe-webhook", kind]]
+        assert "evt_wrong_plan" in reports[0]["message"]
         assert "auth-stripe-1" not in _said(reports) and "cus_test_1" not in _said(reports)

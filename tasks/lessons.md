@@ -1524,3 +1524,6 @@ Eight routes log "Failed to log chapter content access" and carry on. I read the
 ### A handled error's text is still an error's text (#996)
 Reporting a caught database error by hand sends its message. For the demo's failed insert that was "Document failed validation, full error: {…}", and the part after the comma is the server's whole answer, which for a schema rule includes the value that failed. The scrubber already cut a duplicate-key message for the same reason. Each new way of sending an exception to Sentry needs the question asked again: what does this library put in the message?
 
+### A test that runs the app's real start-up also runs its shutdown (#996)
+Three new tests ran `main.lifespan()` to drive the start-up failures. They passed, and 86 export tests later in the same run failed with "cannot schedule new futures after shutdown": the lifespan's shutdown closes the shared export thread pool. Only the commit hook's whole-suite run showed it; the file on its own was green. One existing test already ran the lifespan, with a comment saying exactly this and a throwaway pool to hand it. Before using a piece of the app's machinery in a test, grep for a test that already does, and run the new file followed by the rest of the suite, not alone.
+
