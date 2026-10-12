@@ -13,12 +13,9 @@ import logging
 import os
 from pathlib import Path
 from app.api.request_validation import RequestValidationMiddleware
+from app.core.request_context import configure_logging
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+configure_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -52,9 +49,10 @@ def _init_sentry() -> None:
     """Initialize Sentry error tracking (issue #334).
 
     Inert when SENTRY_DSN is unset — no events are sent, so CI/local/tests are
-    unaffected. When set (staging/prod), an unhandled 500 reaches Sentry once:
-    the global exception handler below reports it, the SDK's Starlette
-    integration would report it too, and the SDK drops the second as a duplicate.
+    unaffected. When set (staging/prod), an unhandled 500 reaches Sentry once,
+    from the global exception handler below. The request middleware answers the
+    failure by calling that handler (#810), so the exception never travels on to
+    where the SDK's own Starlette integration would see it.
     """
     if not settings.SENTRY_DSN:
         return
@@ -236,6 +234,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# The last one added is the outermost. CORS has to be outside the request
+# middleware, which is where an unhandled failure becomes a response: a 500
+# made outside CORS carries no CORS headers and the page cannot read it (#810).
+app.add_middleware(RequestValidationMiddleware)
+
 # Set up CORS
 app.add_middleware(
     CORSMiddleware,
@@ -244,11 +247,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     # What a page on the frontend's origin may read on a refusal (#803): when
-    # to come back, and which AI allowance ran out.
-    expose_headers=["Retry-After", "X-AI-Quota-Limit", "X-AI-Quota-Period"],
+    # to come back, and which AI allowance ran out. And the request's id, which
+    # is the reference the user is shown (#810).
+    expose_headers=["Retry-After", "X-AI-Quota-Limit", "X-AI-Quota-Period", "X-Request-ID"],
 )
-
-app.add_middleware(RequestValidationMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
@@ -338,6 +340,8 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "detail": "An unexpected error occurred",
+            # What the user can quote and the logs and the error report carry (#810).
+            "request_id": getattr(request.state, "request_id", None),
         },
     )
 

@@ -11,7 +11,7 @@ import {
   ERROR_TYPE_TO_SEVERITY,
   DEFAULT_RETRY_CONFIG,
 } from './types';
-import { generateCorrelationId } from './utils';
+import { generateCorrelationId, requestIdOf } from './utils';
 
 /**
  * Classify an error and determine handling strategy
@@ -24,7 +24,9 @@ export function classifyError(
   error: unknown,
   context?: string
 ): ClassifiedError {
-  const correlationId = generateCorrelationId();
+  // The server's id for the request when there is one, so the Reference ID
+  // matches the server's logs (#810). A request that got no answer has none.
+  const correlationId = requestIdOf(error) ?? generateCorrelationId();
   const timestamp = new Date();
 
   // Handle API errors with status codes
@@ -124,7 +126,6 @@ export function classifyError(
     timestamp,
     originalError: error instanceof Error ? error : undefined,
     suggestedActions: [
-      `Reference ID: ${correlationId}`,
       'Try refreshing the page',
       'Contact support if the problem persists',
     ],

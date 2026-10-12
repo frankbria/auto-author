@@ -4,7 +4,7 @@
  */
 
 import { showErrorNotification } from '@/components/errors/ErrorNotification';
-import { ErrorType, ErrorSeverity } from '@/lib/errors';
+import { ErrorType, ErrorSeverity, requestIdOf } from '@/lib/errors';
 
 /**
  * AI Service error response structure
@@ -216,7 +216,7 @@ export async function handleAIServiceError<T>(
         details: userMessage,
         statusCode: errorDetails.status_code,
         retryable: false,
-        correlationId: `entitlement-${Date.now()}`,
+        correlationId: requestIdOf(error) ?? `entitlement-${Date.now()}`,
         timestamp: new Date(),
         suggestedActions: [
           'Upgrade your plan to unlock this feature',
@@ -249,7 +249,7 @@ export async function handleAIServiceError<T>(
         details: errorDetails.message,
         statusCode: 429,
         retryable: false,
-        correlationId: `ai-quota-${Date.now()}`,
+        correlationId: requestIdOf(error) ?? `ai-quota-${Date.now()}`,
         timestamp: new Date(),
         suggestedActions: [],
       },
@@ -270,7 +270,7 @@ export async function handleAIServiceError<T>(
         details: 'AI service temporarily unavailable. Showing cached content from previous generation.',
         statusCode: errorDetails.status_code,
         retryable: retryable,
-        correlationId: `ai-cache-${Date.now()}`,
+        correlationId: requestIdOf(error) ?? `ai-cache-${Date.now()}`,
         timestamp: new Date(),
         suggestedActions: retryable && onRetry
           ? ['The cached content below is from a previous generation', 'Click retry to generate fresh content when available']
@@ -318,7 +318,7 @@ export async function handleAIServiceError<T>(
       details: userMessage,
       statusCode: errorDetails.status_code,
       retryable,
-      correlationId: `ai-error-${Date.now()}`,
+      correlationId: requestIdOf(error) ?? `ai-error-${Date.now()}`,
       timestamp: new Date(),
       suggestedActions,
     },

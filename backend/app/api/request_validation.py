@@ -5,6 +5,10 @@ import uuid
 from typing import Callable
 import logging
 
+import sentry_sdk
+
+from app.core.request_context import request_id_var
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,6 +29,9 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         # Generate a unique request ID
         request_id = str(uuid.uuid4())
         request.state.request_id = request_id
+        # For every log line, error body and error report made on the way (#810).
+        request_id_var.set(request_id)
+        sentry_sdk.set_tag("request_id", request_id)
 
         # Log request info
         client_host = request.client.host if request.client else "unknown"
@@ -39,36 +46,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         try:
             # Process the request
             response = await call_next(request)
-
-            # Add security headers
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["X-Frame-Options"] = "DENY"
-            response.headers["X-XSS-Protection"] = "1; mode=block"
-            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-            response.headers["X-Request-ID"] = request_id
-
-            # Set Content Security Policy
-            # Includes Swagger UI and other trusted resources
-            response.headers["Content-Security-Policy"] = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "img-src 'self' data: https://fastapi.tiangolo.com; "
-                "connect-src 'self'; "
-                "frame-src 'self'; "
-                "font-src 'self' data: https://r2cdn.perplexity.ai;"
-            )
-
-            # Calculate and log request duration
-            process_time = (time.time() - start_time) * 1000
-            logger.info(
-                f"Request completed: {request.method} {request.url.path} "
-                f"[ID: {request_id}] - Status: {response.status_code}, "
-                f"Took: {process_time:.2f}ms"
-            )
-
-            return response
-
         except Exception as e:
             # Log exceptions
             process_time = (time.time() - start_time) * 1000
@@ -77,4 +54,39 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 f"[ID: {request_id}] - Error: {str(e)}, "
                 f"Took: {process_time:.2f}ms"
             )
-            raise
+            # Answered here instead of re-raised (#810). A response made
+            # outside this middleware passes no CORS middleware, so a page on
+            # the frontend's origin could not read a 500 at all.
+            handler = request.app.exception_handlers.get(Exception)
+            if handler is None:
+                raise
+            response = await handler(request, e)
+
+        # Add security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["X-Request-ID"] = request_id
+
+        # Set Content Security Policy
+        # Includes Swagger UI and other trusted resources
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://fastapi.tiangolo.com; "
+            "connect-src 'self'; "
+            "frame-src 'self'; "
+            "font-src 'self' data: https://r2cdn.perplexity.ai;"
+        )
+
+        # Calculate and log request duration
+        process_time = (time.time() - start_time) * 1000
+        logger.info(
+            f"Request completed: {request.method} {request.url.path} "
+            f"[ID: {request_id}] - Status: {response.status_code}, "
+            f"Took: {process_time:.2f}ms"
+        )
+
+        return response

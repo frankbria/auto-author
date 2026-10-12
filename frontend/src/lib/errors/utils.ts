@@ -13,6 +13,15 @@ export function generateCorrelationId(): string {
 }
 
 /**
+ * The server's id for the request that failed, when the error carries one
+ * (#810). It is what the server's logs and error report are filed under.
+ */
+export function requestIdOf(error: unknown): string | undefined {
+  const id = (error as { requestId?: unknown } | null)?.requestId;
+  return typeof id === 'string' && id ? id : undefined;
+}
+
+/**
  * Calculate retry delay with exponential backoff
  *
  * @param attempt - Current attempt number (0-indexed)

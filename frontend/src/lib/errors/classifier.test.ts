@@ -235,10 +235,12 @@ describe('classifyError – generic errors', () => {
     expect(result.details).toBe('An unexpected error occurred');
   });
 
-  it('includes a correlationId reference in suggestedActions', () => {
+  it('leaves the Reference ID to the notification, which prints it once (#810)', () => {
+    // It was also a suggested action, and the toast printed both.
     const result = classifyError(new Error('boom'));
-    const hasRef = result.suggestedActions?.some((a) => a.includes('Reference ID:'));
-    expect(hasRef).toBe(true);
+
+    expect(result.correlationId).toBeTruthy();
+    expect(result.suggestedActions).toEqual(['Try refreshing the page', 'Contact support if the problem persists']);
   });
 });
 

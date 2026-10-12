@@ -32,6 +32,18 @@ import { BookResponse, toBookProject } from '@/types/book';
 import { ExportTemplate, TemplateCustomization } from '@/types/export';
 import { apiFetch } from '@/lib/api/unauthorized';
 
+/** Give an error the server's id for the request that failed (#810). */
+function withRequestId<E extends Error>(error: E, response: Response): E {
+  const requestId = response.headers?.get?.('X-Request-ID');
+  return requestId ? Object.assign(error, { requestId }) : error;
+}
+
+/** The error for a failed response: what failed, the status and, unless told not to, the body. */
+async function failure(response: Response, what: string, withBody = true): Promise<Error> {
+  const body = withBody ? ` ${await response.text()}` : '';
+  return withRequestId(new Error(`${what}: ${response.status}${body}`), response);
+}
+
 /** A content save rejected because the chapter was saved elsewhere (#760). */
 export type ChapterSaveConflict = Error & {
   statusCode: 409;
@@ -216,7 +228,7 @@ export class BookClient {
     err.retryAfter = retryAfter ?? (seconds > 0 ? seconds : undefined);
     // Set on the 429 for an exhausted AI allowance, and only on that one.
     err.quotaPeriod = headers?.get?.('X-AI-Quota-Period') ?? undefined;
-    return err;
+    return withRequestId(err, response);
   }
 
   /**
@@ -240,7 +252,7 @@ export class BookClient {
     ) as Error & { statusCode: number; userMessage?: string };
     err.statusCode = response.status;
     err.userMessage = message;
-    return err;
+    return withRequestId(err, response);
   }
 
   /**
@@ -294,7 +306,7 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      throw new Error(`Failed to fetch books: ${response.status}`);
+      throw await failure(response, 'Failed to fetch books', false);
     }
     // BookResponse carries no chapters/progress; compute them from toc_items so
     // BookCard never renders "undefined chapters" or a fabricated progress bar
@@ -350,7 +362,7 @@ export class BookClient {
       if (response.status === 401 || response.status === 403) {
         throw new Error('You are not authorized to view this book. Please check your login or permissions.');
       }
-      throw new Error(`Failed to fetch book: ${response.status}`);
+      throw await failure(response, 'Failed to fetch book', false);
     }
     return response.json();
   }
@@ -417,8 +429,7 @@ export class BookClient {
       body: JSON.stringify(bookData),
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to create book: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to create book');
     }
     return response.json();
   }
@@ -485,8 +496,7 @@ export class BookClient {
       body: JSON.stringify(bookData),
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to update book: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to update book');
     }
     return response.json();
   }
@@ -546,8 +556,7 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to delete book: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to delete book');
     }
   }
 
@@ -845,8 +854,7 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get TOC: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get TOC');
     }
     return response.json();
   }
@@ -960,8 +968,7 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to fetch book summary: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to fetch book summary');
     }
     return response.json();
   }
@@ -998,8 +1005,7 @@ export class BookClient {
       body: JSON.stringify({ summary }),
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to save book summary: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to save book summary');
     }
     return response.json();
   }
@@ -1020,8 +1026,7 @@ export class BookClient {
       body: JSON.stringify({ responses }),
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to save question responses: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to save question responses');
     }
     return response.json();
   }
@@ -1043,8 +1048,7 @@ export class BookClient {
       if (response.status === 404) {
         return { responses: [], status: 'not_provided' };
       }
-      const error = await response.text();
-      throw new Error(`Failed to get question responses: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get question responses');
     }
     return response.json();
   }
@@ -1093,7 +1097,7 @@ export class BookClient {
           currentContent: conflict.current_content,
         }) satisfies ChapterSaveConflict;
       }
-      throw new Error(`Failed to save chapter content: ${response.status} ${error}`);
+      throw withRequestId(new Error(`Failed to save chapter content: ${response.status} ${error}`), response);
     }
     return response.json();
   }
@@ -1130,8 +1134,7 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get chapter content: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get chapter content');
     }
     return response.json();
   }
@@ -1166,8 +1169,7 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get chapters metadata: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get chapters metadata');
     }
     return response.json();
   }
@@ -1186,8 +1188,7 @@ export class BookClient {
       })
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to update chapter status: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to update chapter status');
     }
     return response.json();
   }
@@ -1206,8 +1207,7 @@ export class BookClient {
       })
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to update bulk chapter status: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to update bulk chapter status');
     }
     return response.json();
   }
@@ -1232,8 +1232,7 @@ export class BookClient {
       })
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to save tab state: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to save tab state');
     }
     return response.json();
   }
@@ -1253,8 +1252,7 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get tab state: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get tab state');
     }
     return response.json();
   }
@@ -1481,8 +1479,7 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get questions: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get questions');
     }
     return response.json();
   }
@@ -1506,8 +1503,7 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to save question response: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to save question response');
     }
     return response.json();
   }
@@ -1528,8 +1524,7 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get question response: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get question response');
     }
     return response.json();
   }
@@ -1624,8 +1619,7 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to save question responses batch: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to save question responses batch');
     }
     return response.json();
   }
@@ -1649,8 +1643,7 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to rate question: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to rate question');
     }
     return response.json();
   }
@@ -1670,8 +1663,7 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get question progress: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get question progress');
     }
     return response.json();
   }
@@ -1913,8 +1905,7 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get export formats: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get export formats');
     }
 
     return response.json();
@@ -1933,8 +1924,7 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get export templates: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to get export templates');
     }
 
     const data = await response.json();
@@ -1969,8 +1959,7 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to create chapter: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to create chapter');
     }
 
     return await response.json();
@@ -1990,8 +1979,7 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to delete chapter: ${response.status} ${error}`);
+      throw await failure(response, 'Failed to delete chapter');
     }
   }
 

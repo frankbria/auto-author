@@ -19,12 +19,15 @@ from app.services.ai_errors import (
 import logging
 import uuid
 
+from app.core.request_context import NO_REQUEST, request_id_var
+
 logger = logging.getLogger(__name__)
 
 
 def generate_request_id() -> str:
-    """Generate a unique request ID for error tracking"""
-    return f"req_{uuid.uuid4().hex[:12]}"
+    """The id of the request being handled (#810), or a new one outside a request."""
+    current = request_id_var.get()
+    return current if current != NO_REQUEST else f"req_{uuid.uuid4().hex[:12]}"
 
 
 def handle_book_not_found(

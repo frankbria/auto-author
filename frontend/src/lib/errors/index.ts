@@ -34,6 +34,7 @@ export type { HandleApiCallOptions } from './handler';
 // Utilities
 export {
   generateCorrelationId,
+  requestIdOf,
   calculateRetryDelay,
   sleep,
   canRetry,
