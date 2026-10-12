@@ -8,13 +8,14 @@ name: Staging Health Probe
 # with retries; a failure opens or comments on one `ci-alert:staging-health`
 # issue (scripts/ci-alert-issue.sh, #776) and the next healthy run closes it.
 #
-# Every 6 hours at :23 (off the top of the hour, when scheduled runs queue).
-# The alert comments once per failing run, so a tighter cadence would mostly
-# add comments to an issue that is already open.
+# Every 15 minutes (#811): the #537 credential outage went unnoticed for days,
+# and at six hours an outage could still run most of a working day unseen.
+# While the issue is open a failing run adds a comment only after six quiet
+# hours (ALERT_QUIET_HOURS), so the cadence does not flood it.
 
 on:
   schedule:
-    - cron: '23 */6 * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -51,6 +52,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           ALERT_LABEL: ci-alert:staging-health
           ALERT_TITLE: '[P0.27.1] Staging health probe is failing'
+          ALERT_QUIET_HOURS: '6'
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           OUTCOME: ${{ steps.probe.outcome }}
         run: |

@@ -76,6 +76,10 @@ def test_health_probe_is_scheduled_ai_free_and_alerts_with_its_own_label():
     assert "steps.probe.outcome == 'success'" in alert["if"]
     assert alert["env"]["ALERT_LABEL"] == "ci-alert:staging-health"
     assert alert["env"]["ALERT_TITLE"].startswith("[P0.27.1] ")
+    # P1.29 (#811): an outage is noticed within a quarter of an hour, and the
+    # open issue is not given a comment by every one of those runs.
+    assert [entry["cron"] for entry in on["schedule"]] == ["*/15 * * * *"]
+    assert int(alert["env"]["ALERT_QUIET_HOURS"]) >= 1
 
 
 class Staging(BaseHTTPRequestHandler):

@@ -6,6 +6,7 @@ the stub's `issue list` answer is driven by FAKE_OPEN so each state is covered.
 
 import os
 import subprocess
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -16,11 +17,19 @@ WORKFLOW = REPO / ".github" / "workflows" / "e2e-staging-tests.yml"
 
 STUB = """#!/bin/sh
 echo "$@" >> "$GH_LOG"
-if [ "$1" = "api" ]; then echo "$FAKE_OPEN"; fi
+case "$1 $2" in
+  "api repos/o/r/issues?"*) echo "$FAKE_OPEN" ;;
+  "api repos/o/r/issues/"*) [ -z "${FAKE_UPDATED_FAILS:-}" ] || exit 1; echo "$FAKE_UPDATED" ;;
+esac
 """
 
 
-def run(tmp_path, mode, open_issue=""):
+def hours_ago(hours):
+    then = datetime.now(timezone.utc) - timedelta(hours=hours)
+    return then.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def run(tmp_path, mode, open_issue="", **extra):
     gh = tmp_path / "gh"
     gh.write_text(STUB)
     gh.chmod(0o755)
@@ -34,6 +43,7 @@ def run(tmp_path, mode, open_issue=""):
         "ALERT_LABEL": "ci-alert:test",
         "ALERT_TITLE": "[P0.28] Test alert",
         "RUN_URL": "https://example.test/run/1",
+        **extra,
     }
     subprocess.run(["sh", str(SCRIPT), mode], env=env, check=True)
     return log.read_text().splitlines() if log.exists() else []
@@ -57,6 +67,38 @@ def test_repeated_failure_comments_instead_of_creating(tmp_path):
     assert "labels=ci-alert:test&state=open" in lookup
     assert writes(lines) == ["issue comment"]
     assert lines[-1].startswith("issue comment 42")
+
+
+# P1.29 (#811): the health probe runs every 15 minutes. Commenting on every
+# failing run would be 96 comments a day on an issue that is already open.
+def test_a_repeat_failure_inside_the_quiet_period_writes_nothing(tmp_path):
+    lines = run(tmp_path, "failure", open_issue="42", ALERT_QUIET_HOURS="6", FAKE_UPDATED=hours_ago(1))
+
+    assert any(line.startswith("api repos/o/r/issues/42") for line in lines), "it has to ask when the issue last changed"
+    assert writes(lines) == []
+
+
+def test_a_repeat_failure_after_the_quiet_period_comments_once_more(tmp_path):
+    lines = run(tmp_path, "failure", open_issue="42", ALERT_QUIET_HOURS="6", FAKE_UPDATED=hours_ago(7))
+
+    assert writes(lines) == ["issue comment"]
+
+
+def test_when_the_issue_cannot_be_read_the_failure_is_still_reported(tmp_path):
+    """Not knowing when it last changed must not silence the alert or fail the step."""
+    lines = run(tmp_path, "failure", open_issue="42", ALERT_QUIET_HOURS="6", FAKE_UPDATED_FAILS="1")
+
+    assert writes(lines) == ["issue comment"]
+
+
+def test_the_first_failure_opens_the_issue_whatever_the_quiet_period(tmp_path):
+    assert writes(run(tmp_path, "failure", ALERT_QUIET_HOURS="6")) == ["label create", "issue create"]
+
+
+def test_recovery_closes_at_once_even_inside_the_quiet_period(tmp_path):
+    lines = run(tmp_path, "recovery", open_issue="42", ALERT_QUIET_HOURS="6", FAKE_UPDATED=hours_ago(1))
+
+    assert writes(lines) == ["issue comment", "issue close"]
 
 
 def test_recovery_comments_and_closes_open_issue(tmp_path):
