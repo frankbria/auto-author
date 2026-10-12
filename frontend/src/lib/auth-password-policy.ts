@@ -3,6 +3,7 @@ import { isPasswordValid } from "./password-policy";
 
 // The request field that carries a NEW password, by better-auth endpoint.
 // Sign-in is absent on purpose: an existing account's password is not judged.
+// An endpoint added later that sets a password (an admin plugin, say) belongs here.
 const NEW_PASSWORD_FIELD = new Map([
   ["/sign-up/email", "password"],
   ["/reset-password", "newPassword"],

@@ -66,9 +66,11 @@ function createAuthInstance(database: Db) {
             // No address in either line (#794): logs outlive and outreach the user record.
             console.log("Password reset email sent");
           } catch (error) {
+            // A provider's error can echo the recipient in any case or
+            // encoding, so anything address-shaped is masked.
             console.error(
               "Failed to send password reset email:",
-              String(error).replaceAll(user.email, "[address]")
+              String(error).replace(/[^\s"'<>]+(?:@|%40)[^\s"'<>]+/gi, "[address]")
             );
           }
         })();

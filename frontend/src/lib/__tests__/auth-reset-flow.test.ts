@@ -77,7 +77,13 @@ describe('The reset email is sent without logging the address (issue #794)', () 
 
   it.each([
     ['sent', () => Promise.resolve()],
-    ['not sent', () => Promise.reject(new Error('provider down for reset-me@example.com'))],
+    [
+      'not sent',
+      () =>
+        Promise.reject(
+          new Error('rejected reset-me@example.com, RESET-ME@EXAMPLE.COM and reset-me%40example.com')
+        ),
+    ],
   ])('keeps the address out of the log when the email is %s', async (_case, outcome) => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -95,6 +101,7 @@ describe('The reset email is sent without logging the address (issue #794)', () 
       expect.objectContaining({ to: 'reset-me@example.com' })
     );
     const logged = JSON.stringify([...log.mock.calls, ...error.mock.calls.map((c) => c.map(String))]);
-    expect(logged).not.toContain('reset-me@example.com');
+    expect(logged).not.toMatch(/reset-me(@|%40)example\.com/i);
+    if (_case === 'not sent') expect(logged).toContain('rejected [address] [address] and [address]');
   });
 });

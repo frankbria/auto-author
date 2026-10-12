@@ -11,7 +11,8 @@ export interface PasswordValidation {
 }
 
 /**
- * Validates a password against all requirements
+ * Validates a password against all requirements. The letter classes are ASCII
+ * on purpose: this is the rule the pages have always shown, unchanged.
  */
 export function validatePassword(password: string): PasswordValidation {
   return {
