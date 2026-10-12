@@ -119,6 +119,7 @@ describe('TwoFactorSetup', () => {
     });
     mockVerifyTotp.mockResolvedValue({ data: {}, error: null });
     mockTwoFactorDisable.mockResolvedValue({ data: {}, error: null });
+    mockRevokeOtherSessions.mockResolvedValue({ data: {}, error: null });
   });
 
   it('walks through enable: password → QR + backup codes → verify', async () => {
@@ -150,6 +151,31 @@ describe('TwoFactorSetup', () => {
       expect(mockVerifyTotp).toHaveBeenCalledWith({ code: '123456' })
     );
     await waitFor(() => expect(screen.getByText('Enabled')).toBeInTheDocument());
+    // #793: a session someone else already holds must not outlive the change.
+    expect(mockRevokeOtherSessions).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves other sessions alone when the verification code is wrong (#793)', async () => {
+    mockVerifyTotp.mockResolvedValue({ data: null, error: { message: 'Invalid code' } });
+    render(<TwoFactorSetup />);
+    fireEvent.click(screen.getByRole('button', { name: /enable 2fa/i }));
+    fireEvent.change(screen.getByLabelText('Confirm your password'), {
+      target: { value: 'my-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+    await waitFor(() => expect(mockTwoFactorEnable).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText('Verification Code'), {
+      target: { value: '000000' },
+    });
+    fireEvent.click(screen.getByLabelText(/i.ve saved my backup codes/i));
+    fireEvent.click(screen.getByRole('button', { name: /verify & enable/i }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Invalid code', variant: 'destructive' })
+      )
+    );
+    expect(mockRevokeOtherSessions).not.toHaveBeenCalled();
   });
 
   it('refuses to start setup when the server returns a non-TOTP method', async () => {
@@ -356,6 +382,61 @@ describe('TwoFactorSetup', () => {
     );
     // Status flips locally even though the session flag is stale until refetch
     await waitFor(() => expect(screen.getByText('Disabled')).toBeInTheDocument());
+    // #793: disabling needs only the password, so it ends other sessions too.
+    expect(mockRevokeOtherSessions).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['the server refuses', () => Promise.resolve({ data: null, error: { message: 'boom' } })],
+    ['the request never arrives', () => Promise.reject(new Error('Failed to fetch'))],
+  ])('says so when 2FA changed but %s and other devices stay signed in (#793)', async (_case, answer) => {
+    mockRevokeOtherSessions.mockImplementation(answer);
+    mockUseSession.mockReturnValue({
+      data: {
+        user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: true },
+        session: { token: 'tok' },
+      },
+    });
+    render(<TwoFactorSetup />);
+    fireEvent.click(screen.getByRole('button', { name: /disable 2fa/i }));
+    fireEvent.change(screen.getByLabelText('Confirm your password'), {
+      target: { value: 'my-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Disable 2FA' }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Other devices are still signed in',
+          variant: 'destructive',
+        })
+      )
+    );
+    // The 2FA change itself happened and is shown.
+    expect(screen.getByText('Disabled')).toBeInTheDocument();
+  });
+
+  it('leaves other sessions alone when the disable password is wrong (#793)', async () => {
+    mockTwoFactorDisable.mockResolvedValue({ data: null, error: { message: 'Invalid password' } });
+    mockUseSession.mockReturnValue({
+      data: {
+        user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: true },
+        session: { token: 'tok' },
+      },
+    });
+    render(<TwoFactorSetup />);
+    fireEvent.click(screen.getByRole('button', { name: /disable 2fa/i }));
+    fireEvent.change(screen.getByLabelText('Confirm your password'), {
+      target: { value: 'bad' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Disable 2FA' }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Could not disable 2FA', variant: 'destructive' })
+      )
+    );
+    expect(mockRevokeOtherSessions).not.toHaveBeenCalled();
   });
 });
 

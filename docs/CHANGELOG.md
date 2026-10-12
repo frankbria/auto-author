@@ -2,6 +2,14 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-12
+
+- **A password reset or a two-factor change ends the account's other sessions (#793, P1.11)**: a session someone else already held survived the reset or the 2FA change that was meant to lock them out.
+  - **Password reset.** `revokeSessionsOnPasswordReset` is on; better-auth's default is off. A reset deletes every session of the account.
+  - **No session cookie cache.** With `session.cookieCache` on, `get-session` kept answering from the cookie for up to five minutes after the session row was gone, so a revoked session still looked signed in to the frontend while the backend answered 401. The cache is removed. Each session check is now one database lookup, which the backend already does on every request.
+  - **Two-factor.** After 2FA is enabled or disabled from Settings, the page ends every other session (`revokeOtherSessions`). better-auth rotates only the session that made the change. If that call fails, the page says other devices are still signed in and where to end them.
+  - **Not covered.** The two-factor revocation runs in the browser, after the change succeeds. A client that calls better-auth's endpoints directly and skips it leaves other sessions alive. Disabling 2FA still needs only the password. `get-session` answers `null` with 200 for a revoked session, not 401; the backend answers 401.
+
 ### 2026-10-11
 
 - **The frontend reports whether sign-up email can be sent, and the staging probe checks it (#968, P1.10.1)**: since #792 nobody can finish signing up without the verification email, a missing provider is invisible to the user, and no health check knew about the frontend's email settings.

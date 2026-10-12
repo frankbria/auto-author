@@ -43,6 +43,9 @@ function createAuthInstance(database: Db) {
       // No session until the address is verified (#792): sign-up returns none
       // and sign-in answers 403 EMAIL_NOT_VERIFIED.
       requireEmailVerification: true,
+      // A reset ends every session of the account (#793). better-auth's default
+      // leaves them alive, so a session an attacker held would survive the reset.
+      revokeSessionsOnPasswordReset: true,
       // Password reset configuration
       sendResetPassword: async ({ user, url }) => {
         // Send password reset email
@@ -79,10 +82,8 @@ function createAuthInstance(database: Db) {
     session: {
       expiresIn: 60 * 60 * 24 * 7, // 7 days
       updateAge: 60 * 60 * 24, // Refresh every 24 hours
-      cookieCache: {
-        enabled: true,
-        maxAge: 5 * 60, // Cache for 5 minutes
-      },
+      // No cookieCache (#793): with it, get-session kept answering from the
+      // cookie for up to five minutes after a session was revoked.
     },
     advanced: {
       defaultCookieAttributes: getDefaultCookieAttributes(),
