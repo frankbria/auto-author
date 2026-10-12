@@ -52,9 +52,9 @@ def _init_sentry() -> None:
     """Initialize Sentry error tracking (issue #334).
 
     Inert when SENTRY_DSN is unset — no events are sent, so CI/local/tests are
-    unaffected. When set (staging/prod), unhandled 500s reach Sentry via the
-    global exception handler below (our handler catches every exception, so the
-    ASGI integration alone would never see them).
+    unaffected. When set (staging/prod), an unhandled 500 reaches Sentry once:
+    the global exception handler below reports it, the SDK's Starlette
+    integration would report it too, and the SDK drops the second as a duplicate.
     """
     if not settings.SENTRY_DSN:
         return
@@ -78,9 +78,9 @@ def _init_sentry() -> None:
         before_send=_scrub_free_text,
         # No log line reaches Sentry, as a breadcrumb or as an event. A log
         # message is free text no scrubber can read, and lines all over this
-        # app log at ERROR, some quoting what the user wrote. The one report for a 500 is
-        # the handler's capture_exception below, and a handled failure worth
-        # reporting has to call it too.
+        # app log at ERROR, some quoting what the user wrote. An unhandled
+        # exception is still reported (see above); a handled failure worth
+        # reporting has to call capture_exception itself.
         integrations=[LoggingIntegration(level=None, event_level=None)],
     )
     logger.info("Sentry error tracking initialized")
