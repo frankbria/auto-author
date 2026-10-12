@@ -26,6 +26,8 @@ _USER_TEXT_KEYS = [
     "content", "text", "title", "subtitle", "description", "question", "question_text",
     "answer", "response_text", "feedback", "bio", "prompt", "transcript",
     "email", "first_name", "last_name", "display_name",
+    # Not user text: the header a Stripe delivery is authenticated by (#812).
+    "stripe-signature",
 ]  # fmt: skip
 
 
@@ -77,8 +79,10 @@ def _init_sentry() -> None:
         # No log line reaches Sentry, as a breadcrumb or as an event. A log
         # message is free text no scrubber can read, and lines all over this
         # app log at ERROR, some quoting what the user wrote. An unhandled
-        # exception is still reported (see above); a handled failure worth
-        # reporting has to call capture_exception itself.
+        # exception is still reported (see above), and so is a 5xx that a route
+        # raises as an HTTPException: the SDK's Starlette integration reports
+        # those itself. A failure answered below 500, or logged and carried on
+        # from, has to call capture_exception or capture_message to be seen.
         integrations=[LoggingIntegration(level=None, event_level=None)],
     )
     logger.info("Sentry error tracking initialized")
