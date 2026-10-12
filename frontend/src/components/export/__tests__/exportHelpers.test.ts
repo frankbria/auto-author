@@ -18,6 +18,20 @@ describe('generateFilename', () => {
   it('uses an explicit extension override (multi-file markdown -> .zip)', () => {
     expect(generateFilename('My Book', 'markdown', 'zip')).toBe('my-book.zip');
   });
+
+  // #804: letters and digits of any script are kept. An ASCII-only filter
+  // named a CJK-titled download ".pdf".
+  it.each([
+    ['書名', '書名.pdf'],
+    ['Война и мир', 'война-и-мир.pdf'],
+    ['Café Olé', 'café-olé.pdf'],
+  ])('keeps a non-Latin title: %s', (title, expected) => {
+    expect(generateFilename(title, 'pdf')).toBe(expected);
+  });
+
+  it('falls back to a plain name when nothing in the title can be kept', () => {
+    expect(generateFilename('📚 ✨', 'pdf')).toBe('book.pdf');
+  });
 });
 
 describe('validateExportOptions', () => {
@@ -96,10 +110,34 @@ describe('downloadBlob', () => {
     expect(appendSpy).toHaveBeenCalledWith(anchor);
     expect(clickSpy).toHaveBeenCalledTimes(1);
     expect(removeSpy).toHaveBeenCalledWith(anchor);
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
 
     createSpy.mockRestore();
     appendSpy.mockRestore();
     removeSpy.mockRestore();
+  });
+});
+
+// #804: the URL was revoked in the same tick as the click. A browser reads the
+// blob after the click handler returns, so the download could start from a URL
+// that no longer existed.
+describe('downloadBlob keeps the blob URL alive for the browser to read', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('revokes the URL later, not in the same tick as the click', () => {
+    const revokeObjectURL = jest.fn();
+    Object.assign(window.URL, { createObjectURL: jest.fn(() => 'blob:mock-url'), revokeObjectURL });
+    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    downloadBlob(new Blob(['x']), 'my-book.pdf');
+
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(59_000);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1_000);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
   });
 });

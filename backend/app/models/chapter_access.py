@@ -10,10 +10,11 @@ class ChapterAccessLog(BaseModel):
     """Model for tracking chapter access and tab interactions"""
 
     id: ObjectId = Field(default_factory=ObjectId, alias="_id")
-    user_id: str  # Clerk user ID
+    user_id: str  # the better-auth user id
     book_id: str
-    chapter_id: str
-    access_type: str  # "view", "edit", "create", "delete", "tab_state"
+    # None for an event about the whole book, such as an export (#804).
+    chapter_id: Optional[str] = None
+    access_type: str  # "view", "edit", "create", "delete", "tab_state", "export_<format>"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     session_id: Optional[str] = None
     tab_order: Optional[int] = None  # For tab ordering persistence
