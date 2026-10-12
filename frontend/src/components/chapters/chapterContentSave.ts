@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
 import {
   ChapterBackup,
@@ -73,6 +74,18 @@ export function keepDroppedChapterText({ bookId, chapterId, content }: PendingCh
   return setValidatedItem(chapterDroppedKey(bookId, chapterId), kept, validateChapterBackup);
 }
 
+/**
+ * Report a chapter that could not be saved, backed up or restored (#813).
+ * These went to the console and nowhere else. The error and two tags are
+ * sent, never the chapter's text: a failed save's error is about the response.
+ */
+export function reportSaveFailure(
+  operation: 'auto-save' | 'manual-save' | 'leave-save' | 'backup' | 'restore',
+  error: unknown
+): void {
+  Sentry.captureException(error, { tags: { feature: 'autosave', operation } });
+}
+
 /** Keeps content that failed to save in localStorage. Returns whether it was stored. */
 export function backupChapterContent(
   { bookId, chapterId, content }: PendingChapterEdit,
@@ -83,7 +96,10 @@ export function backupChapterContent(
     timestamp: Date.now(),
     error: err instanceof Error ? err.message : 'Unknown error',
   };
-  return setValidatedItem(chapterBackupKey(bookId, chapterId), backup, validateChapterBackup);
+  const stored = setValidatedItem(chapterBackupKey(bookId, chapterId), backup, validateChapterBackup);
+  // The save failed and so did this: the text is now only in the editor.
+  if (!stored) reportSaveFailure('backup', new Error('Chapter backup could not be written'));
+  return stored;
 }
 
 /**
@@ -107,6 +123,8 @@ export async function flushChapterContent(
     localStorage.removeItem(chapterBackupKey(edit.bookId, edit.chapterId));
   } catch (err) {
     console.error('Failed to save chapter content on leaving it:', err);
+    // A conflict is an answer, not a failure: the other copy stands and this one is kept.
+    if (!isChapterConflict(err)) reportSaveFailure('leave-save', err);
     backupChapterContent(edit, err);
   }
 }

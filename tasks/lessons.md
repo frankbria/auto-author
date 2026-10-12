@@ -1506,3 +1506,6 @@ The issue asked for the request id "in the 500 body". One request with an `Origi
 ### A repeat run in the same browser session is not a second measurement (#810)
 The scripted browser step passed on every fresh start and showed nothing on a second run against the same servers: the dialog was not submitted, and no request reached the backend. The script printed "Reference ID: nothing" and the server's id from the earlier run on the next line, which read like a failure of the feature. Each side of the demo is recorded once after a fresh start. A probe that compares the page with the server's last request should check that the request is new.
 
+### The unit test counted one failure; the browser showed the loop around it (#813)
+The acceptance criterion was "each failure calls captureException", and a jest test with one rejected save passed. Running the real editor against a stopped backend showed what the test's single failure could not: autosave retries every three seconds, so "each failure" was a report every three seconds from every open editor for as long as the backend is away. The count came from the demo, and the code now reports once per run of failures. When a criterion says "each", find out how often "each" happens in the real loop before implementing it literally.
+

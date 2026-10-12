@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **A chapter that could not be saved is reported (#813, P1.31)**:
+  - **Problem.** When a chapter failed to save, the editor said so and kept the text in a local backup, and nobody else was told: the failure went to the browser console. The same for a backup that could not be written, which is the case where the text exists nowhere but the open editor, and for a backup that could not be restored.
+  - **Fix.** `reportSaveFailure()` in `chapterContentSave.ts` calls `Sentry.captureException` with the tags `feature: 'autosave'` and an `operation` (`auto-save`, `manual-save`, `leave-save`, `backup`, `restore`), and never with the chapter's text. The editor calls it for a failed autosave, a failed save the writer asked for, and a failed restore; `backupChapterContent` calls it when the backup cannot be written; the save made on leaving a chapter calls it too.
+  - **Once per run of failures.** Autosave retries every three seconds while the server is away. A real browser against a stopped backend sent three reports in eight seconds, so a failed autosave is reported once until a save works again. The issue asks for a report on each failure; from every open editor for the length of an outage that is the wrong amount.
+  - **A conflict is not a failure.** A save that lost to another copy is answered by asking the writer what to do, and is not reported.
+  - **Not covered.** A chapter that fails to load is still only in the console. Nothing reaches Sentry from staging until the frontend is built with an address (#992).
+
 - **Staging's health is probed from outside every 15 minutes (#811, P1.29)**:
   - **Already there.** `staging-health.yml` (#916) probed staging from a GitHub runner and opened, commented on and closed one labelled issue through `scripts/ci-alert-issue.sh` (#776). That is most of what this issue asks for. It ran every six hours, because the alert commented on every failing run and a tighter schedule would have filled the issue with comments.
   - **Changed.** The schedule is `*/15`. `ci-alert-issue.sh` takes `ALERT_QUIET_HOURS`: with it set, a failing run comments on the open issue only when the issue has had no activity for that many hours. The probe sets 6, so a day-long outage is still about four comments, and recovery closes the issue at the next healthy run, within fifteen minutes. The post-deploy E2E alert does not set it and comments on every failing run as before.
