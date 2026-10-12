@@ -32,9 +32,9 @@ pytestmark = pytest.mark.asyncio
 
 MONGO_TEXT = (
     "E11000 duplicate key error collection: auto_author.books index: owner_id_1_title_1 "
-    "dup key: { owner_id: \"a1\" }, full error: {'host': 'cluster0-shard-00-01.x1y2z.mongodb.net:27017'}"
+    "dup key: { owner_id: \"a1\" }, full error: {'host': 'db1.internal.example:27017'}"
 )
-SECRETS_IN_MONGO_TEXT = ["E11000", "owner_id_1_title_1", "mongodb.net", "auto_author.books"]
+SECRETS_IN_MONGO_TEXT = ["E11000", "owner_id_1_title_1", "internal.example", "auto_author.books"]
 
 PROVIDER_TEXT = (
     "This model's maximum context length is 8192 tokens, requested by organization "
@@ -95,7 +95,7 @@ class TestASharedHandlerKeepsTheDriversTextOutOfTheResponse:
         assert [secret for secret in SECRETS_IN_MONGO_TEXT if secret in body] == []
         assert answer.detail["request_id"] == "req_1"
         # The text is not lost: it is in the log, next to the same id.
-        assert "cluster0-shard-00-01.x1y2z.mongodb.net" in caplog.text
+        assert "db1.internal.example" in caplog.text
         assert "req_1" in caplog.text
 
 
@@ -147,7 +147,7 @@ class TestARewriteReportsAnAIFailureLikeTheOtherAIRoutes:
 
         assert response.status_code >= 500, response.text
         assert [s for s in SECRETS_IN_MONGO_TEXT if s in response.text] == []
-        assert "mongodb.net" in caplog.text
+        assert "internal.example" in caplog.text
 
 
 class TestNoAIRoutePassesOnWhatTheProviderSaid:

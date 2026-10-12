@@ -1443,3 +1443,6 @@ The script's edit step failed on an escaping mismatch, the test run went ahead o
 ### A heredoc inside a heredoc ends at the first matching line (#802)
 A shell command embedded a Python script whose text contained a line reading `EOF`, inside a heredoc that also ended at `EOF`. The outer heredoc stopped there, Python saw half a string, and the rest of the script was run as shell. Nothing was changed, because the failure came first, but that was luck. Put a script that contains heredoc markers in its own file.
 
+### A made-up cluster hostname fails the same guard as a real one (#802)
+A test fixture imitated a database driver's error, with an invented hostname in the shape of a managed-cluster host. `scripts/test_no_staging_identifiers.py` matches that shape, not a list of real names, and failed the Security Audit job in CI; nothing local runs it. `docs/references/quality-standards.md` says so, and another test file carries a comment about it. For a hostname in a fixture use a reserved domain (`.example`, `.invalid`), and before pushing a file that imitates infrastructure text run `uv run --project backend pytest scripts/test_no_staging_identifiers.py`.
+
