@@ -153,6 +153,18 @@ class TestAnOversizeAIRequestIsRefusedBeforeItCostsAnything:
         assert model_call.call_count == 2
 
 
+    async def test_a_chapter_filled_by_one_batch_save_can_be_drafted(self, author):
+        """The page sends every answered question, and one batch save takes 100."""
+        api, book, model_call = author
+
+        response = await api.post(
+            f"{book}/chapters/ch1/generate-draft", json={"question_responses": _pairs(count=100)}
+        )
+
+        assert response.status_code == 200, response.text
+        assert model_call.called
+
+
 class TestAnswersAreCappedWhereTheyAreSaved:
     """A saved answer comes back as model input, so it is capped at the door."""
 
