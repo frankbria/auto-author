@@ -31,6 +31,7 @@ from app.db.toc_transactions import (
 )
 from app.services.chapter_access_service import chapter_access_service
 from app.services.chapter_status_service import chapter_status_service
+from app.core.reporting import report_failure
 
 logger = logging.getLogger(__name__)
 
@@ -601,8 +602,9 @@ async def update_chapter_status_bulk(
                     "bulk_update": True,
                 },
             )
-    except Exception:
+    except Exception as error:
         logger.error("Failed to log bulk status change", exc_info=True)
+        report_failure("access-log", error)
 
     return {
         "book_id": book_id,

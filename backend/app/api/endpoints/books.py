@@ -79,6 +79,7 @@ from app.services.content_enhancement import (
     available_enhancements,
     is_valid_enhancement,
 )
+from app.core.reporting import report_failure
 from app.services.ai_errors import (
     AIServiceError
 )
@@ -1406,8 +1407,9 @@ async def get_chapter_content(
                 "access_timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
-    except Exception:
+    except Exception as error:
         logger.error("Failed to log chapter content access", exc_info=True)
+        report_failure("access-log", error)
     # Prepare response
     response = {
         "book_id": book_id,
@@ -1532,8 +1534,9 @@ async def update_chapter_content(
                 "update_timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
-    except Exception:
+    except Exception as error:
         logger.error("Failed to log chapter content update", exc_info=True)
+        report_failure("access-log", error)
 
     # Persist via a targeted, concurrency-safe positional update (only this
     # chapter's fields + an atomic version $inc) rather than a whole-TOC rewrite.
@@ -1697,8 +1700,9 @@ async def batch_get_chapter_content(
                 "access_timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
-    except Exception:
+    except Exception as error:
         logger.error("Failed to log batch chapter access", exc_info=True)
+        report_failure("access-log", error)
 
     return {
         "book_id": book_id,

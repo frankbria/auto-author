@@ -24,6 +24,7 @@ from app.services.chapter_access_service import chapter_access_service
 from app.core.config import settings
 from datetime import datetime, timezone
 import io
+from app.core.reporting import report_failure
 from urllib.parse import quote
 
 def _download_headers(title: str, suffix: str, size: int) -> Dict[str, str]:
@@ -144,8 +145,9 @@ async def export_book_pdf(
                 "export_timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
-    except Exception:
+    except Exception as error:
         logger.error("Failed to log export access", exc_info=True)
+        report_failure("access-log", error)
 
     try:
         # Generate PDF
@@ -238,8 +240,9 @@ async def export_book_docx(
                 "export_timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
-    except Exception:
+    except Exception as error:
         logger.error("Failed to log export access", exc_info=True)
+        report_failure("access-log", error)
 
     try:
         # Generate DOCX
@@ -322,8 +325,9 @@ async def export_book_epub(
                 "export_timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
-    except Exception:
+    except Exception as error:
         logger.error("Failed to log export access", exc_info=True)
+        report_failure("access-log", error)
 
     try:
         # Generate EPUB
@@ -407,8 +411,9 @@ async def export_book_markdown(
                 "export_timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
-    except Exception:
+    except Exception as error:
         logger.error("Failed to log export access", exc_info=True)
+        report_failure("access-log", error)
 
     try:
         # Generate Markdown

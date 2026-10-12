@@ -8,6 +8,7 @@ from pymongo import ReturnDocument
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 from .audit_log import create_audit_log
+from app.core.reporting import report_failure
 
 logger = logging.getLogger(__name__)
 
@@ -250,8 +251,9 @@ async def delete_user(
             from app.services.file_upload_service import FileUploadService
 
             await FileUploadService().delete_profile_picture(auth_id, avatar_url)
-        except Exception:
+        except Exception as error:
             logger.error("Failed to delete avatar for user %s", auth_id, exc_info=True)
+            report_failure("delete-files", error)
 
     # Unconditional: a better-auth user who never reached the backend has no
     # app record, but their sessions and credentials must still go.
@@ -344,6 +346,7 @@ async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
         )
 
         return result.deleted_count > 0
-    except Exception:
+    except Exception as error:
         logger.error("Failed to delete user books", exc_info=True)
+        report_failure("delete-user-data", error)
         return False

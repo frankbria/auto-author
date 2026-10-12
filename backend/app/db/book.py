@@ -2,6 +2,8 @@
 
 import logging
 
+from app.core.reporting import report_failure
+
 from .base import books_collection, users_collection, _client, get_collection
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
@@ -435,8 +437,9 @@ async def _delete_cover_files(book: Dict) -> None:
         from app.services.file_upload_service import FileUploadService
 
         await FileUploadService().delete_cover_image(book_id, cover_url, thumbnail_url)
-    except Exception:
+    except Exception as error:
         logger.error("Failed to delete cover files for book %s", book_id, exc_info=True)
+        report_failure("delete-files", error)
 
 
 async def _delete_books_internal(

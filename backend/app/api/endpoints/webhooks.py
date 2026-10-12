@@ -1,14 +1,13 @@
 import json
 import logging
-import time
 
-import sentry_sdk
 import stripe
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from stripe import SignatureVerificationError
 
 from app.core.config import settings
+from app.core.reporting import report_failure
 from app.core.entitlements import (
     DEFAULT_PLAN,
     LIVE_SUBSCRIPTION_STATUSES,
@@ -26,10 +25,6 @@ from app.db.user import (
 
 logger = logging.getLogger(__name__)
 
-# When each kind of failure was last sent to Sentry (#812).
-_last_reported: dict[str, float] = {}
-REPORT_EVERY_SECONDS = 300
-
 
 def _report(kind: str, message: str, *args, anyone_can_cause_it: bool = False) -> None:
     """Log a webhook failure as an error and send it to Sentry (#812).
@@ -41,11 +36,7 @@ def _report(kind: str, message: str, *args, anyone_can_cause_it: bool = False) -
     cause is reported once every few minutes; the log gets every one.
     """
     logger.error(message, *args)
-    now = time.monotonic()
-    if anyone_can_cause_it and now - _last_reported.get(kind, -REPORT_EVERY_SECONDS) < REPORT_EVERY_SECONDS:
-        return
-    _last_reported[kind] = now
-    sentry_sdk.capture_message(message % args, level="error", fingerprint=["stripe-webhook", kind])
+    report_failure(kind, message=message % args, every_time=not anyone_can_cause_it, group="stripe-webhook")
 router = APIRouter()
 
 # Clerk webhooks are deprecated - users are now created automatically on better-auth signup
@@ -205,6 +196,13 @@ async def _apply_subscription_event(
                 "current %s — likely double-billed; ignoring it",
                 user["auth_id"], subscription_id, status, current_id,
             )
+            # Needs a human (#996). The event id finds the rest in Stripe.
+            report_failure(
+                "second-subscription",
+                message=f"A customer has a second live Stripe subscription and is likely billed twice (event {event_id})",
+                every_time=True,
+                group="stripe-webhook",
+            )
         else:
             logger.info(
                 "Stripe %s for subscription %s is not user %s's current %s — ignoring",
@@ -228,6 +226,11 @@ async def _apply_subscription_event(
                 "Stripe subscription %s has unknown status %r — treating as %s",
                 subscription_id, status, plan,
             )
+            report_failure(
+                "unknown-status",
+                message=f"A Stripe subscription has a status this app does not know (event {event_id})",
+                group="stripe-webhook",
+            )
         elif policy == PRICED and plan == DEFAULT_PLAN:
             # A paying subscriber is about to land on free: the pro price is
             # unset or Stripe sent one we don't know. Needs a human.
@@ -235,6 +238,11 @@ async def _apply_subscription_event(
                 "Stripe subscription %s is %s but no price %s matches "
                 "STRIPE_PRICE_ID_PRO — user resolves to %s",
                 subscription_id, status, price_ids, plan,
+            )
+            report_failure(
+                "price-not-matched",
+                message=f"A paying subscription matches no configured price, so its user is on the free plan (event {event_id})",
+                group="stripe-webhook",
             )
 
     # Out-of-order guard. Stripe does not order deliveries, so an older
