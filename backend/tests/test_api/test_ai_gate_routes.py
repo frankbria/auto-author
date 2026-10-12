@@ -23,9 +23,12 @@ The denial tests use a nonexistent book id on purpose: both gates are route-leve
 dependencies, so they fire before the handler ever looks the book up.
 """
 
+from datetime import datetime, timezone
+
 import pytest
 
 from app.core.config import settings
+from app.db.usage import increment_usage
 from app.schemas.errors import ErrorCode
 from tests.route_introspection import route_dependency_calls, shared_dependency_call
 
@@ -264,20 +267,22 @@ class TestQuotaExhaustionPerRoute:
         arm_real_ai_quota(limit=1)
 
         # `plan: free` clears the entitlement gate so the quota is what trips.
-        client = await auth_client_factory(overrides={"plan": "free"})
+        client = await auth_client_factory(
+            overrides={"plan": "free", "auth_id": "quota-per-route"}
+        )
         url = _url(path)
 
-        # The book doesn't exist, so this 404s out of the handler long before any
-        # AI call — yet it still consumes the quota. That is the "metered BEFORE
-        # the spend" guarantee (`dependencies.py::get_ai_usage_quota`) proven by
-        # construction: if the counter only incremented after a successful
-        # generation, this request would leave it at 0 and the next one could
-        # never 429.
+        # A request for a book that does not exist reaches the handler and
+        # costs nothing (#798): it never got near the model.
         first = await client.request(method, url, json={})
         assert first.status_code == 404, (
             f"{method} {path} did not reach the handler on the first call "
             f"(expected 404 for the nonexistent book, got {first.status_code})."
         )
+
+        # Spend today's allowance of one, as a generation would have.
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        assert await increment_usage("quota-per-route", f"day:{today}", 3600) == 1
 
         second = await client.request(method, url, json={})
         assert second.status_code == 429, (
