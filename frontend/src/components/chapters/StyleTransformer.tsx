@@ -10,6 +10,7 @@ import { SparklesIcon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { toast } from '@/lib/toast';
 import { bookClient } from '@/lib/api/bookClient';
 import { LoadingStateManager } from '@/components/loading';
+import { RewriteWordCounts, type WordCounts } from './RewriteWordCounts';
 import DOMPurify from 'dompurify';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +51,7 @@ export function StyleTransformer({
   const [targetStyle, setTargetStyle] = useState('professional');
   const [original, setOriginal] = useState('');
   const [transformed, setTransformed] = useState('');
+  const [wordCounts, setWordCounts] = useState<WordCounts>({});
   const [error, setError] = useState<string | null>(null);
 
   // Guard against SSR (DOMPurify needs a DOM) and skip work until there's content.
@@ -87,6 +89,10 @@ export function StyleTransformer({
         target_style: targetStyle,
       });
       setTransformed(result.transformed);
+      setWordCounts({
+        before: result.metadata?.original_word_count,
+        after: result.metadata?.transformed_word_count,
+      });
       setStep('preview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to transform style');
@@ -191,6 +197,8 @@ export function StyleTransformer({
               </div>
             </div>
           )}
+
+          {step === 'preview' && <RewriteWordCounts {...wordCounts} />}
 
           <DialogFooter>
             {step === 'options' && (

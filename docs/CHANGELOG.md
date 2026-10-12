@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **A rewrite that lost most of the text is refused, and the preview shows the word counts (#983, P1.19.1)**:
+  - **Problem.** Transform, enhance and dictation cleanup refused an answer the model reported as cut off, and nothing else. A model that condenses a long text and reports a normal finish passed, and the page offered the result as the finished rewrite. In live runs for #801 a 5,000-word chapter came back at 28% to 49% of its length, as a 200.
+  - **Refusal.** `shortened_rewrite_error` in `backend/app/services/ai_service.py` compares the word counts. Transform and enhance refuse a result with under 60% of the source's words; cleanup, which removes filler, under 40%. A source under 200 words is not checked. The route answers 413 with `error_code: REWRITE_SHORTENED` and a message carrying both counts, through the same helper as `REWRITE_TRUNCATED`. The provider was called, so the generation stays charged.
+  - **Why those shares.** Against gpt-oss:120b a faithful transform kept 94% to 112% of the words and a condensed one 28% to 54%; cleaning up a dictation that was a quarter filler kept 58% to 66%.
+  - **Preview.** `RewriteWordCounts` puts one line under the before and after panes of all three dialogs: "2,868 words before, 2,320 after (19% shorter)". The response already carried the counts; the dialogs did not show them.
+  - **Not covered.** A rewrite between the threshold and the source's length is returned, and it is the author who has to notice the line. Word count is a crude measure: a rewrite of the right length that dropped a section and padded another passes. The shares come from one model. The dialogs show the 413 as raw status and JSON, like every error from these client methods (#803).
+
 - **Transform, enhance and transcription cleanup work on a chapter of ordinary length (#801, P1.19)**:
   - **Problem.** The three rewrite flows ran on the default model class (`AI_MODEL_DEFAULT`, gpt-4: an 8,192-token context shared by the prompt and the answer) with a fixed 4,000-token completion budget. A chapter over about 3,000 words could not come back whole.
   - **Model and budget.** They now run on the long-output class (`AI_MODEL_LONG_OUTPUT`, gpt-4o by default), as drafts and contents already do. The completion budget follows the text: a third of its characters, never under the 4,000 these flows always had, clamped to `AI_MAX_OUTPUT_TOKENS_LONG` (8,000) by the request method. `metadata.model_used` names the long-output model.

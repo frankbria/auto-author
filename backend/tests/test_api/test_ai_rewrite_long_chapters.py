@@ -48,9 +48,13 @@ async def test_the_sample_chapter_is_the_size_that_was_measured():
 class TestAChapterOfOrdinaryLengthCanBeRewritten:
     @pytest.mark.parametrize("route, options", REWRITES, ids=ROUTE_IDS)
     async def test_five_thousand_words_go_to_the_long_output_model_with_its_whole_budget(
-        self, author, route, options
+        self, author, monkeypatch, route, options
     ):
-        api, book, model_call = author
+        api, book, _ = author
+        # A provider that returns the chapter at its own length, as a rewrite should.
+        provider = autospec_openai_client(content=FIVE_THOUSAND_WORDS)
+        monkeypatch.setattr(ai_service, "client", provider)
+        model_call = provider.chat.completions.create
 
         response = await api.post(
             f"{book}/chapters/ch1/{route}", json={"content": FIVE_THOUSAND_WORDS, **options}
@@ -103,3 +107,72 @@ class TestARewriteTheModelCouldNotFinishIsAFixedRefusal:
         assert "half a" not in response.text
         # The provider was called, so the generation stays charged (#798).
         assert await _charged() == 1
+
+
+def _words(count: int, word: str = "word") -> str:
+    return " ".join([word] * count)
+
+
+# route, options, the fewest words a rewrite of 1,000 may keep
+SHARES = [
+    ("transform-style", {"target_style": "professional"}, 600),
+    ("enhance-text", {"enhancement_type": "clarity"}, 600),
+    # Cleanup removes filler, so it is allowed to lose more.
+    ("enhance-transcription", {}, 400),
+]
+
+
+class TestARewriteThatLostMostOfTheTextIsRefused:
+    """A model can condense a chapter and report a normal finish (#983). In live
+    runs a 5,000-word chapter came back at 28% to 49% of its length, as a 200,
+    and the page would have offered it as the finished rewrite."""
+
+    @pytest.mark.parametrize("route, options, fewest", SHARES, ids=ROUTE_IDS)
+    async def test_a_rewrite_under_the_share_is_a_413_that_says_how_much_was_lost(
+        self, author, monkeypatch, route, options, fewest
+    ):
+        api, book, _ = author
+        monkeypatch.setattr(
+            ai_service, "client", autospec_openai_client(content=_words(fewest - 1, "kept"))
+        )
+
+        response = await api.post(
+            f"{book}/chapters/ch1/{route}", json={"content": _words(1000), **options}
+        )
+
+        assert response.status_code == 413, response.text
+        detail = response.json()["detail"]
+        assert detail["error_code"] == "REWRITE_SHORTENED"
+        assert f"{fewest - 1} of 1000 words" in detail["message"]
+        assert "kept kept" not in response.text
+        # The provider was called, so the generation stays charged (#798).
+        assert await _charged() == 1
+
+    @pytest.mark.parametrize("route, options, fewest", SHARES, ids=ROUTE_IDS)
+    async def test_a_rewrite_at_the_share_is_returned_with_both_word_counts(
+        self, author, monkeypatch, route, options, fewest
+    ):
+        api, book, _ = author
+        monkeypatch.setattr(
+            ai_service, "client", autospec_openai_client(content=_words(fewest, "kept"))
+        )
+
+        response = await api.post(
+            f"{book}/chapters/ch1/{route}", json={"content": _words(1000), **options}
+        )
+
+        assert response.status_code == 200, response.text
+        counts = [v for k, v in response.json()["metadata"].items() if k.endswith("_word_count")]
+        assert sorted(counts) == [fewest, 1000]
+
+    async def test_a_short_text_may_shrink_by_any_amount(self, author, monkeypatch):
+        """Under 200 words the share says little: tightening a paragraph can halve it."""
+        api, book, _ = author
+        monkeypatch.setattr(ai_service, "client", autospec_openai_client(content=_words(20)))
+
+        response = await api.post(
+            f"{book}/chapters/ch1/enhance-text",
+            json={"content": _words(199), "enhancement_type": "clarity"},
+        )
+
+        assert response.status_code == 200, response.text

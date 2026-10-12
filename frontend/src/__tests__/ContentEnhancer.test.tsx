@@ -97,3 +97,21 @@ it('shows an error and returns to options when enhancement fails', async () => {
   // (the toolbar trigger is aria-hidden while the dialog is open).
   expect(screen.getByRole('button', { name: /^enhance$/i })).toBeInTheDocument();
 });
+
+it('shows the word counts before and after, so a shortened rewrite is visible before applying', async () => {
+  const user = userEvent.setup();
+  mockEnhance.mockResolvedValueOnce({
+    success: true,
+    enhanced: '<p>The cat sat upon the mat.</p>',
+    metadata: { enhancement_label: 'Clarity', original_word_count: 1000, enhanced_word_count: 1100 },
+  });
+  setup();
+
+  await user.click(screen.getByRole('button', { name: /^enhance$/i }));
+  const enhanceButtons = screen.getAllByRole('button', { name: /^enhance$/i });
+  await user.click(enhanceButtons[enhanceButtons.length - 1]);
+
+  expect(
+    await screen.findByText('1,000 words before, 1,100 after (10% longer)')
+  ).toBeInTheDocument();
+});

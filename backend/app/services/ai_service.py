@@ -70,6 +70,28 @@ def rewrite_max_tokens(content: str) -> int:
     return max(REWRITE_MIN_COMPLETION_TOKENS, len(content) // 3)
 
 
+# A model can condense a long text and still report a normal finish, and the
+# page would offer the result as the finished rewrite (#983). A rewrite that
+# keeps under this share of its source's words is refused. Against a real model
+# a faithful transform kept 94% to 112% and a condensed one 28% to 54%; cleaning
+# up a dictation that was a quarter filler kept 62% to 64%, so cleanup may lose
+# more. Under 200 words the share says little: tightening a paragraph can halve it.
+REWRITE_MIN_SHARE_KEPT = 0.6
+CLEANUP_MIN_SHARE_KEPT = 0.4
+REWRITE_SHARE_CHECKED_FROM_WORDS = 200
+
+
+def shortened_rewrite_error(source: str, rewrite: str, min_share: float) -> Optional[str]:
+    """What to tell the author when ``rewrite`` lost too much of ``source``, else None."""
+    before, after = len(source.split()), len(rewrite.split())
+    if before < REWRITE_SHARE_CHECKED_FROM_WORDS or after >= min_share * before:
+        return None
+    return (
+        f"The result came back much shorter than the text it was given "
+        f"({after} of {before} words), so it was not used. Try a shorter section."
+    )
+
+
 # True once this request has been handed to the provider. The AI quota reads
 # it to tell a request refused beforehand, which costs nothing, from one the
 # provider may have billed (#798). A ContextVar, so each request has its own.
@@ -1149,6 +1171,15 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 }
 
             transformed = choice.message.content
+            shortened = shortened_rewrite_error(content, transformed, REWRITE_MIN_SHARE_KEPT)
+            if shortened:
+                return {
+                    "success": False,
+                    "error_code": "REWRITE_SHORTENED",
+                    "error": shortened,
+                    "transformed": "",
+                    "metadata": {},
+                }
             original_words = len(content.split())
             transformed_words = len(transformed.split())
 
@@ -1248,6 +1279,15 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 }
 
             enhanced = choice.message.content
+            shortened = shortened_rewrite_error(content, enhanced, REWRITE_MIN_SHARE_KEPT)
+            if shortened:
+                return {
+                    "success": False,
+                    "error_code": "REWRITE_SHORTENED",
+                    "error": shortened,
+                    "enhanced": "",
+                    "metadata": {},
+                }
             original_words = len(content.split())
             enhanced_words = len(enhanced.split())
 
@@ -1338,6 +1378,15 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 }
 
             enhanced = choice.message.content
+            shortened = shortened_rewrite_error(content, enhanced, CLEANUP_MIN_SHARE_KEPT)
+            if shortened:
+                return {
+                    "success": False,
+                    "error_code": "REWRITE_SHORTENED",
+                    "error": shortened,
+                    "enhanced": "",
+                    "metadata": {},
+                }
             return {
                 "success": True,
                 "enhanced": enhanced,

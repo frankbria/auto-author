@@ -93,3 +93,36 @@ it('shows an error and returns to options when transformation fails', async () =
   // Still on the options step (Transform button visible again).
   expect(screen.getByRole('button', { name: /^transform$/i })).toBeInTheDocument();
 });
+
+it('shows the word counts before and after, so a shortened rewrite is visible before applying', async () => {
+  const user = userEvent.setup();
+  mockTransform.mockResolvedValueOnce({
+    success: true,
+    transformed: '<p>The feline reposed upon the rug.</p>',
+    metadata: { style_label: 'Academic', original_word_count: 4945, transformed_word_count: 3956 },
+  });
+  setup();
+
+  await user.click(screen.getByRole('button', { name: /transform style/i }));
+  await user.click(screen.getByRole('button', { name: /^transform$/i }));
+
+  expect(
+    await screen.findByText('4,945 words before, 3,956 after (20% shorter)')
+  ).toBeInTheDocument();
+});
+
+it('shows no word counts when the response carries none', async () => {
+  const user = userEvent.setup();
+  mockTransform.mockResolvedValueOnce({
+    success: true,
+    transformed: '<p>The feline reposed upon the rug.</p>',
+    metadata: { style_label: 'Academic' },
+  });
+  setup();
+
+  await user.click(screen.getByRole('button', { name: /transform style/i }));
+  await user.click(screen.getByRole('button', { name: /^transform$/i }));
+
+  await screen.findByText(/feline reposed upon the rug/i);
+  expect(screen.queryByText(/words before/i)).not.toBeInTheDocument();
+});
