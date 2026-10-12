@@ -75,5 +75,5 @@ cd /home/frankbria/projects/worktrees/issue-811-health-probe && uvx --quiet --wi
 ```
 
 ```output
-23 passed
+24 passed
 ```

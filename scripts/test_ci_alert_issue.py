@@ -19,7 +19,7 @@ STUB = """#!/bin/sh
 echo "$@" >> "$GH_LOG"
 case "$1 $2" in
   "api repos/o/r/issues?"*) echo "$FAKE_OPEN" ;;
-  "api repos/o/r/issues/"*) echo "$FAKE_UPDATED" ;;
+  "api repos/o/r/issues/"*) [ -z "${FAKE_UPDATED_FAILS:-}" ] || exit 1; echo "$FAKE_UPDATED" ;;
 esac
 """
 
@@ -80,6 +80,13 @@ def test_a_repeat_failure_inside_the_quiet_period_writes_nothing(tmp_path):
 
 def test_a_repeat_failure_after_the_quiet_period_comments_once_more(tmp_path):
     lines = run(tmp_path, "failure", open_issue="42", ALERT_QUIET_HOURS="6", FAKE_UPDATED=hours_ago(7))
+
+    assert writes(lines) == ["issue comment"]
+
+
+def test_when_the_issue_cannot_be_read_the_failure_is_still_reported(tmp_path):
+    """Not knowing when it last changed must not silence the alert or fail the step."""
+    lines = run(tmp_path, "failure", open_issue="42", ALERT_QUIET_HOURS="6", FAKE_UPDATED_FAILS="1")
 
     assert writes(lines) == ["issue comment"]
 

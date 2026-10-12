@@ -22,7 +22,8 @@ case "$mode" in
 failure)
   if [ -n "$open" ]; then
     if [ "${ALERT_QUIET_HOURS:-0}" -gt 0 ]; then
-      updated=$(gh api "repos/$GH_REPO/issues/$open" --jq .updated_at)
+      # A lookup that fails leaves this empty, which sorts first: the comment is made.
+      updated=$(gh api "repos/$GH_REPO/issues/$open" --jq .updated_at || true)
       cutoff=$(date -u -d "$ALERT_QUIET_HOURS hours ago" +%Y-%m-%dT%H:%M:%SZ)
       # Both are UTC ISO timestamps, so the later one sorts last.
       if [ "$(printf '%s\n%s\n' "$updated" "$cutoff" | sort | tail -1)" = "$updated" ]; then
