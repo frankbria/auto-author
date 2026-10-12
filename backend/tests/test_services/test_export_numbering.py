@@ -93,6 +93,24 @@ class TestATwoByTwoBookIsNumberedByItsOutline:
         assert positions == sorted(positions)
         assert "Chapter3" not in text and "Chapter4" not in text
 
+    async def test_pdf_sets_a_subchapter_heading_smaller_than_a_chapter_heading(self, monkeypatch):
+        from reportlab import rl_config
+
+        monkeypatch.setattr(rl_config, "pageCompression", 0)
+        monkeypatch.setattr(rl_config, "useA85", 0)
+
+        pdf = await export_service.export_book(two_by_two(), format="pdf")
+
+        # Each text fragment with the font size in force when it was drawn.
+        sizes, size = {}, None
+        for set_size, text in re.findall(rb"/F\d+ ([\d.]+) Tf|\(([^)]*)\) Tj", pdf):
+            if set_size:
+                size = float(set_size)
+            else:
+                sizes[text.decode()] = size
+        assert sizes["1.1 Outlines"] == sizes["1.2 Research"]
+        assert sizes["1.1 Outlines"] < sizes["Chapter 1: Planning"] == sizes["Chapter 2: Writing"]
+
     async def test_epub_headings(self):
         files = await _epub_files(two_by_two())
 
