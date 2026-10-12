@@ -16,6 +16,7 @@ from httpx import ASGITransport, AsyncClient
 from app.db.base import get_collection
 from app.db.user import ensure_user_indexes
 from app.main import app
+from tests.session_cookies import signed_session_cookie
 
 
 async def _seed_better_auth_user(
@@ -69,12 +70,12 @@ async def _mint_session(user_oid: ObjectId) -> str:
 
 
 def _client(token: str) -> AsyncClient:
-    # better-auth signs the cookie as "<token>.<signature>"; the backend strips
-    # the signature before the lookup, so send it in that shape.
+    # better-auth signs the cookie as "<token>.<signature>", and the backend
+    # refuses one whose signature does not verify (#795).
     return AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",
-        cookies={"better-auth.session_token": f"{token}.signature"},
+        cookies={"better-auth.session_token": signed_session_cookie(token)},
     )
 
 

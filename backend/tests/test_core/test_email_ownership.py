@@ -17,6 +17,7 @@ from app.core.security import get_current_user_from_session
 from app.db import base
 from app.db.user import ensure_user_indexes
 from app.main import app
+from tests.session_cookies import signed_session_cookie
 
 pytestmark = pytest.mark.asyncio
 
@@ -48,7 +49,7 @@ async def _indexed_users():
 
 
 def _request(token: str) -> Request:
-    cookie = f"better-auth.session_token={token}".encode()
+    cookie = f"better-auth.session_token={signed_session_cookie(token)}".encode()
     return Request({"type": "http", "headers": [(b"cookie", cookie)]})
 
 
@@ -64,7 +65,7 @@ async def test_stale_email_holder_no_longer_blocks_first_login(motor_reinit_db):
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",
-        cookies={"better-auth.session_token": token},
+        cookies={"better-auth.session_token": signed_session_cookie(token)},
     ) as client:
         resp = await client.get("/api/v1/users/me")
 

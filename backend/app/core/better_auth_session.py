@@ -16,46 +16,73 @@ Better-auth stores sessions in the 'session' collection with the following schem
 - userAgent: String (optional)
 """
 
-from typing import Optional, Dict, Any
-from datetime import datetime, timezone
-from fastapi import Request
+import base64
+import hashlib
+import hmac
 import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+from urllib.parse import unquote
 
+from fastapi import Request
+
+from app.core.config import is_deployed_env, settings
 from app.db.base import get_collection
 
 logger = logging.getLogger(__name__)
 
-# Cookie names used by better-auth (with and without __Secure- prefix)
-SESSION_COOKIE_NAMES = [
-    "__Secure-better-auth.session_token",  # Production (HTTPS)
-    "better-auth.session_token",            # Development (HTTP)
-]
+# better-auth sets the __Secure- name over HTTPS and the bare one over plain
+# HTTP (local development).
+SECURE_COOKIE_NAME = "__Secure-better-auth.session_token"
+DEV_COOKIE_NAME = "better-auth.session_token"
+
+
+def _accepted_cookie_names() -> List[str]:
+    """A deployed environment accepts only the __Secure- name (#795).
+
+    A browser will not let plain http or a script set a __Secure- cookie, so it
+    cannot be planted by a sibling subdomain or a network attacker. The bare
+    name can (cookie tossing, login CSRF), and no deployed frontend sets it.
+    """
+    if is_deployed_env():
+        return [SECURE_COOKIE_NAME]
+    return [SECURE_COOKIE_NAME, DEV_COOKIE_NAME]
+
+
+def _verified_token(cookie_value: str) -> Optional[str]:
+    """The session token, if the cookie carries better-auth's signature for it.
+
+    better-call sets the cookie as url-encoded "<token>.<signature>", where the
+    signature is base64(HMAC-SHA256(BETTER_AUTH_SECRET, token)). Without this
+    check the token alone would authenticate, and the token is readable by any
+    script on the page from /get-session and /list-sessions (#795).
+    """
+    token, dot, signature = unquote(cookie_value).rpartition(".")
+    if not dot or not token:
+        return None
+    expected = base64.b64encode(
+        hmac.new(settings.BETTER_AUTH_SECRET.encode(), token.encode(), hashlib.sha256).digest()
+    )
+    # Bytes on both sides: compare_digest raises on a non-ASCII str.
+    if not hmac.compare_digest(signature.encode(), expected):
+        return None
+    return token
 
 
 async def get_session_token_from_cookies(request: Request) -> Optional[str]:
-    """Extract better-auth session token from request cookies.
-
-    Tries both __Secure- prefixed cookies (production) and
-    non-prefixed cookies (development).
-
-    Args:
-        request: FastAPI request object
+    """Extract the verified better-auth session token from request cookies.
 
     Returns:
-        Session token string or None if not found
+        The session token, or None when there is no cookie or its signature
+        does not verify. A cookie that fails does not fall through to the
+        next name.
     """
-    for cookie_name in SESSION_COOKIE_NAMES:
-        token = request.cookies.get(cookie_name)
-        if token:
-            logger.debug(f"Found session token in cookie: {cookie_name}")
-
-            # Better-auth uses signed cookies: "token.signature"
-            # Extract only the base token part for database lookup
-            if '.' in token:
-                base_token = token.split('.')[0]
-                logger.debug(f"Extracted base token from signed cookie (length: {len(base_token)})")
-                return base_token
-
+    for cookie_name in _accepted_cookie_names():
+        cookie_value = request.cookies.get(cookie_name)
+        if cookie_value:
+            token = _verified_token(cookie_value)
+            if token is None:
+                logger.warning(f"Rejected {cookie_name} cookie: signature does not verify")
             return token
 
     return None

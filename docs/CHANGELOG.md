@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **The backend verifies the session cookie's signature, and deployed environments accept only the `__Secure-` cookie (#795, P1.13)**: `get_session_token_from_cookies` took the part of the cookie before the dot and looked it up, ignoring the signature. The bare session token was therefore a working credential for seven days, and better-auth returns that token in the bodies of `/get-session` and `/list-sessions`, where any script on the page can read it.
+  - **Signature.** The cookie is better-call's url-encoded `<token>.<signature>`, the signature being base64 HMAC-SHA256 of the token under `BETTER_AUTH_SECRET`. The backend now recomputes it and compares with `hmac.compare_digest`; a missing, forged or borrowed signature yields no token. A cookie that fails does not fall through to the other cookie name.
+  - **Cookie name.** In a deployed environment (staging and production) only `__Secure-better-auth.session_token` is read. A browser will not let plain http or a script set a `__Secure-` cookie; the bare name can be planted by a sibling subdomain (cookie tossing, login CSRF). Development still accepts both.
+  - **Tests.** Two cookies signed by the real library (better-call 1.4.0) with a fixed secret are checked in as fixtures, so the check is held to the library's algorithm and not to a copy of itself. `tests/session_cookies.py` signs cookies for the tests that drive the real session path; 25 of them had been sending a made-up signature.
+  - **Deploy note.** The backend and the frontend must share one `BETTER_AUTH_SECRET`. On staging both read it from the same `.env`. If they ever differed, every request would be refused.
+  - **Not covered.** better-auth still returns the session token in those response bodies; it is no longer enough on its own at the backend.
+
 - **The password reset flow is hardened in four places (#794, P1.12)**:
   - **The password rule is enforced by the server.** Eight characters with an uppercase letter, a lowercase letter and a number was checked only in the browser, so a direct request could set `aaaaaaaa`. A better-auth `before` hook (`frontend/src/lib/auth-password-policy.ts`) now answers 400 to a new password that fails the rule at sign-up, reset and change. The rule itself moved to `frontend/src/lib/password-policy.ts`, shared by the hook and the page checklist. Sign-in is not checked: an existing account's password is not judged.
   - **Forgot-password says the same thing for every address.** The page no longer maps a server error to "No account found", never shows the server's own error text, and its success message reads "If an account exists for ..., we have sent it a password reset link."
