@@ -51,6 +51,21 @@ describe('an error from a failed response carries the id of the request', () => 
     expect(error.requestId).toBe(SERVER_ID);
   });
 
+  it('a chapter save that lost to another one', async () => {
+    const conflict = { detail: { message: 'Changed elsewhere', current_last_modified: 't1', current_content: '<p>x</p>' } };
+    const error = await thrownBy(() => bookClient.saveChapterContent('b1', 'c1', '<p>y</p>'), failed(409, conflict));
+
+    expect(error.statusCode).toBe(409);
+    expect(error.requestId).toBe(SERVER_ID);
+  });
+
+  it('a book the user may not open', async () => {
+    const error = await thrownBy(() => bookClient.getBook('b1'), failed(403, { detail: 'Forbidden' }));
+
+    expect(error.message).toMatch(/not authorized/);
+    expect(error.requestId).toBe(SERVER_ID);
+  });
+
   it('keeps the message it had', async () => {
     const error = await thrownBy(() => bookClient.createBook({ title: 'A' }), failed(500, SERVER_ERROR));
 

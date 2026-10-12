@@ -360,7 +360,10 @@ export class BookClient {
     });
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        throw new Error('You are not authorized to view this book. Please check your login or permissions.');
+        throw withRequestId(
+          new Error('You are not authorized to view this book. Please check your login or permissions.'),
+          response
+        );
       }
       throw await failure(response, 'Failed to fetch book', false);
     }
@@ -1091,11 +1094,14 @@ export class BookClient {
       const error = await response.text();
       const conflict = response.status === 409 ? chapterConflictDetail(error) : null;
       if (conflict) {
-        throw Object.assign(new Error(conflict.message), {
-          statusCode: 409 as const,
-          currentLastModified: conflict.current_last_modified,
-          currentContent: conflict.current_content,
-        }) satisfies ChapterSaveConflict;
+        throw withRequestId(
+          Object.assign(new Error(conflict.message), {
+            statusCode: 409 as const,
+            currentLastModified: conflict.current_last_modified,
+            currentContent: conflict.current_content,
+          }) satisfies ChapterSaveConflict,
+          response
+        );
       }
       throw withRequestId(new Error(`Failed to save chapter content: ${response.status} ${error}`), response);
     }

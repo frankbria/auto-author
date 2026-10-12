@@ -117,6 +117,14 @@ class TestLogLinesCarryIt:
         assert {r.request_id for r in mine} == {response.headers["x-request-id"]}
         assert any(r.levelno == logging.ERROR for r in mine)
 
+    def test_a_request_that_failed_is_not_also_logged_as_completed(self, api, caplog):
+        with caplog.at_level(logging.INFO):
+            api.get(PROBE + "/fail")
+            api.get(PROBE)
+
+        said = [r.getMessage().split(":")[0] for r in caplog.records if r.name == "app.api.request_validation"]
+        assert said == ["Request started", "Request failed", "Request started", "Request completed"]
+
     def test_a_line_written_outside_any_request_says_so(self, api, caplog):
         api.get(PROBE)
         with caplog.at_level(logging.INFO):

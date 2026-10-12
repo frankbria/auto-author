@@ -61,6 +61,14 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             if handler is None:
                 raise
             response = await handler(request, e)
+        else:
+            # Calculate and log request duration
+            process_time = (time.time() - start_time) * 1000
+            logger.info(
+                f"Request completed: {request.method} {request.url.path} "
+                f"[ID: {request_id}] - Status: {response.status_code}, "
+                f"Took: {process_time:.2f}ms"
+            )
 
         # Add security headers
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -79,14 +87,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             "connect-src 'self'; "
             "frame-src 'self'; "
             "font-src 'self' data: https://r2cdn.perplexity.ai;"
-        )
-
-        # Calculate and log request duration
-        process_time = (time.time() - start_time) * 1000
-        logger.info(
-            f"Request completed: {request.method} {request.url.path} "
-            f"[ID: {request_id}] - Status: {response.status_code}, "
-            f"Took: {process_time:.2f}ms"
         )
 
         return response
