@@ -5,6 +5,7 @@ Tests S3, Cloudinary, and factory pattern
 import pytest
 from unittest.mock import Mock, patch
 from botocore.exceptions import ClientError
+from app.core.config import settings
 from app.services.cloud_storage_service import (
     S3StorageService,
     CloudinaryStorageService,
@@ -246,10 +247,10 @@ class TestGetCloudStorageService:
         app.services.cloud_storage_service._storage_service = None
 
     def test_get_storage_with_cloudinary(self, monkeypatch, reset_global_service):
-        """Test that Cloudinary is preferred when credentials exist."""
-        monkeypatch.setenv('CLOUDINARY_CLOUD_NAME', 'test-cloud')
-        monkeypatch.setenv('CLOUDINARY_API_KEY', 'test-key')
-        monkeypatch.setenv('CLOUDINARY_API_SECRET', 'test-secret')
+        """Cloudinary is used when its settings are complete (settings, not the process environment: #806)."""
+        monkeypatch.setattr(settings, 'CLOUDINARY_CLOUD_NAME', 'test-cloud')
+        monkeypatch.setattr(settings, 'CLOUDINARY_API_KEY', 'test-key')
+        monkeypatch.setattr(settings, 'CLOUDINARY_API_SECRET', 'test-secret')
 
         with patch('app.services.cloud_storage_service.CloudStorageFactory.create_storage_service') as mock_factory:
             mock_service = Mock()
@@ -267,9 +268,9 @@ class TestGetCloudStorageService:
 
     def test_get_storage_with_s3(self, monkeypatch, reset_global_service):
         """Test S3 is used when only S3 credentials exist."""
-        monkeypatch.setenv('AWS_ACCESS_KEY_ID', 'test-key')
-        monkeypatch.setenv('AWS_SECRET_ACCESS_KEY', 'test-secret')
-        monkeypatch.setenv('AWS_S3_BUCKET', 'test-bucket')
+        monkeypatch.setattr(settings, 'AWS_ACCESS_KEY_ID', 'test-key')
+        monkeypatch.setattr(settings, 'AWS_SECRET_ACCESS_KEY', 'test-secret')
+        monkeypatch.setattr(settings, 'AWS_S3_BUCKET', 'test-bucket')
 
         with patch('app.services.cloud_storage_service.CloudStorageFactory.create_storage_service') as mock_factory:
             mock_service = Mock()

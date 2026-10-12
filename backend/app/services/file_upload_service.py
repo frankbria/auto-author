@@ -11,6 +11,7 @@ from typing import Optional, Tuple
 from PIL import Image
 from fastapi import UploadFile, HTTPException, status
 from io import BytesIO
+from app.core.config import settings
 from app.services.cloud_storage_service import get_cloud_storage_service
 import logging
 
@@ -185,9 +186,18 @@ class FileUploadService:
         """Initialize the upload service and ensure directories exist."""
         self.cloud_storage = get_cloud_storage_service()
         if self.cloud_storage is None:
-            # Only create local directories if not using cloud storage
-            COVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-            PROFILE_PICTURES_DIR.mkdir(parents=True, exist_ok=True)
+            # Local disk is for development (#806). In the container image the
+            # working directory belongs to root, so this fails there; say why,
+            # and what to set, instead of a bare PermissionError.
+            try:
+                COVER_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+                PROFILE_PICTURES_DIR.mkdir(parents=True, exist_ok=True)
+            except OSError as error:
+                raise RuntimeError(
+                    f"Uploads are not available: no cloud storage is configured and the local "
+                    f"directory {UPLOAD_DIR.absolute()} cannot be created ({error.strerror}). "
+                    f"{settings.storage_setup_help}"
+                ) from error
             logger.info("Using local file storage for uploads")
         else:
             logger.info("Using cloud storage for uploads")

@@ -87,6 +87,18 @@ The **backend** gets everything else in the file wholesale via `env_file:` — i
 also needs `AWS_*`, `CLOUDINARY_*`, `BETTER_AUTH_ISSUER` and
 `BACKEND_CORS_ORIGINS`, which an explicit allowlist would have silently dropped.
 
+**Upload storage must be configured on a deployed backend** (#806). The backend
+uses Cloudinary when `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and
+`CLOUDINARY_API_SECRET` are all set, else S3 when `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY` and `AWS_S3_BUCKET` are all set. With neither complete it
+falls back to a local `uploads/` directory, which the image cannot create (`/app`
+belongs to root). The container still starts; the first cover or avatar upload
+fails, and the log says `Uploads are not available: no cloud storage is configured
+and the local directory /app/uploads cannot be created`, followed by the settings
+to set and any that are half set. With `ENVIRONMENT=production` the backend
+refuses to start instead: `Application startup blocked: no upload storage is
+configured`.
+
 The **frontend does not** (#781). It takes an explicit `environment:` list in
 `docker-compose.yml` — the Mongo connection, `BETTER_AUTH_*`, the `EMAIL_*`
 settings (password reset, and since #792 the sign-up verification email, without
