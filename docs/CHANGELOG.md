@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-11
 
+- **The frontend reports whether sign-up email can be sent, and the staging probe checks it (#968, P1.10.1)**: since #792 nobody can finish signing up without the verification email, a missing provider is invisible to the user, and no health check knew about the frontend's email settings.
+  - **Route.** `GET /api/health` on the frontend answers `{"status": "ok", "email": {"configured": true, "provider": "resend"}}`. It is public and unauthenticated, reads the environment on every request, and never returns the key or the from-address.
+  - **One rule.** `emailProvider()` in `frontend/src/lib/email.ts` decides the answer: `resend` or `sendgrid` with an API key, `console` in development, otherwise none. A test holds it to what a send does, case by case, so the route cannot say "configured" for settings a send would reject.
+  - **Probe.** `scripts/staging_health_probe.py` now fails unless that route says email is configured, so `staging-health.yml` raises its alert when a deploy or an edit to the box's `.env` loses the provider.
+  - **Not covered.** "Configured" means a known provider and a key are present. It does not prove the key is valid or that mail is delivered.
+
 - **A new account must verify its email address before it can sign in (#792, P1.10)**: anyone could register any address and was signed in at once, which allowed pre-account hijacking, throwaway accounts for AI quota, and receipts sent to addresses nobody had confirmed.
   - **better-auth.** `requireEmailVerification` is on. Sign-up creates the account and returns no session; sign-in for an unverified address answers 403 `EMAIL_NOT_VERIFIED` and mails a fresh link. The link is valid for one hour, verifies the address and signs the user in once; opening it again grants nothing.
   - **Email.** `frontend/src/lib/email.ts` has one delivery function behind both the reset and the verification email. The verification email carries no name, so nothing a user typed is put into its HTML. A failed send is not visible to the user: better-auth catches and logs it, and the page says "Check your email" either way. The trace is an `[email] Verification email NOT sent` line in the frontend's server log.

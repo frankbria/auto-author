@@ -79,7 +79,7 @@ def test_health_probe_is_scheduled_ai_free_and_alerts_with_its_own_label():
 
 
 class Staging(BaseHTTPRequestHandler):
-    """Answers /health and / from the server's `answers` script, one per hit."""
+    """Answers /health, / and /api/health from the server's `answers` script, one per hit."""
 
     def do_GET(self):
         script = self.server.answers[self.path]
@@ -99,6 +99,8 @@ UNHEALTHY = (
     json.dumps({"status": "unhealthy", "checks": {"mongodb": "error: OperationFailure", "config": "ok"}}),
 )
 PAGE = (200, "<html>ok</html>")
+EMAIL_OK = (200, json.dumps({"status": "ok", "email": {"configured": True, "provider": "resend"}}))
+EMAIL_MISSING = (200, json.dumps({"status": "ok", "email": {"configured": False, "provider": None}}))
 
 
 @pytest.fixture
@@ -110,8 +112,8 @@ def staging():
     server.shutdown()
 
 
-def probe(server, health, frontend, attempts=2):
-    server.answers = {"/health": list(health), "/": list(frontend)}
+def probe(server, health, frontend, attempts=2, email=(EMAIL_OK,)):
+    server.answers = {"/health": list(health), "/": list(frontend), "/api/health": list(email)}
     base = f"http://127.0.0.1:{server.server_address[1]}"
     env = {
         **os.environ,
@@ -145,6 +147,30 @@ def test_probe_fails_when_frontend_root_is_not_200(staging):
     result = probe(staging, [HEALTHY], [(502, "Bad Gateway")])
     assert result.returncode == 1
     assert "502" in result.stdout
+
+
+NO_PROVIDER = "no email provider is configured"
+NO_ANSWER = "health route did not answer"
+
+
+@pytest.mark.parametrize(
+    "answer, reason",
+    [
+        (EMAIL_MISSING, NO_PROVIDER),
+        ((200, json.dumps({"status": "ok", "email": {"configured": "yes"}})), NO_PROVIDER),
+        # A build from before the route existed must not be reported as a lost provider.
+        ((404, "Not Found"), NO_ANSWER),
+        ((200, "<html>not json</html>"), NO_ANSWER),
+        ((200, json.dumps({"status": "ok"})), NO_ANSWER),
+    ],
+    ids=["not configured", "not a boolean true", "route missing", "not json", "no email key"],
+)
+def test_probe_fails_unless_the_frontend_says_email_is_configured(staging, answer, reason):
+    # #968: without a provider no new account can verify its address (#792),
+    # and nothing else outside the container shows it.
+    result = probe(staging, [HEALTHY], [PAGE], email=[answer])
+    assert result.returncode == 1
+    assert "/api/health" in result.stdout and reason in result.stdout
 
 
 def test_probe_rides_out_one_transient_failure(staging):

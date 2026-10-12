@@ -151,6 +151,21 @@ export async function sendVerificationEmail({
 }
 
 /**
+ * Which provider `deliver` will use, or null when it cannot send (#968). The
+ * health route reports this; a test holds it to what `deliver` actually does.
+ */
+export function emailProvider(): "resend" | "sendgrid" | "console" | null {
+  const provider = process.env.EMAIL_SERVICE_PROVIDER?.toLowerCase();
+  if (process.env.NODE_ENV === "development" && (!provider || provider === "console")) {
+    return "console";
+  }
+  if ((provider === "resend" || provider === "sendgrid") && process.env.EMAIL_SERVICE_API_KEY) {
+    return provider;
+  }
+  return null;
+}
+
+/**
  * Delivers one email.
  *
  * Providers are selected via `EMAIL_SERVICE_PROVIDER`:

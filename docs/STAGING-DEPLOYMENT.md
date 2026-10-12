@@ -82,7 +82,8 @@ also needs `AWS_*`, `CLOUDINARY_*`, `BETTER_AUTH_ISSUER` and
 The **frontend does not** (#781). It takes an explicit `environment:` list in
 `docker-compose.yml` — the Mongo connection, `BETTER_AUTH_*`, the `EMAIL_*`
 settings (password reset, and since #792 the sign-up verification email, without
-which no new account can sign in), `NEXT_PUBLIC_SENTRY_DSN`/`NEXT_PUBLIC_ENVIRONMENT` —
+which no new account can sign in; `GET /api/health` on the frontend reports
+whether a provider is configured, #968), `NEXT_PUBLIC_SENTRY_DSN`/`NEXT_PUBLIC_ENVIRONMENT` —
 with values still read from this same `.env` by compose interpolation, so there
 is one file on the box and no second one to keep in step. OpenAI, Stripe, AWS
 and Cloudinary keys never enter the Next.js process. Consequences:

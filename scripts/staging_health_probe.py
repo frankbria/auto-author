@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Staging health probe (#916): the API health check plus the frontend root.
+"""Staging health probe (#916): the API health check plus the frontend.
 
 No AI, no auth, public URLs only. It catches infra drift between deploys (the
 #537 Atlas credential outage left /health answering 503 for days) now that the
 E2E suite only runs after a deploy. The API must answer 200 with
-{"status": "healthy"}; the frontend root must answer 200. Each attempt checks
-both; it exits 0 on the first fully healthy attempt and 1 after the last.
+{"status": "healthy"}; the frontend root must answer 200; and the frontend's
+own health route must say an email provider is configured (#968), because
+without one nobody can finish signing up and nothing else shows it. Each
+attempt checks all three; it exits 0 on the first fully healthy attempt and 1
+after the last.
 
 Run: python3 scripts/staging_health_probe.py
 """
@@ -19,6 +22,7 @@ import urllib.request
 
 API = os.environ.get("API_HEALTH_URL", "https://api.dev.autoauthor.app/api/v1/health")
 FRONTEND = os.environ.get("FRONTEND_URL", "https://dev.autoauthor.app/")
+FRONTEND_HEALTH = FRONTEND.rstrip("/") + "/api/health"
 ATTEMPTS = int(os.environ.get("PROBE_ATTEMPTS", "3"))
 DELAY = float(os.environ.get("PROBE_DELAY", "20"))
 
@@ -45,6 +49,22 @@ def problems():
     status, body = fetch(FRONTEND)
     if status != 200:
         found.append(f"{FRONTEND} -> {status} {body[:200]!r}")
+    status, body = fetch(FRONTEND_HEALTH)
+    try:
+        configured = json.loads(body)["email"]["configured"]
+    except (ValueError, KeyError, TypeError):
+        configured = None
+    if status != 200 or configured is None:
+        # e.g. a build from before the route existed: say so, not "no provider".
+        found.append(
+            f"{FRONTEND_HEALTH} -> {status} {body[:200]!r}: the frontend health"
+            " route did not answer, so whether sign-up email can be sent is unknown"
+        )
+    elif configured is not True:
+        found.append(
+            f"{FRONTEND_HEALTH} -> {status} {body[:200]!r}: no email provider is"
+            " configured, so no new account can verify its address"
+        )
     return found
 
 
@@ -52,7 +72,7 @@ def main():
     for attempt in range(1, ATTEMPTS + 1):
         found = problems()
         if not found:
-            print(f"healthy: {API} and {FRONTEND} (attempt {attempt}/{ATTEMPTS})")
+            print(f"healthy: {API}, {FRONTEND} and its email provider (attempt {attempt}/{ATTEMPTS})")
             return 0
         print(f"attempt {attempt}/{ATTEMPTS} failed: " + "; ".join(found))
         if attempt < ATTEMPTS:
