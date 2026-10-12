@@ -1,6 +1,7 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useSession } from '@/lib/auth-client';
 import { useAuthFetch } from '@/hooks/useAuthFetch';
+import { browser, resetUnauthorizedForTests } from '@/lib/api/unauthorized';
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -114,10 +115,10 @@ describe('useAuthFetch Hook', () => {
   });
 
   test('handles 401 unauthorized errors and allows retry', async () => {
-    // Note: This tests error handling for 401 responses.
-    // In cookie-based auth, session refresh is handled automatically by better-auth,
-    // but 401 errors are still surfaced so the application can handle them
-    // (e.g., by redirecting to login page).
+    // A 401 is surfaced to the caller AND ends the dead session: the shared
+    // handler signs out and sends the user to sign in (#796).
+    resetUnauthorizedForTests();
+    const go = jest.spyOn(browser, 'go').mockImplementation(() => {});
 
     // Mock fetch to first return unauthorized, then success on retry
     (global.fetch as jest.Mock)
@@ -152,6 +153,11 @@ describe('useAuthFetch Hook', () => {
         expect(secondResponse).toEqual(mockFetchResponse);
       }
     });
+
+    await waitFor(() =>
+      expect(go).toHaveBeenCalledWith(expect.stringMatching(/^\/auth\/sign-in\?redirect=/))
+    );
+    go.mockRestore();
   });
 
   test('returns isAuthenticated based on session state', async () => {

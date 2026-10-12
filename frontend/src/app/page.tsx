@@ -1,7 +1,8 @@
 // app/page.tsx
 'use client';
 
-import { useSession, authClient } from '@/lib/auth-client';
+import { useSession } from '@/lib/auth-client';
+import { signOutOrNotify } from '@/lib/sign-out';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import SiteFooter from '@/components/SiteFooter';
@@ -87,9 +88,7 @@ export default function Home() {
               </button>
             </Link>
             <button
-              onClick={async () => {
-                await authClient.signOut();
-              }}
+              onClick={() => void signOutOrNotify()}
               className="px-6 py-3 text-white font-semibold bg-gray-700 hover:bg-gray-600 rounded-lg shadow-md transition inline-block cursor-pointer"
             >
               Sign Out

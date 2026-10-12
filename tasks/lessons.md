@@ -1385,3 +1385,12 @@ Worktrees here link `frontend/node_modules` to the main checkout's. That install
 
 ### A recorded demo command can trip the secrets hook with a variable reference (#793)
 `body: JSON.stringify({ password: '$DEMO_PW' })` inside a recorded `agent-browser eval` matched the commit hook's password pattern, although it holds no secret. The demo file cannot be hand-edited, so the fix cost a re-recording of half the demo with the stack restarted. Keep `password: '...'` out of recorded commands (pass the value through a file or a variable with another name), and run `pre-commit run check-secrets` on the demo before tearing the stack down.
+
+### A check that passes under the mutation it exists to catch is not a check (#843)
+The real-auth E2E's "the bare session token is refused" assertion passed with the backend's signature comparison switched off, twice. First because the cookie never left the browser: Playwright does not send a `Cookie` header set through `extraHTTPHeaders`, so the 401 was for want of any cookie. Then, sent properly, because a bare token has no signature and is refused for its shape before any comparison runs. Only a token with a made-up signature of the right shape reaches the comparison. Two habits came out of it: when asserting a refusal, include a positive control sent the same way (the genuine cookie replayed gets 200), and run the mutation the assertion is named for before trusting it. A test that passes on its first run has shown nothing yet.
+
+### The bot's green review check can mean the model never ran (#795)
+The repo's GLM review job ended in about a second with `is_error: true`, one turn, zero cost and a comment reading "I'll analyze this and get back to you", and the check was green. The plan it runs on had hit its usage limit, which the local reviewer reported in words (`Weekly/Monthly Limit Exhausted`). A green review check is evidence of a review only if the comment contains one. Ping the reviewer with a one-word prompt before relying on it, and say on the PR when the bot did not review.
+
+### Edit a PR comment by the id that was returned, never "the last comment" (#795)
+To fix a typo in a comment just posted, the command fetched the newest comment's id and patched it. A bot's tracking comment had landed nine seconds after mine, so the patch overwrote the bot's comment with my text. `gh pr comment` prints the URL of what it created; take the id from that.

@@ -507,6 +507,45 @@ describe('ActiveSessionsList', () => {
     );
   });
 
+  // #796: better-auth refuses to list sessions once the session is more than a
+  // day old. That is not a failure to retry; signing in again is what fixes it.
+  it('asks for a fresh sign-in when the session is too old to list devices', async () => {
+    mockListSessions.mockResolvedValue({
+      data: null,
+      error: { code: 'SESSION_NOT_FRESH', status: 403, message: 'Session is not fresh' },
+    });
+    render(<ActiveSessionsList />);
+
+    const prompt = await screen.findByRole('alert');
+    expect(prompt).toHaveTextContent(/sign in again to see your devices/i);
+    expect(screen.getByRole('link', { name: /sign in again/i })).toHaveAttribute(
+      'href',
+      `/auth/sign-in?redirect=${encodeURIComponent('/dashboard/settings')}`
+    );
+    expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      'the session is too old to list devices',
+      () => Promise.resolve({ data: null, error: { code: 'SESSION_NOT_FRESH', status: 403 } }),
+    ],
+    ['the list fails to load', () => Promise.reject(new Error('nope'))],
+    ['this is the only device', () => Promise.resolve({ data: [sessions[0]], error: null })],
+  ])('still offers to sign out other devices when %s', async (_case, listing) => {
+    mockListSessions.mockImplementation(listing);
+    render(<ActiveSessionsList />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /sign out other devices/i }));
+
+    await waitFor(() => expect(mockRevokeOtherSessions).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Signed out of other devices' })
+      )
+    );
+  });
+
   it('offers retry when the session list fails to load', async () => {
     mockListSessions.mockRejectedValueOnce(new Error('nope'));
     render(<ActiveSessionsList />);

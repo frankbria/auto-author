@@ -20,6 +20,7 @@ import {
 import { handleAIServiceError, AIServiceResult } from '@/lib/api/aiErrorHandler';
 import { BookResponse, toBookProject } from '@/types/book';
 import { ExportTemplate, TemplateCustomization } from '@/types/export';
+import { apiFetch } from '@/lib/api/unauthorized';
 
 /** A content save rejected because the chapter was saved elsewhere (#760). */
 export type ChapterSaveConflict = Error & {
@@ -256,7 +257,7 @@ export class BookClient {
     if (options.limit !== undefined) params.append('limit', String(options.limit));
     const query = params.toString();
 
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${query ? `?${query}` : ''}`,  // Added trailing slash
       {
         headers: await this.getHeaders(),
@@ -312,7 +313,7 @@ export class BookClient {
    * ```
    */
   public async getBook(bookId: string): Promise<BookProject> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}`, {
       headers: await this.getHeaders(),
       credentials: 'include',
     });
@@ -380,7 +381,7 @@ export class BookClient {
     genre?: string;
     target_audience?: string;
   }): Promise<BookProject> {
-    const response = await fetch(`${this.baseUrl}/books/`, {
+    const response = await apiFetch(`${this.baseUrl}/books/`, {
       method: 'POST',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -448,7 +449,7 @@ export class BookClient {
     bookId: string,
     bookData: { title?: string; description?: string; subtitle?: string; genre?: string; target_audience?: string }
   ): Promise<BookProject> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}`, {
       method: 'PATCH',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -510,7 +511,7 @@ export class BookClient {
    * @see {@link frontend/src/components/books/DeleteBookModal.tsx} - UI component with type-to-confirm
    */
   public async deleteBook(bookId: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}`, {
       method: 'DELETE',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -564,7 +565,7 @@ export class BookClient {
     character_count: number;
     meets_minimum_requirements: boolean;
   }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/toc-readiness`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/toc-readiness`, {
       headers: await this.getHeaders(),
       credentials: 'include',
     });
@@ -640,7 +641,7 @@ export class BookClient {
     };
     analyzed_at: string;
   }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/analyze-summary`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/analyze-summary`, {
       method: 'POST',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -678,7 +679,7 @@ export class BookClient {
   public async generateQuestions(bookId: string): Promise<{
     questions: string[];
   }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/generate-questions`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/generate-questions`, {
       method: 'POST',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -750,7 +751,7 @@ export class BookClient {
     base_version?: number;
     replaces_drafts?: number;
   }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/generate-toc`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/generate-toc`, {
       method: 'POST',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -810,7 +811,7 @@ export class BookClient {
     /** Stored TOC version (0 when no TOC exists yet); send back as expected_version on PUT. */
     version?: number;
   }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/toc`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/toc`, {
       headers: await this.getHeaders(),
       credentials: 'include',
     });
@@ -888,7 +889,7 @@ export class BookClient {
     };
     success: boolean;
   }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/toc`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/toc`, {
       method: 'PUT',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -925,7 +926,7 @@ export class BookClient {
    * ```
    */
   public async getBookSummary(bookId: string): Promise<{ summary: string; summary_history?: unknown[] }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/summary`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/summary`, {
       headers: await this.getHeaders(),
       credentials: 'include',
     });
@@ -961,7 +962,7 @@ export class BookClient {
    * ```
    */
   public async saveBookSummary(bookId: string, summary: string): Promise<{ summary: string; success: boolean }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/summary`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/summary`, {
       method: 'PUT',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -983,7 +984,7 @@ export class BookClient {
     answered_at: string;
     ready_for_toc_generation: boolean;
   }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/question-responses`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/question-responses`, {
       method: 'PUT',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -1004,7 +1005,7 @@ export class BookClient {
     answered_at?: string;
     status: string;
   }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/question-responses`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/question-responses`, {
       method: 'GET',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -1044,7 +1045,7 @@ export class BookClient {
       auto_update_metadata: autoUpdateMetadata,
       expected_last_modified: options.expectedLastModified,
     });
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content`, {
       method: 'PATCH',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -1094,7 +1095,7 @@ export class BookClient {
       track_access: trackAccess.toString()
     });
 
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content?${params}`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/chapters/${chapterId}/content?${params}`, {
       method: 'GET',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -1131,7 +1132,7 @@ export class BookClient {
     };
     last_active_chapter?: string;
   }> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/metadata?include_content_stats=${includeContentStats}`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/chapters/metadata?include_content_stats=${includeContentStats}`, {
       headers: await this.getHeaders(),
       credentials: 'include',
     });
@@ -1145,7 +1146,7 @@ export class BookClient {
    * Update chapter status
    */
   public async updateChapterStatus(bookId: string, chapterId: string, status: ChapterStatus): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/bulk-status`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/chapters/bulk-status`, {
       method: 'PATCH',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -1165,7 +1166,7 @@ export class BookClient {
    * Update bulk chapter status
    */
   public async updateBulkChapterStatus(bookId: string, chapterIds: string[], status: ChapterStatus): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/bulk-status`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/chapters/bulk-status`, {
       method: 'PATCH',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -1192,7 +1193,7 @@ export class BookClient {
   }): Promise<void> {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/tab-state`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/chapters/tab-state`, {
       method: 'POST',
       headers: await this.getHeaders(),
       credentials: 'include',
@@ -1218,7 +1219,7 @@ export class BookClient {
     session_id?: string;
   } | null> {
     const params = sessionId ? `?session_id=${sessionId}` : '';
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/chapters/tab-state${params}`, {
+    const response = await apiFetch(`${this.baseUrl}/books/${bookId}/chapters/tab-state${params}`, {
       headers: await this.getHeaders(),
       credentials: 'include',
     });
@@ -1259,7 +1260,7 @@ export class BookClient {
     suggestions: string[];
     message: string;
   }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/generate-draft`,
       {
         method: 'POST',
@@ -1301,7 +1302,7 @@ export class BookClient {
     };
     message: string;
   }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/transform-style`,
       {
         method: 'POST',
@@ -1342,7 +1343,7 @@ export class BookClient {
     };
     message: string;
   }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/enhance-text`,
       {
         method: 'POST',
@@ -1384,7 +1385,7 @@ export class BookClient {
     };
     message: string;
   }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/enhance-transcription`,
       {
         method: 'POST',
@@ -1410,7 +1411,7 @@ export class BookClient {
     chapterId: string,
     options: GenerateQuestionsRequest = {}
   ): Promise<GenerateQuestionsResponse> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/generate-questions`,
       {
         method: 'POST',
@@ -1447,7 +1448,7 @@ export class BookClient {
     if (options.page) params.append('page', options.page.toString());
     if (options.limit) params.append('limit', options.limit.toString());
 
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions?${params}`,
       {
         headers: await this.getHeaders(),
@@ -1470,7 +1471,7 @@ export class BookClient {
     questionId: string,
     responseData: QuestionResponseRequest
   ): Promise<{ response: QuestionResponse; success: boolean; message: string }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/response`,
       {
         method: 'PUT',
@@ -1494,7 +1495,7 @@ export class BookClient {
     chapterId: string,
     questionId: string
   ): Promise<{ response: QuestionResponse | null; has_response: boolean; success: boolean }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/response`,
       {
         headers: await this.getHeaders(),
@@ -1588,7 +1589,7 @@ export class BookClient {
     }>;
     message: string;
   }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/responses/batch`,
       {
         method: 'POST',
@@ -1613,7 +1614,7 @@ export class BookClient {
     questionId: string,
     ratingData: QuestionRatingRequest
   ): Promise<{ rating: { id: string; question_id: string; rating: number; feedback?: string; created_at: string }; success: boolean; message: string }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/rating`,
       {
         method: 'POST',
@@ -1636,7 +1637,7 @@ export class BookClient {
     bookId: string,
     chapterId: string
   ): Promise<QuestionProgressResponse> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/question-progress`,
       {
         headers: await this.getHeaders(),
@@ -1659,7 +1660,7 @@ export class BookClient {
     options: GenerateQuestionsRequest = {},
     preserveResponses: boolean = true
   ): Promise<GenerateQuestionsResponse> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/regenerate-questions?preserve_responses=${preserveResponses}`,
       {
         method: 'POST',
@@ -1685,7 +1686,7 @@ export class BookClient {
     questionId: string,
     options: { focus?: QuestionType } = {}
   ): Promise<Question> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/questions/${questionId}/regenerate`,
       {
         method: 'POST',
@@ -1744,7 +1745,7 @@ export class BookClient {
       params.append('custom_options', JSON.stringify(options.customization));
     }
 
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/export/pdf?${params.toString()}`,
       {
         headers: await this.getHeaders(),
@@ -1781,7 +1782,7 @@ export class BookClient {
       params.append('custom_options', JSON.stringify(options.customization));
     }
 
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/export/docx?${params.toString()}`,
       {
         headers: await this.getHeaders(),
@@ -1810,7 +1811,7 @@ export class BookClient {
       params.append('include_empty_chapters', options.includeEmptyChapters.toString());
     }
 
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/export/epub?${params.toString()}`,
       {
         headers: await this.getHeaders(),
@@ -1843,7 +1844,7 @@ export class BookClient {
       params.append('multi_file', options.multiFile.toString());
     }
 
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/export/markdown?${params.toString()}`,
       {
         headers: await this.getHeaders(),
@@ -1879,7 +1880,7 @@ export class BookClient {
     };
     templates?: ExportTemplate[];
   }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/export/formats`,
       {
         headers: await this.getHeaders(),
@@ -1899,7 +1900,7 @@ export class BookClient {
    * Get the available professional export templates (issue #59)
    */
   public async getExportTemplates(bookId: string): Promise<ExportTemplate[]> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/export/templates`,
       {
         headers: await this.getHeaders(),
@@ -1933,7 +1934,7 @@ export class BookClient {
     created_at: string;
     updated_at: string;
   }> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters`,
       {
         method: 'POST',
@@ -1955,7 +1956,7 @@ export class BookClient {
    * Delete a chapter from a book
    */
   public async deleteChapter(bookId: string, chapterId: string): Promise<void> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${this.baseUrl}/books/${bookId}/chapters/${chapterId}`,
       {
         method: 'DELETE',

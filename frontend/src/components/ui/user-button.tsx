@@ -1,8 +1,8 @@
 "use client";
 
 import { useSession } from "@/lib/auth-client";
-import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { signOutOrNotify } from "@/lib/sign-out";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -36,12 +36,8 @@ export function UserButton() {
     .toUpperCase() || "U";
 
   async function handleSignOut() {
-    try {
-      await authClient.signOut();
-      router.push("/");
-    } catch (error) {
-      console.error("Sign out error:", error);
-    }
+    // Go home only once the session is really gone (#796).
+    if (await signOutOrNotify()) router.push("/");
   }
 
   return (
