@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **AI requests have a time budget, and a refused credential or billing refusal is treated as an outage (#799, P1.17)**:
+  - **Timeout.** The OpenAI client was built with no timeout, so the SDK's 600 seconds applied. With three attempts, a stalled provider could hold a worker thread for half an hour on the executor that also runs uploads and payments. `AI_REQUEST_TIMEOUT_SECONDS` (default 120, per attempt) is now passed to the client.
+  - **Rejected credential.** A 401 or 403 from the provider was retried and then reported as an unexpected error. It now raises `AIProviderAuthError` after one attempt: not retryable, logged CRITICAL, answered to the user as 503 with the code `AI_PROVIDER_AUTH_FAILED` and no mention of keys.
+  - **Billing refusal.** `insufficient_quota` and a 402 were already non-retryable since #775; their log line moved from ERROR to CRITICAL.
+  - **Not covered.** 120 seconds is a guess that leaves room for a long draft; it has not been measured against real generations. The model call still runs on the shared default executor.
+
 - **The required Playwright job now runs one test with real authentication (#843, P1.61)**: every spec ran with `BYPASS_AUTH`, so nothing required exercised the chain a real user depends on: better-auth signs a cookie, the backend verifies it, finds the session, and scopes data to that user. That is the class of failure behind #556.
   - **Config.** `frontend/playwright.real-auth.config.ts` starts its own backend (port 8001) and frontend (port 3001, `next dev`) with the bypass explicitly off, against their own database (`auto_author_e2e_real_auth`).
   - **Spec.** `frontend/src/e2e/real-auth/sign-up-to-protected-api.spec.ts` signs up through the page, is refused a session until the address is verified, opens the verification link the server emailed (read from the development server's output, since no provider is configured), then calls protected endpoints: the profile carries the id better-auth gave the user, a created book is owned by that id, the bare session token without its signature is refused, and a second user signed up the same way sees none of the first user's books. It also sends a weak password straight to the server and expects 400.

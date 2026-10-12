@@ -13,6 +13,7 @@ from app.services.ai_errors import (
     AIRateLimitError,
     AINetworkError,
     AIServiceUnavailableError,
+    AIProviderAuthError,
     AIProviderQuotaError,
     AIInvalidRequestError
 )
@@ -70,6 +71,8 @@ class AIService:
             # OpenAI key elsewhere: AI_BASE_URL is the only switch (#917).
             base_url=settings.AI_BASE_URL or "https://api.openai.com/v1",
             max_retries=0,
+            # Per attempt; without it the SDK waits ten minutes (#799).
+            timeout=settings.AI_REQUEST_TIMEOUT_SECONDS,
         )
         self.model = settings.AI_MODEL_DEFAULT
         self.long_output_model = settings.AI_MODEL_LONG_OUTPUT
@@ -112,9 +115,9 @@ class AIService:
 
             except openai.RateLimitError as e:
                 if e.code == "insufficient_quota":
-                    # Logged at ERROR so Sentry raises it: every AI feature is
-                    # down until someone adds credit (#775).
-                    logger.error(
+                    # CRITICAL: every AI feature is down until someone adds
+                    # credit, and no retry will change that (#775, #799).
+                    logger.critical(
                         f"OpenAI refused for billing (insufficient_quota) [correlation_id={correlation_id}]"
                     )
                     raise AIProviderQuotaError(
@@ -137,6 +140,17 @@ class AIService:
                         original_exception=e,
                         correlation_id=correlation_id
                     )
+
+            except (openai.AuthenticationError, openai.PermissionDeniedError) as e:
+                # The key is wrong or may not use this model. Retrying sends the
+                # same key again; an operator has to act (#799).
+                logger.critical(
+                    f"AI provider rejected our credential ({e.status_code}) "
+                    f"[correlation_id={correlation_id}]"
+                )
+                raise AIProviderAuthError(
+                    original_exception=e, correlation_id=correlation_id
+                )
 
             except (openai.APITimeoutError, openai.APIConnectionError) as e:
                 last_exception = e
@@ -194,7 +208,7 @@ class AIService:
                 # 402 is how OpenAI-compatible providers (Ollama cloud,
                 # OpenRouter) refuse for billing; same meaning as #775's 429 (#917).
                 if isinstance(e, openai.APIStatusError) and e.status_code == 402:
-                    logger.error(
+                    logger.critical(
                         f"AI provider refused for billing (402) [correlation_id={correlation_id}]"
                     )
                     raise AIProviderQuotaError(
