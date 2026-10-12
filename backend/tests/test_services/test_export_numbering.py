@@ -175,6 +175,30 @@ class TestNumberingFollowsWhatIsExported:
         # Title page, contents, then Chapter 1 with 1.1 under it, then Chapter 2.
         assert len(re.findall(rb"/Type /Page\b", pdf)) == 4
 
+    async def test_epub_gives_a_grouping_chapter_no_document_of_its_own(self):
+        """In a reader each document starts a new page, so a document holding
+        only the heading would be the page of its own the other formats avoid.
+        The heading opens the first document under it instead."""
+        book = _book(
+            _chapter("Planning", _chapter("Outlines"), _chapter("Research"), content=""),
+            _chapter("Writing"),
+        )
+
+        files = await _epub_files(book)
+
+        chapters = {name.split("/")[-1]: markup for name, markup in files.items() if "chap_" in name}
+        assert sorted(chapters) == ["chap_2.xhtml", "chap_3.xhtml", "chap_4.xhtml"]
+        assert re.findall(r"<(h\d)[^>]*>(.*?)</\1>", chapters["chap_2.xhtml"]) == [
+            ("h1", "Chapter 1: Planning"),
+            ("h2", "1.1 Outlines"),
+        ]
+        # The navigation still has the chapter, over its subchapters, and it opens that document.
+        nav = next(markup for name, markup in files.items() if "nav" in name)
+        planning = nav[: nav.index("Chapter 2: Writing")]
+        planning = planning[planning.rindex("<li", 0, planning.index("Chapter 1: Planning")) :]
+        assert _text(planning) == "Chapter 1: Planning 1.1 Outlines 1.2 Research"
+        assert re.search(r'href="[^"]*chap_2\.xhtml"[^>]*>\s*Chapter 1: Planning', planning)
+
     async def test_an_empty_chapter_that_was_asked_for_keeps_its_placeholder(self):
         book = _book(_chapter("Planning", content=""), _chapter("Writing"))
 

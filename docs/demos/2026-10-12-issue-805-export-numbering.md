@@ -1,7 +1,7 @@
 # Exports number chapters by their place in the outline (#805)
 
-*2026-10-12T08:56:18Z by Showboat 0.6.1*
-<!-- showboat-id: 93bae1b0-1d3c-4018-9537-437935fb2e6e -->
+*2026-10-12T10:11:59Z by Showboat 0.6.1*
+<!-- showboat-id: 9a4f3d3d-8633-4372-a4b6-d218714971bb -->
 
 Every export format numbered the flattened list of chapters, so a subchapter came out as a chapter. This demo stores one book, with two chapters and two subchapters under the first, behind two real backends: one running main and one running this branch. Each exports it as PDF, Word, EPUB and Markdown, and each file is read back with a library that had no part in writing it (pypdf, python-docx, the EPUB zip itself).
 
@@ -27,7 +27,7 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 ```output
 before.pdf: HTTP 200, 4503 bytes
 before.docx: HTTP 200, 36875 bytes
-before.epub: HTTP 200, 3753 bytes
+before.epub: HTTP 200, 3752 bytes
 before.md: HTTP 200, 249 bytes
 before.pdf
   page 2: 1. Planning
@@ -82,7 +82,7 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 ```output
 after.pdf: HTTP 200, 4487 bytes
 after.docx: HTTP 200, 36879 bytes
-after.epub: HTTP 200, 3807 bytes
+after.epub: HTTP 200, 3812 bytes
 after.md: HTTP 200, 235 bytes
 after.pdf
   page 2: 1. Planning
@@ -128,10 +128,10 @@ after.md
   ## Chapter 2: Writing
 ```
 
-Numbers follow what is exported. Empty chapters are left out by default. In this second book Planning has no text of its own and only groups three subchapters, one of them empty; Notes is empty with nothing under it. Planning keeps its heading because its subchapters need it, with no placeholder line and no page of its own; the empty Research and Notes are left out, and nothing is skipped in the numbering. With empty chapters asked for, all six are numbered, and the ones with nothing under them say that they have no content yet.
+Numbers follow what is exported. Empty chapters are left out by default. In this second book Planning has no text of its own and only groups three subchapters, one of them empty; Notes is empty with nothing under it. Planning keeps its heading because its subchapters need it, with no placeholder line and no page of its own (in the EPUB, no document of its own: the heading opens the first document under it); the empty Research and Notes are left out, and nothing is skipped in the numbering. With empty chapters asked for, all six are numbered, and the ones with nothing under them say that they have no content yet.
 
 ```bash
-source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo805/env.sh; new_book 8100 aa_demo_805 "[{id: 'c1', title: 'Planning', description: '', content: '', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: [{id: 'c1a', title: 'Outlines', description: '', content: '<p>Outline it.</p>', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}, {id: 'c1b', title: 'Research', description: '', content: '', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}, {id: 'c1c', title: 'Sources', description: '', content: '<p>Keep a list.</p>', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}]}, {id: 'c2', title: 'Notes', description: '', content: '', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}, {id: 'c3', title: 'Writing', description: '', content: '<p>Write every day.</p>', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}]" > $D/book-8100; mongosh --quiet mongodb://127.0.0.1:27017/aa_demo_805 --eval 'const show = (cs, d) => cs.forEach(c => { print("  ".repeat(d) + c.title + (c.content ? "" : "  (no text)")); show(c.subchapters, d + 1) }); show(db.books.findOne({_id: ObjectId("'$(cat $D/book-8100)'")}).table_of_contents.chapters, 1)'; curl -s -o $D/grouping.docx "localhost:8100/api/v1/books/$(cat $D/book-8100)/export/docx"; echo 'default export:'; show grouping.docx; curl -s -o $D/grouping-all.docx "localhost:8100/api/v1/books/$(cat $D/book-8100)/export/docx?include_empty_chapters=true"; echo 'with empty chapters:'; show grouping-all.docx
+source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo805/env.sh; new_book 8100 aa_demo_805 "[{id: 'c1', title: 'Planning', description: '', content: '', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: [{id: 'c1a', title: 'Outlines', description: '', content: '<p>Outline it.</p>', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}, {id: 'c1b', title: 'Research', description: '', content: '', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}, {id: 'c1c', title: 'Sources', description: '', content: '<p>Keep a list.</p>', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}]}, {id: 'c2', title: 'Notes', description: '', content: '', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}, {id: 'c3', title: 'Writing', description: '', content: '<p>Write every day.</p>', order: 1, level: 1, parent_id: null, status: 'completed', word_count: 3, subchapters: []}]" > $D/book-8100; mongosh --quiet mongodb://127.0.0.1:27017/aa_demo_805 --eval 'const show = (cs, d) => cs.forEach(c => { print("  ".repeat(d) + c.title + (c.content ? "" : "  (no text)")); show(c.subchapters, d + 1) }); show(db.books.findOne({_id: ObjectId("'$(cat $D/book-8100)'")}).table_of_contents.chapters, 1)'; curl -s -o $D/grouping.docx "localhost:8100/api/v1/books/$(cat $D/book-8100)/export/docx"; echo 'default export:'; show grouping.docx; curl -s -o $D/grouping.epub "localhost:8100/api/v1/books/$(cat $D/book-8100)/export/epub"; echo 'default export, EPUB:'; show grouping.epub; curl -s -o $D/grouping-all.docx "localhost:8100/api/v1/books/$(cat $D/book-8100)/export/docx?include_empty_chapters=true"; echo 'with empty chapters:'; show grouping-all.docx
 ```
 
 ```output
@@ -155,6 +155,17 @@ default export:
   Heading 2  1.2 Sources
   ---------- page break
   Heading 1  Chapter 2: Writing
+default export, EPUB:
+  navigation:
+    Title Page
+    Chapter 1: Planning
+        1.1 Outlines
+        1.2 Sources
+    Chapter 2: Writing
+  chapter files:
+    chap_2.xhtml: <h1> Chapter 1: Planning, then <h2> 1.1 Outlines
+    chap_3.xhtml: <h2> 1.2 Sources
+    chap_4.xhtml: <h1> Chapter 2: Writing
 with empty chapters:
   ---------- page break
   Heading 1  Table of Contents
@@ -186,5 +197,5 @@ cd /home/frankbria/projects/worktrees/issue-805-export-numbering/backend && ENVI
 ```
 
 ```output
-============================== 12 passed ==============================
+============================== 14 passed ==============================
 ```

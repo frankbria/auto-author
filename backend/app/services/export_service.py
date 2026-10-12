@@ -684,16 +684,21 @@ class ExportService:
         """
         return await _run_export_build(self._build_epub, book_data, chapters)
 
-    def _chapter_to_xhtml(self, chapter: Dict, index: int) -> str:
+    def _xhtml_heading(self, chapter: Dict, index: int) -> str:
+        """The chapter's heading as XHTML, one heading level down for each level of nesting."""
+        level = min(chapter.get('level', 1), 6)
+        return f"<h{level}>{html.escape(self._chapter_heading(chapter, index))}</h{level}>"
+
+    def _chapter_to_xhtml(self, chapter: Dict, index: int, lead: str = "") -> str:
         """Render a chapter to a complete, well-formed XHTML document.
 
         Reuses the shared HTML→formatted-text pipeline (same as PDF/DOCX) so the
         output is guaranteed valid XHTML — raw TipTap HTML isn't always XML-valid
-        and would break ereaders.
+        and would break ereaders. ``lead`` is the headings of the chapters this
+        one is the first document under.
         """
         heading = html.escape(self._chapter_heading(chapter, index))
-        level = min(chapter.get('level', 1), 6)
-        parts = [f"<h{level}>{heading}</h{level}>"]
+        parts = [lead, self._xhtml_heading(chapter, index)]
 
         if chapter.get("description"):
             parts.append(f"<p><em>{html.escape(chapter['description'])}</em></p>")
@@ -762,24 +767,39 @@ class ExportService:
         )
         book.add_item(title_page)
 
-        # Chapters
-        epub_chapters = []
+        # Chapters. A reader starts a new page for each document, so a chapter
+        # that only heads its subchapters gets none of its own: its heading
+        # opens the first document under it, and its navigation entry points
+        # there (#805).
+        documents, entries, lead = [], [], ""
         for i, chapter in enumerate(chapters, 1):
+            level = chapter.get("level", 1)
+            if chapter.get("heading_only"):
+                first_under = next(
+                    j for j in range(i, len(chapters)) if not chapters[j].get("heading_only")
+                )
+                lead += self._xhtml_heading(chapter, i)
+                section = epub.Section(
+                    self._chapter_heading(chapter, i), href=f"chap_{first_under + 1}.xhtml"
+                )
+                entries.append((level, section))
+                continue
             item = epub.EpubHtml(
                 title=self._chapter_heading(chapter, i),
                 file_name=f"chap_{i}.xhtml",
                 lang="en",
             )
-            item.content = self._chapter_to_xhtml(chapter, i)
+            item.content = self._chapter_to_xhtml(chapter, i, lead)
+            lead = ""
             book.add_item(item)
-            epub_chapters.append(item)
+            documents.append(item)
+            entries.append((level, item))
 
-        # Subchapters sit under their chapter in the reader's navigation (#805).
-        levels = [chapter.get("level", 1) for chapter in chapters]
-        book.toc = [title_page, *self._nested(list(zip(levels, epub_chapters)))]
+        # Subchapters sit under their chapter in the reader's navigation.
+        book.toc = [title_page, *self._nested(entries)]
         book.add_item(epub.EpubNcx())
         book.add_item(epub.EpubNav())
-        book.spine = [title_page, "nav", *epub_chapters]
+        book.spine = [title_page, "nav", *documents]
 
         output = io.BytesIO()
         epub.write_epub(output, book)
