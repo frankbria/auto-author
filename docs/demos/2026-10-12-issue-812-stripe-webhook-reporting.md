@@ -1,7 +1,7 @@
 # A Stripe webhook that cannot do its job says so (#812)
 
-*2026-10-12T19:45:18Z by Showboat 0.6.1*
-<!-- showboat-id: 17a34008-fc4e-4ead-a75c-ca6bad75f02b -->
+*2026-10-12T20:47:07Z by Showboat 0.6.1*
+<!-- showboat-id: fb32ebd5-36b0-4579-933a-8a069f70873b -->
 
 Three failures of the Stripe webhook left nothing an operator would see. This demo runs the real backend from main and from this branch, posts the same subscription event to it the way Stripe does (a real HMAC signature over the raw body), and then reads what each delivery left behind: the webhook's own log lines and what the backend sent to a stand-in for Sentry on this machine. Every Stripe value is made up.
 
@@ -79,17 +79,21 @@ reports sent to Sentry: 1
   the signature: in neither the log nor a report
 ```
 
-No signing secret configured. The 503 is reported on both, by the Sentry SDK itself, which reports any 5xx a route raises. On main there is no log line, and that report carries the delivery's Stripe-Signature header with the rest of the request's headers. On the branch the refusal is logged and the header is filtered.
+No signing secret configured, three deliveries. On main the 503 is raised, and the Sentry SDK reports every 5xx a route raises: three reports, no log line, and each report carries the delivery's Stripe-Signature header with the rest of the request's headers. On the branch each refusal is logged, the 503 is answered without being raised and reported by hand: one report for the three, and no header.
 
 ```bash
-source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo812/env.sh; echo 'main:'; backend $MAIN STRIPE_WEBHOOK_SECRET=; deliver $SIGNING; traces; echo; echo 'branch:'; backend $WT STRIPE_WEBHOOK_SECRET=; deliver $SIGNING; traces; stop
+source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo812/env.sh; echo 'main:'; backend $MAIN STRIPE_WEBHOOK_SECRET=; for i in 1 2 3; do deliver $SIGNING; done; traces; echo; echo 'branch:'; backend $WT STRIPE_WEBHOOK_SECRET=; for i in 1 2 3; do deliver $SIGNING; done; traces; stop
 ```
 
 ```output
 main:
 answered 503 {"detail":"Stripe webhook is not configured"}
+answered 503 {"detail":"Stripe webhook is not configured"}
+answered 503 {"detail":"Stripe webhook is not configured"}
 log lines from the webhook: 0
-reports sent to Sentry: 1
+reports sent to Sentry: 3
+  error | fingerprint default | HTTPException: Stripe webhook is not configured
+  error | fingerprint default | HTTPException: Stripe webhook is not configured
   error | fingerprint default | HTTPException: Stripe webhook is not configured
   the customer id: in neither the log nor a report
   the payer's email: in neither the log nor a report
@@ -97,10 +101,12 @@ reports sent to Sentry: 1
 
 branch:
 answered 503 {"detail":"Stripe webhook is not configured"}
-log lines from the webhook: 1
-  1x app.api.endpoints.webhooks - ERROR - Stripe webhook refused a delivery: STRIPE_WEBHOOK_SECRET is not set
+answered 503 {"detail":"Stripe webhook is not configured"}
+answered 503 {"detail":"Stripe webhook is not configured"}
+log lines from the webhook: 3
+  3x app.api.endpoints.webhooks - ERROR - Stripe webhook refused a delivery: STRIPE_WEBHOOK_SECRET is not set
 reports sent to Sentry: 1
-  error | fingerprint default | HTTPException: Stripe webhook is not configured
+  error | fingerprint ['stripe-webhook', 'not-configured'] | Stripe webhook refused a delivery: STRIPE_WEBHOOK_SECRET is not set
   the customer id: in neither the log nor a report
   the payer's email: in neither the log nor a report
   the signature: in neither the log nor a report

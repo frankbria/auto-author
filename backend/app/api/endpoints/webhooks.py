@@ -5,6 +5,7 @@ import time
 import sentry_sdk
 import stripe
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from stripe import SignatureVerificationError
 
 from app.core.config import settings
@@ -33,11 +34,11 @@ REPORT_EVERY_SECONDS = 300
 def _report(kind: str, message: str, *args, anyone_can_cause_it: bool = False) -> None:
     """Log a webhook failure as an error and send it to Sentry (#812).
 
-    No log line reaches Sentry (#808), and the SDK reports only a 5xx, so a
-    failure answered with a 400 or a 200 is reported by hand, under a fixed
-    fingerprint so repeats are one issue. Nothing from the payload goes in the
-    message. A failure that any caller of this public route can cause is
-    reported once every few minutes; the log gets every one.
+    No log line reaches Sentry (#808), and the SDK reports only a 5xx that is
+    raised, every time it is raised. So each of these is reported by hand,
+    under a fixed fingerprint so repeats are one issue. Nothing from the payload
+    goes in the message. A failure that any caller of this public route can
+    cause is reported once every few minutes; the log gets every one.
     """
     logger.error(message, *args)
     now = time.monotonic()
@@ -74,10 +75,15 @@ async def stripe_webhook(request: Request):
     Stripe ids on the matching user. Replays (same event id) are no-ops.
     """
     if not settings.STRIPE_WEBHOOK_SECRET:
-        # Fail closed: never process unverifiable payloads. Logged, and not
-        # reported by hand: the Sentry SDK reports a 5xx a route raises (#812).
-        logger.error("Stripe webhook refused a delivery: STRIPE_WEBHOOK_SECRET is not set")
-        raise HTTPException(status_code=503, detail="Stripe webhook is not configured")
+        # Fail closed: never process unverifiable payloads. Answered, not
+        # raised: the Sentry SDK reports every 5xx a route raises, and anyone
+        # can post here, so this is reported by hand and throttled (#812).
+        _report(
+            "not-configured",
+            "Stripe webhook refused a delivery: STRIPE_WEBHOOK_SECRET is not set",
+            anyone_can_cause_it=True,
+        )
+        return JSONResponse(status_code=503, content={"detail": "Stripe webhook is not configured"})
 
     raw_body = await request.body()
     sig_header = request.headers.get("stripe-signature")

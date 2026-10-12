@@ -115,16 +115,22 @@ class TestASignatureThatDoesNotVerify:
 
 
 class TestAWebhookWithNoSecretConfigured:
-    async def test_is_logged_and_reported(self, webhook, reports, caplog, monkeypatch):
+    async def test_is_logged_and_reported_once_however_many_deliveries_arrive(
+        self, webhook, reports, caplog, monkeypatch
+    ):
+        """Anyone can post here while it is unconfigured, so it is throttled like a bad signature.
+        Raised as an exception, the 503 was reported by the SDK itself on every request."""
         monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", "")
         payload = _unknown_customer_event()
         with caplog.at_level(logging.INFO, logger=LOGGER):
-            response = await webhook.post(WEBHOOK_URL, content=payload, headers={"stripe-signature": sign(payload)})
+            responses = [
+                await webhook.post(WEBHOOK_URL, content=payload, headers={"stripe-signature": sign(payload)})
+                for _ in range(3)
+            ]
 
-        assert response.status_code == 503
-        assert len(_errors(caplog)) == 1 and "STRIPE_WEBHOOK_SECRET" in _errors(caplog)[0]
-        # Not reported by hand: the SDK reports a 5xx that a route raises.
-        assert [r["exception"]["values"][-1]["type"] for r in reports] == ["HTTPException"]
+        assert [(r.status_code, r.json()) for r in responses] == [(503, {"detail": "Stripe webhook is not configured"})] * 3
+        assert len(_errors(caplog)) == 3 and "STRIPE_WEBHOOK_SECRET" in _errors(caplog)[0]
+        assert [r.get("fingerprint") for r in reports] == [["stripe-webhook", "not-configured"]]
         said = caplog.text + json.dumps(reports, default=str)
         assert CUSTOMER not in said and EMAIL not in said and sign(payload).split("v1=")[1] not in said
 
