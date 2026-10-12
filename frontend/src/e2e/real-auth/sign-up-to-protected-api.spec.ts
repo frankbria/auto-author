@@ -101,9 +101,13 @@ test('a visitor signs up, verifies their email, and the backend serves them and 
   // of sending a cookie works, so the 401 below is the backend's refusal.
   const signed = (await page.context().cookies()).find((c) => c.name === 'better-auth.session_token')!;
   expect(decodeURIComponent(signed.value)).toMatch(new RegExp(`^${session.session.token}\\..+`));
+  // A bare token is refused for having no signature at all; only the forged
+  // one shows that the signature is actually compared.
+  const forged = encodeURIComponent(`${session.session.token}.${'A'.repeat(43)}=`);
   for (const [value, status] of [
     [signed.value, 200],
     [session.session.token, 401],
+    [forged, 401],
   ] as const) {
     const replay = await browser.newContext();
     await replay.addCookies([{ name: signed.name, value, domain: 'localhost', path: '/' }]);
