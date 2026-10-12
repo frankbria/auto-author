@@ -1,9 +1,18 @@
 # Issue #793: a password reset or a two-factor change ends other sessions
 
-*2026-10-12T00:31:22Z by Showboat 0.6.1*
-<!-- showboat-id: 435a3809-315f-4be4-b603-a23a7f7a5495 -->
+*2026-10-12T00:48:34Z by Showboat 0.6.1*
+<!-- showboat-id: b39c7402-29a0-4bbb-be9d-17a9e2a8216d -->
 
-A session someone else already held survived the password reset or the 2FA change meant to lock them out. This demo runs the branch: real better-auth on $WEB, the FastAPI backend on $API, and a throwaway local MongoDB database ($DB). `post`, `new_account`, `sign_in`, `state` and `totp` are small wrappers around curl and the one-time-code library, defined for this demo. Nothing here touches staging.
+A session someone else already held survived the password reset or the 2FA change meant to lock them out. This demo runs the branch: real better-auth on $WEB, the FastAPI backend on $API, and a throwaway local MongoDB database ($DB). `post`, `new_account`, `sign_in`, `state` and `totp` are small wrappers around curl and the one-time-code library, defined for this demo. Nothing here touches staging. The library version the server is running, which is the one the lockfile pins:
+
+```bash
+cd "$WT/frontend" && node -e "console.log(\"better-auth\", require(\"./node_modules/better-auth/package.json\").version)" && grep -A1 "\"node_modules/better-auth\": {" package-lock.json | tail -1 | tr -d " ,"
+```
+
+```output
+better-auth 1.7.7
+"version":"1.7.7"
+```
 
 **Criterion 1: after a reset, the old session is refused by get-session and by the backend.** One account is signed in twice, as two cookie jars: "phone" and "laptop". Both work.
 
@@ -21,7 +30,7 @@ laptop: get-session answers {"session":{, backend GET /users/me answers HTTP 200
 sessions for this account: 2
 ```
 
-The password is reset with the token from the emailed link (printed by the development server). Then each of the two sessions is tried again, and a sign-in with the new password is checked.
+The password is reset with the token from the emailed link (printed by the development server). Then each of the two sessions is tried again, and a sign-in with each password is checked.
 
 ```bash
 post request-password-reset "{\"email\":\"reset@example.com\",\"redirectTo\":\"/auth/reset-password\"}" -o /dev/null; sleep 2
@@ -130,9 +139,10 @@ cd "$WT/frontend" && npx jest src/lib/__tests__/auth-session-revocation.test.ts 
     ✓ does not cache sessions in a cookie
     ✓ leaves other sessions alone when the disable password is wrong (#793)
     ✓ leaves other sessions alone when the verification code is wrong (#793)
-    ✓ says so when 2FA changed but the other devices could not be signed out (#793)
+    ✓ says so when 2FA changed but the request never arrives and other devices stay signed in (#793)
+    ✓ says so when 2FA changed but the server refuses and other devices stay signed in (#793)
     ✓ tells better-auth to revoke sessions when a password is reset
     ✓ walks through enable: password → QR + backup codes → verify
 ```
 
-Not shown: a client that calls the two-factor endpoints directly and skips the page. The page is what ends the other sessions after a 2FA change, so such a client leaves them alive. For a revoked session get-session answers null with HTTP 200, not 401; the backend answers 401.
+Not shown: a client that calls the two-factor endpoints directly and skips the page. The page is what ends the other sessions after a 2FA change, so such a client leaves them alive, and so does a page that is closed between the change and the follow-up request. For a revoked session get-session answers null with HTTP 200, not 401; the backend answers 401.

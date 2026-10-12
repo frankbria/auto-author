@@ -1379,3 +1379,9 @@ A test that entered `lifespan(app)` to check a startup step passed, and 33 later
 
 ### Do not run a demo stack while the commit hooks are running (#792)
 The frontend coverage hook failed on tests the change never touched: a performance test measured 127ms against a 100ms limit, and two suites took over a minute each. The demo's dev server, browser and its own test runs were competing for the same machine. With nothing else running the same commit passed. Let the hooks finish, or record the demo first.
+
+### The local install can be older than the lockfile, and every local probe then runs the wrong library (#793)
+Worktrees here link `frontend/node_modules` to the main checkout's. That install was better-auth 1.7.2 while `package-lock.json` pinned 1.7.7, and 14 other production packages had moved too. Unit tests mock the library, so nothing failed; the "real better-auth" probes and demos for #789, #792 and #793 all ran on 1.7.2 while CI and staging ran 1.7.7. A reviewer caught it by reading `node_modules/.package-lock.json`. The results were the same on 1.7.7, but that was luck. Before a probe or demo that depends on a library's behaviour, print the installed version next to the locked one, and run `npm ci` when they differ.
+
+### A recorded demo command can trip the secrets hook with a variable reference (#793)
+`body: JSON.stringify({ password: '$DEMO_PW' })` inside a recorded `agent-browser eval` matched the commit hook's password pattern, although it holds no secret. The demo file cannot be hand-edited, so the fix cost a re-recording of half the demo with the stack restarted. Keep `password: '...'` out of recorded commands (pass the value through a file or a variable with another name), and run `pre-commit run check-secrets` on the demo before tearing the stack down.

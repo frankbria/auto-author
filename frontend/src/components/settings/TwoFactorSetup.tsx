@@ -132,8 +132,13 @@ export default function TwoFactorSetup() {
   // already holds would otherwise outlive the change meant to lock them out.
   // better-auth rotates only the session that made the change.
   const signOutOtherDevices = async () => {
-    const { error } = await authClient.revokeOtherSessions();
-    if (error) {
+    // The client resolves with { error } when refused and throws when the
+    // request never arrives; either way the other sessions are still alive.
+    const failed = await authClient.revokeOtherSessions().then(
+      ({ error }) => Boolean(error),
+      () => true
+    );
+    if (failed) {
       toast({
         title: 'Other devices are still signed in',
         description: 'Use "Sign out other devices" under Active Sessions to end them.',

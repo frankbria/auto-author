@@ -386,8 +386,11 @@ describe('TwoFactorSetup', () => {
     expect(mockRevokeOtherSessions).toHaveBeenCalledTimes(1);
   });
 
-  it('says so when 2FA changed but the other devices could not be signed out (#793)', async () => {
-    mockRevokeOtherSessions.mockResolvedValue({ data: null, error: { message: 'boom' } });
+  it.each([
+    ['the server refuses', () => Promise.resolve({ data: null, error: { message: 'boom' } })],
+    ['the request never arrives', () => Promise.reject(new Error('Failed to fetch'))],
+  ])('says so when 2FA changed but %s and other devices stay signed in (#793)', async (_case, answer) => {
+    mockRevokeOtherSessions.mockImplementation(answer);
     mockUseSession.mockReturnValue({
       data: {
         user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: true },
