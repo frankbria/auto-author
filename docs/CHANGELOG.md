@@ -4,6 +4,16 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **A backend error report no longer carries what the user wrote, and one failure is one report (#808, P1.26)**:
+  - **Problem.** Sentry ran on the SDK's defaults. A probe of main found, in the events for one failed request: a frame local holding manuscript text, the request body, the session cookie's value, an email address from an INFO log line, the query string, and the colliding email quoted in MongoDB's duplicate-key message. A prompt sent to the model was in the frame locals of the model client's own error report. One 500 produced two events. The container has no git, so events had no release.
+  - **No log line reaches Sentry.** Every ERROR log line was an event and every INFO line a breadcrumb. A log message is free text that a key-based scrubber cannot read, and 133 calls in the backend log at ERROR; review found one endpoint (question generation) that could send seven events for one failure, several quoting the question it was saving. The logging integration now sends nothing. The one report for a 500 is the global handler's `capture_exception`, which is what #334 set out to do.
+  - **Options.** `include_local_variables=False`, `max_request_body_size="never"`, the SDK's key-based scrubber extended with the field names that hold user text or identity (`content`, `title`, `email` and others), and a `before_send` that drops the query string and the referer and cuts a duplicate-key message before the value.
+  - **422s.** Both validation handlers log a warning that names the fields and the kind of error. Neither logs a value or a traceback.
+  - **Release.** The image build passes the commit as `GIT_SHA`; the backend image keeps it in its environment and Sentry is started with it.
+  - **Measured, not changed.** MongoDB commands are recorded as breadcrumbs with every value already replaced by the SDK; a test with a real database pins that.
+  - **What this costs.** A failure the code handles and logs at ERROR (a Stripe call, a refused AI request, a failed background write) is no longer reported unless the code calls `capture_exception` itself: #996. A failed model call is still reported, by the SDK's own model-client integration (#994).
+  - **Not covered.** The text of an exception other than a duplicate key is sent as it is; a message that quotes user input still reaches Sentry. Nothing was sent to a real Sentry project: staging has no DSN (#992). The Privacy Policy's Sentry row is unchanged for that reason and because the frontend's Sentry is #809.
+
 - **In production /health fails when the box cannot store uploads, bill or report errors, and liveness has its own route (#807, P1.25)**:
   - **Problem.** `/health` checked MongoDB and two secrets. A production deployment with no storage provider, no Stripe values or no `SENTRY_DSN` passed the deploy gate. The container's liveness check used the same route, so a database outage marked a live process unhealthy.
   - **Checks.** `/health` now also reports `storage`, `billing` and `error_reporting`: `ok`, `disabled`, or `missing:` with the names of the unset settings, never their values. Storage asks `settings.storage_provider` (#806); billing needs `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `STRIPE_PRICE_ID_PRO`; error reporting needs `SENTRY_DSN`.

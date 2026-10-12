@@ -47,6 +47,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
 USER appuser
 EXPOSE 8000
 
+# The commit this image was built from: the Sentry release (#808). Last, so a
+# new commit invalidates no layer above it.
+ARG GIT_SHA=""
+ENV GIT_SHA=${GIT_SHA}
+
 # app.main:app — note backend/main.py is an unrelated stub (`print("Hello from
 # backend!")`), not the server entrypoint.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

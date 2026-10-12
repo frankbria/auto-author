@@ -22,24 +22,66 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# Field names that hold what a user wrote or who they are (#808). Frame locals,
+# request bodies and log lines are off, so these cover what is attached by key:
+# breadcrumb data, contexts, extras.
+_USER_TEXT_KEYS = [
+    "content", "text", "title", "subtitle", "description", "question", "question_text",
+    "answer", "response_text", "feedback", "bio", "prompt", "transcript",
+    "email", "first_name", "last_name", "display_name",
+]  # fmt: skip
+
+
+def _scrub_free_text(event, hint):
+    """Take out what a key-based scrubber cannot see (#808).
+
+    The query string is one string, the referer is the address of the page the
+    user was on, and MongoDB's duplicate-key error quotes the colliding value
+    (an email address, for the users index) in its message.
+    """
+    request = event.get("request", {})
+    request.pop("query_string", None)
+    request.get("headers", {}).pop("referer", None)
+    for failure in event.get("exception", {}).get("values", []):
+        if failure.get("value"):
+            failure["value"] = failure["value"].split(" dup key:")[0]
+    return event
+
+
 def _init_sentry() -> None:
     """Initialize Sentry error tracking (issue #334).
 
     Inert when SENTRY_DSN is unset — no events are sent, so CI/local/tests are
-    unaffected. When set (staging/prod), unhandled 500s reach Sentry via the
-    global exception handler below (our handler catches every exception, so the
-    ASGI integration alone would never see them).
+    unaffected. When set (staging/prod), an unhandled 500 reaches Sentry once:
+    the global exception handler below reports it, the SDK's Starlette
+    integration would report it too, and the SDK drops the second as a duplicate.
     """
     if not settings.SENTRY_DSN:
         return
     import sentry_sdk
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
 
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         environment=os.getenv("ENVIRONMENT") or os.getenv("NODE_ENV") or "unknown",
+        # The commit the image was built from; the container has no git to ask.
+        release=settings.GIT_SHA or None,
         # Errors-only by default; enable tracing later via config if needed.
         traces_sample_rate=0.0,
         send_default_pii=False,
+        # The SDK's defaults attach every frame's locals and the request body:
+        # in this app those are the manuscript (#808).
+        include_local_variables=False,
+        max_request_body_size="never",
+        event_scrubber=EventScrubber(denylist=DEFAULT_DENYLIST + _USER_TEXT_KEYS, recursive=True),
+        before_send=_scrub_free_text,
+        # No log line reaches Sentry, as a breadcrumb or as an event. A log
+        # message is free text no scrubber can read, and lines all over this
+        # app log at ERROR, some quoting what the user wrote. An unhandled
+        # exception is still reported (see above); a handled failure worth
+        # reporting has to call capture_exception itself.
+        integrations=[LoggingIntegration(level=None, event_level=None)],
     )
     logger.info("Sentry error tracking initialized")
 
@@ -250,7 +292,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     error_details = "; ".join(errors)
     # No traceback: the exception's text contains the rejected input, which is
     # the user's writing and, for an oversize request, most of the request.
-    logger.error(f"Validation error: {error_details}")
+    # A warning: a refused request is the client's mistake, not an error to
+    # report (#808).
+    logger.warning(f"Validation error: {error_details}")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
@@ -268,7 +312,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # Pydantic validation error handler
 @app.exception_handler(ValidationError)
 async def pydantic_validation_exception_handler(request: Request, exc: ValidationError):
-    logger.error(f"Pydantic validation error: {exc}", exc_info=True)
+    # Which model and which fields, never the values: str(exc) and its traceback
+    # quote the rejected input (#808).
+    fields = "; ".join(
+        f"{'.'.join(map(str, error['loc']))}: {error['type']}"
+        for error in exc.errors(include_input=False, include_context=False, include_url=False)
+    )
+    logger.warning("Pydantic validation error for %s: %s", exc.title, fields)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={"detail": "Validation error"},

@@ -128,8 +128,10 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}${{ matrix.environment }}
           # From the job's environment only — no fallbacks (#779). Harmless no-ops
           # for the backend. NEXT_PUBLIC_SENTRY_DSN is optional: Sentry stays inert
-          # without it.
+          # without it. GIT_SHA is the backend's Sentry release (#808) and a
+          # no-op for the frontend.
           build-args: |
+            GIT_SHA=${{ github.sha }}
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_BETTER_AUTH_URL=${{ vars.NEXT_PUBLIC_BETTER_AUTH_URL }}
             NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
