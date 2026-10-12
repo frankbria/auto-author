@@ -221,7 +221,10 @@ def mount_local_uploads(target: FastAPI) -> None:
         logger.info("Mounting local uploads directory for static file serving")
         # check_dir=False: the first upload creates the directory, after startup.
         target.mount("/uploads", StaticFiles(directory="uploads", check_dir=False), name="uploads")
-    elif any(path.is_file() for path in Path("uploads").rglob("*")):
+    elif any(
+        path.is_file() and not path.name.startswith(".")  # not the tracked .gitkeep
+        for path in Path("uploads").rglob("*")
+    ):
         # The provider follows backend/.env since #806, so a checkout that wrote
         # to local disk can find itself on a cloud provider after an upgrade.
         logger.warning(

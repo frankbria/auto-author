@@ -186,6 +186,9 @@ class TestTheMountAsksTheSameQuestion:
 
         configure(**CLOUDINARY)
         monkeypatch.chdir(tmp_path)
+        # What a fresh checkout has: the directory and its tracked placeholder.
+        (tmp_path / "uploads").mkdir()
+        (tmp_path / "uploads" / ".gitkeep").touch()
 
         with caplog.at_level("WARNING"):
             mount_local_uploads(FastAPI())
