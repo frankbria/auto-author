@@ -19,7 +19,7 @@ class ChapterAccessService:
         self,
         user_id: str,
         book_id: str,
-        chapter_id: str,
+        chapter_id: Optional[str],
         access_type: str,
         session_id: Optional[str] = None,
         tab_order: Optional[int] = None,

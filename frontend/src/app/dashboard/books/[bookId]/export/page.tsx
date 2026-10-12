@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/auth-client';
 import bookClient from '@/lib/api/bookClient';
 import { toast } from '@/lib/toast';
+import { downloadBlob as saveBlob, filenameStem } from '@/components/export/exportHelpers';
 import { BookProject } from '@/components/BookCard';
 import { LoadingStateManager } from '@/components/loading';
 import { createProgressTracker } from '@/lib/loading';
@@ -168,14 +169,7 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
     // Multi-file Markdown returns a ZIP archive, not a .md file
     const extension =
       selectedFormat === 'markdown' && multiFile ? '.zip' : format?.extension || '';
-    const url = window.URL.createObjectURL(downloadBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${book.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}${extension}`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    saveBlob(downloadBlob, `${filenameStem(book.title)}${extension}`);
 
     toast.success({ title: 'Download started!' });
   };

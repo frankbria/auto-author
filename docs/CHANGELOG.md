@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **Exports work for any book title and are logged, and the download no longer races its own cleanup (#804, P1.22)**:
+  - **Title in the header.** The export routes put the title into `Content-Disposition` as written. Starlette encodes headers as latin-1, so a CJK or Cyrillic title raised a 500 after the whole file had been built, in all four formats. `_download_headers` in `backend/app/api/endpoints/export.py` now sends an ASCII fallback in `filename` and the real name in `filename*` (RFC 6266), for PDF, Word, EPUB and Markdown.
+  - **Access log.** Each export called `log_access(chapter_id=None)`, which failed validation because the model required a chapter, and the handler swallowed the error: no export was ever recorded. `chapter_id` is optional now, and an export writes one `export_<format>` row with no chapter.
+  - **Blob URL.** The download helper revoked the blob URL in the same tick as the click. It now waits 60 seconds. The export page used its own copy of that code and now calls the helper.
+  - **Download name.** The page names the file itself, with an ASCII-only filter that turned a CJK title into underscores (export page) or into no name at all (book page). Both now use one builder, `filenameStem`, which keeps letters and digits of any script and falls back to "book" when nothing is left; the export page's names change from underscores to hyphens.
+  - **Not covered.** The account-level export (`/users/me/export`, #790) is still not logged. A real browser was not driven; the header and the names are covered by tests.
+
 - **AI requests have a time budget, and a refused credential or billing refusal is treated as an outage (#799, P1.17)**:
   - **Timeout.** The OpenAI client was built with no timeout, so the SDK's 600 seconds applied. With three attempts, a stalled provider could hold a worker thread for half an hour on the executor that also runs uploads and payments. `AI_REQUEST_TIMEOUT_SECONDS` (default 120, per attempt) is now passed to the client.
   - **Rejected credential.** A 401 or 403 from the provider was retried and then reported as an unexpected error. It now raises `AIProviderAuthError` after one attempt: not retryable, logged CRITICAL, answered to the user as 503 with the code `AI_PROVIDER_AUTH_FAILED` and no mention of keys.
