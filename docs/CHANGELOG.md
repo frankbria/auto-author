@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **Exports number chapters by their place in the outline (#805, P1.23)**:
+  - **Problem.** PDF, Word, EPUB and Markdown numbered the flattened list of chapters, so a book with two chapters and two subchapters under the first came out as Chapter 1 to Chapter 4, in the body and in each table of contents. In Word all four were top-level headings and the EPUB navigation was one flat list.
+  - **Numbering.** `_flatten_chapters` in `backend/app/services/export_service.py` gives each chapter its outline number while it flattens: 1, 1.1, 1.2, 2. A chapter is headed "Chapter 1: Title" and anything under one "1.1 Title"; a contents row reads "1. Title" or "1.1 Title". The four builders take both from `_chapter_heading` and `_contents_entry`.
+  - **Levels.** Word uses a heading one level down for each level of nesting, the PDF a smaller title style, EPUB `<h2>` and below, and the EPUB navigation nests subchapters under their chapter.
+  - **What is counted.** Numbers count what is exported, so they have no gaps. Empty chapters are still left out by default, with one change: a chapter with no text of its own is kept when a chapter under it is kept, because its subchapters need its heading. Such a heading gets no "(No content yet)" line and no page of its own. On main it was dropped and its subchapters were numbered as chapters.
+  - **Not covered.** Each subchapter still starts on a new page in PDF and Word, as every entry did before. The PDF contents page has no page numbers, as before. `export_service.py` is over the 500-line limit and this adds to it. No ereader or word processor was opened: the files were read back with pypdf, python-docx and the EPUB's own XHTML.
+
 - **Transform, enhance and transcription cleanup work on a chapter of ordinary length (#801, P1.19)**:
   - **Problem.** The three rewrite flows ran on the default model class (`AI_MODEL_DEFAULT`, gpt-4: an 8,192-token context shared by the prompt and the answer) with a fixed 4,000-token completion budget. A chapter over about 3,000 words could not come back whole.
   - **Model and budget.** They now run on the long-output class (`AI_MODEL_LONG_OUTPUT`, gpt-4o by default), as drafts and contents already do. The completion budget follows the text: a third of its characters, never under the 4,000 these flows always had, clamped to `AI_MAX_OUTPUT_TOKENS_LONG` (8,000) by the request method. `metadata.model_used` names the long-output model.

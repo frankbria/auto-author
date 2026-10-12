@@ -421,9 +421,8 @@ class ExportService:
 
         toc_data = []
         for i, chapter in enumerate(chapters, 1):
-            chapter_title = chapter.get('title', f'Chapter {i}')
             # Simple TOC without page numbers for now
-            toc_data.append([f"{i}.", chapter_title])
+            toc_data.append(list(self._contents_entry(chapter, i)))
 
         if toc_data:
             toc_table = Table(toc_data, colWidths=[0.5*inch, 5*inch])
@@ -439,9 +438,10 @@ class ExportService:
 
         # Chapters
         for i, chapter in enumerate(chapters, 1):
-            # Chapter title
-            chapter_title = chapter.get('title', f'Chapter {i}')
-            story.append(Paragraph(f"Chapter {i}: {_pdf_text(chapter_title)}", chapter_title_style))
+            # Chapter title, in a smaller style for anything under a chapter
+            level = chapter.get('level', 1)
+            title_style = {1: chapter_title_style, 2: heading2_style}.get(level, heading3_style)
+            story.append(Paragraph(_pdf_text(self._chapter_heading(chapter, i)), title_style))
 
             # Chapter description
             if chapter.get('description'):
@@ -463,11 +463,11 @@ class ExportService:
                         story.append(Paragraph(_pdf_text(para['text']), heading3_style))
                     else:
                         story.append(Paragraph(_pdf_text(para['text']), body_style))
-            else:
+            elif not chapter.get('heading_only'):
                 story.append(Paragraph("(No content yet)", styles['Italic']))
 
             # Add page break after each chapter except the last
-            if i < len(chapters):
+            if i < len(chapters) and not chapter.get('heading_only'):
                 story.append(PageBreak())
 
         # Build PDF. With a template, draw a running header/footer on every page
@@ -618,17 +618,15 @@ class ExportService:
         doc.add_heading('Table of Contents', 1)
 
         for i, chapter in enumerate(chapters, 1):
-            chapter_title = chapter.get('title', f'Chapter {i}')
-            toc_entry = doc.add_paragraph(f"{i}. {chapter_title}")
-            toc_entry.paragraph_format.left_indent = Inches(0.25)
+            toc_entry = doc.add_paragraph(" ".join(self._contents_entry(chapter, i)))
+            toc_entry.paragraph_format.left_indent = Inches(0.25 * chapter.get('level', 1))
 
         doc.add_page_break()
 
         # Chapters
         for i, chapter in enumerate(chapters, 1):
-            # Chapter heading
-            chapter_title = chapter.get('title', f'Chapter {i}')
-            doc.add_heading(f"Chapter {i}: {chapter_title}", 1)
+            # Chapter heading, one heading level down for each level of nesting
+            doc.add_heading(self._chapter_heading(chapter, i), min(chapter.get('level', 1), 9))
 
             # Chapter description
             if chapter.get('description'):
@@ -651,12 +649,12 @@ class ExportService:
                     else:
                         p = doc.add_paragraph(para['text'])
                         p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            else:
+            elif not chapter.get('heading_only'):
                 doc.add_paragraph("(No content yet)")
                 doc.paragraphs[-1].runs[0].italic = True
 
             # Add page break after each chapter except the last
-            if i < len(chapters):
+            if i < len(chapters) and not chapter.get('heading_only'):
                 doc.add_page_break()
 
         # Save to stream
@@ -693,8 +691,9 @@ class ExportService:
         output is guaranteed valid XHTML — raw TipTap HTML isn't always XML-valid
         and would break ereaders.
         """
-        title = chapter.get("title", f"Chapter {index}")
-        parts = [f"<h1>Chapter {index}: {html.escape(title)}</h1>"]
+        heading = html.escape(self._chapter_heading(chapter, index))
+        level = min(chapter.get('level', 1), 6)
+        parts = [f"<h{level}>{heading}</h{level}>"]
 
         if chapter.get("description"):
             parts.append(f"<p><em>{html.escape(chapter['description'])}</em></p>")
@@ -706,7 +705,7 @@ class ExportService:
                 text = html.escape(para["text"])
                 tag = heading_tag.get(para["style"], "p")
                 parts.append(f"<{tag}>{text}</{tag}>")
-        else:
+        elif not chapter.get("heading_only"):
             parts.append("<p><em>(No content yet)</em></p>")
 
         # No <?xml?> prolog: ebooklib parses content as a str during nav
@@ -714,7 +713,7 @@ class ExportService:
         # declaration. ebooklib writes its own prolog to the EPUB file.
         return (
             "<html xmlns='http://www.w3.org/1999/xhtml'><head>"
-            f"<title>{html.escape(title)}</title></head><body>"
+            f"<title>{heading}</title></head><body>"
             + "".join(parts)
             + "</body></html>"
         )
@@ -767,7 +766,7 @@ class ExportService:
         epub_chapters = []
         for i, chapter in enumerate(chapters, 1):
             item = epub.EpubHtml(
-                title=chapter.get("title", f"Chapter {i}"),
+                title=self._chapter_heading(chapter, i),
                 file_name=f"chap_{i}.xhtml",
                 lang="en",
             )
@@ -775,9 +774,9 @@ class ExportService:
             book.add_item(item)
             epub_chapters.append(item)
 
-        # ponytail: flat nav — every chapter is a top-level nav point. EpubNcx +
-        # EpubNav give working ereader navigation; nest by `level` if needed later.
-        book.toc = [title_page, *epub_chapters]
+        # Subchapters sit under their chapter in the reader's navigation (#805).
+        levels = [chapter.get("level", 1) for chapter in chapters]
+        book.toc = [title_page, *self._nested(list(zip(levels, epub_chapters)))]
         book.add_item(epub.EpubNcx())
         book.add_item(epub.EpubNav())
         book.spine = [title_page, "nav", *epub_chapters]
@@ -844,13 +843,13 @@ class ExportService:
 
     def _chapter_markdown(self, chapter: Dict, index: int) -> str:
         """Render one chapter to Markdown (heading level tracks nesting depth)."""
-        title = chapter.get('title', f'Chapter {index}')
         # level 1 chapter -> '##' (book title owns '#'); deeper nests indent.
         heading = '#' * min(6, chapter.get('level', 1) + 1)
-        parts = [f"{heading} Chapter {index}: {title}"]
+        parts = [f"{heading} {self._chapter_heading(chapter, index)}"]
         if chapter.get('description'):
             parts.append(f"*{chapter['description']}*")
-        parts.append(self._content_to_markdown(chapter.get('content', '')))
+        if not chapter.get('heading_only'):
+            parts.append(self._content_to_markdown(chapter.get('content', '')))
         return "\n\n".join(parts)
 
     def _build_markdown(
@@ -894,33 +893,87 @@ class ExportService:
 
         return ("\n\n".join(lines).strip() + "\n").encode('utf-8')
 
-    def _flatten_chapters(self, chapters: List[Dict], level: int = 1) -> List[Dict]:
-        """Flatten nested chapter structure for export."""
+    def _flatten_chapters(
+        self,
+        chapters: List[Dict],
+        level: int = 1,
+        include_empty: bool = True,
+        parent_number: str = "",
+    ) -> List[Dict]:
+        """Flatten nested chapters for export, each with its ``level`` and outline ``number``.
+
+        A chapter with no text is left out when ``include_empty`` is false,
+        unless one under it is kept: a chapter that only groups subchapters is
+        the usual shape of a book, and they need its heading. Numbers count what
+        is kept ("1", "1.1", "1.2", "2"), so they have no gaps (#805).
+        """
         flattened = []
+        kept = 0
 
         for chapter in chapters:
-            # Add the chapter itself
+            number = f"{parent_number}{kept + 1}"
+            below = self._flatten_chapters(
+                chapter.get('subchapters') or [], level + 1, include_empty, f"{number}."
+            )
+            has_text = bool((chapter.get('content') or '').strip())
+            if not (include_empty or below or has_text):
+                continue
+            kept += 1
             chapter_copy = chapter.copy()
             chapter_copy['level'] = level
+            chapter_copy['number'] = number
+            # No text of its own: it is there to head the chapters under it, so
+            # it gets no "(No content yet)" line and no page to itself.
+            chapter_copy['heading_only'] = bool(below) and not has_text
             flattened.append(chapter_copy)
-
-            # Recursively add subchapters
-            if chapter.get('subchapters'):
-                flattened.extend(
-                    self._flatten_chapters(chapter['subchapters'], level + 1)
-                )
+            flattened.extend(below)
 
         return flattened
+
+    @staticmethod
+    def _number(chapter: Dict, index: int) -> str:
+        """The chapter's outline number; its position in a list that was not numbered."""
+        return chapter.get('number') or str(index)
+
+    @classmethod
+    def _chapter_heading(cls, chapter: Dict, index: int) -> str:
+        """ "Chapter 2: Title" for a chapter, "2.1 Title" for anything under one."""
+        number = cls._number(chapter, index)
+        title = chapter.get('title', f'Chapter {number}')
+        return f"{number} {title}" if '.' in number else f"Chapter {number}: {title}"
+
+    @classmethod
+    def _contents_entry(cls, chapter: Dict, index: int) -> tuple:
+        """A table-of-contents row: ("2.", title) for a chapter, ("2.1", title) under one."""
+        number = cls._number(chapter, index)
+        label = number if '.' in number else f"{number}."
+        return label, chapter.get('title', f'Chapter {number}')
+
+    @staticmethod
+    def _nested(entries: List[tuple]) -> List:
+        """(level, item) pairs as ebooklib's table of contents: an item with
+        others under it becomes ``(item, [those])``."""
+        root: List = []
+        path = [root]  # path[d] holds the entries at depth d + 1
+        for level, item in entries:
+            del path[level:]
+            node = [item, []]
+            path[-1].append(node)
+            path.append(node[1])
+
+        def finish(nodes):
+            return [(item, finish(below)) if below else item for item, below in nodes]
+
+        return finish(root)
 
     def _select_chapters(
         self, book_data: Dict, include_empty_chapters: bool
     ) -> List[Dict]:
-        """Flatten the TOC and drop empty chapters unless explicitly included."""
+        """Flatten and number the TOC, dropping empty chapters unless explicitly included."""
         toc = book_data.get('table_of_contents', {})
-        flattened = self._flatten_chapters(toc.get('chapters', []))
-        if include_empty_chapters:
-            return flattened
-        return [ch for ch in flattened if ch.get('content', '').strip()]
+        return self._flatten_chapters(
+            toc.get('chapters', []), include_empty=include_empty_chapters
+        )
 
     def validate_book_for_export(
         self, book_data: Dict, include_empty_chapters: bool = False
