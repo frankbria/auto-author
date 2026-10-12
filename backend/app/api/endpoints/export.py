@@ -88,7 +88,7 @@ async def export_book_pdf(
     custom_options: Optional[str] = Query(
         None, description="JSON object of template overrides (font_size, margins, ...)"
     ),
-    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 exports per hour
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 an hour for this format, across all books
 ):
     """
     Export a book as a PDF file.
@@ -191,7 +191,7 @@ async def export_book_docx(
     custom_options: Optional[str] = Query(
         None, description="JSON object of template overrides (font_size, margins, ...)"
     ),
-    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 exports per hour
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 an hour for this format, across all books
 ):
     """
     Export a book as a DOCX (Microsoft Word) file.
@@ -286,7 +286,7 @@ async def export_book_epub(
         False,
         description="Include chapters without content"
     ),
-    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 exports per hour
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 an hour for this format, across all books
 ):
     """
     Export a book as an EPUB file.
@@ -376,7 +376,7 @@ async def export_book_markdown(
         False,
         description="Export one Markdown file per chapter as a ZIP archive"
     ),
-    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 exports per hour
+    rate_limit_info: Dict = Depends(get_rate_limiter(limit=10, window=3600)),  # 10 an hour for this format, across all books
 ):
     """
     Export a book as Markdown.

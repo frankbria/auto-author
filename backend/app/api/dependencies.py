@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 
 from app.db.database import get_collection
 from app.db.database import create_audit_log
-from app.db.usage import increment_usage
+from app.db.usage import increment_usage, refund_usage
+from app.services.ai_service import model_call_attempted
 from app.core.config import settings, is_production_env
 from app.core.security import get_current_user_from_session
 
@@ -118,16 +119,23 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
         bucket_start = int(now // window) * window
         reset_at = bucket_start + window
 
+        # The route as declared ("/books/{book_id}/export/pdf"), not the URL
+        # that matched it: keyed on the URL, every book id was a fresh bucket,
+        # so "10 exports an hour" meant 10 per book (#798).
+        route = getattr(request.scope.get("route"), "path", None)
+        if not isinstance(route, str) or not route:
+            route = request.url.path
+
         # TTL of 2 windows: the bucket outlives its own window, then Mongo reaps it.
         count = await increment_usage(
-            subject, f"rl:{request.url.path}:{bucket_start}", ttl_seconds=window * 2
+            subject, f"rl:{route}:{bucket_start}", ttl_seconds=window * 2
         )
 
         if count > limit:
             retry_after = max(1, int(reset_at - now) + 1)
             logger.warning(
-                "Rate limit exceeded: subject=%s path=%s limit=%s window=%ss count=%s",
-                subject, request.url.path, limit, window, count,
+                "Rate limit exceeded: subject=%s route=%s limit=%s window=%ss count=%s",
+                subject, route, limit, window, count,
             )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -176,8 +184,15 @@ def get_ai_usage_quota():
     call so a leaked cookie or runaway client can't rack up unbounded spend.
 
     Counts off the user's ``auth_id``; the cap comes from the user's ``plan``
-    (``app.core.entitlements.ai_quota_for_plan``, #766). ponytail: rejected calls still increment (matches the in-memory
-    limiter) — the counter tracks attempts, which is fine for a spend cap.
+    (``app.core.entitlements.ai_quota_for_plan``, #766).
+
+    The charge is taken up front and handed back when the request fails
+    without a model call having been attempted (#798): a refusal past the cap,
+    a failed validation, a book that is missing or someone else's, a rate
+    limit. It is a dependency with ``yield`` for that reason; FastAPI raises
+    the request's failure at the yield. Once a call has been handed to the
+    provider the charge stays whatever happens next, including a 4xx such as a
+    truncated draft: the provider may have billed for it.
     """
 
     async def check_quota(
@@ -191,9 +206,12 @@ def get_ai_usage_quota():
         # FastAPIError at route registration (would block startup).
         # Skip in auth-bypass mode (E2E/test) and when disabled, mirroring the
         # rate limiter so test suites can generate freely.
-        if settings.BYPASS_AUTH or not settings.AI_QUOTA_ENABLED:
-            return
-        if _is_exempt_e2e_user(current_user):
+        if (
+            settings.BYPASS_AUTH
+            or not settings.AI_QUOTA_ENABLED
+            or _is_exempt_e2e_user(current_user)
+        ):
+            yield
             return
 
         user_id = (
@@ -230,21 +248,31 @@ def get_ai_usage_quota():
             ("day", now.strftime("%Y-%m-%d"), daily, 2 * 86400),
             ("month", now.strftime("%Y-%m"), monthly, 40 * 86400),
         )
-        for period, bucket, limit, ttl in windows:
-            if limit <= 0:  # window disabled
-                continue
-            count = await increment_usage(user_id, f"{period}:{bucket}", ttl)
-            if count > limit:
-                path = getattr(getattr(request, "url", None), "path", "unknown")
-                logger.warning(
-                    "AI quota exceeded: subject=%s path=%s period=%s limit=%s count=%s",
-                    user_id, path, period, limit, count,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=_quota_exceeded_detail(plan, limit, period),
-                    headers={"X-AI-Quota-Limit": str(limit), "X-AI-Quota-Period": period},
-                )
+        charged = []
+        try:
+            for period, bucket, limit, ttl in windows:
+                if limit <= 0:  # window disabled
+                    continue
+                key = f"{period}:{bucket}"
+                count = await increment_usage(user_id, key, ttl)
+                charged.append(key)
+                if count > limit:
+                    path = getattr(getattr(request, "url", None), "path", "unknown")
+                    logger.warning(
+                        "AI quota exceeded: subject=%s path=%s period=%s limit=%s count=%s",
+                        user_id, path, period, limit, count,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=_quota_exceeded_detail(plan, limit, period),
+                        headers={"X-AI-Quota-Limit": str(limit), "X-AI-Quota-Period": period},
+                    )
+            yield
+        except Exception:
+            if not model_call_attempted.get():
+                for key in charged:
+                    await refund_usage(user_id, key)
+            raise
 
     return check_quota
 

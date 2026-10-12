@@ -3,6 +3,7 @@ import openai
 import logging
 import re
 import asyncio
+from contextvars import ContextVar
 import time
 import uuid
 from typing import Dict, List, Optional, Any
@@ -47,6 +48,12 @@ DRAFT_WORDS_TO_TOKENS_FACTOR = 1.6
 # headroom over the largest shape the prompt asks for. Runs on the long-output
 # model because gpt-4's 8192-token context is shared with the prompt.
 TOC_MAX_COMPLETION_TOKENS = 6000
+
+
+# True once this request has been handed to the provider. The AI quota reads
+# it to tell a request refused beforehand, which costs nothing, from one the
+# provider may have billed (#798). A ContextVar, so each request has its own.
+model_call_attempted: ContextVar[bool] = ContextVar("model_call_attempted", default=False)
 
 
 class AIService:
@@ -280,6 +287,7 @@ class AIService:
             # generation must not stall health checks or other users' requests.
             return await asyncio.to_thread(_sync_request)
 
+        model_call_attempted.set(True)
         return await self._retry_with_backoff(_async_wrapper, correlation_id=correlation_id)
 
     def _untruncated_text(self, response, correlation_id: Optional[str] = None) -> str:

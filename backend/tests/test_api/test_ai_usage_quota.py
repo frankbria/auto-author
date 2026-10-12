@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 import app.api.dependencies as deps
 from app.db.usage import increment_usage
+from tests.yield_dependencies import completes
 
 
 # --- DAO: atomic counter -------------------------------------------------
@@ -49,7 +50,7 @@ async def test_quota_rejects_n_plus_one_in_window(motor_reinit_db, real_ai_quota
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 2), \
          patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
 
         await checker(current_user=user)  # 1
         await checker(current_user=user)  # 2
@@ -78,7 +79,7 @@ async def test_quota_logs_warning_before_429(motor_reinit_db, real_ai_quota, cap
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
          patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         await checker(current_user=user, request=req)  # 1
         with caplog.at_level(logging.WARNING, logger="app.api.dependencies"):
             with pytest.raises(HTTPException):
@@ -132,7 +133,7 @@ async def test_quota_isolated_per_user(motor_reinit_db, real_ai_quota):
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
          patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         await checker(current_user={"auth_id": "user-x"})  # x at cap
         with pytest.raises(HTTPException):
             await checker(current_user={"auth_id": "user-x"})
@@ -145,7 +146,7 @@ async def test_quota_bypassed_when_disabled(motor_reinit_db, real_ai_quota):
     """Disabling the quota (or BYPASS_AUTH) short-circuits without counting."""
     with patch.object(deps.settings, "AI_QUOTA_ENABLED", False), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         for _ in range(5):
             assert await checker(current_user={"auth_id": "u"}) is None
 
@@ -157,7 +158,7 @@ async def test_quota_monthly_window_enforced(motor_reinit_db, real_ai_quota):
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 100), \
          patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 2):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         await checker(current_user={"auth_id": "m"})
         await checker(current_user={"auth_id": "m"})
         with pytest.raises(HTTPException) as exc:
@@ -188,7 +189,7 @@ async def test_free_user_429s_at_free_cap_while_pro_passes_at_same_count(
          patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0), \
          patch.object(deps.settings, "AI_QUOTA_PRO_DAILY", 5), \
          patch.object(deps.settings, "AI_QUOTA_PRO_MONTHLY", 0):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         free = {"auth_id": "plan-free", "plan": "free"}
         pro = {"auth_id": "plan-pro", "plan": "pro"}
         for _ in range(2):
@@ -212,7 +213,7 @@ async def test_pro_at_cap_is_shown_the_cap_not_told_to_contact_support(
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
          patch.object(deps.settings, "AI_QUOTA_PRO_DAILY", 1), \
          patch.object(deps.settings, "AI_QUOTA_PRO_MONTHLY", 0):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         user = {"auth_id": "pro-cap", "plan": "pro"}
         await checker(current_user=user)
         with pytest.raises(HTTPException) as exc:
@@ -233,7 +234,7 @@ async def test_pro_at_cap_is_shown_the_cap_not_told_to_contact_support(
 async def test_restricted_and_unknown_plans_get_zero(motor_reinit_db, real_ai_quota, plan):
     with patch.object(deps.settings, "BYPASS_AUTH", False), \
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         with pytest.raises(HTTPException) as exc:
             await checker(current_user={"auth_id": "zero", "plan": plan})
     assert exc.value.status_code == 402
@@ -247,7 +248,7 @@ async def test_missing_plan_is_metered_as_free(motor_reinit_db, real_ai_quota):
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
          patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0), \
          patch.object(deps.settings, "AI_QUOTA_PRO_DAILY", 99):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         await checker(current_user={"auth_id": "legacy"})
         with pytest.raises(HTTPException):
             await checker(current_user={"auth_id": "legacy"})
@@ -263,7 +264,7 @@ async def test_restricted_is_metered_like_free_when_plan_enforcement_is_off(
          patch.object(deps.settings, "PLAN_ENFORCEMENT_ENABLED", False), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
          patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         user = {"auth_id": "lapsed", "plan": "restricted"}
         await checker(current_user=user)  # metered, not 402
         with pytest.raises(HTTPException) as exc:
