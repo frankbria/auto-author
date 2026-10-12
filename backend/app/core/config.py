@@ -281,6 +281,9 @@ class Settings(BaseSettings):
     # CI/local/tests get no new behavior. Set the DSN secret in staging/prod to
     # route unhandled 500s (and frontend errors) to Sentry instead of PM2 stdout.
     SENTRY_DSN: str = ""
+    # The commit the image was built from, baked in by the image build, and the
+    # Sentry release (#808). Not something an operator sets.
+    GIT_SHA: str = ""
 
     @field_validator(
         "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID_PRO", "STRIPE_SECRET_KEY", mode="before"

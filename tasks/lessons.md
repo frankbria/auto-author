@@ -1479,3 +1479,12 @@ The health gate made missing Stripe fatal "in production" by calling `is_product
 ### A reviewer that could not read the tree exits 0 with nothing to say (#807)
 The review was started from the scratch directory instead of the worktree. The reviewer was refused every file under the worktree, wrote one byte and exited 0. The refusal was only in its error file. Start it from the checkout it reviews, and read the size of its answer before reading the exit code.
 
+### A sentinel written in the probe's own source is found in every error report (#808)
+A probe looked for "what the user typed" in the events the Sentry SDK built. On the fixed branch two values were still found. They were string literals in the probe file, a few lines below the route that failed, and an event carries the source lines around every frame. The values now come from a file read at run time, and in the tests from module constants referred to by name. When a check searches a report for a value, make sure the value can only get there the way a user's would.
+
+### The Sentry SDK watches only the database clients created after it starts (#808)
+The check that MongoDB commands reach an event with their values removed needs the commands to be recorded at all. The SDK registers its listener when it starts and a client made earlier is never seen, so a test that reuses the session's client records nothing and passes for that reason. The test makes its client inside the request and asserts a `query` breadcrumb exists before it asserts the value is absent.
+
+### Ask what the library reports on its own before counting reports (#808)
+"Exactly one event per 500" looked like a question about our handler. The two events came from two of our ERROR log lines, the handler's explicit capture was already dropped as a duplicate, and a third source was not ours at all: the SDK turns on an integration for the model client by itself, and that integration reports a failed model call even when the app handles it. List the integrations the SDK enabled (`sentry_sdk.get_client().integrations`) before reasoning about what is sent.
+

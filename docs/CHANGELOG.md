@@ -4,6 +4,15 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **A backend error report no longer carries what the user wrote, and one failure is one report (#808, P1.26)**:
+  - **Problem.** Sentry ran on the SDK's defaults. A probe of main found, in the events for one failed request: a frame local holding manuscript text, the request body, the session cookie's value, an email address from an INFO log line, the query string, and the colliding email quoted in MongoDB's duplicate-key message. A prompt sent to the model was in the frame locals of the model client's own error report. One 500 produced two events. The container has no git, so events had no release.
+  - **Options.** `include_local_variables=False`, `max_request_body_size="never"`, the SDK's key-based scrubber extended with the field names that hold user text or identity (`content`, `title`, `email` and others), log breadcrumbs from WARNING up only, and a `before_send` that drops the query string and cuts a duplicate-key message before the value.
+  - **One report.** The request middleware logged a failed request at ERROR and the handler logged it again; each ERROR line is an event. The middleware's line is now a WARNING that names the exception type, which also puts the request id on the event as a breadcrumb. The handler's message names the type, not the text.
+  - **422s.** Both validation handlers log a warning that names the fields and the kind of error. Neither logs a value or a traceback, and neither is reported.
+  - **Release.** The image build passes the commit as `GIT_SHA`; the backend image keeps it in its environment and Sentry is started with it.
+  - **Measured, not changed.** MongoDB commands are recorded as breadcrumbs with every value already replaced by the SDK; a test with a real database pins that.
+  - **Not covered.** The text of any other exception is sent as it is, and so is any WARNING or ERROR log line; a message that quotes user input still reaches Sentry. The SDK's model-client integration reports a failed model call on its own, so a handled model failure is still more than one event. Nothing was sent to a real Sentry project: staging has no DSN (#992). The Privacy Policy's Sentry row is unchanged for that reason and because the frontend's Sentry is #809.
+
 - **In production /health fails when the box cannot store uploads, bill or report errors, and liveness has its own route (#807, P1.25)**:
   - **Problem.** `/health` checked MongoDB and two secrets. A production deployment with no storage provider, no Stripe values or no `SENTRY_DSN` passed the deploy gate. The container's liveness check used the same route, so a database outage marked a live process unhealthy.
   - **Checks.** `/health` now also reports `storage`, `billing` and `error_reporting`: `ok`, `disabled`, or `missing:` with the names of the unset settings, never their values. Storage asks `settings.storage_provider` (#806); billing needs `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `STRIPE_PRICE_ID_PRO`; error reporting needs `SENTRY_DSN`.
