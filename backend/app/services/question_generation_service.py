@@ -83,7 +83,8 @@ class QuestionGenerationService:
         chapter = find_chapter(chapters)
 
         if chapter:
-            chapter_title = chapter.get("title", "Chapter")[:MAX_CHAPTER_TITLE_CHARS]
+            # A stored title can be null or not a string: no write path checks it.
+            chapter_title = str(chapter.get("title") or "Chapter")[:MAX_CHAPTER_TITLE_CHARS]
             chapter_content = chapter.get("content", "")
 
         return {

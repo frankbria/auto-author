@@ -2808,6 +2808,28 @@ async def generate_chapter_draft(
         )
 
 
+def _rewrite_failure(result: dict, action: str) -> HTTPException:
+    """The response for a transform, enhance or cleanup that did not succeed.
+
+    A rewrite the model could not finish is a 413 with a fixed code: the text is
+    too long for one pass, and 503 would invite a retry that ends the same way
+    (#801). Anything else is an outage.
+    """
+    if result.get("error_code") == "REWRITE_TRUNCATED":
+        return HTTPException(
+            status_code=413,
+            detail={
+                "message": result.get("error"),
+                "error_code": "REWRITE_TRUNCATED",
+                "retryable": False,
+            },
+        )
+    return HTTPException(
+        status_code=503,
+        detail=f"Failed to {action}: {result.get('error', 'Unknown error')}",
+    )
+
+
 @router.post("/{book_id}/chapters/{chapter_id}/transform-style", response_model=dict, dependencies=[Depends(get_ai_usage_quota()), Depends(get_entitlement_checker("transform_style"))])
 async def transform_chapter_style(
     book_id: str,
@@ -2857,10 +2879,7 @@ async def transform_chapter_style(
     )
 
     if not result.get("success"):
-        raise HTTPException(
-            status_code=503,
-            detail=f"Failed to transform style: {result.get('error', 'Unknown error')}",
-        )
+        raise _rewrite_failure(result, "transform style")
 
     return {
         "success": True,
@@ -2938,10 +2957,7 @@ async def enhance_chapter_text(
     )
 
     if not result.get("success"):
-        raise HTTPException(
-            status_code=503,
-            detail=f"Failed to enhance text: {result.get('error', 'Unknown error')}",
-        )
+        raise _rewrite_failure(result, "enhance text")
 
     return {
         "success": True,
@@ -3011,13 +3027,7 @@ async def enhance_chapter_transcription(
     result = await ai_service.enhance_transcription(content=content)
 
     if not result.get("success"):
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Failed to clean up transcription: "
-                f"{result.get('error', 'Unknown error')}"
-            ),
-        )
+        raise _rewrite_failure(result, "clean up transcription")
 
     return {
         "success": True,

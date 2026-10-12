@@ -110,10 +110,6 @@ class TestDefaultsMatchTodaysRequests:
         await svc.analyze_summary_for_toc(SUMMARY)
         assert _sent(svc) == ("gpt-4", 1000)
 
-        svc.client = autospec_openai_client(content="Enhanced text.")
-        await svc.enhance_text("Some text to enhance.", "clarity")
-        assert _sent(svc) == ("gpt-4", 4000)
-
     @pytest.mark.asyncio
     async def test_long_output_flow_params(self, unset_ai_settings):
         svc = AIService()
@@ -125,6 +121,11 @@ class TestDefaultsMatchTodaysRequests:
         result = await svc.generate_chapter_draft("Ch", "Desc", RESPONSES, target_length=5000)
         assert _sent(svc) == ("gpt-4o", 8000)
         assert result["metadata"]["model_used"] == "gpt-4o"
+
+        # A rewrite is as long as its source, so it is long output too (#801).
+        svc.client = autospec_openai_client(content="Enhanced text.")
+        await svc.enhance_text("Some text to enhance.", "clarity")
+        assert _sent(svc) == ("gpt-4o", 4000)
 
 
 class TestAlternateProviderOnTheWire:

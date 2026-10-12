@@ -14,9 +14,11 @@ MAX_QA_PAIRS = 100  # as many answers as one batch save takes
 MAX_QUESTION_CHARS = 1000  # the cap a generated question already has
 MAX_ANSWER_CHARS = 10_000
 MAX_QA_TOTAL_CHARS = 100_000
-# The transform and enhance calls allow 4,000 completion tokens, so a longer
-# text could not come back whole anyway.
-MAX_AI_CONTENT_CHARS = 20_000
+# A rewrite comes back about as long as it went in, and the long-output class
+# allows 8,000 completion tokens by default. Measured with the gpt-4o tokenizer,
+# 5,000 words of English prose as the editor stores it is 33,000 characters and
+# 5,900 tokens; 35,000 leaves the rewrite a quarter more room than its source (#801).
+MAX_AI_CONTENT_CHARS = 35_000
 MAX_WRITING_STYLE_CHARS = 100
 
 # Text the book already stores goes into prompts as well, and some of it was

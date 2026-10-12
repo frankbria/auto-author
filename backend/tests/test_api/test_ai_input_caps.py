@@ -30,7 +30,7 @@ from app.schemas.ai_input import (
 from app.services.ai_errors import AIInvalidRequestError
 from app.services.ai_service import ai_service, model_call_attempted
 from tests.test_api.test_ai_quota_charging import _charged
-from tests.test_api.test_rate_limit_routes import _create_book, _seed_toc, _small_toc
+from tests.test_api.test_rate_limit_routes import _seed_toc, _small_toc
 from tests.test_services.openai_autospec import autospec_openai_client
 
 pytestmark = pytest.mark.asyncio
@@ -78,18 +78,6 @@ OVERSIZE_AI_REQUESTS = [
 def _prompt(model_call) -> str:
     """Everything the provider was sent in its one call."""
     return "".join(m["content"] for m in model_call.call_args.kwargs["messages"])
-
-
-@pytest.fixture
-async def author(auth_client_factory, arm_real_ai_quota, monkeypatch):
-    """A signed-in author with a book, a counted allowance and a stubbed provider."""
-    arm_real_ai_quota(limit=5)
-    api = await auth_client_factory(overrides={"plan": "pro"})
-    book_id = await _create_book(api, with_summary=True)
-    await _seed_toc(book_id, _small_toc())
-    provider = autospec_openai_client()
-    monkeypatch.setattr(ai_service, "client", provider)
-    return api, f"/api/v1/books/{book_id}", provider.chat.completions.create
 
 
 class TestAnOversizeAIRequestIsRefusedBeforeItCostsAnything:
@@ -247,6 +235,26 @@ class TestStoredTextIsBoundedOnItsWayIntoAPrompt:
         prompt = _prompt(model_call)
         assert "t" * MAX_CHAPTER_TITLE_CHARS in prompt
         assert "t" * (MAX_CHAPTER_TITLE_CHARS + 1) not in prompt
+
+    async def test_a_chapter_stored_without_a_description_can_still_be_drafted(self, author):
+        """``description: null`` is a stored shape: nothing on the write path checks it."""
+        api, book, model_call = author
+        await self._store_chapter(book, description=None)
+
+        response = await api.post(
+            f"{book}/chapters/ch1/generate-draft", json={"question_responses": [QA]}
+        )
+
+        assert response.status_code == 200, response.text
+        assert "Chapter Description: \n" in _prompt(model_call)
+
+    async def test_a_chapter_stored_without_a_title_can_still_be_asked_questions(self, author):
+        api, book, model_call = author
+        await self._store_chapter(book, title=None)
+
+        await api.post(f"{book}/chapters/ch1/generate-questions", json={"count": 3})
+
+        assert 'the chapter titled "Chapter"' in _prompt(model_call)
 
     async def test_answers_saved_before_the_caps_are_checked_when_the_contents_fall_back_to_them(
         self, author
