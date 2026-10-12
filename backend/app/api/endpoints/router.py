@@ -42,9 +42,42 @@ def _misconfigured_secrets() -> list[str]:
     return bad
 
 
+_STRIPE_SETTINGS = ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID_PRO")
+
+
+def _capabilities() -> dict[str, str]:
+    """What this deployment can do besides answer: store uploads, bill, report
+    errors (#807). Each is "ok", "disabled" or "missing: NAMES"; names only,
+    never values."""
+    if settings.storage_provider != "local":
+        storage = "ok"
+    else:
+        storage = "missing: " + (", ".join(settings.storage_fields_missing) or "CLOUDINARY_* or AWS_*")
+
+    unset = [name for name in _STRIPE_SETTINGS if not getattr(settings, name)]
+    if not settings.BILLING_ENABLED:
+        billing = "disabled"
+    else:
+        billing = f"missing: {', '.join(unset)}" if unset else "ok"
+
+    return {
+        "storage": storage,
+        "billing": billing,
+        "error_reporting": "ok" if settings.SENTRY_DSN else "missing: SENTRY_DSN",
+    }
+
+
 @router.get("/")
 async def read_root():
     return {"message": "Welcome to the Auto Author API!"}
+
+
+@router.get("/health/live")
+async def liveness():
+    """Liveness: the process is up and serving. It touches nothing else, so a
+    database outage or a missing setting does not get a live container
+    restarted; /health is the readiness probe and the deploy gate (#807)."""
+    return {"status": "alive"}
 
 
 @router.get("/health")
@@ -69,6 +102,17 @@ async def health_check(response: Response):
     missing = _misconfigured_secrets()
     checks["config"] = "ok" if not missing else f"missing: {', '.join(missing)}"
 
-    healthy = checks["mongodb"] == "ok" and not missing
+    # Reported everywhere, fatal in production only (#807): a production box
+    # that cannot store uploads, bill or report errors must not pass the deploy
+    # gate, and staging shows the same gaps without failing its own.
+    capabilities = _capabilities()
+    checks.update(capabilities)
+    capable = all(state in ("ok", "disabled") for state in capabilities.values())
+    # The validated ENVIRONMENT, not is_production_env(): that also reads
+    # NODE_ENV, and one left in the box's shared .env would fail a staging
+    # deploy for having no Stripe.
+    production = settings.ENVIRONMENT == "production"
+
+    healthy = checks["mongodb"] == "ok" and not missing and (capable or not production)
     response.status_code = status.HTTP_200_OK if healthy else status.HTTP_503_SERVICE_UNAVAILABLE
     return {"status": "healthy" if healthy else "unhealthy", "checks": checks}

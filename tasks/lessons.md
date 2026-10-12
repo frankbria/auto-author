@@ -1464,3 +1464,18 @@ The test for "local files are served" created `uploads/` and then mounted it. Th
 ### A backend change can fail a frontend test, and the hooks will not show it (#806)
 `frontend/src/lib/constants/__tests__/subprocessors.test.ts` reads `backend/app` to keep the subprocessor list honest, and its "the sweep finds something" assertion named a Cloudinary read through `os.getenv`. Moving that read into settings removed the anchor. The commit hooks run the frontend suite only when frontend paths change, so the first failure was in CI. Before removing or moving an environment read, grep the whole repository for the variable's name, tests included, and run `npx jest src/lib/constants` when `backend/app` stops reading something from the process environment.
 
+### To show a dependency going away, take it away; do not start without it (#807)
+To show that liveness answers while the database is down, the first attempt started the backend with a database URL nothing listens on. It never served: startup creates indexes and gives up after thirty seconds. "Down at start" and "goes away while running" are different states, and the second is the one a liveness check is for. The demo starts a database of its own on another port, boots against it, and kills it.
+
+### A filter at the end of a pipeline hides where a long command is (#807)
+A dry run of several server starts was piped through `cut` and looked hung with one line of output for six minutes. `cut` writes in blocks when its output is not a terminal, so nothing arrived until the end, and the end was a step that waited on a server that would never start. Write each step's result to a file as it happens and read the file.
+
+### A server started inside a recorded command has to be stopped inside it (#807)
+`showboat exec` did not return for ten minutes: the command it ran had started a backend and left it running, and the recorder waits for everything the command started. Earlier demo scripts happened to end each such command with a stop. And clearing up the stuck run with a process search by command line killed the shell doing the clearing, which the notes already warn about; `ps -eo pid,args | grep "[r]ecord.sh"` does not match itself.
+
+### A helper named for a decision may read more than the setting you have in mind (#807)
+The health gate made missing Stripe fatal "in production" by calling `is_production_env()`, the helper every production guard uses. It also reads `NODE_ENV`, and the backend container receives the box's whole `.env`. For a guard that refuses something dangerous, counting either marker is right. For a gate that fails a deploy, it means a leftover `NODE_ENV=production` on staging turns every deploy red with a message about Stripe. The reviewer found it; the box's file could not be read to rule it out. When a new consequence hangs on an existing predicate, read what feeds the predicate and ask which way this consequence should fail.
+
+### A reviewer that could not read the tree exits 0 with nothing to say (#807)
+The review was started from the scratch directory instead of the worktree. The reviewer was refused every file under the worktree, wrote one byte and exited 0. The refusal was only in its error file. Start it from the checkout it reviews, and read the size of its answer before reading the exit code.
+

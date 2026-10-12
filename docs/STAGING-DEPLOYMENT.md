@@ -99,6 +99,17 @@ to set and any that are half set. With `ENVIRONMENT=production` the backend
 refuses to start instead: `Application startup blocked: no upload storage is
 configured`.
 
+**What `/api/v1/health` reports** (#807). Besides `mongodb` and `config` it has
+`storage`, `billing` and `error_reporting`, each `ok`, `disabled` or `missing:`
+followed by the names of the settings that are not set (never their values).
+Outside production these three are information: staging answers 200 with them
+listed. With `ENVIRONMENT=production` any `missing:` makes the answer a 503, so
+the deploy gate stops a box that cannot store uploads, bill or report errors.
+`BILLING_ENABLED=false` reports billing as `disabled` for a deployment that
+sells nothing. `/api/v1/health/live` answers 200 whenever the process is
+serving; the container's own health check uses it, so a database outage does
+not mark a live container unhealthy.
+
 The **frontend does not** (#781). It takes an explicit `environment:` list in
 `docker-compose.yml` — the Mongo connection, `BETTER_AUTH_*`, the `EMAIL_*`
 settings (password reset, and since #792 the sign-up verification email, without
