@@ -10,6 +10,7 @@ import { SparklesIcon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { toast } from '@/lib/toast';
 import { bookClient } from '@/lib/api/bookClient';
 import { LoadingStateManager } from '@/components/loading';
+import { RewriteWordCounts, type WordCounts } from './RewriteWordCounts';
 import DOMPurify from 'dompurify';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +49,7 @@ export function ContentEnhancer({
   const [enhancementType, setEnhancementType] = useState('clarity');
   const [original, setOriginal] = useState('');
   const [enhanced, setEnhanced] = useState('');
+  const [wordCounts, setWordCounts] = useState<WordCounts>({});
   const [error, setError] = useState<string | null>(null);
 
   // Guard against SSR (DOMPurify needs a DOM) and skip work until there's content.
@@ -85,6 +87,10 @@ export function ContentEnhancer({
         enhancement_type: enhancementType,
       });
       setEnhanced(result.enhanced);
+      setWordCounts({
+        before: result.metadata?.original_word_count,
+        after: result.metadata?.enhanced_word_count,
+      });
       setStep('preview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to enhance text');
@@ -189,6 +195,8 @@ export function ContentEnhancer({
               </div>
             </div>
           )}
+
+          {step === 'preview' && <RewriteWordCounts {...wordCounts} />}
 
           <DialogFooter>
             {step === 'options' && (

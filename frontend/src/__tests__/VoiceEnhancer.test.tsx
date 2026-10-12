@@ -91,3 +91,20 @@ it('shows an error and returns to intro when cleanup fails', async () => {
   // Back on the intro step: the footer "Clean up" submit button is visible again.
   expect(screen.getByRole('button', { name: /^clean up$/i })).toBeInTheDocument();
 });
+
+it('shows the word counts before and after, so a shortened cleanup is visible before applying', async () => {
+  const user = userEvent.setup();
+  mockCleanup.mockResolvedValueOnce({
+    success: true,
+    enhanced: '<p>The cat sat on the mat.</p>',
+    metadata: { enhancement_label: 'Dictation Cleanup', original_word_count: 1359, enhanced_word_count: 876 },
+  });
+  setup();
+
+  await user.click(screen.getByRole('button', { name: /clean up dictation/i }));
+  await user.click(screen.getByRole('button', { name: /^clean up$/i }));
+
+  expect(
+    await screen.findByText('1,359 words before, 876 after (36% shorter)')
+  ).toBeInTheDocument();
+});

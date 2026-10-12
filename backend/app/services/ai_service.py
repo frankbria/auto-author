@@ -1,4 +1,5 @@
 # backend/app/services/ai_service.py
+import html
 import openai
 import logging
 import re
@@ -68,6 +69,52 @@ REWRITE_MIN_COMPLETION_TOKENS = 4000
 
 def rewrite_max_tokens(content: str) -> int:
     return max(REWRITE_MIN_COMPLETION_TOKENS, len(content) // 3)
+
+
+# A model can condense a long text and still report a normal finish, and the
+# page would offer the result as the finished rewrite (#983). A rewrite that
+# keeps under this percentage of its source's text is refused. Against a real
+# model a faithful transform kept 94% to 112% of the words and a condensed one
+# 28% to 54%; cleaning up a dictation that was a quarter filler kept 58% to 66%,
+# so cleanup may lose more. Under 1,000 characters (about 200 English words)
+# the share says little: tightening a paragraph can halve it.
+REWRITE_MIN_PERCENT_KEPT = 60
+CLEANUP_MIN_PERCENT_KEPT = 40
+REWRITE_SHARE_CHECKED_FROM_CHARS = 1000
+
+MARKUP = re.compile(r"<[^>]+>")
+
+
+def visible_text(text: str) -> str:
+    """The text a reader sees: tags become spaces and entities the characters
+    they stand for. The editor stores paragraphs side by side with nothing
+    between them, and pasted rich text is full of ``&nbsp;``."""
+    return html.unescape(MARKUP.sub(" ", text))
+
+
+def text_length(text: str) -> int:
+    """Characters of visible text, without whitespace.
+
+    Not words: Chinese, Japanese and Thai are written without spaces, and the
+    same text marked up or spaced differently must measure the same.
+    """
+    return len("".join(visible_text(text).split()))
+
+
+def word_count(text: str) -> int:
+    """Words of visible text, for the counts the preview shows."""
+    return len(visible_text(text).split())
+
+
+def shortened_rewrite_error(source: str, rewrite: str, min_percent: int) -> Optional[str]:
+    """What to tell the author when ``rewrite`` lost too much of ``source``, else None."""
+    before, after = text_length(source), text_length(rewrite)
+    if before < REWRITE_SHARE_CHECKED_FROM_CHARS or after * 100 >= min_percent * before:
+        return None
+    return (
+        f"The result came back at {after * 100 // before}% of the length of the text "
+        "it was given, so it was not used. Try a shorter section."
+    )
 
 
 # True once this request has been handed to the provider. The AI quota reads
@@ -1149,8 +1196,17 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 }
 
             transformed = choice.message.content
-            original_words = len(content.split())
-            transformed_words = len(transformed.split())
+            shortened = shortened_rewrite_error(content, transformed, REWRITE_MIN_PERCENT_KEPT)
+            if shortened:
+                return {
+                    "success": False,
+                    "error_code": "REWRITE_SHORTENED",
+                    "error": shortened,
+                    "transformed": "",
+                    "metadata": {},
+                }
+            original_words = word_count(content)
+            transformed_words = word_count(transformed)
 
             return {
                 "success": True,
@@ -1248,8 +1304,17 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 }
 
             enhanced = choice.message.content
-            original_words = len(content.split())
-            enhanced_words = len(enhanced.split())
+            shortened = shortened_rewrite_error(content, enhanced, REWRITE_MIN_PERCENT_KEPT)
+            if shortened:
+                return {
+                    "success": False,
+                    "error_code": "REWRITE_SHORTENED",
+                    "error": shortened,
+                    "enhanced": "",
+                    "metadata": {},
+                }
+            original_words = word_count(content)
+            enhanced_words = word_count(enhanced)
 
             return {
                 "success": True,
@@ -1338,14 +1403,23 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 }
 
             enhanced = choice.message.content
+            shortened = shortened_rewrite_error(content, enhanced, CLEANUP_MIN_PERCENT_KEPT)
+            if shortened:
+                return {
+                    "success": False,
+                    "error_code": "REWRITE_SHORTENED",
+                    "error": shortened,
+                    "enhanced": "",
+                    "metadata": {},
+                }
             return {
                 "success": True,
                 "enhanced": enhanced,
                 "metadata": {
                     "enhancement_type": "transcription",
                     "enhancement_label": TRANSCRIPTION_ENHANCEMENT_LABEL,
-                    "original_word_count": len(content.split()),
-                    "enhanced_word_count": len(enhanced.split()),
+                    "original_word_count": word_count(content),
+                    "enhanced_word_count": word_count(enhanced),
                     "model_used": self.long_output_model,
                     "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 },
