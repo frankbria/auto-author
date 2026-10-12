@@ -21,6 +21,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app import main
 from app.api.endpoints import webhooks
+from app.core import reporting
 from app.core.config import settings
 from tests.test_api.test_stripe_webhook import (
     TEST_PRO_PRICE_ID,
@@ -45,7 +46,7 @@ async def webhook(motor_reinit_db, monkeypatch):
     monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
     monkeypatch.setattr(settings, "STRIPE_PRICE_ID_PRO", TEST_PRO_PRICE_ID)
     monkeypatch.setattr(stripe_events_dao, "_ttl_index_ensured", False)
-    monkeypatch.setattr(webhooks, "_last_reported", {})
+    monkeypatch.setattr(reporting, "_last_reported", {})
     app = FastAPI()
     app.include_router(webhooks.router, prefix="/api/v1/webhooks")
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

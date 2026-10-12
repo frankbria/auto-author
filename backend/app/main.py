@@ -13,6 +13,7 @@ import logging
 import os
 from pathlib import Path
 from app.api.request_validation import RequestValidationMiddleware
+from app.core.reporting import report_failure
 from app.core.request_context import configure_logging
 
 configure_logging()
@@ -43,7 +44,9 @@ def _scrub_free_text(event, hint):
     request.get("headers", {}).pop("referer", None)
     for failure in event.get("exception", {}).get("values", []):
         if failure.get("value"):
-            failure["value"] = failure["value"].split(" dup key:")[0]
+            # The driver also ends a write error with the server's whole answer,
+            # which for a schema rule holds the value that failed (#996).
+            failure["value"] = failure["value"].split(" dup key:")[0].split(", full error:")[0]
     return event
 
 
@@ -189,6 +192,7 @@ async def lifespan(app: FastAPI):
     result = await ChapterTabIndexManager(get_database()).create_all_indexes()
     if not result.get("success"):
         logger.error(f"Startup index creation failed: {result.get('message')}")
+        report_failure("startup-indexes", message="Startup index creation failed")
 
     # Accounts older than the email-verification requirement count as verified
     # (#792). Never fatal: the app must still boot.
@@ -196,8 +200,9 @@ async def lifespan(app: FastAPI):
         grandfathered = await grandfather_unverified_accounts()
         if grandfathered:
             logger.info("Marked %d existing account(s) as email-verified", grandfathered)
-    except Exception:
+    except Exception as error:
         logger.error("Marking existing accounts as verified failed", exc_info=True)
+        report_failure("startup-verify-accounts", error)
 
     # Erase deactivated accounts whose 18 months are up (#954): now, then daily,
     # so the purge does not wait for the next deploy.
@@ -207,8 +212,10 @@ async def lifespan(app: FastAPI):
                 purged = await purge_expired_users()
                 if purged:
                     logger.info("Purged %d expired deactivated account(s)", purged)
-            except Exception:
+            except Exception as error:
+                # Accounts past their 18 months are still held (#954, #996).
                 logger.error("Purge of deactivated accounts failed", exc_info=True)
+                report_failure("purge-accounts", error)
             await asyncio.sleep(24 * 60 * 60)
 
     purge_task = asyncio.create_task(purge_daily())

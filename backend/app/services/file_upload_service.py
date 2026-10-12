@@ -12,6 +12,7 @@ from PIL import Image
 from fastapi import UploadFile, HTTPException, status
 from io import BytesIO
 from app.core.config import settings
+from app.core.reporting import report_failure
 from app.services.cloud_storage_service import get_cloud_storage_service
 import logging
 
@@ -342,6 +343,7 @@ class FileUploadService:
                         url, f"cover_images/{book_id}/"
                     ):
                         logger.warning("Cloud storage did not delete cover image %s", url)
+                        report_failure("delete-files", message="Cloud storage did not delete a cover image")
                     continue
                 path = _resolve_local_cover_path(url, book_id)
                 if path is None:
@@ -352,8 +354,10 @@ class FileUploadService:
                 if path.exists():
                     path.unlink()
             except Exception as e:
-                # Log error but don't fail the operation
+                # Log error but don't fail the operation. This method never
+                # raises, so a file left behind is reported from here (#996).
                 logger.error(f"Error deleting image file {url}: {e}")
+                report_failure("delete-files", e)
 
     async def process_and_save_profile_picture(
         self,
@@ -419,6 +423,7 @@ class FileUploadService:
                     logger.warning(
                         "Cloud storage did not delete profile picture %s", image_url
                     )
+                    report_failure("delete-files", message="Cloud storage did not delete a profile picture")
                 return
             path = _resolve_local_profile_path(image_url, user_id)
             if path is None:
@@ -430,6 +435,7 @@ class FileUploadService:
                 path.unlink()
         except Exception as e:
             logger.error(f"Error deleting profile picture: {e}")
+            report_failure("delete-files", e)
 
     def get_upload_stats(self) -> dict:
         """Get statistics about uploaded files."""

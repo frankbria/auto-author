@@ -27,6 +27,7 @@ from urllib.parse import unquote
 from fastapi import Request
 
 from app.core.config import is_deployed_env, settings
+from app.core.reporting import report_failure
 from app.db.base import get_collection
 
 logger = logging.getLogger(__name__)
@@ -176,6 +177,8 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
 
     except Exception as e:
         logger.error(f"Error validating session: {str(e)}")
+        # The user is treated as signed out for what is our failure (#996).
+        report_failure("session-validation", e)
         return None
 
 
@@ -219,6 +222,7 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
 
     except Exception as e:
         logger.error(f"Error fetching better-auth user {user_id}: {str(e)}")
+        report_failure("session-validation", e)
         return None
 
 
