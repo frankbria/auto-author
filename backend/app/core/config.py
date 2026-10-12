@@ -66,6 +66,11 @@ def is_published_secret(value: str) -> bool:
 
 
 class Settings(BaseSettings):
+    # Every field that holds a credential, or an address that can carry one, is
+    # declared with repr=False: the model's repr prints field values, and a
+    # failure that rendered `settings` printed live keys (#930).
+    # tests/test_core/test_settings_repr.py enforces it by field name.
+
     # Required, but defaulted to None and validated: a plain required field's
     # "missing" error prints every other setting (Mongo URI, API keys) as its
     # input_value into the startup log.
@@ -89,8 +94,8 @@ class Settings(BaseSettings):
         return v.lower()
 
     # MongoDB connection - MONGODB_URI takes precedence over DATABASE_URL
-    MONGODB_URI: str = ""  # Standard env var name (e.g., for Atlas)
-    DATABASE_URL: str = "mongodb://localhost:27017"  # Fallback/legacy
+    MONGODB_URI: str = Field("", repr=False)  # Standard env var name (e.g., for Atlas)
+    DATABASE_URL: str = Field("mongodb://localhost:27017", repr=False)  # Fallback/legacy
     DATABASE_NAME: str = "auto_author_test"
 
     @property
@@ -100,8 +105,8 @@ class Settings(BaseSettings):
     # OpenAI key. OPENAI_API_KEY is the canonical/standard name (matches the
     # GitHub env secret); OPENAI_AUTOAUTHOR_API_KEY is the legacy app-specific
     # name kept for backward compatibility. Use `settings.openai_api_key`.
-    OPENAI_API_KEY: str = ""
-    OPENAI_AUTOAUTHOR_API_KEY: str = "test-key"  # Default for testing
+    OPENAI_API_KEY: str = Field("", repr=False)
+    OPENAI_AUTOAUTHOR_API_KEY: str = Field("test-key", repr=False)  # Default for testing
 
     @property
     def openai_api_key(self) -> str:
@@ -124,8 +129,8 @@ class Settings(BaseSettings):
     # API terms on training and retention (#788). Pointing AI_BASE_URL at another
     # provider means updating subprocessors.ts and section 4 of /privacy; no test
     # can see a deploy-time value.
-    AI_BASE_URL: str = ""
-    AI_API_KEY: str = ""
+    AI_BASE_URL: str = Field("", repr=False)
+    AI_API_KEY: str = Field("", repr=False)
     AI_MODEL_DEFAULT: str = "gpt-4"
     AI_MODEL_LONG_OUTPUT: str = "gpt-4o"
     AI_MAX_OUTPUT_TOKENS_DEFAULT: int = Field(default=4000, ge=1)
@@ -138,9 +143,10 @@ class Settings(BaseSettings):
     BETTER_AUTH_SECRET: str = Field(
         default="test-secret-for-ci-minimum-32-characters-long-safe-for-testing",
         min_length=32,
+        repr=False,
         description="JWT signing secret - MUST be strong random value, minimum 32 characters"
     )
-    BETTER_AUTH_URL: str = "http://localhost:3000"  # Base URL of the application
+    BETTER_AUTH_URL: str = Field("http://localhost:3000", repr=False)  # Base URL of the application
     BETTER_AUTH_ISSUER: str = "better-auth"  # Issuer identifier for JWT tokens
     JWT_ALGORITHM: str = "HS256"  # Changed from RS256 (Clerk) to HS256 (better-auth)
 
@@ -166,7 +172,7 @@ class Settings(BaseSettings):
     # (#173) throttled it into perpetual red. These accounts skip the limiter /
     # quota / entitlement gate — FENCED to non-production so it can never loosen
     # limits on the real product (see _is_exempt_e2e_user in dependencies.py).
-    E2E_EXEMPT_EMAILS: str = ""
+    E2E_EXEMPT_EMAILS: str = Field("", repr=False)
 
     # ge=1: range(max_retries) with 0 or a negative value never enters the loop,
     # so _retry_with_backoff returns None implicitly and the caller AttributeErrors
@@ -211,15 +217,15 @@ class Settings(BaseSettings):
     EXPORT_MAX_WORKERS: int = 2
 
     # AWS Settings (Optional - for transcription and storage)
-    AWS_ACCESS_KEY_ID: str = ""
-    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_ACCESS_KEY_ID: str = Field("", repr=False)
+    AWS_SECRET_ACCESS_KEY: str = Field("", repr=False)
     AWS_REGION: str = "us-east-1"
     AWS_S3_BUCKET: str = ""
 
     # Cloudinary Settings (Optional - for image storage)
     CLOUDINARY_CLOUD_NAME: str = ""
-    CLOUDINARY_API_KEY: str = ""
-    CLOUDINARY_API_SECRET: str = ""
+    CLOUDINARY_API_KEY: str = Field("", repr=False)
+    CLOUDINARY_API_SECRET: str = Field("", repr=False)
 
     # What each storage provider needs. Cloudinary first: it is the better fit for images.
     _STORAGE_FIELDS: ClassVar[dict] = {
@@ -269,9 +275,9 @@ class Settings(BaseSettings):
     # billing as "disabled" instead of failing production for missing Stripe
     # values (#807). It does not switch the billing routes off.
     BILLING_ENABLED: bool = True
-    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_WEBHOOK_SECRET: str = Field("", repr=False)
     STRIPE_PRICE_ID_PRO: str = ""
-    STRIPE_SECRET_KEY: str = ""
+    STRIPE_SECRET_KEY: str = Field("", repr=False)
     # Stripe Tax on checkout (#783). Off by default: Stripe rejects every
     # checkout with automatic_tax on an account where Stripe Tax isn't activated,
     # so the operator turns this on after registering tax settings in Stripe.
@@ -280,7 +286,7 @@ class Settings(BaseSettings):
     # Error tracking (issue #334). Unset => Sentry is inert (no events sent), so
     # CI/local/tests get no new behavior. Set the DSN secret in staging/prod to
     # route unhandled 500s (and frontend errors) to Sentry instead of PM2 stdout.
-    SENTRY_DSN: str = ""
+    SENTRY_DSN: str = Field("", repr=False)
     # The commit the image was built from, baked in by the image build, and the
     # Sentry release (#808). Not something an operator sets.
     GIT_SHA: str = ""
