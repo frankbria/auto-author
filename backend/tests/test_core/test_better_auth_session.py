@@ -205,7 +205,7 @@ class TestValidateBetterAuthSession:
             result = await bas.validate_better_auth_session(req)
         assert result is None
 
-    async def test_db_exception_returns_none(self):
+    async def test_an_error_that_is_not_the_database_being_away_returns_none(self):
         req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
         with patch.object(bas, "get_collection", AsyncMock(side_effect=RuntimeError("db down"))):
             assert await bas.validate_better_auth_session(req) is None
@@ -236,7 +236,7 @@ class TestGetBetterAuthUser:
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             assert await bas.get_better_auth_user("not-an-objectid") is None
 
-    async def test_exception_returns_none(self):
+    async def test_an_error_that_is_not_the_database_being_away_returns_none(self):
         with patch.object(bas, "get_collection", AsyncMock(side_effect=RuntimeError("boom"))):
             assert await bas.get_better_auth_user("u1") is None
 

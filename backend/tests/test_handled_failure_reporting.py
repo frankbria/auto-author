@@ -20,6 +20,7 @@ import pytest
 import sentry_sdk
 from bson import ObjectId
 from fastapi import FastAPI
+from pymongo.errors import ServerSelectionTimeoutError
 from starlette.requests import Request
 
 from app import main
@@ -152,19 +153,21 @@ class TestASessionThatCouldNotBeChecked:
         cookie = f"better-auth.session_token={signed_session_cookie(token)}"
         return Request({"type": "http", "method": "GET", "path": "/", "headers": [(b"cookie", cookie.encode())]})
 
-    async def test_is_reported_and_the_request_goes_on_as_signed_out(self, reports):
-        with patch.object(better_auth_session, "get_collection", AsyncMock(side_effect=RuntimeError("database is away"))):
-            session = await better_auth_session.validate_better_auth_session(self._request(SENTINEL))
+    async def test_is_reported_and_is_not_taken_for_a_session_that_is_not_there(self, reports):
+        away = AsyncMock(side_effect=ServerSelectionTimeoutError("no primary"))
+        with patch.object(better_auth_session, "get_collection", away):
+            with pytest.raises(better_auth_session.SessionStoreUnavailable):
+                await better_auth_session.validate_better_auth_session(self._request(SENTINEL))
 
-        assert session is None
         assert _kinds(reports) == ["session-validation"]
         assert SENTINEL not in _said(reports)
 
     async def test_so_is_a_user_who_could_not_be_looked_up(self, reports):
-        with patch.object(better_auth_session, "get_collection", AsyncMock(side_effect=RuntimeError("database is away"))):
-            user = await better_auth_session.get_better_auth_user(str(ObjectId()))
+        away = AsyncMock(side_effect=ServerSelectionTimeoutError("no primary"))
+        with patch.object(better_auth_session, "get_collection", away):
+            with pytest.raises(better_auth_session.SessionStoreUnavailable):
+                await better_auth_session.get_better_auth_user(str(ObjectId()))
 
-        assert user is None
         assert _kinds(reports) == ["session-validation"]
 
 
