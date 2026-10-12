@@ -2,6 +2,7 @@
 
 import { useSession } from "@/lib/auth-client";
 import { useState, useCallback } from "react";
+import { apiFetch } from "@/lib/api/unauthorized";
 
 interface UseAuthFetchOptions {
   /** Base URL for API requests */
@@ -61,7 +62,7 @@ export function useAuthFetch(options: UseAuthFetchOptions = {}) {
 
         // Make the request with credentials included for cookie-based auth
         // Browser automatically sends httpOnly cookies when credentials: 'include' is set
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
           ...restOptions,
           headers,
           // Include credentials (cookies) for authenticated requests
