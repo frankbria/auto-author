@@ -255,7 +255,7 @@ async def get_current_user_from_session(request: Request) -> Dict:
             }
 
             user = await create_user(user_data)
-            logger.info(f"Successfully created backend user record for {email} (auth_id: {user_id})")
+            logger.info(f"Successfully created backend user record (auth_id: {user_id})")
 
         except HTTPException:
             raise

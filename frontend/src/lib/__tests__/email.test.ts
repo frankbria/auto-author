@@ -128,6 +128,23 @@ describe('sendPasswordResetEmail', () => {
     expect(logged).toContain(params.resetUrl);
   });
 
+  // #794: the name is user-chosen and the email comes from the genuine sender.
+  it('escapes the name in the HTML part and leaves the text part as typed', async () => {
+    setNodeEnv('production');
+    process.env.EMAIL_SERVICE_PROVIDER = 'resend';
+    process.env.EMAIL_SERVICE_API_KEY = 'test-key';
+    const name = `<a href=x>Click</a> & "friends" 'here'`;
+
+    await sendPasswordResetEmail({ ...params, name });
+
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.html).toContain(
+      'Hi &lt;a href=x&gt;Click&lt;/a&gt; &amp; &quot;friends&quot; &#39;here&#39;,'
+    );
+    expect(body.html).not.toContain('<a href=x>');
+    expect(body.text).toContain(`Hi ${name},`);
+  });
+
   // #792: the verification email goes through the same delivery path.
   describe('sendVerificationEmail', () => {
     const verification = {

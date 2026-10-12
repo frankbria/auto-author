@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **The password reset flow is hardened in four places (#794, P1.12)**:
+  - **The password rule is enforced by the server.** Eight characters with an uppercase letter, a lowercase letter and a number was checked only in the browser, so a direct request could set `aaaaaaaa`. A better-auth `before` hook (`frontend/src/lib/auth-password-policy.ts`) now answers 400 to a new password that fails the rule at sign-up, reset and change. The rule itself moved to `frontend/src/lib/password-policy.ts`, shared by the hook and the page checklist. Sign-in is not checked: an existing account's password is not judged.
+  - **Forgot-password says the same thing for every address.** The page no longer maps a server error to "No account found", never shows the server's own error text, and its success message reads "If an account exists for ..., we have sent it a password reset link."
+  - **No address in the logs.** The reset hook logged the recipient on every send, and wrote the raw provider error on failure; it now logs neither. The backend's "created backend user record" line and a debug line in the session lookup dropped the address too.
+  - **The name is escaped in the reset email.** The HTML part interpolated the user-chosen name as written, so markup in a name arrived from the genuine sender.
+  - **Not covered.** An account that already has a weak password keeps it until it is next changed. The development console still prints whole emails, address included, when no provider is configured. Jest cannot load better-auth's server build, so the 400 itself is shown by the demo (#843).
+
 - **A password reset or a two-factor change ends the account's other sessions (#793, P1.11)**: a session someone else already held survived the reset or the 2FA change that was meant to lock them out.
   - **Password reset.** `revokeSessionsOnPasswordReset` is on; better-auth's default is off. A reset deletes every session of the account.
   - **No session cookie cache.** With `session.cookieCache` on, `get-session` kept answering from the cookie for up to five minutes after the session row was gone, so a revoked session still looked signed in to the frontend while the backend answered 401. The cache is removed. Each session check is now one database lookup, which the backend already does on every request.

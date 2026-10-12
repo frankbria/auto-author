@@ -56,6 +56,9 @@ describe("ForgotPasswordPage", () => {
     // Verify success state is shown
     expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
     expect(screen.getByText(/test@example.com/i)).toBeInTheDocument();
+    // #794: the page does not claim an email was sent, only that one is if the account exists.
+    expect(screen.getByText(/if an account exists for/i)).toBeInTheDocument();
+    expect(screen.queryByText(/we've sent a password reset link to/i)).not.toBeInTheDocument();
     expect(screen.getByText(/link will expire in 1 hour/i)).toBeInTheDocument();
   });
 
@@ -75,7 +78,22 @@ describe("ForgotPasswordPage", () => {
     await user.type(emailInput, "notfound@example.com");
     await user.click(submitButton);
 
-    expect(await screen.findByText(/no account found with this email address/i)).toBeInTheDocument();
+    // #794: never say whether the account exists, and never echo the server's text.
+    expect(await screen.findByText(/could not send the reset link/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no account found/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/user not found/i)).not.toBeInTheDocument();
+  });
+
+  it("does not echo a thrown error's text (#794)", async () => {
+    mockRequestPasswordReset.mockRejectedValueOnce(new Error("User notfound@example.com does not exist"));
+
+    const user = userEvent.setup();
+    render(<ForgotPasswordPage />);
+    await user.type(screen.getByLabelText(/email/i), "notfound@example.com");
+    await user.click(screen.getByRole("button", { name: /send reset link/i }));
+
+    expect(await screen.findByText(/could not send the reset link/i)).toBeInTheDocument();
+    expect(screen.queryByText(/does not exist/i)).not.toBeInTheDocument();
   });
 
   it("shows rate limit error message", async () => {

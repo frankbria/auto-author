@@ -284,6 +284,18 @@ async function deliver({
   throw new Error(`${kind} email not sent: ${reason}`);
 }
 
+/** The name is user-chosen and this email comes from the genuine sender (#794). */
+function escapeHtml(text: string): string {
+  const entities: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return text.replace(/[&<>"']/g, (char) => entities[char]);
+}
+
 function generatePasswordResetHtml({
   name,
   resetUrl,
@@ -307,7 +319,7 @@ function generatePasswordResetHtml({
   <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
     <h2 style="color: #333; margin-top: 0;">Reset Your Password</h2>
 
-    <p>Hi ${name},</p>
+    <p>Hi ${escapeHtml(name)},</p>
 
     <p>We received a request to reset your password. Click the button below to create a new password:</p>
 

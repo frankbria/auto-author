@@ -5,7 +5,9 @@ import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { twoFactor } from "better-auth/plugins";
 import { MongoClient, Db } from "mongodb";
 
+import { createAuthMiddleware } from "better-auth/api";
 import { getDefaultCookieAttributes } from "./auth-cookies";
+import { rejectWeakPassword } from "./auth-password-policy";
 import { getIpAddressConfig } from "./auth-ip";
 import { stampTermsAcceptance, termsAcceptanceFields } from "./auth-terms";
 
@@ -38,6 +40,8 @@ function createAuthInstance(database: Db) {
     // Every new account records the Terms version it accepted and when (#789).
     user: { additionalFields: termsAcceptanceFields },
     databaseHooks: { user: { create: { before: stampTermsAcceptance } } },
+    // The password rule the pages show is enforced here too (#794).
+    hooks: { before: createAuthMiddleware(rejectWeakPassword) },
     emailAndPassword: {
       enabled: true,
       // No session until the address is verified (#792): sign-up returns none
@@ -59,9 +63,15 @@ function createAuthInstance(database: Db) {
               name: user.name || "User",
               resetUrl: url,
             });
-            console.log(`Password reset email sent to ${user.email}`);
+            // No address in either line (#794): logs outlive and outreach the user record.
+            console.log("Password reset email sent");
           } catch (error) {
-            console.error("Failed to send password reset email:", error);
+            // A provider's error can echo the recipient in any case or
+            // encoding, so anything address-shaped is masked.
+            console.error(
+              "Failed to send password reset email:",
+              String(error).replace(/[^\s"'<>]+(?:@|%40)[^\s"'<>]+/gi, "[address]")
+            );
           }
         })();
       },
