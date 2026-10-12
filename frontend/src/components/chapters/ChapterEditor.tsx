@@ -58,6 +58,8 @@ import {
   flushChapterContent,
   isChapterConflict,
   keepDroppedChapterText,
+  reportSaveFailure,
+  saveSucceeded,
   PendingChapterEdit,
   saveChapterEdit,
   SeenChapters,
@@ -335,6 +337,7 @@ export function ChapterEditor({
   // sent. An edit typed while the request was in flight stays pending, and the
   // autosave effect re-arms for it because lastAutoSavedContent changed (#757).
   const markSaved = (content: string) => {
+    saveSucceeded();
     setLastAutoSavedContent(content);
     if (editor?.getHTML() !== content) return;
     unsavedRef.current = null;
@@ -421,7 +424,10 @@ export function ChapterEditor({
 
         if (isChapterConflict(err)) {
           handleConflict(content, err);
-        } else if (backupChapterContent({ bookId, chapterId, content }, err)) {
+          return;
+        }
+        reportSaveFailure('auto-save', err);
+        if (backupChapterContent({ bookId, chapterId, content }, err)) {
           noteBackupWrite();
           setError('Failed to auto-save. Content backed up locally.');
         } else {
@@ -466,6 +472,7 @@ export function ChapterEditor({
         return;
       }
       setError('Failed to save chapter content');
+      reportSaveFailure('manual-save', err);
 
       // Backup to localStorage on manual save failure too
       backupChapterContent({ bookId, chapterId, content }, err);
@@ -564,6 +571,7 @@ export function ChapterEditor({
         localStorage.removeItem(restoreKey);
       } catch (err) {
         console.error('Failed to recover backup:', err);
+        reportSaveFailure('restore', err);
         setError('Failed to recover backed up content');
       }
     }
