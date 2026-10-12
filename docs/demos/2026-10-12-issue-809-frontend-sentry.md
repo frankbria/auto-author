@@ -122,5 +122,5 @@ cd /home/frankbria/projects/worktrees/issue-809-frontend-sentry/frontend && npx 
 ```
 
 ```output
-Tests: 33 passed, 33 total
+Tests: 34 passed, 34 total
 ```
