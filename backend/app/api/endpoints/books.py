@@ -2811,16 +2811,17 @@ async def generate_chapter_draft(
 def _rewrite_failure(result: dict, action: str) -> HTTPException:
     """The response for a transform, enhance or cleanup that did not succeed.
 
-    A rewrite the model could not finish is a 413 with a fixed code: the text is
-    too long for one pass, and 503 would invite a retry that ends the same way
-    (#801). Anything else is an outage.
+    A rewrite the model could not finish, or one that came back with most of
+    the text gone, is a 413 with a fixed code: the text is too long for one
+    pass, and 503 would invite a retry that ends the same way (#801, #983).
+    Anything else is an outage.
     """
-    if result.get("error_code") == "REWRITE_TRUNCATED":
+    if result.get("error_code") in ("REWRITE_TRUNCATED", "REWRITE_SHORTENED"):
         return HTTPException(
             status_code=413,
             detail={
                 "message": result.get("error"),
-                "error_code": "REWRITE_TRUNCATED",
+                "error_code": result["error_code"],
                 "retryable": False,
             },
         )

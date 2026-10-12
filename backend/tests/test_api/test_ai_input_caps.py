@@ -109,8 +109,12 @@ class TestAnOversizeAIRequestIsRefusedBeforeItCostsAnything:
         assert "x" * 100 not in response.text
         assert "x" * 100 not in caplog.text
 
-    async def test_content_exactly_at_the_cap_reaches_the_model(self, author):
-        api, book, model_call = author
+    async def test_content_exactly_at_the_cap_reaches_the_model(self, author, monkeypatch):
+        api, book, _ = author
+        # A rewrite as long as its source; a much shorter one is refused (#983).
+        provider = autospec_openai_client(content="y" * MAX_AI_CONTENT_CHARS)
+        monkeypatch.setattr(ai_service, "client", provider)
+        model_call = provider.chat.completions.create
 
         response = await api.post(
             f"{book}/chapters/ch1/transform-style",
