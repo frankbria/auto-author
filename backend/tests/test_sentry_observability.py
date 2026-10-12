@@ -25,6 +25,13 @@ class TestSentryConfig:
         assert s.SENTRY_DSN == "https://k@o1.ingest.sentry.io/1"
 
 
+def _request():
+    """A request as the handler meets it: the middleware has given it an id (#810)."""
+    request = MagicMock()
+    request.state.request_id = "an-id"
+    return request
+
+
 class TestGlobalHandlerSentryCapture:
     @pytest.mark.asyncio
     async def test_captures_to_sentry_when_dsn_set(self, monkeypatch):
@@ -33,7 +40,7 @@ class TestGlobalHandlerSentryCapture:
         monkeypatch.setattr(sentry_sdk, "capture_exception", lambda e: captured.setdefault("exc", e))
 
         exc = ValueError("boom")
-        resp = await global_exception_handler(MagicMock(), exc)
+        resp = await global_exception_handler(_request(), exc)
 
         assert resp.status_code == 500
         assert captured.get("exc") is exc
@@ -44,7 +51,7 @@ class TestGlobalHandlerSentryCapture:
         calls = []
         monkeypatch.setattr(sentry_sdk, "capture_exception", lambda e: calls.append(e))
 
-        resp = await global_exception_handler(MagicMock(), ValueError("boom"))
+        resp = await global_exception_handler(_request(), ValueError("boom"))
 
         assert resp.status_code == 500
         assert calls == []
