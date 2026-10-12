@@ -45,3 +45,10 @@ async def increment_usage(user_id: str, period_key: str, ttl_seconds: int) -> in
         return_document=ReturnDocument.AFTER,
     )
     return doc["count"]
+
+
+async def refund_usage(user_id: str, period_key: str) -> None:
+    """Hand back one unit charged by ``increment_usage`` (#798): the request it
+    was charged for never reached the model."""
+    coll = await _usage_collection()
+    await coll.update_one({"_id": f"{user_id}:{period_key}"}, {"$inc": {"count": -1}})

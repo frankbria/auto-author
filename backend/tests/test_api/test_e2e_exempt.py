@@ -11,6 +11,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 import app.api.dependencies as deps
+from tests.yield_dependencies import completes
 
 
 EXEMPT = "e2e-bot@staging.example, other@staging.example"
@@ -67,7 +68,7 @@ async def test_exempt_user_skips_ai_quota(motor_reinit_db, real_ai_quota):
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
          patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 1):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         for _ in range(5):  # far past the cap of 1
             assert await checker(current_user=user) is None
 
@@ -82,7 +83,7 @@ async def test_non_exempt_user_still_capped(motor_reinit_db, real_ai_quota):
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
          patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0):
-        checker = real_ai_quota()
+        checker = completes(real_ai_quota())
         await checker(current_user=user)  # 1 → ok
         with pytest.raises(HTTPException) as exc:
             await checker(current_user=user)  # 2 → 429
