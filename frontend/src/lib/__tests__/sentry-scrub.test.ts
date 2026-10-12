@@ -92,9 +92,27 @@ describe('beforeSend', () => {
     expect(text).toContain('https://api.example/books');
   });
 
-  it('leaves an ordinary error message as it is', () => {
-    const value = "Cannot read properties of undefined (reading 'chapters')";
+  it('takes it out of an address without a host, and a token out of a fragment', () => {
+    const event = send({
+      exception: {
+        values: [
+          { type: 'Error', value: `Cannot navigate to /auth/reset-password?token=${TOKEN} from here` },
+          { type: 'Error', value: `Bad redirect (/auth/callback#access_token=${TOKEN}&state=1)` },
+        ],
+      },
+    });
 
+    expect(event.exception?.values?.map((failure) => failure.value)).toEqual([
+      'Cannot navigate to /auth/reset-password from here',
+      'Bad redirect (/auth/callback)',
+    ]);
+  });
+
+  it.each([
+    "Cannot read properties of undefined (reading 'chapters')",
+    'a?.b is not a function',
+    'Why did this fail? Nobody knows = nothing to cut',
+  ])('leaves an ordinary error message as it is: %s', (value) => {
     expect(send({ exception: { values: [{ type: 'TypeError', value }] } }).exception?.values?.[0].value).toBe(value);
   });
 

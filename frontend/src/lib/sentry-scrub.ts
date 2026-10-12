@@ -10,8 +10,10 @@ import type { Breadcrumb, ErrorEvent } from '@sentry/nextjs';
 
 const withoutQuery = (address: string) => address.split(/[?#]/)[0];
 
-// An address inside a sentence: keep it up to its `?` or `#`.
-const withoutQueries = (text: string) => text.replace(/(https?:\/\/[^\s"'<>?#]+)[?#][^\s"'<>]*/g, '$1');
+// An address inside a sentence, with or without a host: drop a `?name=…` or
+// `#name=…` up to the next space, quote or bracket. Needing the `name=` keeps
+// `a?.b` and an ordinary question mark out of it.
+const withoutQueries = (text: string) => text.replace(/[?#][\w.%-]+=[^\s"'<>)]*/g, '');
 
 // bookClient throws `Failed to <do something>: <status> <response body>`.
 const withoutResponseBody = (message: string) => message.replace(/^([^\n]{0,80}?: \d{3})\s[\s\S]*$/, '$1');
