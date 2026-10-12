@@ -265,6 +265,10 @@ class Settings(BaseSettings):
     # (app.core.entitlements.resolve_plan_for_price). STRIPE_SECRET_KEY is the
     # API key (dashboard -> Developers -> API keys) used by checkout (#221);
     # unset => POST /billing/checkout fails closed with 503.
+    # False says this deployment sells nothing, on purpose. /health then reports
+    # billing as "disabled" instead of failing production for missing Stripe
+    # values (#807). It does not switch the billing routes off.
+    BILLING_ENABLED: bool = True
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRICE_ID_PRO: str = ""
     STRIPE_SECRET_KEY: str = ""

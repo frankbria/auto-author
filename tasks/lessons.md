@@ -1464,3 +1464,12 @@ The test for "local files are served" created `uploads/` and then mounted it. Th
 ### A backend change can fail a frontend test, and the hooks will not show it (#806)
 `frontend/src/lib/constants/__tests__/subprocessors.test.ts` reads `backend/app` to keep the subprocessor list honest, and its "the sweep finds something" assertion named a Cloudinary read through `os.getenv`. Moving that read into settings removed the anchor. The commit hooks run the frontend suite only when frontend paths change, so the first failure was in CI. Before removing or moving an environment read, grep the whole repository for the variable's name, tests included, and run `npx jest src/lib/constants` when `backend/app` stops reading something from the process environment.
 
+### To show a dependency going away, take it away; do not start without it (#807)
+To show that liveness answers while the database is down, the first attempt started the backend with a database URL nothing listens on. It never served: startup creates indexes and gives up after thirty seconds. "Down at start" and "goes away while running" are different states, and the second is the one a liveness check is for. The demo starts a database of its own on another port, boots against it, and kills it.
+
+### A filter at the end of a pipeline hides where a long command is (#807)
+A dry run of several server starts was piped through `cut` and looked hung with one line of output for six minutes. `cut` writes in blocks when its output is not a terminal, so nothing arrived until the end, and the end was a step that waited on a server that would never start. Write each step's result to a file as it happens and read the file.
+
+### A server started inside a recorded command has to be stopped inside it (#807)
+`showboat exec` did not return for ten minutes: the command it ran had started a backend and left it running, and the recorder waits for everything the command started. Earlier demo scripts happened to end each such command with a stop. And clearing up the stuck run with a process search by command line killed the shell doing the clearing, which the notes already warn about; `ps -eo pid,args | grep "[r]ecord.sh"` does not match itself.
+

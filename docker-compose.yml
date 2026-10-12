@@ -43,9 +43,10 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
     healthcheck:
-      # The same /health endpoint the existing deploy smoke-checks (#341 made it
-      # do real dependency checks rather than returning a static ok).
-      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5).status==200 else 1)\""]
+      # Liveness only (#807): is the process serving. /health, which checks
+      # MongoDB and the configuration, stays the deploy gate; using it here
+      # marked a live container unhealthy whenever the database was away.
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/live', timeout=5).status==200 else 1)\""]
       interval: 30s
       timeout: 10s
       retries: 5

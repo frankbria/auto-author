@@ -4,6 +4,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **In production /health fails when the box cannot store uploads, bill or report errors, and liveness has its own route (#807, P1.25)**:
+  - **Problem.** `/health` checked MongoDB and two secrets. A production deployment with no storage provider, no Stripe values or no `SENTRY_DSN` passed the deploy gate. The container's liveness check used the same route, so a database outage marked a live process unhealthy.
+  - **Checks.** `/health` now also reports `storage`, `billing` and `error_reporting`: `ok`, `disabled`, or `missing:` with the names of the unset settings, never their values. Storage asks `settings.storage_provider` (#806); billing needs `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `STRIPE_PRICE_ID_PRO`; error reporting needs `SENTRY_DSN`.
+  - **Fatal in production only.** With `ENVIRONMENT=production` any `missing:` is a 503. Elsewhere the same lines are reported and the answer stays 200, so staging keeps passing its gate and shows from outside what it has configured.
+  - **`BILLING_ENABLED`.** New setting, default true. False reports billing as `disabled` for a deployment that sells nothing on purpose. It changes only what `/health` reports.
+  - **`/health/live`.** Answers `{"status": "alive"}` and touches nothing. `docker-compose.yml`'s backend health check uses it; `/health` stays the readiness probe and the deploy gate.
+  - **Not covered.** For storage the production 503 is behind another guard: since #806 a production backend without a provider does not start at all. The checks are presence checks; a wrong Stripe key or a dead DSN passes. The frontend service waits for the backend's container health, which is now liveness, so it can start while the database is still away.
+
 - **Where uploads go is decided in one place, and production refuses local disk (#806, P1.24)**:
   - **Problem.** The storage provider was chosen three ways. The `AWS_*` and `CLOUDINARY_*` fields on `Settings` were declared and never read. `get_cloud_storage_service` read `os.getenv` and needed every key of a provider. The static mount in `main.py` looked at one key of each. With half a Cloudinary configuration the service wrote uploads to local disk and the mount, seeing "cloud", never served them.
   - **One answer.** `settings.storage_provider` returns `cloudinary`, `s3` or `local`; a provider counts only with all of its values set, and `settings.storage_fields_missing` names the absent half. The service and `mount_local_uploads` both ask it.
