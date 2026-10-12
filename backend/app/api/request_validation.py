@@ -70,13 +70,11 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             return response
 
         except Exception as e:
-            # A warning naming the type: the handler that answers this request
-            # logs the error itself, once, with its traceback. A second ERROR
-            # line here was a second Sentry event for one failure (#808).
+            # Log exceptions
             process_time = (time.time() - start_time) * 1000
-            logger.warning(
+            logger.error(
                 f"Request failed: {request.method} {request.url.path} "
-                f"[ID: {request_id}] - Error: {type(e).__name__}, "
+                f"[ID: {request_id}] - Error: {str(e)}, "
                 f"Took: {process_time:.2f}ms"
             )
             raise

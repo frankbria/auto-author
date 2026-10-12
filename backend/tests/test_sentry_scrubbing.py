@@ -33,6 +33,8 @@ DUPLICATE = "DUPLICATE-SENTINEL@example.com"
 COOKIE = "COOKIE-SENTINEL"
 QUERY = "QUERY-SENTINEL"
 REJECTED = "REJECTED-SENTINEL"
+LOGGED = "LOGGED-SENTINEL the question about chapter two"
+REFERER = "REFERER-SENTINEL"
 STORED = "STORED-SENTINEL the chapter as saved"
 PROMPT = "PROMPT-SENTINEL the chapter sent to the model"
 
@@ -53,8 +55,10 @@ def _scratch(collection: str):
 async def _fail(payload: dict):
     manuscript = LOCAL  # noqa: F841 - a frame local, which is where the probe found text
     log.info("signed in %s", CRUMB)
-    # Nested, so the scrubber has to look inside.
-    log.warning("draft kept", extra={"chapter": {"content": KEYED}, "email": CRUMB})
+    # What 133 lines in the app do, some of them with what the user wrote.
+    log.error(f"Question dict: {{'question_text': '{LOGGED}'}}")
+    # Attached by key and nested, so the scrubber has to look inside.
+    sentry_sdk.add_breadcrumb(category="chapter", data={"chapter": {"content": KEYED}})
     # MongoDB's own duplicate-key error, which quotes the colliding value.
     users = _scratch("sentry_probe_users")
     await users.create_index("email", unique=True)
@@ -110,7 +114,10 @@ def _fail_a_request(api: TestClient):
         f"{PROBE}?q={QUERY}",
         # Under a name the scrubber does not know: only not sending bodies keeps it out.
         json={"notes": BODY},
-        headers={"Cookie": f"better-auth.session_token={COOKIE}"},
+        headers={
+            "Cookie": f"better-auth.session_token={COOKIE}",
+            "Referer": f"https://app.example/reset-password?token={REFERER}",
+        },
     )
 
 
@@ -125,8 +132,11 @@ class TestAFailedRequestIsReportedOnce:
 class TestTheReportCarriesNothingTheUserWrote:
     @pytest.mark.parametrize(
         "sentinel",
-        [LOCAL, BODY, CRUMB, KEYED, DUPLICATE, COOKIE, QUERY],
-        ids=["frame local", "request body", "log line", "keyed value", "duplicate key", "cookie", "query"],
+        [LOCAL, BODY, CRUMB, LOGGED, KEYED, DUPLICATE, COOKIE, QUERY, REFERER],
+        ids=[
+            "frame local", "request body", "info log line", "error log line", "keyed value",
+            "duplicate key", "cookie", "query", "referer",
+        ],  # fmt: skip
     )
     def test_it_is_absent_from_the_event_and_its_breadcrumbs(self, api, events, sentinel):
         _fail_a_request(api)

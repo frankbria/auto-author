@@ -22,9 +22,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# Field names that hold what a user wrote or who they are (#808). Frame locals
-# and request bodies are off, so these cover the keyed places that are left:
-# log extras and breadcrumb data.
+# Field names that hold what a user wrote or who they are (#808). Frame locals,
+# request bodies and log lines are off, so these cover what is attached by key:
+# breadcrumb data, contexts, extras.
 _USER_TEXT_KEYS = [
     "content", "text", "title", "subtitle", "description", "question", "question_text",
     "answer", "response_text", "feedback", "bio", "prompt", "transcript",
@@ -35,10 +35,13 @@ _USER_TEXT_KEYS = [
 def _scrub_free_text(event, hint):
     """Take out what a key-based scrubber cannot see (#808).
 
-    The query string is one string, and MongoDB's duplicate-key error quotes the
-    colliding value (an email address, for the users index) in its message.
+    The query string is one string, the referer is the address of the page the
+    user was on, and MongoDB's duplicate-key error quotes the colliding value
+    (an email address, for the users index) in its message.
     """
-    event.get("request", {}).pop("query_string", None)
+    request = event.get("request", {})
+    request.pop("query_string", None)
+    request.get("headers", {}).pop("referer", None)
     for failure in event.get("exception", {}).get("values", []):
         if failure.get("value"):
             failure["value"] = failure["value"].split(" dup key:")[0]
@@ -73,9 +76,12 @@ def _init_sentry() -> None:
         max_request_body_size="never",
         event_scrubber=EventScrubber(denylist=DEFAULT_DENYLIST + _USER_TEXT_KEYS, recursive=True),
         before_send=_scrub_free_text,
-        # INFO lines are not breadcrumbs: they are free text, and the request
-        # log among them carries the client address.
-        integrations=[LoggingIntegration(level=logging.WARNING, event_level=logging.ERROR)],
+        # No log line reaches Sentry, as a breadcrumb or as an event. A log
+        # message is free text no scrubber can read, and lines all over this
+        # app log at ERROR, some quoting what the user wrote. The one report for a 500 is
+        # the handler's capture_exception below, and a handled failure worth
+        # reporting has to call it too.
+        integrations=[LoggingIntegration(level=None, event_level=None)],
     )
     logger.info("Sentry error tracking initialized")
 
@@ -322,9 +328,7 @@ async def pydantic_validation_exception_handler(request: Request, exc: Validatio
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    # The type in the message; the text is in the traceback below it, and the
-    # message is what Sentry groups by (#808).
-    logger.error("Unhandled exception: %s", type(exc).__name__, exc_info=True)
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
     # Route to Sentry (#334). No-op when Sentry isn't initialized (no DSN).
     if settings.SENTRY_DSN:
         import sentry_sdk

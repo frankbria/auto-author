@@ -1,9 +1,9 @@
 # A backend error report no longer carries what the user wrote, and one failure is one report (#808)
 
-*2026-10-12T15:25:03Z by Showboat 0.6.1*
-<!-- showboat-id: 9c63122d-5d8d-4e9a-a26a-40df215531fd -->
+*2026-10-12T16:11:35Z by Showboat 0.6.1*
+<!-- showboat-id: 2f247285-b1e4-4dc2-9c76-41e32675f991 -->
 
-Sentry ran on the SDK defaults: every frame's local variables, the request body, every INFO log line. This demo runs the real backend app with the real Sentry SDK, started the way the app starts it, and sends it one request that fails. The SDK's transport is a list, so the reports can be read and nothing leaves the machine; staging has no DSN (#992), so there is no real project to look at. MongoDB is the local one. The probe runs from an empty directory, as a container does: no git to ask for a release.
+Sentry ran on the SDK defaults: every frame's local variables, the request body, every INFO log line as a breadcrumb and every ERROR log line as a report of its own. This demo runs the real backend app with the real Sentry SDK, started the way the app starts it, and sends it one request that fails. The SDK's transport is a list, so the reports can be read and nothing leaves the machine; staging has no DSN (#992), so there is no real project to look at. MongoDB is the local one. The probe runs from an empty directory, as a container does: no git to ask for a release.
 
 ```bash
 source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo808/env.sh; echo "main:   $(git -C $MAIN log --oneline -1 | cut -c1-7)"; echo "branch: $(git -C $WT rev-parse --abbrev-ref HEAD)"; echo 'what the user typed, sent in the request (the probe looks for each value in everything the SDK sends):'; cat $D/typed.json
@@ -23,24 +23,25 @@ what the user typed, sent in the request (the probe looks for each value in ever
 }```
 ```
 
-Before. The request saves a chapter, logs a line, and fails on a duplicate key in MongoDB. Main sends two reports for the one failure, with no release, and every value the user typed is in them.
+Before. The request saves a chapter, logs an INFO line and an ERROR line that quotes the title, and fails on a duplicate key in MongoDB. Main sends three reports for the one failure, with no release, and every value the user typed is in them.
 
 ```bash
 source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo808/env.sh; probe $MAIN fail GIT_SHA=0123abc
 ```
 
 ```output
-one failed request -> HTTP 500, reports sent to Sentry: 2
+one failed request -> HTTP 500, reports sent to Sentry: 3
+  report: a log line via app.demo, release: None
   report: a log line via app.api.request_validation, release: None
   report: DuplicateKeyError via logging, release: None
   FOUND   the manuscript text
   FOUND   the chapter title
   FOUND   the email address
   FOUND   the session cookie
-  FOUND   the query string
+  FOUND   the query string (in the request and in the referer)
 ```
 
-After. One report, carrying the release, and none of the values.
+After. One report, the handler's, carrying the release, and none of the values. No log line reaches Sentry any more, as a report or as a breadcrumb.
 
 ```bash
 source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo808/env.sh; probe $WT fail GIT_SHA=0123abc
@@ -48,15 +49,15 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 
 ```output
 one failed request -> HTTP 500, reports sent to Sentry: 1
-  report: DuplicateKeyError via logging, release: 0123abc
+  report: DuplicateKeyError via generic, release: 0123abc
   absent  the manuscript text
   absent  the chapter title
   absent  the email address
   absent  the session cookie
-  absent  the query string
+  absent  the query string (in the request and in the referer)
 ```
 
-What the report still says: the error with MongoDB's message cut before the colliding value, where it happened, the request without its body or query, the cookie filtered, and the database commands with every value replaced. The last breadcrumb carries the request id.
+What the report still says: the error with MongoDB's message cut before the colliding value, where it happened, the request without its body, query or referer, the cookie filtered, and the database commands with every value replaced.
 
 ```bash
 source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo808/env.sh; probe $WT show GIT_SHA=0123abc
@@ -70,11 +71,11 @@ what the report still says:
   request:  POST http://testserver/__demo/save | body: '' | query: None
   headers:  {'user-agent': 'testclient', 'cookie': '[Filtered]', 'content-type': 'application/json'}
   release:  0123abc | environment: staging
+  referer:  None
   crumb:    query | {"insert": "chapters", "ordered": true, "documents": [{"title": "%s", "content": "%s", "_id": "%s"}]}
   crumb:    query | {"createIndexes": "users", "indexes": [{"unique": true, "name": "email_1", "key": {"email": 1}}]}
   crumb:    query | {"insert": "users", "ordered": true, "documents": [{"email": "%s", "_id": "%s"}]}
   crumb:    query | {"insert": "users", "ordered": true, "documents": [{"email": "%s", "_id": "%s"}]}
-  crumb:    app.api.request_validation | Request failed: POST /__demo/save [ID: efc101b4-c273-4737-af77-ef43f0f11d0e] - Error: DuplicateKeyError, Took:
 ```
 
 A prompt sent to the model. The call fails (nothing listens on that port) and the app handles it. The SDK's model-client integration reports that failure on its own; on main the prompt is in that report, in the client's frame locals. The report is still sent on this branch, without the prompt.
@@ -94,7 +95,7 @@ a model call that fails and is handled -> HTTP 200, reports sent to Sentry: 1
   absent  the prompt sent to the model
 ```
 
-A refused request. Main logs it as an error, which is a report to Sentry for a client's mistake. The branch logs a warning and sends nothing. The value is in neither log (#800 took it out).
+A refused request. Main logs it as an error, which was a report to Sentry for a client's mistake. The branch logs a warning. The value is in neither log (#800 took it out).
 
 ```bash
 source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo808/env.sh; echo 'main:'; probe $MAIN refuse; echo 'branch:'; probe $WT refuse
@@ -119,7 +120,7 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 
 ```output
 main image, GIT_SHA: (not set)
-branch image, GIT_SHA: fd764f012991a8bfbd65e0b606f8f5f8c54d38a8
+branch image, GIT_SHA: 958860b6604c9d1119fcb20b9c3bd1cacf367452
 134:            GIT_SHA=${{ github.sha }}
 ```
 
@@ -130,5 +131,5 @@ cd /home/frankbria/projects/worktrees/issue-808-sentry-scrub/backend && ENVIRONM
 ```
 
 ```output
-======================= 19 passed ========================
+======================= 21 passed ========================
 ```
