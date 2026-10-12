@@ -66,18 +66,27 @@ test('a session too old to list devices asks for a fresh sign-in and can still s
   await other.close();
 });
 
-test('a browser whose session was revoked is signed out and sent to sign in', async ({ page }) => {
+test('a page that is already open when its session is revoked signs out on its next request', async ({
+  page,
+}) => {
   const email = `revoked-session-${Date.now()}@example.com`;
   await signUpAndVerify(page, email);
   const { session } = await (await page.request.get('/api/auth/get-session')).json();
 
+  // The profile page is open and loaded while the session is still good. A
+  // fresh page load would notice a dead session by itself; an open page only
+  // finds out when a request fails, which is what the shared handler is for.
+  await page.goto('/profile');
+  const save = page.getByRole('button', { name: 'Save Changes' });
+  await expect(save).toBeEnabled();
+
   // The session is revoked from somewhere else. This browser still holds its cookie.
   await sessions().deleteOne({ token: session.token });
 
-  // Its next visit loads the dashboard, whose first backend call answers 401.
-  await page.goto('/dashboard');
+  // Saving calls the backend, which answers 401.
+  await save.click();
 
-  await expect(page).toHaveURL(/\/auth\/sign-in\?redirect=%2Fdashboard/);
+  await expect(page).toHaveURL(/\/auth\/sign-in\?redirect=%2Fprofile/);
   // The dead cookie is gone, so the middleware no longer treats it as signed in.
   const cookies = await page.context().cookies();
   expect(cookies.find((c) => c.name === 'better-auth.session_token')).toBeUndefined();
