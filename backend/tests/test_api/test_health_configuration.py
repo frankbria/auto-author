@@ -34,6 +34,7 @@ def deployment(monkeypatch):
     def configure(environment: str, without=(), **overrides):
         monkeypatch.setenv("ENVIRONMENT", environment)
         values = {
+            "ENVIRONMENT": environment,
             **dict.fromkeys(CLOUDINARY + STRIPE, "configured"),
             **dict.fromkeys(S3, ""),
             "SENTRY_DSN": "https://key@sentry.invalid/1",
@@ -143,6 +144,19 @@ class TestOtherEnvironmentsReportWithoutFailing:
         assert body["checks"]["storage"] == "missing: CLOUDINARY_* or AWS_*"
         assert body["checks"]["billing"].startswith("missing: STRIPE_SECRET_KEY")
         assert body["checks"]["error_reporting"] == "missing: SENTRY_DSN"
+
+    def test_a_stray_node_env_does_not_turn_staging_into_production(
+        self, client, deployment, monkeypatch
+    ):
+        """The box's shared .env reaches the backend whole; NODE_ENV=production
+        left in it must not fail staging's deploy gate for having no Stripe."""
+        deployment("staging", without=STRIPE + ("SENTRY_DSN",))
+        monkeypatch.setenv("NODE_ENV", "production")
+
+        status, body = _health(client)
+
+        assert (status, body["status"]) == (200, "healthy")
+        assert body["checks"]["billing"].startswith("missing: STRIPE_SECRET_KEY")
 
 
 class TestLivenessDependsOnNothing:

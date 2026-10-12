@@ -96,12 +96,12 @@ main:
 the compose health check asks: http://127.0.0.1:8000/api/v1/health/live'
 ```
 
-The same behaviour as tests: every missing capability in production as its own case, the same gaps outside production, the liveness route with the database unreachable, and the compose file.
+The same behaviour as tests: every missing capability in production as its own case, the same gaps outside production (and a NODE_ENV=production left in a staging box does not make it production), the liveness route with the database unreachable, and the compose file.
 
 ```bash
 cd /home/frankbria/projects/worktrees/issue-807-health-config/backend && ENVIRONMENT=test TEST_MONGO_URI=mongodb://localhost:27017/auto-author-test-demo807 uv run pytest tests/test_api/test_health_configuration.py -q -p no:cacheprovider --no-cov 2>&1 | tail -1 | sed 's/ in [0-9.]*s//'
 ```
 
 ```output
-============================== 16 passed ==============================
+============================== 17 passed ==============================
 ```

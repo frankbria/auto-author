@@ -1473,3 +1473,9 @@ A dry run of several server starts was piped through `cut` and looked hung with 
 ### A server started inside a recorded command has to be stopped inside it (#807)
 `showboat exec` did not return for ten minutes: the command it ran had started a backend and left it running, and the recorder waits for everything the command started. Earlier demo scripts happened to end each such command with a stop. And clearing up the stuck run with a process search by command line killed the shell doing the clearing, which the notes already warn about; `ps -eo pid,args | grep "[r]ecord.sh"` does not match itself.
 
+### A helper named for a decision may read more than the setting you have in mind (#807)
+The health gate made missing Stripe fatal "in production" by calling `is_production_env()`, the helper every production guard uses. It also reads `NODE_ENV`, and the backend container receives the box's whole `.env`. For a guard that refuses something dangerous, counting either marker is right. For a gate that fails a deploy, it means a leftover `NODE_ENV=production` on staging turns every deploy red with a message about Stripe. The reviewer found it; the box's file could not be read to rule it out. When a new consequence hangs on an existing predicate, read what feeds the predicate and ask which way this consequence should fail.
+
+### A reviewer that could not read the tree exits 0 with nothing to say (#807)
+The review was started from the scratch directory instead of the worktree. The reviewer was refused every file under the worktree, wrote one byte and exited 0. The refusal was only in its error file. Start it from the checkout it reviews, and read the size of its answer before reading the exit code.
+

@@ -108,7 +108,11 @@ async def health_check(response: Response):
     capabilities = _capabilities()
     checks.update(capabilities)
     capable = all(state in ("ok", "disabled") for state in capabilities.values())
+    # The validated ENVIRONMENT, not is_production_env(): that also reads
+    # NODE_ENV, and one left in the box's shared .env would fail a staging
+    # deploy for having no Stripe.
+    production = settings.ENVIRONMENT == "production"
 
-    healthy = checks["mongodb"] == "ok" and not missing and (capable or not is_production_env())
+    healthy = checks["mongodb"] == "ok" and not missing and (capable or not production)
     response.status_code = status.HTTP_200_OK if healthy else status.HTTP_503_SERVICE_UNAVAILABLE
     return {"status": "healthy" if healthy else "unhealthy", "checks": checks}
