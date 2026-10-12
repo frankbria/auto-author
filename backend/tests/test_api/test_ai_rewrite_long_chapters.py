@@ -72,9 +72,12 @@ class TestAChapterOfOrdinaryLengthCanBeRewritten:
         ids=["a paragraph keeps the old budget", "15,000 characters", "21,000 characters"],
     )
     async def test_the_completion_budget_follows_the_length_of_the_text(
-        self, author, characters, budget
+        self, author, monkeypatch, characters, budget
     ):
-        api, book, model_call = author
+        api, book, _ = author
+        provider = autospec_openai_client(content="y" * characters)
+        monkeypatch.setattr(ai_service, "client", provider)
+        model_call = provider.chat.completions.create
 
         response = await api.post(
             f"{book}/chapters/ch1/enhance-text",
@@ -113,7 +116,7 @@ def _words(count: int, word: str = "word") -> str:
     return " ".join([word] * count)
 
 
-# route, options, the fewest words a rewrite of 1,000 may keep
+# route, options, the fewest words a rewrite of 1,000 equal words may keep
 SHARES = [
     ("transform-style", {"target_style": "professional"}, 600),
     ("enhance-text", {"enhancement_type": "clarity"}, 600),
@@ -143,7 +146,7 @@ class TestARewriteThatLostMostOfTheTextIsRefused:
         assert response.status_code == 413, response.text
         detail = response.json()["detail"]
         assert detail["error_code"] == "REWRITE_SHORTENED"
-        assert f"{fewest - 1} of 1000 words" in detail["message"]
+        assert f"at {fewest // 10 - 1}% of the length" in detail["message"]
         assert "kept kept" not in response.text
         # The provider was called, so the generation stays charged (#798).
         assert await _charged() == 1
@@ -166,13 +169,45 @@ class TestARewriteThatLostMostOfTheTextIsRefused:
         assert sorted(counts) == [fewest, 1000]
 
     async def test_a_short_text_may_shrink_by_any_amount(self, author, monkeypatch):
-        """Under 200 words the share says little: tightening a paragraph can halve it."""
+        """Under 1,000 characters the share says little: tightening a paragraph can halve it."""
         api, book, _ = author
         monkeypatch.setattr(ai_service, "client", autospec_openai_client(content=_words(20)))
 
         response = await api.post(
             f"{book}/chapters/ch1/enhance-text",
-            json={"content": _words(199), "enhancement_type": "clarity"},
+            json={"content": _words(249), "enhancement_type": "clarity"},  # 996 characters
         )
 
         assert response.status_code == 200, response.text
+
+    async def test_markup_and_spacing_do_not_count_as_lost_text(self, author, monkeypatch):
+        """The same text with its paragraphs marked up differently is not a shorter text."""
+        api, book, _ = author
+        lines = [_words(8)] * 250
+        monkeypatch.setattr(
+            ai_service, "client", autospec_openai_client(content="".join(lines).replace(" ", ""))
+        )
+
+        response = await api.post(
+            f"{book}/chapters/ch1/transform-style",
+            json={
+                "content": "".join(f'<p class="lead">{line}</p>\n' for line in lines),
+                "target_style": "professional",
+            },
+        )
+
+        assert response.status_code == 200, response.text
+
+    async def test_a_text_written_without_spaces_is_measured_too(self, author, monkeypatch):
+        """Chinese, Japanese and Thai have no spaces between words, so words cannot be the measure."""
+        api, book, _ = author
+        chapter = "".join(f"<p>{'写' * 60}</p>" for _ in range(50))  # 3,000 characters, 1 "word"
+        monkeypatch.setattr(ai_service, "client", autospec_openai_client(content="写" * 1000))
+
+        response = await api.post(
+            f"{book}/chapters/ch1/transform-style",
+            json={"content": chapter, "target_style": "professional"},
+        )
+
+        assert response.status_code == 413, response.text
+        assert "at 33% of the length" in response.json()["detail"]["message"]

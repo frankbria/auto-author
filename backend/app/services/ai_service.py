@@ -72,23 +72,35 @@ def rewrite_max_tokens(content: str) -> int:
 
 # A model can condense a long text and still report a normal finish, and the
 # page would offer the result as the finished rewrite (#983). A rewrite that
-# keeps under this share of its source's words is refused. Against a real model
-# a faithful transform kept 94% to 112% and a condensed one 28% to 54%; cleaning
-# up a dictation that was a quarter filler kept 62% to 64%, so cleanup may lose
-# more. Under 200 words the share says little: tightening a paragraph can halve it.
-REWRITE_MIN_SHARE_KEPT = 0.6
-CLEANUP_MIN_SHARE_KEPT = 0.4
-REWRITE_SHARE_CHECKED_FROM_WORDS = 200
+# keeps under this percentage of its source's text is refused. Against a real
+# model a faithful transform kept 94% to 112% of the words and a condensed one
+# 28% to 54%; cleaning up a dictation that was a quarter filler kept 58% to 66%,
+# so cleanup may lose more. Under 1,000 characters (about 200 English words)
+# the share says little: tightening a paragraph can halve it.
+REWRITE_MIN_PERCENT_KEPT = 60
+CLEANUP_MIN_PERCENT_KEPT = 40
+REWRITE_SHARE_CHECKED_FROM_CHARS = 1000
+
+MARKUP_OR_SPACE = re.compile(r"<[^>]+>|\s+")
 
 
-def shortened_rewrite_error(source: str, rewrite: str, min_share: float) -> Optional[str]:
+def text_length(text: str) -> int:
+    """Characters of text, without markup or whitespace.
+
+    Not words: Chinese, Japanese and Thai are written without spaces, and the
+    same text marked up or spaced differently must measure the same.
+    """
+    return len(MARKUP_OR_SPACE.sub("", text))
+
+
+def shortened_rewrite_error(source: str, rewrite: str, min_percent: int) -> Optional[str]:
     """What to tell the author when ``rewrite`` lost too much of ``source``, else None."""
-    before, after = len(source.split()), len(rewrite.split())
-    if before < REWRITE_SHARE_CHECKED_FROM_WORDS or after >= min_share * before:
+    before, after = text_length(source), text_length(rewrite)
+    if before < REWRITE_SHARE_CHECKED_FROM_CHARS or after * 100 >= min_percent * before:
         return None
     return (
-        f"The result came back much shorter than the text it was given "
-        f"({after} of {before} words), so it was not used. Try a shorter section."
+        f"The result came back at {after * 100 // before}% of the length of the text "
+        "it was given, so it was not used. Try a shorter section."
     )
 
 
@@ -1171,7 +1183,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 }
 
             transformed = choice.message.content
-            shortened = shortened_rewrite_error(content, transformed, REWRITE_MIN_SHARE_KEPT)
+            shortened = shortened_rewrite_error(content, transformed, REWRITE_MIN_PERCENT_KEPT)
             if shortened:
                 return {
                     "success": False,
@@ -1279,7 +1291,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 }
 
             enhanced = choice.message.content
-            shortened = shortened_rewrite_error(content, enhanced, REWRITE_MIN_SHARE_KEPT)
+            shortened = shortened_rewrite_error(content, enhanced, REWRITE_MIN_PERCENT_KEPT)
             if shortened:
                 return {
                     "success": False,
@@ -1378,7 +1390,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                 }
 
             enhanced = choice.message.content
-            shortened = shortened_rewrite_error(content, enhanced, CLEANUP_MIN_SHARE_KEPT)
+            shortened = shortened_rewrite_error(content, enhanced, CLEANUP_MIN_PERCENT_KEPT)
             if shortened:
                 return {
                     "success": False,
