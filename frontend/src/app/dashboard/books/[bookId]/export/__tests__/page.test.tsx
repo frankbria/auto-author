@@ -296,7 +296,7 @@ describe('ExportBookPage download filenames', () => {
   it('downloads single-file Markdown as .md', async () => {
     renderPage();
     await exportAndDownload('Markdown Document');
-    expect(anchors[anchors.length - 1].download).toBe('my_great_book.md');
+    expect(anchors[anchors.length - 1].download).toBe('my-great-book.md');
   });
 
   it('downloads multi-file Markdown as .zip (blob is a ZIP archive)', async () => {
@@ -305,26 +305,31 @@ describe('ExportBookPage download filenames', () => {
     fireEvent.click(screen.getByLabelText('Separate File Per Chapter'));
     fireEvent.click(screen.getByRole('button', { name: 'Export Book' }));
     fireEvent.click(await screen.findByRole('button', { name: /Download File/ }));
-    expect(anchors[anchors.length - 1].download).toBe('my_great_book.zip');
+    expect(anchors[anchors.length - 1].download).toBe('my-great-book.zip');
   });
 
   it('downloads EPUB as .epub', async () => {
     renderPage();
     await exportAndDownload('EPUB Ebook');
-    expect(anchors[anchors.length - 1].download).toBe('my_great_book.epub');
+    expect(anchors[anchors.length - 1].download).toBe('my-great-book.epub');
   });
 
   it('downloads PDF as .pdf', async () => {
     renderPage();
     await exportAndDownload('PDF Document');
-    expect(anchors[anchors.length - 1].download).toBe('my_great_book.pdf');
+    expect(anchors[anchors.length - 1].download).toBe('my-great-book.pdf');
   });
 
-  it('names the download after a non-Latin title instead of underscores (#804)', async () => {
-    mockBookClient.getBook = jest.fn().mockResolvedValue({ id: 'book-1', title: '書名' } as any);
+  // #804: one name builder for every download, so a title of any script is kept
+  // and a title with nothing to keep still gets a name.
+  it.each([
+    ['書名', '書名.pdf'],
+    ['📚 ✨', 'book.pdf'],
+  ])('names the download for the title %s', async (title, expected) => {
+    mockBookClient.getBook = jest.fn().mockResolvedValue({ id: 'book-1', title } as any);
     renderPage();
     await exportAndDownload('PDF Document');
-    expect(anchors[anchors.length - 1].download).toBe('書名.pdf');
+    expect(anchors[anchors.length - 1].download).toBe(expected);
   });
 
   it('does not revoke the blob URL in the same tick as the click (#804)', async () => {

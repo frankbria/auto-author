@@ -45,6 +45,21 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /**
+ * A book title as the name part of a download: lowercase, with anything that
+ * is not a letter or digit collapsed to a hyphen. Letters and digits of any
+ * script are kept (#804): an ASCII-only filter left a CJK title with no name
+ * at all. Falls back to "book" when nothing is left, as for an emoji-only title.
+ */
+export function filenameStem(bookTitle: string): string {
+  return (
+    bookTitle
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, '-')
+      .replace(/^-+|-+$/g, '') || 'book'
+  );
+}
+
+/**
  * Generate filename for export
  *
  * Creates a sanitized filename from book title and format
@@ -64,14 +79,7 @@ export function generateFilename(
   format: ExportFormat,
   extensionOverride?: string
 ): string {
-  // Sanitize title: lowercase, replace spaces/special chars with hyphens.
-  // Letters and digits of any script are kept (#804): an ASCII-only filter
-  // left a CJK title with no name at all.
-  const sanitized =
-    bookTitle
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, '-')
-      .replace(/^-+|-+$/g, '') || 'book'; // Remove leading/trailing hyphens
+  const sanitized = filenameStem(bookTitle);
 
   // 'markdown' uses the conventional .md extension; multi-file passes 'zip'.
   const extension = extensionOverride ?? (format === 'markdown' ? 'md' : format);
