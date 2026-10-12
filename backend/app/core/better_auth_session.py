@@ -56,6 +56,10 @@ def _verified_token(cookie_value: str) -> Optional[str]:
     signature is base64(HMAC-SHA256(BETTER_AUTH_SECRET, token)). Without this
     check the token alone would authenticate, and the token is readable by any
     script on the page from /get-session and /list-sessions (#795).
+
+    One secret only: better-auth's rotation list (``BETTER_AUTH_SECRETS``) signs
+    with its first entry, which this check does not know. Turning rotation on
+    in the frontend means teaching this function the list first.
     """
     token, dot, signature = unquote(cookie_value).rpartition(".")
     if not dot or not token:

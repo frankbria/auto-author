@@ -75,6 +75,14 @@ query:
 MONGODB_URI, DATABASE_NAME, BETTER_AUTH_SECRET, OPENAI_API_KEY
 ```
 
+**`BETTER_AUTH_SECRET` must be the same value for both containers** (#795). The
+frontend signs the session cookie with it and the backend verifies that
+signature on every request. Both read it from this one file, so they agree. If
+they ever differ, sign-in still works and every backend call answers 401; the
+backend log says `Rejected ... cookie: signature does not verify`. The backend
+knows one secret only: better-auth's rotation list (`BETTER_AUTH_SECRETS`) is
+not supported until the backend check is taught it.
+
 The **backend** gets everything else in the file wholesale via `env_file:` — it
 also needs `AWS_*`, `CLOUDINARY_*`, `BETTER_AUTH_ISSUER` and
 `BACKEND_CORS_ORIGINS`, which an explicit allowlist would have silently dropped.
