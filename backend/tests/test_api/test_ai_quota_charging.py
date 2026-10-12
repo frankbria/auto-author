@@ -12,12 +12,16 @@ Real routes, real MongoDB counters; only the model call is stubbed.
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
+import httpx
+import openai
 import pytest
 from starlette.requests import Request
 
 from app.api import dependencies as deps
 from app.db import base
+from app.services.ai_service import ai_service
 from tests.conftest import real_get_rate_limiter
+from tests.test_services.openai_autospec import autospec_openai_client
 from tests.test_api.test_rate_limit_routes import (
     ANALYSIS_OK,
     _create_book,
@@ -130,19 +134,58 @@ class TestQuotaIsChargedOnlyForARequestThatMayHaveReachedTheModel:
         assert second.headers["X-AI-Quota-Limit"] == "1"
         assert await _charged() == 1
 
-    async def test_a_generation_that_fails_in_the_model_call_stays_charged(
-        self, auth_client_factory, arm_real_ai_quota
+    @pytest.mark.parametrize(
+        "provider_error, route, expected_status",
+        [
+            (openai.InternalServerError, "analyze-summary", 503),
+            # A 4xx too: the provider was called, whatever it answered. The same
+            # holds for a draft the model truncated, which is answered 422.
+            (openai.RateLimitError, "generate-questions", 429),
+        ],
+        ids=["provider 500", "provider rate limit"],
+    )
+    async def test_a_request_handed_to_the_provider_stays_charged_when_it_fails(
+        self,
+        auth_client_factory,
+        arm_real_ai_quota,
+        monkeypatch,
+        provider_error,
+        route,
+        expected_status,
     ):
         """The provider may have billed for it, so the allowance is not handed back."""
         arm_real_ai_quota(limit=5)
         api = await auth_client_factory(overrides={"plan": "free"})
         book_id = await _create_book(api, with_summary=True)
+        # Stubbed at the wire, so the service's own request path runs.
+        status = 500 if provider_error is openai.InternalServerError else 429
+        request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+        client = autospec_openai_client()
+        client.chat.completions.create.side_effect = provider_error(
+            "stub", response=httpx.Response(status, request=request), body={"code": "stub"}
+        )
+        monkeypatch.setattr(ai_service, "client", client)
+        monkeypatch.setattr(ai_service, "base_delay", 0)
 
-        with patch(ANALYZE, new=AsyncMock(side_effect=RuntimeError("model call blew up"))):
+        response = await api.post(f"/api/v1/books/{book_id}/{route}")
+
+        assert response.status_code == expected_status, response.text
+        assert client.chat.completions.create.called
+        assert await _charged() == 1
+
+    async def test_a_failure_before_any_model_call_costs_nothing_even_as_a_500(
+        self, auth_client_factory, arm_real_ai_quota
+    ):
+        arm_real_ai_quota(limit=5)
+        api = await auth_client_factory(overrides={"plan": "free"})
+        book_id = await _create_book(api, with_summary=True)
+
+        # The service method itself is replaced, so nothing is sent to a provider.
+        with patch(ANALYZE, new=AsyncMock(side_effect=RuntimeError("broke before the call"))):
             response = await api.post(f"/api/v1/books/{book_id}/analyze-summary")
 
         assert response.status_code >= 500, response.text
-        assert await _charged() == 1
+        assert await _charged() == 0
 
 
 class TestRateLimitsAreKeyedOnTheRouteNotTheResource:

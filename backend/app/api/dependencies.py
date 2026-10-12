@@ -1,5 +1,4 @@
 from fastapi import Depends, HTTPException, status, Request
-from fastapi.exceptions import RequestValidationError
 from typing import Dict, Optional, Any
 import logging
 import time
@@ -11,6 +10,7 @@ from datetime import datetime, timezone
 from app.db.database import get_collection
 from app.db.database import create_audit_log
 from app.db.usage import increment_usage, refund_usage
+from app.services.ai_service import model_call_attempted
 from app.core.config import settings, is_production_env
 from app.core.security import get_current_user_from_session
 
@@ -186,12 +186,13 @@ def get_ai_usage_quota():
     Counts off the user's ``auth_id``; the cap comes from the user's ``plan``
     (``app.core.entitlements.ai_quota_for_plan``, #766).
 
-    The charge is taken up front and handed back when the request turns out
-    never to have reached the model (#798): a refusal past the cap, a failed
-    validation, a book that is missing or someone else's, a rate limit. It is a
-    dependency with ``yield`` for that reason; FastAPI raises the request's
-    failure at the yield. A 5xx keeps its charge, because the provider may have
-    billed for a call that failed afterwards.
+    The charge is taken up front and handed back when the request fails
+    without a model call having been attempted (#798): a refusal past the cap,
+    a failed validation, a book that is missing or someone else's, a rate
+    limit. It is a dependency with ``yield`` for that reason; FastAPI raises
+    the request's failure at the yield. Once a call has been handed to the
+    provider the charge stays whatever happens next, including a 4xx such as a
+    truncated draft: the provider may have billed for it.
     """
 
     async def check_quota(
@@ -248,6 +249,7 @@ def get_ai_usage_quota():
             ("month", now.strftime("%Y-%m"), monthly, 40 * 86400),
         )
         charged = []
+        model_call_attempted.set(False)
         try:
             for period, bucket, limit, ttl in windows:
                 if limit <= 0:  # window disabled
@@ -267,25 +269,13 @@ def get_ai_usage_quota():
                         headers={"X-AI-Quota-Limit": str(limit), "X-AI-Quota-Period": period},
                     )
             yield
-        except Exception as exc:
-            if _never_reached_the_model(exc):
+        except Exception:
+            if not model_call_attempted.get():
                 for key in charged:
                     await refund_usage(user_id, key)
             raise
 
     return check_quota
-
-
-def _never_reached_the_model(exc: Exception) -> bool:
-    """True for a failure that ends the request before, or instead of, a model call.
-
-    Every 4xx qualifies: the quota's own refusal, validation, ownership, the
-    plan gate, the rate limiter, and a provider that turned the request down.
-    Anything else is treated as a 5xx, where the call may have been billed.
-    """
-    if isinstance(exc, RequestValidationError):
-        return True
-    return isinstance(exc, HTTPException) and exc.status_code < 500
 
 
 def get_entitlement_checker(feature: str):
