@@ -74,6 +74,12 @@ export function keepDroppedChapterText({ bookId, chapterId, content }: PendingCh
   return setValidatedItem(chapterDroppedKey(bookId, chapterId), kept, validateChapterBackup);
 }
 
+// When each kind of failure was last reported. Autosave retries every few
+// seconds while the server is away, and its backup with it, so a kind is
+// reported once and then again only after this long or after a save has worked.
+const REPORT_AGAIN_MS = 5 * 60 * 1000;
+const lastReported = new Map<string, number>();
+
 /**
  * Report a chapter that could not be saved, backed up or restored (#813).
  * These went to the console and nowhere else. The error and two tags are
@@ -83,7 +89,15 @@ export function reportSaveFailure(
   operation: 'auto-save' | 'manual-save' | 'leave-save' | 'backup' | 'restore',
   error: unknown
 ): void {
+  const last = lastReported.get(operation);
+  if (last !== undefined && Date.now() - last < REPORT_AGAIN_MS) return;
+  lastReported.set(operation, Date.now());
   Sentry.captureException(error, { tags: { feature: 'autosave', operation } });
+}
+
+/** A save worked, so the next failure is a new one and is reported. */
+export function saveSucceeded(): void {
+  lastReported.clear();
 }
 
 /** Keeps content that failed to save in localStorage. Returns whether it was stored. */
@@ -120,6 +134,7 @@ export async function flushChapterContent(
   try {
     // A conflict lands in the backup too: leaving never overwrites the other copy.
     await saveChapterEdit(edit, seen, { keepalive: true });
+    saveSucceeded();
     localStorage.removeItem(chapterBackupKey(edit.bookId, edit.chapterId));
   } catch (err) {
     console.error('Failed to save chapter content on leaving it:', err);

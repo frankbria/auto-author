@@ -10,7 +10,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as Sentry from '@sentry/nextjs';
 import { ChapterEditor } from '../ChapterEditor';
-import { flushChapterContent } from '../chapterContentSave';
+import { flushChapterContent, saveSucceeded } from '../chapterContentSave';
 import bookClient from '@/lib/api/bookClient';
 
 jest.mock('@/lib/api/bookClient');
@@ -45,6 +45,7 @@ describe('ChapterEditor reports what it could not save', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    saveSucceeded(); // what has been reported is kept for the page, not per test
     jest.useFakeTimers();
     jest.spyOn(console, 'error').mockImplementation(() => {});
     mockBookClient.getChapterContent.mockResolvedValue(chapterContent('<p>Start</p>'));
@@ -80,6 +81,41 @@ describe('ChapterEditor reports what it could not save', () => {
     }
 
     expect(reports()).toEqual([{ feature: 'autosave', operation: 'auto-save' }]);
+  });
+
+  it('once for the backup too, when it cannot be written on any of those retries', async () => {
+    mockBookClient.saveChapterContent.mockRejectedValue(new Error('Failed to save chapter content: 500'));
+    jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    });
+
+    await typeAndWaitForAutosave();
+    await waitFor(() => expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1));
+    for (const attempt of [2, 3]) {
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(attempt));
+    }
+
+    expect(reports()).toEqual([
+      { feature: 'autosave', operation: 'auto-save' },
+      { feature: 'autosave', operation: 'backup' },
+    ]);
+  });
+
+  it('again after five minutes of it, so a long outage is not one report and silence', async () => {
+    mockBookClient.saveChapterContent.mockRejectedValue(new Error('Failed to save chapter content: 500'));
+
+    await typeAndWaitForAutosave();
+    await waitFor(() => expect(reports()).toHaveLength(1));
+    await act(async () => {
+      jest.advanceTimersByTime(5 * 60 * 1000);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(reports()).toHaveLength(2));
   });
 
   it('again when saving has worked in between', async () => {
@@ -187,6 +223,7 @@ describe('leaving a chapter with an edit that cannot be saved', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    saveSucceeded();
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 

@@ -44,12 +44,12 @@ reports the browser posted to Sentry: 1
 the sentence is in what was posted: False
 ```
 
-The same behaviour as tests: an autosave, a save the writer asked for, a backup that could not be written, a backup that could not be restored, leaving a chapter with an unsaved edit, and a conflict, which is not a failure and is not reported.
+The same behaviour as tests: an autosave, a save the writer asked for, a backup that could not be written, a backup that could not be restored, leaving a chapter with an unsaved edit, and a conflict, which is not a failure and is not reported. And the counting: one report for a run of retries, for the backup too, and another after five minutes or after a save has worked.
 
 ```bash
 cd /home/frankbria/projects/worktrees/issue-813-autosave-sentry/frontend && npx jest src/components/chapters/__tests__/ChapterEditor.reporting.test.tsx 2>&1 | grep -E '^Tests:' | sed -E 's/ +/ /g'
 ```
 
 ```output
-Tests: 9 passed, 9 total
+Tests: 11 passed, 11 total
 ```
