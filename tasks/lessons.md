@@ -1446,3 +1446,12 @@ A shell command embedded a Python script whose text contained a line reading `EO
 ### A made-up cluster hostname fails the same guard as a real one (#802)
 A test fixture imitated a database driver's error, with an invented hostname in the shape of a managed-cluster host. `scripts/test_no_staging_identifiers.py` matches that shape, not a list of real names, and failed the Security Audit job in CI; nothing local runs it. `docs/references/quality-standards.md` says so, and another test file carries a comment about it. For a hostname in a fixture use a reserved domain (`.example`, `.invalid`), and before pushing a file that imitates infrastructure text run `uv run --project backend pytest scripts/test_no_staging_identifiers.py`.
 
+### A header the page cannot read is not part of the contract (#803)
+The issue asked for a 429 "carrying X-AI-Quota-Period" to be shown as a quota. The header was sent, and a client test with a mocked `fetch` would have passed. In a browser the page is on another origin than the API, and the backend's CORS setup exposed no headers, so `response.headers.get(...)` returns null there. The demo ran the page and the API on different ports for that reason. When a frontend change reads a response header, check `Access-Control-Expose-Headers` first, and prove it in a browser with the two on different origins.
+
+### A page remembers its last tab, and a scripted demo starts where the last run stopped (#803)
+The recording opened the book and pressed "Transform Style"; the page had reopened on the Interview Questions tab, left there by the dry run, so three steps captured an empty state. The failure lines were cut off by a `tail`. Select the tab, do not assume it; and read a recording's captured values before reading its last line.
+
+### A daemon started inside a piped command keeps the pipe open (#803)
+`bash setup.sh 2>&1 | grep ... | tail` never returned: the browser daemon the script started inherited the pipe, and `tail` waits for every writer to close. The script itself had finished minutes earlier. Send such a script's output to a file and read the file.
+

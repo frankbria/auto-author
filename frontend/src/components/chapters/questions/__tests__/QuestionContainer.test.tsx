@@ -11,6 +11,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom';
 import QuestionContainer from '../QuestionContainer';
 import { bookClient } from '@/lib/api/bookClient';
+import { showErrorNotification } from '@/components/errors/ErrorNotification';
 import { Question, QuestionType, QuestionDifficulty, QuestionProgressResponse } from '@/types/chapter-questions';
 import { ErrorType } from '@/lib/errors/errorHandler';
 
@@ -27,6 +28,10 @@ jest.mock('@/lib/toast', () => ({
     info: jest.fn(),
   }),
 }));
+jest.mock('@/components/errors/ErrorNotification', () => ({
+  showErrorNotification: jest.fn(),
+}));
+
 jest.mock('@/hooks/use-media-query', () => ({
   useMediaQuery: jest.fn(() => false),
 }));
@@ -794,5 +799,76 @@ describe('QuestionContainer - chapter change (#584)', () => {
     rerender(<QuestionContainer {...defaultProps} chapterId="ch-2" />);
 
     expect(screen.queryByText('Failed to load questions.')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Refusals from the backend (#803): a plan refusal and an exhausted allowance
+// ---------------------------------------------------------------------------
+
+describe('QuestionContainer - what a refusal shows', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const QUOTA = 'AI usage limit reached (10 generations per day on the free plan). It resets at midnight UTC.';
+  const refusal = (message: string, extra: Record<string, unknown>) =>
+    Object.assign(new Error(message), extra);
+
+  async function generate(error: Error) {
+    mockedBookClient.getChapterQuestions.mockResolvedValue({ questions: [], total: 0, page: 1, pages: 1 });
+    mockedBookClient.getChapterQuestionProgress.mockResolvedValue(mockProgress);
+    mockedBookClient.generateChapterQuestions.mockRejectedValue(error);
+    render(<QuestionContainer {...defaultProps} />);
+    await waitFor(() => expect(screen.getByTestId('question-generator')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('generator-btn'));
+    return screen.findByTestId('generator-error');
+  }
+
+  async function regenerateAll(error: Error) {
+    setupTwoQuestions();
+    mockedBookClient.regenerateChapterQuestions.mockRejectedValue(error);
+    render(<QuestionContainer {...defaultProps} />);
+    await waitFor(() => expect(screen.getByTestId('question-display')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /regenerate all/i }));
+    fireEvent.click(screen.getByTestId('confirm-regenerate-all'));
+    await waitFor(() => expect(showErrorNotification).toHaveBeenCalled());
+  }
+
+  it('generating: a plan refusal (402) goes to the Upgrade notification, with its message on the page', async () => {
+    const shown = await generate(refusal('Your plan does not include this feature.', { statusCode: 402 }));
+
+    expect(shown).toHaveTextContent(/does not include this feature/i);
+    expect(showErrorNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'entitlement', message: 'Upgrade required', retryable: false }),
+      expect.anything()
+    );
+  });
+
+  it('generating: an exhausted allowance (429 with its period) is a limit, not "try again"', async () => {
+    const shown = await generate(refusal(QUOTA, { statusCode: 429, quotaPeriod: 'day' }));
+
+    expect(shown).toHaveTextContent(QUOTA);
+    expect(shown).not.toHaveTextContent(/try again/i);
+    expect(showErrorNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Daily AI limit reached', retryable: false }),
+      expect.anything()
+    );
+  });
+
+  it('regenerating all: a plan refusal (402) goes to the Upgrade notification', async () => {
+    await regenerateAll(refusal('Your plan does not include this feature.', { statusCode: 402 }));
+
+    expect(showErrorNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'entitlement', message: 'Upgrade required' }),
+      expect.anything()
+    );
+  });
+
+  it('regenerating all: an exhausted allowance (429 with its period) is a limit with no retry', async () => {
+    await regenerateAll(refusal(QUOTA, { statusCode: 429, quotaPeriod: 'month' }));
+
+    expect(showErrorNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Monthly AI limit reached', details: QUOTA, retryable: false }),
+      expect.anything()
+    );
   });
 });
