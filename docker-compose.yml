@@ -75,9 +75,11 @@ services:
       EMAIL_SERVICE_API_KEY:
       EMAIL_FROM_ADDRESS:
       EMAIL_FROM_NAME:
-      # Read at runtime by the server-side Sentry init and the CSP middleware.
-      # Public values, not secrets. (Not build args, so the browser bundle
-      # does not get them.)
+      # Public values, not secrets. They are also build arguments (#779), and
+      # what the build was given is what the browser bundle and the page's CSP
+      # use (#809: an image built with an address allows it in its CSP with
+      # neither of these set). Set the GitHub environment variable the image
+      # build reads, not only these.
       NEXT_PUBLIC_SENTRY_DSN:
       NEXT_PUBLIC_ENVIRONMENT:
       # Retry tuning for better-auth's Mongo connect (frontend/src/lib/auth.ts).
