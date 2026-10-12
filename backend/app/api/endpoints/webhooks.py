@@ -1,6 +1,8 @@
 import json
 import logging
+import time
 
+import sentry_sdk
 import stripe
 from fastapi import APIRouter, HTTPException, Request
 from stripe import SignatureVerificationError
@@ -22,6 +24,27 @@ from app.db.user import (
 )
 
 logger = logging.getLogger(__name__)
+
+# When each kind of failure was last sent to Sentry (#812).
+_last_reported: dict[str, float] = {}
+REPORT_EVERY_SECONDS = 300
+
+
+def _report(kind: str, message: str, *args, anyone_can_cause_it: bool = False) -> None:
+    """Log a webhook failure as an error and send it to Sentry (#812).
+
+    No log line reaches Sentry (#808), and the SDK reports only a 5xx, so a
+    failure answered with a 400 or a 200 is reported by hand, under a fixed
+    fingerprint so repeats are one issue. Nothing from the payload goes in the
+    message. A failure that any caller of this public route can cause is
+    reported once every few minutes; the log gets every one.
+    """
+    logger.error(message, *args)
+    now = time.monotonic()
+    if anyone_can_cause_it and now - _last_reported.get(kind, -REPORT_EVERY_SECONDS) < REPORT_EVERY_SECONDS:
+        return
+    _last_reported[kind] = now
+    sentry_sdk.capture_message(message % args, level="error", fingerprint=["stripe-webhook", kind])
 router = APIRouter()
 
 # Clerk webhooks are deprecated - users are now created automatically on better-auth signup
@@ -51,7 +74,9 @@ async def stripe_webhook(request: Request):
     Stripe ids on the matching user. Replays (same event id) are no-ops.
     """
     if not settings.STRIPE_WEBHOOK_SECRET:
-        # Fail closed: never process unverifiable payloads.
+        # Fail closed: never process unverifiable payloads. Logged, and not
+        # reported by hand: the Sentry SDK reports a 5xx a route raises (#812).
+        logger.error("Stripe webhook refused a delivery: STRIPE_WEBHOOK_SECRET is not set")
         raise HTTPException(status_code=503, detail="Stripe webhook is not configured")
 
     raw_body = await request.body()
@@ -64,6 +89,13 @@ async def stripe_webhook(request: Request):
             raw_body, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
     except (ValueError, SignatureVerificationError):
+        # A rotated signing secret looks like this, and Stripe disables an
+        # endpoint that keeps refusing. Nothing from the delivery is logged.
+        _report(
+            "signature",
+            "Stripe webhook refused a delivery: its signature or payload did not verify",
+            anyone_can_cause_it=True,
+        )
         raise HTTPException(
             status_code=400, detail="Invalid Stripe webhook signature or payload"
         )
@@ -141,8 +173,13 @@ async def _apply_subscription_event(
         # replay marker is recorded: once the user is linked later, an operator
         # can "Resend" the event from the Stripe dashboard (same event id) and
         # it reprocesses.
-        logger.warning(
-            "Stripe %s for customer %s matches no user", event_type, customer_id
+        # The event id, not the customer: it is what the operator resends, and
+        # it identifies nobody.
+        _report(
+            "no-matching-user",
+            "Stripe %s matches no user (event %s): resend it once the user is linked",
+            event_type,
+            event_id,
         )
         return {"status": "no_matching_user"}
 
