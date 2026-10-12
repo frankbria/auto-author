@@ -48,6 +48,7 @@ uv run pytest --cov=app tests/ --cov-report=term-missing
 # E2E
 cd frontend && npx playwright test --ui
 BYPASS_AUTH=true npx playwright test       # Playwright's webServer sets E2E_ALLOW_BYPASS=1
+npx playwright test --config=playwright.real-auth.config.ts   # real auth, no bypass (#843); starts its own servers on 3001/8001
 ```
 
 ### Staging E2E (real auth against https://dev.autoauthor.app)

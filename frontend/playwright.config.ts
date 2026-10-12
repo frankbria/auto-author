@@ -11,6 +11,8 @@ dotenv.config({ path: path.resolve(__dirname, '.env.test') });
  */
 export default defineConfig({
   testDir: './src/e2e',
+  // Runs with the bypass off, under playwright.real-auth.config.ts (#843).
+  testIgnore: '**/real-auth/**',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
