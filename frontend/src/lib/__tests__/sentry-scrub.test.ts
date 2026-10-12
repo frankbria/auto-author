@@ -24,6 +24,12 @@ describe('beforeSend', () => {
     expect(event.request?.url).toBe('https://app.example/reset-password');
   });
 
+  it('cuts a fragment that stands alone, where a sign-in redirect can put a token', () => {
+    const event = send({ request: { url: `https://app.example/auth/callback#access_token=${TOKEN}` } });
+
+    expect(event.request?.url).toBe('https://app.example/auth/callback');
+  });
+
   it('drops the query string, the request body and the cookies the server SDK attaches', () => {
     const event = send({
       request: {
