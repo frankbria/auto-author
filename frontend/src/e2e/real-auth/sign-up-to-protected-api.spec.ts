@@ -96,12 +96,20 @@ test('a visitor signs up, verifies their email, and the backend serves them and 
   const mine = await (await page.request.get(`${API}/books/`)).json();
   expect(mine.map((b: { id: string }) => b.id)).toContain(book.id);
 
-  // The session token alone is not a credential (#795): it must carry its signature.
-  const bare = await browser.newContext({
-    extraHTTPHeaders: { Cookie: `better-auth.session_token=${session.session.token}` },
-  });
-  expect((await bare.request.get(`${API}/users/me`)).status()).toBe(401);
-  await bare.close();
+  // The session token alone is not a credential (#795): it must carry its
+  // signature. The signed cookie, replayed in a fresh context, proves this way
+  // of sending a cookie works, so the 401 below is the backend's refusal.
+  const signed = (await page.context().cookies()).find((c) => c.name === 'better-auth.session_token')!;
+  expect(decodeURIComponent(signed.value)).toMatch(new RegExp(`^${session.session.token}\\..+`));
+  for (const [value, status] of [
+    [signed.value, 200],
+    [session.session.token, 401],
+  ] as const) {
+    const replay = await browser.newContext();
+    await replay.addCookies([{ name: signed.name, value, domain: 'localhost', path: '/' }]);
+    expect((await replay.request.get(`${API}/users/me`)).status()).toBe(status);
+    await replay.close();
+  }
 
   // A second visitor, signed up the same way, sees none of the first one's data.
   const other = await browser.newContext();
