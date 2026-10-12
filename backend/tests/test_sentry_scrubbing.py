@@ -53,7 +53,8 @@ def _scratch(collection: str):
 async def _fail(payload: dict):
     manuscript = LOCAL  # noqa: F841 - a frame local, which is where the probe found text
     log.info("signed in %s", CRUMB)
-    log.warning("draft kept", extra={"content": KEYED, "email": CRUMB})
+    # Nested, so the scrubber has to look inside.
+    log.warning("draft kept", extra={"chapter": {"content": KEYED}, "email": CRUMB})
     # MongoDB's own duplicate-key error, which quotes the colliding value.
     users = _scratch("sentry_probe_users")
     await users.create_index("email", unique=True)
@@ -107,7 +108,8 @@ def api():
 def _fail_a_request(api: TestClient):
     return api.post(
         f"{PROBE}?q={QUERY}",
-        json={"content": BODY},
+        # Under a name the scrubber does not know: only not sending bodies keeps it out.
+        json={"notes": BODY},
         headers={"Cookie": f"better-auth.session_token={COOKIE}"},
     )
 
