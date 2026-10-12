@@ -130,6 +130,15 @@ function determineErrorType(statusCode: number, message: string): AIErrorRespons
 }
 
 /**
+ * A wait as the user should read it: "4 seconds", "1 second", "5 minutes".
+ * The provider's limit clears in seconds; a quota-style wait runs to minutes.
+ */
+function formatWait(seconds: number): string {
+  const [amount, unit] = seconds < 60 ? [seconds, 'second'] : [Math.ceil(seconds / 60), 'minute'];
+  return `${amount} ${unit}${amount === 1 ? '' : 's'}`;
+}
+
+/**
  * Get user-friendly error message based on error type
  */
 function getUserFriendlyMessage(errorDetails: Partial<AIErrorResponse>): string {
@@ -137,11 +146,9 @@ function getUserFriendlyMessage(errorDetails: Partial<AIErrorResponse>): string 
 
   switch (error_type) {
     case 'rate_limit':
-      if (!estimated_retry_after) return 'AI service rate limit reached. Please try again in a few minutes.';
-      // The provider's limit clears in seconds; say so rather than rounding up to a minute.
-      return estimated_retry_after < 60
-        ? `AI service rate limit reached. Please wait ${estimated_retry_after} second${estimated_retry_after === 1 ? '' : 's'} before retrying.`
-        : `AI service rate limit reached. Please wait ${Math.ceil(estimated_retry_after / 60)} minutes before retrying.`;
+      return estimated_retry_after
+        ? `AI service rate limit reached. Please wait ${formatWait(estimated_retry_after)} before retrying.`
+        : 'AI service rate limit reached. Please try again in a few minutes.';
 
     case 'network':
       return 'Network connection issue. Please check your internet connection and try again.';
@@ -290,7 +297,7 @@ export async function handleAIServiceError<T>(
   if (errorDetails.error_type === 'rate_limit') {
     suggestedActions.push('Wait for the rate limit to reset');
     if (errorDetails.estimated_retry_after) {
-      suggestedActions.push(`Estimated wait time: ${Math.ceil(errorDetails.estimated_retry_after / 60)} minutes`);
+      suggestedActions.push(`Estimated wait time: ${formatWait(errorDetails.estimated_retry_after)}`);
     }
   } else if (errorDetails.error_type === 'network') {
     suggestedActions.push('Check your internet connection');

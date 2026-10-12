@@ -277,6 +277,13 @@ describe('aiErrorHandler', () => {
       expect(result.canRetry).toBe(true);
       expect(result.retryAfter).toBe(4);
       expect(result.error).toBe('AI service rate limit reached. Please wait 4 seconds before retrying.');
+      // The notification's hint says the same wait, not "1 minutes".
+      expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          suggestedActions: expect.arrayContaining(['Estimated wait time: 4 seconds']),
+        }),
+        expect.any(Object)
+      );
     });
 
     it('shows what the backend said about a request it refused, not a generic line (#803)', async () => {

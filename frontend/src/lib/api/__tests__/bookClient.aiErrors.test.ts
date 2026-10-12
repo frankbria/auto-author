@@ -104,9 +104,16 @@ describe.each(METHODS)('%s', (_name, call) => {
       text: async () => '<html>Bad Gateway</html>',
     });
 
-    await expect(call()).rejects.toMatchObject({ statusCode: 502 });
-    await call().catch((error: Error) => {
-      expect(error.message).not.toMatch(/[<{]|502/);
-    });
+    // One call, and the error it threw: a second call would get no response at all.
+    const error = await call().then(
+      () => {
+        throw new Error('the call did not throw');
+      },
+      (thrown: Error & { statusCode?: number }) => thrown
+    );
+
+    expect(error.statusCode).toBe(502);
+    expect(error.message).toMatch(/^Failed to .+\. Please try again\.$/);
+    expect(error.message).not.toMatch(/[<{]|502|Bad Gateway/);
   });
 });
