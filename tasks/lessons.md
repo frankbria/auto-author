@@ -1461,3 +1461,6 @@ Importing the upload service in a directory it cannot write to raised `Permissio
 ### A test's setup can be the condition the bug needs to be absent (#806)
 The test for "local files are served" created `uploads/` and then mounted it. The demo started the real backend in an empty directory, uploaded a picture and got a 404: the mount is decided at startup, and the directory is only created by the first upload. The setup line had supplied the one thing a real first run does not have. When a test arranges state by hand, ask in what order the real system arrives at that state, and let the demo run from empty.
 
+### A backend change can fail a frontend test, and the hooks will not show it (#806)
+`frontend/src/lib/constants/__tests__/subprocessors.test.ts` reads `backend/app` to keep the subprocessor list honest, and its "the sweep finds something" assertion named a Cloudinary read through `os.getenv`. Moving that read into settings removed the anchor. The commit hooks run the frontend suite only when frontend paths change, so the first failure was in CI. Before removing or moving an environment read, grep the whole repository for the variable's name, tests included, and run `npx jest src/lib/constants` when `backend/app` stops reading something from the process environment.
+

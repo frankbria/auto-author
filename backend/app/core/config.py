@@ -287,6 +287,17 @@ class Settings(BaseSettings):
         # webhook fail signature verification with no obvious cause.
         return v.strip() if isinstance(v, str) else v
 
+    @field_validator(
+        "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+        "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_S3_BUCKET",
+        mode="before",
+    )
+    @classmethod
+    def strip_storage_values(cls, v):
+        """A quoted space or a trailing newline is not a value (#806): it would
+        count as a configured provider and get past the production check."""
+        return v.strip() if isinstance(v, str) else v
+
     @field_validator("SENTRY_DSN", mode="before")
     @classmethod
     def strip_sentry_dsn(cls, v):

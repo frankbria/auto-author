@@ -70,6 +70,24 @@ class TestOneAnswerFromSettings:
 
         assert settings.storage_provider == provider
 
+    @pytest.mark.parametrize("blank", [" ", "\n", "  \t "], ids=["a space", "a newline", "spaces and a tab"])
+    def test_whitespace_is_not_a_value(self, blank):
+        """A quoted space or a trailing newline in ``.env`` must not count as
+        a bucket name: it would get past the production check."""
+        from app.core.config import Settings
+
+        built = Settings(
+            BETTER_AUTH_SECRET=settings.BETTER_AUTH_SECRET,
+            AWS_ACCESS_KEY_ID="id",
+            AWS_SECRET_ACCESS_KEY="secret",
+            AWS_S3_BUCKET=blank,
+            CLOUDINARY_CLOUD_NAME=f" demo{blank}",
+        )
+
+        assert built.storage_provider == "local"
+        assert built.CLOUDINARY_CLOUD_NAME == "demo"
+        assert "AWS_S3_BUCKET" in built.storage_fields_missing
+
     def test_half_a_configuration_is_named(self, configure):
         configure(CLOUDINARY_CLOUD_NAME="demo", AWS_S3_BUCKET="bucket")
 
@@ -144,6 +162,35 @@ class TestTheMountAsksTheSameQuestion:
 
         response = TestClient(app).get("/uploads/profile_pictures/a.txt")
         assert (response.status_code, response.text) == (200, "picture")
+
+    def test_local_files_left_behind_under_a_cloud_provider_are_reported(
+        self, configure, tmp_path, monkeypatch, caplog
+    ):
+        from app.main import mount_local_uploads
+
+        configure(**CLOUDINARY)
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "uploads" / "cover_images").mkdir(parents=True)
+        (tmp_path / "uploads" / "cover_images" / "old.png").write_bytes(b"png")
+
+        with caplog.at_level("WARNING"):
+            mount_local_uploads(FastAPI())
+
+        assert "Uploads now go to cloudinary" in caplog.text
+        assert "no longer served" in caplog.text
+
+    def test_a_cloud_provider_with_no_local_files_says_nothing(
+        self, configure, tmp_path, monkeypatch, caplog
+    ):
+        from app.main import mount_local_uploads
+
+        configure(**CLOUDINARY)
+        monkeypatch.chdir(tmp_path)
+
+        with caplog.at_level("WARNING"):
+            mount_local_uploads(FastAPI())
+
+        assert caplog.text == ""
 
     def test_cloud_storage_mounts_nothing(self, configure, tmp_path, monkeypatch):
         from app.main import mount_local_uploads
