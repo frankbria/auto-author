@@ -3,12 +3,11 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 
-export interface PasswordValidation {
-  minLength: boolean;
-  hasUppercase: boolean;
-  hasLowercase: boolean;
-  hasNumber: boolean;
-}
+import { isPasswordValid, validatePassword } from "@/lib/password-policy";
+
+// The rule itself is shared with the server (#794); re-exported for existing imports.
+export { isPasswordValid, validatePassword };
+export type { PasswordValidation } from "@/lib/password-policy";
 
 export interface PasswordRequirementsProps {
   password: string;
@@ -16,30 +15,6 @@ export interface PasswordRequirementsProps {
   className?: string;
 }
 
-/**
- * Validates a password against all requirements
- */
-export function validatePassword(password: string): PasswordValidation {
-  return {
-    minLength: password.length >= 8,
-    hasUppercase: /[A-Z]/.test(password),
-    hasLowercase: /[a-z]/.test(password),
-    hasNumber: /[0-9]/.test(password),
-  };
-}
-
-/**
- * Checks if all password requirements are met
- */
-export function isPasswordValid(password: string): boolean {
-  const validation = validatePassword(password);
-  return (
-    validation.minLength &&
-    validation.hasUppercase &&
-    validation.hasLowercase &&
-    validation.hasNumber
-  );
-}
 
 /**
  * Calculates password strength as a percentage

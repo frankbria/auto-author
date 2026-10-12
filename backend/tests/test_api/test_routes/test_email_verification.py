@@ -107,3 +107,18 @@ async def test_startup_marks_existing_accounts_verified(motor_reinit_db, monkeyp
         pass
 
     assert await _verified(existing["unverified"]) is True
+
+
+async def test_creating_the_record_does_not_log_the_email_address(motor_reinit_db, caplog):
+    """#794: logs are kept longer and read more widely than the users collection."""
+    seeded = await _seed_better_auth_user("private-address@example.com")
+
+    with caplog.at_level("DEBUG", logger="app"):
+        async with _client(seeded["tokens"][0]) as c:
+            assert (await c.get("/api/v1/users/me")).status_code == 200
+
+    # The application's own lines; the driver's DEBUG output is not ours to shape.
+    app_log = "\n".join(r.getMessage() for r in caplog.records if r.name.startswith("app."))
+    assert "Auto-creating user record" in app_log
+    assert "Found better-auth user" in app_log
+    assert "private-address@example.com" not in app_log

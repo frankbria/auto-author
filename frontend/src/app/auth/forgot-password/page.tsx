@@ -18,6 +18,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { CheckmarkCircle01Icon, ArrowLeft01Icon, Mail01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 
+const SEND_FAILED = "We could not send the reset link. Please try again";
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -43,14 +45,12 @@ export default function ForgotPasswordPage() {
       });
 
       if (resetError) {
-        // Map specific errors to user-friendly messages
+        // Never say whether the account exists, and never echo the server's text (#794).
         const errorMessage = resetError.message?.toLowerCase() || "";
-        if (errorMessage.includes("not found") || errorMessage.includes("no user")) {
-          setError("No account found with this email address");
-        } else if (errorMessage.includes("rate") || errorMessage.includes("limit")) {
+        if (errorMessage.includes("rate") || errorMessage.includes("limit")) {
           setError("Too many requests. Please try again later");
         } else {
-          setError(resetError.message || "Failed to send reset email");
+          setError(SEND_FAILED);
         }
         return;
       }
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
         if (err.message.includes("network") || err.message.includes("fetch")) {
           setError("Connection error. Please check your internet");
         } else {
-          setError(err.message);
+          setError(SEND_FAILED);
         }
       } else {
         setError("An unexpected error occurred. Please try again");
@@ -81,7 +81,8 @@ export default function ForgotPasswordPage() {
             </div>
             <CardTitle className="text-2xl">Check Your Email</CardTitle>
             <CardDescription className="mt-2">
-              We've sent a password reset link to <strong>{email}</strong>
+              If an account exists for <strong>{email}</strong>, we have sent it a
+              password reset link.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

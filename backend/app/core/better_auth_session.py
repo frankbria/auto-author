@@ -182,7 +182,7 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
                 logger.debug(f"Could not convert user_id to ObjectId: {user_id}")
 
         if user:
-            logger.debug(f"Found better-auth user: {user.get('email')}")
+            logger.debug(f"Found better-auth user {user_id}")
 
         return user
 
