@@ -231,6 +231,18 @@ Doing step 2 before step 1 makes Stripe reject every checkout (the API returns 5
    set `X-Real-IP`, or switch `frontend/src/lib/auth-ip.ts` to
    `advanced.ipAddress.trustedProxies` listing the whole chain.
 
+   The API `location /` **must** carry
+   `proxy_set_header X-Forwarded-Proto $scheme;` and
+   `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (#814). The
+   backend builds its own redirects (`/api/v1/books` to `/api/v1/books/`) from
+   the scheme it believes it was reached on, and logs the client it believes
+   called. uvicorn believes those two headers only from the peers in
+   `FORWARDED_ALLOW_IPS`, which `docker-compose.yml` sets to the ranges Docker
+   gives its networks, because nginx reaches the container as the network's
+   gateway. If Docker on the box was given its own address pools, that list has
+   to name them. To check: `curl -sI https://<api host>/api/v1/books` must show
+   a `location:` that starts with `https://`.
+
 ---
 
 ## Deploying

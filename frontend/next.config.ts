@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
   // .next/standalone/server.js, which is what the Dockerfile COPYs.
   outputFileTracingRoot: path.join(__dirname),
 
+  // No `X-Powered-By: Next.js` on every answer (#814).
+  poweredByHeader: false,
+
   // Enable SWC minification and optimization
   // swcMinify: true,
 
@@ -40,6 +43,13 @@ const nextConfig: NextConfig = {
         headers: [
           // Content-Security-Policy is set per-request in src/middleware.ts
           // (#190) — it carries a nonce, which a static header can't.
+          {
+            // No includeSubDomains (#814): a browser keeps it for the year, and
+            // it would cover every name under the domain, including ones not
+            // yet chosen. Adding it later is one line; taking it back is not.
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000',
+          },
           {
             key: 'X-Frame-Options',
             value: 'DENY',

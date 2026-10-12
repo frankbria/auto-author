@@ -75,6 +75,9 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # Same value and reasoning as frontend/next.config.ts (#814). A browser
+        # ignores it on an answer that did not arrive over https.
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
         response.headers["X-Request-ID"] = request_id
 
         # Set Content Security Policy
