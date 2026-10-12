@@ -11,8 +11,8 @@ from app.core.config import settings, is_production_env
 import asyncio
 import logging
 import os
-from app.api.request_validation import RequestValidationMiddleware
 from pathlib import Path
+from app.api.request_validation import RequestValidationMiddleware
 
 # Set up logging
 logging.basicConfig(
@@ -91,6 +91,15 @@ def validate_production_security() -> None:
                 "Remove BYPASS_AUTH=true from your production configuration."
             )
         logger.info("Production security validation passed: BYPASS_AUTH is disabled")
+        # No local-disk fallback in production (#806): a container's disk is
+        # gone at the next deploy, and the image has no writable uploads/.
+        if settings.storage_provider == "local":
+            message = (
+                "no upload storage is configured, so uploads would go to local disk "
+                f"in production. {settings.storage_setup_help}"
+            )
+            logger.critical(f"FATAL CONFIGURATION ERROR: {message}")
+            raise RuntimeError(f"Application startup blocked: {message}")
     elif settings.BYPASS_AUTH:
         current_env = os.getenv("ENVIRONMENT") or os.getenv("NODE_ENV") or "unset"
         logger.warning(
@@ -202,15 +211,30 @@ app.add_middleware(RequestValidationMiddleware)
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
-# Mount static files for local uploads (only if not using cloud storage)
-# This allows serving uploaded images when using local storage
-uploads_path = Path("uploads")
-if uploads_path.exists() and not any([
-    os.getenv('CLOUDINARY_CLOUD_NAME'),
-    os.getenv('AWS_S3_BUCKET')
-]):
-    logger.info("Mounting local uploads directory for static file serving")
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+def mount_local_uploads(target: FastAPI) -> None:
+    """Serve ``uploads/`` when, and only when, the upload service writes there.
+
+    Both ask ``settings.storage_provider`` (#806). They used to ask different
+    questions, and half a cloud configuration wrote local files nothing served.
+    """
+    if settings.storage_provider == "local":
+        logger.info("Mounting local uploads directory for static file serving")
+        # check_dir=False: the first upload creates the directory, after startup.
+        target.mount("/uploads", StaticFiles(directory="uploads", check_dir=False), name="uploads")
+    elif any(
+        path.is_file() and not path.name.startswith(".")  # not the tracked .gitkeep
+        for path in Path("uploads").rglob("*")
+    ):
+        # The provider follows backend/.env since #806, so a checkout that wrote
+        # to local disk can find itself on a cloud provider after an upgrade.
+        logger.warning(
+            "Uploads now go to %s, and uploads/ still holds files from local storage. "
+            "Their /uploads/... URLs are no longer served.",
+            settings.storage_provider,
+        )
+
+
+mount_local_uploads(app)
 
 
 # Validation error handler

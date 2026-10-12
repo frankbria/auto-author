@@ -1455,3 +1455,12 @@ The recording opened the book and pressed "Transform Style"; the page had reopen
 ### A daemon started inside a piped command keeps the pipe open (#803)
 `bash setup.sh 2>&1 | grep ... | tail` never returned: the browser daemon the script started inherited the pipe, and `tail` waits for every writer to close. The script itself had finished minutes earlier. Send such a script's output to a file and read the file.
 
+### Test an inference at the level of the claim (#806)
+Importing the upload service in a directory it cannot write to raised `PermissionError`, and the container's working directory is unwritable, so I concluded that the container cannot start without storage configured, and from staging being healthy that staging has storage configured. Both went into the changelog. Booting the old code in an unwritable directory took ten seconds and showed it starts: the service is imported inside the request handlers, on first use. "The import fails" was measured; "startup fails" was assumed. Run the experiment on the thing the sentence is about.
+
+### A test's setup can be the condition the bug needs to be absent (#806)
+The test for "local files are served" created `uploads/` and then mounted it. The demo started the real backend in an empty directory, uploaded a picture and got a 404: the mount is decided at startup, and the directory is only created by the first upload. The setup line had supplied the one thing a real first run does not have. When a test arranges state by hand, ask in what order the real system arrives at that state, and let the demo run from empty.
+
+### A backend change can fail a frontend test, and the hooks will not show it (#806)
+`frontend/src/lib/constants/__tests__/subprocessors.test.ts` reads `backend/app` to keep the subprocessor list honest, and its "the sweep finds something" assertion named a Cloudinary read through `os.getenv`. Moving that read into settings removed the anchor. The commit hooks run the frontend suite only when frontend paths change, so the first failure was in CI. Before removing or moving an environment read, grep the whole repository for the variable's name, tests included, and run `npx jest src/lib/constants` when `backend/app` stops reading something from the process environment.
+

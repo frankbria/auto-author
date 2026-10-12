@@ -27,7 +27,8 @@ const backendSettings = [
   ...readFileSync(join(BACKEND_APP, 'core/config.py'), 'utf8').matchAll(/^ {4}([A-Z][A-Z0-9_]+):/gm),
 ].map((m) => m[1]);
 
-// Reads that bypass Settings (cloud_storage_service.py does) are swept too.
+// Reads that bypass Settings are swept too. cloud_storage_service.py did until
+// #806; the seed script still does.
 const backendEnv = (readdirSync(BACKEND_APP, { recursive: true }) as string[])
   .filter((file) => file.endsWith('.py'))
   .flatMap((file) =>
@@ -53,7 +54,8 @@ const claimed = SUBPROCESSORS.flatMap((s) => s.envKeys);
 describe('subprocessor inventory (#788)', () => {
   it('finds the settings it is meant to sweep', () => {
     expect(backendSettings).toContain('STRIPE_SECRET_KEY');
-    expect(backendEnv).toContain('CLOUDINARY_API_SECRET');
+    expect(backendSettings).toContain('CLOUDINARY_API_SECRET');
+    expect(backendEnv).toContain('SEED_USER_PASSWORD');
     expect(frontendEnv).toContain('EMAIL_SERVICE_API_KEY');
     expect(credentials.length).toBeGreaterThan(FIRST_PARTY.length);
   });

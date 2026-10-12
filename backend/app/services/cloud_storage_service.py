@@ -4,11 +4,12 @@ Provides a unified interface for cloud storage operations.
 """
 
 import asyncio
-import os
 import re
 import uuid
 from pathlib import Path
 from typing import Optional, Protocol
+
+from app.core.config import settings
 from urllib.parse import urlparse
 import logging
 
@@ -249,37 +250,31 @@ def get_cloud_storage_service() -> Optional[CloudStorageInterface]:
     global _storage_service
 
     if _storage_service is None:
-        # Check for Cloudinary credentials first (better for images)
-        if all([
-            os.getenv('CLOUDINARY_CLOUD_NAME'),
-            os.getenv('CLOUDINARY_API_KEY'),
-            os.getenv('CLOUDINARY_API_SECRET')
-        ]):
+        # settings.storage_provider is the one place the provider is decided (#806).
+        provider = settings.storage_provider
+        if provider == "cloudinary":
             logger.info("Using Cloudinary for image storage")
             _storage_service = CloudStorageFactory.create_storage_service(
                 provider="cloudinary",
-                cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
-                api_key=os.getenv('CLOUDINARY_API_KEY'),
-                api_secret=os.getenv('CLOUDINARY_API_SECRET')
+                cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                api_key=settings.CLOUDINARY_API_KEY,
+                api_secret=settings.CLOUDINARY_API_SECRET,
             )
-
-        # Check for S3 credentials
-        elif all([
-            os.getenv('AWS_ACCESS_KEY_ID'),
-            os.getenv('AWS_SECRET_ACCESS_KEY'),
-            os.getenv('AWS_S3_BUCKET')
-        ]):
+        elif provider == "s3":
             logger.info("Using AWS S3 for image storage")
             _storage_service = CloudStorageFactory.create_storage_service(
                 provider="s3",
-                bucket_name=os.getenv('AWS_S3_BUCKET'),
-                region=os.getenv('AWS_REGION', 'us-east-1'),
-                access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+                bucket_name=settings.AWS_S3_BUCKET,
+                region=settings.AWS_REGION,
+                access_key_id=settings.AWS_ACCESS_KEY_ID,
+                secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             )
-
         else:
-            logger.warning("No cloud storage credentials found, using local storage")
+            missing = settings.storage_fields_missing
+            logger.warning(
+                "No complete cloud storage configuration%s, using local storage",
+                f" (not set: {', '.join(missing)})" if missing else "",
+            )
             _storage_service = None
 
     return _storage_service

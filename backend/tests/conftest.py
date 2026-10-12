@@ -13,6 +13,15 @@ import pymongo
 # staging/production would otherwise flip the guards the suite asserts on.
 os.environ["ENVIRONMENT"] = "test"
 
+# Uploads in tests go to local disk, whatever a developer's backend/.env sets
+# (#806): the storage provider is decided from settings now, and settings read
+# that file. The process environment wins over it, so empty values here do too.
+for _storage_field in (
+    "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+    "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_S3_BUCKET",
+):
+    os.environ[_storage_field] = ""
+
 
 import app.api.dependencies as deps
 from fastapi import Request

@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field, ValidationInfo
 from dotenv import dotenv_values
-from typing import List, Union
+from typing import ClassVar, List, Union
 import hashlib
 import logging
 import os
@@ -221,6 +221,44 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
+    # What each storage provider needs. Cloudinary first: it is the better fit for images.
+    _STORAGE_FIELDS: ClassVar[dict] = {
+        "cloudinary": ("CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"),
+        "s3": ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_S3_BUCKET"),
+    }
+
+    @property
+    def storage_provider(self) -> str:
+        """Where uploads go: "cloudinary", "s3" or "local" (#806).
+
+        The one place this is decided; the upload service and the static mount
+        both ask here. A provider counts only with every one of its fields set,
+        so half a configuration is local disk, and ``storage_fields_missing``
+        says which half is absent.
+        """
+        for provider, fields in self._STORAGE_FIELDS.items():
+            if all(getattr(self, field) for field in fields):
+                return provider
+        return "local"
+
+    @property
+    def storage_setup_help(self) -> str:
+        """What to set to get off local disk, for an error an operator will read."""
+        providers = " or ".join(", ".join(fields) for fields in self._STORAGE_FIELDS.values())
+        missing = self.storage_fields_missing
+        return f"Set {providers}." + (f" Not set: {', '.join(missing)}." if missing else "")
+
+    @property
+    def storage_fields_missing(self) -> List[str]:
+        """The unset fields of any provider that has some of its fields set."""
+        return [
+            field
+            for fields in self._STORAGE_FIELDS.values()
+            if any(getattr(self, f) for f in fields)
+            for field in fields
+            if not getattr(self, field)
+        ]
+
     # Stripe billing (issues #220/#221). STRIPE_WEBHOOK_SECRET verifies webhook
     # payloads (raw-body HMAC); unset => POST /webhooks/stripe fails closed
     # with 503. STRIPE_PRICE_ID_PRO maps that Stripe price to the "pro" plan
@@ -247,6 +285,17 @@ class Settings(BaseSettings):
     def strip_stripe_values(cls, v):
         # A trailing newline from `.env`/`$(cat secret)` would make every
         # webhook fail signature verification with no obvious cause.
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator(
+        "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+        "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_S3_BUCKET",
+        mode="before",
+    )
+    @classmethod
+    def strip_storage_values(cls, v):
+        """A quoted space or a trailing newline is not a value (#806): it would
+        count as a configured provider and get past the production check."""
         return v.strip() if isinstance(v, str) else v
 
     @field_validator("SENTRY_DSN", mode="before")
