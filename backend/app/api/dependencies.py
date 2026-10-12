@@ -249,7 +249,6 @@ def get_ai_usage_quota():
             ("month", now.strftime("%Y-%m"), monthly, 40 * 86400),
         )
         charged = []
-        model_call_attempted.set(False)
         try:
             for period, bucket, limit, ttl in windows:
                 if limit <= 0:  # window disabled

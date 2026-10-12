@@ -173,6 +173,28 @@ class TestQuotaIsChargedOnlyForARequestThatMayHaveReachedTheModel:
         assert client.chat.completions.create.called
         assert await _charged() == 1
 
+    async def test_a_refused_request_is_refunded_even_right_after_one_that_reached_the_provider(
+        self, auth_client_factory, arm_real_ai_quota, monkeypatch
+    ):
+        """The mark belongs to one request: each runs in its own context, so
+        the first one's does not carry over to the second."""
+        arm_real_ai_quota(limit=5)
+        api = await auth_client_factory(overrides={"plan": "free"})
+        book_id = await _create_book(api, with_summary=True)
+        request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+        client = autospec_openai_client()
+        client.chat.completions.create.side_effect = openai.InternalServerError(
+            "stub", response=httpx.Response(500, request=request), body={"code": "stub"}
+        )
+        monkeypatch.setattr(ai_service, "client", client)
+        monkeypatch.setattr(ai_service, "base_delay", 0)
+
+        reached = await api.post(f"/api/v1/books/{book_id}/analyze-summary")
+        refused = await api.post("/api/v1/books/000000000000000000000000/analyze-summary")
+
+        assert (reached.status_code, refused.status_code) == (503, 404)
+        assert await _charged() == 1
+
     async def test_a_failure_before_any_model_call_costs_nothing_even_as_a_500(
         self, auth_client_factory, arm_real_ai_quota
     ):
