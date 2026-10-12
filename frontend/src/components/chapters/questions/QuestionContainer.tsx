@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from '@/lib/toast';
 import { bookClient } from '@/lib/api/bookClient';
+import { handleAIServiceError } from '@/lib/api/aiErrorHandler';
 import {
   Question,
   QuestionProgressResponse,
@@ -208,13 +209,10 @@ export default function QuestionContainer({
       });
     } catch (err) {
       console.error('Error generating questions:', err);
-      setError('Failed to generate questions. Please try again.');
-
-      toast({
-        title: 'Error',
-        description: 'Failed to generate questions. Please try again.',
-        variant: 'destructive',
-      });
+      // Classified and announced once by the shared handler: an Upgrade link
+      // for a plan refusal, the allowance for a quota (#803).
+      const { error: message } = await handleAIServiceError(err);
+      setError(message ?? 'Failed to generate questions. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -295,11 +293,7 @@ export default function QuestionContainer({
       });
     } catch (err) {
       console.error('Error regenerating questions:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to regenerate questions. Please try again.',
-        variant: 'destructive',
-      });
+      await handleAIServiceError(err);
     } finally {
       setIsGenerating(false);
     }

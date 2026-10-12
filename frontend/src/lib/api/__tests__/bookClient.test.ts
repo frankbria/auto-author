@@ -382,9 +382,10 @@ describe('BookClient.transformChapterStyle', () => {
   it('throws on non-ok response', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(503, 'Service unavailable'));
 
+    // The backend's message and the status, not "<action>: <status> <body>" (#803).
     await expect(
       bookClient.transformChapterStyle(bookId, chapterId, requestData)
-    ).rejects.toThrow('Failed to transform style: 503 Service unavailable');
+    ).rejects.toMatchObject({ message: 'Service unavailable', statusCode: 503 });
   });
 });
 
@@ -600,7 +601,7 @@ describe('BookClient.regenerateChapterQuestions', () => {
 
     await expect(
       bookClient.regenerateChapterQuestions(bookId, chapterId, {})
-    ).rejects.toThrow('Failed to regenerate questions: 500 Generation failed');
+    ).rejects.toMatchObject({ message: 'Generation failed', statusCode: 500 });
   });
 });
 
@@ -1979,9 +1980,10 @@ describe('BookClient core CRUD – success paths', () => {
 
   it('generateChapterQuestions throws on non-ok response', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(400, 'Bad opts'));
-    await expect(bookClient.generateChapterQuestions(BOOK_ID, CHAPTER_ID, {})).rejects.toThrow(
-      'Failed to generate questions: 400 Bad opts'
-    );
+    await expect(bookClient.generateChapterQuestions(BOOK_ID, CHAPTER_ID, {})).rejects.toMatchObject({
+      message: 'Bad opts',
+      statusCode: 400,
+    });
   });
 
   // getChapterQuestions – success and error (no filter options)
@@ -2102,7 +2104,7 @@ describe('BookClient – enhancement & template endpoints', () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(503, 'AI down'));
     await expect(
       bookClient.enhanceChapterText(BOOK_ID, CHAPTER_ID, { content: 'x', enhancement_type: 'clarity' })
-    ).rejects.toThrow('Failed to enhance text: 503 AI down');
+    ).rejects.toMatchObject({ message: 'AI down', statusCode: 503 });
   });
 
   it('enhanceVoiceTranscription POSTs to the enhance-transcription route', async () => {

@@ -1544,9 +1544,13 @@ describe('BookClient', () => {
         text: async () => 'Invalid question options',
       });
 
+      // A body that is not JSON: a plain sentence and the status, never the body (#803).
       await expect(
         bookClient.generateChapterQuestions('book123', 'ch1', { question_count: -1 })
-      ).rejects.toThrow('Failed to generate questions: 400 Invalid question options');
+      ).rejects.toMatchObject({
+        message: 'Failed to generate questions. Please try again.',
+        statusCode: 400,
+      });
     });
 
     it('should handle error when getting chapter questions', async () => {

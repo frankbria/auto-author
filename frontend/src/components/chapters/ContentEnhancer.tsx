@@ -9,6 +9,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { SparklesIcon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import { toast } from '@/lib/toast';
 import { bookClient } from '@/lib/api/bookClient';
+import { handleAIServiceError } from '@/lib/api/aiErrorHandler';
 import { LoadingStateManager } from '@/components/loading';
 import { RewriteWordCounts, type WordCounts } from './RewriteWordCounts';
 import DOMPurify from 'dompurify';
@@ -93,13 +94,12 @@ export function ContentEnhancer({
       });
       setStep('preview');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to enhance text');
+      // The shared handler classifies the refusal and announces it once: an
+      // Upgrade link for a plan refusal, the allowance for a quota, a retry
+      // for a rate limit (#803). The dialog shows its readable message.
+      const { error: message } = await handleAIServiceError(err);
+      setError(message ?? 'Failed to enhance text');
       setStep('options');
-      toast({
-        title: 'Enhancement Failed',
-        description: err instanceof Error ? err.message : 'Failed to enhance text',
-        variant: 'destructive',
-      });
     }
   };
 

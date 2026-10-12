@@ -245,6 +245,49 @@ describe('aiErrorHandler', () => {
       );
     });
 
+    it.each([
+      ['day', 'Daily AI limit reached'],
+      ['month', 'Monthly AI limit reached'],
+    ])('names the allowance that ran out when the 429 says which (%s) (#803)', async (period, title) => {
+      // The period comes from the X-AI-Quota-Period header, so the wording of
+      // the message does not have to be recognised.
+      const error = Object.assign(new Error('You have used your allowance.'), {
+        statusCode: 429,
+        quotaPeriod: period,
+      });
+      const onRetry = jest.fn();
+
+      const result = await handleAIServiceError(error, onRetry);
+
+      expect(result).toEqual({ error: 'You have used your allowance.', canRetry: false });
+      expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ message: title, details: 'You have used your allowance.', retryable: false }),
+        expect.not.objectContaining({ onRetry })
+      );
+    });
+
+    it('offers a retry for a provider rate limit, with the wait the backend gave in seconds (#803)', async () => {
+      const error = Object.assign(new Error('AI service rate limit exceeded'), {
+        statusCode: 429,
+        retryAfter: 4,
+      });
+
+      const result = await handleAIServiceError(error, jest.fn());
+
+      expect(result.canRetry).toBe(true);
+      expect(result.retryAfter).toBe(4);
+      expect(result.error).toBe('AI service rate limit reached. Please wait 4 seconds before retrying.');
+    });
+
+    it('shows what the backend said about a request it refused, not a generic line (#803)', async () => {
+      const message = 'This text is longer than the limit of 32,000 characters. Try a shorter section.';
+      const error = Object.assign(new Error(message), { statusCode: 422 });
+
+      const result = await handleAIServiceError(error);
+
+      expect(result).toMatchObject({ error: message, canRetry: false });
+    });
+
     it('should show estimated wait time for rate limits', async () => {
       const error = new Error(
         `Failed: 429 ${JSON.stringify({

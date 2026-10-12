@@ -18,6 +18,16 @@ import {
   QuestionType
 } from '@/types/chapter-questions';
 import { handleAIServiceError, AIServiceResult } from '@/lib/api/aiErrorHandler';
+
+/** What an AI method throws when the backend refuses: a readable message and what the response said. */
+export type AIClientError = Error & {
+  statusCode: number;
+  errorCode?: string;
+  /** Seconds, from the body or the Retry-After header. */
+  retryAfter?: number;
+  /** "day" or "month": which AI allowance ran out. */
+  quotaPeriod?: string;
+};
 import { BookResponse, toBookProject } from '@/types/book';
 import { ExportTemplate, TemplateCustomization } from '@/types/export';
 import { apiFetch } from '@/lib/api/unauthorized';
@@ -170,23 +180,42 @@ export class BookClient {
    * structured `detail.message` (e.g. timeout / rate-limit text from issue #48)
    * so the wizard can show a meaningful message instead of a generic one.
    */
-  private async aiError(response: Response, fallback: string): Promise<Error> {
+  private async aiError(response: Response, fallback: string): Promise<AIClientError> {
     let message: string | undefined;
+    let errorCode: string | undefined;
+    let retryAfter: number | undefined;
     try {
       const body = await response.json();
       const detail = body?.detail;
-      if (typeof detail === 'string' && detail) message = detail;
+      // A 422 for a text over its cap (#800) says so in `errors`, not `detail`.
+      const tooLong = Array.isArray(body?.errors)
+        ? body.errors.find((e: { type?: string; ctx?: { max_length?: number } }) =>
+            e?.type === 'string_too_long' && e?.ctx?.max_length)
+        : undefined;
+      if (tooLong) {
+        const limit = Number(tooLong.ctx.max_length).toLocaleString('en-US');
+        message = `This text is longer than the limit of ${limit} characters. Try a shorter section.`;
+      } else if (typeof detail === 'string' && detail) message = detail;
       else if (detail?.message) message = detail.message;
       // Structured errors (e.g. the 402 entitlement denial, #174) carry their
       // text under `detail.error`, not `detail.message`.
       else if (detail?.error) message = detail.error;
+      if (typeof detail?.error_code === 'string') errorCode = detail.error_code;
+      if (typeof detail?.retry_after === 'number') retryAfter = detail.retry_after;
     } catch {
       // Non-JSON body — fall through to the generic fallback message.
     }
     // Attach the status so the unified classifier maps it correctly (402 →
     // entitlement/upgrade, 429 → rate limit) instead of a generic system error.
-    const err = new Error(message || fallback) as Error & { statusCode: number };
+    const err = new Error(message || fallback) as AIClientError;
     err.statusCode = response.status;
+    err.errorCode = errorCode;
+    // What the headers say (#803). The backend exposes these to the page's origin.
+    const headers = response.headers;
+    const seconds = Number(headers?.get?.('Retry-After'));
+    err.retryAfter = retryAfter ?? (seconds > 0 ? seconds : undefined);
+    // Set on the 429 for an exhausted AI allowance, and only on that one.
+    err.quotaPeriod = headers?.get?.('X-AI-Quota-Period') ?? undefined;
     return err;
   }
 
@@ -1313,8 +1342,7 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to transform style: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to transform the writing style. Please try again.');
     }
 
     return response.json();
@@ -1354,8 +1382,7 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to enhance text: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to enhance the text. Please try again.');
     }
 
     return response.json();
@@ -1396,8 +1423,7 @@ export class BookClient {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to clean up transcription: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to clean up the dictation. Please try again.');
     }
 
     return response.json();
@@ -1421,8 +1447,7 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to generate questions: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to generate questions. Please try again.');
     }
     return response.json();
   }
@@ -1670,8 +1695,7 @@ export class BookClient {
       }
     );
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to regenerate questions: ${response.status} ${error}`);
+      throw await this.aiError(response, 'Failed to regenerate questions. Please try again.');
     }
     return response.json();
   }

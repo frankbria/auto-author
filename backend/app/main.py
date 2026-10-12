@@ -192,6 +192,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # What a page on the frontend's origin may read on a refusal (#803): when
+    # to come back, and which AI allowance ran out.
+    expose_headers=["Retry-After", "X-AI-Quota-Limit", "X-AI-Quota-Period"],
 )
 
 app.add_middleware(RequestValidationMiddleware)

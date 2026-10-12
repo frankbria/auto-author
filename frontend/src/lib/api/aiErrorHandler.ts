@@ -15,6 +15,8 @@ export interface AIErrorResponse {
   cached_content_available?: boolean;
   cached_content?: unknown;
   estimated_retry_after?: number; // seconds
+  /** "day" or "month" when the 429 is an exhausted AI allowance (X-AI-Quota-Period). */
+  quota_period?: string;
   error_type?: 'rate_limit' | 'network' | 'service_unavailable' | 'validation' | 'entitlement' | 'unknown';
 }
 
@@ -45,8 +47,10 @@ function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
   // Handle Error objects
   if (error instanceof Error) {
     const message = error.message;
-    // Callers (e.g. bookClient.aiError) may attach the HTTP status directly.
-    const attachedStatus = (error as Error & { statusCode?: number }).statusCode;
+    // Callers (e.g. bookClient.aiError) may attach the HTTP status directly,
+    // with the retry time and the allowance period the response carried.
+    const attached = error as Error & { statusCode?: number; retryAfter?: number; quotaPeriod?: string };
+    const attachedStatus = attached.statusCode;
 
     // Try to parse JSON from error message
     try {
@@ -59,7 +63,8 @@ function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
           status_code: statusCode,
           cached_content_available: parsed.cached_content_available,
           cached_content: parsed.cached_content,
-          estimated_retry_after: parsed.estimated_retry_after,
+          estimated_retry_after: parsed.estimated_retry_after ?? attached.retryAfter,
+          quota_period: attached.quotaPeriod,
           // Backend structured errors don't send error_type; derive it from the
           // status code so a 402 is classified as an entitlement denial (#174).
           error_type: parsed.error_type || determineErrorType(statusCode, message),
@@ -75,6 +80,8 @@ function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
     return {
       message,
       status_code: statusCode,
+      estimated_retry_after: attached.retryAfter,
+      quota_period: attached.quotaPeriod,
       error_type: determineErrorType(statusCode, message),
     };
   }
@@ -130,9 +137,11 @@ function getUserFriendlyMessage(errorDetails: Partial<AIErrorResponse>): string 
 
   switch (error_type) {
     case 'rate_limit':
-      return estimated_retry_after
-        ? `AI service rate limit reached. Please wait ${Math.ceil(estimated_retry_after / 60)} minutes before retrying.`
-        : 'AI service rate limit reached. Please try again in a few minutes.';
+      if (!estimated_retry_after) return 'AI service rate limit reached. Please try again in a few minutes.';
+      // The provider's limit clears in seconds; say so rather than rounding up to a minute.
+      return estimated_retry_after < 60
+        ? `AI service rate limit reached. Please wait ${estimated_retry_after} second${estimated_retry_after === 1 ? '' : 's'} before retrying.`
+        : `AI service rate limit reached. Please wait ${Math.ceil(estimated_retry_after / 60)} minutes before retrying.`;
 
     case 'network':
       return 'Network connection issue. Please check your internet connection and try again.';
@@ -141,7 +150,11 @@ function getUserFriendlyMessage(errorDetails: Partial<AIErrorResponse>): string 
       return 'AI service is temporarily unavailable. Please try again in a moment.';
 
     case 'validation':
-      return 'Invalid request data. Please check your input and try again.';
+      // What the backend said is the useful part ("longer than the limit of
+      // 32,000 characters"); its bare "Validation error" is not.
+      return errorDetails.message && errorDetails.message !== 'Validation error'
+        ? errorDetails.message
+        : 'Invalid request data. Please check your input and try again.';
 
     case 'entitlement':
       return 'Your current plan does not include this feature. Upgrade your plan to continue.';
@@ -212,12 +225,20 @@ export async function handleAIServiceError<T>(
   // Quota cap (#766): the backend detail already states the cap, when it resets and
   // what Pro raises it to. Waiting a few minutes cannot help, so show it verbatim
   // and don't offer a retry.
-  if (errorDetails.status_code === 429 && isQuotaCapMessage(errorDetails.message)) {
+  // The X-AI-Quota-Period header is the contract (#803); the message prefix is
+  // the fallback for a response whose headers could not be read.
+  if (
+    errorDetails.status_code === 429 &&
+    (errorDetails.quota_period || isQuotaCapMessage(errorDetails.message))
+  ) {
+    const title =
+      { day: 'Daily AI limit reached', month: 'Monthly AI limit reached' }[errorDetails.quota_period ?? ''] ??
+      'AI usage limit reached';
     showErrorNotification(
       {
         type: ErrorType.PERMANENT,
         severity: ErrorSeverity.HIGH,
-        message: 'AI usage limit reached',
+        message: title,
         details: errorDetails.message,
         statusCode: 429,
         retryable: false,
