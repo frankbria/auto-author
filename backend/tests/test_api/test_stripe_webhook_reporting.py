@@ -149,6 +149,15 @@ class TestAnEventForACustomerNobodyHas:
         assert "evt_unmatched_1" in reports[0]["message"]
         assert CUSTOMER not in said and EMAIL not in said
 
+    async def test_each_one_is_reported_because_each_names_a_different_event(self, webhook, reports):
+        """Only Stripe can cause this one, so it is not held to one report in five minutes."""
+        for event_id in ("evt_unmatched_1", "evt_unmatched_2"):
+            payload = subscription_event(event_id=event_id, customer=CUSTOMER)
+            await webhook.post(WEBHOOK_URL, content=payload, headers={"stripe-signature": sign(payload)})
+
+        assert ["evt_unmatched_1" in reports[0]["message"], "evt_unmatched_2" in reports[1]["message"]] == [True, True]
+        assert len(reports) == 2
+
     async def test_different_kinds_of_failure_are_reported_separately(self, webhook, reports):
         payload = _unknown_customer_event()
         await webhook.post(WEBHOOK_URL, content=payload, headers={"stripe-signature": "t=1,v1=forged"})
