@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,7 +49,10 @@ export default function ActiveSessionsList() {
   // setState in an effect (#584). No stale-response guard: Retry only renders
   // once the current attempt has failed, so two are never in flight.
   const [attempt, setAttempt] = useState(0);
-  const [outcome, setOutcome] = useState<{ attempt: number; state: 'loaded' | 'error' } | null>(null);
+  const [outcome, setOutcome] = useState<{
+    attempt: number;
+    state: 'loaded' | 'error' | 'stale';
+  } | null>(null);
   const loadState = outcome?.attempt === attempt ? outcome.state : 'loading';
   const [revokingToken, setRevokingToken] = useState<string | null>(null);
 
@@ -56,6 +60,11 @@ export default function ActiveSessionsList() {
     const loadSessions = async () => {
       try {
         const { data, error } = await authClient.listSessions();
+        // better-auth lists sessions only for a session under a day old (#796).
+        if (error?.code === 'SESSION_NOT_FRESH') {
+          setOutcome({ attempt, state: 'stale' });
+          return;
+        }
         if (error) throw new Error(error.message || 'Failed to load sessions');
         setSessions((data ?? []) as SessionInfo[]);
         setOutcome({ attempt, state: 'loaded' });
@@ -102,8 +111,6 @@ export default function ActiveSessionsList() {
     }
   };
 
-  const hasOtherSessions = sessions.some((s) => s.token !== currentToken);
-
   return (
     <Card>
       <CardHeader>
@@ -126,8 +133,20 @@ export default function ActiveSessionsList() {
           </div>
         )}
 
+        {loadState === 'stale' && (
+          <div role="alert" className="text-sm text-muted-foreground">
+            <span>You signed in more than a day ago. </span>
+            <Link
+              href={`/auth/sign-in?redirect=${encodeURIComponent('/dashboard/settings')}`}
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              Sign in again
+            </Link>
+            <span> to see your devices.</span>
+          </div>
+        )}
+
         {loadState === 'loaded' && (
-          <>
             <ul className="space-y-3">
               {sessions.map((s, index) => {
                 const isCurrent = s.token === currentToken;
@@ -167,16 +186,18 @@ export default function ActiveSessionsList() {
                 );
               })}
             </ul>
-            {hasOtherSessions && (
-              <Button
-                variant="outline"
-                onClick={() => void revokeOthers()}
-                disabled={revokingToken !== null}
-              >
-                {revokingToken === '__others__' ? 'Signing out…' : 'Sign out other devices'}
-              </Button>
-            )}
-          </>
+        )}
+
+        {/* Always offered: it works on any valid session, and the list above
+            may be unavailable exactly when it is needed (#796). */}
+        {loadState !== 'loading' && (
+          <Button
+            variant="outline"
+            onClick={() => void revokeOthers()}
+            disabled={revokingToken !== null}
+          >
+            {revokingToken === '__others__' ? 'Signing out…' : 'Sign out other devices'}
+          </Button>
         )}
       </CardContent>
     </Card>

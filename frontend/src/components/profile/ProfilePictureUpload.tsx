@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import useOptimizedClerkImage from '@/hooks/useOptimizedClerkImage';
 import { toast } from '@/lib/toast';
+import { apiFetch } from '@/lib/api/unauthorized';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -57,7 +58,7 @@ export function ProfilePictureUpload({ currentAvatarUrl, onUploaded }: ProfilePi
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch(`${API_BASE_URL}/users/me/avatar`, {
+      const res = await apiFetch(`${API_BASE_URL}/users/me/avatar`, {
         method: 'POST',
         credentials: 'include',
         body: formData,

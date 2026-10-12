@@ -1,6 +1,6 @@
-import { readFileSync } from 'fs';
-import { expect, test, type Page } from '@playwright/test';
-import { API, FRONTEND_LOG, WEB } from '../../../playwright.real-auth.config';
+import { expect, test } from '@playwright/test';
+import { API } from '../../../playwright.real-auth.config';
+import { SAME_ORIGIN, STRONG, signUp, signUpAndVerify, verificationLink } from './helpers';
 
 /**
  * The one required check of real authentication (#843): no bypass anywhere.
@@ -13,40 +13,7 @@ import { API, FRONTEND_LOG, WEB } from '../../../playwright.real-auth.config';
  * id better-auth gave the user (the #556 class of failure).
  */
 
-// Built by concatenation so the pre-commit secrets pattern cannot false-positive.
-const STRONG = ['Real', 'Auth', '-e2e-', '1'].join('');
 const WEAK = 'a'.repeat(8);
-
-// better-auth refuses a cross-site POST; a page's own requests carry this.
-const SAME_ORIGIN = { Origin: WEB };
-
-/**
- * The link in the email the development server printed when `email` signed up.
- * Each address is used once, so the first email to it is the sign-up one; a
- * refused sign-in mails another, whose link lands on the home page instead.
- */
-async function verificationLink(email: string): Promise<string> {
-  let link: string | undefined;
-  await expect
-    .poll(() => {
-      const log = readFileSync(FRONTEND_LOG, 'utf8');
-      const start = log.indexOf(`To: ${email}`);
-      link = start < 0 ? undefined : /URL: (\S+verify-email\S+)/.exec(log.slice(start))?.[1];
-      return link;
-    })
-    .toBeTruthy();
-  return link!;
-}
-
-async function signUp(page: Page, email: string) {
-  await page.goto('/auth/sign-up');
-  await page.locator('#name').fill('Real Author');
-  await page.locator('#email').fill(email);
-  await page.locator('#password').fill(STRONG);
-  await page.locator('#confirmPassword').fill(STRONG);
-  await page.getByRole('button', { name: 'Sign Up' }).click();
-  await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
-}
 
 test('a visitor signs up, verifies their email, and the backend serves them and only them', async ({
   page,
@@ -119,9 +86,7 @@ test('a visitor signs up, verifies their email, and the backend serves them and 
   const other = await browser.newContext();
   const otherPage = await other.newPage();
   const otherEmail = `real-auth-other-${Date.now()}@example.com`;
-  await signUp(otherPage, otherEmail);
-  await otherPage.goto(await verificationLink(otherEmail));
-  await expect(otherPage).toHaveURL(/\/dashboard/);
+  await signUpAndVerify(otherPage, otherEmail);
   expect(await (await otherPage.request.get(`${API}/books/`)).json()).toEqual([]);
   expect((await otherPage.request.get(`${API}/books/${book.id}`)).status()).not.toBe(200);
   await other.close();
