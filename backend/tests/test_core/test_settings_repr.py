@@ -13,8 +13,8 @@ import pytest
 from app.core.config import Settings
 
 # A setting whose name ends in, or contains as a whole word, one of these holds
-# a credential or an address that can carry one.
-SECRET_NAME = re.compile(r"(^|_)(KEY|SECRET|PASSWORD|DSN|TOKEN|URI|URL)(_|$)")
+# a credential, an address that can carry one, or somebody's email address.
+SECRET_NAME = re.compile(r"(^|_)(KEY|SECRET|PASSWORD|DSN|TOKEN|URI|URL|EMAILS?)(_|$)")
 SECRETS = [name for name in Settings.model_fields if SECRET_NAME.search(name)]
 
 
@@ -34,7 +34,7 @@ class TestSecretsAreNotPrinted:
             "MONGODB_URI", "DATABASE_URL", "OPENAI_API_KEY", "OPENAI_AUTOAUTHOR_API_KEY",
             "AI_API_KEY", "BETTER_AUTH_SECRET", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
             "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "STRIPE_WEBHOOK_SECRET",
-            "STRIPE_SECRET_KEY", "SENTRY_DSN",
+            "STRIPE_SECRET_KEY", "SENTRY_DSN", "E2E_EXEMPT_EMAILS",
         }  # fmt: skip
         assert "AI_MAX_OUTPUT_TOKENS_DEFAULT" not in SECRETS, "a token budget is not a token"
 

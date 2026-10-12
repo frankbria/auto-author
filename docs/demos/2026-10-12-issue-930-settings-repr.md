@@ -1,7 +1,7 @@
 # The settings object does not print its secrets (#930)
 
-*2026-10-12T16:45:37Z by Showboat 0.6.1*
-<!-- showboat-id: b0af4fb3-ff07-47fb-9a66-25b047516bb0 -->
+*2026-10-12T17:01:14Z by Showboat 0.6.1*
+<!-- showboat-id: e954543b-b161-4dcf-b9ed-c730ffe3042d -->
 
 A pydantic model prints every field value in its repr. This demo gives the backend a made-up value for each of the thirteen settings the issue names, from an empty directory so no .env is read, and counts how many of those values come out when the settings are printed. Each value says which setting it stands for; none is real.
 
@@ -71,11 +71,11 @@ source /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-
 OPENAI_API_KEY reads back as: LIVE-VALUE-OF-OPENAI_API_KEY-0123456789
 Settings(ENVIRONMENT='test', DATABASE_NAME='auto_author_test', AI_MODEL_DEFAULT='gpt-4', AI_MODEL_LONG_OUTPUT='gpt-4o', 
 AI_MAX_OUTPUT_TOKENS_DEFAULT=4000, AI_MAX_OUTPUT_TOKENS_LONG=8000, BETTER_AUTH_ISSUER='better-auth', JWT_ALGORITHM='HS256', API_V1_PREFIX='/api/v1', 
-BACKEND_CORS_ORIGINS=['http://localhost:3000', 'http://localhost:8000'], E2E_ALLOW_BYPASS='', BYPASS_AUTH=False, E2E_EXEMPT_EMAILS='', 
-AI_MAX_RETRIES=3, AI_REQUEST_TIMEOUT_SECONDS=120.0, MAX_QUESTION_REGENERATION_COUNT=5, AI_QUOTA_ENABLED=True, AI_QUOTA_FREE_DAILY=10, 
-AI_QUOTA_FREE_MONTHLY=100, AI_QUOTA_PRO_DAILY=50, AI_QUOTA_PRO_MONTHLY=500, PLAN_ENFORCEMENT_ENABLED=True, EXPORT_TIMEOUT_SECONDS=120, 
-EXPORT_MAX_WORKERS=2, AWS_REGION='us-east-1', AWS_S3_BUCKET='', CLOUDINARY_CLOUD_NAME='', BILLING_ENABLED=True, STRIPE_PRICE_ID_PRO='', 
-STRIPE_AUTOMATIC_TAX=False, GIT_SHA='')
+BACKEND_CORS_ORIGINS=['http://localhost:3000', 'http://localhost:8000'], E2E_ALLOW_BYPASS='', BYPASS_AUTH=False, AI_MAX_RETRIES=3, 
+AI_REQUEST_TIMEOUT_SECONDS=120.0, MAX_QUESTION_REGENERATION_COUNT=5, AI_QUOTA_ENABLED=True, AI_QUOTA_FREE_DAILY=10, AI_QUOTA_FREE_MONTHLY=100, 
+AI_QUOTA_PRO_DAILY=50, AI_QUOTA_PRO_MONTHLY=500, PLAN_ENFORCEMENT_ENABLED=True, EXPORT_TIMEOUT_SECONDS=120, EXPORT_MAX_WORKERS=2, 
+AWS_REGION='us-east-1', AWS_S3_BUCKET='', CLOUDINARY_CLOUD_NAME='', BILLING_ENABLED=True, STRIPE_PRICE_ID_PRO='', STRIPE_AUTOMATIC_TAX=False, 
+GIT_SHA='')
 ```
 
 The same behaviour as tests, with a guard: any setting whose name marks it as a credential must be declared hidden, so a new one cannot be added without it.
@@ -85,5 +85,5 @@ cd /home/frankbria/projects/worktrees/issue-930-settings-repr/backend && ENVIRON
 ```
 
 ```output
-============================== 20 passed ==============================
+============================== 21 passed ==============================
 ```

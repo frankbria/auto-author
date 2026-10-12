@@ -172,7 +172,7 @@ class Settings(BaseSettings):
     # (#173) throttled it into perpetual red. These accounts skip the limiter /
     # quota / entitlement gate — FENCED to non-production so it can never loosen
     # limits on the real product (see _is_exempt_e2e_user in dependencies.py).
-    E2E_EXEMPT_EMAILS: str = ""
+    E2E_EXEMPT_EMAILS: str = Field("", repr=False)
 
     # ge=1: range(max_retries) with 0 or a negative value never enters the loop,
     # so _retry_with_backoff returns None implicitly and the caller AttributeErrors
