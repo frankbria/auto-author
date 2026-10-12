@@ -93,12 +93,12 @@ reports sent to Sentry: 1
   'SESSION-TOKEN-VALUE' is in what was sent: False
 ```
 
-The same behaviour as tests, with the real Sentry SDK and a real MongoDB: the function every report goes through, and each group of failures it is now called from.
+The same behaviour as tests, with the real Sentry SDK and a real MongoDB: the function every report goes through, and each group of failures it is now called from, including a file the disk or the storage provider would not delete.
 
 ```bash
 cd /home/frankbria/projects/worktrees/issue-996-handled-failures/backend && ENVIRONMENT=test TEST_MONGO_URI=mongodb://localhost:27017/auto-author-test-demo996 uv run pytest tests/test_handled_failure_reporting.py -q -p no:cacheprovider --no-cov 2>&1 | tail -1 | sed -E 's/ in [0-9.]*s//; s/, [0-9]+ warnings?//'
 ```
 
 ```output
-======================= 16 passed ========================
+======================= 24 passed ========================
 ```

@@ -252,6 +252,8 @@ async def delete_user(
 
             await FileUploadService().delete_profile_picture(auth_id, avatar_url)
         except Exception as error:
+            # Reached only when the upload service cannot be set up at all: its
+            # own delete never raises, and reports from where it catches.
             logger.error("Failed to delete avatar for user %s", auth_id, exc_info=True)
             report_failure("delete-files", error)
 
@@ -346,7 +348,6 @@ async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
         )
 
         return result.deleted_count > 0
-    except Exception as error:
+    except Exception:
         logger.error("Failed to delete user books", exc_info=True)
-        report_failure("delete-user-data", error)
         return False

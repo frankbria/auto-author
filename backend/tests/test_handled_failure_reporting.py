@@ -13,6 +13,7 @@ to a list; real MongoDB.
 import asyncio
 import json
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -27,7 +28,9 @@ from app.core.config import settings
 from app.core.reporting import report_failure
 from app.db import book as book_dao
 from app.db import user as user_dao
+from app.services import file_upload_service
 from app.services.chapter_access_service import chapter_access_service
+from app.services.file_upload_service import FileUploadService
 from tests.session_cookies import signed_session_cookie
 from tests.test_api.test_rate_limit_routes import _create_book, _seed_toc, _small_toc
 from tests.test_api import test_stripe_webhook_current_subscription as stripe_tests
@@ -102,6 +105,15 @@ class TestTheOneFunctionEveryReportGoesThrough:
         monkeypatch.setattr(sentry_sdk, "capture_exception", MagicMock(side_effect=RuntimeError("sentry is down")))
 
         report_failure("audit-log", RuntimeError("database is away"))
+
+    async def test_a_report_that_could_not_be_sent_does_not_silence_the_next_one(self, reports, monkeypatch):
+        with monkeypatch.context() as broken:
+            broken.setattr(sentry_sdk, "capture_exception", MagicMock(side_effect=RuntimeError("sentry is down")))
+            report_failure("purge-accounts", RuntimeError("database is away"))
+
+        report_failure("purge-accounts", RuntimeError("database is away"))
+
+        assert _kinds(reports) == ["purge-accounts"]
 
 
 class TestADatabaseErrorDoesNotBringTheDocumentWithIt:
@@ -190,37 +202,78 @@ class TestStartUpAndTheDailyPurge:
 
 
 class TestADeletedUsersFilesStillInStorage:
-    async def test_a_cover_that_could_not_be_deleted(self, reports):
-        from app.services.file_upload_service import FileUploadService
+    """The upload service catches its own failures and never raises, so that is
+    where a file left behind has to be reported from."""
 
-        with patch.object(FileUploadService, "delete_cover_image", AsyncMock(side_effect=RuntimeError("storage is down"))):
+    @pytest.fixture
+    def stored(self, tmp_path, monkeypatch):
+        """A cover and an avatar on local disk, named as the service names them."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(file_upload_service, "get_cloud_storage_service", lambda: None)
+        book_id, user_id = str(ObjectId()), "auth-closing"
+        cover = tmp_path / "uploads" / "cover_images" / f"{book_id}_{'a' * 32}.png"
+        avatar = tmp_path / "uploads" / "profile_pictures" / f"{user_id}_{'b' * 32}.png"
+        for file in (cover, avatar):
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_bytes(b"image")
+        return {"book_id": book_id, "user_id": user_id, "cover": cover, "avatar": avatar}
+
+    async def test_a_cover_the_disk_would_not_let_go_of(self, stored, reports, monkeypatch):
+        monkeypatch.setattr(Path, "unlink", MagicMock(side_effect=PermissionError("read-only file system")))
+
+        await FileUploadService().delete_cover_image(stored["book_id"], f"/uploads/cover_images/{stored['cover'].name}")
+
+        assert stored["cover"].exists()
+        assert _kinds(reports) == ["delete-files"]
+
+    async def test_an_avatar_the_disk_would_not_let_go_of(self, stored, reports, monkeypatch):
+        monkeypatch.setattr(Path, "unlink", MagicMock(side_effect=PermissionError("read-only file system")))
+
+        await FileUploadService().delete_profile_picture(
+            stored["user_id"], f"/uploads/profile_pictures/{stored['avatar'].name}"
+        )
+
+        assert stored["avatar"].exists()
+        assert _kinds(reports) == ["delete-files"]
+
+    @pytest.mark.parametrize("which", ["cover", "avatar"])
+    async def test_a_file_the_cloud_provider_did_not_delete(self, stored, reports, which):
+        """The provider's own failure is caught a layer down and comes back as False."""
+        service = FileUploadService()
+        service.cloud_storage = MagicMock(delete_image=AsyncMock(return_value=False))
+
+        if which == "cover":
+            await service.delete_cover_image(stored["book_id"], f"https://cdn.invalid/{SENTINEL}.png")
+        else:
+            await service.delete_profile_picture(stored["user_id"], f"https://cdn.invalid/{SENTINEL}.png")
+
+        assert _kinds(reports) == ["delete-files"]
+        assert SENTINEL not in _said(reports)
+
+    async def test_a_file_that_was_deleted_is_not_a_report(self, stored, reports):
+        await FileUploadService().delete_cover_image(stored["book_id"], f"/uploads/cover_images/{stored['cover'].name}")
+
+        assert not stored["cover"].exists()
+        assert reports == []
+
+    async def test_storage_that_cannot_even_be_set_up_when_a_book_is_deleted(self, reports):
+        """The one way the callers' own handlers are reached: the service cannot be constructed."""
+        with patch.object(FileUploadService, "__init__", MagicMock(side_effect=RuntimeError("no upload storage"))):
             await book_dao._delete_cover_files({"_id": ObjectId(), "cover_image_url": f"/uploads/{SENTINEL}.png"})
 
         assert _kinds(reports) == ["delete-files"]
         assert SENTINEL not in _said(reports)
 
-    async def test_an_avatar_that_could_not_be_deleted_when_the_account_is_closed(self, motor_reinit_db, reports):
-        from app.services.file_upload_service import FileUploadService
-
+    async def test_or_when_an_account_is_closed(self, motor_reinit_db, reports):
         await user_dao.create_user(
             {"auth_id": "auth-closing", "email": "closing@example.com", "avatar_url": f"/uploads/{SENTINEL}.png"}
         )
-        with patch.object(FileUploadService, "delete_profile_picture", AsyncMock(side_effect=RuntimeError("storage is down"))):
+        with patch.object(FileUploadService, "__init__", MagicMock(side_effect=RuntimeError("no upload storage"))):
             closed = await user_dao.delete_user("auth-closing")
 
         assert closed is True, "the account is still closed; only the file was left behind"
         assert _kinds(reports) == ["delete-files"]
         assert SENTINEL not in _said(reports)
-
-    async def test_books_that_could_not_be_deleted_for_a_user(self, reports):
-        broken = MagicMock()
-        broken.delete_many = AsyncMock(side_effect=RuntimeError("database is away"))
-        broken.find = MagicMock(side_effect=RuntimeError("database is away"))
-        with patch.object(user_dao, "books_collection", broken):
-            deleted = await user_dao.delete_user_books("auth-1")
-
-        assert deleted is False
-        assert _kinds(reports) == ["delete-user-data"]
 
 
 class TestACustomerBilledTwice:

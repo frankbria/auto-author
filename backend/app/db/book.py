@@ -438,6 +438,8 @@ async def _delete_cover_files(book: Dict) -> None:
 
         await FileUploadService().delete_cover_image(book_id, cover_url, thumbnail_url)
     except Exception as error:
+        # Reached only when the upload service cannot be set up at all: its
+        # own delete never raises, and reports from where it catches.
         logger.error("Failed to delete cover files for book %s", book_id, exc_info=True)
         report_failure("delete-files", error)
 

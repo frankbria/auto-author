@@ -37,7 +37,6 @@ def report_failure(
     now = time.monotonic()
     if not every_time and now - _last_reported.get(kind, -REPORT_AGAIN_SECONDS) < REPORT_AGAIN_SECONDS:
         return
-    _last_reported[kind] = now
     try:
         if error is not None:
             sentry_sdk.capture_exception(error, fingerprint=[group, kind])
@@ -46,3 +45,7 @@ def report_failure(
     except Exception:
         # Reporting a failure must never become one for the code that asked.
         logger.warning("Could not report %s to Sentry", kind, exc_info=True)
+    else:
+        # Only once it has gone: a report that could not be sent must not
+        # silence the next one.
+        _last_reported[kind] = now
