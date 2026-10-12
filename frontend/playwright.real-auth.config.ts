@@ -21,8 +21,8 @@ export const API = 'http://localhost:8001/api/v1';
 export const FRONTEND_LOG = path.resolve(__dirname, 'test-results/real-auth-frontend.log');
 const BACKEND_LOG = path.resolve(__dirname, 'test-results/real-auth-backend.log');
 
-const MONGO = process.env.E2E_MONGODB_URI || 'mongodb://localhost:27017';
-const DATABASE = 'auto_author_e2e_real_auth';
+export const MONGO = process.env.E2E_MONGODB_URI || 'mongodb://localhost:27017';
+export const DATABASE = 'auto_author_e2e_real_auth';
 const SECRET =
   process.env.BETTER_AUTH_SECRET || 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing';
 
