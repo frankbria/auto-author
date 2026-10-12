@@ -52,6 +52,20 @@ def _in_time(lookup):
     """A database call for a session, given up on after the lookup's own limit."""
     return asyncio.wait_for(lookup, SESSION_LOOKUP_TIMEOUT_SECONDS)
 
+
+async def when_the_store_answers(lookup):
+    """``lookup`` with that limit, and a database failure told apart from an answer.
+
+    For the sign-in check's lookups outside this module. Reported once every
+    few minutes, like the two here.
+    """
+    try:
+        return await _in_time(lookup)
+    except (PyMongoError, asyncio.TimeoutError) as e:
+        logger.error(f"A sign-in lookup could not be made: {type(e).__name__}: {str(e)}")
+        report_failure("session-validation", e)
+        raise SessionStoreUnavailable() from e
+
 # better-auth sets the __Secure- name over HTTPS and the bare one over plain
 # HTTP (local development).
 SECURE_COOKIE_NAME = "__Secure-better-auth.session_token"
@@ -231,12 +245,17 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
         user = await _in_time(user_collection.find_one({"id": user_id}))
 
         if not user:
-            # Try with _id as fallback (convert string to ObjectId)
+            # Try with _id as fallback (convert string to ObjectId). Only the
+            # conversion is allowed to fail quietly: the lookup's own failure
+            # is the database's and goes to the handlers below (#1007).
             from bson import ObjectId
+            from bson.errors import InvalidId
             try:
-                user = await _in_time(user_collection.find_one({"_id": ObjectId(user_id)}))
-            except Exception:
+                object_id = ObjectId(user_id)
+            except (InvalidId, TypeError):
                 logger.debug(f"Could not convert user_id to ObjectId: {user_id}")
+            else:
+                user = await _in_time(user_collection.find_one({"_id": object_id}))
 
         if user:
             logger.debug(f"Found better-auth user {user_id}")

@@ -57,6 +57,6 @@ cd /home/frankbria/projects/worktrees/issue-1007-session-outage/backend && ENVIR
 ```
 
 ```output
-========================= 9 passed =========================
+======================== 12 passed =========================
 Tests: 12 passed, 12 total
 ```

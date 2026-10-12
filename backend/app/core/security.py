@@ -4,6 +4,8 @@ from fastapi import HTTPException, status, Request
 from app.core.better_auth_session import (
     validate_better_auth_session,
     get_better_auth_user,
+    SessionStoreUnavailable,
+    when_the_store_answers,
 )
 import logging
 
@@ -167,11 +169,14 @@ async def get_current_user_from_session(request: Request) -> Dict:
             detail="User not found. Please sign up again."
         )
 
-    # Try to find user in application database
+    # Try to find user in application database. A database that cannot be
+    # asked is answered 503 like the two lookups above (#1007), not 500.
     try:
         from app.db.user import get_user_by_auth_id
 
-        user = await get_user_by_auth_id(user_id)
+        user = await when_the_store_answers(get_user_by_auth_id(user_id))
+    except SessionStoreUnavailable:
+        raise
     except Exception as e:
         logger.error(f"Error fetching user {user_id}: {str(e)}")
         raise HTTPException(

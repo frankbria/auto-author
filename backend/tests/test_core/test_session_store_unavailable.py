@@ -68,6 +68,23 @@ class TestTheLookupSaysItCouldNotLook:
             with pytest.raises(sessions.SessionStoreUnavailable):
                 await sessions.validate_better_auth_session(_request())
 
+    async def test_nor_is_the_second_way_of_finding_the_user_when_the_database_goes_between_the_two(self):
+        """A user stored under an ObjectId is found by a second lookup. Its failure used to be
+        swallowed as "that id is not an ObjectId", which is a 401."""
+        collection = AsyncMock()
+        collection.find_one.side_effect = [None, ServerSelectionTimeoutError("no primary")]
+        with patch.object(sessions, "get_collection", AsyncMock(return_value=collection)):
+            with pytest.raises(sessions.SessionStoreUnavailable):
+                await sessions.get_better_auth_user(str(ObjectId()))
+
+    async def test_an_id_that_is_not_an_object_id_is_still_just_a_user_who_is_not_there(self):
+        collection = AsyncMock()
+        collection.find_one.return_value = None
+        with patch.object(sessions, "get_collection", AsyncMock(return_value=collection)):
+            assert await sessions.get_better_auth_user("not-an-object-id") is None
+
+        assert collection.find_one.await_count == 1
+
     async def test_a_session_that_is_not_there_is_still_just_not_there(self):
         collection = AsyncMock()
         collection.find_one.return_value = None
@@ -124,6 +141,18 @@ class TestTheRequestIsToldToComeBackNotToSignIn:
 
         assert [r["fingerprint"] for r in reports] == [["handled", "session-validation"]]
         assert "TOKEN-SENTINEL" not in str(reports)
+
+    async def test_the_same_when_the_database_goes_after_the_session_was_found(self, api, monkeypatch):
+        """The sign-in check makes a third lookup, of the app's own record of the user."""
+        from app.core import security
+
+        monkeypatch.setattr(security, "validate_better_auth_session", AsyncMock(return_value={"userId": ObjectId()}))
+        monkeypatch.setattr(security, "get_better_auth_user", AsyncMock(return_value={"email": "writer@example.com"}))
+        with patch("app.db.user.get_user_by_auth_id", AsyncMock(side_effect=ServerSelectionTimeoutError("no primary"))):
+            response = await api.get("/api/v1/books/", headers={"Cookie": COOKIE})
+
+        assert response.status_code == 503
+        assert int(response.headers["retry-after"]) > 0
 
     async def test_a_request_with_no_session_is_still_asked_to_sign_in(self, api):
         response = await api.get("/api/v1/books/")
