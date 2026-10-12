@@ -3,6 +3,7 @@ import openai
 import logging
 import re
 import asyncio
+from contextvars import ContextVar
 import time
 import uuid
 from typing import Dict, List, Optional, Any
@@ -13,6 +14,7 @@ from app.services.ai_errors import (
     AIRateLimitError,
     AINetworkError,
     AIServiceUnavailableError,
+    AIProviderAuthError,
     AIProviderQuotaError,
     AIInvalidRequestError
 )
@@ -48,6 +50,12 @@ DRAFT_WORDS_TO_TOKENS_FACTOR = 1.6
 TOC_MAX_COMPLETION_TOKENS = 6000
 
 
+# True once this request has been handed to the provider. The AI quota reads
+# it to tell a request refused beforehand, which costs nothing, from one the
+# provider may have billed (#798). A ContextVar, so each request has its own.
+model_call_attempted: ContextVar[bool] = ContextVar("model_call_attempted", default=False)
+
+
 class AIService:
     """
     AI Service for handling OpenAI API interactions for summary analysis and TOC generation.
@@ -70,6 +78,8 @@ class AIService:
             # OpenAI key elsewhere: AI_BASE_URL is the only switch (#917).
             base_url=settings.AI_BASE_URL or "https://api.openai.com/v1",
             max_retries=0,
+            # Per attempt; without it the SDK waits ten minutes (#799).
+            timeout=settings.AI_REQUEST_TIMEOUT_SECONDS,
         )
         self.model = settings.AI_MODEL_DEFAULT
         self.long_output_model = settings.AI_MODEL_LONG_OUTPUT
@@ -112,9 +122,9 @@ class AIService:
 
             except openai.RateLimitError as e:
                 if e.code == "insufficient_quota":
-                    # Logged at ERROR so Sentry raises it: every AI feature is
-                    # down until someone adds credit (#775).
-                    logger.error(
+                    # CRITICAL: every AI feature is down until someone adds
+                    # credit, and no retry will change that (#775, #799).
+                    logger.critical(
                         f"OpenAI refused for billing (insufficient_quota) [correlation_id={correlation_id}]"
                     )
                     raise AIProviderQuotaError(
@@ -137,6 +147,17 @@ class AIService:
                         original_exception=e,
                         correlation_id=correlation_id
                     )
+
+            except (openai.AuthenticationError, openai.PermissionDeniedError) as e:
+                # The key is wrong or may not use this model. Retrying sends the
+                # same key again; an operator has to act (#799).
+                logger.critical(
+                    f"AI provider rejected our credential ({e.status_code}) "
+                    f"[correlation_id={correlation_id}]"
+                )
+                raise AIProviderAuthError(
+                    original_exception=e, correlation_id=correlation_id
+                )
 
             except (openai.APITimeoutError, openai.APIConnectionError) as e:
                 last_exception = e
@@ -194,7 +215,7 @@ class AIService:
                 # 402 is how OpenAI-compatible providers (Ollama cloud,
                 # OpenRouter) refuse for billing; same meaning as #775's 429 (#917).
                 if isinstance(e, openai.APIStatusError) and e.status_code == 402:
-                    logger.error(
+                    logger.critical(
                         f"AI provider refused for billing (402) [correlation_id={correlation_id}]"
                     )
                     raise AIProviderQuotaError(
@@ -266,6 +287,7 @@ class AIService:
             # generation must not stall health checks or other users' requests.
             return await asyncio.to_thread(_sync_request)
 
+        model_call_attempted.set(True)
         return await self._retry_with_backoff(_async_wrapper, correlation_id=correlation_id)
 
     def _untruncated_text(self, response, correlation_id: Optional[str] = None) -> str:

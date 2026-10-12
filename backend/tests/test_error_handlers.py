@@ -204,6 +204,20 @@ class TestQuestionGenerationErrorHandler:
         assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         assert exc_info.value.detail["details"][0]["code"] == "AI_PROVIDER_QUOTA_EXHAUSTED"
 
+    def test_provider_rejecting_our_key_is_503_though_not_retryable(self):
+        """A rejected API key is an outage for the user, not their mistake (#799)."""
+        from app.services.ai_errors import AIProviderAuthError
+
+        with pytest.raises(HTTPException) as exc_info:
+            raise handle_question_generation_error(
+                error=AIProviderAuthError(),
+                book_id="book-123",
+                chapter_id="chapter-456",
+            )
+
+        assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert exc_info.value.detail["details"][0]["code"] == "AI_PROVIDER_AUTH_FAILED"
+
     def test_handles_generic_exception(self):
         """Test handling generic exceptions"""
         generic_error = Exception("Something went wrong")
