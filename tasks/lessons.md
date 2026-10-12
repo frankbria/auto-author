@@ -1431,3 +1431,15 @@ With the provider stubbed, a 5,000-word chapter "succeeds". Against a real model
 ### A measurement on a cleaned sample measures the cleaning (#801)
 To size a cap I counted gpt-4o tokens for 5,000 words of the repository's docs, after a filter that kept only alphabetic words. It gave 5.6 characters a token, and I set the cap from it. The filter had removed punctuation, numbers and identifiers, which are exactly what costs tokens: the same docs with punctuation kept are 4.4, and license prose is 4.9. The reviewer doubted the number without knowing why it was wrong. Measure the thing as it will arrive, on more than one source, and put the measuring command in the demo so the number can be re-run.
 
+### Writing the reviewer's brief is a review (#983)
+The brief for the cross-family review asked "what happens for a script written without spaces, where split() yields very few words?" Writing that sentence answered it: a long Chinese chapter has almost no words, so the check never ran, and the same text marked up differently counted as shorter and would have been refused. Both reviewers were out of quota; the two tests and the fix came from the brief. Write the brief before the PR, and read it as a list of things to check yourself.
+
+### Read the demo output for what else changed (#805)
+The change kept a chapter with no text when its subchapters have text, so that "1.1" has a "Chapter 1" above it. The demo's page listing showed that such a chapter then printed "(No content yet)" and took a page to itself, which main never did because main dropped it. No test asked about that line. The recorded output is evidence for the claim and also the first look at everything near it.
+
+### A mutation whose edit did not apply looks like a mutation that survived (#983)
+The script's edit step failed on an escaping mismatch, the test run went ahead on unchanged code, and the line read "markup counts as text -> 19 passed". Only a count of `AssertionError` in the log gave it away. The script now prints `NOT APPLIED` and skips the run when the file is unchanged after the edit.
+
+### A heredoc inside a heredoc ends at the first matching line (#802)
+A shell command embedded a Python script whose text contained a line reading `EOF`, inside a heredoc that also ended at `EOF`. The outer heredoc stopped there, Python saw half a string, and the rest of the script was run as shell. Nothing was changed, because the failure came first, but that was luck. Put a script that contains heredoc markers in its own file.
+

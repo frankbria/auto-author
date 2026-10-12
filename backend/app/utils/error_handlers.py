@@ -9,7 +9,13 @@ endpoints with consistent formatting and detailed debugging information.
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException, status
 from app.schemas.errors import ErrorCode, ErrorDetail, create_error_response
-from app.services.ai_errors import AIServiceError, AIServiceUnavailableError
+from app.services.ai_errors import (
+    AIInvalidRequestError,
+    AINetworkError,
+    AIRateLimitError,
+    AIServiceError,
+    AIServiceUnavailableError,
+)
 import logging
 import uuid
 
@@ -158,6 +164,36 @@ def handle_validation_error(
     )
 
 
+def ai_error_http_exception(error: AIServiceError) -> HTTPException:
+    """The response for a failed AI call, the same on every AI route (#802).
+
+    The status follows the kind of failure. The message is the service's own
+    fixed text, never the provider's, which is in the log under the same
+    correlation id. A failure that knows when to come back says so in
+    ``Retry-After`` as well as in the body.
+    """
+    if isinstance(error, AIRateLimitError):
+        status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    elif isinstance(error, (AIServiceUnavailableError, AINetworkError)):
+        status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    elif isinstance(error, AIInvalidRequestError):
+        status_code = status.HTTP_400_BAD_REQUEST
+    else:
+        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "message": error.message,
+            "error_code": error.error_code,
+            "retry_after": error.retry_after,
+            "retryable": error.retryable,
+            "cached_content_available": error.cached_content_available,
+            "correlation_id": error.correlation_id,
+        },
+        headers={"Retry-After": str(error.retry_after)} if error.retry_after else None,
+    )
+
+
 def handle_question_generation_error(
     error: Exception,
     book_id: str,
@@ -211,7 +247,7 @@ def handle_question_generation_error(
             details=[
                 ErrorDetail(
                     field="book_id",
-                    message=f"Error during question generation: {str(error)}",
+                    message="Error during question generation",
                     value=book_id
                 ),
                 ErrorDetail(
@@ -365,7 +401,7 @@ def handle_response_save_error(
         details=[
             ErrorDetail(
                 field="question_id",
-                message=f"Error saving response: {str(error)}",
+                message="Error saving response",
                 value=question_id
             )
         ],
@@ -421,7 +457,7 @@ def handle_rating_save_error(
         details=[
             ErrorDetail(
                 field="question_id",
-                message=f"Error saving rating: {str(error)}",
+                message="Error saving rating",
                 value=question_id
             )
         ],
@@ -508,7 +544,7 @@ def handle_generic_error(
 
     details = [
         ErrorDetail(
-            message=f"Operation failed: {str(error)}",
+            message="Operation failed",
             code=ErrorCode.OPERATION_FAILED.value
         )
     ]

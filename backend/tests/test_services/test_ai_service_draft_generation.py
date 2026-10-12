@@ -119,8 +119,10 @@ class TestAIServiceDraftGeneration:
             )
 
         # The structured detail the old dict threw away.
-        assert exc.value.error_code
-        assert "OpenAI API error" in exc.value.message
+        assert exc.value.error_code == "AI_UNEXPECTED_ERROR"
+        # What the provider said is for the log; the message goes to the client (#802).
+        assert "OpenAI API error" not in exc.value.message
+        assert str(exc.value.original_exception) == "OpenAI API error"
 
     @pytest.mark.asyncio
     async def test_generate_chapter_draft_calculates_metadata(self, ai_service):
