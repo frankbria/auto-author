@@ -56,6 +56,20 @@ DRAFT_WORDS_TO_TOKENS_FACTOR = 1.6
 TOC_MAX_COMPLETION_TOKENS = 6000
 
 
+# Transform, enhance and transcription cleanup return a text about as long as
+# the one they were given, so their completion budget follows its length (#801).
+# A third of the characters is well over the measured rate for English (4.9
+# characters a token for prose, 4.4 for technical text); the floor is the
+# budget these flows always had, which
+# keeps room for scripts that take a token or more per character. The request
+# method clamps the result to AI_MAX_OUTPUT_TOKENS_LONG.
+REWRITE_MIN_COMPLETION_TOKENS = 4000
+
+
+def rewrite_max_tokens(content: str) -> int:
+    return max(REWRITE_MIN_COMPLETION_TOKENS, len(content) // 3)
+
+
 # True once this request has been handed to the provider. The AI quota reads
 # it to tell a request refused beforehand, which costs nothing, from one the
 # provider may have billed (#798). A ContextVar, so each request has its own.
@@ -1111,7 +1125,10 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             ]
 
             response = await self._make_openai_request(
-                messages, temperature=0.7, max_tokens=4000
+                messages,
+                temperature=0.7,
+                max_tokens=rewrite_max_tokens(content),
+                long_output=True,
             )
 
             choice = response.choices[0]
@@ -1120,6 +1137,9 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             if getattr(choice, "finish_reason", None) == "length":
                 return {
                     "success": False,
+                    # Tagged so the route answers 413, not 503: a retry would be
+                    # cut off at the same place (#801).
+                    "error_code": "REWRITE_TRUNCATED",
                     "error": (
                         "This chapter is too long to transform in one pass. "
                         "Try transforming a shorter section."
@@ -1140,7 +1160,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     "style_label": STYLE_LABELS.get(target_style, target_style),
                     "original_word_count": original_words,
                     "transformed_word_count": transformed_words,
-                    "model_used": self.model,
+                    "model_used": self.long_output_model,
                     "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 },
             }
@@ -1204,7 +1224,10 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             # Lower temperature than style transform: enhancement should be a
             # consistent, conservative improvement rather than a creative rewrite.
             response = await self._make_openai_request(
-                messages, temperature=0.3, max_tokens=4000
+                messages,
+                temperature=0.3,
+                max_tokens=rewrite_max_tokens(content),
+                long_output=True,
             )
 
             choice = response.choices[0]
@@ -1213,6 +1236,9 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             if getattr(choice, "finish_reason", None) == "length":
                 return {
                     "success": False,
+                    # Tagged so the route answers 413, not 503: a retry would be
+                    # cut off at the same place (#801).
+                    "error_code": "REWRITE_TRUNCATED",
                     "error": (
                         "This chapter is too long to enhance in one pass. "
                         "Try enhancing a shorter section."
@@ -1235,7 +1261,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     ),
                     "original_word_count": original_words,
                     "enhanced_word_count": enhanced_words,
-                    "model_used": self.model,
+                    "model_used": self.long_output_model,
                     "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 },
             }
@@ -1288,7 +1314,10 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
 
             # Conservative, like enhance_text: cleanup must not invent content.
             response = await self._make_openai_request(
-                messages, temperature=0.3, max_tokens=4000
+                messages,
+                temperature=0.3,
+                max_tokens=rewrite_max_tokens(content),
+                long_output=True,
             )
 
             choice = response.choices[0]
@@ -1297,6 +1326,9 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
             if getattr(choice, "finish_reason", None) == "length":
                 return {
                     "success": False,
+                    # Tagged so the route answers 413, not 503: a retry would be
+                    # cut off at the same place (#801).
+                    "error_code": "REWRITE_TRUNCATED",
                     "error": (
                         "This transcription is too long to clean up in one pass. "
                         "Try cleaning up a shorter section."
@@ -1314,7 +1346,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     "enhancement_label": TRANSCRIPTION_ENHANCEMENT_LABEL,
                     "original_word_count": len(content.split()),
                     "enhanced_word_count": len(enhanced.split()),
-                    "model_used": self.model,
+                    "model_used": self.long_output_model,
                     "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 },
             }
@@ -1362,8 +1394,8 @@ Book Context:
         return f"""
 Generate a compelling chapter draft based on the following information:
 
-Chapter Title: {chapter_title[:MAX_CHAPTER_TITLE_CHARS]}
-Chapter Description: {chapter_description[:MAX_CHAPTER_DESCRIPTION_CHARS]}
+Chapter Title: {str(chapter_title or "")[:MAX_CHAPTER_TITLE_CHARS]}
+Chapter Description: {str(chapter_description or "")[:MAX_CHAPTER_DESCRIPTION_CHARS]}
 {metadata_context}{style_instruction}
 Target Length: Approximately {target_length} words
 

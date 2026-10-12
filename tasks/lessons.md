@@ -1416,3 +1416,18 @@ A demo backend started with `BYPASS_AUTH` reported zero generations charged afte
 ### A validation error carries the rejected input, into the response and the log (#800)
 FastAPI's `RequestValidationError` lists each error with its `input`, and its text form includes it. This app's handler returned the list and logged with `exc_info=True`, so a refused request came back whole and was written to the log, user text included. A dry run of the demo showed a 400 KB log after one request. Check what a refusal returns and logs, not only its status.
 
+### `.get(key, default)` does not apply the default to a stored null (#800, fixed in #801)
+`chapter.get("title", "Chapter")[:500]` and `chapter_description[:2000]` both raised `TypeError` for a chapter stored with `"description": null`, a shape no write path rejects. Main had rendered the value with an f-string, which accepts anything, so adding a slice turned a harmless `None` into a failed draft. The tests seeded only well-formed chapters. When a change starts calling a method on a stored value, test the stored shapes that exist: missing, null, wrong type.
+
+### A review bot that is mid-review is about to say something (#800)
+The repo's review bot was 12 minutes into a real review when PR #982 merged on green required checks. Its verdict arrived two minutes later with two confirmed defects, and main carried the regression for about an hour. "Never wait on review bots" was written when the bot was a no-op. My reading now: do not sit idle for it, but when its tracking comment shows work in progress, start the next issue and merge when the verdict lands.
+
+### Write a demo note about a live model after the run, not before (#801)
+A note said the 1,000-word chapter "comes back whole"; in that recording the real model spent its budget on hidden reasoning and the route answered 413. Three sections had to be popped and recorded again. For anything a stub does not control, the note before the command says what is being tried, the command runs more than once, and a second note says what was observed.
+
+### One live call found what the stubbed tests could not (#801)
+With the provider stubbed, a 5,000-word chapter "succeeds". Against a real model it also returned 200, with 42% to 49% of the words. The stub returns what the test author scripted; only a live call shows what a model does with the larger input the change now allows. Filed as #983.
+
+### A measurement on a cleaned sample measures the cleaning (#801)
+To size a cap I counted gpt-4o tokens for 5,000 words of the repository's docs, after a filter that kept only alphabetic words. It gave 5.6 characters a token, and I set the cap from it. The filter had removed punctuation, numbers and identifiers, which are exactly what costs tokens: the same docs with punctuation kept are 4.4, and license prose is 4.9. The reviewer doubted the number without knowing why it was wrong. Measure the thing as it will arrive, on more than one source, and put the measuring command in the demo so the number can be re-run.
+
