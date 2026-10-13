@@ -1646,3 +1646,15 @@ The session lookup changed from `find_one` to `aggregate(...).to_list(1)`. Eleve
 The session's `updatedAt` was written on every request and nothing in the backend reads it. The frontend does: Settings shows it as "Last active". The write is throttled to once in five minutes, not removed.
 **Rule:** before removing a write, search both `backend/` and `frontend/` for the field.
 
+### I added a limit that needed data the save path is built not to read (#828)
+To stop a book outgrowing its document I wrote a limit on the total size of a book's chapters, checked on every save. The save handler reads the book without the chapters' bodies, deliberately (#344), so the check had nothing to add up without a second read on the path that saves every three seconds. Reaching the database's limit takes more than thirty full-size chapters. The limit came out; the database's own refusal, which was a 500, is answered 413.
+**Rule:** before adding a check to a hot path, read what that path already loads and why. If the check needs more, ask whether the failure it guards against can be reported when it happens.
+
+### A size taken from `json.dumps` counts escapes, not bytes (#828)
+The limit on a table of contents measured `json.dumps(body)`. By default that writes each non-ASCII character as a six-character escape, so text in French or Japanese was counted at up to three times its stored size. The chapter limit, written a few lines away with `.encode()`, was right, and had a test with accented text. The table-of-contents limit had only an ASCII test. The reviewer found it.
+**Rule:** every size limit gets a test with non-ASCII input, and `json.dumps` used for measuring takes `ensure_ascii=False`.
+
+### The commit had failed after ten minutes and the log's last line still said "done" (#828)
+A test I appended left an extra blank line at the end of the file. The end-of-file hook fixed it, which fails the commit, after the test hook had run for ten minutes. My wait loop looked for the helper's last line, "done", and the line above it showed a commit, the previous one. I recorded a demo on top of an uncommitted tree before noticing. Earlier in the same issue I had also reverted a mutation with `git checkout` while a fix sat uncommitted in the same file, and had to reapply it: the rule for that is already here and I did not follow it.
+**Rule:** the commit helper now runs the two file-tidying hooks first and writes "NOT COMMITTED" when HEAD has not moved. After any commit, check the exit code and the hash, not the last line.
+
