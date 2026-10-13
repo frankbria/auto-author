@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **The frontend ships the notices of the software it is built with (#825, P1.43)**:
+  - **Problem.** The frontend image carries `libvips`, which is LGPL-3.0-or-later, as a shared library that `sharp` loads, and neither the LGPL nor the GPL was anywhere in the image. Next's standalone output copies no licence file at all: the image had none for any of its packages.
+  - **Fix.** `frontend/scripts/third-party-notices.mjs` runs before every build (`prebuild`), in the image build too, and writes `public/third-party-notices.txt`: each installed package the lockfile does not mark as dev, with its version, licence, source address, and the text of the licence file it ships. The footer links to it. The LGPL and GPL version 3 texts, byte for byte the ones at gnu.org, are kept at `public/licenses/`.
+  - **libvips ships no licence file.** Its README has a table of the libraries built into it and what each is under, so for a package with no licence file the script takes the licensing section of its README. The notices name the packages under a GNU licence at the top, with where the two texts are.
+  - **Guard.** The image build looks in each frontend image for the three files before it is pushed, and fails if one is missing or empty.
+  - **Listed, though not shipped.** A package that is both a dev dependency and an optional peer of a shipped one, as Playwright is of `next`, is not marked dev in the lockfile and npm keeps it under `--omit=dev`. It is in the notices. The file says what the application is built with, and errs towards naming too many.
+
 - **EPUB export is written with the standard library, not an AGPL one (#824, P1.42)**:
   - **Problem.** `ebooklib`, which is AGPL-3.0-or-later, wrote every EPUB this MIT-licensed repository exports. It was the last runtime dependency under the GPL or the AGPL after #823.
   - **Fix.** An EPUB is a zip with a fixed first entry and four small XML files around the book's own documents. `backend/app/services/epub_writer.py` writes it with `zipfile`: the media type first and not compressed, `META-INF/container.xml`, the package document, the EPUB 3 contents page, and the older `toc.ncx` for readers from before EPUB 3. `ebooklib` is out of `pyproject.toml` and `uv.lock`, and the formats endpoint reports EPUB as available without asking whether a library is installed.

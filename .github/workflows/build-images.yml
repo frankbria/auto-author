@@ -183,6 +183,14 @@ jobs:
               exit 1
             fi
             echo "OK: .next/static contains $NEXT_PUBLIC_API_URL"
+            # It ships libvips, which is LGPL: the licence texts have to be in it (#825).
+            for file in public/third-party-notices.txt public/licenses/LGPL-3.0.txt public/licenses/GPL-3.0.txt; do
+              if ! docker run --rm --entrypoint test "$TAG" -s "$file"; then
+                echo "::error::$TAG: $file is missing or empty"
+                exit 1
+              fi
+            done
+            echo "OK: the licence texts are in the image"
             docker run -d --name smoke -p 3002:3002 \
               -e DATABASE_URL=mongodb://127.0.0.1:27017/smoke \
               -e DATABASE_NAME=smoke \
