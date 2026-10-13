@@ -21,16 +21,22 @@ from app.main import app
 
 pytestmark = pytest.mark.asyncio
 
-COMPOSE = Path(__file__).resolve().parents[3] / "docker-compose.yml"
+REPO = Path(__file__).resolve().parents[3]
 # What nginx sends: the scheme it was reached on, and its peer's address added
 # to whatever X-Forwarded-For the caller sent.
 FROM_NGINX = {"X-Forwarded-Proto": "https", "X-Forwarded-For": "203.0.113.7, 198.51.100.9"}
 
 
 def _allowed() -> str:
-    found = re.search(r'^\s*FORWARDED_ALLOW_IPS: "([^"]+)"', COMPOSE.read_text(), re.M)
-    assert found, "docker-compose.yml gives the backend no FORWARDED_ALLOW_IPS"
-    return found.group(1)
+    """The one list the compose files give uvicorn. An overlay that set another would be
+    what runs, and these tests would go on checking the base file's."""
+    found = [
+        value
+        for compose in sorted(REPO.glob("docker-compose*.yml"))
+        for value in re.findall(r'^[^#\n]*FORWARDED_ALLOW_IPS[:=]\s*"?([^"\s]+)', compose.read_text(), re.M)
+    ]
+    assert len(found) == 1, f"expected one FORWARDED_ALLOW_IPS in the compose files, found {found}"
+    return found[0]
 
 
 async def _get_books_from(peer: str):
