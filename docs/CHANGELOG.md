@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **The table of contents travels without the chapters' bodies, and an oversize save is refused as too large (#828, P1.46)**:
+  - **Problem.** `GET /toc` returned every chapter's HTML, and `PUT /toc` returned it again, on the routes the editor calls to draw its tabs. Nothing limited the size of a chapter's content or of a table of contents. A book is one MongoDB document, and at the database's sixteen megabytes a save that made the book longer was answered 500.
+  - **Fix.** Both responses leave `content` out at every depth (`_without_bodies`, in the route handlers; what is stored and what the database functions return is untouched). A chapter's content over 500,000 bytes and a `PUT /toc` body over 1,000,000 bytes are answered 413 before anything is written. A write the database refuses because the book's document would pass its limit is answered 413 on both routes, with a message that says what to do.
+  - **Checked before removing it.** No page read `content` from a table of contents: the editor reads a chapter's body from the chapter's own route. Saving a table of contents does not send the bodies back, and the save has re-attached stored bodies by chapter id since #749, which a test here pins from the outside: read the table of contents, send it back with a title changed, and every body is still in the database, three levels deep.
+  - **No separate limit for a whole book.** It was written and then removed. Reaching sixteen megabytes takes more than thirty chapters at the per-chapter limit, each about seventy thousand words, and checking the book's size on every save costs a read on the path that saves every three seconds. The database's own refusal is the limit, and it is now reported as what it is.
+  - **Not done.** The editor shows a 413 as it shows any failed save. It does not yet say "this chapter is too long".
+
 - **Saving a chapter no longer inserts an access-log row (#827, P1.45)**:
   - **Problem.** The editor saves three seconds after the last keystroke, and every save inserted a row into `chapter_access_logs`: entered in six indexes, kept ninety days. Twenty saves, about a minute of typing, left twenty rows.
   - **Nothing in the application read them.** The rows had the type `update_content`. Recent chapters are found from `view` and `edit` rows, and tab state from `tab_state` rows. The only reader of `update_content` rows was `GET /books/{id}/chapters/{chapter_id}/analytics`, which counts rows by type, and which no page calls.
