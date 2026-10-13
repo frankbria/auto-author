@@ -49,6 +49,7 @@ import { useRouter } from 'next/navigation';
 import {
   validateChapterBackup,
   getValidatedItem,
+  cleanupStorage,
   ChapterBackup,
 } from '@/lib/storage/dataValidator';
 import {
@@ -160,8 +161,15 @@ export function ChapterEditor({
     shownChapterRef.current = backupKey;
   }, [backupKey]);
   // Storage raises no event in the tab that wrote it; bumping this re-reads it.
-  const [, setBackupWrites] = useState(0);
+  // The initialiser runs once, as the editor mounts and before a backup is looked
+  // for: backups past their week are removed, here and for every other chapter (#831).
+  const [, setBackupWrites] = useState(() => {
+    cleanupStorage();
+    return 0;
+  });
   const noteBackupWrite = () => setBackupWrites((n) => n + 1);
+  // A backup older than the saved chapter, which the writer has asked to restore.
+  const [olderBackup, setOlderBackup] = useState<{ backedUp: number; saved: number } | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Snapshot of content before a style transform, for single-level revert (#58).
   const [preTransformContent, setPreTransformContent] = useState<string | null>(null);
@@ -276,7 +284,8 @@ export function ChapterEditor({
         const contentData = await bookClient.getChapterContent(bookId, chapterId);
         if (ignore) return;
         if (editor) {
-          editor.commands.setContent(contentData.content || '');
+          // Loading is not an edit: no update event, so nothing is marked unsaved (#831).
+          editor.commands.setContent(contentData.content || '', { emitUpdate: false });
           seenRef.current.set(chapterBackupKey(bookId, chapterId), {
             lastModified: contentData.last_modified,
             content: contentData.content || '',
@@ -321,7 +330,7 @@ export function ChapterEditor({
   // Update content if initialContent changes
   useEffect(() => {
     if (editor && initialContent && editor.getHTML() !== initialContent) {
-      editor.commands.setContent(initialContent);
+      editor.commands.setContent(initialContent, { emitUpdate: false });
       unsavedRef.current = null;
       // Synchronising an external system (#584): the TipTap editor is imperative,
       // and whether it needs new content is only knowable by reading it. The saved
@@ -384,7 +393,7 @@ export function ChapterEditor({
     // The conflict-time backup is older text the dropped copy already holds.
     localStorage.removeItem(backupKey);
     noteBackupWrite();
-    editor.commands.setContent(conflict.currentContent);
+    editor.commands.setContent(conflict.currentContent, { emitUpdate: false });
     unsavedRef.current = null;
     setLastAutoSavedContent(conflict.currentContent);
     setAutoSavePending(false);
@@ -559,10 +568,19 @@ export function ChapterEditor({
     }
   };
 
-  const handleRecoverBackup = () => {
+  // A backup is restored without a question when it is the newer text, which is
+  // what a failed save leaves. One older than the saved chapter would replace
+  // newer writing, so the writer is told which is which and asked (#831).
+  const handleRecoverBackup = (confirmed = false) => {
     if (!restoreKey) return;
     const backup = getValidatedItem<ChapterBackup>(restoreKey, validateChapterBackup);
     if (backup && editor) {
+      const savedAt = Date.parse(seenRef.current.get(backupKey)?.lastModified ?? '');
+      if (!confirmed && backup.timestamp < savedAt) {
+        setOlderBackup({ backedUp: backup.timestamp, saved: savedAt });
+        return;
+      }
+      setOlderBackup(null);
       try {
         editor.commands.setContent(backup.content);
         setAutoSavePending(true); // Trigger auto-save of recovered content
@@ -579,6 +597,7 @@ export function ChapterEditor({
 
   const handleDismissBackup = () => {
     if (restoreKey) localStorage.removeItem(restoreKey);
+    setOlderBackup(null);
     noteBackupWrite();
   };
 
@@ -599,25 +618,44 @@ export function ChapterEditor({
           an editor that can never save it (#757), so those controls wait for Retry. */}
       {hasBackup && !loadFailed && !conflict && (
         <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-700 dark:text-yellow-400 px-4 py-2 text-sm flex items-center justify-between">
-          <span>A local backup of your content is available. Would you like to restore it?</span>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleRecoverBackup}
-              className="text-xs"
-            >
-              Restore Backup
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleDismissBackup}
-              className="text-xs"
-            >
-              Dismiss
-            </Button>
-          </div>
+          {olderBackup ? (
+            <>
+              <span role="alert">
+                This backup is from {new Date(olderBackup.backedUp).toLocaleString()}, older than the saved chapter (
+                {new Date(olderBackup.saved).toLocaleString()}). Restoring it replaces the newer text.
+              </span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleRecoverBackup(true)} className="text-xs">
+                  Restore the older backup
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setOlderBackup(null)} className="text-xs">
+                  Keep the saved text
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span>A local backup of your content is available. Would you like to restore it?</span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleRecoverBackup()}
+                  className="text-xs"
+                >
+                  Restore Backup
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDismissBackup}
+                  className="text-xs"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
       {/* role="alert": a failed autosave means the user's writing may exist only

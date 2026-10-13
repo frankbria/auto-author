@@ -329,10 +329,11 @@ jest.mock('@tiptap/react', () => {
               return true;
             }),
           })),
-          setContent: jest.fn((newContent: string) => ({
+          setContent: jest.fn((newContent: string, options?: { emitUpdate?: boolean }) => ({
             run: jest.fn(() => {
               content = newContent;
-              if (updateHandler) {
+              // As the real command: an update is emitted unless asked not to (#831).
+              if (updateHandler && options?.emitUpdate !== false) {
                 updateHandler({ editor: mockEditor });
               }
               return true;
@@ -346,9 +347,9 @@ jest.mock('@tiptap/react', () => {
 
       // Direct command access
       commands: {
-        setContent: jest.fn((newContent: string) => {
+        setContent: jest.fn((newContent: string, options?: { emitUpdate?: boolean }) => {
           content = newContent;
-          if (updateHandler) {
+          if (updateHandler && options?.emitUpdate !== false) {
             updateHandler({ editor: mockEditor });
           }
           return true;
@@ -423,8 +424,8 @@ jest.mock('@tiptap/react', () => {
       if (originalOnUpdate && editor) {
         // Override the setContent command to also force re-render
         const originalSetContent = editor.commands.setContent;
-        editor.commands.setContent = jest.fn((newContent: string) => {
-          const result = originalSetContent(newContent);
+        editor.commands.setContent = jest.fn((newContent: string, options?: { emitUpdate?: boolean }) => {
+          const result = originalSetContent(newContent, options);
           // Force parent component to re-render after content change
           forceUpdate();
           return result;
