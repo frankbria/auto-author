@@ -102,6 +102,9 @@
     "js-yaml@^3": "3.15.2",
     "js-yaml@^4": "4.3.2",
     "@babel/core": "^7.29.0",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "@tailwindcss/typography": {
+      "postcss-selector-parser": "^7.1.6"
+    }
   }
 }

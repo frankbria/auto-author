@@ -233,9 +233,11 @@ the result, because an advisory outside it produces a green check rather than a 
 
 Two limits worth stating plainly rather than discovering:
 
-- **npm advisories below `high` never fail this gate.** `audit_gate.py` defaults `--min-severity`
-  to `high` and the workflow does not override it. A moderate advisory is not baselined, not
-  reported, and not a failure — by design, but invisible unless you know to look.
+- **npm advisories below `moderate` never fail this gate.** `audit_gate.py` defaults
+  `--min-severity` to `moderate` and the workflow passes the same value (#820; it was `high`, and
+  a moderate advisory was not baselined, not reported and not a failure). A `low` or `info`
+  advisory is still invisible here. `--write-baseline` writes at the same floor, so regenerating
+  the file does not drop the entries CI checks for.
 - **Only `frontend/package-lock.json` is scanned.** A lockfile anywhere else in the repo is
   invisible to both this gate and Dependabot's version updates, which is why a separate step fails
   the build when one appears outside that path.
