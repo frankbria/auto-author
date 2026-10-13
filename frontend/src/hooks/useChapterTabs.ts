@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ChapterTabsState, ChapterStatus, ChapterTabMetadata } from '../types/chapter-tabs';
 import bookClient from '../lib/api/bookClient';
 import { convertTocToChapterTabs } from '../lib/utils/toc-to-tabs-converter';
+import { reconcileTabState } from '../lib/utils/reconcileTabState';
 
 export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
   const [state, setState] = useState<ChapterTabsState>({
@@ -109,13 +110,20 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
           tabState = localTabState;
         }
 
-        // Handle chapter metadata and state
+        // The saved tabs are from the last visit and the chapters are from now:
+        // make them agree, with the chapter a link names ahead of the saved one (#830).
         setState(prev => ({
           ...prev,
           chapters: chapterTabsMetadata,
-          active_chapter_id: tabState?.active_chapter_id || initialActiveChapter || lastActiveChapter || (chapterTabsMetadata.length > 0 ? chapterTabsMetadata[0].id : null),
-          open_tab_ids: tabState?.open_tab_ids || (chapterTabsMetadata.length > 0 ? [chapterTabsMetadata[0].id] : []),
-          tab_order: tabState?.tab_order || chapterTabsMetadata.map(ch => ch.id),
+          ...reconcileTabState(
+            chapterTabsMetadata.map(ch => ch.id),
+            {
+              active_chapter_id: tabState?.active_chapter_id || lastActiveChapter,
+              open_tab_ids: tabState?.open_tab_ids,
+              tab_order: tabState?.tab_order,
+            },
+            initialActiveChapter,
+          ),
           is_loading: false,
         }));
       } catch (error) {
@@ -294,36 +302,14 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
       }
     }
 
-    setState(prev => {
-      // Handle removed chapters: if active chapter is deleted, switch to first available
-      const existingChapterIds = chapterTabsMetadata.map(ch => ch.id);
-      const validOpenTabs = prev.open_tab_ids.filter(id => existingChapterIds.includes(id));
-      const validTabOrder = prev.tab_order.filter(id => existingChapterIds.includes(id));
-
-      // Add any new chapters to tab order
-      const newChapterIds = existingChapterIds.filter(id => !validTabOrder.includes(id));
-      const updatedTabOrder = [...validTabOrder, ...newChapterIds];
-
-      let newActiveChapter = prev.active_chapter_id;
-      if (!newActiveChapter || !existingChapterIds.includes(newActiveChapter)) {
-        // Active chapter was deleted or doesn't exist, select first available
-        newActiveChapter = validOpenTabs.length > 0 ? validOpenTabs[0] :
-                          (chapterTabsMetadata.length > 0 ? chapterTabsMetadata[0].id : null);
-      }
-
-      // If no tabs are open, open the active chapter
-      const finalOpenTabs = validOpenTabs.length > 0 ? validOpenTabs :
-                           (newActiveChapter ? [newActiveChapter] : []);
-
-      return {
-        ...prev,
-        chapters: chapterTabsMetadata,
-        active_chapter_id: newActiveChapter,
-        open_tab_ids: finalOpenTabs,
-        tab_order: updatedTabOrder,
-        error: null,
-      };
-    });
+    // A chapter deleted is dropped from the tabs and a new one is given a tab,
+    // by the same rules as on load.
+    setState(prev => ({
+      ...prev,
+      chapters: chapterTabsMetadata,
+      ...reconcileTabState(chapterTabsMetadata.map(ch => ch.id), prev),
+      error: null,
+    }));
 
     logger.debug('Successfully refreshed chapter tabs state');
   }, [bookId]);
