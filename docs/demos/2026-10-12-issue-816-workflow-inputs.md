@@ -1,7 +1,7 @@
 # Issue #816: what a caller types into a workflow dispatch never becomes part of a shell command
 
-*2026-10-13T01:45:49Z by Showboat 0.6.1*
-<!-- showboat-id: 75b871b4-1cfc-41ed-8493-5338bcf4dd67 -->
+*2026-10-13T02:15:38Z by Showboat 0.6.1*
+<!-- showboat-id: f66ac01b-82ea-49ad-986f-f9fb293d85da -->
 
 Three acceptance criteria: inputs reach the shell through `env:` only; each input is checked against a pattern before use; a guard test fails if an input appears inside a `run:` block.
 
@@ -191,33 +191,31 @@ feature/issue-816-workflow-inputs: success
 
 ## The guard
 
-It reads every workflow. It fails if a dispatch input, anything from the event payload or a pull request`s branch name is pasted into a script; if a variable filled from one is missing from its table; if a job`s first step is not the check or can be skipped; and it runs each check`s own script against values that must pass and values that must not.
+It reads every workflow. It fails if a dispatch input, anything from the event payload or a branch`s name appears anywhere but in a variable set on a job (or where no shell reads it: an action`s input, a condition); if such a variable is missing from its table; if a job`s first step is not the check or can be skipped; and it runs each check`s own script against values that must pass and values that must not.
 
 ```bash
 cd /home/frankbria/projects/worktrees/issue-816-workflow-inputs && uvx --with pytest --with pyyaml pytest scripts/test_workflow_inputs_not_in_run.py -q 2>&1 | tail -1
 ```
 
 ```output
-83 passed in 0.59s
+84 passed in 0.61s
 ```
 
 Against main`s workflows the same guard fails, and names each place.
 
 ```bash
-cd /home/frankbria/projects/worktrees/issue-816-workflow-inputs && git checkout -q main -- .github/workflows && uvx --with pytest --with pyyaml pytest scripts/test_workflow_inputs_not_in_run.py -q -k 'pasted' 2>&1 | grep -E 'step [0-9]+ \(|passed|failed' | cut -c1-150; git checkout -q HEAD -- .github/workflows; git diff --quiet HEAD -- .github/workflows && echo 'workflows restored'
+cd /home/frankbria/projects/worktrees/issue-816-workflow-inputs && git checkout -q main -- .github/workflows && uvx --with pytest --with pyyaml pytest scripts/test_workflow_inputs_not_in_run.py -q -k 'nowhere_but' 2>&1 | grep -E '^E +jobs\.|passed|failed' | cut -c1-150; git checkout -q HEAD -- .github/workflows; git diff --quiet HEAD -- .github/workflows && echo 'workflows restored'
 ```
 
 ```output
-E         deploy: step 4 (Pull and start): ${{ inputs.image_tag }}
-E         deploy: step 5 (Health check): ${{ inputs.image_tag }}
-E         deploy: step 8 (Summary): ${{ inputs.image_tag }}
-E         deploy: step 8 (Summary): ${{ inputs.image_tag }}
-E       assert not ['deploy: step 4 (Pull and start): ${{ inputs.image_tag }}', 'deploy: step 5 (Health check): ${{ inputs.image_tag }}', 'deploy: ste
-E         e2e-staging: step 5 (Write staging E2E summary): ${{ github.event.inputs.staging_e2e_workers || '1' }}
-E       assert not ["e2e-staging: step 5 (Write staging E2E summary): ${{ github.event.inputs.staging_e2e_workers || '1' }}"]
-E         sync: step 7 (Summary): ${{ inputs.recreate }}
-E       assert not ['sync: step 7 (Summary): ${{ inputs.recreate }}']
-3 failed, 5 passed, 75 deselected in 0.06s
+E         jobs.deploy.steps.4.run: ${{ inputs.image_tag }}
+E         jobs.deploy.steps.5.run: ${{ inputs.image_tag }}
+E         jobs.deploy.steps.8.run: ${{ inputs.image_tag }}
+E         jobs.deploy.steps.8.run: ${{ inputs.image_tag }}
+E         jobs.e2e-staging.steps.4.env.STAGING_E2E_WORKERS: ${{ github.event.inputs.staging_e2e_workers || '1' }}
+E         jobs.e2e-staging.steps.5.run: ${{ github.event.inputs.staging_e2e_workers || '1' }}
+E         jobs.sync.steps.7.run: ${{ inputs.recreate }}
+3 failed, 5 passed, 76 deselected in 0.08s
 workflows restored
 ```
 
