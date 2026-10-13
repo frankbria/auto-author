@@ -117,11 +117,14 @@ jobs:
             type=sha,format=short,prefix=sha-,suffix=${{ matrix.environment && format('-{0}', matrix.environment) || '' }}
             type=raw,value=staging,enable=${{ matrix.environment != 'production' && '{{is_default_branch}}' || 'false' }}
 
-      - name: Build and push
+      # Built into this runner's own Docker and published by nothing here (#817).
+      # Building and pushing in one step put the sha- and staging tags in the
+      # registry before the smoke test below had booted the image.
+      - name: Build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./${{ matrix.app }}
-          push: ${{ github.event_name != 'pull_request' }}
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.app }}${{ matrix.environment }}
@@ -137,8 +140,9 @@ jobs:
             NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
             NEXT_PUBLIC_ENVIRONMENT=${{ matrix.environment }}
 
-      # A built image that cannot start is worse than a failed build: it publishes
-      # a tag the deploy would happily pull. Boot each image before it is trusted.
+      # A built image that cannot start is worse than a failed build: published,
+      # it is a tag the deploy would happily pull. Boot each image before it is
+      # pushed.
       - name: Smoke test the built image
         if: github.event_name != 'pull_request'
         env:
@@ -181,6 +185,17 @@ jobs:
           echo "::error::${{ matrix.app }} image failed to serve $URL"
           docker logs smoke 2>&1 | tail -40
           exit 1
+
+      # The image that was just booted, not a second build of it. Skipped, like
+      # every step without always(), once the smoke test has failed.
+      - name: Push the image that passed
+        if: github.event_name != 'pull_request'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          while read -r tag; do
+            docker push "$tag"
+          done <<< "$TAGS"
 
       - name: Report published tags
         if: github.event_name != 'pull_request'
