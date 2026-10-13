@@ -54,7 +54,7 @@ describe('BookPage error → in-place refetch (#215)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useSession as jest.Mock).mockReturnValue({ data: { user: { id: 'u1' } } });
-    mockBookClient.getToc.mockResolvedValue({ toc: null } as never);
+    mockBookClient.getChaptersMetadata.mockResolvedValue({ chapters: [] } as never);
     mockBookClient.getBookSummary.mockResolvedValue({ summary: '' } as never);
   });
 
@@ -95,7 +95,7 @@ describe('BookPage — light-theme title token (#331)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useSession as jest.Mock).mockReturnValue({ data: { user: { id: 'u1' } } });
-    mockBookClient.getToc.mockResolvedValue({ toc: null } as never);
+    mockBookClient.getChaptersMetadata.mockResolvedValue({ chapters: [] } as never);
     mockBookClient.getBookSummary.mockResolvedValue({ summary: '' } as never);
   });
 

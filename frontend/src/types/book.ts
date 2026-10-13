@@ -679,6 +679,15 @@ export function isQuestionResponse(obj: unknown): obj is QuestionResponse {
 // ============================================================================
 
 /**
+ * What the two calculations below read: each chapter's status and word count.
+ * A `BookResponse` has it, and so does what `getChaptersMetadata` returns, which
+ * is how the book page's stats panel uses the same sums as the book cards (#833).
+ */
+export interface ChapterCounts {
+  toc_items: ReadonlyArray<{ status: string; word_count: number }>;
+}
+
+/**
  * Calculate the total word count for a book from its chapters
  *
  * @param book - Book with toc_items
@@ -690,7 +699,7 @@ export function isQuestionResponse(obj: unknown): obj is QuestionResponse {
  * console.log(`Total words: ${totalWords.toLocaleString()}`);
  * ```
  */
-export function calculateBookWordCount(book: BookResponse): number {
+export function calculateBookWordCount(book: ChapterCounts): number {
   return book.toc_items.reduce((total, item) => total + item.word_count, 0);
 }
 
@@ -706,7 +715,7 @@ export function calculateBookWordCount(book: BookResponse): number {
  * console.log(`Book is ${progress}% complete`);
  * ```
  */
-export function calculateBookProgress(book: BookResponse): number {
+export function calculateBookProgress(book: ChapterCounts): number {
   if (book.toc_items.length === 0) return 0;
 
   const completedChapters = book.toc_items.filter(

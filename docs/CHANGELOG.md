@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **The Book Stats panel shows the book's numbers (#833, P1.51)**:
+  - **Problem.** On a book's page the panel showed a word count of 0 and "0 of N" chapters completed for every book: both were written into the page as constants when it built its chapter list. Its progress read a field the book route does not return, so the bar had a width of `undefined%` and the figure beside it was a bare "%".
+  - **Fix.** The page reads its chapters from `getChaptersMetadata`, which has each chapter's status and word count, in place of the table of contents, which the page only used for ids and titles. Progress is `calculateBookProgress`, the sum the book cards have used since #291; it and `calculateBookWordCount` now accept anything with chapter statuses and word counts, not only a whole book. The bar is a `progressbar` with its value, so a screen reader can read it.
+  - **One request, not one more.** The chapter read replaces the table-of-contents read on this page; the chapter tabs still fetch the table of contents themselves.
+  - **Stand-ins moved with it.** Four page tests and two Playwright specs stood in for the table-of-contents call on this page. Two failed; the others passed without the call they stood in for ever being made. All six now stand in for the chapter read.
+
 - **A summary that could not be saved is not lost, and the writer is told (#832, P1.50)**:
   - **Problem.** The summary page saves a second after typing stops. When that save failed, nothing said so: the failure was caught and dropped. The only copy of the text was the one in the browser, and the next visit loaded the server's older summary into the field and wrote it over the browser's. And a browser that was full, or set to keep nothing, threw from `localStorage.setItem` inside the effect that also starts the save.
   - **Fix.** A failed save shows a message, as an alert: the summary could not be saved, it is kept on this device, and saving is tried again when it is changed. The text is kept under its own key (`book-summary-unsaved-<book>`), which loading does not write over. On the next visit the saved summary is shown, the unsaved one is offered with "Restore it" and "Discard it", and it stays stored until one is chosen, through typing and through later saves. Restoring it saves it. A save that gets through clears the message and the kept copy.
