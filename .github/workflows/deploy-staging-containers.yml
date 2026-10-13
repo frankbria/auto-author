@@ -47,8 +47,26 @@ jobs:
     environment:
       name: staging
       url: https://dev.autoauthor.app
+    # The dispatch input reaches every script as a variable, never as text
+    # GitHub pastes into the script (#816).
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag }}
 
     steps:
+      # First, before anything reaches the box (#816). The deploy's script is a
+      # string handed to ssh: this runner's shell puts the tag into it, and the
+      # box's shell, as root, then reads it. So the tag must be nothing but a
+      # build's sha- tag. scripts/test_workflow_inputs_not_in_run.py runs this
+      # script against tags that are not. Where the tag is put into that
+      # string it is also quoted for the box (printf %q), so a step that ran
+      # without this check would still hand the box a word, not a command.
+      - name: Check the image tag
+        run: |
+          if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{7,40}$ ]]; then
+            echo "::error::image_tag must be a build's sha- tag, such as sha-3931169"
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -113,7 +131,7 @@ jobs:
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              cd /opt/auto-author
-             export IMAGE_TAG='${{ inputs.image_tag }}'
+             export IMAGE_TAG=$(printf '%q' "$IMAGE_TAG")
              # docker-compose.yml requires ENVIRONMENT with no default (#777).
              # This workflow only ever targets staging, so it says so here.
              export ENVIRONMENT=staging
@@ -139,7 +157,7 @@ jobs:
              cd /opt/auto-author
              # \`logs\` interpolates the compose files too, so it needs the same
              # required vars as \`up\` or it aborts instead of printing anything.
-             export IMAGE_TAG='${{ inputs.image_tag }}' ENVIRONMENT=staging
+             export IMAGE_TAG=$(printf '%q' "$IMAGE_TAG") ENVIRONMENT=staging
              docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=60
              exit 1"
 
@@ -175,7 +193,7 @@ jobs:
         if: always()
         run: |
           { echo '## Staging container deploy';
-            echo "- tag: \`${{ inputs.image_tag }}\` (frontend: \`${{ inputs.image_tag }}-staging\`)";
+            echo "- tag: \`$IMAGE_TAG\` (frontend: \`$IMAGE_TAG-staging\`)";
             echo "- result: ${{ job.status }}";
             echo '- rollback: re-run this workflow with an earlier `sha-` tag';
           } >> "$GITHUB_STEP_SUMMARY"

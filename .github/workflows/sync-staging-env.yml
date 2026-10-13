@@ -46,8 +46,20 @@ jobs:
     environment:
       name: staging
       url: https://dev.autoauthor.app
+    # The dispatch input reaches every script as a variable, never as text
+    # GitHub pastes into the script (#816).
+    env:
+      RECREATE: ${{ inputs.recreate }}
 
     steps:
+      # First (#816); scripts/test_workflow_inputs_not_in_run.py runs this script.
+      - name: Check the recreate flag
+        run: |
+          if [[ ! "$RECREATE" =~ ^(true|false)$ ]]; then
+            echo "::error::recreate must be true or false"
+            exit 1
+          fi
+
       # Same access path as the deploy: the box firewalls :22 off the public
       # internet except from the owner's home subnet, and the runner reaches it
       # over Tailscale. Both tags are required — Tailscale matches the OAuth
@@ -208,7 +220,7 @@ jobs:
         run: |
           { echo '## Staging env sync';
             echo '- key: `MONGODB_URI` (value never printed)';
-            echo "- containers recreated: ${{ inputs.recreate }}";
+            echo "- containers recreated: $RECREATE";
             echo "- result: ${{ job.status }}";
             echo '- a timestamped `.env.bak.*` was left on the box before the write';
           } >> $GITHUB_STEP_SUMMARY
