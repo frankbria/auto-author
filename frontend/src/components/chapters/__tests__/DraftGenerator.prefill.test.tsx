@@ -141,4 +141,21 @@ describe('the toolbar draft generator', () => {
     await waitFor(() => expect(questions()).toEqual(['What does the sea say?']));
     expect(mockedClient.getChapterQAResponses).toHaveBeenLastCalledWith('book-1', 'chapter-2');
   });
+
+  it('does not show one chapter\'s answers under the next, which has none', async () => {
+    mockedClient.getChapterQAResponses.mockResolvedValue(saved(['Who keeps the light?', 'An old man named Tam.']));
+    const view = await opened();
+    await waitFor(() => expect(answers()).toEqual(['An old man named Tam.']));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    mockedClient.getChapterQAResponses.mockResolvedValue(saved());
+    view.rerender(<DraftGenerator bookId="book-1" chapterId="chapter-2" chapterTitle="The First Letter" />);
+    fireEvent.click(screen.getByRole('button', { name: /generate ai draft/i }));
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(mockedClient.getChapterQAResponses).toHaveBeenLastCalledWith('book-1', 'chapter-2'));
+
+    expect(questions()).toHaveLength(5);
+    expect(answers()).toEqual(['', '', '', '', '']);
+  });
 });
