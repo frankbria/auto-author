@@ -277,12 +277,15 @@ def test_nothing_is_copied_out_of_an_image_the_dockerfile_does_not_pin(directory
 def test_uv_is_pinned_and_waits_out_the_cooldown_like_every_other_tool():
     """uv is a third party's release, unlike the base images' own rebuilds, so a new one waits
     the fourteen days this file gives every ecosystem that has no semver-specific keys."""
-    assert any(ref.startswith("ghcr.io/astral-sh/uv:") for ref in _external_bases("/backend"))
+    # Docker Hub's copy on purpose. Measured with the real updater (#819): for the same image
+    # on ghcr.io it logs "Cooldown was not applied", because that registry reports no
+    # publication dates, and the stanza below would be decoration.
+    assert any(ref.startswith("astral/uv:") for ref in _external_bases("/backend"))
     entry = next(e for e in UPDATES if e["package-ecosystem"] == "docker" and e["directory"] == "/backend")
     cooldown = entry.get("cooldown") or {}
 
     assert cooldown.get("default-days") == 14
-    assert any("uv" in name for name in cooldown.get("include") or []), cooldown
+    assert "astral/uv" in (cooldown.get("include") or []), cooldown
     assert not any("python" in name for name in cooldown.get("include") or []), "a base image refresh does not wait"
 
 

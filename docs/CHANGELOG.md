@@ -6,9 +6,9 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 - **uv is pinned in the image build and installed by a pinned action in CI (#819, P1.37)**:
   - **Problem.** The backend image copied the uv binary from `ghcr.io/astral-sh/uv:latest`, whatever that was on the day of the build. Three jobs in `tests.yml` installed uv with `curl … | sh`: whatever that address served, run with the job's token.
-  - **Dockerfile.** uv is a stage of its own, `FROM ghcr.io/astral-sh/uv:0.13.0@sha256:… AS uv`, and the build copies the binary from that stage. 0.13.0 is what `latest` pointed at, so the image built is the same one, layer for layer.
+  - **Dockerfile.** uv is a stage of its own, `FROM astral/uv:0.13.0@sha256:… AS uv`, and the build copies the binary from that stage. 0.13.0 is what `latest` pointed at, and Docker Hub's copy has the same digest as ghcr.io's, so the image built is the same one, layer for layer.
   - **CI.** The three jobs use `astral-sh/setup-uv` at the commit the staging load-smoke job already pins, with the same cache settings.
-  - **Kept current.** Named in a `FROM` line, uv is seen by the backend's Dependabot `docker` entry. A new uv waits fourteen days there, like every other tool in that file; the base image's own rebuilds still do not wait.
+  - **Kept current.** Named in a `FROM` line, uv is seen by the backend's Dependabot `docker` entry. A new uv waits fourteen days there, like every other tool in that file; the base image's own rebuilds still do not wait. The reference is Docker Hub's because of that: run for real, Dependabot's updater says of the same image on ghcr.io that the cooldown was not applied, since that registry reports no publication dates.
   - **Guards.** No workflow pipes a download into a shell. Every job that runs uv sets it up with the action. A Dockerfile copies only from its own stages, and every image it starts from has a tag, a digest and is not `latest`.
   - **Not covered.** The uv version `setup-uv` installs in CI is the newest one, verified against the checksum the action knows for it. Only the image build is pinned to a version.
 

@@ -17,7 +17,12 @@ FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c
 # uv, by version and digest (#819). `:latest` was whatever was newest on the day
 # of the build. A stage of its own, so that it is named in a FROM line like the
 # base image and Dependabot's docker entry moves it the same way.
-FROM ghcr.io/astral-sh/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77ad87865e381d9917da55a168 AS uv
+#
+# Docker Hub's copy, not ghcr.io's. They are the same image (this digest is the
+# digest of both), but Dependabot can hold a new release back for the cooldown
+# only where the registry tells it when a tag was published. Measured: for
+# ghcr.io it reports "Cooldown was not applied" and carries on.
+FROM astral/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77ad87865e381d9917da55a168 AS uv
 
 # ---- build: resolve from uv.lock only
 FROM base AS build
