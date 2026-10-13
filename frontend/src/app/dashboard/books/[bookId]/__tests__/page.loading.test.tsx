@@ -14,7 +14,7 @@ jest.mock('@/lib/api/bookClient', () => ({
   __esModule: true,
   default: {
     getBook: jest.fn(),
-    getToc: jest.fn(),
+    getChaptersMetadata: jest.fn(),
     getBookSummary: jest.fn(),
   },
 }));
@@ -79,7 +79,7 @@ const page = (bookId: string) => (
 describe('BookPage loading (#584)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedClient.getToc.mockRejectedValue(new Error('no toc'));
+    mockedClient.getChaptersMetadata.mockRejectedValue(new Error('no chapters'));
     mockedClient.getBookSummary.mockResolvedValue({ summary: '' } as Awaited<ReturnType<typeof bookClient.getBookSummary>>);
   });
 

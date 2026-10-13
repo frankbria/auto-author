@@ -66,10 +66,10 @@ test.describe('Export error recovery (issue #49)', () => {
   test('surfaces the backend error with a retry option, and recovers on retry', async ({
     page,
   }) => {
-    // Page-load data (book renders; TOC/summary are best-effort).
+    // Page-load data (book renders; chapters/summary are best-effort).
     await page.route(`**/api/v1/books/${BOOK_ID}`, (route) => route.fulfill(BOOK_BODY));
-    await page.route(`**/api/v1/books/${BOOK_ID}/toc`, (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ toc: { chapters: [] } }) })
+    await page.route(`**/api/v1/books/${BOOK_ID}/chapters/metadata*`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ chapters: [] }) })
     );
     await page.route(`**/api/v1/books/${BOOK_ID}/summary`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ summary: '' }) })

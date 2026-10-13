@@ -22,7 +22,7 @@ jest.mock('next/navigation', () => {
 });
 jest.mock('@/lib/api/bookClient', () => ({
   __esModule: true,
-  default: { getBook: jest.fn(), getToc: jest.fn(), getBookSummary: jest.fn() },
+  default: { getBook: jest.fn(), getChaptersMetadata: jest.fn(), getBookSummary: jest.fn() },
 }));
 jest.mock('@/lib/toast', () => ({ toast: Object.assign(jest.fn(), { error: jest.fn(), success: jest.fn() }) }));
 jest.mock('@/components/navigation/ChapterBreadcrumb', () => ({ ChapterBreadcrumb: () => null }));
@@ -44,7 +44,7 @@ const mockedClient = bookClient as jest.Mocked<typeof bookClient>;
 const mockedUseSession = useSession as unknown as jest.Mock;
 
 type Book = Awaited<ReturnType<typeof bookClient.getBook>>;
-type Toc = Awaited<ReturnType<typeof bookClient.getToc>>;
+type Chapters = Awaited<ReturnType<typeof bookClient.getChaptersMetadata>>;
 
 const sessionFor = (userId: string) => ({
   data: { user: { id: userId, email: `${userId}@example.com`, name: userId, image: null }, session: { id: `s-${userId}` } },
@@ -68,9 +68,9 @@ describe('BookPage session identity (#758)', () => {
     currentSession = sessionFor('user-1');
     mockedUseSession.mockImplementation(() => currentSession);
     mockedClient.getBook.mockResolvedValue({ id: 'book-1', title: 'Book', description: '', owner_id: 'user-1' } as unknown as Book);
-    mockedClient.getToc.mockResolvedValue({
-      toc: { chapters: [{ id: 'ch-1', title: 'One', description: '', level: 1, order: 1, subchapters: [] }] },
-    } as unknown as Toc);
+    mockedClient.getChaptersMetadata.mockResolvedValue({
+      chapters: [{ id: 'ch-1', title: 'One', description: '', level: 1, order: 1, status: 'draft', word_count: 0 }],
+    } as unknown as Chapters);
     mockedClient.getBookSummary.mockResolvedValue({ summary: 'S' } as Awaited<ReturnType<typeof bookClient.getBookSummary>>);
   });
 

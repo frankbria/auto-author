@@ -6,7 +6,7 @@ import { useSession } from '@/lib/auth-client';
 import { useSearchParams } from 'next/navigation';
 import bookClient from '@/lib/api/bookClient';
 import { BookProject } from '@/components/BookCard';
-import { TocData } from '@/types/toc';
+import { calculateBookProgress, ChapterStatus } from '@/types/book';
 import * as React from 'react';
 import { toast } from '@/lib/toast';
 import Image from 'next/image';
@@ -27,7 +27,6 @@ type Chapter = {
   title: string;
   completed: boolean;
   wordCount: number;
-  progress: number;
 };
 
 type BookDetails = Omit<BookProject, 'chapters'> & {
@@ -43,43 +42,6 @@ type BookDetails = Omit<BookProject, 'chapters'> & {
   collaborators?: Record<string, unknown>[];
   owner_id?: string;
   summary?: string; // Add summary for wizard logic
-};
-
-// Helper function to convert TOC data to Chapter format for UI
-const convertTocToChapters = (tocData: TocData | null): Chapter[] => {
-  if (!tocData || !tocData.chapters) {
-    return [];
-  }
-
-  const chapters: Chapter[] = [];
-
-  tocData.chapters.forEach((tocChapter) => {
-    // Add main chapter
-    const chapter: Chapter = {
-      id: tocChapter.id,
-      title: tocChapter.title,
-      completed: false, // Default to false since we don't have content yet
-      wordCount: 0, // Default to 0 since we don't have content yet
-      progress: 0, // Default to 0 since we don't have content yet
-    };
-    chapters.push(chapter);
-
-    // Add subchapters if they exist
-    if (tocChapter.subchapters && tocChapter.subchapters.length > 0) {
-      tocChapter.subchapters.forEach((subchapter) => {
-        const subChapter: Chapter = {
-          id: subchapter.id,
-          title: subchapter.title,
-          completed: false,
-          wordCount: 0,
-          progress: 0,
-        };
-        chapters.push(subChapter);
-      });
-    }
-  });
-
-  return chapters;
 };
 
 export default function BookPage({ params }: { params: Promise<{ bookId: string }> }) {
@@ -115,13 +77,23 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
 
         // Fetch book details
         const bookData: BookProject = await bookClient.getBook(bookId);
-        // Fetch TOC data to populate chapters
+        // The chapters, with the status and word count each one really has. They
+        // were read from the table of contents and given a word count of 0 and
+        // "not completed" as constants, which is what Book Stats then showed (#833).
         let chapters: Chapter[] = [];
+        let progress = 0;
         try {
-          const tocResponse = await bookClient.getToc(bookId);
-          chapters = convertTocToChapters(tocResponse.toc as TocData);
-        } catch (tocError) {
-          console.warn('No TOC found for this book yet:', tocError);
+          const metadata = await bookClient.getChaptersMetadata(bookId);
+          chapters = metadata.chapters.map((chapter) => ({
+            id: chapter.id,
+            title: chapter.title,
+            completed: chapter.status === ChapterStatus.COMPLETED || chapter.status === ChapterStatus.PUBLISHED,
+            wordCount: chapter.word_count,
+          }));
+          // The same sum as the book cards (#291).
+          progress = calculateBookProgress({ toc_items: metadata.chapters });
+        } catch (chaptersError) {
+          console.warn('The chapters of this book could not be read:', chaptersError);
         }
 
         // Always fetch summary from API
@@ -149,6 +121,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           collaborators: bookData.collaborators,
           owner_id: bookData.owner_id,
           chapters: chapters,
+          // Not `bookData.progress`: the book route does not return one.
+          progress,
           summary: summary,
         });
         setError(null);
@@ -581,7 +555,14 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
             <div>
               <div className="text-sm text-muted-foreground mb-1">Overall Progress</div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 bg-muted rounded-full h-2">
+                <div
+                  className="flex-1 bg-muted rounded-full h-2"
+                  role="progressbar"
+                  aria-label="Overall progress"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={book.progress}
+                >
                   <div
                     className="bg-indigo-600 h-2 rounded-full"
                     style={{ width: `${book.progress}%` }}

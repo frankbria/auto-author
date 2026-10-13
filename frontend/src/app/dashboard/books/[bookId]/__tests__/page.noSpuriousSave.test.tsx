@@ -67,7 +67,7 @@ describe('BookPage load does not auto-save (#350)', () => {
     jest.clearAllMocks();
     (useSession as jest.Mock).mockReturnValue({ data: { user: { id: 'u1' } } });
     mockBookClient.getBook.mockResolvedValue(BOOK as never);
-    mockBookClient.getToc.mockResolvedValue({ toc: null } as never);
+    mockBookClient.getChaptersMetadata.mockResolvedValue({ chapters: [] } as never);
     mockBookClient.getBookSummary.mockResolvedValue({ summary: '' } as never);
     mockBookClient.updateBook.mockResolvedValue(BOOK as never);
   });
