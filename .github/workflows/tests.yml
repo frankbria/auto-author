@@ -208,10 +208,11 @@ jobs:
       # steps scanning different sets was the real defect.
       #
       # Widening cost nothing when it landed: 478 -> 977 exported lines, and the
-      # only advisory on the wider surface was click's PYSEC-2026-2132, already
-      # baselined. A test-only advisory does not ship to the container, but it
-      # does run in CI against this repo, so it is ledgered with a reason rather
-      # than hidden.
+      # only advisory on the wider surface then was click's PYSEC-2026-2132.
+      # click has since been upgraded past it, and the Python side of the
+      # baseline is empty (#821). A test-only advisory does not ship to the
+      # container, but it does run in CI against this repo, so it is ledgered
+      # with a reason rather than hidden.
       - name: Run pip-audit
         working-directory: backend
         run: |

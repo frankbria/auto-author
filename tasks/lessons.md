@@ -1578,3 +1578,12 @@ The new floor reported `postcss-selector-parser` 6.0.10, pinned exactly by `@tai
 
 ### `--write-baseline` at a higher floor than CI would have dropped what CI checks (#820)
 The baseline file's own header says to regenerate it with `--write-baseline`. That flag used the same default floor as checking did. Raising only the floor CI passes on its command line would have left the default at `high`: the next regeneration would write a baseline without the moderate entries, and CI would then fail on them. The default and the workflow's flag now agree, and a test regenerates a baseline holding a moderate entry. When a tool both checks and regenerates its own allow-list, a threshold has to move in both paths at once.
+
+### The command in the issue upgraded 38 packages and quietly took one down (#821)
+`uv lock --upgrade --exclude-newer <fourteen days ago>` is what the issue asks for. Its summary line said `Updated botocore v1.43.111 -> v1.43.103` in the middle of thirty-eight upgrades: the locked botocore was younger than the cut-off, so the resolver could no longer see it and picked an older one. It also wrote the cut-off into the lock as an option. Neither is an error and neither stops anything. A small script comparing the two locks by version, in both directions, found the downgrade; a plain `uv lock` afterwards dropped the option and `--upgrade-package 'botocore==1.43.111'` put the version back. After any bulk upgrade, diff the lock for packages that went down, not only for the ones meant to go up.
+
+### A test that failed on the upgrade was wrong about the thing it tested (#821)
+The CA bundle test read the file's first 500 characters and looked for `BEGIN CERTIFICATE`. certifi 2026 puts a root with a longer comment block first, so the test failed on a bundle with 121 good roots in it. It now builds a TLS context from the bundle and counts what loaded. When a dependency bump breaks a test, read what the test actually asserts before reading the dependency's changelog: a test of a file's opening bytes is a test of formatting.
+
+### I quoted a test count from a run I had told to stop at the first failure (#821)
+The PR description said "the whole backend suite (1,409 tests)". That number came from `pytest -x`, which had stopped at the one failure with 1,408 passed behind it. CI's run of the same suite reports 1,870. A count is only the population when the run finished; take it from a run without `-x`, or from CI.
