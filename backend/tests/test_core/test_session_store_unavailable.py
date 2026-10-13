@@ -25,7 +25,7 @@ from app.core import better_auth_session as sessions
 from app.core import reporting
 from app.core.config import settings
 from app.main import app
-from tests.session_cookies import signed_session_cookie
+from tests.session_cookies import session_collection, signed_session_cookie
 
 pytestmark = pytest.mark.asyncio
 
@@ -62,17 +62,15 @@ class TestTheLookupSaysItCouldNotLook:
             await sessions.get_better_auth_user(str(ObjectId()))
 
     async def test_an_error_the_database_reports_counts_too(self):
-        collection = AsyncMock()
-        collection.find_one.side_effect = ServerSelectionTimeoutError("no primary")
+        collection = session_collection(error=ServerSelectionTimeoutError("no primary"))
         with patch.object(sessions, "get_collection", AsyncMock(return_value=collection)):
             with pytest.raises(sessions.SessionStoreUnavailable):
                 await sessions.validate_better_auth_session(_request())
 
-    async def test_nor_is_the_second_way_of_finding_the_user_when_the_database_goes_between_the_two(self):
-        """A user stored under an ObjectId is found by a second lookup. Its failure used to be
-        swallowed as "that id is not an ObjectId", which is a 401."""
+    async def test_nor_is_the_user_lookup_when_the_database_reports_an_error(self):
+        """Its failure used to be swallowed as "that id is not an ObjectId", which is a 401."""
         collection = AsyncMock()
-        collection.find_one.side_effect = [None, ServerSelectionTimeoutError("no primary")]
+        collection.find_one.side_effect = ServerSelectionTimeoutError("no primary")
         with patch.object(sessions, "get_collection", AsyncMock(return_value=collection)):
             with pytest.raises(sessions.SessionStoreUnavailable):
                 await sessions.get_better_auth_user(str(ObjectId()))
@@ -86,14 +84,14 @@ class TestTheLookupSaysItCouldNotLook:
         assert collection.find_one.await_count == 1
 
     async def test_a_session_that_is_not_there_is_still_just_not_there(self):
-        collection = AsyncMock()
-        collection.find_one.return_value = None
+        collection = session_collection()
         with patch.object(sessions, "get_collection", AsyncMock(return_value=collection)):
             assert await sessions.validate_better_auth_session(_request()) is None
 
+        collection.aggregate.return_value.to_list.assert_awaited_once()
+
     async def test_a_session_record_that_makes_no_sense_is_still_refused_not_an_outage(self):
-        collection = AsyncMock()
-        collection.find_one.return_value = {"_id": "s1", "userId": "u1", "expiresAt": "not a date"}
+        collection = session_collection({"_id": "s1", "userId": "u1", "expiresAt": "not a date"})
         with patch.object(sessions, "get_collection", AsyncMock(return_value=collection)):
             assert await sessions.validate_better_auth_session(_request()) is None
 

@@ -9,6 +9,7 @@ cookies signed by the real library for that.
 import base64
 import hashlib
 import hmac
+from unittest.mock import AsyncMock, Mock
 from urllib.parse import quote
 
 from app.core.config import settings
@@ -20,3 +21,12 @@ def signed_session_cookie(token: str) -> str:
         hmac.new(settings.BETTER_AUTH_SECRET.encode(), token.encode(), hashlib.sha256).digest()
     ).decode()
     return quote(f"{token}.{signature}", safe="")
+
+
+def session_collection(found=None, error=None) -> AsyncMock:
+    """A stand-in for the session collection as the lookup reads it (#826): one
+    joined read, which answers ``found`` or raises ``error``."""
+    answer = AsyncMock(side_effect=error) if error else AsyncMock(return_value=[found] if found else [])
+    collection = AsyncMock()
+    collection.aggregate = Mock(return_value=Mock(to_list=answer))
+    return collection

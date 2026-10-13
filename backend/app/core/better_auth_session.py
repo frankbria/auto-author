@@ -21,10 +21,11 @@ import base64
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import unquote
 
+from bson import ObjectId
 from fastapi import Request
 from pymongo.errors import PyMongoError
 
@@ -37,6 +38,11 @@ logger = logging.getLogger(__name__)
 # How long a session lookup may wait for the database. The driver's own limit
 # is thirty seconds, which is how long a signed-in request used to hang (#1007).
 SESSION_LOOKUP_TIMEOUT_SECONDS = 5
+
+# How stale a session's updatedAt may get before a request writes it. Settings
+# shows it as "Last active"; writing it on every request was a write on every
+# request (#826).
+SESSION_ACTIVITY_INTERVAL = timedelta(minutes=5)
 
 
 class SessionStoreUnavailable(Exception):
@@ -108,6 +114,19 @@ def _verified_token(cookie_value: str) -> Optional[str]:
     return token
 
 
+def _session_and_its_user(token: str) -> List[Dict[str, Any]]:
+    """The session with that token and, joined to it, its better-auth user: one read, not two (#826).
+
+    better-auth's MongoDB adapter keys a user by ``_id`` and stores a session's
+    ``userId`` as the same ObjectId, so the join goes through the index on ``_id``.
+    """
+    return [
+        {"$match": {"token": token}},
+        {"$limit": 1},
+        {"$lookup": {"from": "user", "localField": "userId", "foreignField": "_id", "as": "user"}},
+    ]
+
+
 async def get_session_token_from_cookies(request: Request) -> Optional[str]:
     """Extract the verified better-auth session token from request cookies.
 
@@ -156,8 +175,9 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
         # Get the session collection using the shared MongoDB client
         session_collection = await get_collection("session")
 
-        # Find session by token
-        session = await _in_time(session_collection.find_one({"token": session_token}))
+        # Find the session by its token, and its user with it
+        found = await _in_time(session_collection.aggregate(_session_and_its_user(session_token)).to_list(1))
+        session = found[0] if found else None
 
         if not session:
             logger.warning("Session not found for provided token")
@@ -200,11 +220,15 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
                 await _in_time(session_collection.delete_one({"_id": session["_id"]}))
                 return None
 
-        # Update last activity time
-        await _in_time(session_collection.update_one(
-            {"_id": session["_id"]},
-            {"$set": {"updatedAt": datetime.now(timezone.utc)}}
-        ))
+        # Update last activity time, once it is out of date
+        last_active = session.get("updatedAt")
+        if isinstance(last_active, datetime) and last_active.tzinfo is None:
+            last_active = last_active.replace(tzinfo=timezone.utc)
+        if not isinstance(last_active, datetime) or now - last_active > SESSION_ACTIVITY_INTERVAL:
+            await _in_time(session_collection.update_one(
+                {"_id": session["_id"]},
+                {"$set": {"updatedAt": now}}
+            ))
 
         logger.debug(f"Session validated for user: {session.get('userId')}")
         return session
@@ -223,7 +247,7 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
     """Get user data from better-auth's user collection.
 
     Better-auth stores users in the 'user' collection with fields:
-    - id: String (user ID)
+    - _id: ObjectId (user ID)
     - email: String
     - name: String (optional)
     - image: String (optional)
@@ -241,21 +265,12 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
         # Get the user collection using the shared MongoDB client
         user_collection = await get_collection("user")
 
-        # Find user by ID (better-auth stores ID as 'id' field, not '_id')
-        user = await _in_time(user_collection.find_one({"id": user_id}))
-
-        if not user:
-            # Try with _id as fallback (convert string to ObjectId). Only the
-            # conversion is allowed to fail quietly: the lookup's own failure
-            # is the database's and goes to the handlers below (#1007).
-            from bson import ObjectId
-            from bson.errors import InvalidId
-            try:
-                object_id = ObjectId(user_id)
-            except (InvalidId, TypeError):
-                logger.debug(f"Could not convert user_id to ObjectId: {user_id}")
-            else:
-                user = await _in_time(user_collection.find_one({"_id": object_id}))
+        # better-auth's MongoDB adapter keys a user by _id, an ObjectId, and
+        # writes no `id` field: looking for one scanned the collection on every
+        # request and found nothing (#826).
+        user_id = str(user_id)
+        key = ObjectId(user_id) if ObjectId.is_valid(user_id) else user_id
+        user = await _in_time(user_collection.find_one({"_id": key}))
 
         if user:
             logger.debug(f"Found better-auth user {user_id}")

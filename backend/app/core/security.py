@@ -161,7 +161,10 @@ async def get_current_user_from_session(request: Request) -> Dict:
 
     # The better-auth user row must still exist: a session outliving its user
     # (deleted account, #763) is not a credential.
-    better_auth_user = await get_better_auth_user(user_id)
+    # It comes joined to the session (#826). A session that holds its user id
+    # as text is joined to nothing, and its user is looked up on its own.
+    joined = session.get("user")
+    better_auth_user = joined[0] if joined else await get_better_auth_user(user_id)
     if not better_auth_user:
         logger.warning(f"Session for user {user_id} has no better-auth user")
         raise HTTPException(

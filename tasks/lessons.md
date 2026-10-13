@@ -1634,3 +1634,15 @@ I expected the lockfile's `dev` flag to separate what ships from what does not, 
 The recorder printed "recorded" and the document said `entries: 0`: the count used a `{72}` repetition that busybox grep, inside the image, does not read without `-E`. Both screenshots were of the top of the page, not the footer: the scroll ran before the page had settled.
 **Rule:** read every recorded output and open every screenshot before the demo is committed. A command that runs inside an image runs with that image's tools. A screenshot of something scrolled to waits until the element's position says it is in view.
 
+### The issue's reason for deleting a read had stopped being true (#826)
+The launch review said the better-auth user read on every request was used only when creating the application's record, so it could go. That was right on the day it was written. Two later issues from the same review made that row load-bearing on every request: a session whose user is gone is refused (#763), and the application's email follows better-auth's (#765). The read stayed, joined into the session's.
+**Rule:** an issue describes the code as of its audit commit. Before removing something it calls unused, grep what reads it now.
+
+### Tests that mocked the old call kept passing, for the wrong reason (#826)
+The session lookup changed from `find_one` to `aggregate(...).to_list(1)`. Eleven tests stood in for the session's `find_one`. Five failed. The other six passed: the mock's `aggregate` returned a coroutine with no `to_list`, the function's catch-all turned that into "no session", and "no session" was what those six expected.
+**Rule:** when code changes how it calls something tests stand in for, change every test that stands in for the old call, and do not take "it still passes" as the list of the ones that are fine.
+
+### The write that looked like waste had a reader in the other half of the repository (#826)
+The session's `updatedAt` was written on every request and nothing in the backend reads it. The frontend does: Settings shows it as "Last active". The write is throttled to once in five minutes, not removed.
+**Rule:** before removing a write, search both `backend/` and `frontend/` for the field.
+
