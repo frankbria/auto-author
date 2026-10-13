@@ -8,10 +8,13 @@ kilobytes and whose other large fields are another 300.
 """
 
 from contextlib import asynccontextmanager
+from io import BytesIO
+from unittest.mock import AsyncMock
 
 import pytest
 from bson import ObjectId
 
+from app.api.endpoints import books as books_endpoint
 from app.db import base
 
 pytestmark = pytest.mark.asyncio
@@ -50,6 +53,9 @@ async def _a_large_book(api) -> str:
 async def _reads_of_the_book():
     """The finds made on ``books`` inside the block, as the database recorded them."""
     reads = []
+    # The profiler's record outlives the block that made it. Each test starts with an empty
+    # database, so nothing is left from another test; this is for a second block in the same one.
+    await base._db["system.profile"].drop()
     await base._db.command("profile", 2)
     try:
         yield reads
@@ -74,9 +80,16 @@ ROUTES = [
     ("the table of contents", "GET", "/toc", None, 200, NO_BODIES),
     ("the chapters' metadata", "GET", "/chapters/metadata", None, 200, NO_BODIES),
     ("enhancing text, refused for having none", "POST", "/chapters/c2/enhance-text", {"content": "   "}, 400, NO_BODIES),
+    ("saving the interview answers", "PUT", "/question-responses",
+     {"responses": [{"question": "Who is it for?", "answer": "Readers who like the sea."}]}, 200, 5 * KB),
+    ("cleaning up a transcription, refused for having none", "POST", "/chapters/c2/enhance-transcription", {"content": "   "}, 400, NO_BODIES),
+    ("deleting the book", "DELETE", "", None, 204, 5 * KB),
     # A chapter's body is in the table of contents, so that is read whole; the 300 KB beside it is not.
     ("one chapter's content", "GET", "/chapters/c1a/content", None, 200, 750 * KB),
     ("several chapters' content", "POST", "/chapters/batch-content", {"chapter_ids": ["c1", "c2"]}, 200, 750 * KB),
+    # Two reads: the book without its bodies, then the table of contents for the body to show beside the refusal.
+    ("a save refused as out of date", "PATCH", "/chapters/c2/content",
+     {"content": "<p>new</p>", "expected_last_modified": "2000-01-01T00:00:00+00:00"}, 409, 1_060 * KB),
 ]
 
 
@@ -91,6 +104,53 @@ async def test_the_read_brings_back_no_more_than_the_route_uses(auth_client_fact
     assert answer.status_code == answers, answer.text[:300]
     assert reads, "the profiler recorded no read of the book: this would pass by measuring nothing"
     assert _bytes(reads) <= at_most, f"{what}: {_bytes(reads):,} bytes read from books, in {len(reads)} read(s)"
+
+
+async def test_generating_a_draft_reads_no_bodies(auth_client_factory, monkeypatch):
+    """The model is stood in for; the book and the read of it are real."""
+    api = await auth_client_factory()
+    book_id = await _a_large_book(api)
+    drafted = {"success": True, "draft": "A draft.", "metadata": {"word_count": 2, "estimated_reading_time": 1}, "suggestions": []}
+    monkeypatch.setattr(books_endpoint.ai_service, "generate_chapter_draft", AsyncMock(return_value=drafted))
+
+    async with _reads_of_the_book() as reads:
+        answer = await api.post(
+            f"{API}/{book_id}/chapters/c2/generate-draft",
+            json={"question_responses": [{"question": "What happens here?", "answer": "The keeper finds the first letter."}]},
+        )
+
+    assert answer.status_code == 200, answer.text[:300]
+    assert reads and _bytes(reads) <= NO_BODIES, f"{_bytes(reads):,} bytes read from books"
+
+
+async def test_uploading_a_cover_reads_the_owner_and_the_cover_it_replaces(auth_client_factory, monkeypatch, tmp_path):
+    import app.services.file_upload_service as uploads
+    from PIL import Image
+
+    monkeypatch.setattr(uploads, "COVER_IMAGES_DIR", tmp_path)
+    monkeypatch.setattr(uploads, "get_cloud_storage_service", lambda: None)
+    api = await auth_client_factory()
+    book_id = await _a_large_book(api)
+    picture = BytesIO()
+    Image.new("RGB", (400, 600), "navy").save(picture, format="JPEG")
+
+    async with _reads_of_the_book() as reads:
+        answer = await api.post(f"{API}/{book_id}/cover-image", files={"file": ("cover.jpg", picture.getvalue(), "image/jpeg")})
+
+    assert answer.status_code == 200, answer.text[:300]
+    assert reads and _bytes(reads) <= 5 * KB, f"{_bytes(reads):,} bytes read from books"
+
+
+async def test_one_measurement_does_not_count_the_one_before(auth_client_factory):
+    api = await auth_client_factory()
+    book_id = await _a_large_book(api)
+
+    async with _reads_of_the_book() as first:
+        await api.get(f"{API}/{book_id}/toc-readiness")
+    async with _reads_of_the_book() as second:
+        await api.get(f"{API}/{book_id}/toc-readiness")
+
+    assert len(first) == len(second) == 1 and _bytes(first) == _bytes(second)
 
 
 async def test_the_book_in_these_tests_is_as_large_as_they_say(auth_client_factory):
