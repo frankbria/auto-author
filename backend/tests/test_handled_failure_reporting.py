@@ -178,7 +178,9 @@ class TestStartUpAndTheDailyPurge:
         monkeypatch.setattr("app.services.export_service.export_executor", ThreadPoolExecutor(1))
 
     async def _start(self):
-        async with main.lifespan(FastAPI()):
+        served = FastAPI()
+        async with main.lifespan(served):
+            await served.state.database_prepared  # beside the server since #1012
             await asyncio.sleep(0.05)  # the purge runs as a task of its own
 
     async def test_indexes_that_could_not_be_created(self, motor_reinit_db, reports):

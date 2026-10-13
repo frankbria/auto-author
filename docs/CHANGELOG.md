@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **The backend starts whether or not the database can be reached (#1012, P1.25.2)**:
+  - **Problem.** Start-up created its indexes one after another before the server took a request. Each waits the driver's thirty seconds for a database that is not there, so a backend restarted during an outage answered nothing, its liveness route included, for over ten minutes. Compose then called the container unhealthy, and the frontend, which waits for a healthy backend, did not start. Whatever had failed was not tried again until the next restart.
+  - **Fix.** The indexes and the one-off account fix-up run as a task beside the server. It first waits for the database to answer a ping, for as long as that takes, trying again five seconds after each failed attempt, and then does the work. Each step logs its own failure and carries on, so when the work is over the task asks the database once more, and if it has gone, does the work again when it is back (review found that a database which answered and then went left every step "finished" and nothing created). The wait is reported as `startup-database`, once every five minutes like every hand-made report.
+  - **Measured on the image.** With no database, the liveness route answers two seconds after the container starts, and `/api/v1/health` answers 503 with `mongodb: error`. With a database brought up beside it afterwards, the indexes exist four seconds later and health is 200, with no restart.
+  - **What changes when the database is there.** The first requests after a start can now arrive a moment before the indexes have been checked. They exist from every earlier start; on a database that has never been used, a unique index could be created a second later than it was.
+  - **Not covered.** An index that fails to build while the database is reachable is logged and reported as before, and not tried again. The daily purge of expired accounts was already a task of its own.
+
 - **Exports no longer depend on a GPL library (#823, P1.41)**:
   - **Problem.** The repository is MIT-licensed, and `html2text`, which is GPL-3.0-or-later, turned chapter HTML into text on every export path: PDF, DOCX, EPUB and Markdown.
   - **Fix.** `markdownify` (MIT, with `beautifulsoup4`, also MIT) does it now, through one function, `_html_to_markdown`, which builds its converter on each call (#751). `html2text` is out of `pyproject.toml` and `uv.lock`.
