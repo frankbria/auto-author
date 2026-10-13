@@ -122,3 +122,17 @@ def test_a_push_that_fails_stops_the_job(steps, tmp_path):
 
     assert code != 0
     assert len(docker) == 1, "it went on to the next tag"
+
+
+def test_the_image_is_scanned_before_it_is_pushed_and_a_finding_stops_the_job(steps):
+    """#818: a fixable CRITICAL or HIGH vulnerability in either image publishes no tag."""
+    build, scan, push = (_index(steps, what) for what in ("docker/build-push-action", "aquasecurity/trivy-action", "Push"))
+    step = steps[scan]
+
+    assert build < scan < push
+    # On every event, pull requests included: that is where a new finding should first be seen.
+    assert "if" not in step and "continue-on-error" not in step
+    assert set(step["with"]["severity"].split(",")) == {"CRITICAL", "HIGH"}
+    assert str(step["with"]["ignore-unfixed"]).lower() == "true"
+    assert str(step["with"]["exit-code"]) == "1"
+    assert "steps.meta.outputs" in step["with"]["image-ref"], "it must scan the image this job built"

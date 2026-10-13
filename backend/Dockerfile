@@ -7,10 +7,15 @@
 #
 # pyproject.toml requires >=3.13.
 
-ARG PYTHON_VERSION=3.13-slim
+# The one place the base image is named, by tag and by digest (#818). The tag
+# alone floats: each build took whatever it pointed at that day. Dependabot's
+# docker entry moves the digest, as a pull request the image scan runs on. It
+# reads a literal FROM line only; with the tag in a build argument it found no
+# dependency here at all.
+FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f AS base
 
 # ---- build: resolve from uv.lock only
-FROM python:${PYTHON_VERSION} AS build
+FROM base AS build
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
@@ -31,8 +36,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
 # ---- runtime
-FROM python:${PYTHON_VERSION} AS runtime
+FROM base AS runtime
 WORKDIR /app
+
+# The runtime runs the virtualenv built above and installs nothing, so the base
+# image's own pip goes (#818). pip carries its own copies of urllib3, msgpack
+# and setuptools, which is what an image scan finds, and a package manager is
+# the first thing an intruder would reach for.
+RUN python -m pip uninstall --yes pip
 
 # Non-root. python:slim has no unprivileged user of its own, so create one.
 RUN useradd --create-home --uid 1000 appuser

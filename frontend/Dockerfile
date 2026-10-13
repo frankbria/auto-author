@@ -12,16 +12,21 @@
 # at .next/standalone/projects/auto-author/frontend/server.js instead of
 # .next/standalone/server.js. The COPY paths below assume the pinned layout.
 
-ARG NODE_VERSION=24-alpine
+# The one place the base image is named, by tag and by digest (#818). The tag
+# alone floats: each build took whatever it pointed at that day. Dependabot's
+# docker entry moves the digest, as a pull request the image scan runs on. It
+# reads a literal FROM line only; with the tag in a build argument it found no
+# dependency here at all.
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS base
 
 # ---- deps: install with the lockfile only, so this layer caches on lock changes
-FROM node:${NODE_VERSION} AS deps
+FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
 # ---- build
-FROM node:${NODE_VERSION} AS build
+FROM base AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -41,12 +46,20 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
 RUN npm run build
 
 # ---- runtime
-FROM node:${NODE_VERSION} AS runtime
+FROM base AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3002 \
     HOSTNAME=0.0.0.0
+
+# The runtime runs `node server.js` and installs nothing, so the base image's
+# npm, corepack and yarn go (#818). npm carries its own dependencies, which is
+# what an image scan finds, and a package manager is the first thing an
+# intruder would reach for.
+RUN rm -rf /usr/local/lib/node_modules /opt/yarn-* \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+      /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 # Non-root. node:alpine already ships a `node` user (uid 1000); reuse it rather
 # than creating another.

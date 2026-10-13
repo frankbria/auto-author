@@ -8,6 +8,7 @@ that entry, and an exclude-paths glob is relative to its entry's `directory`, so
 repo-relative path silently matches nothing while the config still looks correct.
 """
 
+import re
 from fnmatch import fnmatch
 from pathlib import Path
 
@@ -223,3 +224,52 @@ def test_better_auth_is_never_grouped(directory, name, group):
         f"26-package diff, that locked out every existing account on deploy. Add "
         f'`exclude-patterns: ["{_MUST_ARRIVE_ALONE}"]` to this group.'
     )
+
+
+# Base images (#818). `python:3.13-slim` and `node:24-alpine` floated: each build
+# took whatever the tag pointed at that day, unseen and unscanned. The
+# Dockerfiles now name a digest, and these entries are how a rebuilt base image
+# reaches them: as a pull request, on which build-images.yml scans the result.
+DOCKERFILES = {"/backend": "python", "/frontend": "node"}
+_FROM = re.compile(r"^FROM\s+(\S+)", re.M)
+
+
+def _external_bases(directory):
+    """The images a Dockerfile starts from, leaving out its own earlier stages."""
+    text = (REPO / directory.lstrip("/") / "Dockerfile").read_text()
+    stages = set(re.findall(r"^FROM\s+\S+\s+AS\s+(\S+)", text, re.M))
+    return [ref for ref in _FROM.findall(text) if ref not in stages]
+
+
+@pytest.mark.parametrize("directory", DOCKERFILES)
+def test_each_image_has_a_docker_entry(directory):
+    entries = [e for e in UPDATES if e["package-ecosystem"] == "docker" and e["directory"] == directory]
+
+    assert len(entries) == 1, f"expected one docker entry for {directory}, found {len(entries)}"
+
+
+@pytest.mark.parametrize(("directory", "image"), DOCKERFILES.items())
+def test_each_base_image_is_one_dependabot_can_read_and_is_pinned_to_a_digest(directory, image):
+    bases = _external_bases(directory)
+
+    assert bases, f"{directory}/Dockerfile starts from no image; this guard is vacuous"
+    for ref in bases:
+        # Measured (#818): the docker updater finds no dependency at all in
+        # `FROM python:${PYTHON_VERSION}`, so an entry pointed at it updates nothing.
+        assert "$" not in ref, f"{ref}: Dependabot does not resolve a build argument in FROM"
+        assert re.fullmatch(rf"{image}:[\w.-]+@sha256:[0-9a-f]{{64}}", ref), f"{ref}: name a tag and a digest"
+
+
+@pytest.mark.parametrize(("directory", "image"), DOCKERFILES.items())
+def test_the_language_version_is_not_moved_by_a_base_image_update(directory, image):
+    """Python 3.13 and Node 24 are also named in pyproject.toml, package.json and CI. Only the
+    digest and the patch level may arrive from here."""
+    entry = next(e for e in UPDATES if e["package-ecosystem"] == "docker" and e["directory"] == directory)
+    ignored = {
+        update
+        for rule in entry.get("ignore") or []
+        if rule.get("dependency-name") == image
+        for update in rule.get("update-types") or []
+    }
+
+    assert {"version-update:semver-major", "version-update:semver-minor"} <= ignored, ignored

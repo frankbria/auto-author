@@ -4,6 +4,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **Both images are scanned before they are pushed, and their base images are pinned and kept current (#818, P1.36)**:
+  - **Problem.** `python:3.13-slim` and `node:24-alpine` floated: each build took whatever the tag pointed at that day, and nothing ever looked inside the result. Dependabot had no `docker` ecosystem.
+  - **Scan.** `build-images.yml` runs Trivy on each image as built (`CRITICAL,HIGH`, `ignore-unfixed`, vulnerabilities only), on pull requests as well as on main. On main a finding stops the job before the push. The action is pinned to the commit of v0.36.0: in March 2026 nearly every tag of it was repointed at credential-stealing code (GHSA-69fq-xp46-6x23).
+  - **What the first scan found, and what was done.** Eleven fixable `HIGH` findings, none in the application: four in pip's own vendored libraries in the Python base image, seven in npm's own dependencies in the Node one. The runtime images install nothing, so pip is uninstalled from the backend's runtime stage and npm, corepack and yarn are removed from the frontend's. Both images then scan clean, with no ignore file.
+  - **Base images.** Each Dockerfile names its base image once, by tag and digest, in a `base` stage the others start from. Two Dependabot `docker` entries move the digest by pull request. They leave the language version alone: Python 3.13 and Node 24 are also named in `pyproject.toml`, `package.json` and CI.
+  - **Measured, not assumed.** Dependabot's docker updater, run against main's Dockerfiles, found no dependency in them at all: it does not resolve `FROM python:${PYTHON_VERSION}`. An entry added without changing the Dockerfiles would have updated nothing.
+  - **Not covered.** `mongo:7`, which only the workflow's own smoke test runs. The `uv` image the backend build copies its binary from, still `:latest`: #819.
+
 - **An image is pushed only after its smoke test has booted it (#817, P1.35)**:
   - **Problem.** `build-images.yml` built and pushed in one step and ran its smoke test afterwards. An image whose `CMD` could not start already had its `sha-` tag, and on main the floating `staging` tag, in the registry by the time the smoke test failed.
   - **Fix.** The build loads the image into the runner's own Docker (`load: true`) and publishes nothing. The smoke test boots it. A step of its own then runs `docker push` for each tag, and is skipped once the smoke test has failed. What is pushed is the image that was booted, not a second build of it.

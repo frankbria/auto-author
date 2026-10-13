@@ -208,3 +208,47 @@ updates:
     # github-actions doesn't support semver-* cooldown keys (config parse error)
     cooldown:
       default-days: 14
+
+  # Base images (#818). Each Dockerfile names its base image by tag and digest,
+  # so a rebuilt `3.13-slim` or `24-alpine` reaches an image only through a pull
+  # request from here, where build-images.yml builds and scans the result.
+  #
+  # No cooldown: a moved digest under the same tag is the upstream's own
+  # security refresh, which is the thing being waited for.
+  #
+  # The language version itself is not taken from here. Python 3.13 and Node 24
+  # are also named in pyproject.toml, package.json and CI, and moving one of
+  # those is a decision, not an update.
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      base-images:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      base-images:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
