@@ -174,19 +174,24 @@ class TestStartingWhileTheDatabaseIsAway:
         yield lambda: monkeypatch.setattr(base, "_db", real)
         client.close()
 
+    # Each of these enters the lifespan under a time limit: a start-up that waits for the
+    # database would otherwise hang the run instead of failing it.
+
     @pytest.mark.asyncio
     async def test_start_up_does_not_wait_for_it(self, away):
         started = time.monotonic()
-        async with main.lifespan(FastAPI()) as _:
-            took = time.monotonic() - started
+        async with asyncio.timeout(10):
+            async with main.lifespan(FastAPI()) as _:
+                took = time.monotonic() - started
 
         assert took < 0.25, f"start-up took {took:.2f}s; one failed attempt at the database alone is 0.3s"
 
     @pytest.mark.asyncio
     async def test_the_liveness_route_answers(self, away):
-        async with main.lifespan(app):
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.get("/api/v1/health/live")
+        async with asyncio.timeout(10):
+            async with main.lifespan(app):
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                    response = await client.get("/api/v1/health/live")
 
         assert response.status_code == 200
 
@@ -197,15 +202,22 @@ class TestStartingWhileTheDatabaseIsAway:
         bring_it_back = away
         bring_it_back()
         await _warm_collections()
+        await base._db.users.insert_one({"warm": True, "auth_id": "warm", "email": "warm@example.com"})
+        await base._db.question_responses.insert_one({"warm": True})
         monkeypatch.setattr(base, "_db", AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")["nowhere"])
         served = FastAPI()
 
-        async with main.lifespan(served):
-            await asyncio.sleep(1)  # long enough for more than one failed attempt
-            assert not served.state.database_prepared.done(), "it gave up, or thought an absent database was ready"
-            assert set(reported) == {"startup-database"}
-            bring_it_back()
-            await asyncio.wait_for(served.state.database_prepared, timeout=30)
+        async with asyncio.timeout(60):
+            async with main.lifespan(served):
+                await asyncio.sleep(1)  # long enough for more than one failed attempt
+                assert not served.state.database_prepared.done(), "it gave up, or thought an absent database was ready"
+                assert set(reported) == {"startup-database"}
+                bring_it_back()
+                await served.state.database_prepared
 
+        # The first step's indexes as well as the last's: work that went ahead while the
+        # database was away would have failed its early steps and still finished its late ones.
+        assert "question_user_idx" in await _index_map(base._db.question_responses)
+        assert "auth_id_unique_idx" in await _index_map(base._db.users)
         assert "owner_book_id_idx" in await _index_map(base._db.books)
         assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)
