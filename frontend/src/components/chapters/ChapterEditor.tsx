@@ -169,7 +169,10 @@ export function ChapterEditor({
   });
   const noteBackupWrite = () => setBackupWrites((n) => n + 1);
   // A backup older than the saved chapter, which the writer has asked to restore.
-  const [olderBackup, setOlderBackup] = useState<{ backedUp: number; saved: number } | null>(null);
+  // It is a question about one backup: shown only while that backup is the one
+  // on offer, so it cannot be answered for another chapter's (#831).
+  const [askedAbout, setOlderBackup] = useState<{ key: string; backedUp: number; saved: number } | null>(null);
+  const olderBackup = askedAbout?.key === restoreKey ? askedAbout : null;
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Snapshot of content before a style transform, for single-level revert (#58).
   const [preTransformContent, setPreTransformContent] = useState<string | null>(null);
@@ -577,7 +580,7 @@ export function ChapterEditor({
     if (backup && editor) {
       const savedAt = Date.parse(seenRef.current.get(backupKey)?.lastModified ?? '');
       if (!confirmed && backup.timestamp < savedAt) {
-        setOlderBackup({ backedUp: backup.timestamp, saved: savedAt });
+        setOlderBackup({ key: restoreKey, backedUp: backup.timestamp, saved: savedAt });
         return;
       }
       setOlderBackup(null);

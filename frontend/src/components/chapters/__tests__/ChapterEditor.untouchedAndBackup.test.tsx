@@ -168,6 +168,25 @@ describe('restoring a backup', () => {
     expect(screen.queryByText(/older than the saved chapter/i)).not.toBeInTheDocument();
   });
 
+  it('does not carry the question over to another chapter shown in the same editor', async () => {
+    const user = userEvent.setup({ delay: null });
+    backupFrom(3 * DAY);
+    backupFrom(3 * DAY, '<p>Chapter two, three days ago</p>', 'chapter-backup-book-1-chapter-2');
+    serverHas('<p>Saved since</p>', HOUR);
+    const view = await opened();
+    await user.click(screen.getByRole('button', { name: /restore backup/i }));
+    expect(screen.getByText(/older than the saved chapter/i)).toBeInTheDocument();
+
+    view.rerender(<ChapterEditor {...props} chapterId="chapter-2" chapterTitle="The First Letter" />);
+
+    // The second chapter's backup is offered plainly, and pressing Restore asks about it afresh.
+    const restore = await screen.findByRole('button', { name: /^restore backup$/i });
+    expect(screen.queryByRole('button', { name: /restore the older backup/i })).not.toBeInTheDocument();
+    await user.click(restore);
+    expect(screen.getByText(/older than the saved chapter/i)).toBeInTheDocument();
+    expect(localStorage.getItem('chapter-backup-book-1-chapter-2')).not.toBeNull();
+  });
+
   it('keeps the saved text, and the backup, when the writer says not to', async () => {
     const user = userEvent.setup({ delay: null });
     backupFrom(3 * DAY);
