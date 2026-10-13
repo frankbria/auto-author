@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **Saving a chapter no longer inserts an access-log row (#827, P1.45)**:
+  - **Problem.** The editor saves three seconds after the last keystroke, and every save inserted a row into `chapter_access_logs`: entered in six indexes, kept ninety days. Twenty saves, about a minute of typing, left twenty rows.
+  - **Nothing in the application read them.** The rows had the type `update_content`. Recent chapters are found from `view` and `edit` rows, and tab state from `tab_state` rows. The only reader of `update_content` rows was `GET /books/{id}/chapters/{chapter_id}/analytics`, which counts rows by type, and which no page calls.
+  - **Fix.** The insert is gone from `update_chapter_content`. A save still writes the chapter and still answers the same way.
+  - **What changes for a caller of the analytics endpoint.** It no longer has an `update_content` count for new saves. The rows already written stay until their ninety days are up.
+  - **Left alone.** Reading a chapter's content still writes a `read_content` row, once per read, not once per three seconds.
+
 - **A signed-in request asks the database two things, not five (#826, P1.44)**:
   - **Problem.** Every authenticated request made four reads and a write. It found its session by token, on a collection with no index on the token. It wrote the session's `updatedAt`. It looked for the better-auth user by an `id` field that better-auth's MongoDB adapter does not write, which scanned the whole `user` collection and found nothing, then found the user by `_id`. And it read the application's record of the user with `book_ids`, a list that grows with every book.
   - **Measured, not assumed.** The tests turn on MongoDB's profiler around one request and read back what the database was asked and the plan it ran. Before: `query session`, `update session`, `query user` (a collection scan), `query user`, `query users`. After: one `aggregate` on `session` and one `query` on `users`, both through an index, and no write.

@@ -345,6 +345,33 @@ async def test_get_chapter_content_wrong_owner(auth_client_factory):
 # update_chapter_content  (PATCH /{book_id}/chapters/{chapter_id}/content)
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
+async def test_saving_content_writes_no_access_log_row(auth_client_factory):
+    """#827: the editor saves three seconds after the last keystroke, and each save
+    inserted a row into chapter_access_logs, with five indexes to maintain, kept
+    ninety days, which nothing in the application reads."""
+    api = await auth_client_factory()
+    book_id = await _create_book(api)
+    await _seed_toc(api, book_id, [_chapter("ch1", content="", word_count=0, status="draft")])
+    logs = base._db.get_collection("chapter_access_logs")
+    before = await logs.count_documents({})
+
+    for n in range(3):
+        r = await api.patch(
+            f"{API}/{book_id}/chapters/ch1/content",
+            json={"content": f"draft number {n}", "auto_update_metadata": True},
+        )
+        assert r.status_code == 200, r.text
+
+    assert await logs.count_documents({}) == before
+    assert await logs.count_documents({"access_type": "update_content"}) == 0
+    # The right collection is being counted: reading the chapter does add a row.
+    assert (await api.get(f"{API}/{book_id}/chapters/ch1/content")).status_code == 200
+    assert await logs.count_documents({}) == before + 1
+    # And the saves were real ones.
+    assert (await api.get(f"{API}/{book_id}/chapters/ch1/content")).json()["content"] == "draft number 2"
+
+
+@pytest.mark.asyncio
 async def test_update_chapter_content_draft_to_in_progress(auth_client_factory):
     api = await auth_client_factory()
     book_id = await _create_book(api)
