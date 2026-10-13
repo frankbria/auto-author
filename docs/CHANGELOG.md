@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **A deployed API serves no documentation, and its policy drops what only the Swagger page needed (#815, P1.33)**:
+  - **Problem.** `/docs`, `/redoc` and `/openapi.json` answered 200 on staging: the whole API, route by route, to anyone. Every answer also carried a `Content-Security-Policy` allowing script and style from jsdelivr and inline, which only the Swagger page uses.
+  - **Fix.** When `is_deployed_env()` is true (staging and production) the app is built with `openapi_url=None`, which is FastAPI's own switch: with no schema it serves none of the three, nor the OAuth redirect page under `/docs`. The policy on a deployed host is `default-src 'self'`.
+  - **Unchanged.** In development and under test the three routes and the old policy are as they were.
+  - **Decided at start, not per request.** Both follow the environment the process started with. The tests for the deployed case import the app in a fresh interpreter with `ENVIRONMENT=staging` and `production`.
+
 - **The API knows it is served over https; both hosts send HSTS; the frontend does not name its framework (#814, P1.32)**:
   - **Problem.** `GET https://api.dev.autoauthor.app/api/v1/books` answered `307` to `http://…/api/v1/books/`, and the backend's log named the Docker gateway as every request's client. Neither host sent `Strict-Transport-Security`, and the frontend sent `X-Powered-By: Next.js`.
   - **The cause is not a missing `--proxy-headers`.** That is uvicorn's default. What it believes the headers from is `FORWARDED_ALLOW_IPS`, by default loopback, and nginx on the host reaches the container as the Docker network's gateway (measured: `172.22.0.1` on a local network). `docker-compose.yml` now sets the list to the ranges Docker gives its networks, `172.16.0.0/12,192.168.0.0/16`. The image is unchanged: who the proxy is belongs to the deployment.
