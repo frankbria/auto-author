@@ -26,8 +26,12 @@ from test_actions_are_sha_pinned import _workflow_files
 
 # Text chosen by whoever triggers the run: dispatch inputs, the event payload
 # (titles, bodies, branch names) and the names of the branches involved.
+# An expression runs to its closing `}}`; a single `}` inside it (`format('{0}', …)`)
+# does not end it.
+_INSIDE = r"(?:(?!\}\}).)*"
 CALLER_TEXT = re.compile(
-    r"\$\{\{[^}]*\b(inputs|github\.event|github\.head_ref|github\.base_ref|github\.ref_name)\b[^}]*\}\}"
+    r"\$\{\{" + _INSIDE + r"\b(inputs|github\.event|github\.(head_|base_)?ref(_name)?)\b" + _INSIDE + r"\}\}",
+    re.S,
 )
 
 HOSTILE = ["", "$(id)", "`id`", "x'; id; '", 'x"; id; "', "x && id", "x | id", "x\nid", "x y"]
@@ -83,12 +87,16 @@ def test_the_pattern_sees_what_it_is_for():
         "git checkout ${{ github.head_ref }}",
         'echo "built from ${{ github.ref_name }}"',
         "git diff ${{ github.base_ref }}...",
+        'echo "building ${{ github.ref }}"',
+        # A `}` inside the expression, before the name, must not end the match.
+        "export IMAGE_TAG='${{ format('sha-{0}', inputs.image_tag) }}'",
         'echo "${{ github.event.pull_request.title }}"',
     ]:
         assert CALLER_TEXT.search(hit), hit
     for miss in [
         "${{ secrets.USER }}", "${{ job.status }}", "${{ github.event_name }}", "${{ matrix.app }}",
-        "${{ github.sha }}", "${{ github.repository }}", "$IMAGE_TAG",
+        "${{ github.sha }}", "${{ github.repository }}", "${{ github.ref_type }}", "$IMAGE_TAG",
+        "${{ secrets.USER }} and then the word inputs.image_tag outside any expression",
     ]:
         assert not CALLER_TEXT.search(miss), miss
 
