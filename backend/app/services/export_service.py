@@ -11,6 +11,7 @@ import re
 import textwrap
 
 from app.core.config import settings
+from app.services.epub_writer import write_epub
 from app.services.export_templates import PAGE_SIZES_INCHES, resolve_template
 
 logger = logging.getLogger(__name__)
@@ -95,12 +96,6 @@ def _add_page_number_field(paragraph) -> None:
     run._r.append(begin)
     run._r.append(instr)
     run._r.append(end)
-
-try:
-    from ebooklib import epub
-    EPUB_AVAILABLE = True
-except ImportError:
-    EPUB_AVAILABLE = False
 
 try:
     from markdownify import ATX, MarkdownConverter, abstract_inline_conversion
@@ -738,8 +733,8 @@ class ExportService:
         """
         Generate an EPUB (3.0) file from book data and chapters.
 
-        ebooklib is synchronous, so the build runs on the dedicated export pool
-        to keep the event loop responsive — same pattern as PDF/DOCX. An outer
+        The build is synchronous, so it runs on the dedicated export pool to
+        keep the event loop responsive — same pattern as PDF/DOCX. An outer
         timeout abandons the await; it does not stop the build (#345).
         """
         return await _run_export_build(self._build_epub, book_data, chapters)
@@ -773,36 +768,20 @@ class ExportService:
         elif not chapter.get("heading_only"):
             parts.append("<p><em>(No content yet)</em></p>")
 
-        # No <?xml?> prolog: ebooklib parses content as a str during nav
-        # generation, and lxml rejects a unicode string carrying an encoding
-        # declaration. ebooklib writes its own prolog to the EPUB file.
+        return self._xhtml_document(heading, "".join(parts))
+
+    @staticmethod
+    def _xhtml_document(escaped_title: str, body: str) -> str:
+        """One of the book's documents, complete, as the EPUB file stores it."""
         return (
-            "<html xmlns='http://www.w3.org/1999/xhtml'><head>"
-            f"<title>{heading}</title></head><body>"
-            + "".join(parts)
-            + "</body></html>"
+            "<?xml version='1.0' encoding='utf-8'?>\n<!DOCTYPE html>\n"
+            '<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>'
+            f"<title>{escaped_title}</title></head><body>{body}</body></html>"
         )
 
     def _build_epub(self, book_data: Dict, chapters: List[Dict]) -> bytes:
-        if not EPUB_AVAILABLE:
-            raise ExportUnavailableError(
-                "EPUB export unavailable: ebooklib is not installed"
-            )
-
-        book = epub.EpubBook()
-        book.set_identifier(
-            str(book_data.get("id") or book_data.get("_id") or "auto-author-book")
-        )
-        book.set_title(book_data.get("title", "Untitled"))
-        book.set_language("en")
-
+        title = book_data.get("title", "Untitled")
         author = book_data.get("author_name") or book_data.get("owner_name")
-        if author:
-            book.add_author(author)
-        if book_data.get("description"):
-            book.add_metadata("DC", "description", book_data["description"])
-        if book_data.get("genre"):
-            book.add_metadata("DC", "subject", book_data["genre"])
 
         # Title page
         meta_lines = []
@@ -815,23 +794,16 @@ class ExportService:
                 meta_lines.append(f"<p>{label}: {html.escape(book_data[key])}</p>")
         if book_data.get("description"):
             meta_lines.append(f"<p>{html.escape(book_data['description'])}</p>")
-        title_page = epub.EpubHtml(
-            title="Title Page", file_name="title.xhtml", lang="en"
-        )
-        title_page.content = (
-            "<html xmlns='http://www.w3.org/1999/xhtml'><head>"
-            f"<title>{html.escape(book_data.get('title', 'Untitled'))}</title></head>"
-            f"<body><h1>{html.escape(book_data.get('title', 'Untitled'))}</h1>"
-            + "".join(meta_lines)
-            + "</body></html>"
-        )
-        book.add_item(title_page)
+        documents = [(
+            "title.xhtml",
+            self._xhtml_document(html.escape(title), f"<h1>{html.escape(title)}</h1>" + "".join(meta_lines)),
+        )]
 
         # Chapters. A reader starts a new page for each document, so a chapter
         # that only heads its subchapters gets none of its own: its heading
         # opens the first document under it, and its navigation entry points
         # there (#805).
-        documents, entries, lead = [], [], ""
+        entries, lead = [], ""
         for i, chapter in enumerate(chapters, 1):
             level = chapter.get("level", 1)
             if chapter.get("heading_only"):
@@ -839,32 +811,22 @@ class ExportService:
                     j for j in range(i, len(chapters)) if not chapters[j].get("heading_only")
                 )
                 lead += self._xhtml_heading(chapter, i)
-                section = epub.Section(
-                    self._chapter_heading(chapter, i), href=f"chap_{first_under + 1}.xhtml"
-                )
-                entries.append((level, section))
+                entries.append((level, self._chapter_heading(chapter, i), f"chap_{first_under + 1}.xhtml"))
                 continue
-            item = epub.EpubHtml(
-                title=self._chapter_heading(chapter, i),
-                file_name=f"chap_{i}.xhtml",
-                lang="en",
-            )
-            item.content = self._chapter_to_xhtml(chapter, i, lead)
+            documents.append((f"chap_{i}.xhtml", self._chapter_to_xhtml(chapter, i, lead)))
             lead = ""
-            book.add_item(item)
-            documents.append(item)
-            entries.append((level, item))
+            entries.append((level, self._chapter_heading(chapter, i), f"chap_{i}.xhtml"))
 
-        # Subchapters sit under their chapter in the reader's navigation.
-        book.toc = [title_page, *self._nested(entries)]
-        book.add_item(epub.EpubNcx())
-        book.add_item(epub.EpubNav())
-        book.spine = [title_page, "nav", *documents]
-
-        output = io.BytesIO()
-        epub.write_epub(output, book)
-        output.seek(0)
-        return output.getvalue()
+        return write_epub(
+            identifier=str(book_data.get("id") or book_data.get("_id") or "auto-author-book"),
+            title=title,
+            author=author,
+            description=book_data.get("description"),
+            subject=book_data.get("genre"),
+            documents=documents,
+            # Subchapters sit under their chapter in the reader's navigation.
+            toc=[("Title Page", "title.xhtml", []), *self._nested(entries)],
+        )
 
     async def generate_markdown(
         self,
@@ -1018,20 +980,16 @@ class ExportService:
 
     @staticmethod
     def _nested(entries: List[tuple]) -> List:
-        """(level, item) pairs as ebooklib's table of contents: an item with
-        others under it becomes ``(item, [those])``."""
+        """(level, label, document) in reading order as a table of contents:
+        ``(label, document, [the entries under it])``."""
         root: List = []
         path = [root]  # path[d] holds the entries at depth d + 1
-        for level, item in entries:
+        for level, label, document in entries:
             del path[level:]
-            node = [item, []]
+            node = (label, document, [])
             path[-1].append(node)
-            path.append(node[1])
-
-        def finish(nodes):
-            return [(item, finish(below)) if below else item for item, below in nodes]
-
-        return finish(root)
+            path.append(node[2])
+        return root
 
     def _select_chapters(
         self, book_data: Dict, include_empty_chapters: bool

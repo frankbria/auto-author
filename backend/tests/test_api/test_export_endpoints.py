@@ -508,7 +508,7 @@ class TestExportAvailability:
         expected = {
             "pdf": export_endpoint.PDF_AVAILABLE,
             "docx": export_endpoint.DOCX_AVAILABLE,
-            "epub": export_endpoint.EPUB_AVAILABLE,
+            "epub": True,
             "markdown": export_endpoint.MARKDOWNIFY_AVAILABLE,
         }
         for fmt in data["formats"]:
