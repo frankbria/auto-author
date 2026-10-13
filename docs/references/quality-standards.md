@@ -250,6 +250,33 @@ A test-only advisory does not ship to the container, but it does run in CI again
 repository, so the rule is the same as for any other: fix it, or ledger it in
 `security-baseline.json` with a reason. Never leave it to a blind spot.
 
+## The image scan, and what it covers that the audit gate does not
+
+The audit gate reads lockfiles. It never sees what is in an image that no lockfile names: the
+base image's operating-system packages, and whatever the base image ships besides. Since #818
+`build-images.yml` scans each image as built with Trivy (`CRITICAL,HIGH`, `ignore-unfixed`), on
+pull requests as well as on main, and on main a finding stops the job before the image is
+pushed.
+
+Its first run found eleven fixable `HIGH` findings and none of them in the application: four in
+pip's own vendored libraries in the Python base image, seven in npm's own dependencies in the
+Node one. The runtime images install nothing, so both package managers were removed from them,
+which left the scan with nothing to report and no ignore file to keep.
+
+When it fails:
+
+- **A finding in the base image** is fixed by the upstream rebuilding the tag. The Dockerfiles
+  pin the base image by digest, and Dependabot's `docker` entries move the digest, so the fix
+  arrives as a pull request. Merge it.
+- **A finding in an application dependency** is the audit gate's subject too: bump it.
+- **A finding that cannot be fixed yet**, and has a fix published (the scan ignores the ones
+  without): add a `.trivyignore.yaml` with the id, a `statement` saying why it does not apply
+  and an `expired_at` date, and point the scan step's `trivyignores` at it. There is none
+  today, on purpose.
+
+Because a new advisory can turn this red with no change on our side, a red image build on main
+after an unrelated merge is usually this. Staging keeps running the image it has.
+
 ## This repository is public — what must not be committed
 
 Two categories, two guards, both in the `Security Audit` job:

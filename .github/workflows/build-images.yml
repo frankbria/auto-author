@@ -140,6 +140,21 @@ jobs:
             NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
             NEXT_PUBLIC_ENVIRONMENT=${{ matrix.environment }}
 
+      # Fixable CRITICAL and HIGH vulnerabilities in the image as built: the base
+      # image's packages and everything installed on top (#818). On every event,
+      # so a pull request that brings one in shows it; on main a finding stops
+      # the job before the push below. Pinned to a commit like every action here,
+      # and this one for cause: in March 2026 nearly every tag of this action
+      # was repointed at credential-stealing code (GHSA-69fq-xp46-6x23).
+      - name: Scan the image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
       # A built image that cannot start is worse than a failed build: published,
       # it is a tag the deploy would happily pull. Boot each image before it is
       # pushed.
