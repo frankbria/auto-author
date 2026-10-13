@@ -57,7 +57,9 @@ jobs:
       # string handed to ssh: this runner's shell puts the tag into it, and the
       # box's shell, as root, then reads it. So the tag must be nothing but a
       # build's sha- tag. scripts/test_workflow_inputs_not_in_run.py runs this
-      # script against tags that are not.
+      # script against tags that are not. Where the tag is put into that
+      # string it is also quoted for the box (printf %q), so a step that ran
+      # without this check would still hand the box a word, not a command.
       - name: Check the image tag
         run: |
           if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{7,40}$ ]]; then
@@ -129,7 +131,7 @@ jobs:
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              cd /opt/auto-author
-             export IMAGE_TAG='$IMAGE_TAG'
+             export IMAGE_TAG=$(printf '%q' "$IMAGE_TAG")
              # docker-compose.yml requires ENVIRONMENT with no default (#777).
              # This workflow only ever targets staging, so it says so here.
              export ENVIRONMENT=staging
@@ -155,7 +157,7 @@ jobs:
              cd /opt/auto-author
              # \`logs\` interpolates the compose files too, so it needs the same
              # required vars as \`up\` or it aborts instead of printing anything.
-             export IMAGE_TAG='$IMAGE_TAG' ENVIRONMENT=staging
+             export IMAGE_TAG=$(printf '%q' "$IMAGE_TAG") ENVIRONMENT=staging
              docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=60
              exit 1"
 

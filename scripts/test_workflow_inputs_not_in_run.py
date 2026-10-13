@@ -214,3 +214,37 @@ def test_the_check_lets_through_only_what_it_should(workflow, job, variable, val
     code = _first_step_exit(workflow, job, variable, value)
 
     assert (code == 0) is ok, f"{variable}={value!r} exited {code}"
+
+
+DEPLOY = "deploy-staging-containers.yml"
+
+
+@pytest.mark.parametrize("step_name", ["Pull and start", "Health check"])
+def test_the_box_does_not_parse_the_tag_even_when_the_check_did_not_run(step_name, tmp_path):
+    """A later step given `if: always()` would run after the check had failed, with the refused
+    tag still in the variable. So the tag is also quoted for the box where it is handed to ssh."""
+    path = next(p for p in _workflow_files() if p.name == DEPLOY)
+    step = next(s for s in dict(_jobs(path))["deploy"]["steps"] if s.get("name") == step_name)
+    box, stubs = tmp_path / "box", tmp_path / "bin"
+    box.mkdir(), stubs.mkdir()
+    # ssh: run the command it is handed, on a stand-in for the box.
+    (stubs / "ssh").write_text(
+        f'#!/usr/bin/env bash\ncmd="${{@: -1}}"; cd {box} && bash -c "${{cmd//\\/opt\\/auto-author/{box}}}"\n'
+    )
+    (stubs / "docker").write_text(f'#!/usr/bin/env bash\nprintf "%s\\n" "$IMAGE_TAG" >> {box}/tags\n')
+    (stubs / "curl").write_text("#!/usr/bin/env bash\nprintf 000\n")
+    (stubs / "sleep").write_text("#!/usr/bin/env bash\n")
+    for stub in stubs.iterdir():
+        stub.chmod(0o755)
+    script = re.sub(r"\$\{\{[^}]*\}\}", "box", step["run"])
+    hostile = "sha-3931169'; touch pwned; echo '"
+
+    subprocess.run(
+        ["bash", "-e", "-c", script],
+        env={"PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(tmp_path), "IMAGE_TAG": hostile},
+        capture_output=True,
+        timeout=60,
+    )
+
+    assert not (box / "pwned").exists(), "the tag was parsed as a command on the box"
+    assert set((box / "tags").read_text().splitlines()) == {hostile}, "docker did not receive the tag as it was given"
