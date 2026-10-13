@@ -25,8 +25,10 @@ import yaml
 from test_actions_are_sha_pinned import _workflow_files
 
 # Text chosen by whoever triggers the run: dispatch inputs, the event payload
-# (titles, bodies, branch names) and the head branch of a pull request.
-CALLER_TEXT = re.compile(r"\$\{\{[^}]*\b(inputs|github\.event|github\.head_ref)\b[^}]*\}\}")
+# (titles, bodies, branch names) and the names of the branches involved.
+CALLER_TEXT = re.compile(
+    r"\$\{\{[^}]*\b(inputs|github\.event|github\.head_ref|github\.base_ref|github\.ref_name)\b[^}]*\}\}"
+)
 
 HOSTILE = ["", "$(id)", "`id`", "x'; id; '", 'x"; id; "', "x && id", "x | id", "x\nid", "x y"]
 
@@ -79,10 +81,15 @@ def test_the_pattern_sees_what_it_is_for():
         "export IMAGE_TAG='${{ inputs.image_tag }}'",
         'echo "- Workers: ${{ github.event.inputs.staging_e2e_workers || \'1\' }}"',
         "git checkout ${{ github.head_ref }}",
+        'echo "built from ${{ github.ref_name }}"',
+        "git diff ${{ github.base_ref }}...",
         'echo "${{ github.event.pull_request.title }}"',
     ]:
         assert CALLER_TEXT.search(hit), hit
-    for miss in ["${{ secrets.USER }}", "${{ job.status }}", "${{ github.event_name }}", "${{ matrix.app }}", "$IMAGE_TAG"]:
+    for miss in [
+        "${{ secrets.USER }}", "${{ job.status }}", "${{ github.event_name }}", "${{ matrix.app }}",
+        "${{ github.sha }}", "${{ github.repository }}", "$IMAGE_TAG",
+    ]:
         assert not CALLER_TEXT.search(miss), miss
 
 
