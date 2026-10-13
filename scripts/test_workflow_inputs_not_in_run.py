@@ -140,7 +140,10 @@ CASES = [
     (workflow, job, variable, value, ok)
     for (workflow, job), checks in VALIDATED.items()
     for variable, (good, bad) in checks.items()
-    for value, ok in [(v, True) for v in good] + [(v, False) for v in bad + HOSTILE]
+    # A value that passes with a command before or after it must not: a check
+    # that is not anchored at both ends lets exactly that through.
+    for value, ok in [(v, True) for v in good]
+    + [(v, False) for v in bad + HOSTILE + [f"id; {good[0]}", f"{good[0]}; id", f"x{good[0]}", f"{good[0]}x"]]
 ]
 
 
