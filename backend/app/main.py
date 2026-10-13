@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from contextlib import asynccontextmanager
 from app.api.endpoints.router import router as api_router
-from app.core.config import settings, is_production_env
+from app.core.config import settings, is_deployed_env, is_production_env
 import asyncio
 import logging
 import os
@@ -244,6 +244,9 @@ app = FastAPI(
     description="API for the Auto Author application",
     version="0.1.0",
     lifespan=lifespan,
+    # No /docs, /redoc or /openapi.json where real users are (#815): without
+    # the schema FastAPI serves none of the three.
+    openapi_url=None if is_deployed_env() else "/openapi.json",
 )
 
 # The last one added is the outermost. CORS has to be outside the request

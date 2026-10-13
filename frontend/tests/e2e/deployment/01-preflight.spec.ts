@@ -125,59 +125,22 @@ test.describe('Pre-Flight Health Checks', () => {
     console.log('✅ Frontend CSP headers are configured');
   });
 
-  test('CSP Headers - Backend API Docs', async ({ request }) => {
-    console.log(`\n🛡️ Testing API docs CSP: ${API_BASE_URL}/docs`);
+  test('API documentation is not served on a deployed host (#815)', async ({ request }) => {
+    console.log(`\n📖 Testing that the API serves no documentation: ${API_BASE_URL}`);
 
-    const response = await request.get(`${API_BASE_URL}/docs`);
-    const headers = response.headers();
-    const csp = headers['content-security-policy'];
+    for (const path of ['/docs', '/redoc', '/openapi.json']) {
+      const response = await request.get(`${API_BASE_URL}${path}`);
+      expect(response.status(), `${path} should not be served`).toBe(404);
+    }
 
-    // Verify CSP header exists
+    // The allowances only the Swagger page needed are gone with it.
+    const live = await request.get(`${API_BASE_URL}/api/v1/health/live`);
+    const csp = live.headers()['content-security-policy'];
     expect(csp, 'Content-Security-Policy header should exist').toBeTruthy();
+    expect(csp).not.toContain('unsafe-inline');
+    expect(csp).not.toContain('cdn.jsdelivr.net');
 
-    // Verify key directives for Swagger UI
-    expect(csp).toContain('script-src');
-    expect(csp).toContain('cdn.jsdelivr.net');
-    expect(csp).toContain('style-src');
-    expect(csp).toContain('img-src');
-
-    console.log('✅ Backend API docs CSP headers are configured');
-  });
-
-  test('Swagger UI - Loads Without Errors', async ({ page }) => {
-    console.log(`\n📖 Testing Swagger UI: ${API_BASE_URL}/docs`);
-
-    const cspViolations: string[] = [];
-
-    // Monitor for CSP violations
-    page.on('console', msg => {
-      const text = msg.text();
-      if (text.toLowerCase().includes('refused to') || text.toLowerCase().includes('csp')) {
-        cspViolations.push(text);
-      }
-    });
-
-    // Navigate to Swagger UI
-    await page.goto(`${API_BASE_URL}/docs`);
-
-    // Wait for Swagger UI to load
-    await page.waitForSelector('.swagger-ui', { timeout: 15000 });
-
-    // Verify no CSP violations
-    expect(
-      cspViolations,
-      `Expected no CSP violations, but found: ${cspViolations.join(', ')}`
-    ).toHaveLength(0);
-
-    // Verify Swagger UI is visible (not blank/white page)
-    const swaggerUI = page.locator('.swagger-ui');
-    await expect(swaggerUI).toBeVisible();
-
-    // Verify can expand/collapse endpoints
-    const firstEndpoint = page.locator('.opblock').first();
-    await expect(firstEndpoint).toBeVisible();
-
-    console.log('✅ Swagger UI loads without CSP errors');
+    console.log('✅ The API serves no documentation');
   });
 });
 
@@ -190,7 +153,7 @@ test.describe('Pre-Flight Health Checks', () => {
  * ✅ API endpoints are reachable (not returning 500 errors)
  * ✅ Frontend loads without console errors
  * ✅ CSP headers are properly configured (frontend & backend)
- * ✅ Swagger UI documentation is accessible
+ * ✅ The API serves no documentation (#815)
  *
  * If all pre-flight checks pass, the deployment is healthy and ready for full testing.
  */
