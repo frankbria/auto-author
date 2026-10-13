@@ -134,7 +134,8 @@ def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
         convert_em = convert_i = abstract_inline_conversion(lambda self: "_")
 
         def convert_hN(self, n, el, text, parent_tags):
-            return super().convert_hN(min(6, n + below_the_chapter_heading), el, text, parent_tags)
+            # markdownify stops at the sixth level itself.
+            return super().convert_hN(n + below_the_chapter_heading, el, text, parent_tags)
 
     converter = _Chapter(
         heading_style=ATX,  # the default writes an h1 as text over a row of `=`
