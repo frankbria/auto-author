@@ -1542,3 +1542,6 @@ The issue said uvicorn ran without `--proxy-headers`. That is uvicorn's default.
 
 ### A server started inside `showboat exec` keeps the step open (#814)
 The demo script started `next dev` in the background inside a `showboat exec` step and the recording stopped there for six minutes. The server's own output went to a file, but the shell that launched it still held the pipe showboat reads the step's output from, so the step never reached end of file. Start servers before the recording, with all three of their streams redirected, and let the recorded steps only ask them things.
+
+### My search for callers of a route I was removing looked in `frontend/src` only (#815)
+Before turning `/docs` off on deployed hosts I searched for anything that calls it and found nothing. The reviewer found two specs in `frontend/tests/e2e/deployment` that load the Swagger page on staging, and an operator checklist that says to. No workflow runs that suite, so CI would have stayed green and the first person to run it by hand after the deploy would have got two failures. The search had named `frontend/src`, and then filtered its own output until the hits were gone. When removing something other code may call, search the whole tree for the literal with one plain `grep -rn`, excluding only `node_modules` and build output, and read every hit before filtering any.
