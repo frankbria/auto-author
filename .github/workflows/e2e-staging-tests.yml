@@ -217,9 +217,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The uv the image build pins in backend/Dockerfile, as in tests.yml (#819).
+      - name: Read the pinned uv version
+        id: uv
+        run: |
+          version=$(sed -n 's|^FROM astral/uv:\([0-9][0-9.]*\)@sha256:.*|\1|p' backend/Dockerfile)
+          [ -n "$version" ] || { echo "::error::backend/Dockerfile pins no uv version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Setup uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
+          version: ${{ steps.uv.outputs.version }}
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
           # v9 flipped the `prune-cache` default to false to ease load on PyPI

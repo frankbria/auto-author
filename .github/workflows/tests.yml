@@ -104,10 +104,25 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install uv
+      # The pinned action, not `curl … | sh` (#819): that ran whatever the
+      # address served on the day, with this job's token. And the version the
+      # image build pins in backend/Dockerfile, not the newest one: without
+      # `version` the action installs whatever was released that day. Dependabot
+      # moves the Dockerfile's uv by pull request, and this follows it.
+      - name: Read the pinned uv version
+        id: uv
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          version=$(sed -n 's|^FROM astral/uv:\([0-9][0-9.]*\)@sha256:.*|\1|p' backend/Dockerfile)
+          [ -n "$version" ] || { echo "::error::backend/Dockerfile pins no uv version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ steps.uv.outputs.version }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+          prune-cache: true
 
       - name: Install dependencies
         working-directory: backend
@@ -149,10 +164,25 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Install uv
+      # The pinned action, not `curl … | sh` (#819): that ran whatever the
+      # address served on the day, with this job's token. And the version the
+      # image build pins in backend/Dockerfile, not the newest one: without
+      # `version` the action installs whatever was released that day. Dependabot
+      # moves the Dockerfile's uv by pull request, and this follows it.
+      - name: Read the pinned uv version
+        id: uv
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          version=$(sed -n 's|^FROM astral/uv:\([0-9][0-9.]*\)@sha256:.*|\1|p' backend/Dockerfile)
+          [ -n "$version" ] || { echo "::error::backend/Dockerfile pins no uv version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ steps.uv.outputs.version }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+          prune-cache: true
 
       # Both audit tools exit 1 when they find advisories, which is the normal
       # case here — the gate script decides pass/fail. Any OTHER exit code means
@@ -287,10 +317,25 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Install uv
+      # The pinned action, not `curl … | sh` (#819): that ran whatever the
+      # address served on the day, with this job's token. And the version the
+      # image build pins in backend/Dockerfile, not the newest one: without
+      # `version` the action installs whatever was released that day. Dependabot
+      # moves the Dockerfile's uv by pull request, and this follows it.
+      - name: Read the pinned uv version
+        id: uv
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          version=$(sed -n 's|^FROM astral/uv:\([0-9][0-9.]*\)@sha256:.*|\1|p' backend/Dockerfile)
+          [ -n "$version" ] || { echo "::error::backend/Dockerfile pins no uv version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ steps.uv.outputs.version }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+          prune-cache: true
 
       - name: Install backend dependencies
         working-directory: backend

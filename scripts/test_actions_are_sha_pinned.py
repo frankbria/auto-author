@@ -24,6 +24,8 @@ costs no ongoing manual work; `.github/dependabot.yml` already covers
 tag diffs, making the release notes in the PR body the primary review artifact.
 """
 
+import os
+import subprocess
 import re
 from pathlib import Path
 
@@ -126,3 +128,114 @@ def test_every_pin_carries_a_version_comment(path):
 def test_workflow_parses_as_yaml(path):
     """The pins are applied by rewriting `uses:` lines; a bad edit shows up here."""
     yaml.safe_load(path.read_text())
+
+
+# A download piped into a shell is the same hole as a floating tag, one step
+# earlier (#819): `curl … | sh` runs whatever that address serves on the day,
+# with the job's token and secrets, and leaves nothing to pin, diff or review.
+# tests.yml installed uv that way in three jobs.
+PIPED_INTO_A_SHELL = re.compile(r"\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(ba|z|da)?sh\b")
+
+
+def _jobs(path):
+    return (yaml.safe_load(path.read_text()).get("jobs") or {}).items()
+
+
+def _scripts(job):
+    return [step["run"] for step in job.get("steps") or [] if isinstance(step.get("run"), str)]
+
+
+def test_the_pattern_sees_a_piped_installer():
+    for hit in [
+        "curl -LsSf https://astral.sh/uv/install.sh | sh",
+        "curl -fsSL https://example.test/install | sudo bash -s -- --yes",
+        "wget -qO- https://example.test/i.sh | bash",
+    ]:
+        assert PIPED_INTO_A_SHELL.search(hit), hit
+    for miss in [
+        "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/ || true",
+        "curl -s https://example.test/health | cut -c1-80",
+        "echo done | shasum",
+    ]:
+        assert not PIPED_INTO_A_SHELL.search(miss), miss
+
+
+@pytest.mark.parametrize("path", _workflow_files(), ids=lambda p: p.name)
+def test_no_workflow_pipes_a_download_into_a_shell(path):
+    offenders = [
+        f"{name}: {match.group(0)}"
+        for name, job in _jobs(path)
+        for script in _scripts(job)
+        for match in PIPED_INTO_A_SHELL.finditer(script)
+    ]
+
+    assert not offenders, "install it with a pinned action instead:\n" + "\n".join(offenders)
+
+
+def test_every_job_that_runs_uv_installs_it_with_the_setup_action():
+    """So that removing the piped installer cannot leave a job relying on whatever uv a
+    runner image happens to carry."""
+    uses_uv = re.compile(r"(^|[\s;&|(])uv (sync|run|export|lock|python|pip|venv|tool|build)\b", re.M)
+    checked = []
+    for path in _workflow_files():
+        for name, job in _jobs(path):
+            if not any(uses_uv.search(script) for script in _scripts(job)):
+                continue
+            checked.append(f"{path.name}:{name}")
+            actions = [step.get("uses", "") for step in job.get("steps") or []]
+            assert any(a.startswith("astral-sh/setup-uv@") for a in actions), f"{path.name}: job {name} runs uv without setup-uv"
+
+    assert len(checked) >= 4, f"only {checked} run uv; this guard is close to vacuous"
+
+
+# One uv everywhere (#819 review). The image build pins uv in backend/Dockerfile,
+# where Dependabot moves it by pull request. `setup-uv` without `version` installs
+# whatever is newest that day, so CI would run a uv nobody reviewed. Each job
+# reads the version out of the Dockerfile instead: one place to change, and a
+# Dependabot bump of the image's uv moves CI's in the same pull request.
+DOCKERFILE_UV = re.compile(r"^FROM astral/uv:([0-9][0-9.]*)@sha256:", re.M)
+
+
+def _setup_uv_jobs():
+    for path in _workflow_files():
+        for name, job in _jobs(path):
+            steps = job.get("steps") or []
+            for index, step in enumerate(steps):
+                if step.get("uses", "").startswith("astral-sh/setup-uv@"):
+                    yield f"{path.name}:{name}", steps, index
+
+
+def _read_version(script, cwd, tmp_path):
+    """Run a job's `Read the pinned uv version` script in `cwd`; return its exit code and what it set."""
+    out = tmp_path / "github_output"
+    out.write_text("")
+    code = subprocess.run(
+        ["bash", "-e", "-c", script], cwd=cwd, env={"PATH": os.environ["PATH"], "GITHUB_OUTPUT": str(out)},
+        capture_output=True, timeout=30,
+    ).returncode
+    return code, out.read_text().strip()
+
+
+def test_every_setup_of_uv_installs_the_version_the_image_build_pins(tmp_path):
+    pinned = DOCKERFILE_UV.search((REPO / "backend" / "Dockerfile").read_text())
+    assert pinned, "backend/Dockerfile pins no uv version"
+    found = list(_setup_uv_jobs())
+    assert len(found) >= 4, f"only {[name for name, *_ in found]} set uv up; this guard is close to vacuous"
+
+    for name, steps, index in found:
+        assert steps[index]["with"].get("version") == "${{ steps.uv.outputs.version }}", f"{name}: uv's version floats"
+        readers = [i for i, step in enumerate(steps) if step.get("id") == "uv"]
+        assert readers and readers[0] < index, f"{name}: nothing reads the version before uv is set up"
+        code, output = _read_version(steps[readers[0]]["run"], REPO, tmp_path)
+        assert (code, output) == (0, f"version={pinned.group(1)}"), f"{name}: read {output!r}, exit {code}"
+
+
+def test_a_dockerfile_that_pins_no_uv_stops_the_job_instead_of_installing_the_newest(tmp_path):
+    """An empty `version` means "latest" to the action, which is the thing being prevented."""
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend" / "Dockerfile").write_text("FROM python:3.13-slim AS base\nCOPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv\n")
+
+    for name, steps, _ in _setup_uv_jobs():
+        script = next(step["run"] for step in steps if step.get("id") == "uv")
+        code, output = _read_version(script, tmp_path, tmp_path)
+        assert code != 0 and output == "", f"{name}: exit {code}, set {output!r}"

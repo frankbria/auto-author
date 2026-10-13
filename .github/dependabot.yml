@@ -224,6 +224,13 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # uv only (#819). It is a third party's release, not the base image's own
+    # rebuild, so a new one waits the fourteen days every other tool here does.
+    # This works because the Dockerfile takes uv from Docker Hub: a cooldown
+    # needs the registry's publication dates, and ghcr.io gives Dependabot none.
+    cooldown:
+      default-days: 14
+      include: ["astral/uv"]
     ignore:
       - dependency-name: "python"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
