@@ -9,6 +9,7 @@ jest.mock('@/lib/api/bookClient', () => ({
   __esModule: true,
   default: {
     generateChapterDraftWithErrorHandling: jest.fn(),
+    getChapterQAResponses: jest.fn(),
   },
 }));
 
@@ -34,6 +35,9 @@ describe('DraftGenerator', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // A chapter whose interview has not been answered: the dialog starts from its
+    // sample questions, which is what these tests are about (#834).
+    (bookClient.getChapterQAResponses as jest.Mock).mockResolvedValue({ responses: [], totalQuestions: 0, completedCount: 0, inProgressCount: 0 });
   });
 
   it('renders the generate button', () => {

@@ -31,6 +31,7 @@ interface QuestionResponse {
   answer: string;
 }
 
+// What the dialog starts from for a chapter with no interview answers yet.
 const SAMPLE_QUESTIONS = [
   "What is the main concept or idea you want to convey in this chapter?",
   "Can you share a personal story or example that illustrates this concept?",
@@ -49,9 +50,22 @@ export function DraftGenerator({
   const { trackOperation } = usePerformanceTracking();
   const [isOpen, setIsOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [questionResponses, setQuestionResponses] = useState<QuestionResponse[]>(
-    SAMPLE_QUESTIONS.map(q => ({ question: q, answer: '' }))
-  );
+  const sampleQuestions = () => SAMPLE_QUESTIONS.map(q => ({ question: q, answer: '' }));
+  const [questionResponses, setQuestionResponses] = useState<QuestionResponse[]>(sampleQuestions);
+  // The questions and answers belong to a chapter: the editor can hand this
+  // component another one, and the first chapter's must not be shown under it.
+  const chapterKey = `${bookId}/${chapterId}`;
+  const [responsesFor, setResponsesFor] = useState(chapterKey);
+  if (responsesFor !== chapterKey) {
+    setResponsesFor(chapterKey);
+    setQuestionResponses(sampleQuestions());
+  }
+  // The chapter whose questions the writer has changed in this dialog. Their
+  // text is not written over by the saved answers arriving, or on reopening.
+  const editedFor = useRef<string | null>(null);
+  const noteEdit = () => {
+    editedFor.current = chapterKey;
+  };
   const [writingStyle, setWritingStyle] = useState('conversational');
   const [targetLength, setTargetLength] = useState(2000);
   // Pre-select the user's default writing style (#64) unless they've already
@@ -64,6 +78,31 @@ export function DraftGenerator({
       setWritingStyle(preferred);
     }
   }, [userPreferences]);
+  // On opening, start from what the writer has already answered in this
+  // chapter's interview (#834). It opened with five sample questions and empty
+  // answers whatever had been answered, to be typed again. Answers still in
+  // draft are included: the writer sees them here and can change them.
+  useEffect(() => {
+    if (!isOpen) return;
+    let ignore = false;
+    const key = `${bookId}/${chapterId}`;
+    bookClient
+      .getChapterQAResponses(bookId, chapterId)
+      .then((saved) => {
+        if (ignore || editedFor.current === key) return;
+        const answered = saved.responses.map(({ question, answer }) => ({ question, answer }));
+        // None now: back to the sample questions, and not whatever was read the
+        // last time the dialog was open.
+        setQuestionResponses(answered.length > 0 ? answered : sampleQuestions());
+      })
+      .catch(() => {
+        // Whatever is shown stays, the sample questions or the answers read the
+        // last time: the dialog works without a fresh read.
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [isOpen, bookId, chapterId]);
   const [generatedDraft, setGeneratedDraft] = useState<string | null>(null);
   const [draftMetadata, setDraftMetadata] = useState<{
     word_count: number;
@@ -98,16 +137,19 @@ export function DraftGenerator({
   }, [generatedDraft]);
 
   const handleResponseChange = (index: number, value: string) => {
+    noteEdit();
     const newResponses = [...questionResponses];
     newResponses[index].answer = value;
     setQuestionResponses(newResponses);
   };
 
   const addQuestion = () => {
+    noteEdit();
     setQuestionResponses([...questionResponses, { question: '', answer: '' }]);
   };
 
   const removeQuestion = (index: number) => {
+    noteEdit();
     setQuestionResponses(questionResponses.filter((_, i) => i !== index));
   };
 
@@ -274,6 +316,7 @@ export function DraftGenerator({
                           placeholder="Enter your question..."
                           value={qr.question}
                           onChange={(e) => {
+                            noteEdit();
                             const newResponses = [...questionResponses];
                             newResponses[index].question = e.target.value;
                             setQuestionResponses(newResponses);
@@ -281,6 +324,7 @@ export function DraftGenerator({
                           className="w-full px-3 py-2 border rounded-md"
                         />
                         <Textarea
+                          aria-label={`Answer to question ${index + 1}`}
                           placeholder="Your answer..."
                           value={qr.answer}
                           onChange={(e) => handleResponseChange(index, e.target.value)}

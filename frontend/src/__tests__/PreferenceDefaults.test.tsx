@@ -16,6 +16,8 @@ jest.mock('@/lib/api/bookClient', () => ({
   __esModule: true,
   default: {
     generateChapterDraft: jest.fn(),
+    // No saved interview answers: the draft dialog starts from its sample questions (#834).
+    getChapterQAResponses: jest.fn().mockResolvedValue({ responses: [], totalQuestions: 0, completedCount: 0, inProgressCount: 0 }),
     getExportFormats: jest.fn(),
     getChapterContent: jest.fn(),
     saveChapterContent: jest.fn(),
