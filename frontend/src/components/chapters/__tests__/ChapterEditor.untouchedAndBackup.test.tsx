@@ -100,6 +100,19 @@ describe('a chapter that is opened and not touched', () => {
     expect(mockBookClient.saveChapterContent).not.toHaveBeenCalled();
   });
 
+  it('is not marked unsaved when the page hands the editor new text either', async () => {
+    serverHas('<p>Unused</p>');
+    const view = render(<ChapterEditor {...props} initialContent="<p>First text</p>" />);
+    await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue('<p>First text</p>'));
+
+    view.rerender(<ChapterEditor {...props} initialContent="<p>Second text</p>" />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(asksBeforeLeaving()).toBe(false);
+  });
+
   it('still asks once something has been typed', async () => {
     const user = userEvent.setup({ delay: null });
     serverHas('<p>Saved text</p>');
@@ -136,6 +149,22 @@ describe('restoring a backup', () => {
 
     await expectTheBackupToBeWhatIsSaved();
     expect(localStorage.getItem(BACKUP_KEY)).toBeNull();
+    expect(screen.queryByText(/older than the saved chapter/i)).not.toBeInTheDocument();
+  });
+
+  it('offers a later backup plainly, not with the question the earlier one raised', async () => {
+    const user = userEvent.setup({ delay: null });
+    backupFrom(3 * DAY);
+    serverHas('<p>Saved since</p>', HOUR);
+    await opened();
+    await user.click(screen.getByRole('button', { name: /restore backup/i }));
+    await user.click(screen.getByRole('button', { name: /restore the older backup/i }));
+
+    // A save fails later and leaves a new backup; typing makes the editor look again.
+    backupFrom(0, '<p>A later backup</p>');
+    await user.type(screen.getByRole('textbox'), '!');
+
+    expect(await screen.findByRole('button', { name: /^restore backup$/i })).toBeInTheDocument();
     expect(screen.queryByText(/older than the saved chapter/i)).not.toBeInTheDocument();
   });
 

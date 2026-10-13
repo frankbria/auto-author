@@ -1678,3 +1678,15 @@ The issue said a chapter missing from the saved tab order gets no tab. Two tests
 My deploy helper waited for the image build with `gh run watch` and then read the build's conclusion. While the GitHub API was answering 502, the watch returned at once and the conclusion came back empty; the helper printed the empty conclusion and dispatched the deploy anyway. The deploy run failed on an image tag that was not there yet, and staging stayed on the previous build. I only saw it because the E2E line said "skipped".
 **Rule:** a wait is not a check. After waiting for a run, compare its conclusion with the one word that means go, and stop on anything else, an empty answer included. Read the helper's whole log, not its last line.
 
+### The stand-in for the editor could not show the bug, or the fix (#831)
+The unit tests run against a stand-in for the editor library. Its `setContent` emitted an update whatever options it was given, so a fix that passes `{ emitUpdate: false }` could not pass a test; it does not redraw restored text, so three assertions about what the editor showed were about nothing; and it reset the editor's content by itself when a prop changed, which the real hook never does. Each had to be found and the stand-in corrected against the library's source before a test meant anything.
+**Rule:** before writing a test against a stand-in, read the stand-in for the behaviour under test, and compare it with the real thing's source. When a fix depends on an option, the stand-in has to honour the option.
+
+### The issue said "always"; a browser said "for three seconds" (#831)
+The issue: every untouched load is marked unsaved and the browser always asks before leaving. With the real editor in a browser, on main, asked once a second: yes, yes, yes, no, no, no. The mark lasts until the autosave timer runs, finds nothing to save and clears it. Still a defect, on every chapter opened, but a different size from the one described, and the unit test alone (which only looks once, straight away) would have agreed with the issue.
+**Rule:** measure the defect in the real thing before writing it up, and over time when a timer is involved.
+
+### Two browsers on one backend talk to each other through it (#831)
+For the before-and-after I ran main's frontend and the branch's against one backend, one scenario after another. A scenario on main restored a backup; its autosave reached the backend three seconds later, after the next scenario had reset the chapter, and the branch's page loaded the backup text as the saved chapter. The branch looked as if it had restored the backup while still asking whether to. The driver now leaves the page at the end of each scenario and fails loudly if the chapter does not load as seeded.
+**Rule:** in a shared-backend comparison, end each scenario by leaving the page and waiting out its saves, and assert the starting state before measuring.
+

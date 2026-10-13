@@ -433,12 +433,10 @@ jest.mock('@tiptap/react', () => {
       }
     }, [editor, config?.onUpdate, forceUpdate]);
 
-    // Update content when initialContent changes
-    React.useEffect(() => {
-      if (config?.content && editor.getHTML() !== config.content) {
-        editor.commands.setContent(config.content);
-      }
-    }, [config?.content, editor]);
+    // The real useEditor does not put a changed `content` option into the editor:
+    // a component that wants that calls setContent itself, as ChapterEditor does.
+    // The stand-in used to do it here, with an update event, which made any
+    // component look as if its text had been edited (#831).
 
     return editor;
   });

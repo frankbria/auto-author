@@ -393,7 +393,7 @@ export function ChapterEditor({
     // The conflict-time backup is older text the dropped copy already holds.
     localStorage.removeItem(backupKey);
     noteBackupWrite();
-    editor.commands.setContent(conflict.currentContent, { emitUpdate: false });
+    editor.commands.setContent(conflict.currentContent);
     unsavedRef.current = null;
     setLastAutoSavedContent(conflict.currentContent);
     setAutoSavePending(false);
