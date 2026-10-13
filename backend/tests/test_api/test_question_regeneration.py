@@ -16,19 +16,15 @@ from httpx import AsyncClient
 
 from app.db.base import get_collection
 from app.services.ai_errors import AIRateLimitError
+from app.services.question_templates import FOCUS_HINTS
 
 AI_METHOD = "app.services.ai_service.ai_service.generate_chapter_questions"
 
 
-# Marker phrases the prompt builder emits per focus type, so the stub can
-# honor a requested focus the way the real model would.
-_FOCUS_MARKERS = {
-    "character development, motivations": "character",
-    "plot structure, events": "plot",
-    "setting details, world-building": "setting",
-    "themes, messages, symbolism": "theme",
-    "research needs, factual accuracy": "research",
-}
+# The hint the prompt builder emits for each focus type, so the stub can honor a
+# requested focus the way the real model would. Taken from the builder's own
+# table: these were copies of its wording, and matched nothing once it changed (#835).
+_FOCUS_MARKERS = {hint: kind.value for kind, hint in FOCUS_HINTS.items()}
 
 
 def _ai_question_dicts(prompt, count):

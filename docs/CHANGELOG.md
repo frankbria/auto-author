@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **The questions asked about a chapter are for a non-fiction book (#835, P1.53)**:
+  - **Problem.** When the model returned nothing usable, the chapter interview fell back to template questions written for a novel: "Who are the main characters in this chapter?", "How does the protagonist change?", "What sensory details bring the setting to life?". The hints given to the model for a chosen focus asked for "world-building" and "narrative progression". A generated question whose `help_text` was `null` raised an AttributeError that was caught and logged, and the question was dropped: three good questions with null help text were replaced by three templates. And templates added after generated questions started numbering again at 1.
+  - **Fix.** The templates, the help shown with them and the focus hints are rewritten for non-fiction and moved to `backend/app/services/question_templates.py`. The prompt says the book is non-fiction and what each type means for it. `help_text` is read with `or ""`. Questions are numbered once the list is final, so a dropped question leaves no gap and added templates carry on.
+  - **Found by the first test.** Asked for more than five questions across all five types, the fallback returned the same five again and again: the type and the template were both chosen by the same remainder. Ten questions were five questions twice. Each type now uses its templates in turn.
+  - **The type names stay.** `character`, `plot` and `setting` are stored on every question and sent by the frontend; changing them is a data change. They now mean the chapter's people, its structure and its context.
+  - **Two tests held the old wording.** One asserted the fiction hints; the other's stand-in for the model chose a question type by finding them in the prompt. Both now read the hints from the table the prompt is built from.
+
 - **"Generate AI Draft" in the toolbar starts from the chapter's interview answers (#834, P1.52)**:
   - **Problem.** The editor toolbar's draft dialog opened with five sample questions and empty answers, whatever the writer had already answered in the Interview Questions tab of the same chapter. To get a draft from those answers through this button they had to be typed again.
   - **Fix.** On opening, the dialog reads the chapter's saved answers (`getChapterQAResponses`, the call the interview tab's own draft button uses) and shows them, questions and answers, ready to edit. Answers still in draft are included. A chapter with no answers yet starts from the sample questions as before, and so does one whose answers cannot be read the first time it is opened.

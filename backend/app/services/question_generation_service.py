@@ -21,6 +21,7 @@ from app.services.ai_errors import AIServiceError
 from app.services.ai_service import AIService
 from app.utils.validators import validate_text_safety
 from app.core.config import settings
+from app.services.question_templates import FALLBACK_HELP, FOCUS_HINTS, fallback_templates
 from app.db.database import (
     create_questions_batch,
     get_questions_for_chapter as db_get_questions_for_chapter,
@@ -650,6 +651,9 @@ class QuestionGenerationService:
         These questions should help the author develop their chapter content by exploring key aspects that readers
         would want to understand. The questions should be diverse and cover important elements that would make
         the chapter compelling and complete.
+
+        The book is non-fiction. Ask about what the chapter says, who it is for, the order of its ideas and the
+        evidence for them.
         """
 
         # Add content context if available
@@ -691,16 +695,10 @@ class QuestionGenerationService:
         if focus_types and len(focus_types) > 0:
             focus_descriptions = []
             for focus in focus_types:
-                if focus == QuestionType.CHARACTER:
-                    focus_descriptions.append("character development, motivations, relationships, and arcs")
-                elif focus == QuestionType.PLOT:
-                    focus_descriptions.append("plot structure, events, conflicts, and narrative progression")
-                elif focus == QuestionType.SETTING:
-                    focus_descriptions.append("setting details, world-building, atmosphere, and environment")
-                elif focus == QuestionType.THEME:
-                    focus_descriptions.append("themes, messages, symbolism, and deeper meaning")
-                elif focus == QuestionType.RESEARCH:
-                    focus_descriptions.append("research needs, factual accuracy, and technical details")
+                # The type names are from fiction and are kept as stored values; what
+                # each asks of a non-fiction chapter is in FOCUS_HINTS (#835).
+                if focus in FOCUS_HINTS:
+                    focus_descriptions.append(FOCUS_HINTS[focus])
 
             if focus_descriptions:
                 focus_text = ", ".join(focus_descriptions)
@@ -732,6 +730,10 @@ class QuestionGenerationService:
             "help_text": "Optional guidance to help the author answer the question",
             "examples": ["Optional example 1", "Optional example 2"]
         }
+
+        The question types, for a non-fiction chapter: character is the people in it and its reader, plot is its
+        structure and argument, setting is context and background, theme is its message, research is evidence
+        and sources.
 
         Return the questions as a JSON array of these objects.
         """
@@ -807,7 +809,9 @@ class QuestionGenerationService:
                     difficulty = requested_difficulty or QuestionDifficulty.MEDIUM
 
                 # Process help text and examples
-                help_text = q.get("help_text", "").strip()
+                # `or ""`: the model writes null for "none", and .get's default is only
+                # for a missing key. It raised, and the question was dropped (#835).
+                help_text = (q.get("help_text") or "").strip()
                 examples = q.get("examples", [])
                 if isinstance(examples, list):
                     examples = [ex for ex in examples if isinstance(ex, str)]
@@ -851,8 +855,13 @@ class QuestionGenerationService:
             )
             processed_questions.extend(fallback_questions)
 
-        # Limit to requested count
-        return processed_questions[:count]
+        # Limit to requested count, and number what is left: generated questions
+        # that were dropped left gaps, and the templates added above started
+        # again at 1 (#835).
+        processed_questions = processed_questions[:count]
+        for position, question in enumerate(processed_questions, 1):
+            question.order = position
+        return processed_questions
 
     def _generate_fallback_questions(
         self,
@@ -877,68 +886,8 @@ class QuestionGenerationService:
         if not focus_types or len(focus_types) == 0:
             focus_types = [t for t in QuestionType]
 
-        # Template questions by type
-        templates = {
-            QuestionType.CHARACTER: [
-                "Who are the main characters in this chapter and what are their key traits?",
-                "How does the protagonist change or develop during this chapter?",
-                "What motivates the main character's actions in this chapter?",
-                "What conflicts or tensions exist between characters in this chapter?",
-                "How do the relationships between characters evolve in this chapter?"
-            ],
-            QuestionType.PLOT: [
-                f"What is the main event or conflict in {chapter_title}?",
-                "How does this chapter advance the overall story?",
-                "What obstacles or challenges arise in this chapter?",
-                "Is there a turning point or climax in this chapter?",
-                "How does this chapter connect to previous and future events in the story?"
-            ],
-            QuestionType.SETTING: [
-                "Where does this chapter take place and how is the setting described?",
-                "How does the environment or atmosphere contribute to the mood of the chapter?",
-                "What sensory details (sights, sounds, smells) bring the setting to life?",
-                "How does the setting influence the characters or events in this chapter?",
-                "Are there any changes to the setting during this chapter?"
-            ],
-            QuestionType.THEME: [
-                "What themes or messages are explored in this chapter?",
-                "What symbols or motifs appear in this chapter?",
-                "How does this chapter contribute to the book's overall meaning?",
-                "What moral dilemmas or philosophical questions arise in this chapter?",
-                "How might different readers interpret the events of this chapter?"
-            ],
-            QuestionType.RESEARCH: [
-                "What research might be needed to make this chapter more authentic?",
-                "Are there any technical details that require verification?",
-                "What historical, cultural, or scientific facts are relevant to this chapter?",
-                "Are there any specialized terms or concepts that need explanation?",
-                "What expert knowledge would enhance the realism of this chapter?"
-            ]
-        }
-
-        # Helper metadata by type
-        helper_metadata = {
-            QuestionType.CHARACTER: {
-                "help_text": "Consider physical traits, psychological aspects, backstory, and character development.",
-                "examples": ["The protagonist shows determination through her decision to confront her fear"]
-            },
-            QuestionType.PLOT: {
-                "help_text": "Focus on the sequence of events, cause and effect, conflicts, and resolution.",
-                "examples": ["The discovery of the map sets in motion a chain of events that leads to..."]
-            },
-            QuestionType.SETTING: {
-                "help_text": "Include time, place, atmosphere, and how the setting affects the story.",
-                "examples": ["The dark, narrow alleyways create a sense of claustrophobia that mirrors the character's mental state"]
-            },
-            QuestionType.THEME: {
-                "help_text": "Think about underlying messages, symbols, and deeper meaning.",
-                "examples": ["The recurring image of birds represents freedom and the character's desire to escape"]
-            },
-            QuestionType.RESEARCH: {
-                "help_text": "Consider what facts, terminology, or technical details need verification.",
-                "examples": ["The medical procedure described would require research on current surgical practices"]
-            }
-        }
+        templates = fallback_templates(chapter_title)
+        helper_metadata = FALLBACK_HELP
 
         # Generate questions
         questions = []
@@ -947,8 +896,11 @@ class QuestionGenerationService:
             question_type = focus_types[i % len(focus_types)]
 
             # Select question template
+            # The nth time a type comes round it takes its nth template. `i % 5`
+            # picked the same one every time when all five types were in play, so
+            # ten questions were five questions twice (#835).
             templates_for_type = templates[question_type]
-            template_idx = i % len(templates_for_type)
+            template_idx = (i // len(focus_types)) % len(templates_for_type)
             question_text = templates_for_type[template_idx]
 
             # Get helper metadata
