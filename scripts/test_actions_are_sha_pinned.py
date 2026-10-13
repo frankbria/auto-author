@@ -126,3 +126,61 @@ def test_every_pin_carries_a_version_comment(path):
 def test_workflow_parses_as_yaml(path):
     """The pins are applied by rewriting `uses:` lines; a bad edit shows up here."""
     yaml.safe_load(path.read_text())
+
+
+# A download piped into a shell is the same hole as a floating tag, one step
+# earlier (#819): `curl … | sh` runs whatever that address serves on the day,
+# with the job's token and secrets, and leaves nothing to pin, diff or review.
+# tests.yml installed uv that way in three jobs.
+PIPED_INTO_A_SHELL = re.compile(r"\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(ba|z|da)?sh\b")
+
+
+def _jobs(path):
+    return (yaml.safe_load(path.read_text()).get("jobs") or {}).items()
+
+
+def _scripts(job):
+    return [step["run"] for step in job.get("steps") or [] if isinstance(step.get("run"), str)]
+
+
+def test_the_pattern_sees_a_piped_installer():
+    for hit in [
+        "curl -LsSf https://astral.sh/uv/install.sh | sh",
+        "curl -fsSL https://example.test/install | sudo bash -s -- --yes",
+        "wget -qO- https://example.test/i.sh | bash",
+    ]:
+        assert PIPED_INTO_A_SHELL.search(hit), hit
+    for miss in [
+        "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/ || true",
+        "curl -s https://example.test/health | cut -c1-80",
+        "echo done | shasum",
+    ]:
+        assert not PIPED_INTO_A_SHELL.search(miss), miss
+
+
+@pytest.mark.parametrize("path", _workflow_files(), ids=lambda p: p.name)
+def test_no_workflow_pipes_a_download_into_a_shell(path):
+    offenders = [
+        f"{name}: {match.group(0)}"
+        for name, job in _jobs(path)
+        for script in _scripts(job)
+        for match in PIPED_INTO_A_SHELL.finditer(script)
+    ]
+
+    assert not offenders, "install it with a pinned action instead:\n" + "\n".join(offenders)
+
+
+def test_every_job_that_runs_uv_installs_it_with_the_setup_action():
+    """So that removing the piped installer cannot leave a job relying on whatever uv a
+    runner image happens to carry."""
+    uses_uv = re.compile(r"(^|[\s;&|(])uv (sync|run|export|lock|python|pip|venv|tool|build)\b", re.M)
+    checked = []
+    for path in _workflow_files():
+        for name, job in _jobs(path):
+            if not any(uses_uv.search(script) for script in _scripts(job)):
+                continue
+            checked.append(f"{path.name}:{name}")
+            actions = [step.get("uses", "") for step in job.get("steps") or []]
+            assert any(a.startswith("astral-sh/setup-uv@") for a in actions), f"{path.name}: job {name} runs uv without setup-uv"
+
+    assert len(checked) >= 4, f"only {checked} run uv; this guard is close to vacuous"

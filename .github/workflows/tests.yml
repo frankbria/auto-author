@@ -104,10 +104,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      # The pinned action, not `curl … | sh` (#819): that ran whatever the
+      # address served on the day, with this job's token. Same settings as the
+      # staging load-smoke job.
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+          prune-cache: true
 
       - name: Install dependencies
         working-directory: backend
@@ -149,10 +154,15 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      # The pinned action, not `curl … | sh` (#819): that ran whatever the
+      # address served on the day, with this job's token. Same settings as the
+      # staging load-smoke job.
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+          prune-cache: true
 
       # Both audit tools exit 1 when they find advisories, which is the normal
       # case here — the gate script decides pass/fail. Any OTHER exit code means
@@ -287,10 +297,15 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      # The pinned action, not `curl … | sh` (#819): that ran whatever the
+      # address served on the day, with this job's token. Same settings as the
+      # staging load-smoke job.
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+          prune-cache: true
 
       - name: Install backend dependencies
         working-directory: backend

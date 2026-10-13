@@ -4,6 +4,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **uv is pinned in the image build and installed by a pinned action in CI (#819, P1.37)**:
+  - **Problem.** The backend image copied the uv binary from `ghcr.io/astral-sh/uv:latest`, whatever that was on the day of the build. Three jobs in `tests.yml` installed uv with `curl … | sh`: whatever that address served, run with the job's token.
+  - **Dockerfile.** uv is a stage of its own, `FROM ghcr.io/astral-sh/uv:0.13.0@sha256:… AS uv`, and the build copies the binary from that stage. 0.13.0 is what `latest` pointed at, so the image built is the same one, layer for layer.
+  - **CI.** The three jobs use `astral-sh/setup-uv` at the commit the staging load-smoke job already pins, with the same cache settings.
+  - **Kept current.** Named in a `FROM` line, uv is seen by the backend's Dependabot `docker` entry. A new uv waits fourteen days there, like every other tool in that file; the base image's own rebuilds still do not wait.
+  - **Guards.** No workflow pipes a download into a shell. Every job that runs uv sets it up with the action. A Dockerfile copies only from its own stages, and every image it starts from has a tag, a digest and is not `latest`.
+  - **Not covered.** The uv version `setup-uv` installs in CI is the newest one, verified against the checksum the action knows for it. Only the image build is pinned to a version.
+
 - **Both images are scanned before they are pushed, and their base images are pinned and kept current (#818, P1.36)**:
   - **Problem.** `python:3.13-slim` and `node:24-alpine` floated: each build took whatever the tag pointed at that day, and nothing ever looked inside the result. Dependabot had no `docker` ecosystem.
   - **Scan.** `build-images.yml` runs Trivy on each image as built (`CRITICAL,HIGH`, `ignore-unfixed`, vulnerabilities only), on pull requests as well as on main. On main a finding stops the job before the push. The action is pinned to the commit of v0.36.0: in March 2026 nearly every tag of it was repointed at credential-stealing code (GHSA-69fq-xp46-6x23).

@@ -252,12 +252,38 @@ def test_each_image_has_a_docker_entry(directory):
 def test_each_base_image_is_one_dependabot_can_read_and_is_pinned_to_a_digest(directory, image):
     bases = _external_bases(directory)
 
-    assert bases, f"{directory}/Dockerfile starts from no image; this guard is vacuous"
+    assert any(ref.startswith(f"{image}:") for ref in bases), f"{directory}/Dockerfile does not start from {image}"
     for ref in bases:
         # Measured (#818): the docker updater finds no dependency at all in
         # `FROM python:${PYTHON_VERSION}`, so an entry pointed at it updates nothing.
         assert "$" not in ref, f"{ref}: Dependabot does not resolve a build argument in FROM"
-        assert re.fullmatch(rf"{image}:[\w.-]+@sha256:[0-9a-f]{{64}}", ref), f"{ref}: name a tag and a digest"
+        assert re.fullmatch(r"[\w./-]+:[\w.-]+@sha256:[0-9a-f]{64}", ref), f"{ref}: name a tag and a digest"
+        assert ":latest" not in ref, f"{ref}: `latest` is not a version"
+
+
+@pytest.mark.parametrize("directory", DOCKERFILES)
+def test_nothing_is_copied_out_of_an_image_the_dockerfile_does_not_pin(directory):
+    """#819: the backend copied the uv binary `--from=ghcr.io/astral-sh/uv:latest`, whatever
+    that was on the day. An image has to be named in a FROM line, where the guard above
+    and Dependabot both see it; `--from=` may only name one of the Dockerfile's own stages."""
+    text = (REPO / directory.lstrip("/") / "Dockerfile").read_text()
+    stages = set(re.findall(r"^FROM\s+\S+\s+AS\s+(\S+)", text, re.M))
+    sources = re.findall(r"--from=(\S+)", text)
+
+    assert sources, f"{directory}/Dockerfile copies from no stage; this guard is vacuous"
+    assert not [s for s in sources if s not in stages], f"copied from outside the Dockerfile's stages: {sources}"
+
+
+def test_uv_is_pinned_and_waits_out_the_cooldown_like_every_other_tool():
+    """uv is a third party's release, unlike the base images' own rebuilds, so a new one waits
+    the fourteen days this file gives every ecosystem that has no semver-specific keys."""
+    assert any(ref.startswith("ghcr.io/astral-sh/uv:") for ref in _external_bases("/backend"))
+    entry = next(e for e in UPDATES if e["package-ecosystem"] == "docker" and e["directory"] == "/backend")
+    cooldown = entry.get("cooldown") or {}
+
+    assert cooldown.get("default-days") == 14
+    assert any("uv" in name for name in cooldown.get("include") or []), cooldown
+    assert not any("python" in name for name in cooldown.get("include") or []), "a base image refresh does not wait"
 
 
 @pytest.mark.parametrize(("directory", "image"), DOCKERFILES.items())

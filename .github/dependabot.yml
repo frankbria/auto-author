@@ -224,6 +224,11 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # uv only (#819). It is a third party's release, not the base image's own
+    # rebuild, so a new one waits the fourteen days every other tool here does.
+    cooldown:
+      default-days: 14
+      include: ["astral-sh/uv"]
     ignore:
       - dependency-name: "python"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
