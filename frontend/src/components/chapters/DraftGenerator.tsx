@@ -90,9 +90,7 @@ export function DraftGenerator({
       .getChapterQAResponses(bookId, chapterId)
       .then((saved) => {
         if (ignore || editedFor.current === key) return;
-        const answered = saved.responses
-          .filter((response) => response.answer.trim())
-          .map(({ question, answer }) => ({ question, answer }));
+        const answered = saved.responses.map(({ question, answer }) => ({ question, answer }));
         if (answered.length > 0) setQuestionResponses(answered);
       })
       .catch(() => {

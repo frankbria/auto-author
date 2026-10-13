@@ -6,7 +6,7 @@
  * had already answered in the Interview Questions tab of the same chapter, and
  * a draft was written from whatever was retyped there.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { DraftGenerator } from '../DraftGenerator';
@@ -119,9 +119,12 @@ describe('the toolbar draft generator', () => {
     await opened();
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Answer to question 1' }), { target: { value: 'Typed before they arrived' } });
-    arrive(saved(['Who keeps the light?', 'An old man named Tam.']));
-    await waitFor(() => expect(mockedClient.getChapterQAResponses).toHaveBeenCalled());
-    await Promise.resolve();
+    // Let the answers arrive and be acted on: a turn of the event loop, inside act,
+    // or the assertion below runs before anything could have been written over.
+    await act(async () => {
+      arrive(saved(['Who keeps the light?', 'An old man named Tam.']));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     expect(answers()[0]).toBe('Typed before they arrived');
     expect(questions()).toHaveLength(5);

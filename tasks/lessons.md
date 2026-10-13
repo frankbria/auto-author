@@ -1698,3 +1698,7 @@ The demo stops the backend to make a save fail, then starts it again, inside a c
 The demo's screenshot of the Book Stats panel was first a window full of chapter text: the panel sits beside a tall editor and `scrollIntoView` centred the wrong thing. The second try had the panel but cut its last row off, under a caption that listed it. The third used a window tall enough for the panel and recorded where the panel's last row ends, in pixels, beside the picture.
 **Rule:** check a screenshot against its own caption, item by item. For something that will not scroll into view, size the window to it, and record the element's position with the picture.
 
+### A test of "nothing happens" that did not wait for the thing (#834)
+The test: answers that arrive after the writer has started typing must not write over the typing. It resolved the pending request, awaited one microtask, and asserted the typed text was still there. It was, with or without the guard: the handler that would have written over it had not run yet. Two mutations that removed the guard passed. The request's arrival now happens inside `act` with a turn of the event loop, and both mutations fail.
+**Rule:** a test that something does not happen has to let it happen first. Flush the event loop after the trigger, and run the test once against code that does the thing, to see it fail.
+
