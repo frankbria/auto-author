@@ -7,11 +7,24 @@ import logging
 
 import sentry_sdk
 
+from app.core.config import is_deployed_env
 from app.core.request_context import request_id_var
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# The other origins and 'unsafe-inline' are what the Swagger page at /docs
+# needs. A deployed host does not serve that page (#815), so it allows neither.
+CONTENT_SECURITY_POLICY = "default-src 'self'" if is_deployed_env() else (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; "
+    "connect-src 'self'; "
+    "frame-src 'self'; "
+    "font-src 'self' data: https://r2cdn.perplexity.ai;"
+)
 
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
@@ -80,16 +93,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = "max-age=31536000"
         response.headers["X-Request-ID"] = request_id
 
-        # Set Content Security Policy
-        # Includes Swagger UI and other trusted resources
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "img-src 'self' data: https://fastapi.tiangolo.com; "
-            "connect-src 'self'; "
-            "frame-src 'self'; "
-            "font-src 'self' data: https://r2cdn.perplexity.ai;"
-        )
+        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
 
         return response
