@@ -1694,3 +1694,7 @@ For the before-and-after I ran main's frontend and the branch's against one back
 The demo stops the backend to make a save fail, then starts it again, inside a command the recorder runs. The start was written `(cd backend && server >> log 2>&1 &)`. The shell backgrounds the whole `cd && server` list as a subshell, and the redirection belongs to the server, not to that subshell: it kept the recorder's output pipe open for as long as the server ran, and the recorder waits for the pipe to close. An earlier lesson says to start servers outside the recording; this one had to be inside it.
 **Rule:** when a recorded or piped command must start something that outlives it, background only that one command, with its own stdin, stdout and stderr: `cd dir || exit; server >> log 2>&1 < /dev/null &`. Prove it by piping the call through `cat` and seeing it return.
 
+### The screenshot's caption named four figures and the picture had none, then three (#833)
+The demo's screenshot of the Book Stats panel was first a window full of chapter text: the panel sits beside a tall editor and `scrollIntoView` centred the wrong thing. The second try had the panel but cut its last row off, under a caption that listed it. The third used a window tall enough for the panel and recorded where the panel's last row ends, in pixels, beside the picture.
+**Rule:** check a screenshot against its own caption, item by item. For something that will not scroll into view, size the window to it, and record the element's position with the picture.
+
