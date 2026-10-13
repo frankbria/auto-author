@@ -16,9 +16,9 @@ from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
 
-# GPL or AGPL, but not LGPL: a library under the LGPL may be used by a program
-# under another licence.
-STRONG_COPYLEFT = re.compile(r"(?<![A-Za-z])A?GPL|Affero")
+# GPL or AGPL, abbreviated or spelled out, but not LGPL: a library under the LGPL
+# may be used by a program under another licence.
+STRONG_COPYLEFT = re.compile(r"(?<![A-Za-z])A?GPL|Affero|(?<!Lesser )(?<!Library )General Public License")
 
 
 def _runtime_packages() -> list[str]:
@@ -43,10 +43,12 @@ def _declared_licence(package: str) -> str:
 
 def test_the_pattern_tells_the_gpl_from_the_lgpl():
     for copyleft in ["GPL-3.0-or-later", "AGPL-3.0-or-later", "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-                     "License :: OSI Approved :: GNU Affero General Public License v3", "MIT OR GPL-2.0"]:
+                     "License :: OSI Approved :: GNU Affero General Public License v3", "MIT OR GPL-2.0",
+                     "GNU General Public License v3 or later", "GNU Affero General Public License"]:
         assert STRONG_COPYLEFT.search(copyleft), copyleft
     for fine in ["MIT", "Apache-2.0", "BSD-3-Clause", "LGPL-3.0-or-later", "MPL-2.0",
-                 "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)"]:
+                 "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+                 "GNU Lesser General Public License v2.1", "GNU Library General Public License"]:
         assert not STRONG_COPYLEFT.search(fine), fine
 
 

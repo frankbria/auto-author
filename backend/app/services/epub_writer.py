@@ -88,7 +88,7 @@ def _ncx(identifier: str, title: str, toc: List[Entry]) -> str:
         for label, href, below in entries:
             count += 1
             written.append(
-                f'<navPoint id="nav_{count}"><navLabel><text>{escape(label)}</text></navLabel>'
+                f'<navPoint id="nav_{count}" playOrder="{count}"><navLabel><text>{escape(label)}</text></navLabel>'
                 f"<content src={quoteattr(href)}/>{points(below)}</navPoint>"
             )
         return "".join(written)

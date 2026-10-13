@@ -172,6 +172,7 @@ def test_the_older_contents_file_nests_the_same_way():
         "title.xhtml", "chap_1.xhtml", "chap_3.xhtml", "chap_3.xhtml", "chap_3.xhtml", "chap_4.xhtml",
     ]
     assert len({p.get("id") for p in points}) == len(points), "two entries share an id"
+    assert [p.get("playOrder") for p in points] == ["1", "2", "3", "4", "5", "6"], "the format requires each entry's place in the order"
     uid = next(m.get("content") for m in ncx.iter(f"{NCX}meta") if m.get("name") == "dtb:uid")
     assert uid == "book-824", "it has to be the package's identifier"
 
