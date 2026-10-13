@@ -110,7 +110,10 @@ describe('Tab State Persistence', () => {
       expect(result.current.state.active_chapter_id).toBe(savedState.active_chapter_id);
     });
 
-    expect(result.current.state.tab_order).toEqual(savedState.tab_order);
+    // The saved order, then the chapter it does not name. The tab bar draws only
+    // what is in the order, so a chapter left out of it could not be opened (#830).
+    expect(result.current.state.tab_order).toEqual([...savedState.tab_order, 'ch1']);
+    expect(result.current.state.open_tab_ids).toEqual(savedState.open_tab_ids);
 
     // Verify localStorage was checked
     expect(mockLocalStorage.getItem).toHaveBeenCalledWith(`tabState_${bookId}`);
@@ -181,7 +184,9 @@ describe('Tab State Persistence', () => {
       expect(result.current.state.active_chapter_id).toBe(backendState.tab_state.active_chapter_id);
     });
 
-    expect(result.current.state.tab_order).toEqual(backendState.tab_state.tab_order);
+    // The backend's order, not the browser's ['ch1'], then the chapter it does not name (#830).
+    expect(result.current.state.tab_order).toEqual([...backendState.tab_state.tab_order, 'ch2']);
+    expect(result.current.state.open_tab_ids).toEqual(backendState.tab_state.open_tab_ids);
   });
 
   test('handles offline mode gracefully', async () => {
