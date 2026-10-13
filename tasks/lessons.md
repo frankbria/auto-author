@@ -1662,3 +1662,11 @@ A test I appended left an extra blank line at the end of the file. The end-of-fi
 I capped a chapter's content on the route that saves it. I knew `PUT /toc` also stores whatever `content` comes with a chapter new to the table of contents, and wrote it off as something only a hand-made client would do. The second review called it what it was: a way round the limit I had just added. A body sent with a table of contents is dropped now.
 **Rule:** when adding a limit on a value, list every route that can write that value and close or cap each. "Our own client does not do that" is not a reason to leave one.
 
+### The test table covered eleven of seventeen changed reads (#829)
+I changed seventeen reads and wrote a table of eleven routes to measure. Reverting any of the eleven failed a test. Reverting the cover upload or draft generation passed everything, and four more routes had no row either: I had left out the ones that needed a file, a stand-in for the model, or a conflict to provoke.
+**Rule:** when a change is the same edit in N places, the test table has N rows, and the mutation run is one mutation per place. Count both against the diff before calling it covered.
+
+### A measuring helper that reads a log has to clear it (#829)
+The profiler helper read every entry in `system.profile`. Between tests the database is dropped, so nothing was left over, and every test passed. Twice in one test it counted the first measurement in the second, which I hit in the demo and fixed only there. The reviewer raised it against the tests; the scenario it described does not happen in this suite, but the helper was one reuse away from it.
+**Rule:** a helper that measures by reading a log clears the log, or filters to its own window, itself. Fix it where it lives the first time it bites, not in the one caller that tripped.
+

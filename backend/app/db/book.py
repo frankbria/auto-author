@@ -95,6 +95,22 @@ async def get_book_owner_id(book_id: str) -> Optional[str]:
         return None
 
 
+async def get_book_fields(book_id: str, *fields: str) -> Optional[Dict]:
+    """Get a book's ``_id`` and the top-level fields named, and nothing else (#829).
+
+    For a handler that uses the owner and one or two other fields. Naming
+    ``table_of_contents`` brings every chapter's body with it: that is for the
+    routes that return a body. ``None`` for a missing book and for a malformed
+    id, like the lookups above.
+    """
+    try:
+        return await books_collection.find_one(
+            {"_id": ObjectId(book_id)}, {field: 1 for field in fields}
+        )
+    except Exception:
+        return None
+
+
 async def get_book_metadata_by_id(book_id: str) -> Optional[Dict]:
     """Get a book without any chapter draft HTML.
 

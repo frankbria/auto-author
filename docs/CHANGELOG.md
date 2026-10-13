@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **A handler reads the part of the book it uses (#829, P1.47)**:
+  - **Problem.** A book is one document: its chapters' bodies, its summary's history, its interview answers. Sixteen handlers and one helper read all of it to use the owner, or the summary, or the list of chapters. For a book with 700 kilobytes of chapters and 300 of other large fields, each of those reads brought back a megabyte.
+  - **Fix.** Each handler asks for what it uses. `get_book_fields(book_id, ...)` is new: the fields named and nothing else. The summary routes read the owner and the summary; the readiness check reads under a kilobyte; deleting a book and saving its summary read the owner alone. Handlers that walk the chapter list without reading a body (the book itself, the table of contents, chapter metadata, draft generation, the two enhance routes) use the existing read that leaves the bodies out. The routes that return a chapter's body read the table of contents and the owner, and not the rest.
+  - **Measured.** The test turns on the database's profiler around each route and checks how many bytes its read of `books` returned. Before, all eleven routes it covers read 1,002,503 bytes. Saving the summary read it twice: the first read's result was never used, and is gone.
+  - **Left as they were, and why.** Exports and the export page's statistics count words in every body. Generating a table of contents checks which chapters have a draft it would replace. The bulk status update and the two chapter routes that return bodies (#1039) were not touched.
+  - **Not done.** Reading one chapter still brings back every chapter's body, because a chapter can sit at any depth in the table of contents and a projection cannot pick one out.
+
 - **The table of contents travels without the chapters' bodies, and an oversize save is refused as too large (#828, P1.46)**:
   - **Problem.** `GET /toc` returned every chapter's HTML, and `PUT /toc` returned it again, on the routes the editor calls to draw its tabs. Nothing limited the size of a chapter's content or of a table of contents. A book is one MongoDB document, and at the database's sixteen megabytes a save that made the book longer was answered 500.
   - **Fix.** Both responses leave `content` out at every depth (`_without_bodies`, in the route handlers; what is stored and what the database functions return is untouched). A chapter's content over 500,000 bytes and a `PUT /toc` body over 1,000,000 bytes are answered 413 before anything is written. A write the database refuses because the book's document would pass its limit is answered 413 on both routes, with a message that says what to do.

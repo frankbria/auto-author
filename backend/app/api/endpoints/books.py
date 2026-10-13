@@ -53,7 +53,7 @@ from app.schemas.book import (
 from app.db.book import NO_PRECONDITION
 from pymongo.errors import OperationFailure
 from app.db.database import (
-    create_book, get_book_by_id, get_book_owner_id, get_book_metadata_by_id,
+    create_book, get_book_by_id, get_book_fields, get_book_owner_id, get_book_metadata_by_id,
     get_books_by_user,
     update_book, apply_chapter_content_update, update_book_summary_atomic,
     delete_book
@@ -227,7 +227,7 @@ async def get_book(
             )
 
         # Get the book from the database
-        book = await get_book_by_id(book_id)
+        book = await get_book_metadata_by_id(book_id)
 
         # Check if book exists
         if not book:
@@ -461,7 +461,7 @@ async def delete_book_endpoint(
             )
 
         # First get the book to log its details
-        book = await get_book_by_id(book_id)
+        book = await get_book_fields(book_id, "owner_id")
         if not book:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -523,7 +523,7 @@ async def upload_book_cover_image(
     """
     try:
         # Validate book ownership
-        book = await get_book_by_id(book_id)
+        book = await get_book_fields(book_id, "owner_id", "cover_image_url", "cover_thumbnail_url")
         if not book or book.get("owner_id") != current_user.get("auth_id"):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -613,7 +613,7 @@ async def get_book_summary(
     """
     Retrieve the summary and its revision history for a book.
     """
-    book = await get_book_by_id(book_id)
+    book = await get_book_fields(book_id, "owner_id", "summary", "summary_history")
 
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -636,8 +636,6 @@ async def update_book_summary(
     Save or update the summary for a book, and store revision history.
     Validates min/max length and filters offensive content.
     """
-    book = await get_book_by_id(book_id)
-
     summary = data.get("summary", "")
     if not summary or not isinstance(summary, str):
         raise HTTPException(
@@ -661,7 +659,7 @@ async def update_book_summary(
         raise HTTPException(
             status_code=400, detail="Summary contains inappropriate language."
         )
-    book = await get_book_by_id(book_id)
+    book = await get_book_fields(book_id, "owner_id")
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -692,7 +690,7 @@ async def patch_book_summary(
     Partially update the summary for a book. Only updates the summary field if provided.
     Stores revision history and validates input.
     """
-    book = await get_book_by_id(book_id)
+    book = await get_book_fields(book_id, "owner_id", "summary", "summary_history")
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -898,7 +896,7 @@ async def get_question_responses(
     Returns responses that were previously saved for TOC generation.
     """
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    book = await get_book_fields(book_id, "owner_id", "question_responses")
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -934,7 +932,7 @@ async def save_question_responses(
     Stores responses that will be used to generate the table of contents.
     """
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    book = await get_book_fields(book_id, "owner_id", "clarifying_questions")
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -1004,7 +1002,7 @@ async def check_toc_generation_readiness(
     Returns the current state and what steps are needed next.
     """
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    book = await get_book_fields(book_id, "owner_id", "summary", "summary_analysis")
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -1211,7 +1209,7 @@ async def get_book_toc(
     """
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    book = await get_book_metadata_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -1384,7 +1382,7 @@ async def _chapter_save_rejected(book_id: str, chapter_id: str) -> HTTPException
     """Why a content save didn't land: 404 if the chapter is gone, else 409
     carrying what the editor needs to offer reload-or-overwrite (#760) without
     another GET. Overwrite = resend with ``current_last_modified``."""
-    book = await get_book_by_id(book_id) or {}
+    book = await get_book_fields(book_id, "table_of_contents") or {}
     chapters = (book.get("table_of_contents") or {}).get("chapters", [])
     # One level of subchapters: the depth apply_chapter_content_update writes.
     chapter = next(
@@ -1421,7 +1419,7 @@ async def get_chapter_content(
     Get chapter content with enhanced metadata for tab interface.
     """
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    book = await get_book_fields(book_id, "owner_id", "table_of_contents")
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -1675,7 +1673,7 @@ async def batch_get_chapter_content(
         )
 
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    book = await get_book_fields(book_id, "owner_id", "table_of_contents")
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -2541,7 +2539,7 @@ async def generate_chapter_draft(
     This transforms interview-style responses into narrative content.
     """
     # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
+    book = await get_book_metadata_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -2778,7 +2776,7 @@ async def enhance_chapter_text(
     Dimensions: clarity, grammar, tone, vocabulary.
     """
     # Verify book ownership.
-    book = await get_book_by_id(book_id)
+    book = await get_book_metadata_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
@@ -2863,7 +2861,7 @@ async def enhance_chapter_transcription(
     by restoring the snapshot it held before applying. Single cleanup mode.
     """
     # Verify book ownership.
-    book = await get_book_by_id(book_id)
+    book = await get_book_metadata_by_id(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):

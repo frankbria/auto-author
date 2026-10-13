@@ -22,7 +22,7 @@ from app.schemas.book import (
     ChapterMetadata,
     ChapterStatus,
 )
-from app.db.database import get_book_by_id, get_book_owner_id
+from app.db.database import get_book_by_id, get_book_metadata_by_id, get_book_owner_id
 from app.db.toc_transactions import (
     add_chapter_with_transaction,
     update_chapter_with_transaction,
@@ -131,7 +131,7 @@ async def get_chapters_metadata(
     """
     try:
         # Get the book and verify ownership
-        book = await get_book_by_id(book_id)
+        book = await get_book_metadata_by_id(book_id)
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
         if book.get("owner_id") != current_user.get("auth_id"):
