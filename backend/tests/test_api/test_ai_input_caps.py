@@ -263,7 +263,7 @@ class TestStoredTextIsBoundedOnItsWayIntoAPrompt:
     async def test_a_chapter_whose_stored_content_is_not_text_can_still_be_asked_questions(
         self, author
     ):
-        """``PUT /toc`` passes ``content`` through unchecked, so a number can be stored."""
+        """Until #828 ``PUT /toc`` stored whatever ``content`` came with a new chapter, so a number can be there."""
         api, book, model_call = author
         await self._store_chapter(book, content=123)
 

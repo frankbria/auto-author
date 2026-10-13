@@ -1319,9 +1319,11 @@ async def update_book_toc(
         logger.info(f"Updating TOC for book_id={book_id}, user_auth_id={current_user.get('auth_id')}")
 
         # Update TOC with transaction
+        # A chapter's body has one way in, its own route, where its size is
+        # checked (#828). Sent here it is dropped; the stored one is kept by id.
         updated_toc = await update_toc_with_transaction(
             book_id=book_id,
-            toc_data=toc_data,
+            toc_data={**toc_data, "chapters": _without_bodies(chapters)},
             user_auth_id=current_user.get("auth_id")
         )
 

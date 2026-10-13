@@ -93,6 +93,39 @@ class TestTheTableOfContentsHasNoBodies:
         assert answer.json()["content"] == BODIES["c1a"]
 
 
+class TestABodyDoesNotComeInThroughTheTableOfContents:
+    """It has one way in, the chapter's own route, which is where its size is checked.
+    Before, a chapter new to the table of contents was stored with whatever ``content``
+    came with it: any size up to the limit on the whole body, and not necessarily text."""
+
+    async def test_content_sent_with_a_new_chapter_is_not_stored(self, auth_client_factory):
+        api = await auth_client_factory()
+        book_id = await _book_with_drafts(api)
+        sent = (await api.get(f"{API}/{book_id}/toc")).json()["toc"]
+        sent["chapters"].append({"title": "Three", "level": 1, "order": 3, "content": "x" * 600_000,
+                                 "subchapters": [{"title": "Three A", "level": 2, "order": 1, "content": 123, "subchapters": []}]})
+
+        answer = await api.put(f"{API}/{book_id}/toc", json={"toc": sent})
+
+        assert answer.status_code == 200, answer.text[:200]
+        book = await base.books_collection.find_one({"_id": ObjectId(book_id)})
+        stored = list(_every_chapter(book["table_of_contents"]["chapters"]))
+        assert [c["title"] for c in stored] == ["One", "One A", "Deep", "Two", "Three", "Three A"]
+        assert [c["title"] for c in stored if "content" in c] == ["One", "One A", "Deep", "Two"]
+        assert {c["id"]: c["content"] for c in stored if "content" in c} == BODIES
+
+    async def test_content_sent_for_a_chapter_that_has_a_body_does_not_replace_it(self, auth_client_factory):
+        api = await auth_client_factory()
+        book_id = await _book_with_drafts(api)
+        sent = (await api.get(f"{API}/{book_id}/toc")).json()["toc"]
+        sent["chapters"][1]["content"] = "<p>overwritten</p>"
+
+        answer = await api.put(f"{API}/{book_id}/toc", json={"toc": sent})
+
+        assert answer.status_code == 200, answer.text[:200]
+        assert await _stored_bodies(book_id) == BODIES
+
+
 class TestAChapterHasALargestSize:
     async def test_content_over_the_limit_is_refused_and_what_was_there_is_kept(self, auth_client_factory):
         api = await auth_client_factory()
