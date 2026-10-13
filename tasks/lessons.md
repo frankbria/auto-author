@@ -1622,3 +1622,15 @@ The reviewer said every entry in `toc.ncx` needs a `playOrder`, and that ebookli
 ebooklib parsed every document it was given, so a form feed or vertical tab pasted into a chapter made it raise and the export failed. Writing the same text straight into a zip does not fail: it produces a file that is not XML and that no reader opens. Comparing the two exports of one ordinary book showed no difference, and would never have shown this; it took a book with the awkward input.
 **Rule:** when a library is replaced by direct code, find out what the library refused or repaired, not only what it produced. Feed both the input that is not valid in the output format (control characters, lone surrogates, unescaped markup) and compare what each does.
 
+### The assertion found the address somewhere else in the entry (#825)
+The notices give each package's source on a line of its own. The test for it asked whether libvips's entry contained the repository's address, and a mutation that removed the line passed: the README text carried into the same entry links to that repository's issue page.
+**Rule:** when a test reads a block of generated text, assert the labelled line (`^Source: ...`), not that the value appears somewhere in the block.
+
+### "Not marked dev" is not "shipped" (#825)
+I expected the lockfile's `dev` flag to separate what ships from what does not, and wrote a test that Playwright is left out of the notices. It is not marked dev: it is a dev dependency and also an optional peer of `next`, which npm records as `devOptional` and keeps under `--omit=dev`, though it is never installed in the image for that reason alone. `npm ls --omit=dev` lists it too.
+**Rule:** before asserting what a lockfile flag means, tally the flags (`dev`, `devOptional`, `optional`, `peer`) over the whole file and look at the small groups.
+
+### Two demo outputs were wrong and I only saw them by reading the document (#825)
+The recorder printed "recorded" and the document said `entries: 0`: the count used a `{72}` repetition that busybox grep, inside the image, does not read without `-E`. Both screenshots were of the top of the page, not the footer: the scroll ran before the page had settled.
+**Rule:** read every recorded output and open every screenshot before the demo is committed. A command that runs inside an image runs with that image's tools. A screenshot of something scrolled to waits until the element's position says it is in view.
+

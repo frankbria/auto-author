@@ -65,7 +65,8 @@ describe('third-party notices', () => {
     expect(libvips).toContain('Licence: LGPL-3.0-or-later');
     // It ships no licence file. Its README lists the libraries built into it.
     expect(libvips).toMatch(/glib\s+\|\s+LGPLv3/);
-    expect(libvips).toContain('github.com/lovell/sharp-libvips');
+    // On its own line: the address also appears in the README's text.
+    expect(libvips).toMatch(/^Source: \S*github\.com\/lovell\/sharp-libvips/m);
     expect(notices).toContain('/licenses/LGPL-3.0.txt');
     expect(notices).toContain('/licenses/GPL-3.0.txt');
   });
