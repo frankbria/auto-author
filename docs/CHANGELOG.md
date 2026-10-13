@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **An image is pushed only after its smoke test has booted it (#817, P1.35)**:
+  - **Problem.** `build-images.yml` built and pushed in one step and ran its smoke test afterwards. An image whose `CMD` could not start already had its `sha-` tag, and on main the floating `staging` tag, in the registry by the time the smoke test failed.
+  - **Fix.** The build loads the image into the runner's own Docker (`load: true`) and publishes nothing. The smoke test boots it. A step of its own then runs `docker push` for each tag, and is skipped once the smoke test has failed. What is pushed is the image that was booted, not a second build of it.
+  - **Guard.** `scripts/test_image_is_smoke_tested_before_push.py` pins the order, that nothing else publishes, and that the push runs exactly when the smoke test does; it runs the smoke test's and the push step's own scripts against a stand-in docker.
+  - **Given up.** The build action attaches a provenance attestation only when it does the pushing itself, so published images no longer carry one. Nothing here read it.
+  - **Not covered.** Pull requests still build and do not boot: they have no environment, so the frontend's bundle check has nothing to compare against.
+
 - **What a caller types into a workflow dispatch never becomes part of a shell command (#816, P1.34)**:
   - **Problem.** `${{ inputs.image_tag }}` sat inside the command the staging deploy runs over SSH as root. GitHub pastes an expression into the script before any shell reads it, so a dispatch with a tag of `x'; …; '` was that command. `staging_e2e_workers` and `recreate` were pasted into scripts on the runner the same way.
   - **Fix, in two parts.** Each input reaches its job as an environment variable (`IMAGE_TAG`, `STAGING_E2E_WORKERS`, `RECREATE`), which a shell expands as data. And each job's first step checks its variable against a pattern and stops the job: a build's `sha-` tag, one digit from 1 to 9, `true` or `false`. A variable alone would not protect the box: the deploy's script is a string handed to ssh, so the runner's shell still puts the tag into it and the box's shell still reads it. So, as well as the check, the tag is quoted for the box (`printf %q`) at the two places it is put into that string, and a step that ran without the check would still hand the box a word and not a command.
