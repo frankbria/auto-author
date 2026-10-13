@@ -75,8 +75,20 @@ jobs:
       (github.event_name == 'pull_request' &&
        github.event.pull_request.head.repo.full_name == github.repository &&
        contains(github.event.pull_request.labels.*.name, 'e2e-staging'))
+    # The dispatch input reaches every script as a variable, never as text
+    # GitHub pastes into the script (#816). Empty on every other event.
+    env:
+      STAGING_E2E_WORKERS: ${{ github.event.inputs.staging_e2e_workers || '1' }}
 
     steps:
+      # First (#816); scripts/test_workflow_inputs_not_in_run.py runs this script.
+      - name: Check the worker count
+        run: |
+          if [[ ! "$STAGING_E2E_WORKERS" =~ ^[1-9]$ ]]; then
+            echo "::error::staging_e2e_workers must be a single digit from 1 to 9"
+            exit 1
+          fi
+
       # After a deploy, test the commit that deploy ran from, so the specs match
       # the build. Empty on every other event, which keeps checkout's default.
       # ponytail: a rollback (older image_tag) still checks out the dispatch
@@ -109,7 +121,6 @@ jobs:
           # env names the auth fixture reads first.
           STAGING_TEST_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           STAGING_TEST_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-          STAGING_E2E_WORKERS: ${{ github.event.inputs.staging_e2e_workers || '1' }}
         run: npm run test:e2e:staging
 
       - name: Write staging E2E summary
@@ -120,7 +131,7 @@ jobs:
             echo ""
             echo "- Environment: https://dev.autoauthor.app"
             echo "- Workflow result: ${{ job.status }}"
-            echo "- Workers: ${{ github.event.inputs.staging_e2e_workers || '1' }}"
+            echo "- Workers: $STAGING_E2E_WORKERS"
             echo "- Visual smoke screenshots and failure video: see the staging test-results artifact"
             echo "- No trace, HTML report or results JSON is published (#599) — reproduce a failure by running the suite locally, where traces are on"
           } >> "$GITHUB_STEP_SUMMARY"

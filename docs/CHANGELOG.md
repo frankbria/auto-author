@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **What a caller types into a workflow dispatch never becomes part of a shell command (#816, P1.34)**:
+  - **Problem.** `${{ inputs.image_tag }}` sat inside the command the staging deploy runs over SSH as root. GitHub pastes an expression into the script before any shell reads it, so a dispatch with a tag of `x'; …; '` was that command. `staging_e2e_workers` and `recreate` were pasted into scripts on the runner the same way.
+  - **Fix, in two parts.** Each input reaches its job as an environment variable (`IMAGE_TAG`, `STAGING_E2E_WORKERS`, `RECREATE`), which a shell expands as data. And each job's first step checks its variable against a pattern and stops the job: a build's `sha-` tag, one digit from 1 to 9, `true` or `false`. The second part is what protects the box. The deploy's script is a string handed to ssh, so the runner's shell still puts the tag into it and the box's shell still reads it.
+  - **Guard.** `scripts/test_workflow_inputs_not_in_run.py` reads every workflow. It fails if a dispatch input, anything from the event payload or a pull request's branch name is pasted into a `run:` block; if a variable filled from one is not in its table; if the job's first step is not the check, or can be skipped; and it runs each check's own script against tags, counts and flags that must pass and ones that must not.
+  - **Not covered.** Other expressions in scripts (`matrix.*`, a step's outputs, `needs.*.result`) come from the repository, not the caller, and are left as they are. Expressions passed to an action through `with:` are not shell.
+
 - **A deployed API serves no documentation, and its policy drops what only the Swagger page needed (#815, P1.33)**:
   - **Problem.** `/docs`, `/redoc` and `/openapi.json` answered 200 on staging: the whole API, route by route, to anyone. Every answer also carried a `Content-Security-Policy` allowing script and style from jsdelivr and inline, which only the Swagger page uses.
   - **Fix.** When `is_deployed_env()` is true (staging and production) the app is built with `openapi_url=None`, which is FastAPI's own switch: with no schema it serves none of the three, nor the OAuth redirect page under `/docs`. The policy on a deployed host is `default-src 'self'`.
