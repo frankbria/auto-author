@@ -203,6 +203,31 @@ describe('moving on to another book', () => {
     expect(screen.queryByText(/could not be saved/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /restore it/i })).not.toBeInTheDocument();
   });
+
+  it('does not put a failure on the second book when the first book\'s save fails after the move', async () => {
+    serverHas('The first book');
+    const view = await opened();
+    let failTheSave!: (reason: unknown) => void;
+    mockedClient.saveBookSummary.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        failTheSave = reject;
+      }) as never,
+    );
+    await typeAndWaitForTheSave('Written in the first book, still being saved');
+
+    mockParams = { bookId: 'book-2' };
+    serverHas('The second book');
+    view.rerender(<BookSummaryPage />);
+    await waitFor(() => expect(field()).toHaveValue('The second book'));
+    await act(async () => {
+      failTheSave(new Error('Network error'));
+    });
+
+    expect(screen.queryByText(/could not be saved/i)).not.toBeInTheDocument();
+    // It is still kept for the first book, to be offered there.
+    expect(localStorage.getItem(UNSAVED)).toBe('Written in the first book, still being saved');
+    expect(localStorage.getItem('book-summary-unsaved-book-2')).toBeNull();
+  });
 });
 
 describe('a browser that will not store anything', () => {

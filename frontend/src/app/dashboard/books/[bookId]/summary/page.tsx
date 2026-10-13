@@ -64,6 +64,12 @@ export default function BookSummaryPage() {
   // While that text is on offer its stored copy is not this visit's to remove:
   // a later save that works is of something else.
   const draftOnOffer = useRef(false);
+  // The book on screen, for a save that comes back after the page has moved on:
+  // this page stays mounted from one book to the next.
+  const shownBookRef = useRef(bookId);
+  useEffect(() => {
+    shownBookRef.current = bookId;
+  }, [bookId]);
   const [summaryHistory, setSummaryHistory] = useState<unknown[]>([]);
   // Derived during render, not mirrored into state via an effect (#584,
   // react-hooks/set-state-in-effect). `getSummaryReadinessError` is a pure
@@ -148,14 +154,18 @@ export default function BookSummaryPage() {
       saveTimeout.current = setTimeout(() => {
         bookClient.saveBookSummary(bookId, summary)
           .then((data) => {
+            // A save of another book says nothing about the one on screen.
+            if (shownBookRef.current !== bookId) return;
             lastSaved.current = data.summary;
             if (!draftOnOffer.current) removeStored(unsavedKey(bookId));
             setSaveFailure(null);
           })
           .catch(() => {
             // The text exists only here now. It is kept under its own key, which the
-            // next load does not write over, and the writer is told (#832).
-            setSaveFailure({ kept: writeStored(unsavedKey(bookId), summary) });
+            // next load does not write over, and the writer is told (#832). Kept for
+            // its own book whichever book is on screen; told only if it is this one.
+            const kept = writeStored(unsavedKey(bookId), summary);
+            if (shownBookRef.current === bookId) setSaveFailure({ kept });
           });
       }, 1000);
     }
