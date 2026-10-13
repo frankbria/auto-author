@@ -233,7 +233,7 @@ OPTIMIZED_QUERIES = {
         "query": {
             "user_id": "USER_ID",
             "book_id": "BOOK_ID",
-            "access_type": {"$in": ["read_content", "update_content", "view"]},
+            "access_type": {"$in": ["view", "edit"]},
         },
         "sort": {"timestamp": -1},
         "limit": 10,

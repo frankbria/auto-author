@@ -131,7 +131,7 @@ class TestADatabaseErrorDoesNotBringTheDocumentWithIt:
 
 class TestAnAccessRecordThatCouldNotBeWritten:
     async def test_the_request_is_answered_and_the_gap_in_the_record_is_reported(self, auth_client_factory, reports):
-        """Eight routes log who read or changed a chapter, and carry on if that fails."""
+        """Seven routes log who read or changed a chapter, and carry on if that fails."""
         api = await auth_client_factory()
         book_id = await _create_book(api)
         toc = _small_toc()

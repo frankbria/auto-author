@@ -1511,9 +1511,7 @@ async def update_chapter_content(
 
     computed = compute_chapter_update(chapters)
     if not computed:
-        raise HTTPException(
-            status_code=404, detail="Chapter not found"
-        )  # Log chapter access
+        raise HTTPException(status_code=404, detail="Chapter not found")
     chapter_fields, parent_chapter_id, stored_last_modified = computed
     precondition = NO_PRECONDITION
     if "expected_last_modified" in body.model_fields_set:
@@ -1522,21 +1520,8 @@ async def update_chapter_content(
         # Match the raw stored value (string or Date) in the write itself, so a
         # save committed after the read above still makes this one a no-match.
         precondition = stored_last_modified
-    try:
-        await chapter_access_service.log_access(
-            user_id=current_user.get("auth_id"),
-            book_id=book_id,
-            chapter_id=chapter_id,
-            access_type="update_content",
-            metadata={
-                "content_length": len(content) if content else 0,
-                "auto_updated_metadata": auto_update_metadata,
-                "update_timestamp": datetime.now(timezone.utc).isoformat(),
-            },
-        )
-    except Exception as error:
-        logger.error("Failed to log chapter content update", exc_info=True)
-        report_failure("access-log", error)
+    # No access-log row for a save (#827): the editor saves three seconds after
+    # the last keystroke, and nothing in the application read the rows.
 
     # Persist via a targeted, concurrency-safe positional update (only this
     # chapter's fields + an atomic version $inc) rather than a whole-TOC rewrite.
