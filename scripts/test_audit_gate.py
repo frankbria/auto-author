@@ -345,7 +345,9 @@ def test_main_fails_on_a_new_advisory(audit_files, capsys):
     assert "PYSEC-1" not in out.split("New advisories")[1]
 
 
-def test_main_resolved_entries_do_not_fail_the_build(audit_files, capsys):
+def test_main_a_resolved_entry_fails_the_build_until_it_is_pruned(audit_files, capsys):
+    """#821. It used to be reported and passed. An entry for an advisory that is gone stays an
+    exemption for that id: the day a downgrade brings the advisory back, the gate says nothing."""
     pip, npm, baseline = audit_files
     baseline.write_text(
         json.dumps(
@@ -355,8 +357,44 @@ def test_main_resolved_entries_do_not_fail_the_build(audit_files, capsys):
 
     rc = main(["--pip-audit", str(pip), "--npm-audit", str(npm), "--baseline", str(baseline)])
 
-    assert rc == 0
-    assert "GHSA-gone" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "GHSA-gone" in out and "prune" in out.lower()
+    assert "PASS" not in out
+
+
+def test_main_an_entry_for_an_ecosystem_that_was_not_scanned_is_not_called_resolved(audit_files, capsys):
+    pip, _, baseline = audit_files
+    baseline.write_text(json.dumps({"pypi": {"PYSEC-1": "why"}, "npm": {"GHSA-1": "why"}}))
+
+    rc = main(["--pip-audit", str(pip), "--baseline", str(baseline)])
+
+    assert rc == 0, capsys.readouterr().out
+
+
+@pytest.mark.parametrize("reason", ["", "   ", None, 7, ["a list is not a reason"]])
+def test_main_an_entry_without_a_reason_fails_the_build(audit_files, capsys, reason):
+    """#821. An id with nothing beside it is an ignore-list. The reason is what lets the next
+    reader decide whether the entry still holds."""
+    pip, npm, baseline = audit_files
+    baseline.write_text(json.dumps({"pypi": {"PYSEC-1": "why"}, "npm": {"GHSA-1": reason}}))
+
+    rc = main(["--pip-audit", str(pip), "--npm-audit", str(npm), "--baseline", str(baseline)])
+
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "GHSA-1" in out and "reason" in out.lower()
+    assert "PASS" not in out
+
+
+def test_main_a_reason_is_required_even_for_an_ecosystem_that_was_not_scanned(audit_files, capsys):
+    pip, _, baseline = audit_files
+    baseline.write_text(json.dumps({"pypi": {"PYSEC-1": "why"}, "npm": {"GHSA-1": ""}}))
+
+    rc = main(["--pip-audit", str(pip), "--baseline", str(baseline)])
+
+    assert rc == 1
+    assert "GHSA-1" in capsys.readouterr().out
 
 
 def test_main_runs_with_only_one_ecosystem(tmp_path, capsys):
@@ -425,6 +463,25 @@ def test_main_write_baseline_emits_current_findings(audit_files, tmp_path):
     written = json.loads(baseline.read_text())
     assert "PYSEC-1" in written["pypi"]
     assert "GHSA-1" in written["npm"]
+
+
+def test_writing_the_baseline_keeps_the_reasons_already_written_and_invents_none(audit_files, capsys):
+    """#821. It used to overwrite every entry with "<package>; fix: …": the reasons someone had
+    written were lost, and what replaced them was not a reason. A new entry is written with no
+    reason, which the gate then refuses until a person supplies one."""
+    pip, npm, baseline = audit_files
+    baseline.write_text(json.dumps({"_comment": "the ledger", "pypi": {"PYSEC-1": "test-only, see #1"}, "npm": {}}))
+    args = ["--pip-audit", str(pip), "--npm-audit", str(npm), "--baseline", str(baseline)]
+
+    assert main(args + ["--write-baseline"]) == 0
+
+    written = json.loads(baseline.read_text())
+    assert written["_comment"] == "the ledger"
+    assert written["pypi"] == {"PYSEC-1": "test-only, see #1"}
+    assert written["npm"] == {"GHSA-1": ""}
+    capsys.readouterr()
+    assert main(args) == 1
+    assert "GHSA-1" in capsys.readouterr().out
 
 
 # --- the severity floor (#820) -----------------------------------------------

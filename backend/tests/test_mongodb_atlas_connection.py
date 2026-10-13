@@ -8,6 +8,7 @@ import pytest
 from motor.motor_asyncio import AsyncIOMotorClient
 import certifi
 import os
+import ssl
 
 
 @pytest.mark.asyncio
@@ -59,12 +60,12 @@ async def test_certifi_ca_bundle_exists():
     assert os.path.exists(ca_bundle_path), f"CA bundle not found at {ca_bundle_path}"
     assert os.path.isfile(ca_bundle_path), f"CA bundle is not a file: {ca_bundle_path}"
 
-    # Verify file is readable and contains certificates
-    # (file may start with comments, so read more content)
-    with open(ca_bundle_path, 'r') as f:
-        content = f.read(500)
-        assert "BEGIN CERTIFICATE" in content or "Entrust" in content, \
-            "CA bundle doesn't appear to be valid"
+    # The bundle is one TLS will actually accept, with a plausible number of
+    # roots in it. This used to look for "BEGIN CERTIFICATE" in the file's first
+    # 500 characters, which stopped being true when certifi 2026 put a root with
+    # a longer comment block first (#821), though the bundle was as valid as ever.
+    context = ssl.create_default_context(cafile=ca_bundle_path)
+    assert len(context.get_ca_certs()) > 50, "CA bundle loaded almost no roots"
 
 
 def test_ssl_configuration_parameters():

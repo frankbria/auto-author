@@ -4,6 +4,15 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-12
 
+- **The backend's stale transitives are upgraded, and a baseline entry has to earn its place (#821, P1.39)**:
+  - **Problem.** Dependabot's `uv` updates move only what `pyproject.toml` pins, so everything those packages pull in had stayed where the lock first put it: a July 2025 certifi CA bundle, click 8.2.1, starlette 1.6.0 and some forty more. In the gate, a baseline entry matched by id alone, needed no reason, and went on exempting its id after the advisory was fixed.
+  - **The lock.** `uv lock --upgrade` with a cut-off of fourteen days ago (2026-09-28), the cooldown Dependabot gives every package. 38 packages moved up, among them click to 8.5.0, certifi to 2026.7.22 and starlette to 1.7.0, and setuptools left the tree. Two things the bare command got wrong were put right: it **downgraded** botocore, which was already newer than the cut-off, and it wrote the cut-off into the lock as an option, which the next plain `uv lock` would have had to undo. No package went down, and the lock carries no option.
+  - **One test was wrong, not the upgrade.** A test looked for `BEGIN CERTIFICATE` in the first 500 characters of the CA bundle. certifi 2026 puts a root with a longer comment block first. The test now loads the bundle the way TLS does and counts its roots (121).
+  - **The gate.** An entry whose advisory is no longer found **fails** the gate until it is pruned; it used to be reported and passed. An entry with no reason fails it too. `--write-baseline` keeps the reasons already written and writes a new entry with an empty one; it used to replace every reason with `<package>; fix: …`.
+  - **The baseline is not empty, and cannot be.** The Python side is. The npm side has two entries, braces and sprintf-js, and neither has a fixed version to move to.
+  - **Comments.** The note in `tests.yml` that click's advisory is "already baselined", and the baseline file's own header, are corrected. `CLAUDE.md` no longer said "91 entries".
+  - **A consequence.** A pull request that fixes a baselined advisory, Dependabot's included, now turns `Security Audit` red until the entry is deleted in the same pull request.
+
 - **The npm advisory gate starts at moderate (#820, P1.38)**:
   - **Problem.** The gate's floor for npm was `high`. A moderate advisory in the frontend's tree was not reported, not baselined and not a failure. The two the issue names (dompurify, fast-uri) were already gone: their Dependabot pull requests, #741 and #742, merged on 2026-10-10.
   - **Fix.** `audit_gate.py` defaults to `moderate`, and `tests.yml` passes `--min-severity moderate` as well. `--write-baseline` writes at the same floor, so regenerating the baseline cannot drop the entries CI then fails on.

@@ -33,11 +33,13 @@ DEFAULT_NPM_FLOOR = "moderate"
 ECOSYSTEMS = ("pypi", "npm")
 
 BASELINE_COMMENT = (
-    "Known-and-accepted advisories as of #342. CI fails on anything NOT listed here, "
-    "so this file is the repo's dependency-debt ledger, not an ignore-list to grow "
-    "casually. Shrink it: each entry names its package and fix version. Regenerate "
-    "wholesale with: python scripts/audit_gate.py --pip-audit <json> --npm-audit <json> "
-    "--baseline security-baseline.json --write-baseline"
+    "Known-and-accepted advisories. CI fails on anything NOT listed here, so this file "
+    "is the repo's dependency-debt ledger, not an ignore-list to grow casually. Every "
+    "entry is an advisory id and the reason it is accepted; the gate fails on an entry "
+    "with no reason, and on an entry whose advisory is gone, until it is pruned (#821). "
+    "Regenerate with: python scripts/audit_gate.py --pip-audit <json> --npm-audit <json> "
+    "--baseline security-baseline.json --write-baseline, which keeps the reasons already "
+    "written and leaves a new entry's reason empty for a person to fill in."
 )
 
 
@@ -151,6 +153,10 @@ def evaluate(
     return unbaselined, resolved
 
 
+def _is_a_reason(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _read(path: str | None, required_key: str) -> dict:
     """Load an audit report, failing closed if it lacks its top-level key.
 
@@ -197,36 +203,69 @@ def main(argv: list[str] | None = None) -> int:
 
     scanned = {eco for eco, arg in (("pypi", args.pip_audit), ("npm", args.npm_audit)) if arg}
 
+    baseline_path = Path(args.baseline)
+    baseline = load_baseline(baseline_path)
+
     if args.write_baseline:
-        out: dict[str, object] = {"_comment": BASELINE_COMMENT}
+        # Keeps the reasons already written and invents none (#821). It used to
+        # overwrite every entry with "<package>; fix: …", which lost them and was
+        # not a reason. A new entry is written empty; the check below refuses it
+        # until someone says why it is accepted.
+        comment = BASELINE_COMMENT
+        if baseline_path.exists():
+            comment = json.loads(baseline_path.read_text()).get("_comment", comment)
+        out: dict[str, object] = {"_comment": comment}
         buckets: dict[str, dict[str, str]] = {eco: {} for eco in ECOSYSTEMS}
         out.update(buckets)
         for f in sorted(findings, key=lambda f: (f.ecosystem, f.id)):
-            buckets[f.ecosystem][f.id] = f"{f.package}; fix: {f.fix or 'none available'}"
-        Path(args.baseline).write_text(json.dumps(out, indent=2) + "\n")
+            kept = baseline.get(f.ecosystem, {}).get(f.id)
+            buckets[f.ecosystem][f.id] = kept if _is_a_reason(kept) else ""
+        baseline_path.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
+        unexplained = sum(1 for entries in buckets.values() for reason in entries.values() if not reason)
         print(f"Wrote {sum(len(v) for v in buckets.values())} entries to {args.baseline}")
+        if unexplained:
+            print(f"{unexplained} of them have no reason yet. The gate fails until each has one.")
         return 0
 
-    unbaselined, resolved = evaluate(findings, load_baseline(Path(args.baseline)), scanned)
+    unbaselined, resolved = evaluate(findings, baseline, scanned)
+    # Every entry, scanned this run or not: a reason does not depend on the scan.
+    unexplained = sorted(
+        (eco, vuln_id)
+        for eco, entries in baseline.items()
+        for vuln_id, reason in entries.items()
+        if not _is_a_reason(reason)
+    )
 
     print(f"Scanned {len(findings)} advisories against {args.baseline}\n")
 
     if resolved:
-        print("Resolved — prune these from the baseline:")
+        # A failure, not a note (#821). An entry for an advisory that is gone is
+        # still an exemption for that id: if a downgrade brings the advisory
+        # back, the gate would say nothing.
+        print(f"Resolved — prune these from the baseline ({len(resolved)}):")
         for eco, vuln_id in sorted(resolved):
             print(f"  [{eco}] {vuln_id}")
         print()
 
-    if not unbaselined:
+    if unexplained:
+        print(f"Baseline entries with no reason ({len(unexplained)}):")
+        for eco, vuln_id in unexplained:
+            print(f"  [{eco}] {vuln_id}")
+        print()
+
+    if unbaselined:
+        print(f"New advisories not in the baseline ({len(unbaselined)}):")
+        for f in sorted(unbaselined, key=lambda f: (f.ecosystem, f.id)):
+            print(f"  [{f.ecosystem}] {f.id}  {f.package}  severity={f.severity}  fix={f.fix or '-'}")
+        print()
+
+    if not (unbaselined or resolved or unexplained):
         print(f"PASS — no new advisories ({len(findings)} known, already in the baseline).")
         return 0
 
-    print(f"New advisories not in the baseline ({len(unbaselined)}):")
-    for f in sorted(unbaselined, key=lambda f: (f.ecosystem, f.id)):
-        print(f"  [{f.ecosystem}] {f.id}  {f.package}  severity={f.severity}  fix={f.fix or '-'}")
     print(
-        "\nFAIL — fix these, or add each ID to the baseline with a reason "
-        "if it is accepted debt."
+        "FAIL — fix a new advisory, or add its ID to the baseline with a reason if it is "
+        "accepted debt; prune a resolved entry; give every entry a reason."
     )
     return 1
 

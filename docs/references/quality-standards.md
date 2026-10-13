@@ -238,6 +238,13 @@ Two limits worth stating plainly rather than discovering:
   a moderate advisory was not baselined, not reported and not a failure). A `low` or `info`
   advisory is still invisible here. `--write-baseline` writes at the same floor, so regenerating
   the file does not drop the entries CI checks for.
+- **A baseline entry has to earn its place on every run (#821).** The gate fails on an entry
+  with no reason, and on an entry whose advisory is no longer found, until that entry is
+  pruned. So a pull request that fixes a baselined advisory, Dependabot's included, turns
+  `Security Audit` red until the entry is deleted in the same pull request. That is the point:
+  a stale entry is still an exemption for its id if a later downgrade brings the advisory back.
+  `--write-baseline` keeps the reasons already written and writes a new entry with an empty
+  one, which fails the gate until a person says why.
 - **Only `frontend/package-lock.json` is scanned.** A lockfile anywhere else in the repo is
   invisible to both this gate and Dependabot's version updates, which is why a separate step fails
   the build when one appears outside that path.
