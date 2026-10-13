@@ -8,6 +8,7 @@ own documents, which the caller supplies as complete XHTML.
 """
 
 import io
+import re
 import zipfile
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
@@ -17,6 +18,8 @@ from xml.sax.saxutils import escape, quoteattr
 Entry = Tuple[str, str, list]
 
 _XML = "<?xml version='1.0' encoding='utf-8'?>\n"
+# What XML 1.0 allows nowhere, such as a form feed pasted from a PDF: one of these and no reader opens the file.
+_NOT_XML = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
 _CONTAINER = (
     _XML
     + '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">'
@@ -121,13 +124,13 @@ def write_epub(
         # First, and not compressed: a reader identifies the file by these
         # bytes at a fixed offset, before it can read the zip's directory.
         book.writestr(zipfile.ZipInfo("mimetype"), "application/epub+zip", compress_type=zipfile.ZIP_STORED)
-        book.writestr("META-INF/container.xml", _CONTAINER)
-        book.writestr(
-            "EPUB/content.opf",
-            _package(identifier, title, language, author, description, subject, [name for name, _ in documents]),
-        )
-        book.writestr("EPUB/nav.xhtml", _nav(title, language, toc))
-        book.writestr("EPUB/toc.ncx", _ncx(identifier, title, toc))
-        for name, xhtml in documents:
-            book.writestr(f"EPUB/{name}", xhtml)
+        files = [
+            ("META-INF/container.xml", _CONTAINER),
+            ("EPUB/content.opf", _package(identifier, title, language, author, description, subject, [name for name, _ in documents])),
+            ("EPUB/nav.xhtml", _nav(title, language, toc)),
+            ("EPUB/toc.ncx", _ncx(identifier, title, toc)),
+            *((f"EPUB/{name}", xhtml) for name, xhtml in documents),
+        ]
+        for name, xml in files:
+            book.writestr(name, _NOT_XML.sub("", xml))
     return output.getvalue()

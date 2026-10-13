@@ -184,6 +184,25 @@ def test_every_file_in_it_is_well_formed_whatever_the_title():
             ElementTree.fromstring(book.read(name))  # raises on a stray & or <
 
 
+def test_characters_xml_does_not_allow_are_left_out_and_the_rest_is_kept():
+    """A form feed pasted from a PDF. With ebooklib the export failed; without this it would write a file no reader opens."""
+    book = _book(
+        title="Form\x0cfeed", author="A\x0bB", description="d\x08e", subject="s\x00t",
+        documents=[("title.xhtml", _page("T", "<p>pasted\x0c from a PDF\x1f</p>"))],
+        toc=[("Title\x0c Page", "title.xhtml", [])],
+    )
+
+    for name in book.namelist():
+        if name != "mimetype":
+            ElementTree.fromstring(book.read(name))
+    metadata = _package(book)[0].find(f"{OPF}metadata")
+    assert metadata.find(f"{DC}title").text == "Formfeed"
+    assert metadata.find(f"{DC}creator").text == "AB"
+    page = ElementTree.fromstring(book.read("EPUB/title.xhtml"))
+    assert page.find(f"{XHTML}body/{XHTML}p").text == "pasted from a PDF"
+    assert "Title Page" in book.read("EPUB/nav.xhtml").decode() and "Title Page" in book.read("EPUB/toc.ncx").decode()
+
+
 def test_the_documents_are_stored_as_they_were_given():
     assert _book().read("EPUB/chap_1.xhtml").decode() == _page("One", "<h1>One</h1><p>Text.</p>")
 
