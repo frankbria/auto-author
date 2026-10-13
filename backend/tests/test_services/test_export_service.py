@@ -790,7 +790,8 @@ class TestHtmlBecomesMarkdownWithoutHtml2text:
         assert [text for _, text in self._builders_get(html)] == ["* Outer", "* Inner a", "* Inner b", "* Last"]
 
     def test_a_script_or_a_style_block_contributes_nothing(self):
-        """markdownify's `strip` option drops the tag and keeps the text inside it."""
+        """markdownify drops both, text and all, when left alone. Naming them in its `strip`
+        option, which reads like the safe thing to do, keeps their text."""
         html = "<p>Kept.</p><script>alert(1)</script><style>p{color:red}</style><p>Also kept.</p>"
 
         assert [text for _, text in self._builders_get(html)] == ["Kept.", "Also kept."]

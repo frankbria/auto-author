@@ -122,18 +122,15 @@ def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
     """
 
     class _Chapter(MarkdownConverter):
-        # markdownify's `strip` drops a tag and keeps the text inside it, which
-        # for these two is code and not prose.
-        def convert_script(self, el, text, parent_tags):
-            return ""
-
-        convert_style = convert_script
         # `_italic_` beside `**bold**`, as every export has had it until now.
         convert_em = convert_i = abstract_inline_conversion(lambda self: "_")
 
     converter = _Chapter(
         heading_style=ATX,  # the default writes an h1 as text over a row of `=`
         bullets="*",  # the default changes the bullet at each level of nesting
+        # Only ever `img` here. `strip` drops a tag and keeps the text inside
+        # it; a <script> or <style> named here would put its code in the book.
+        # Left alone, markdownify drops both, text and all.
         strip=None if for_a_markdown_reader else ["img"],
         escape_asterisks=for_a_markdown_reader,
         escape_underscores=for_a_markdown_reader,
