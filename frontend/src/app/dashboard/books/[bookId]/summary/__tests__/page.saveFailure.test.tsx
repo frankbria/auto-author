@@ -185,6 +185,26 @@ describe('coming back after a save failed', () => {
   });
 });
 
+describe('moving on to another book', () => {
+  it('leaves the first book\'s notices behind', async () => {
+    localStorage.setItem(UNSAVED, 'What I wrote last time, which was not saved');
+    serverHas('The older, saved summary');
+    const view = await opened();
+    mockedClient.saveBookSummary.mockRejectedValue(new Error('Network error'));
+    await typeAndWaitForTheSave('A summary the server never received');
+    expect(await screen.findByText(/could not be saved/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /restore it/i })).toBeInTheDocument();
+
+    mockParams = { bookId: 'book-2' };
+    serverHas('The second book');
+    view.rerender(<BookSummaryPage />);
+    await waitFor(() => expect(field()).toHaveValue('The second book'));
+
+    expect(screen.queryByText(/could not be saved/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /restore it/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('a browser that will not store anything', () => {
   it('does not break typing, and says the text is in neither place when the save fails too', async () => {
     serverHas('The saved summary');
