@@ -47,8 +47,11 @@ from app.schemas.book import (
     QuestionListResponse,
     QuestionProgressResponse,
     ChapterContentUpdate,
+    MAX_CHAPTER_CONTENT_BYTES,
+    MAX_TOC_BODY_BYTES,
 )
 from app.db.book import NO_PRECONDITION
+from pymongo.errors import OperationFailure
 from app.db.database import (
     create_book, get_book_by_id, get_book_owner_id, get_book_metadata_by_id,
     get_books_by_user,
@@ -1159,6 +1162,44 @@ async def generate_table_of_contents(
         )
 
 
+def _without_bodies(chapters: Any) -> Any:
+    """Chapters as GET and PUT /toc return them: without ``content``, at any depth (#828).
+
+    The editor reads the table of contents to draw its tabs and reads a
+    chapter's body from the chapter's own route. A stored TOC can hold AI JSON
+    verbatim, so anything that is not a chapter is passed through as it is.
+    """
+    if not isinstance(chapters, list):
+        return chapters
+    return [
+        {
+            key: _without_bodies(value) if key == "subchapters" else value
+            for key, value in chapter.items()
+            if key != "content"
+        }
+        if isinstance(chapter, dict)
+        else chapter
+        for chapter in chapters
+    ]
+
+
+# What MongoDB answers when a write would take a document past sixteen megabytes.
+_DOCUMENT_TOO_LARGE_CODES = {10334, 17419}
+
+
+def _book_is_full(error: Exception) -> Optional[HTTPException]:
+    """413 if ``error`` is the database refusing to let the book's document grow (#828).
+
+    A book is one document. It was a 500, on every save that made the book longer.
+    """
+    if isinstance(error, OperationFailure) and error.code in _DOCUMENT_TOO_LARGE_CODES:
+        return HTTPException(
+            status_code=413,
+            detail="This book has reached the largest size it can be stored at. Shorten a chapter to save more.",
+        )
+    return None
+
+
 @router.get("/{book_id}/toc", status_code=status.HTTP_200_OK)
 async def get_book_toc(
     book_id: str,
@@ -1200,7 +1241,7 @@ async def get_book_toc(
     return {
         "book_id": book_id,
         "toc": {
-            "chapters": toc.get("chapters", []),
+            "chapters": _without_bodies(toc.get("chapters", [])),
             "total_chapters": toc.get("total_chapters", 0),
             "estimated_pages": toc.get("estimated_pages", 0),
             "structure_notes": toc.get("structure_notes", ""),
@@ -1248,6 +1289,13 @@ async def update_book_toc(
             status_code=400, detail="Chapters must be provided as a list"
         )
 
+    # ensure_ascii=False: counted as the UTF-8 it is stored as, not as JSON's \uXXXX escapes.
+    if len(json.dumps(toc_data, ensure_ascii=False).encode()) > MAX_TOC_BODY_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"The table of contents is too large to save: the limit is {MAX_TOC_BODY_BYTES:,} bytes.",
+        )
+
     # Validate each chapter
     for i, chapter in enumerate(chapters):
         if not isinstance(chapter, dict):
@@ -1271,9 +1319,11 @@ async def update_book_toc(
         logger.info(f"Updating TOC for book_id={book_id}, user_auth_id={current_user.get('auth_id')}")
 
         # Update TOC with transaction
+        # A chapter's body has one way in, its own route, where its size is
+        # checked (#828). Sent here it is dropped; the stored one is kept by id.
         updated_toc = await update_toc_with_transaction(
             book_id=book_id,
-            toc_data=toc_data,
+            toc_data={**toc_data, "chapters": _without_bodies(chapters)},
             user_auth_id=current_user.get("auth_id")
         )
 
@@ -1284,7 +1334,7 @@ async def update_book_toc(
         return {
             "book_id": book_id,
             "toc": {
-                "chapters": updated_toc.get("chapters", []),
+                "chapters": _without_bodies(updated_toc.get("chapters", [])),
                 "total_chapters": updated_toc.get("total_chapters", 0),
                 "estimated_pages": updated_toc.get("estimated_pages", 0),
                 "structure_notes": updated_toc.get("structure_notes", ""),
@@ -1308,7 +1358,10 @@ async def update_book_toc(
             )
         else:
             raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
+    except Exception as error:
+        full = _book_is_full(error)
+        if full:
+            raise full
         logger.error("Failed to update TOC", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to update TOC")
 
@@ -1458,6 +1511,11 @@ async def update_chapter_content(
     """
     content = body.content
     auto_update_metadata = body.auto_update_metadata
+    if len(content.encode()) > MAX_CHAPTER_CONTENT_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"This chapter is too long to save: the limit is {MAX_CHAPTER_CONTENT_BYTES:,} bytes. Split it into two chapters.",
+        )
     # Verify ownership and read the TOC *structure*. The projection drops every
     # chapter's draft HTML, which this handler never reads — it only walks the
     # tree to find the target chapter, its parent, and its current status, then
@@ -1525,14 +1583,17 @@ async def update_chapter_content(
 
     # Persist via a targeted, concurrency-safe positional update (only this
     # chapter's fields + an atomic version $inc) rather than a whole-TOC rewrite.
-    persisted = await apply_chapter_content_update(
-        book_id=book_id,
-        chapter_id=chapter_id,
-        parent_chapter_id=parent_chapter_id,
-        chapter_fields=chapter_fields,
-        user_auth_id=current_user.get("auth_id"),
-        expected_last_modified=precondition,
-    )
+    try:
+        persisted = await apply_chapter_content_update(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            parent_chapter_id=parent_chapter_id,
+            chapter_fields=chapter_fields,
+            user_auth_id=current_user.get("auth_id"),
+            expected_last_modified=precondition,
+        )
+    except OperationFailure as error:
+        raise _book_is_full(error) or error
     if not persisted:
         # Deleted/moved since the read above (404), or saved elsewhere (409).
         raise await _chapter_save_rejected(book_id, chapter_id)

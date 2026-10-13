@@ -284,6 +284,13 @@ class ChapterMetadataResponse(BaseModel):
     last_active_chapter: Optional[str] = None
 
 
+# A book is one MongoDB document, chapters and their bodies included, and a
+# document may not pass sixteen megabytes: beyond that every save of the book
+# fails, however small (#828). Counted in UTF-8 bytes, as the database counts.
+MAX_CHAPTER_CONTENT_BYTES = 500_000  # one chapter; about seventy thousand words of HTML
+MAX_TOC_BODY_BYTES = 1_000_000  # one PUT /toc
+
+
 class ChapterContentUpdate(BaseModel):
     content: str
     auto_update_metadata: bool = True
