@@ -20,6 +20,9 @@
 # production
 /build
 
+# written by scripts/third-party-notices.mjs before each build (#825)
+/public/third-party-notices.txt
+
 # misc
 .DS_Store
 *.pem

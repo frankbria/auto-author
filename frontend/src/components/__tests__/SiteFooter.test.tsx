@@ -13,6 +13,13 @@ describe('SiteFooter', () => {
     expect(privacy).toHaveAttribute('href', '/privacy');
   });
 
+  it('links to the notices for the third-party software the site is built with (#825)', () => {
+    render(<SiteFooter />);
+
+    // A file in public/, written at build time: not a page, so not a client-side route.
+    expect(screen.getByRole('link', { name: /third-party notices/i })).toHaveAttribute('href', '/third-party-notices.txt');
+  });
+
   it('renders inside a contentinfo landmark', () => {
     render(<SiteFooter />);
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();

@@ -102,6 +102,13 @@ def test_the_smoke_test_greps_the_bundle_for_its_own_api_host(job: dict) -> None
     assert ".next/static" in smoke["run"] and "NEXT_PUBLIC_API_URL" in smoke["run"]
 
 
+def test_the_smoke_test_looks_in_the_image_for_the_licence_texts(job: dict) -> None:
+    """The frontend image ships libvips, which is LGPL: the texts have to be in it (#825)."""
+    smoke = next(s for s in job["steps"] if s.get("name", "").startswith("Smoke test"))
+    for file in ("public/third-party-notices.txt", "public/licenses/LGPL-3.0.txt", "public/licenses/GPL-3.0.txt"):
+        assert file in smoke["run"], f"the smoke test does not check the image for {file}"
+
+
 def test_local_compose_build_requires_values_instead_of_defaulting_to_staging() -> None:
     args = _load(COMPOSE_BUILD)["services"]["frontend"]["build"]["args"]
     for name in ("NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_BETTER_AUTH_URL", "NEXT_PUBLIC_ENVIRONMENT"):
