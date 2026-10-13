@@ -816,7 +816,32 @@ class TestHtmlBecomesMarkdownWithoutHtml2text:
         html = "<p>Before.</p><pre><code>def f(x):\n    return x * 2\n</code></pre>"
 
         assert self._exported(html) == "Before.\n\n```\ndef f(x):\n    return x * 2\n```"
-        assert self._builders_get(html) == [("normal", "Before."), ("normal", "def f(x):\n    return x * 2")]
+        # Indented for the builders, as it always was; the first line loses its indent when
+        # the paragraph is trimmed.
+        assert self._builders_get(html) == [("normal", "Before."), ("normal", "def f(x):\n        return x * 2")]
+
+    @pytest.mark.parametrize("before", ["<p>Run it:</p>", ""], ids=["after a paragraph", "first in the chapter"])
+    def test_a_code_block_that_begins_with_a_comment_is_not_a_heading_for_the_builders(self, before):
+        """The builders call a block a heading when it begins with `# `. A code block with its
+        fence simply removed begins at the margin, and `# double it` was set as a heading with
+        the code as its text. Indented, it is not mistaken for one."""
+        html = before + "<pre><code># double it\ndef f(x):\n    return x * 2\n</code></pre>"
+
+        assert self._builders_get(html)[-1] == ("normal", "# double it\n    def f(x):\n        return x * 2")
+
+    def test_lines_of_code_that_look_like_list_items_stay_in_their_block_for_the_builders(self):
+        html = "<p>Notes:</p><pre><code>* not a list\n1. nor this\n</code></pre><ul><li><p>A real item</p></li></ul>"
+
+        assert [text for _, text in self._builders_get(html)] == ["Notes:", "* not a list\n    1. nor this", "* A real item"]
+
+    def test_a_comment_in_a_code_block_is_not_moved_down_two_heading_levels(self):
+        """The export moves a chapter's headings below its chapter heading. That was done by
+        rewriting every line that began with `#`, which was safe while code blocks were
+        indented. Fenced, their lines begin at the margin, and `# a comment` became
+        `### a comment`. Review found it."""
+        html = "<h1>Setup</h1><pre><code># a comment\necho hi\n## also code\n</code></pre><h5>Deep</h5>"
+
+        assert self._exported(html) == "### Setup\n\n```\n# a comment\necho hi\n## also code\n```\n\n###### Deep"
 
     def test_an_image_is_in_the_export_and_not_in_the_builders_text(self):
         html = '<p>Before.</p><img src="/uploads/owner_abc.png" alt="A chart"><p>After.</p>'

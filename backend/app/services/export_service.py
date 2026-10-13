@@ -8,6 +8,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, BinaryIO
 import re
+import textwrap
 
 from app.core.config import settings
 from app.services.export_templates import PAGE_SIZES_INCHES, resolve_template
@@ -121,9 +122,19 @@ def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
     exports running at once (#751).
     """
 
+    # In the Markdown export a chapter's own headings sit below its `##` chapter
+    # heading, so that an <h1> in the text cannot outrank the book's title (#61).
+    # Done here, where a heading is known to be one. It used to be done by
+    # rewriting every line of the result that began with `#`, which also
+    # rewrote the comments in a fenced code block.
+    below_the_chapter_heading = 2 if for_a_markdown_reader else 0
+
     class _Chapter(MarkdownConverter):
         # `_italic_` beside `**bold**`, as every export has had it until now.
         convert_em = convert_i = abstract_inline_conversion(lambda self: "_")
+
+        def convert_hN(self, n, el, text, parent_tags):
+            return super().convert_hN(min(6, n + below_the_chapter_heading), el, text, parent_tags)
 
     converter = _Chapter(
         heading_style=ATX,  # the default writes an h1 as text over a row of `=`
@@ -138,6 +149,25 @@ def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
     )
     # The editor writes &nbsp; for a second space in a row.
     return converter.convert(content).replace("\xa0", " ")
+
+
+def _blocks_for_the_builders(markdown: str) -> str:
+    """Markdown as the PDF, DOCX and EPUB builders take it: one paragraph per
+    block separated by a blank line, printed as it comes, and called a heading
+    when it begins with `# `.
+
+    So a code block loses its fence and is indented, as it always reached them:
+    at the margin, a line of code beginning `# ` would be set as a heading. And
+    a list, which Markdown writes as one block, gets a blank line before each
+    item, or its lines would run together in a paragraph.
+    """
+    parts = re.split(r'(?ms)^```[^\n]*\n(.*?)^```[ \t]*$', markdown)
+    for i, part in enumerate(parts):
+        if i % 2:  # the inside of a code block
+            parts[i] = textwrap.indent(part, '    ')
+        else:
+            parts[i] = re.sub(r'\n(?=[ \t]*(?:\*|\d+\.) )', '\n\n', part)
+    return ''.join(parts)
 
 
 class ExportUnavailableError(RuntimeError):
@@ -166,12 +196,9 @@ class ExportService:
             return ""
 
         if MARKDOWNIFY_AVAILABLE:
-            markdown_text = _html_to_markdown(content, for_a_markdown_reader=False)
-            # The builders take one paragraph per blank-line-separated block and
-            # print it. A code fence is syntax for a Markdown reader, and a tight
-            # list is one block whose lines would run together.
-            markdown_text = re.sub(r'(?m)^```.*\n?', '', markdown_text)
-            markdown_text = re.sub(r'\n(?=[ \t]*(?:\*|\d+\.) )', '\n\n', markdown_text)
+            markdown_text = _blocks_for_the_builders(
+                _html_to_markdown(content, for_a_markdown_reader=False)
+            )
         else:
             # ponytail: markdownify not installed — fall back to a tag strip that
             # preserves block boundaries so words/paragraphs don't merge.
@@ -183,7 +210,8 @@ class ExportService:
         # Clean up excessive newlines
         markdown_text = re.sub(r'\n{3,}', '\n\n', markdown_text)
 
-        return markdown_text.strip()
+        # Newlines only: a code block that opens the chapter keeps its indent.
+        return markdown_text.strip('\n')
 
     def _extract_text_formatting(self, content: str) -> List[Dict]:
         """Extract text and basic formatting from HTML content."""
@@ -877,15 +905,6 @@ class ExportService:
         else:
             # ponytail: no markdownify — reuse the block-preserving tag strip.
             md = self._clean_html_content(content)
-        # Push the chapter's own headings below its '##' chapter heading so an
-        # embedded <h1> can't outrank the book title / chapter heading (issue
-        # #61: proper heading hierarchy). Offset every ATX heading by 2, cap 6.
-        md = re.sub(
-            r'^(#{1,6})(?= )',
-            lambda m: '#' * min(6, len(m.group(1)) + 2),
-            md,
-            flags=re.MULTILINE,
-        )
         return re.sub(r'\n{3,}', '\n\n', md).strip()
 
     def _chapter_markdown(self, chapter: Dict, index: int) -> str:
