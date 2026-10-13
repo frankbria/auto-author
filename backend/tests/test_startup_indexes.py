@@ -15,7 +15,7 @@ from httpx import ASGITransport, AsyncClient
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app import main
-from app.db import base
+from app.db import base, questions
 from app.db.audit_log import ensure_audit_log_indexes
 from app.db.indexing_strategy import ChapterTabIndexManager
 from app.main import app
@@ -206,11 +206,23 @@ class TestStartingWhileTheDatabaseIsAway:
         await base._db.question_responses.insert_one({"warm": True})
         monkeypatch.setattr(base, "_db", AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")["nowhere"])
         served = FastAPI()
+        # The first thing the work does. Asserting only on indexes afterwards cannot tell
+        # waiting from going ahead: steps that fail while the database is away fail quietly,
+        # and the later ones succeed once it is back.
+        begun = []
+        first_step = questions.ensure_question_indexes
+
+        async def first_step_watched():
+            begun.append(True)
+            await first_step()
+
+        monkeypatch.setattr(questions, "ensure_question_indexes", first_step_watched)
 
         async with asyncio.timeout(60):
             async with main.lifespan(served):
                 await asyncio.sleep(1)  # long enough for more than one failed attempt
                 assert not served.state.database_prepared.done(), "it gave up, or thought an absent database was ready"
+                assert not begun, "the work went ahead before the database could be reached"
                 assert set(reported) == {"startup-database"}
                 bring_it_back()
                 await served.state.database_prepared
