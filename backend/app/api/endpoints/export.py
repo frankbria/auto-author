@@ -17,7 +17,7 @@ from app.services.export_service import (
     PDF_AVAILABLE,
     DOCX_AVAILABLE,
     EPUB_AVAILABLE,
-    HTML2TEXT_AVAILABLE,
+    MARKDOWNIFY_AVAILABLE,
 )
 from app.services.export_templates import list_templates
 from app.services.chapter_access_service import chapter_access_service
@@ -520,7 +520,7 @@ async def get_export_formats(
                 "description": "Markdown format - ideal for version control and platform compatibility",
                 "mime_type": "text/markdown",
                 "extension": ".md",
-                "available": HTML2TEXT_AVAILABLE,
+                "available": MARKDOWNIFY_AVAILABLE,
                 "options": {
                     "include_empty_chapters": "boolean",
                     "multi_file": "boolean"

@@ -8,6 +8,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, BinaryIO
 import re
+import textwrap
 
 from app.core.config import settings
 from app.services.export_templates import PAGE_SIZES_INCHES, resolve_template
@@ -102,10 +103,72 @@ except ImportError:
     EPUB_AVAILABLE = False
 
 try:
-    import html2text
-    HTML2TEXT_AVAILABLE = True
+    from markdownify import ATX, MarkdownConverter, abstract_inline_conversion
+    MARKDOWNIFY_AVAILABLE = True
 except ImportError:
-    HTML2TEXT_AVAILABLE = False
+    MARKDOWNIFY_AVAILABLE = False
+
+
+def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
+    """Chapter HTML as Markdown, with markdownify (MIT). It replaced a
+    GPL-3.0-or-later converter on every export path (#823).
+
+    `for_a_markdown_reader` is the Markdown export: images are kept, and text
+    that only looks like markup is escaped, so that `__init__` is not the word
+    init in bold. Without it the result is for the PDF, DOCX and EPUB builders,
+    which print what they are given: no images, and no backslashes.
+
+    The converter is built here, on each call, so nothing is shared between two
+    exports running at once (#751).
+    """
+
+    # In the Markdown export a chapter's own headings sit below its `##` chapter
+    # heading, so that an <h1> in the text cannot outrank the book's title (#61).
+    # Done here, where a heading is known to be one. It used to be done by
+    # rewriting every line of the result that began with `#`, which also
+    # rewrote the comments in a fenced code block.
+    below_the_chapter_heading = 2 if for_a_markdown_reader else 0
+
+    class _Chapter(MarkdownConverter):
+        # `_italic_` beside `**bold**`, as every export has had it until now.
+        convert_em = convert_i = abstract_inline_conversion(lambda self: "_")
+
+        def convert_hN(self, n, el, text, parent_tags):
+            # markdownify stops at the sixth level itself.
+            return super().convert_hN(n + below_the_chapter_heading, el, text, parent_tags)
+
+    converter = _Chapter(
+        heading_style=ATX,  # the default writes an h1 as text over a row of `=`
+        bullets="*",  # the default changes the bullet at each level of nesting
+        # Only ever `img` here. `strip` drops a tag and keeps the text inside
+        # it; a <script> or <style> named here would put its code in the book.
+        # Left alone, markdownify drops both, text and all.
+        strip=None if for_a_markdown_reader else ["img"],
+        escape_asterisks=for_a_markdown_reader,
+        escape_underscores=for_a_markdown_reader,
+        escape_misc=for_a_markdown_reader,
+    )
+    # The editor writes &nbsp; for a second space in a row.
+    return converter.convert(content).replace("\xa0", " ")
+
+
+def _blocks_for_the_builders(markdown: str) -> str:
+    """Markdown as the PDF, DOCX and EPUB builders take it: one paragraph per
+    block separated by a blank line, printed as it comes, and called a heading
+    when it begins with `# `.
+
+    So a code block loses its fence and is indented, as it always reached them:
+    at the margin, a line of code beginning `# ` would be set as a heading. And
+    a list, which Markdown writes as one block, gets a blank line before each
+    item, or its lines would run together in a paragraph.
+    """
+    parts = re.split(r'(?ms)^```[^\n]*\n(.*?)^```[ \t]*$', markdown)
+    for i, part in enumerate(parts):
+        if i % 2:  # the inside of a code block
+            parts[i] = textwrap.indent(part, '    ')
+        else:
+            parts[i] = re.sub(r'\n(?=[ \t]*(?:\*|\d+\.) )', '\n\n', part)
+    return ''.join(parts)
 
 
 class ExportUnavailableError(RuntimeError):
@@ -133,16 +196,12 @@ class ExportService:
         if not content:
             return ""
 
-        if HTML2TEXT_AVAILABLE:
-            # html2text keeps parse state on the instance, so a shared one leaks
-            # text between concurrent exports (#751): build one per call.
-            h2t = html2text.HTML2Text()
-            h2t.ignore_links = False
-            h2t.ignore_images = True
-            h2t.body_width = 0  # Don't wrap lines
-            markdown_text = h2t.handle(content)
+        if MARKDOWNIFY_AVAILABLE:
+            markdown_text = _blocks_for_the_builders(
+                _html_to_markdown(content, for_a_markdown_reader=False)
+            )
         else:
-            # ponytail: html2text not installed — fall back to a tag strip that
+            # ponytail: markdownify not installed — fall back to a tag strip that
             # preserves block boundaries so words/paragraphs don't merge.
             text = re.sub(r'(?is)<(script|style).*?>.*?</\1>', '', content)
             text = re.sub(r'(?i)</(p|div|h[1-6]|li|br|tr)>', '\n', text)
@@ -152,7 +211,8 @@ class ExportService:
         # Clean up excessive newlines
         markdown_text = re.sub(r'\n{3,}', '\n\n', markdown_text)
 
-        return markdown_text.strip()
+        # Newlines only: a code block that opens the chapter keeps its indent.
+        return markdown_text.strip('\n')
 
     def _extract_text_formatting(self, content: str) -> List[Dict]:
         """Extract text and basic formatting from HTML content."""
@@ -835,30 +895,17 @@ class ExportService:
     def _content_to_markdown(self, content: str) -> str:
         """Convert chapter HTML to Markdown, preserving images and links.
 
-        Uses a dedicated html2text instance with ``ignore_images=False`` so
-        ``<img>`` becomes ``![alt](src)`` (issue #61 AC: images referenced with
-        correct paths), unlike the shared text-extraction converter.
+        Images are kept, so ``<img>`` becomes ``![alt](src)`` (issue #61 AC:
+        images referenced with correct paths), unlike the text the PDF, DOCX and
+        EPUB builders are given.
         """
         if not content:
             return "*(No content yet)*"
-        if HTML2TEXT_AVAILABLE:
-            h2t = html2text.HTML2Text()
-            h2t.ignore_links = False
-            h2t.ignore_images = False
-            h2t.body_width = 0
-            md = h2t.handle(content)
+        if MARKDOWNIFY_AVAILABLE:
+            md = _html_to_markdown(content, for_a_markdown_reader=True)
         else:
-            # ponytail: no html2text — reuse the block-preserving tag strip.
+            # ponytail: no markdownify — reuse the block-preserving tag strip.
             md = self._clean_html_content(content)
-        # Push the chapter's own headings below its '##' chapter heading so an
-        # embedded <h1> can't outrank the book title / chapter heading (issue
-        # #61: proper heading hierarchy). Offset every ATX heading by 2, cap 6.
-        md = re.sub(
-            r'^(#{1,6})(?= )',
-            lambda m: '#' * min(6, len(m.group(1)) + 2),
-            md,
-            flags=re.MULTILINE,
-        )
         return re.sub(r'\n{3,}', '\n\n', md).strip()
 
     def _chapter_markdown(self, chapter: Dict, index: int) -> str:
@@ -875,9 +922,9 @@ class ExportService:
     def _build_markdown(
         self, book_data: Dict, chapters: List[Dict], multi_file: bool = False
     ) -> bytes:
-        if not HTML2TEXT_AVAILABLE:
+        if not MARKDOWNIFY_AVAILABLE:
             raise ExportUnavailableError(
-                "Markdown export unavailable: html2text is not installed"
+                "Markdown export unavailable: markdownify is not installed"
             )
 
         if multi_file:

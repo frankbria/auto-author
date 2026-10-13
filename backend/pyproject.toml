@@ -31,11 +31,11 @@ dependencies = [
     # Export functionality
     "reportlab==5.0.1",
     "python-docx==1.2.0",
-    "html2text==2025.4.15",
     "ebooklib==0.20",
     "stripe==15.6.1",
     # Error tracking (issue #334) — inert unless SENTRY_DSN is set
     "sentry-sdk[fastapi]==2.70.0",
+    "markdownify==1.2.3",
 ]
 
 # Test, load-test, and dev tooling are NOT production runtime dependencies.

@@ -449,15 +449,15 @@ class TestExportAvailabilityGuards:
             await es.export_service.generate_epub({"title": "x"}, [])
 
     @pytest.mark.asyncio
-    async def test_generate_markdown_raises_when_html2text_unavailable(self, monkeypatch):
+    async def test_generate_markdown_raises_when_markdownify_unavailable(self, monkeypatch):
         import app.services.export_service as es
-        monkeypatch.setattr(es, "HTML2TEXT_AVAILABLE", False)
-        with pytest.raises(es.ExportUnavailableError, match="html2text"):
+        monkeypatch.setattr(es, "MARKDOWNIFY_AVAILABLE", False)
+        with pytest.raises(es.ExportUnavailableError, match="markdownify"):
             await es.export_service.generate_markdown({"title": "x"}, [])
 
-    def test_clean_html_falls_back_without_html2text(self, monkeypatch):
+    def test_clean_html_falls_back_without_markdownify(self, monkeypatch):
         import app.services.export_service as es
-        monkeypatch.setattr(es, "HTML2TEXT_AVAILABLE", False)
+        monkeypatch.setattr(es, "MARKDOWNIFY_AVAILABLE", False)
         svc = es.ExportService()
         out = svc._clean_html_content("<p>Hello <strong>world</strong></p>")
         assert "Hello" in out and "world" in out
@@ -740,3 +740,130 @@ class TestNonPdfFormatsKeepTextRaw:
         assert "Genre: Sci-Fi & Fantasy" in text
         assert "Target Audience: Parents & <teens>" in text
         assert "&amp;" not in text and "&lt;" not in text
+
+
+class TestHtmlBecomesMarkdownWithoutHtml2text:
+    """#823: html2text is GPL-3.0-or-later and sat on every export path of an MIT-licensed
+    repository. markdownify (MIT) replaces it. These pin what the exports depend on, most of
+    it found by running both converters over the same chapter HTML and comparing."""
+
+    @staticmethod
+    def _builders_get(html):
+        """The paragraphs the PDF, DOCX and EPUB builders are given."""
+        import app.services.export_service as es
+
+        return [(p["style"], p["text"]) for p in es.ExportService()._extract_text_formatting(html)]
+
+    @staticmethod
+    def _exported(html):
+        import app.services.export_service as es
+
+        return es.ExportService()._content_to_markdown(html)
+
+    def test_html2text_is_gone_from_the_code_the_manifest_and_the_lock(self):
+        from pathlib import Path
+
+        import app.services.export_service as es
+
+        backend = Path(es.__file__).resolve().parents[2]
+        assert not hasattr(es, "html2text")
+        assert "html2text" not in Path(es.__file__).read_text()
+        assert "html2text" not in (backend / "pyproject.toml").read_text()
+        assert "html2text" not in (backend / "uv.lock").read_text()
+
+    def test_headings_keep_their_level(self):
+        """markdownify's own default writes an h1 as a line of text over a line of `=`,
+        which the builders would take for a paragraph."""
+        assert self._builders_get("<h1>Top</h1><p>Text.</p><h2>Middle</h2><h3>Small</h3>") == [
+            ("heading1", "Top"), ("normal", "Text."), ("heading2", "Middle"), ("heading3", "Small"),
+        ]
+
+    def test_each_list_item_is_its_own_paragraph_for_the_builders(self):
+        """A tight Markdown list is one block. In a PDF paragraph its lines run together."""
+        html = "<ul><li><p>One</p></li><li><p>Two</p></li></ul><ol><li><p>First</p></li><li><p>Second</p></li></ol>"
+
+        assert [text for _, text in self._builders_get(html)] == ["* One", "* Two", "1. First", "2. Second"]
+
+    def test_a_nested_list_keeps_every_item(self):
+        html = "<ul><li><p>Outer</p><ul><li><p>Inner a</p></li><li><p>Inner b</p></li></ul></li><li><p>Last</p></li></ul>"
+
+        assert [text for _, text in self._builders_get(html)] == ["* Outer", "* Inner a", "* Inner b", "* Last"]
+
+    def test_a_script_or_a_style_block_contributes_nothing(self):
+        """markdownify drops both, text and all, when left alone. Naming them in its `strip`
+        option, which reads like the safe thing to do, keeps their text."""
+        html = "<p>Kept.</p><script>alert(1)</script><style>p{color:red}</style><p>Also kept.</p>"
+
+        assert [text for _, text in self._builders_get(html)] == ["Kept.", "Also kept."]
+        assert self._exported(html) == "Kept.\n\nAlso kept."
+
+    def test_the_builders_get_the_text_as_it_was_typed(self):
+        """No backslash escapes: a PDF is not a Markdown reader and would print them."""
+        html = "<p>snake_case_name and 2 * 3 and __init__</p><p>1. not a list</p><p>- not a bullet</p>"
+
+        assert [text for _, text in self._builders_get(html)] == [
+            "snake_case_name and 2 * 3 and __init__", "1. not a list", "- not a bullet",
+        ]
+
+    def test_the_markdown_export_escapes_text_that_only_looks_like_markup(self):
+        """In a Markdown file `__init__` unescaped is the word init in bold, and a paragraph
+        that starts with `# ` is a heading."""
+        exported = self._exported("<p># not a heading</p><p>__init__ and 2 * 3</p><p>1. not a list</p>")
+
+        assert exported == "\\# not a heading\n\n\\_\\_init\\_\\_ and 2 \\* 3\n\n1\\. not a list"
+
+    def test_a_code_block_is_fenced_in_the_export_and_plain_for_the_builders(self):
+        html = "<p>Before.</p><pre><code>def f(x):\n    return x * 2\n</code></pre>"
+
+        assert self._exported(html) == "Before.\n\n```\ndef f(x):\n    return x * 2\n```"
+        # Indented for the builders, as it always was; the first line loses its indent when
+        # the paragraph is trimmed.
+        assert self._builders_get(html) == [("normal", "Before."), ("normal", "def f(x):\n        return x * 2")]
+
+    @pytest.mark.parametrize("before", ["<p>Run it:</p>", ""], ids=["after a paragraph", "first in the chapter"])
+    def test_a_code_block_that_begins_with_a_comment_is_not_a_heading_for_the_builders(self, before):
+        """The builders call a block a heading when it begins with `# `. A code block with its
+        fence simply removed begins at the margin, and `# double it` was set as a heading with
+        the code as its text. Indented, it is not mistaken for one."""
+        html = before + "<pre><code># double it\ndef f(x):\n    return x * 2\n</code></pre>"
+
+        assert self._builders_get(html)[-1] == ("normal", "# double it\n    def f(x):\n        return x * 2")
+
+    def test_lines_of_code_that_look_like_list_items_stay_in_their_block_for_the_builders(self):
+        html = "<p>Notes:</p><pre><code>* not a list\n1. nor this\n</code></pre><ul><li><p>A real item</p></li></ul>"
+
+        assert [text for _, text in self._builders_get(html)] == ["Notes:", "* not a list\n    1. nor this", "* A real item"]
+
+    def test_a_comment_in_a_code_block_is_not_moved_down_two_heading_levels(self):
+        """The export moves a chapter's headings below its chapter heading. That was done by
+        rewriting every line that began with `#`, which was safe while code blocks were
+        indented. Fenced, their lines begin at the margin, and `# a comment` became
+        `### a comment`. Review found it."""
+        html = "<h1>Setup</h1><pre><code># a comment\necho hi\n## also code\n</code></pre><h5>Deep</h5>"
+
+        assert self._exported(html) == "### Setup\n\n```\n# a comment\necho hi\n## also code\n```\n\n###### Deep"
+
+    def test_an_image_is_in_the_export_and_not_in_the_builders_text(self):
+        html = '<p>Before.</p><img src="/uploads/owner_abc.png" alt="A chart"><p>After.</p>'
+
+        assert self._exported(html) == "Before.\n\n![A chart](/uploads/owner_abc.png)\n\nAfter."
+        assert [text for _, text in self._builders_get(html)] == ["Before.", "After."]
+
+    def test_a_non_breaking_space_is_an_ordinary_space(self):
+        """The editor writes &nbsp; for a second space in a row."""
+        assert self._builders_get("<p>one&nbsp; two</p>") == [("normal", "one  two")]
+        assert self._exported("<p>one&nbsp; two</p>") == "one  two"
+
+    def test_emphasis_is_marked_as_it_always_was(self):
+        """`_italic_` beside `**bold**`. markdownify's default is `*italic*`; every export
+        until now has had the other, and the builders print the markers as they come."""
+        html = "<p>Some <strong>bold</strong>, some <em>italic</em>, <i>too</i>.</p>"
+
+        assert self._builders_get(html) == [("normal", "Some **bold**, some _italic_, _too_.")]
+        assert self._exported(html) == "Some **bold**, some _italic_, _too_."
+
+    def test_a_link_keeps_its_address(self):
+        html = '<p>See <a href="https://example.com/a_b?x=1&amp;y=2">the page</a>.</p>'
+
+        assert self._builders_get(html) == [("normal", "See [the page](https://example.com/a_b?x=1&y=2).")]
+        assert self._exported(html) == "See [the page](https://example.com/a_b?x=1&y=2)."
