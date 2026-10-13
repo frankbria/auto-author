@@ -38,12 +38,12 @@ def _paste(script: str, app: str) -> str:
     return script
 
 
-def _run(script: str, tmp_path, curl_answers: str, **env) -> tuple[int, list[str]]:
+def _run(script: str, tmp_path, curl_answers: str, docker_exit: int = 0, **env) -> tuple[int, list[str]]:
     """Run a step's script with `docker`, `curl` and `sleep` replaced; return its exit code and the docker calls."""
     log = tmp_path / "docker.log"
     stubs = tmp_path / "bin"
     stubs.mkdir(exist_ok=True)
-    (stubs / "docker").write_text(f'#!/usr/bin/env bash\necho "$*" >> {log}\n')
+    (stubs / "docker").write_text(f'#!/usr/bin/env bash\necho "$*" >> {log}\nexit {docker_exit}\n')
     (stubs / "curl").write_text(f'#!/usr/bin/env bash\nprintf {curl_answers}\n')
     (stubs / "sleep").write_text("#!/usr/bin/env bash\n")
     for stub in stubs.iterdir():
@@ -105,7 +105,7 @@ def test_the_smoke_test_passes_an_image_that_serves_and_boots_the_first_tag(step
     assert any(call.startswith("run -d --name smoke ") and call.endswith(TAGS.splitlines()[0]) for call in docker), docker
 
 
-def test_the_push_step_pushes_every_tag_and_stops_at_the_first_that_fails(steps, tmp_path):
+def test_the_push_step_pushes_every_tag(steps, tmp_path):
     push = steps[_index(steps, "Push")]
     assert "${{" not in push["run"], "the tags reach the script as a variable"
 
@@ -113,3 +113,12 @@ def test_the_push_step_pushes_every_tag_and_stops_at_the_first_that_fails(steps,
 
     assert code == 0
     assert docker == [f"push {tag}" for tag in TAGS.splitlines()]
+
+
+def test_a_push_that_fails_stops_the_job(steps, tmp_path):
+    push = steps[_index(steps, "Push")]
+
+    code, docker = _run(push["run"], tmp_path, curl_answers="200", docker_exit=1, TAGS=TAGS)
+
+    assert code != 0
+    assert len(docker) == 1, "it went on to the next tag"
