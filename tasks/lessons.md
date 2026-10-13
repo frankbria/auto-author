@@ -1560,3 +1560,9 @@ The guard matched `${{ … inputs … }}` with `[^}]*` on either side of the nam
 
 ### I committed the throwaway branch with the hooks switched off (#817)
 The commit that broke both `CMD`s was made with `core.hooksPath=/dev/null`, to keep a deliberately broken Dockerfile from being argued with. The rule here is no bypassed hooks, and it has no exception for a branch that will be deleted. The hooks would have passed anyway: none of them boots an image. Commit a demonstration branch the same way as any other, and if a hook really does refuse the deliberate breakage, that is worth knowing before the demo, not a reason to switch it off.
+
+### A Dependabot entry was measured twice: does it do anything, and does it do only that (#818)
+The issue asked for Dependabot `docker` entries. Run against main with the real updater, an entry found no dependency in either Dockerfile: the updater does not resolve `FROM python:${PYTHON_VERSION}`. With the image named literally and pinned to a digest it found both, and its first proposal was Python 3.13 to 3.14 and Node 24 to 26, which nobody asked for. With `ignore` rules for major and minor it found both and proposed nothing, which is right while the digests are current. Either of the first two would have passed a test that only asserts the entry exists. For a config that drives a tool, run the tool: once to see that it acts, and again to see what else it does.
+
+### The scan's first findings were all in things the image did not need (#818)
+Eleven `HIGH` findings on the first scan, and the reflex is an ignore file with eleven reasons. Looking at where each one sat showed four inside pip and seven inside npm, both shipped by the base images and neither used at run time. Removing the two package managers from the runtime stages emptied the report and left no baseline to maintain. Before baselining a scanner's finding, look at the path it reports and ask whether that thing needs to be there.
