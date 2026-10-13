@@ -12,8 +12,10 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, Mock, patch
 from urllib.parse import unquote
 
+from bson import ObjectId
+
 from app.core import better_auth_session as bas
-from tests.session_cookies import signed_session_cookie
+from tests.session_cookies import session_collection, signed_session_cookie
 
 
 def _request_with_cookies(cookies: dict) -> Mock:
@@ -131,26 +133,34 @@ class TestValidateBetterAuthSession:
 
     async def test_session_not_found_returns_none(self):
         req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
-        coll = AsyncMock()
-        coll.find_one.return_value = None
+        coll = session_collection(None)
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             assert await bas.validate_better_auth_session(req) is None
 
     async def test_valid_session_updates_activity(self):
         req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
         future = datetime.now(timezone.utc) + timedelta(hours=1)
-        coll = AsyncMock()
-        coll.find_one.return_value = {"_id": "s1", "userId": "u1", "expiresAt": future}
+        coll = session_collection({"_id": "s1", "userId": "u1", "expiresAt": future})
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             result = await bas.validate_better_auth_session(req)
         assert result["userId"] == "u1"
         coll.update_one.assert_awaited_once()
 
+    async def test_a_session_active_a_moment_ago_is_not_written(self):
+        """Its updatedAt is what Settings shows as "Last active": written once it is stale, not per request (#826)."""
+        req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
+        now = datetime.now(timezone.utc)
+        for last_active, written in [(now - timedelta(minutes=1), 0), (now - timedelta(minutes=6), 1),
+                                     ((now - timedelta(minutes=6)).replace(tzinfo=None), 1), ("yesterday", 1)]:
+            coll = session_collection({"_id": "s1", "userId": "u1", "expiresAt": now + timedelta(hours=1), "updatedAt": last_active})
+            with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
+                assert (await bas.validate_better_auth_session(req))["userId"] == "u1"
+            assert coll.update_one.await_count == written, last_active
+
     async def test_expired_datetime_deletes_and_returns_none(self):
         req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
         past = datetime.now(timezone.utc) - timedelta(hours=1)
-        coll = AsyncMock()
-        coll.find_one.return_value = {"_id": "s1", "userId": "u1", "expiresAt": past}
+        coll = session_collection({"_id": "s1", "userId": "u1", "expiresAt": past})
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             assert await bas.validate_better_auth_session(req) is None
         coll.delete_one.assert_awaited_once()
@@ -158,32 +168,28 @@ class TestValidateBetterAuthSession:
     async def test_expired_iso_string(self):
         req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
         past_iso = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
-        coll = AsyncMock()
-        coll.find_one.return_value = {"_id": "s1", "userId": "u1", "expiresAt": past_iso}
+        coll = session_collection({"_id": "s1", "userId": "u1", "expiresAt": past_iso})
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             assert await bas.validate_better_auth_session(req) is None
 
     async def test_expires_at_timestamp_number(self):
         req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
         future_ts = (datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()
-        coll = AsyncMock()
-        coll.find_one.return_value = {"_id": "s1", "userId": "u1", "expiresAt": future_ts}
+        coll = session_collection({"_id": "s1", "userId": "u1", "expiresAt": future_ts})
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             result = await bas.validate_better_auth_session(req)
         assert result["userId"] == "u1"
 
     async def test_invalid_expires_at_format_returns_none(self):
         req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
-        coll = AsyncMock()
-        coll.find_one.return_value = {"_id": "s1", "userId": "u1", "expiresAt": object()}
+        coll = session_collection({"_id": "s1", "userId": "u1", "expiresAt": object()})
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             assert await bas.validate_better_auth_session(req) is None
 
     async def test_naive_datetime_treated_as_utc(self):
         req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
         naive_future = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1)
-        coll = AsyncMock()
-        coll.find_one.return_value = {"_id": "s1", "userId": "u1", "expiresAt": naive_future}
+        coll = session_collection({"_id": "s1", "userId": "u1", "expiresAt": naive_future})
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             result = await bas.validate_better_auth_session(req)
         assert result["userId"] == "u1"
@@ -199,8 +205,7 @@ class TestValidateBetterAuthSession:
         than left encoding the defect.
         """
         req = _request_with_cookies({"better-auth.session_token": signed_session_cookie("tok")})
-        coll = AsyncMock()
-        coll.find_one.return_value = {"_id": "s1", "userId": "u1"}
+        coll = session_collection({"_id": "s1", "userId": "u1"})
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             result = await bas.validate_better_auth_session(req)
         assert result is None
@@ -213,25 +218,26 @@ class TestValidateBetterAuthSession:
 
 @pytest.mark.asyncio
 class TestGetBetterAuthUser:
-    async def test_found_by_id(self):
-        coll = AsyncMock()
-        coll.find_one.return_value = {"id": "u1", "email": "a@b.com"}
-        with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
-            user = await bas.get_better_auth_user("u1")
-        assert user["email"] == "a@b.com"
-
-    async def test_objectid_fallback(self):
-        # 24-hex string is a valid ObjectId; first lookup by id misses, fallback hits
+    async def test_it_is_looked_for_by_the_id_better_auth_gives_it(self):
+        """An ObjectId under ``_id``. Not the ``id`` field, which the adapter does not write (#826)."""
         oid = "0123456789abcdef01234567"
         coll = AsyncMock()
-        coll.find_one.side_effect = [None, {"_id": oid, "email": "c@d.com"}]
+        coll.find_one.return_value = {"_id": ObjectId(oid), "email": "c@d.com"}
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             user = await bas.get_better_auth_user(oid)
         assert user["email"] == "c@d.com"
+        coll.find_one.assert_awaited_once_with({"_id": ObjectId(oid)})
+
+    async def test_an_id_that_is_not_an_objectid_is_looked_for_as_it_is(self):
+        coll = AsyncMock()
+        coll.find_one.return_value = {"_id": "u1", "email": "a@b.com"}
+        with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
+            user = await bas.get_better_auth_user("u1")
+        assert user["email"] == "a@b.com"
+        coll.find_one.assert_awaited_once_with({"_id": "u1"})
 
     async def test_not_found_returns_none(self):
         coll = AsyncMock()
-        # both lookups miss; user_id isn't valid ObjectId so fallback is skipped
         coll.find_one.return_value = None
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             assert await bas.get_better_auth_user("not-an-objectid") is None

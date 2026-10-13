@@ -72,11 +72,24 @@ async def ensure_user_indexes() -> None:
             "Failed to create unique index on users.stripe_customer_id", exc_info=True
         )
 
+    try:
+        # Every signed-in request, here and in the frontend, finds its session
+        # by token, and better-auth's adapter creates no index: it was a scan
+        # of every session (#826). The default name, so that an index someone
+        # has already made by hand on a deployed database is this one.
+        await (await get_collection("session")).create_index("token")
+    except Exception:
+        logger.error("Failed to create index on session.token", exc_info=True)
+
 
 # User-related database operations
 async def get_user_by_auth_id(auth_id: str) -> Optional[Dict]:
-    """Get a user by their better-auth ID"""
-    user = await users_collection.find_one({"auth_id": auth_id})
+    """Get a user by their better-auth ID, without ``book_ids``.
+
+    Every signed-in request reads this. That list grows with every book the
+    user creates, and nothing reads it from here (#826).
+    """
+    user = await users_collection.find_one({"auth_id": auth_id}, {"book_ids": 0})
     return user
 
 

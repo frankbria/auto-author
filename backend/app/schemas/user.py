@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Literal
+from typing import Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 
@@ -51,7 +51,6 @@ class UserResponse(UserBase):
     # the Stripe webhook. Deliberately NOT mirrored into UserUpdate.
     stripe_customer_id: Optional[str] = None
     stripe_subscription_id: Optional[str] = None
-    book_ids: List[str] = []
     preferences: Optional[UserPreferences] = Field(default_factory=UserPreferences)
 
     model_config = ConfigDict(

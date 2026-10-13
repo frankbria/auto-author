@@ -120,5 +120,6 @@ async def test_creating_the_record_does_not_log_the_email_address(motor_reinit_d
     # The application's own lines; the driver's DEBUG output is not ours to shape.
     app_log = "\n".join(r.getMessage() for r in caplog.records if r.name.startswith("app."))
     assert "Auto-creating user record" in app_log
-    assert "Found better-auth user" in app_log
+    # The user comes joined to the session now (#826), so it is the session's line that is looked for.
+    assert "Session validated for user" in app_log
     assert "private-address@example.com" not in app_log
