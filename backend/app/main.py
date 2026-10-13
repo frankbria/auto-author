@@ -184,7 +184,20 @@ async def lifespan(app: FastAPI):
         purge_expired_users,
     )
 
-    async def prepare_database():
+    async def database_answers() -> bool:
+        try:
+            await get_database().command("ping")
+            return True
+        except PyMongoError as error:
+            logger.error(
+                "The database cannot be reached (%s); indexes are waiting for it",
+                type(error).__name__,
+            )
+            report_failure("startup-database", error)
+            await asyncio.sleep(DATABASE_RETRY_SECONDS)
+            return False
+
+    async def prepare_database_when_it_is_there():
         """The indexes and the one-off account fix-up, beside the server and not
         in front of it (#1012).
 
@@ -193,20 +206,20 @@ async def lifespan(app: FastAPI):
         backend restarted during an outage answered nothing, its liveness route
         included, for over ten minutes, and whatever had failed was not tried
         again until the next restart. So this waits for the database first, for
-        as long as that takes, and then does the work once.
+        as long as that takes, and then does the work.
         """
         while True:
-            try:
-                await get_database().command("ping")
+            if not await database_answers():
+                continue
+            await prepare_database()
+            # Every step logs its own failure and carries on, so with a database
+            # that went away under them they have all "finished". Ask again; if
+            # it is gone, do them again when it is back. Each is safe to repeat.
+            if await database_answers():
                 break
-            except PyMongoError as error:
-                logger.error(
-                    "The database cannot be reached (%s); indexes are waiting for it",
-                    type(error).__name__,
-                )
-                report_failure("startup-database", error)
-                await asyncio.sleep(DATABASE_RETRY_SECONDS)
+        logger.info("Database prepared")
 
+    async def prepare_database():
         # Create indexes for question collections
         await ensure_question_indexes()
 
@@ -234,10 +247,8 @@ async def lifespan(app: FastAPI):
             logger.error("Marking existing accounts as verified failed", exc_info=True)
             report_failure("startup-verify-accounts", error)
 
-        logger.info("Database prepared")
-
     # On the app, so that a test (or anything else) can wait for it.
-    app.state.database_prepared = asyncio.create_task(prepare_database())
+    app.state.database_prepared = asyncio.create_task(prepare_database_when_it_is_there())
 
     # Erase deactivated accounts whose 18 months are up (#954): now, then daily,
     # so the purge does not wait for the next deploy.

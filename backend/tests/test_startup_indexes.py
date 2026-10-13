@@ -233,3 +233,37 @@ class TestStartingWhileTheDatabaseIsAway:
         assert "auth_id_unique_idx" in await _index_map(base._db.users)
         assert "owner_book_id_idx" in await _index_map(base._db.books)
         assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)
+
+    @pytest.mark.asyncio
+    async def test_the_work_is_done_again_if_the_database_went_away_while_it_was_being_done(self, motor_reinit_db, away, monkeypatch):
+        """Each step logs its own failure and carries on. A database that answers the first
+        ping and then goes leaves every step "finished" and nothing created. Review found it."""
+        reported = []
+        monkeypatch.setattr(main, "report_failure", lambda kind, *args, **kwargs: reported.append(kind))
+        bring_it_back = away
+        bring_it_back()
+        await _warm_collections()
+        gone = AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")["nowhere"]
+        passes = []
+        first_step = questions.ensure_question_indexes
+
+        async def first_step_as_the_database_goes():
+            passes.append(True)
+            if len(passes) == 1:
+                monkeypatch.setattr(base, "_db", gone)
+            await first_step()
+
+        monkeypatch.setattr(questions, "ensure_question_indexes", first_step_as_the_database_goes)
+        served = FastAPI()
+
+        async with asyncio.timeout(120):
+            async with main.lifespan(served):
+                while "startup-database" not in reported:  # the first pass is over, and it is waiting again
+                    await asyncio.sleep(0.1)
+                assert not served.state.database_prepared.done(), "it called the work done with the database gone"
+                bring_it_back()
+                await served.state.database_prepared
+
+        assert len(passes) == 2
+        assert "owner_book_id_idx" in await _index_map(base._db.books)
+        assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)

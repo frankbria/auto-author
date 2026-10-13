@@ -1610,3 +1610,6 @@ A mutation let the work go ahead after one failed attempt at the database, inste
 
 ### The scratch directory did not survive a restart (#823)
 The machine restarted mid-session and the session's scratch directory came back empty: the commit and deploy helpers, the mutation scripts, the demo harnesses and their logs. Nothing in the repository was lost, and the helpers were rewritten in a few minutes, but the pull request description I had been editing there had never been sent, and its corrections had to be redone from the published copy. Send a changed description when it changes; scratch is not a place to keep the only copy of anything that has to outlive the hour.
+
+### "Wait for a ping, then do the work" trusted steps that never say they failed (#1012)
+The start-up steps each catch their own database errors, log them and return. That is why moving them behind a ping looked sufficient: once the database answers, do the work. The reviewer's case was a database that answers the ping and then goes: every step returns normally, the task logs that the database is prepared, and nothing was created. The task now pings again when the work is over and repeats the work if the database has gone. When a sequence is built from steps that swallow their failures, the sequence cannot conclude anything from their having returned; it needs its own check at the end.
