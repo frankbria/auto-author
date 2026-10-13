@@ -104,7 +104,7 @@ async def test_startup_marks_existing_accounts_verified(motor_reinit_db, monkeyp
     existing = await _seed_existing_accounts()
 
     async with lifespan(app):
-        pass
+        await app.state.database_prepared  # beside the server since #1012
 
     assert await _verified(existing["unverified"]) is True
 

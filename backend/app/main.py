@@ -5,6 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
+from pymongo.errors import PyMongoError
 from contextlib import asynccontextmanager
 from app.api.endpoints.router import router as api_router
 from app.core.config import settings, is_deployed_env, is_production_env
@@ -160,6 +161,11 @@ def validate_production_security() -> None:
 validate_production_security()
 
 
+# After a failed attempt to reach the database at start-up, which itself takes the
+# driver's thirty seconds, how long before the next (#1012).
+DATABASE_RETRY_SECONDS = 5
+
+
 # Lifespan context manager for startup and shutdown tasks
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -178,32 +184,60 @@ async def lifespan(app: FastAPI):
         purge_expired_users,
     )
 
-    # Create indexes for question collections
-    await ensure_question_indexes()
+    async def prepare_database():
+        """The indexes and the one-off account fix-up, beside the server and not
+        in front of it (#1012).
 
-    # Create unique indexes guarding against duplicate user records (issue #178)
-    await ensure_user_indexes()
+        Each step used to be awaited before the first request was taken, and each
+        waits the driver's thirty seconds for a database that is not there: a
+        backend restarted during an outage answered nothing, its liveness route
+        included, for over ten minutes, and whatever had failed was not tried
+        again until the next restart. So this waits for the database first, for
+        as long as that takes, and then does the work once.
+        """
+        while True:
+            try:
+                await get_database().command("ping")
+                break
+            except PyMongoError as error:
+                logger.error(
+                    "The database cannot be reached (%s); indexes are waiting for it",
+                    type(error).__name__,
+                )
+                report_failure("startup-database", error)
+                await asyncio.sleep(DATABASE_RETRY_SECONDS)
 
-    # audit_logs 90-day TTL + actor index, backfill of legacy rows (issue #787)
-    await ensure_audit_log_indexes()
+        # Create indexes for question collections
+        await ensure_question_indexes()
 
-    # Book owner_id indexes + chapter_access_logs indexes and 90-day TTL
-    # (issue #183). Idempotent; per-index errors are logged, never fatal —
-    # the app must still boot (queries work unindexed, just slower).
-    result = await ChapterTabIndexManager(get_database()).create_all_indexes()
-    if not result.get("success"):
-        logger.error(f"Startup index creation failed: {result.get('message')}")
-        report_failure("startup-indexes", message="Startup index creation failed")
+        # Create unique indexes guarding against duplicate user records (issue #178)
+        await ensure_user_indexes()
 
-    # Accounts older than the email-verification requirement count as verified
-    # (#792). Never fatal: the app must still boot.
-    try:
-        grandfathered = await grandfather_unverified_accounts()
-        if grandfathered:
-            logger.info("Marked %d existing account(s) as email-verified", grandfathered)
-    except Exception as error:
-        logger.error("Marking existing accounts as verified failed", exc_info=True)
-        report_failure("startup-verify-accounts", error)
+        # audit_logs 90-day TTL + actor index, backfill of legacy rows (issue #787)
+        await ensure_audit_log_indexes()
+
+        # Book owner_id indexes + chapter_access_logs indexes and 90-day TTL
+        # (issue #183). Idempotent; per-index errors are logged, never fatal
+        # (queries work unindexed, just slower).
+        result = await ChapterTabIndexManager(get_database()).create_all_indexes()
+        if not result.get("success"):
+            logger.error(f"Startup index creation failed: {result.get('message')}")
+            report_failure("startup-indexes", message="Startup index creation failed")
+
+        # Accounts older than the email-verification requirement count as verified
+        # (#792). Never fatal.
+        try:
+            grandfathered = await grandfather_unverified_accounts()
+            if grandfathered:
+                logger.info("Marked %d existing account(s) as email-verified", grandfathered)
+        except Exception as error:
+            logger.error("Marking existing accounts as verified failed", exc_info=True)
+            report_failure("startup-verify-accounts", error)
+
+        logger.info("Database prepared")
+
+    # On the app, so that a test (or anything else) can wait for it.
+    app.state.database_prepared = asyncio.create_task(prepare_database())
 
     # Erase deactivated accounts whose 18 months are up (#954): now, then daily,
     # so the purge does not wait for the next deploy.
@@ -221,12 +255,13 @@ async def lifespan(app: FastAPI):
 
     purge_task = asyncio.create_task(purge_daily())
 
-    logger.info("Startup tasks completed")
+    logger.info("Startup tasks started")
 
     # Application runs here
     yield
 
     purge_task.cancel()
+    app.state.database_prepared.cancel()
 
     # Shutdown tasks
     # Drop any export builds still queued on the dedicated pool (#345).

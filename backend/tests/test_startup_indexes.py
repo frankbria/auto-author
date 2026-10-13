@@ -5,10 +5,16 @@ access-log TTL but ran nowhere at runtime. These tests pin that the manager
 creates them and that the app lifespan actually invokes it.
 """
 import asyncio
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+from motor.motor_asyncio import AsyncIOMotorClient
 
+from app import main
 from app.db import base
 from app.db.audit_log import ensure_audit_log_indexes
 from app.db.indexing_strategy import ChapterTabIndexManager
@@ -89,7 +95,8 @@ async def test_lifespan_creates_owner_and_ttl_indexes(motor_reinit_db):
     real lifespan and assert they exist afterwards."""
     await _warm_collections()
     async with app.router.lifespan_context(app):
-        pass
+        # Beside the server, not in front of it (#1012): wait for it here.
+        await app.state.database_prepared
 
     books_indexes = await _index_map(base._db.books)
     assert "owner_book_id_idx" in books_indexes
@@ -141,5 +148,64 @@ async def test_ensure_audit_log_indexes_creates_ttl_and_actor_indexes(motor_rein
 async def test_lifespan_creates_audit_log_indexes(motor_reinit_db):
     await _warm_collections()
     async with app.router.lifespan_context(app):
-        pass
+        await app.state.database_prepared
     _assert_audit_indexes(await _index_map(base._db.audit_logs))
+
+
+class TestStartingWhileTheDatabaseIsAway:
+    """#1012. Start-up created its indexes one after another before the server took a request,
+    and each waited the driver's thirty seconds for a database that was not there. A backend
+    restarted during an outage answered nothing, its liveness route included, for over ten
+    minutes. The work now runs beside the server and waits for the database itself."""
+
+    @pytest.fixture(autouse=True)
+    def own_export_pool(self, monkeypatch):
+        """Shutdown closes the export pool; hand it one that no other test uses."""
+        monkeypatch.setattr("app.services.export_service.export_executor", ThreadPoolExecutor(1))
+
+    @pytest.fixture
+    def away(self, monkeypatch):
+        """Point the app at an address nothing listens on. Returns a function that brings the
+        real database back."""
+        real = base._db
+        client = AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")
+        monkeypatch.setattr(base, "_db", client["nowhere"])
+        monkeypatch.setattr(main, "DATABASE_RETRY_SECONDS", 0.05)
+        yield lambda: monkeypatch.setattr(base, "_db", real)
+        client.close()
+
+    @pytest.mark.asyncio
+    async def test_start_up_does_not_wait_for_it(self, away):
+        started = time.monotonic()
+        async with main.lifespan(FastAPI()) as _:
+            took = time.monotonic() - started
+
+        assert took < 0.25, f"start-up took {took:.2f}s; one failed attempt at the database alone is 0.3s"
+
+    @pytest.mark.asyncio
+    async def test_the_liveness_route_answers(self, away):
+        async with main.lifespan(app):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.get("/api/v1/health/live")
+
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_the_indexes_are_created_when_it_comes_back_without_a_restart(self, motor_reinit_db, away, monkeypatch):
+        reported = []
+        monkeypatch.setattr(main, "report_failure", lambda kind, *args, **kwargs: reported.append(kind))
+        bring_it_back = away
+        bring_it_back()
+        await _warm_collections()
+        monkeypatch.setattr(base, "_db", AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")["nowhere"])
+        served = FastAPI()
+
+        async with main.lifespan(served):
+            await asyncio.sleep(1)  # long enough for more than one failed attempt
+            assert not served.state.database_prepared.done(), "it gave up, or thought an absent database was ready"
+            assert set(reported) == {"startup-database"}
+            bring_it_back()
+            await asyncio.wait_for(served.state.database_prepared, timeout=30)
+
+        assert "owner_book_id_idx" in await _index_map(base._db.books)
+        assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)
