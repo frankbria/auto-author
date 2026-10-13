@@ -178,13 +178,19 @@ class TestStartingWhileTheDatabaseIsAway:
     # database would otherwise hang the run instead of failing it.
 
     @pytest.mark.asyncio
-    async def test_start_up_does_not_wait_for_it(self, away):
+    async def test_start_up_does_not_wait_for_it(self, monkeypatch):
+        # Its own absent database, slower to give up than the fixture's: one failed attempt
+        # takes three seconds, so "under one" holds on a loaded machine and still cannot be
+        # met by a start-up that makes even a single attempt first.
+        client = AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=3000")
+        monkeypatch.setattr(base, "_db", client["nowhere"])
         started = time.monotonic()
-        async with asyncio.timeout(10):
+        async with asyncio.timeout(30):
             async with main.lifespan(FastAPI()) as _:
                 took = time.monotonic() - started
+        client.close()
 
-        assert took < 0.25, f"start-up took {took:.2f}s; one failed attempt at the database alone is 0.3s"
+        assert took < 1, f"start-up took {took:.2f}s; one failed attempt at the database alone is 3s"
 
     @pytest.mark.asyncio
     async def test_the_liveness_route_answers(self, away):
