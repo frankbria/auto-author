@@ -1667,6 +1667,6 @@ I changed seventeen reads and wrote a table of eleven routes to measure. Reverti
 **Rule:** when a change is the same edit in N places, the test table has N rows, and the mutation run is one mutation per place. Count both against the diff before calling it covered.
 
 ### A measuring helper that reads a log has to clear it (#829)
-The profiler helper read every entry in . Between tests the database is dropped, so nothing was left over, and every test passed. Twice in one test it counted the first measurement in the second, which I hit in the demo and fixed only there. The reviewer raised it against the tests; the scenario it described does not happen in this suite, but the helper was one reuse away from it.
+The profiler helper read every entry in `system.profile`. Between tests the database is dropped, so nothing was left over, and every test passed. Twice in one test it counted the first measurement in the second, which I hit in the demo and fixed only there. The reviewer raised it against the tests; the scenario it described does not happen in this suite, but the helper was one reuse away from it.
 **Rule:** a helper that measures by reading a log clears the log, or filters to its own window, itself. Fix it where it lives the first time it bites, not in the one caller that tripped.
 
