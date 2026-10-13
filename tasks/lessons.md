@@ -1551,3 +1551,6 @@ One step of the demo script stashed the tree to run the guard against main's wor
 
 ### Every refused value was wholly wrong, so an unanchored check passed (#816)
 The guard ran each input check against values that must be refused: `staging`, `$(id)`, a tag followed by a command. A mutation that dropped the `^` from the tag's pattern passed all of them, because none had anything in front of a valid tag. A list of bad inputs for a pattern needs a good value with something before it and with something after it, built from the good values so that it stays true when the pattern changes.
+
+### The guard's own pattern stopped at the first `}` (#816)
+The guard matched `${{ … inputs … }}` with `[^}]*` on either side of the name. The repository's review bot pointed out that `${{ format('{0}', inputs.image_tag) }}` has a `}` before the name, so the pattern never reached it, and one evasion defeated both rules at once: the paste rule and the table of checked variables use the same pattern. My own tests of the pattern were the three shapes already in the workflows. A pattern that guards a syntax has to be tested against that syntax's nesting and quoting, not only against today's uses: for a GitHub expression that means a function call, a literal containing a brace, and two expressions on one line.
