@@ -1289,7 +1289,8 @@ async def update_book_toc(
             status_code=400, detail="Chapters must be provided as a list"
         )
 
-    if len(json.dumps(toc_data).encode()) > MAX_TOC_BODY_BYTES:
+    # ensure_ascii=False: counted as the UTF-8 it is stored as, not as JSON's \uXXXX escapes.
+    if len(json.dumps(toc_data, ensure_ascii=False).encode()) > MAX_TOC_BODY_BYTES:
         raise HTTPException(
             status_code=413,
             detail=f"The table of contents is too large to save: the limit is {MAX_TOC_BODY_BYTES:,} bytes.",

@@ -8,7 +8,9 @@ of it fails, the small ones too.
 
 import pytest
 from bson import ObjectId
+from pymongo.errors import OperationFailure
 
+from app.api.endpoints import books as books_endpoint
 from app.db import base
 from app.schemas.book import MAX_CHAPTER_CONTENT_BYTES, MAX_TOC_BODY_BYTES
 from tests.test_api.test_routes.test_books_toc_coverage import (  # noqa: F401  (the fixture is autouse)
@@ -184,3 +186,25 @@ class TestATableOfContentsBodyHasALargestSize:
         answer = await api.put(f"{API}/{book_id}/toc", json={"toc": sent})
 
         assert answer.status_code == 200, answer.text[:200]
+
+    async def test_text_that_is_not_ascii_is_counted_as_the_bytes_it_is(self, auth_client_factory):
+        """Not as the six-character escapes JSON can write it with: 600,000 bytes here, 1,800,000 that way."""
+        api = await auth_client_factory()
+        book_id = await _book_with_drafts(api)
+        sent = (await api.get(f"{API}/{book_id}/toc")).json()["toc"]
+        sent["chapters"][1]["description"] = "é" * 300_000
+
+        answer = await api.put(f"{API}/{book_id}/toc", json={"toc": sent})
+
+        assert answer.status_code == 200, answer.text[:200]
+
+
+class TestOnlyTheSizeRefusalIsCalledAFullBook:
+    async def test_another_database_error_is_left_as_it_is(self):
+        assert books_endpoint._book_is_full(OperationFailure("duplicate key", 11000)) is None
+        assert books_endpoint._book_is_full(OperationFailure("no code")) is None
+        assert books_endpoint._book_is_full(RuntimeError("something else")) is None
+
+    async def test_both_ways_the_database_says_it(self):
+        for code in (10334, 17419):
+            assert books_endpoint._book_is_full(OperationFailure("too large", code)).status_code == 413
