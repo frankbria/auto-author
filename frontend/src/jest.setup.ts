@@ -329,10 +329,11 @@ jest.mock('@tiptap/react', () => {
               return true;
             }),
           })),
-          setContent: jest.fn((newContent: string) => ({
+          setContent: jest.fn((newContent: string, options?: { emitUpdate?: boolean }) => ({
             run: jest.fn(() => {
               content = newContent;
-              if (updateHandler) {
+              // As the real command: an update is emitted unless asked not to (#831).
+              if (updateHandler && options?.emitUpdate !== false) {
                 updateHandler({ editor: mockEditor });
               }
               return true;
@@ -346,9 +347,9 @@ jest.mock('@tiptap/react', () => {
 
       // Direct command access
       commands: {
-        setContent: jest.fn((newContent: string) => {
+        setContent: jest.fn((newContent: string, options?: { emitUpdate?: boolean }) => {
           content = newContent;
-          if (updateHandler) {
+          if (updateHandler && options?.emitUpdate !== false) {
             updateHandler({ editor: mockEditor });
           }
           return true;
@@ -423,8 +424,8 @@ jest.mock('@tiptap/react', () => {
       if (originalOnUpdate && editor) {
         // Override the setContent command to also force re-render
         const originalSetContent = editor.commands.setContent;
-        editor.commands.setContent = jest.fn((newContent: string) => {
-          const result = originalSetContent(newContent);
+        editor.commands.setContent = jest.fn((newContent: string, options?: { emitUpdate?: boolean }) => {
+          const result = originalSetContent(newContent, options);
           // Force parent component to re-render after content change
           forceUpdate();
           return result;
@@ -432,12 +433,10 @@ jest.mock('@tiptap/react', () => {
       }
     }, [editor, config?.onUpdate, forceUpdate]);
 
-    // Update content when initialContent changes
-    React.useEffect(() => {
-      if (config?.content && editor.getHTML() !== config.content) {
-        editor.commands.setContent(config.content);
-      }
-    }, [config?.content, editor]);
+    // The real useEditor does not put a changed `content` option into the editor:
+    // a component that wants that calls setContent itself, as ChapterEditor does.
+    // The stand-in used to do it here, with an update event, which made any
+    // component look as if its text had been edited (#831).
 
     return editor;
   });

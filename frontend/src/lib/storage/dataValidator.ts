@@ -148,8 +148,9 @@ export function cleanupStorage(ttlDays: number = 7): {
 
     for (const key of keys) {
       try {
-        // Skip non-chapter-backup keys
-        if (!key.includes('chapter-backup')) {
+        // Skip everything but a chapter's two kinds of backup: a failed save's,
+        // and text dropped when the server's copy was reloaded.
+        if (!key.includes('chapter-backup') && !key.includes('chapter-dropped')) {
           continue;
         }
 
