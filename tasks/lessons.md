@@ -1639,7 +1639,7 @@ The launch review said the better-auth user read on every request was used only 
 **Rule:** an issue describes the code as of its audit commit. Before removing something it calls unused, grep what reads it now.
 
 ### Tests that mocked the old call kept passing, for the wrong reason (#826)
-The session lookup changed from `find_one` to `aggregate(...).to_list(1)`. Twelve tests mocked `find_one`. Four failed. The other eight passed: the mock's `aggregate` returned a coroutine with no `to_list`, the function's catch-all turned that into "no session", and "no session" was what those eight expected.
+The session lookup changed from `find_one` to `aggregate(...).to_list(1)`. Eleven tests stood in for the session's `find_one`. Five failed. The other six passed: the mock's `aggregate` returned a coroutine with no `to_list`, the function's catch-all turned that into "no session", and "no session" was what those six expected.
 **Rule:** when code changes how it calls something tests stand in for, change every test that stands in for the old call, and do not take "it still passes" as the list of the ones that are fine.
 
 ### The write that looked like waste had a reader in the other half of the repository (#826)
