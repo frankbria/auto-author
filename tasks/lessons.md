@@ -1658,3 +1658,7 @@ The limit on a table of contents measured `json.dumps(body)`. By default that wr
 A test I appended left an extra blank line at the end of the file. The end-of-file hook fixed it, which fails the commit, after the test hook had run for ten minutes. My wait loop looked for the helper's last line, "done", and the line above it showed a commit, the previous one. I recorded a demo on top of an uncommitted tree before noticing. Earlier in the same issue I had also reverted a mutation with `git checkout` while a fix sat uncommitted in the same file, and had to reapply it: the rule for that is already here and I did not follow it.
 **Rule:** the commit helper now runs the two file-tidying hooks first and writes "NOT COMMITTED" when HEAD has not moved. After any commit, check the exit code and the hash, not the last line.
 
+### A limit on one way in, with a second way in left open (#828)
+I capped a chapter's content on the route that saves it. I knew `PUT /toc` also stores whatever `content` comes with a chapter new to the table of contents, and wrote it off as something only a hand-made client would do. The second review called it what it was: a way round the limit I had just added. A body sent with a table of contents is dropped now.
+**Rule:** when adding a limit on a value, list every route that can write that value and close or cap each. "Our own client does not do that" is not a reason to leave one.
+
