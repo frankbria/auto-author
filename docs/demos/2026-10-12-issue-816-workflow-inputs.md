@@ -1,7 +1,7 @@
 # Issue #816: what a caller types into a workflow dispatch never becomes part of a shell command
 
-*2026-10-13T01:37:01Z by Showboat 0.6.1*
-<!-- showboat-id: cdb71a6d-5aed-4768-bb3a-42fe62d514b9 -->
+*2026-10-13T01:45:49Z by Showboat 0.6.1*
+<!-- showboat-id: 75b871b4-1cfc-41ed-8493-5338bcf4dd67 -->
 
 Three acceptance criteria: inputs reach the shell through `env:` only; each input is checked against a pattern before use; a guard test fails if an input appears inside a `run:` block.
 
@@ -198,7 +198,7 @@ cd /home/frankbria/projects/worktrees/issue-816-workflow-inputs && uvx --with py
 ```
 
 ```output
-71 passed in 0.56s
+83 passed in 0.59s
 ```
 
 Against main`s workflows the same guard fails, and names each place.
@@ -217,7 +217,7 @@ E         e2e-staging: step 5 (Write staging E2E summary): ${{ github.event.inpu
 E       assert not ["e2e-staging: step 5 (Write staging E2E summary): ${{ github.event.inputs.staging_e2e_workers || '1' }}"]
 E         sync: step 7 (Summary): ${{ inputs.recreate }}
 E       assert not ['sync: step 7 (Summary): ${{ inputs.recreate }}']
-3 failed, 5 passed, 63 deselected in 0.08s
+3 failed, 5 passed, 75 deselected in 0.06s
 workflows restored
 ```
 
