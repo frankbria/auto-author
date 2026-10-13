@@ -81,14 +81,16 @@ def _nav(title: str, language: str, toc: List[Entry]) -> str:
 
 def _ncx(identifier: str, title: str, toc: List[Entry]) -> str:
     count = 0
+    place = {}  # entries that open the same document have to share a place in the order
 
     def points(entries: List[Entry]) -> str:
         nonlocal count
         written = []
         for label, href, below in entries:
             count += 1
+            order = place.setdefault(href, len(place) + 1)
             written.append(
-                f'<navPoint id="nav_{count}" playOrder="{count}"><navLabel><text>{escape(label)}</text></navLabel>'
+                f'<navPoint id="nav_{count}" playOrder="{order}"><navLabel><text>{escape(label)}</text></navLabel>'
                 f"<content src={quoteattr(href)}/>{points(below)}</navPoint>"
             )
         return "".join(written)
