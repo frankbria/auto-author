@@ -138,7 +138,9 @@ def test_parse_npm_audit_filters_below_threshold():
         },
     )
 
-    assert {f.id for f in parse_npm_audit(report)} == {"GHSA-bad"}
+    # The default floor is moderate since #820; it was high, which hid GHSA-mid.
+    assert {f.id for f in parse_npm_audit(report)} == {"GHSA-mid", "GHSA-bad"}
+    assert {f.id for f in parse_npm_audit(report, min_severity="high")} == {"GHSA-bad"}
     assert {f.id for f in parse_npm_audit(report, min_severity="low")} == {
         "GHSA-low",
         "GHSA-mid",
@@ -423,3 +425,96 @@ def test_main_write_baseline_emits_current_findings(audit_files, tmp_path):
     written = json.loads(baseline.read_text())
     assert "PYSEC-1" in written["pypi"]
     assert "GHSA-1" in written["npm"]
+
+
+# --- the severity floor (#820) -----------------------------------------------
+#
+# The floor was `high`, so a moderate advisory in the frontend's tree was never
+# reported: not baselined with a reason, not a failure, simply unseen. dompurify's
+# DOM XSS (low) and fast-uri (moderate) both sat below it until Dependabot moved
+# them. The gate now starts at `moderate`.
+
+REPO = Path(__file__).resolve().parent.parent
+
+
+def _npm_file(tmp_path, **severity_by_id):
+    """An `npm audit --json` document with one advisory per keyword: GHSA_x="moderate"."""
+    npm = tmp_path / "npm.json"
+    npm.write_text(
+        json.dumps(
+            _npm_report(
+                **{
+                    f"package-{ghsa}": {
+                        "name": f"package-{ghsa}",
+                        "severity": severity,
+                        "via": [{"url": f"https://github.com/advisories/{ghsa}", "severity": severity}],
+                    }
+                    for ghsa, severity in severity_by_id.items()
+                }
+            )
+        )
+    )
+    return npm
+
+
+def test_a_moderate_advisory_fails_the_gate_without_any_flag(tmp_path, capsys):
+    npm = _npm_file(tmp_path, GHSA_moderate="moderate")
+    baseline = tmp_path / "baseline.json"
+
+    rc = main(["--npm-audit", str(npm), "--baseline", str(baseline)])
+
+    assert rc == 1
+    assert "GHSA_moderate" in capsys.readouterr().out
+
+
+def test_a_low_advisory_is_still_below_the_floor(tmp_path, capsys):
+    npm = _npm_file(tmp_path, GHSA_low="low", GHSA_info="info")
+    baseline = tmp_path / "baseline.json"
+
+    rc = main(["--npm-audit", str(npm), "--baseline", str(baseline)])
+
+    assert rc == 0
+    assert "GHSA_low" not in capsys.readouterr().out
+
+
+def test_writing_the_baseline_keeps_its_moderate_entries(tmp_path):
+    """The file's own header says to regenerate it with --write-baseline. Written at a floor
+    above the one CI checks at, it would drop every moderate entry and CI would fail on them."""
+    npm = _npm_file(tmp_path, GHSA_moderate="moderate", GHSA_high="high")
+    baseline = tmp_path / "baseline.json"
+
+    main(["--npm-audit", str(npm), "--baseline", str(baseline), "--write-baseline"])
+
+    assert set(json.loads(baseline.read_text())["npm"]) == {"GHSA_moderate", "GHSA_high"}
+
+
+def _gate_command_in_ci():
+    import yaml
+
+    workflow = yaml.safe_load((REPO / ".github" / "workflows" / "tests.yml").read_text())
+    scripts = [
+        step["run"]
+        for job in workflow["jobs"].values()
+        for step in job.get("steps") or []
+        if "audit_gate.py" in str(step.get("run", "")) and "--npm-audit" in str(step.get("run", ""))
+    ]
+    assert len(scripts) == 1, f"expected one step that runs the gate on npm's report, found {len(scripts)}"
+    return scripts[0]
+
+
+def test_ci_runs_the_gate_at_the_moderate_floor():
+    import re
+
+    floors = re.findall(r"--min-severity[ =](\S+)", _gate_command_in_ci())
+
+    assert floors == ["moderate"], f"the gate in tests.yml runs with floors {floors}"
+
+
+def test_every_entry_in_the_real_baseline_says_why():
+    """An id with no reason is an ignore-list. The reason is what lets the next reader prune it."""
+    baseline = json.loads((REPO / "security-baseline.json").read_text())
+    entries = {**baseline.get("pypi", {}), **baseline.get("npm", {})}
+
+    assert entries, "the baseline is empty; this guard is vacuous"
+    for advisory, reason in entries.items():
+        assert isinstance(reason, str) and len(reason) > 40, f"{advisory}: {reason!r}"

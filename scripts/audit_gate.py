@@ -25,6 +25,10 @@ from pathlib import Path
 # npm severity ladder, lowest first. pip-audit reports no severity (PYSEC
 # records frequently omit one), so every Python advisory counts.
 NPM_SEVERITIES = ["info", "low", "moderate", "high", "critical"]
+# What CI checks at (#820). It was `high`, and a moderate advisory was neither
+# reported nor baselined. This is also the floor --write-baseline writes at: a
+# baseline regenerated above CI's floor would drop the entries CI then fails on.
+DEFAULT_NPM_FLOOR = "moderate"
 
 ECOSYSTEMS = ("pypi", "npm")
 
@@ -85,7 +89,7 @@ def _npm_advisory_id(via: dict, package: str) -> str:
     return f"npm-unidentified-{package}"
 
 
-def parse_npm_audit(report: dict, min_severity: str = "high") -> list[Finding]:
+def parse_npm_audit(report: dict, min_severity: str = DEFAULT_NPM_FLOOR) -> list[Finding]:
     floor = NPM_SEVERITIES.index(min_severity)
     findings = []
     for package, entry in report.get("vulnerabilities", {}).items():
@@ -172,9 +176,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--baseline", required=True, help="security-baseline.json")
     parser.add_argument(
         "--min-severity",
-        default="high",
+        default=DEFAULT_NPM_FLOOR,
         choices=NPM_SEVERITIES,
-        help="npm severity floor (default: high). Python advisories always count.",
+        help=f"npm severity floor (default: {DEFAULT_NPM_FLOOR}). Python advisories always count.",
     )
     parser.add_argument(
         "--write-baseline",

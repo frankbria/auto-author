@@ -276,6 +276,7 @@ jobs:
           python scripts/audit_gate.py \
             --pip-audit /tmp/pip-audit.json \
             --npm-audit /tmp/npm-audit.json \
+            --min-severity moderate \
             --baseline security-baseline.json | tee /tmp/audit-report.txt
           rc=${PIPESTATUS[0]}
           { echo '## Supply-chain audit'; echo '```'; cat /tmp/audit-report.txt; echo '```'; } >> $GITHUB_STEP_SUMMARY
