@@ -135,33 +135,4 @@ export class CSPValidator {
       (allowed.startsWith('*.') && source.endsWith(allowed.substring(1)))
     );
   }
-
-  /**
-   * Verify Swagger UI can load without CSP errors
-   */
-  static async validateSwaggerUICSP(page: Page, apiDocsUrl: string): Promise<void> {
-    const cspViolations: string[] = [];
-
-    // Monitor for CSP violations
-    page.on('console', msg => {
-      const text = msg.text();
-      if (text.toLowerCase().includes('refused to')) {
-        cspViolations.push(text);
-      }
-    });
-
-    // Navigate to Swagger UI
-    await page.goto(apiDocsUrl);
-
-    // Wait for Swagger UI to load
-    await page.waitForSelector('.swagger-ui', { timeout: 10000 });
-
-    // Check for violations
-    if (cspViolations.length > 0) {
-      const violations = cspViolations.join('\n');
-      throw new Error(`Swagger UI CSP violations:\n${violations}`);
-    }
-
-    console.log('✅ Swagger UI loaded without CSP violations');
-  }
 }

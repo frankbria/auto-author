@@ -35,19 +35,6 @@ test.describe('Security & Performance', () => {
       console.log('✅ Frontend CSP validation complete');
     });
 
-    test('CSP Headers: Backend API Docs (Swagger UI)', async ({ page }) => {
-      console.log('\n🔒 Validating Swagger UI CSP headers');
-
-      // Navigate to Swagger UI
-      const apiUrl = process.env.DEPLOYMENT_URL?.replace('https://', 'https://api.') || 'https://api.dev.autoauthor.app';
-      const apiDocsUrl = `${apiUrl}/docs`;
-
-      // Validate Swagger UI CSP
-      await CSPValidator.validateSwaggerUICSP(page, apiDocsUrl);
-
-      console.log('✅ Swagger UI CSP validation complete');
-    });
-
     test('CSP Violations: Monitor during user journey', async ({ page }) => {
       console.log('\n🔍 Monitoring CSP violations during user journey');
 
@@ -470,7 +457,6 @@ test.describe('Security & Performance', () => {
  *
  * This test suite validates:
  * ✅ CSP Headers (Frontend Next.js)
- * ✅ CSP Headers (Backend Swagger UI)
  * ✅ CSP Violations monitoring during user journey
  * ✅ LCP (Largest Contentful Paint) < 2.5s
  * ✅ CLS (Cumulative Layout Shift) < 0.1

@@ -14,16 +14,21 @@ from app.core.request_context import request_id_var
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# The other origins and 'unsafe-inline' are what the Swagger page at /docs
-# needs. A deployed host does not serve that page (#815), so it allows neither.
-CONTENT_SECURITY_POLICY = "default-src 'self'" if is_deployed_env() else (
-    "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-    "img-src 'self' data: https://fastapi.tiangolo.com; "
-    "connect-src 'self'; "
-    "frame-src 'self'; "
-    "font-src 'self' data: https://r2cdn.perplexity.ai;"
+# jsdelivr, the FastAPI logo and 'unsafe-inline' are what the Swagger page at
+# /docs needs; the font host is a leftover nothing loads. A deployed host does
+# not serve that page (#815), so it allows none of them.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'"
+    if is_deployed_env()
+    else (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https://fastapi.tiangolo.com; "
+        "connect-src 'self'; "
+        "frame-src 'self'; "
+        "font-src 'self' data: https://r2cdn.perplexity.ai;"
+    )
 )
 
 

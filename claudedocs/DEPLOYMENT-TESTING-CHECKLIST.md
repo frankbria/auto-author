@@ -490,22 +490,18 @@ curl -I https://dev.autoauthor.app | grep content-security-policy
 ### CSP Headers - Backend
 
 ```bash
-curl -I https://api.dev.autoauthor.app/docs | grep content-security-policy
+curl -sI https://api.dev.autoauthor.app/api/v1/health/live | grep -i content-security-policy
 ```
 
-- [ ] Includes: `script-src` with `cdn.jsdelivr.net` **✅ 🤖 Automated**
-- [ ] Includes: `style-src` with `cdn.jsdelivr.net` **✅ 🤖 Automated**
-- [ ] Includes: `img-src` with `fastapi.tiangolo.com` **✅ 🤖 Automated**
+- [ ] Is `default-src 'self'` and nothing else: no `unsafe-inline`, no other origin (#815) **✅ 🤖 Automated**
 
-### Swagger API Documentation
+### API Documentation is not served
 
-- [ ] Navigate to: `https://api.dev.autoauthor.app/docs` **✅ 🤖 Automated**
-- [ ] Swagger UI interface loads completely **✅ 🤖 Automated**
-- [ ] **No white/blank page** **✅ 🤖 Automated**
-- [ ] No CSP errors in console **✅ 🤖 Automated**
-- [ ] Can expand/collapse endpoints **✅ 🤖 Automated**
-- [ ] FastAPI logo/favicon loads **✅ 🤖 Automated**
-- [ ] Can test endpoints with "Try it out" button **⚠️ 🤖 Interactive API testing**
+A deployed API serves no Swagger page and no schema (#815). Run the backend locally for `/docs`.
+
+- [ ] `https://api.dev.autoauthor.app/docs` answers 404 **✅ 🤖 Automated**
+- [ ] `https://api.dev.autoauthor.app/redoc` answers 404 **✅ 🤖 Automated**
+- [ ] `https://api.dev.autoauthor.app/openapi.json` answers 404 **✅ 🤖 Automated**
 
 ### Performance - Core Web Vitals
 

@@ -37,13 +37,22 @@ print(json.dumps({{
 
 def _served_by_an_app_built_for(environment: str, tmp_path: Path) -> dict:
     """Status of each documentation route, and the CSP, from an app imported with that ENVIRONMENT."""
-    env = {k: v for k, v in os.environ.items() if k not in {"NODE_ENV", "BYPASS_AUTH", "E2E_ALLOW_BYPASS"}}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"NODE_ENV", "BYPASS_AUTH", "E2E_ALLOW_BYPASS"}
+    }
     # cwd is an empty directory: a developer's backend/.env must not decide this.
     env.update(ENVIRONMENT=environment, BETTER_AUTH_SECRET="s" * 64, PYTHONPATH=str(BACKEND_DIR))
     # Production refuses to start without somewhere to keep uploads.
     env.update(CLOUDINARY_CLOUD_NAME="x", CLOUDINARY_API_KEY="x", CLOUDINARY_API_SECRET="x")
     result = subprocess.run(
-        [sys.executable, "-c", PROBE], cwd=tmp_path, env=env, capture_output=True, text=True, timeout=120
+        [sys.executable, "-c", PROBE],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     assert result.returncode == 0, result.stderr[-2000:]
     return json.loads(result.stdout.strip().splitlines()[-1])
