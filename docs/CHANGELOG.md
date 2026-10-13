@@ -2,6 +2,16 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-13
+
+- **Exports no longer depend on a GPL library (#823, P1.41)**:
+  - **Problem.** The repository is MIT-licensed, and `html2text`, which is GPL-3.0-or-later, turned chapter HTML into text on every export path: PDF, DOCX, EPUB and Markdown.
+  - **Fix.** `markdownify` (MIT, with `beautifulsoup4`, also MIT) does it now, through one function, `_html_to_markdown`, which builds its converter on each call (#751). `html2text` is out of `pyproject.toml` and `uv.lock`.
+  - **Compared, not assumed.** Nineteen samples of chapter HTML were run through both converters. What the PDF, DOCX and EPUB builders are given is the same for fourteen. The five that differ: a stray space the old converter put before punctuation after bold or italic text is gone; a code block is a paragraph of its own instead of running on from the one before; a rule is `---` where it was `* * *`; a line the author began with `1.` or `-` no longer gains a backslash; a table is written with its outer bars.
+  - **What markdownify does differently by default, and was told not to.** It writes an `h1` as text over a row of `=`, which the builders would take for a paragraph; it keeps the text inside `<script>` and `<style>`; it writes a list as one block, whose lines would run together in a PDF paragraph; it marks italics with `*`. Each of these has a test.
+  - **The Markdown export is better Markdown.** Text that only looks like markup is escaped, so `__init__` is not the word init in bold, a paragraph beginning `# ` is not a heading, and `<b>` typed as text is not HTML. Lists are tight, and code blocks are fenced.
+  - **Not fixed.** In a PDF, DOCX or EPUB, a paragraph the author begins with `# ` is still set as a heading, as before: #1026.
+
 ### 2026-10-12
 
 - **The backend's stale transitives are upgraded, and a baseline entry has to earn its place (#821, P1.39)**:
