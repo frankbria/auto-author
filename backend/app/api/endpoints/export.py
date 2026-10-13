@@ -16,7 +16,6 @@ from app.services.export_service import (
     ExportTimeoutError,
     PDF_AVAILABLE,
     DOCX_AVAILABLE,
-    EPUB_AVAILABLE,
     MARKDOWNIFY_AVAILABLE,
 )
 from app.services.export_templates import list_templates
@@ -509,7 +508,7 @@ async def get_export_formats(
                 "description": "EPUB format - optimized for ereaders and ebook platforms",
                 "mime_type": "application/epub+zip",
                 "extension": ".epub",
-                "available": EPUB_AVAILABLE,
+                "available": True,  # written with the standard library (#824)
                 "options": {
                     "include_empty_chapters": "boolean"
                 }

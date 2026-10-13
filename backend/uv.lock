@@ -46,7 +46,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "boto3" },
     { name = "cloudinary" },
-    { name = "ebooklib" },
     { name = "fastapi" },
     { name = "markdownify" },
     { name = "motor" },
@@ -97,7 +96,6 @@ requires-dist = [
     { name = "boto3", specifier = "==1.43.103" },
     { name = "cloudinary", specifier = "==1.46.2" },
     { name = "coverage", extras = ["toml"], marker = "extra == 'test'", specifier = "==7.16.1" },
-    { name = "ebooklib", specifier = "==0.20" },
     { name = "faker", marker = "extra == 'test'", specifier = "==40.39.0" },
     { name = "fastapi", specifier = "==0.141.1" },
     { name = "httpx", marker = "extra == 'test'", specifier = "==0.28.1" },
@@ -541,19 +539,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8c/8b/57666417c0f90f08bcafa776861060426765fdb422eb10212086fb811d26/dnspython-2.8.0.tar.gz", hash = "sha256:181d3c6996452cb1189c4046c61599b84a5a86e099562ffde77d26984ff26d0f", size = 368251, upload-time = "2025-09-07T18:58:00.022Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ba/5a/18ad964b0086c6e62e2e7500f7edc89e3faa45033c71c1893d34eed2b2de/dnspython-2.8.0-py3-none-any.whl", hash = "sha256:01d9bbc4a2d76bf0db7c1f729812ded6d912bd318d3b1cf81d30c0f845dbf3af", size = 331094, upload-time = "2025-09-07T18:57:58.071Z" },
-]
-
-[[package]]
-name = "ebooklib"
-version = "0.20"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "lxml" },
-    { name = "six" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/77/85/322e8882a582d4b707220d1929cfb74c125f2ba513991edbce40dbc462de/ebooklib-0.20.tar.gz", hash = "sha256:35e2f9d7d39907be8d39ae2deb261b19848945903ae3dbb6577b187ead69e985", size = 127066, upload-time = "2025-10-26T20:56:20.968Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bf/ee/aa015c5de8b0dc42a8e507eae8c2de5d1c0e068c896858fec6d502402ed6/ebooklib-0.20-py3-none-any.whl", hash = "sha256:fff5322517a37e31c972d27be7d982cc3928c16b3dcc5fd7e8f7c0f5d7bcf42b", size = 40995, upload-time = "2025-10-26T20:56:19.104Z" },
 ]
 
 [[package]]

@@ -442,13 +442,6 @@ class TestExportAvailabilityGuards:
             await es.export_service.generate_docx({"title": "x"}, [])
 
     @pytest.mark.asyncio
-    async def test_generate_epub_raises_when_ebooklib_unavailable(self, monkeypatch):
-        import app.services.export_service as es
-        monkeypatch.setattr(es, "EPUB_AVAILABLE", False)
-        with pytest.raises(es.ExportUnavailableError, match="ebooklib"):
-            await es.export_service.generate_epub({"title": "x"}, [])
-
-    @pytest.mark.asyncio
     async def test_generate_markdown_raises_when_markdownify_unavailable(self, monkeypatch):
         import app.services.export_service as es
         monkeypatch.setattr(es, "MARKDOWNIFY_AVAILABLE", False)

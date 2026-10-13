@@ -1613,3 +1613,12 @@ The machine restarted mid-session and the session's scratch directory came back 
 
 ### "Wait for a ping, then do the work" trusted steps that never say they failed (#1012)
 The start-up steps each catch their own database errors, log them and return. That is why moving them behind a ping looked sufficient: once the database answers, do the work. The reviewer's case was a database that answers the ping and then goes: every step returns normally, the task logs that the database is prepared, and nothing was created. The task now pings again when the work is over and repeats the work if the database has gone. When a sequence is built from steps that swallow their failures, the sequence cannot conclude anything from their having returned; it needs its own check at the end.
+
+### The reviewer's fix failed the validator, and I had already started the commit (#824)
+The reviewer said every entry in `toc.ncx` needs a `playOrder`, and that ebooklib used to write one. The first half is true of the format. The second is not: the file ebooklib wrote for the same book has none. I added the attribute as suggested, numbering the entries one after another, and ran epubcheck in the same command that started the commit, one after the other with nothing between them. epubcheck reported two errors, because entries that open the same document have to share a number, and the commit was already in its hooks with them in it. The next commit fixed it, at the cost of a second ten-minute hook run.
+**Rule:** a fix taken from a review is run through the artefact's own validator before it is committed, and the commit is chained to that check with `&&`, not placed after it. Check the reviewer's "the old one did this" against what the old one actually produced before repeating it.
+
+### The library I replaced had been rejecting input the new code accepted (#824)
+ebooklib parsed every document it was given, so a form feed or vertical tab pasted into a chapter made it raise and the export failed. Writing the same text straight into a zip does not fail: it produces a file that is not XML and that no reader opens. Comparing the two exports of one ordinary book showed no difference, and would never have shown this; it took a book with the awkward input.
+**Rule:** when a library is replaced by direct code, find out what the library refused or repaired, not only what it produced. Feed both the input that is not valid in the output format (control characters, lone surrogates, unescaped markup) and compare what each does.
+
