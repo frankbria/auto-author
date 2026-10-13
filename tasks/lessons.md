@@ -1702,3 +1702,7 @@ The demo's screenshot of the Book Stats panel was first a window full of chapter
 The test: answers that arrive after the writer has started typing must not write over the typing. It resolved the pending request, awaited one microtask, and asserted the typed text was still there. It was, with or without the guard: the handler that would have written over it had not run yet. Two mutations that removed the guard passed. The request's arrival now happens inside `act` with a turn of the event loop, and both mutations fail.
 **Rule:** a test that something does not happen has to let it happen first. Flush the event loop after the trigger, and run the test once against code that does the thing, to see it fail.
 
+### Twice in one issue, a check was satisfied by something beside what it was for (#835)
+A test asserted that the prompt mentions non-fiction. I had added two sentences that do, and the test was for the first; a mutation that removed it passed, on the strength of the second. And the demo counted lines of the new templates file that contain a fiction word and printed 7: the dictionary keys (`QuestionType.CHARACTER`) and the docstring that explains them, not one template. The same shape as the address found elsewhere in an entry (#825).
+**Rule:** assert the particular sentence, and search the values a reader is shown, not the source file that holds them. When a count is meant to be nought, see first that it counts what it claims on something that is not.
+

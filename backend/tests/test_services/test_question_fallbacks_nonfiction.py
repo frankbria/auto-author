@@ -71,7 +71,8 @@ class TestTheFocusHintsAreForNonFiction:
     def test_the_prompt_says_the_book_is_non_fiction(self, service):
         prompt = service._build_question_generation_prompt("Why Habits Stick", "", {"title": "Small Changes"}, count=5)
 
-        assert re.search(r"non-?fiction", prompt, re.IGNORECASE)
+        # This sentence, not any mention: the line that explains the type names says "non-fiction" too.
+        assert "The book is non-fiction." in prompt
 
 
 class TestAGeneratedQuestionWithoutHelpTextIsKept:
