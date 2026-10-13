@@ -1670,3 +1670,11 @@ I changed seventeen reads and wrote a table of eleven routes to measure. Reverti
 The profiler helper read every entry in `system.profile`. Between tests the database is dropped, so nothing was left over, and every test passed. Twice in one test it counted the first measurement in the second, which I hit in the demo and fixed only there. The reviewer raised it against the tests; the scenario it described does not happen in this suite, but the helper was one reuse away from it.
 **Rule:** a helper that measures by reading a log clears the log, or filters to its own window, itself. Fix it where it lives the first time it bites, not in the one caller that tripped.
 
+### Two tests held the defect in place (#830)
+The issue said a chapter missing from the saved tab order gets no tab. Two tests in `TabStatePersistence.test.tsx` asserted exactly that: a saved order of two chapters, a book of three, and the restored order equal to the saved one. They failed as soon as the fix went in, and for a moment that read as a regression. What settled it was the component, not the tests: the tab bar draws only what is in the order, so a chapter left out of it cannot be opened at all.
+**Rule:** when a fix breaks a test, read what the test's expectation means for a user before deciding which of the two is wrong. An old test can be the bug's own specification.
+
+### The deploy was dispatched before its image existed (#829)
+My deploy helper waited for the image build with `gh run watch` and then read the build's conclusion. While the GitHub API was answering 502, the watch returned at once and the conclusion came back empty; the helper printed the empty conclusion and dispatched the deploy anyway. The deploy run failed on an image tag that was not there yet, and staging stayed on the previous build. I only saw it because the E2E line said "skipped".
+**Rule:** a wait is not a check. After waiting for a run, compare its conclusion with the one word that means go, and stop on anything else, an empty answer included. Read the helper's whole log, not its last line.
+
