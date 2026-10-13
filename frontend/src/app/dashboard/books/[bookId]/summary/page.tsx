@@ -16,6 +16,12 @@ import {
   SPEECH_UNSUPPORTED_MESSAGE,
 } from '@/lib/voice/speechRecognitionErrors';
 import { useSpeechRecognitionSupported } from '@/lib/voice/useSpeechRecognitionSupported';
+import { SummarySaveNotices } from '@/components/books/SummarySaveNotices';
+import { readStored, removeStored, writeStored } from '@/lib/storage/safeLocalStorage';
+
+// Where a summary whose save failed is kept (#832): apart from the working copy,
+// which every load and every keystroke writes over.
+const unsavedKey = (bookId: string) => `book-summary-unsaved-${bookId}`;
 
 export default function BookSummaryPage() {
   const router = useRouter();
@@ -50,6 +56,14 @@ export default function BookSummaryPage() {
   const [interimTranscript, setInterimTranscript] = useState('');
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastSaved = useRef('');
+  // A save that failed (#832). `kept` is whether the text is at least in this
+  // browser: storage can refuse too, and then it is nowhere but the field.
+  const [saveFailure, setSaveFailure] = useState<{ kept: boolean } | null>(null);
+  // Text from an earlier visit whose save failed, which the server never got.
+  const [unsavedDraft, setUnsavedDraft] = useState<string | null>(null);
+  // While that text is on offer its stored copy is not this visit's to remove:
+  // a later save that works is of something else.
+  const draftOnOffer = useRef(false);
   const [summaryHistory, setSummaryHistory] = useState<unknown[]>([]);
   // Derived during render, not mirrored into state via an effect (#584,
   // react-hooks/set-state-in-effect). `getSummaryReadinessError` is a pure
@@ -73,6 +87,8 @@ export default function BookSummaryPage() {
     setVisit(visit + 1);
     setSummary('');
     setSummaryHistory([]);
+    setSaveFailure(null);
+    setUnsavedDraft(null);
   }
 
   // Load summary and history from remote on mount
@@ -81,16 +97,26 @@ export default function BookSummaryPage() {
     let ignore = false;
     userEditedRef.current = false;
     lastSaved.current = '';
+    draftOnOffer.current = false;
     bookClient.getBookSummary(bookId)
       .then((data) => {
         if (ignore) return;
         setSummaryHistory(data.summary_history || []);
         lastSaved.current = data.summary || '';
         if (!userEditedRef.current) setSummary(data.summary || '');
+        // What a failed save left behind last time. The server's copy is shown;
+        // the other is kept and offered, not written over (#832).
+        const unsaved = readStored(unsavedKey(bookId));
+        if (unsaved !== null && unsaved !== (data.summary || '')) {
+          draftOnOffer.current = true;
+          setUnsavedDraft(unsaved);
+        } else {
+          removeStored(unsavedKey(bookId));
+        }
       })
       .catch(() => {
         if (ignore || userEditedRef.current) return;
-        const local = localStorage.getItem(`book-summary-${bookId}`);
+        const local = readStored(`book-summary-${bookId}`);
         if (local) {
           // Shown, not saved: the server may hold a newer copy and only failed to
           // load. Baselining it means auto-save waits for a real edit (#718).
@@ -113,8 +139,9 @@ export default function BookSummaryPage() {
   // (#718).
   useEffect(() => {
     if (!bookId || (!summaryLoaded && !userEditedRef.current)) return;
-    // Save to localStorage
-    localStorage.setItem(`book-summary-${bookId}`, summary);
+    // Save to localStorage. A browser that is full, or set to keep nothing,
+    // throws here; the save to the server below still has to happen.
+    writeStored(`book-summary-${bookId}`, summary);
     // Debounce remote save
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     if (summary !== lastSaved.current) {
@@ -122,8 +149,14 @@ export default function BookSummaryPage() {
         bookClient.saveBookSummary(bookId, summary)
           .then((data) => {
             lastSaved.current = data.summary;
+            if (!draftOnOffer.current) removeStored(unsavedKey(bookId));
+            setSaveFailure(null);
           })
-          .catch(() => {});
+          .catch(() => {
+            // The text exists only here now. It is kept under its own key, which the
+            // next load does not write over, and the writer is told (#832).
+            setSaveFailure({ kept: writeStored(unsavedKey(bookId), summary) });
+          });
       }, 1000);
     }
     return () => {
@@ -267,6 +300,22 @@ export default function BookSummaryPage() {
           {error}
         </div>
       )}
+      <SummarySaveNotices
+        saveFailure={saveFailure}
+        unsavedDraft={unsavedDraft}
+        onRestore={() => {
+          if (unsavedDraft === null) return;
+          // Restored, it is the working copy, and saving it is what clears the stored one.
+          draftOnOffer.current = false;
+          editSummary(unsavedDraft);
+          setUnsavedDraft(null);
+        }}
+        onDiscard={() => {
+          draftOnOffer.current = false;
+          removeStored(unsavedKey(bookId));
+          setUnsavedDraft(null);
+        }}
+      />
       <div className="bg-card border border-border rounded-lg p-6">
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
