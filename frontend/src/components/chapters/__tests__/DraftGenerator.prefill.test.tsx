@@ -161,4 +161,37 @@ describe('the toolbar draft generator', () => {
     expect(questions()).toHaveLength(5);
     expect(answers()).toEqual(['', '', '', '', '']);
   });
+
+  it('goes back to the sample questions when the chapter\'s answers have gone since it was last opened', async () => {
+    mockedClient.getChapterQAResponses.mockResolvedValue(saved(['Who keeps the light?', 'An old man named Tam.']));
+    await opened();
+    await waitFor(() => expect(answers()).toEqual(['An old man named Tam.']));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // The interview was started again, say: the answers that were shown no longer exist.
+    mockedClient.getChapterQAResponses.mockResolvedValue(saved());
+    fireEvent.click(screen.getByRole('button', { name: /generate ai draft/i }));
+    await screen.findByRole('dialog');
+
+    await waitFor(() => expect(questions()).toHaveLength(5));
+    expect(answers()).toEqual(['', '', '', '', '']);
+  });
+
+  it('keeps what it last read when the answers cannot be read this time', async () => {
+    mockedClient.getChapterQAResponses.mockResolvedValue(saved(['Who keeps the light?', 'An old man named Tam.']));
+    await opened();
+    await waitFor(() => expect(answers()).toEqual(['An old man named Tam.']));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    mockedClient.getChapterQAResponses.mockRejectedValue(new Error('Network error'));
+    fireEvent.click(screen.getByRole('button', { name: /generate ai draft/i }));
+    await screen.findByRole('dialog');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(answers()).toEqual(['An old man named Tam.']);
+  });
 });

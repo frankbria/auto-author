@@ -91,10 +91,13 @@ export function DraftGenerator({
       .then((saved) => {
         if (ignore || editedFor.current === key) return;
         const answered = saved.responses.map(({ question, answer }) => ({ question, answer }));
-        if (answered.length > 0) setQuestionResponses(answered);
+        // None now: back to the sample questions, and not whatever was read the
+        // last time the dialog was open.
+        setQuestionResponses(answered.length > 0 ? answered : sampleQuestions());
       })
       .catch(() => {
-        // The sample questions stay: the dialog works without the saved answers.
+        // Whatever is shown stays, the sample questions or the answers read the
+        // last time: the dialog works without a fresh read.
       });
     return () => {
       ignore = true;

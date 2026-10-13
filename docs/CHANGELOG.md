@@ -6,8 +6,9 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 - **"Generate AI Draft" in the toolbar starts from the chapter's interview answers (#834, P1.52)**:
   - **Problem.** The editor toolbar's draft dialog opened with five sample questions and empty answers, whatever the writer had already answered in the Interview Questions tab of the same chapter. To get a draft from those answers through this button they had to be typed again.
-  - **Fix.** On opening, the dialog reads the chapter's saved answers (`getChapterQAResponses`, the call the interview tab's own draft button uses) and shows them, questions and answers, ready to edit. Answers still in draft are included. A chapter with no answers yet, or one whose answers cannot be read, starts from the sample questions as before.
+  - **Fix.** On opening, the dialog reads the chapter's saved answers (`getChapterQAResponses`, the call the interview tab's own draft button uses) and shows them, questions and answers, ready to edit. Answers still in draft are included. A chapter with no answers yet starts from the sample questions as before, and so does one whose answers cannot be read the first time it is opened.
   - **What it will not do.** It does not write over anything typed in the dialog: not if the answers arrive after typing has started, and not on reopening for the same chapter. A different chapter starts fresh, so one chapter's answers are never shown under another.
+  - **Found in review.** Reopened for the same chapter after its answers had gone, the dialog kept showing the ones it read the time before. It now goes back to the sample questions. When the answers cannot be read on a later opening, it keeps what it last read.
   - **Also.** Each answer field has a name a screen reader can read ("Answer to question 2"); they had only a placeholder.
 
 - **The Book Stats panel shows the book's numbers (#833, P1.51)**:
