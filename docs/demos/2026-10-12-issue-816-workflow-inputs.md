@@ -1,7 +1,7 @@
 # Issue #816: what a caller types into a workflow dispatch never becomes part of a shell command
 
-*2026-10-13T02:15:38Z by Showboat 0.6.1*
-<!-- showboat-id: f66ac01b-82ea-49ad-986f-f9fb293d85da -->
+*2026-10-13T02:41:38Z by Showboat 0.6.1*
+<!-- showboat-id: 9f60fa8d-f11c-4a73-898d-701a8a1d363c -->
 
 Three acceptance criteria: inputs reach the shell through `env:` only; each input is checked against a pattern before use; a guard test fails if an input appears inside a `run:` block.
 
@@ -94,9 +94,11 @@ the job stops here
 a file named pwned on the box: no
 ```
 
-## Why the check, and not only the variable
+## If the check did not run
 
-The same crafted tag on this branch with the first step left out. The variable alone does not protect the box: the deploy`s script is a string handed to ssh, so the runner`s shell still puts the tag into it, and the box`s shell still reads it. This is why the guard test insists the check is the first step and cannot be skipped.
+The deploy`s script is a string handed to ssh, so a variable alone would not protect the box: the runner`s shell puts the tag into that string and the box`s shell reads it. The check is one answer. The other is that, where the tag is put into the string, it is quoted for the box (`printf %q`), so that a step which ran without the check, such as one a later change gives `if: always()`, still hands the box a word and not a command.
+
+The same crafted tag with the first step left out: the box runs nothing extra, and docker is given the tag exactly as it was typed.
 
 ```bash
 cd /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo816 && uvx --with pyyaml python emulate.py deploy-branch.yml deploy image_tag "sha-3931169'; touch pwned; echo '" --skip-first-step
@@ -104,9 +106,9 @@ cd /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013
 
 ```output
 step 'Pull and start': exit 0
-  box: docker compose -f docker-compose.yml -f docker-compose.staging.yml pull (IMAGE_TAG=sha-3931169)
-  box: docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans (IMAGE_TAG=sha-3931169)
-a file named pwned on the box: YES
+  box: docker compose -f docker-compose.yml -f docker-compose.staging.yml pull (IMAGE_TAG=sha-3931169'; touch pwned; echo ')
+  box: docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans (IMAGE_TAG=sha-3931169'; touch pwned; echo ')
+a file named pwned on the box: no
 ```
 
 ## On GitHub, from this branch
@@ -132,7 +134,7 @@ feature/issue-816-workflow-inputs: failure
 Dispatched with the tag staging was already running, `sha-b6961ff`. It deploys, and the post-deploy E2E run that followed it is green.
 
 ```bash
-cd /home/frankbria/projects/worktrees/issue-816-workflow-inputs && gh run view 38332266344 --json conclusion,headBranch,jobs --jq '"\(.headBranch): \(.conclusion)", (.jobs[0].steps[] | select(.number < 9) | "  \(.number). \(.name): \(.conclusion)")'
+cd /home/frankbria/projects/worktrees/issue-816-workflow-inputs && gh run view 38337504223 --json conclusion,headBranch,jobs --jq '"\(.headBranch): \(.conclusion)", (.jobs[0].steps[] | select(.number < 9) | "  \(.number). \(.name): \(.conclusion)")'
 ```
 
 ```output
@@ -148,7 +150,7 @@ feature/issue-816-workflow-inputs: success
 ```
 
 ```bash
-cd /home/frankbria/projects/worktrees/issue-816-workflow-inputs && gh run view 38332295117 --json conclusion,event --jq '"post-deploy E2E (\(.event)): \(.conclusion)"'
+cd /home/frankbria/projects/worktrees/issue-816-workflow-inputs && gh run view 38337541615 --json conclusion,event --jq '"post-deploy E2E (\(.event)): \(.conclusion)"'
 ```
 
 ```output
@@ -198,7 +200,7 @@ cd /home/frankbria/projects/worktrees/issue-816-workflow-inputs && uvx --with py
 ```
 
 ```output
-84 passed in 0.61s
+86 passed in 0.92s
 ```
 
 Against main`s workflows the same guard fails, and names each place.
@@ -215,7 +217,7 @@ E         jobs.deploy.steps.8.run: ${{ inputs.image_tag }}
 E         jobs.e2e-staging.steps.4.env.STAGING_E2E_WORKERS: ${{ github.event.inputs.staging_e2e_workers || '1' }}
 E         jobs.e2e-staging.steps.5.run: ${{ github.event.inputs.staging_e2e_workers || '1' }}
 E         jobs.sync.steps.7.run: ${{ inputs.recreate }}
-3 failed, 5 passed, 76 deselected in 0.08s
+3 failed, 5 passed, 78 deselected in 0.07s
 workflows restored
 ```
 
