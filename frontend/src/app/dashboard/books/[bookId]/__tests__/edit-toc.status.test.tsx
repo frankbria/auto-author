@@ -160,6 +160,18 @@ describe('Edit TOC page: editing a TOC that has in-progress chapters (#861)', ()
     expect(await screen.findByText(/failed to save the table of contents/i)).toBeInTheDocument();
   });
 
+  it('says what to do when the server refuses duplicate chapter ids (#885)', async () => {
+    mockBookClient.updateToc.mockRejectedValue(
+      Object.assign(new Error('Chapter ids must be unique across the table of contents'), { statusCode: 400 })
+    );
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    renderPage();
+    await screen.findByDisplayValue('One');
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    expect(await screen.findByText(/two chapters share an id/i)).toBeInTheDocument();
+    expect(screen.queryByText(/failed to save the table of contents/i)).not.toBeInTheDocument();
+  });
+
   it('shows the empty state for a book with no TOC', async () => {
     mockBookClient.getToc.mockResolvedValue({ toc: null } as never);
     renderPage();
