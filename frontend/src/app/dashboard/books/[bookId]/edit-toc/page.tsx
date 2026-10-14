@@ -168,9 +168,9 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
           // No TOC exists yet - start with empty state
           setToc([]);
         }
-        // 0 means "no TOC stored yet"; the backend treats that as version 1, so
-        // there is nothing to lock against.
-        setTocVersion(response.version && response.version > 0 ? response.version : undefined);
+        // Sent back on every save, the first included: a book with no TOC yet is
+        // version 1 on both sides, so two first saves cannot both land (#871).
+        setTocVersion(response.version);
         setError('');
         setConflict(false);
       } catch (err) {

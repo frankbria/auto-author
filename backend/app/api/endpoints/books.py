@@ -1231,7 +1231,8 @@ async def get_book_toc(
                 "structure_notes": "",
             },
             "status": "not_generated",
-            "version": 0,
+            # What a first save expects, as a TOC without a version counts (#871).
+            "version": 1,
             "generated_at": None,
             "updated_at": None,
         }
