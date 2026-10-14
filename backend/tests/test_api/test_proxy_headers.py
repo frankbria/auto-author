@@ -80,3 +80,31 @@ async def test_every_answer_tells_the_browser_to_keep_using_https():
     response, _ = await _get_books_from("172.22.0.1")
 
     assert response.headers["strict-transport-security"] == "max-age=31536000"
+
+
+@pytest.mark.parametrize(
+    "peer, recorded",
+    [("172.22.0.1", "198.51.100.9"), ("203.0.113.50", "203.0.113.50")],
+    ids=["through the proxy", "straight from an untrusted peer"],
+)
+async def test_the_audit_row_records_the_client_the_proxy_named(
+    auth_client_factory, monkeypatch, peer, recorded
+):
+    """The audit trail is evidence (#770's renewal consent among it): it must
+    name the client, not the proxy, and only believe the proxy (#907)."""
+    from app.api import dependencies
+    from app.api.endpoints import users as users_endpoint
+    from app.db import base
+
+    api = await auth_client_factory()
+    # The factory stands in for the audit; this test is about the real one.
+    monkeypatch.setattr(users_endpoint, "audit_request", dependencies.audit_request)
+    served = ProxyHeadersMiddleware(app, trusted_hosts=_allowed())
+    transport = ASGITransport(app=served, client=(peer, 40000))
+    async with AsyncClient(transport=transport, base_url="http://api.example.test", cookies=api.cookies) as client:
+        response = await client.patch("/api/v1/users/me", json={"bio": "Small changes."}, headers=FROM_NGINX)
+
+    assert response.status_code == 200, response.text
+    row = await base._db.audit_logs.find_one({"action": "profile_update"})
+    assert row["details"]["ip_address"] == recorded
+    assert "ip_address" not in row  # one place for it, not a top-level null beside it
