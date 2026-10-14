@@ -18,6 +18,7 @@ import pytest
 from starlette.requests import Request
 
 from app.api import dependencies as deps
+from app.core import entitlements
 from app.db import base
 from app.services.ai_service import ai_service
 from tests.conftest import real_get_rate_limiter
@@ -115,6 +116,41 @@ class TestQuotaIsChargedOnlyForARequestThatMayHaveReachedTheModel:
         assert refused.status_code == 429, refused.text
         assert "X-RateLimit-Limit" in refused.headers
         assert await _charged() == 1
+
+    async def test_many_requests_the_rate_limiter_refuses_cost_nothing(
+        self, auth_client_factory, arm_real_ai_quota, arm_real_rate_limiter
+    ):
+        """A user retrying through a rate-limit window keeps the day's allowance (#883)."""
+        arm_real_ai_quota(limit=10)
+        arm_real_rate_limiter(1)
+        api = await auth_client_factory(overrides={"plan": "free"})
+        book_id = await _create_book(api, with_summary=True)
+        url = f"/api/v1/books/{book_id}/analyze-summary"
+
+        with patch(ANALYZE, new=AsyncMock(return_value=dict(ANALYSIS_OK))):
+            statuses = [(await api.post(url)).status_code for _ in range(6)]
+
+        assert statuses == [200] + [429] * 5
+        assert await _charged() == 1
+
+    async def test_a_request_the_entitlement_gate_refuses_costs_nothing(
+        self, auth_client_factory, arm_real_ai_quota, monkeypatch
+    ):
+        """The quota charges before the gate runs, so the gate's 402 must refund (#883)."""
+        arm_real_ai_quota(limit=5)
+        monkeypatch.setattr(deps.settings, "PLAN_ENFORCEMENT_ENABLED", True)
+        # The free plan keeps its quota but loses this one feature.
+        monkeypatch.setitem(entitlements.PLAN_ENTITLEMENTS, "free", frozenset())
+        api = await auth_client_factory(overrides={"plan": "free"})
+        book_id = await _create_book(api, with_summary=True)
+
+        with patch(ANALYZE, new=AsyncMock(return_value=dict(ANALYSIS_OK))) as analyze:
+            response = await api.post(f"/api/v1/books/{book_id}/analyze-summary")
+
+        assert response.status_code == 402, response.text
+        assert "analyze_summary" in response.text
+        analyze.assert_not_called()
+        assert await _charged() == 0
 
     async def test_a_request_past_the_cap_is_refused_and_not_counted(
         self, auth_client_factory, arm_real_ai_quota
