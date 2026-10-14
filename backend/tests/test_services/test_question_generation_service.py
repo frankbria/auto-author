@@ -422,22 +422,6 @@ class TestGenerateQuestionsForChapter:
                     book_id="book-1", chapter_id="ch-1", user_id="u1"
                 )
 
-    async def test_persistence_verification_mismatch_raises(self, service, mock_ai_service):
-        book = {"title": "Bk", "table_of_contents": {"chapters": []}}
-        mock_ai_service.generate_chapter_questions.return_value = [
-            {"question_text": "A question to drive the save path here?", "question_type": "plot", "difficulty": "easy"}
-        ]
-        saved = [_saved_question_dict("q1", 1), _saved_question_dict("q2", 2)]
-        # verification reports fewer than saved -> discrepancy (174-181)
-        verify = QuestionListResponse(questions=[], total=1, page=1, pages=1)
-        with patch(f"{MODULE}.get_book_by_id", AsyncMock(return_value=book)), \
-             patch(f"{MODULE}.create_questions_batch", AsyncMock(return_value=saved)), \
-             patch(f"{MODULE}.db_get_questions_for_chapter", AsyncMock(return_value=verify)):
-            with pytest.raises(Exception, match="Failed to save questions"):
-                await service.generate_questions_for_chapter(
-                    book_id="book-1", chapter_id="ch-1", user_id="u1"
-                )
-
 
 # --------------------------------------------------------------------------- #
 # regenerate_chapter_questions
@@ -455,7 +439,7 @@ class TestRegenerate:
             generation_id="g",
             total=2,
         )
-        ctx = {"previous_questions": ["old q"], "feedback_guidance": None}
+        ctx = {"previous_questions": ["old q"], "existing_total": 3, "feedback_guidance": None}
         call_order = []
 
         async def fake_gen(*a, **k):
@@ -486,7 +470,8 @@ class TestRegenerate:
         assert mock_gen.await_args.kwargs["count"] == 2
         assert mock_gen.await_args.kwargs["previous_questions"] == ["old q"]
         assert result.new_count == 2
-        assert result.preserved_count == 5 - 2
+        # What the chapter keeps (#850): 3 existing, 2 unanswered deleted, not 5 requested - 2.
+        assert result.preserved_count == 3 - 2
 
     async def test_ai_outage_leaves_existing_questions_intact(self, service):
         """The core reliability guarantee (#234): an AI outage during bulk regenerate

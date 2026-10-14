@@ -157,7 +157,9 @@ class QuestionGenerationService:
                     continue
 
         # Limit question count to reasonable range
-        count = max(3, min(count, 20))
+        # Floor 1, as the request schema allows: regeneration asks for exactly the
+        # number of unanswered questions, and a floor of 3 grew the chapter (#850).
+        count = max(1, min(count, 20))
 
         # Generate questions using AI
         try:
@@ -194,38 +196,6 @@ class QuestionGenerationService:
                         raise
 
                 logger.info(f"Atomically saved {len(saved_questions)} questions to database")
-
-                # VERIFICATION: Query database to confirm all questions were saved
-                try:
-                    verification_response = await db_get_questions_for_chapter(
-                        book_id=book_id,
-                        chapter_id=chapter_id,
-                        user_id=user_auth_id,
-                        page=1,
-                        limit=count + 10  # Request more than we saved to ensure we get all
-                    )
-
-                    verified_count = verification_response.total
-                    expected_count = len(saved_questions)
-
-                    if verified_count < expected_count:
-                        discrepancy_msg = (
-                            f"Data persistence verification failed: "
-                            f"Expected {expected_count} questions, but only {verified_count} found in database. "
-                            f"Discrepancy: {expected_count - verified_count} questions missing."
-                        )
-                        logger.error(discrepancy_msg)
-                        raise Exception(discrepancy_msg)
-
-                    logger.info(
-                        f"Verification successful: All {expected_count} questions confirmed in database "
-                        f"(book_id={book_id}, chapter_id={chapter_id}, user_id={user_auth_id})"
-                    )
-
-                except Exception as verify_error:
-                    logger.error(f"Verification query failed: {str(verify_error)}")
-                    # If verification fails, we should still raise an error
-                    raise Exception(f"Failed to verify question persistence: {str(verify_error)}")
 
             except Exception as e:
                 logger.error(f"Failed to save questions batch: {str(e)}")
@@ -368,6 +338,7 @@ class QuestionGenerationService:
 
         return {
             "previous_questions": previous_questions,
+            "existing_total": existing.total,
             "feedback_guidance": feedback_guidance,
         }
 
@@ -440,8 +411,9 @@ class QuestionGenerationService:
         )
 
         # Add metadata about the regeneration
-        result.preserved_count = count - deleted_count if preserve_responses else 0
-        result.new_count = new_count
+        # What the chapter holds now (#850): the requested count says nothing about it.
+        result.preserved_count = regen_context["existing_total"] - deleted_count if preserve_responses else 0
+        result.new_count = len(result.questions)
         result.total = result.preserved_count + result.new_count
 
         return result

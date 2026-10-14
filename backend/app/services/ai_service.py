@@ -41,6 +41,9 @@ logger = logging.getLogger(__name__)
 
 # A list item's leading "1." / "2)" / "-" / "•" / "*" marker.
 LIST_MARKER = re.compile(r"^(?:\d+[.)](?!\d)\s*|[-•*]\s+)")
+# A full stop that ends a sentence: followed by space or the end, and not after
+# a title or "e.g." (#850).
+SENTENCE_END = re.compile(r"(?<!\bDr)(?<!\bMr)(?<!\bMs)(?<!\bMrs)(?<!\bSt)(?<!\bvs)(?<!\be\.g)(?<!\bi\.e)\.(?:\s+|$)")
 
 # Drafts and TOCs run on the long-output model class (settings.AI_MODEL_LONG_OUTPUT,
 # default gpt-4o: 128k context / 16k output) so the UI's top length options stay
@@ -587,7 +590,7 @@ Make questions specific, actionable, and focused on content structure rather tha
                 suggestions_text = line.split(":", 1)[1].strip()
                 # Split suggestions by common delimiters
                 suggestions = [
-                    s.strip() for s in suggestions_text.split(".") if s.strip()
+                    s.strip() for s in SENTENCE_END.split(suggestions_text) if s.strip()
                 ]
                 # Open models put them on the following lines as a list (#917).
                 in_suggestion_list = not suggestions
@@ -1006,7 +1009,7 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
                     # Extract just the question part
                     question_text = line.strip()
                     # Remove numbering, bullets, etc.
-                    question_text = re.sub(r'^[\d\.\-\*\•]\s*', '', question_text)
+                    question_text = LIST_MARKER.sub('', question_text)
                     question_text = question_text.strip('"\'')
 
                     if question_text:
