@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services.ai_errors import AIRateLimitError, AIServiceError
+from app.services.question_templates import FOCUS_HINTS
 from app.services.question_generation_service import (
     QuestionGenerationService,
     get_question_generation_service,
@@ -188,12 +189,9 @@ class TestBuildPrompt:
         assert "Fantasy" in prompt
         assert "Young Adult" in prompt  # audience branch (line 466)
         assert "challenging" in prompt  # HARD difficulty guidance (470-475)
-        # focus guidance for all five types (479-494)
-        assert "character development" in prompt
-        assert "plot structure" in prompt
-        assert "setting details" in prompt
-        assert "themes" in prompt
-        assert "research needs" in prompt
+        # focus guidance for all five types, in the words for a non-fiction chapter (#835)
+        for kind in QuestionType:
+            assert FOCUS_HINTS[kind] in prompt, kind
 
 
 # --------------------------------------------------------------------------- #
