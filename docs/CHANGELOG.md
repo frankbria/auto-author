@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Edit TOC asks before deleting a chapter that holds writing or answers (#906, P1.71)**:
+  - **Problem.** Deleting a chapter was one click, and since #755 saving the TOC without it also deletes its questions and answers: a mis-click and Save destroyed the draft and every answer behind it.
+  - **Fix.** `edit-toc/ConfirmChapterDelete.tsx`: deleting a chapter adds up its words and its subchapters' (`word_count` from GET /toc) and their answers, completed and in progress, from `question-progress` for chapters the server has stored. Nothing to lose: it goes at once. Otherwise a Radix alert dialog names both numbers; when the answers cannot be counted it still asks. Beside Save, the page lists the stored chapters the save will remove (an always-mounted status line).
+  - **Found in review.** The delete wrote back the tree captured at the click, so a chapter added while the answers were being counted vanished with it; `deleteChapter` now works from the latest tree. The dialog keeps its text while it animates closed, and the summary's status line is mounted before it has text so a screen reader announces it.
+  - **Tests.** `edit-toc.deleteConfirm.test.tsx` (7); two existing Edit TOC tests now confirm the delete of a chapter with words. Six mutations caught.
+  - **Not done.** `word_count` is the stored value the autosave last wrote, so words typed in another tab since this page loaded are not counted; the answers are read when the delete is asked for.
+
 - **Refused AI requests cost no quota: the two tests #883 still asked for (#883, P1.67)**:
   - **State.** #798 (PR #979) already charges the quota up front and refunds a request that failed before any model call, and #803 surfaced `X-AI-Quota-*` to the client. What #883's definition of done still lacked was proof for N rate-limited requests and for a refusal by the entitlement gate.
   - **Tests.** `tests/test_api/test_ai_quota_charging.py`: six requests through a 1-per-window limiter (one 200, five 429) leave one charge; the free plan stripped of `analyze_summary` but keeping its quota gets the gate's 402 and is charged nothing, with the model never called. No production code changed.

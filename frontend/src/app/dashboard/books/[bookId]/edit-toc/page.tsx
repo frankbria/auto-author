@@ -158,6 +158,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   // The chapters as stored, id -> title: deleting one of them deletes its answers on save (#906).
   const [storedChapters, setStoredChapters] = useState<Map<string, string>>(new Map());
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   // Fetch the TOC on mount and on Reload
   useEffect(() => {
     const fetchTOC = async () => {
@@ -272,33 +273,21 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     setToc(updatedToc);
   };
 
+  // From the latest tree: a delete can land after an await (#906), and edits
+  // made meanwhile must survive it.
   const deleteChapter = (id: string) => {
-    let updatedToc = [...toc];
-
-    // Handle top-level chapters
-    updatedToc = updatedToc.filter(chapter => chapter.id !== id);
-
-    // Handle nested chapters
-    const findAndDeleteSubchapter = (chapters: Chapter[]) => {
-      for (let i = 0; i < chapters.length; i++) {
-        chapters[i].children = chapters[i].children.filter(
-          subchapter => subchapter.id !== id
-        );
-
-        if (chapters[i].children.length > 0) {
-          findAndDeleteSubchapter(chapters[i].children);
-        }
-      }
-    };
-
-    findAndDeleteSubchapter(updatedToc);
-    setToc(updatedToc);
+    const without = (chapters: Chapter[]): Chapter[] =>
+      chapters.filter((c) => c.id !== id).map((c) => ({ ...c, children: without(c.children) }));
+    setToc((current) => without(current));
   };
   // Ask first when the chapter holds writing or answers (#906).
   const requestDelete = async (chapter: Chapter) => {
     const loss = await whatDeletingLoses(bookId, chapter, new Set(storedChapters.keys()));
     if (loss.words === 0 && loss.answers === 0) deleteChapter(chapter.id);
-    else setPendingDelete(loss);
+    else {
+      setPendingDelete(loss);
+      setDeleteOpen(true);
+    }
   };
 
     const handleDragStart = (id: string) => {
@@ -620,10 +609,11 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
 
       <ConfirmChapterDelete
         pending={pendingDelete}
-        onCancel={() => setPendingDelete(null)}
+        open={deleteOpen}
+        onCancel={() => setDeleteOpen(false)}
         onConfirm={() => {
           if (pendingDelete) deleteChapter(pendingDelete.chapter.id);
-          setPendingDelete(null);
+          setDeleteOpen(false);
         }}
       />
 

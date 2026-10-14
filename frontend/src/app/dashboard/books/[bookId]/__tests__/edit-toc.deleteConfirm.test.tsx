@@ -116,3 +116,28 @@ it('lists the saved chapters the save will remove, but not a chapter added and r
   expect(summary).toHaveTextContent('Gone');
   expect(summary).not.toHaveTextContent('New Chapter');
 });
+
+it('an edit made while the answers are being counted survives the delete (found in review)', async () => {
+  let release!: () => void;
+  mockBookClient.getChapterQuestionProgress.mockImplementation(
+    () => new Promise((resolve) => { release = () => resolve({ total: 0, completed: 0, in_progress: 0 } as never); })
+  );
+  renderPage([chapter('c1', 'Keep', 10), chapter('c2', 'Empty', 0)]);
+  await screen.findByDisplayValue('Empty');
+  fireEvent.click(deleteButtonOf('Empty'));
+  fireEvent.click(screen.getByRole('button', { name: /add chapter/i }));
+  release();
+
+  await waitFor(() => expect(screen.queryByDisplayValue('Empty')).not.toBeInTheDocument());
+  expect(screen.getByDisplayValue('New Chapter')).toBeInTheDocument();
+});
+
+it('a chapter added on this page is deleted without asking the server about answers', async () => {
+  renderPage([chapter('c1', 'Keep', 10)]);
+  await screen.findByDisplayValue('Keep');
+  fireEvent.click(screen.getByRole('button', { name: /add chapter/i }));
+  fireEvent.click(deleteButtonOf('New Chapter'));
+
+  await waitFor(() => expect(screen.queryByDisplayValue('New Chapter')).not.toBeInTheDocument());
+  expect(mockBookClient.getChapterQuestionProgress).not.toHaveBeenCalled();
+});

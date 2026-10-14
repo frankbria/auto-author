@@ -47,16 +47,19 @@ export async function whatDeletingLoses(
 
 export function ConfirmChapterDelete({
   pending,
+  open,
   onCancel,
   onConfirm,
 }: {
+  // Kept after closing, so the text stays while the dialog animates out.
   pending: PendingDelete | null;
+  open: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const answers = pending?.answers == null ? 'any answers to its questions' : plural(pending.answers, 'answer');
   return (
-    <AlertDialog open={pending !== null} onOpenChange={(open) => !open && onCancel()}>
+    <AlertDialog open={open} onOpenChange={(open) => !open && onCancel()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete &ldquo;{pending?.chapter.title}&rdquo;?</AlertDialogTitle>
@@ -78,10 +81,10 @@ export function ConfirmChapterDelete({
 export function RemovedOnSave({ stored, toc }: { stored: Map<string, string>; toc: ChapterNode[] }) {
   const kept = new Set(toc.flatMap(withSubchapters).map((c) => c.id));
   const removed = [...stored].filter(([id]) => !kept.has(id)).map(([, title]) => title);
-  if (removed.length === 0) return null;
+  // Always mounted, so a screen reader is already watching when the text appears.
   return (
     <p role="status" className="text-sm text-red-700 dark:text-red-400">
-      Saving will remove: {removed.join(', ')}. Their writing and answers are deleted with them.
+      {removed.length > 0 && `Saving will remove: ${removed.join(', ')}. Their writing and answers are deleted with them.`}
     </p>
   );
 }
