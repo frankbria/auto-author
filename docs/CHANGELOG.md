@@ -13,6 +13,19 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
   - **Tests.** `test_stripe_webhook_subscription_edges.py` (4) and `test_billing_checkout_tabs.py` (6), signed webhooks and real MongoDB, Stripe's SDK stubbed; four existing tests read the per-subscription mark. Six mutations caught. `Session.retrieve`/`expire` checked against the installed stripe 15.6.1.
   - Demo: `docs/demos/2026-10-14-issue-912-stripe-edges.md`.
 
+- **Edit TOC asks before deleting a chapter that holds writing or answers (#906, P1.71)**:
+  - **Problem.** Deleting a chapter was one click, and since #755 saving the TOC without it also deletes its questions and answers: a mis-click and Save destroyed the draft and every answer behind it.
+  - **Fix.** `edit-toc/ConfirmChapterDelete.tsx`: deleting a chapter adds up its words and its subchapters' (`word_count` from GET /toc) and their answers, completed and in progress, from `question-progress` for chapters the server has stored. Nothing to lose: it goes at once. Otherwise a Radix alert dialog names both numbers; when the answers cannot be counted it still asks. Beside Save, the page lists the stored chapters the save will remove (an always-mounted status line).
+  - **Found in review.** The delete wrote back the tree captured at the click, so a chapter added while the answers were being counted vanished with it; `deleteChapter` now works from the latest tree. The dialog keeps its text while it animates closed, and the summary's status line is mounted before it has text so a screen reader announces it.
+  - **Tests.** `edit-toc.deleteConfirm.test.tsx` (7); two existing Edit TOC tests now confirm the delete of a chapter with words. Six mutations caught.
+  - **Not done.** `word_count` is the stored value the autosave last wrote, so words typed in another tab since this page loaded are not counted; the answers are read when the delete is asked for.
+
+- **The audit row names the client the proxy forwarded, and only the proxy is believed (#907, P1.72)**:
+  - **State.** #814 already made uvicorn trust `X-Forwarded-For` only from the Docker ranges in `FORWARDED_ALLOW_IPS` (never `*`), and `tests/test_api/test_proxy_headers.py` showed the app sees the forwarded client. `create_audit_log` no longer writes a top-level `ip_address`. What #907 still lacked was proof on a stored audit row, which is legal evidence (#770's renewal consent).
+  - **Tests.** `test_the_audit_row_records_the_client_the_proxy_named` (2): a `PATCH /users/me` through uvicorn's own proxy middleware records the forwarded client from a trusted peer and the peer itself from an untrusted one, with no top-level `ip_address`. No production code changed. Three mutations caught (the audit reading the header itself, a top-level null coming back, `FORWARDED_ALLOW_IPS: "*"`).
+  - **Left to #1011 `[P2.42]`.** Trusting only the proxy's own address, rather than every Docker range on the box.
+  - Demo: `docs/demos/2026-10-14-issue-907-audit-real-client.md`.
+
 - **Signing out of a protected page, or deleting the account, lands on the home page (#886, P1.69)**:
   - **Problem.** The session store drops the session as soon as sign-out starts, and `ProtectedRoute` redirected before the caller's `router.push('/')`: the user landed on `/auth/sign-in?redirect=<the page they left>`.
   - **Fix.** `frontend/src/lib/sign-out.ts` marks a sign-out the user asked for as underway, while the request runs and for five seconds after it succeeds; `ProtectedRoute` and the shared 401 handler leave the navigation to the caller meanwhile. A session that ends any other way still goes to sign-in with a way back. The profile page's delete now goes through `signOutOrNotify({ quiet: true })`.
