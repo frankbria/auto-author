@@ -10,6 +10,7 @@ import bookClient from '@/lib/api/bookClient';
 import { triggerTocUpdateEvent } from '@/hooks/useTocSync';
 import { ChapterStatusIndicator } from '@/components/ui/ChapterStatusIndicator';
 import { ChapterStatus } from '@/types/chapter-tabs';
+import { ConfirmChapterDelete, RemovedOnSave, whatDeletingLoses, type PendingDelete } from './ConfirmChapterDelete';
 
 type Chapter = {
   id: string;
@@ -154,6 +155,9 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
   const [reloadKey, setReloadKey] = useState(0);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [dragOverItem, setDragOverItem] = useState<string | null>(null);
+  // The chapters as stored, id -> title: deleting one of them deletes its answers on save (#906).
+  const [storedChapters, setStoredChapters] = useState<Map<string, string>>(new Map());
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   // Fetch the TOC on mount and on Reload
   useEffect(() => {
     const fetchTOC = async () => {
@@ -163,10 +167,14 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
 
         if (response.toc) {
           // Convert API format (TocData) to local format (Chapter[])
-          setToc(convertTocDataToChapters(response.toc));
+          const chapters = convertTocDataToChapters(response.toc);
+          setToc(chapters);
+          const flat = chapters.flatMap((c) => [c, ...c.children]);
+          setStoredChapters(new Map(flat.map((c) => [c.id, c.title])));
         } else {
           // No TOC exists yet - start with empty state
           setToc([]);
+          setStoredChapters(new Map());
         }
         // Sent back on every save, the first included: a book with no TOC yet is
         // version 1 on both sides, so two first saves cannot both land (#871).
@@ -286,6 +294,13 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
     findAndDeleteSubchapter(updatedToc);
     setToc(updatedToc);
   };
+  // Ask first when the chapter holds writing or answers (#906).
+  const requestDelete = async (chapter: Chapter) => {
+    const loss = await whatDeletingLoses(bookId, chapter, new Set(storedChapters.keys()));
+    if (loss.words === 0 && loss.answers === 0) deleteChapter(chapter.id);
+    else setPendingDelete(loss);
+  };
+
     const handleDragStart = (id: string) => {
     setDraggedItem(id);
   };
@@ -465,6 +480,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
           isDragOver ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : ''
         }`}
         style={{ marginLeft: `${chapter.depth * 20}px` }}
+        data-chapter-row
         draggable
         onDragStart={() => handleDragStart(chapter.id)}
         onDragOver={handleDragOver}
@@ -500,7 +516,7 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
               </svg>
             </button>
             <button
-              onClick={() => deleteChapter(chapter.id)}
+              onClick={() => void requestDelete(chapter)}
               className="text-muted-foreground hover:text-red-700 dark:hover:text-red-400 p-1"
               title="Delete Chapter"
             >
@@ -602,7 +618,20 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
         )}
       </div>
 
-      <div className="mt-8 flex justify-between">
+      <ConfirmChapterDelete
+        pending={pendingDelete}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) deleteChapter(pendingDelete.chapter.id);
+          setPendingDelete(null);
+        }}
+      />
+
+      <div className="mt-8 text-right">
+        <RemovedOnSave stored={storedChapters} toc={toc} />
+      </div>
+
+      <div className="mt-4 flex justify-between">
         <button
           onClick={() => router.back()}
           className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md"

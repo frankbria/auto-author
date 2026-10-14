@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import EditTOCPage from '../edit-toc/page';
 import { useSession } from '@/lib/auth-client';
 import bookClient from '@/lib/api/bookClient';
@@ -27,6 +27,16 @@ const tocWith = (chapters: unknown[], version?: number) =>
 const chapter = (id: string, title: string, order: number, status: string) => ({
   id, title, description: '', level: 1, order, status, word_count: 10, subchapters: [],
 });
+
+// Deleting is async since #906: a chapter with writing or answers asks first.
+async function deleteChapterAt(index: number, { confirm = false } = {}) {
+  const rows = screen.getAllByTitle('Delete Chapter').length;
+  fireEvent.click(screen.getAllByTitle('Delete Chapter')[index]);
+  if (confirm) {
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete chapter' }));
+  }
+  await waitFor(() => expect(screen.getAllByTitle('Delete Chapter').length).toBeLessThan(rows));
+}
 
 function renderPage() {
   return render(
@@ -88,7 +98,7 @@ describe('Edit TOC page: editing a TOC that has in-progress chapters (#861)', ()
     });
     fireEvent.click(screen.getAllByTitle('Add Subchapter')[0]);
     fireEvent.click(screen.getByRole('button', { name: /add chapter/i }));
-    fireEvent.click(screen.getAllByTitle('Delete Chapter')[2]); // One, its new subchapter, then Two
+    await deleteChapterAt(2, { confirm: true }); // One, its new subchapter, then Two
     expect(screen.getByDisplayValue('New Chapter')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Two')).not.toBeInTheDocument();
     expect(screen.getByText('In Progress')).toBeInTheDocument();
@@ -108,11 +118,11 @@ describe('Edit TOC page: editing a TOC that has in-progress chapters (#861)', ()
     );
     renderPage();
     await screen.findByDisplayValue('Two');
-    fireEvent.click(screen.getAllByTitle('Delete Chapter')[1]); // Two
+    await deleteChapterAt(1, { confirm: true }); // Two
     fireEvent.click(screen.getByRole('button', { name: /add chapter/i }));
     fireEvent.click(screen.getAllByTitle('Add Subchapter')[0]);
     fireEvent.click(screen.getAllByTitle('Add Subchapter')[0]);
-    fireEvent.click(screen.getAllByTitle('Delete Chapter')[1]); // One's first subchapter
+    await deleteChapterAt(1); // One's first subchapter: added here, empty
     fireEvent.click(screen.getAllByTitle('Add Subchapter')[0]);
 
     fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
