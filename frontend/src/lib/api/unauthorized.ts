@@ -1,4 +1,5 @@
 import { authClient } from "@/lib/auth-client";
+import { signOutUnderway } from "@/lib/sign-out";
 
 /** The one place this module navigates, so tests can watch it. */
 export const browser = {
@@ -20,6 +21,8 @@ async function handleUnauthorized(): Promise<void> {
   if (handling || typeof window === "undefined") return;
   // An auth page that gets a 401 is already where the user needs to be.
   if (window.location.pathname.startsWith("/auth/")) return;
+  // The user is signing out on purpose, and the caller decides where to go (#886).
+  if (signOutUnderway()) return;
   handling = true;
   // A failed sign-out must not strand the user on a page that cannot load.
   await Promise.resolve()

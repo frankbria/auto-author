@@ -3,6 +3,7 @@
 import { useSession } from '@/lib/auth-client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { endSignOut, signOutUnderway } from '@/lib/sign-out';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -34,7 +35,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     // this client guard fires on a session expiry with no navigation, so it must
     // set it too or the user loses their place. The sign-in page validates the
     // param via sanitizeRedirectPath (#184) before honoring it.
-    if (!session) {
+    if (session) {
+      endSignOut();
+    } else if (!signOutUnderway()) {
       router.push(`/auth/sign-in?redirect=${encodeURIComponent(pathname)}`);
     }
   }, [bypassAuth, isPending, session, router, pathname]);

@@ -125,6 +125,10 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
         route = getattr(request.scope.get("route"), "path", None)
         if not isinstance(route, str) or not route:
             route = request.url.path
+        # With the method: the declared path carries no router prefix, so GET,
+        # PATCH and DELETE /users/me were one bucket and a few profile loads
+        # refused the account deletion (#886).
+        route = f"{request.method} {route}"
 
         # TTL of 2 windows: the bucket outlives its own window, then Mongo reaps it.
         count = await increment_usage(
