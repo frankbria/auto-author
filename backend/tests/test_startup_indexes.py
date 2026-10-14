@@ -19,6 +19,7 @@ from app.db import base, questions
 from app.db.audit_log import ensure_audit_log_indexes
 from app.db.indexing_strategy import ChapterTabIndexManager
 from app.main import app
+from bson import ObjectId
 
 NINETY_DAYS = 60 * 60 * 24 * 90
 
@@ -273,3 +274,19 @@ class TestStartingWhileTheDatabaseIsAway:
         assert len(passes) == 2
         assert "owner_book_id_idx" in await _index_map(base._db.books)
         assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)
+
+
+@pytest.mark.asyncio
+async def test_lifespan_repairs_duplicate_chapter_ids(motor_reinit_db):
+    """A book stored before #754 with two chapters sharing an id (#885)."""
+    book_id = ObjectId()
+    chapters = [{"id": "dup", "title": t, "subchapters": []} for t in ("First", "Second")]
+    await base._db.books.insert_one(
+        {"_id": book_id, "owner_id": "o", "table_of_contents": {"chapters": chapters, "version": 1}}
+    )
+    async with app.router.lifespan_context(app):
+        await app.state.database_prepared
+
+    book = await base._db.books.find_one({"_id": book_id})
+    first, second = book["table_of_contents"]["chapters"]
+    assert first["id"] == "dup" and second["id"] != "dup"
