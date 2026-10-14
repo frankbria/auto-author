@@ -171,6 +171,18 @@ describe('when the export page cannot load (#836)', () => {
     expect(mockBookClient.getExportFormats).toHaveBeenCalledTimes(2);
   });
 
+  it('shows that it is loading while the retry is under way, not an empty form', async () => {
+    mockBookClient.getExportFormats.mockRejectedValueOnce(new Error('boom')).mockReturnValueOnce(new Promise(() => {}) as never);
+    const user = userEvent.setup();
+    renderPage();
+    await tabTo(user, await screen.findByRole('button', { name: 'Retry' }));
+
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByText('Loading export options...')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export Book' })).not.toBeInTheDocument();
+  });
+
   it('shows the alert again when the retry fails too', async () => {
     mockBookClient.getExportFormats.mockRejectedValue(new Error('boom'));
     const user = userEvent.setup();
