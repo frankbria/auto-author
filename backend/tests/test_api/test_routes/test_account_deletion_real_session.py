@@ -11,12 +11,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from bson import ObjectId
-from httpx import ASGITransport, AsyncClient
 
 from app.db.base import get_collection
 from app.db.user import ensure_user_indexes
-from app.main import app
-from tests.session_cookies import signed_session_cookie
+from tests.session_cookies import mint_session as _mint_session, real_session_client as _client
 
 
 async def _seed_better_auth_user(
@@ -52,31 +50,6 @@ async def _seed_better_auth_user(
     )
     tokens = [await _mint_session(user_oid) for _ in range(sessions)]
     return {"user_id": str(user_oid), "oid": user_oid, "tokens": tokens}
-
-
-async def _mint_session(user_oid: ObjectId) -> str:
-    token = f"tok-{ObjectId()}"
-    now = datetime.now(timezone.utc)
-    await (await get_collection("session")).insert_one(
-        {
-            "token": token,
-            "userId": user_oid,
-            "expiresAt": now + timedelta(days=7),
-            "createdAt": now,
-            "updatedAt": now,
-        }
-    )
-    return token
-
-
-def _client(token: str) -> AsyncClient:
-    # better-auth signs the cookie as "<token>.<signature>", and the backend
-    # refuses one whose signature does not verify (#795).
-    return AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://testserver",
-        cookies={"better-auth.session_token": signed_session_cookie(token)},
-    )
 
 
 TOMBSTONE_KEYS = {"_id", "auth_id", "deleted_at"}

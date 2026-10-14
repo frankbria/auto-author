@@ -1725,3 +1725,7 @@ To check the test "Tab stays inside the menu" I broke the focus trap twice. The 
 ### Swapping a hand-written control for the shared one can drop what the old one had (#837)
 The old drawer's close button was 44 by 44 pixels on a phone. The shared sheet's is a 16-pixel icon. The swap passed every test and axe; a measurement in the browser found it.
 **Rule:** before replacing a control, list what the old one gives a user (size, label, focus, keys) and measure each on the new one. Fix the gap in the shared component, where its other users get it too.
+
+### A stand-in for a dependency needs the dependency's types, and its own tests (#838)
+The test stand-in for the sign-in check was written twice. One copy declared `request: Request = None`, the other `request=None`. FastAPI fills a parameter with the request only when it is typed as one; untyped, it is a query parameter, always `None` here, and that copy's "no request" branch returned the first user. Every multi-user test on that factory had been one user, and passed.
+**Rule:** a stand-in that everything else is tested through gets tests of its own (two clients are two users; no cookie is nobody). And when a helper exists twice, diff the copies before trusting either.
