@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Refused AI requests cost no quota: the two tests #883 still asked for (#883, P1.67)**:
+  - **State.** #798 (PR #979) already charges the quota up front and refunds a request that failed before any model call, and #803 surfaced `X-AI-Quota-*` to the client. What #883's definition of done still lacked was proof for N rate-limited requests and for a refusal by the entitlement gate.
+  - **Tests.** `tests/test_api/test_ai_quota_charging.py`: six requests through a 1-per-window limiter (one 200, five 429) leave one charge; the free plan stripped of `analyze_summary` but keeping its quota gets the gate's 402 and is charged nothing, with the model never called. No production code changed.
+  - **Mutations.** Removing the refund fails both; refunding only a 429 fails the gate test while every rate-limit test passes.
+  - Demo: `docs/demos/2026-10-14-issue-883-quota-refusals.md`.
+
 - **A question's offline saves land in the order they were made (#873, P1.66)**:
   - **Problem.** `RetryQueue.processQueue` drained every queued operation in parallel. Offline, one question can queue a draft and then a completion; on reconnect the draft could land last and the answer was stored as a draft while the screen said completed. Also, Complete Response offline left the answer editable, so a draft made after it followed the completion into the queue.
   - **Fix.** `RetryQueue.add` takes a `group`; a group drains one operation at a time in the order queued, and an operation still waiting for a retry holds back the rest of its group; groups still run in parallel. `QuestionDisplay` queues both saves under the question's id, and a queued completion locks the answer and both save buttons as a completed one does (the second trigger, which ordering alone does not fix).
