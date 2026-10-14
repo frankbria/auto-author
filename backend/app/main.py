@@ -181,6 +181,7 @@ async def lifespan(app: FastAPI):
     from app.db.user import (
         ensure_user_indexes,
         grandfather_unverified_accounts,
+        erase_stranded_identities,
         purge_expired_users,
     )
     from app.db.toc_repair import repair_duplicate_chapter_ids
@@ -272,6 +273,14 @@ async def lifespan(app: FastAPI):
                 # Accounts past their 18 months are still held (#954, #996).
                 logger.error("Purge of deactivated accounts failed", exc_info=True)
                 report_failure("purge-accounts", error)
+            # A deletion that stopped half way (#935): finish its identity erasure.
+            try:
+                finished = await erase_stranded_identities()
+                if finished:
+                    logger.warning("Finished the identity erasure of %d deleted account(s)", finished)
+            except Exception as error:
+                logger.error("Finishing stranded identity erasures failed", exc_info=True)
+                report_failure("stranded-identities", error)
             await asyncio.sleep(24 * 60 * 60)
 
     purge_task = asyncio.create_task(purge_daily())
