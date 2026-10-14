@@ -267,6 +267,8 @@ def motor_reinit_db():
 
     books_dao.books_collection = base.books_collection
     books_dao.users_collection = base.users_collection
+    # delete_book opens its transaction on this client; left as imported it belongs to another event loop (#839).
+    books_dao._client = base._client
     users_dao.users_collection = base.users_collection
     audit_log_dao.audit_logs_collection = base.audit_logs_collection
 

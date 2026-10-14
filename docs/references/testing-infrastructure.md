@@ -282,3 +282,22 @@ Per the agile testing strategy plan (see `docs/plans/2025-10-13-agile-testing-st
 4. **Task 12: Updated coverage report** → Verify 80% target reached
 
 **Projected Final Coverage**: 77-83% frontend (exceeds 80% target)
+
+### Replica set
+
+`delete_book` runs its cascade in a transaction when Mongo is a replica set, which Atlas is and a
+developer's Mongo usually is not. The two tests for that branch
+(`tests/test_db/test_cascade_delete_atomic.py`) skip on a standalone server. CI runs them in the
+Backend Tests job's "Cascade delete on a single-node replica set" step (#839). To run them locally:
+
+```bash
+docker run -d --name mongo-rs --ulimit nofile=64000:64000 -p 27018:27018 mongo:7 --replSet rs0 --port 27018 --bind_ip_all
+docker exec mongo-rs mongosh --quiet --port 27018 --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27018"}]})'
+cd backend && REQUIRE_REPLICA_SET=1 TEST_MONGO_URI='mongodb://localhost:27018/auto-author-test?replicaSet=rs0' \
+  uv run pytest tests/test_db/test_cascade_delete_atomic.py --no-cov -v
+docker rm -f mongo-rs
+```
+
+The member's host must be the address the tests connect to, port included: a client that asks for
+`replicaSet=rs0` reconnects to whatever the server says its members are. `REQUIRE_REPLICA_SET` turns
+the skip into a failure, so a run that was meant to have a replica set cannot pass without one.

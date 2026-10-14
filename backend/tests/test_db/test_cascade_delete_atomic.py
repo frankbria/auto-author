@@ -7,15 +7,19 @@ transaction when a replica set is available; otherwise children are deleted
 first and the book document last so a partial failure leaves the book
 discoverable rather than orphaned.
 
-Test Mongo is single-node, so these exercise the non-transactional path. The
-failure test therefore asserts *containment* (book survives, error logged);
-true rollback requires a replica set.
+A developer's Mongo is usually standalone, so most of these exercise the
+non-transactional path, and the failure test asserts *containment* (book
+survives, error logged). The transaction branch is the one Atlas runs, and
+the tests at the end are for it: they need a replica set, which CI's
+"Backend Tests (replica set)" job provides (#839). On a standalone server they
+are skipped, unless ``REQUIRE_REPLICA_SET`` is set, in which case they fail.
 
 Account deletion (``delete_all_user_books``) runs the same cascade once for the
 whole account, never in a transaction: one command per collection however many
 books there are (#786).
 """
 
+import os
 from collections import Counter
 
 import motor.motor_asyncio
@@ -312,3 +316,66 @@ async def test_delete_book_failure_is_contained_and_logged(
     assert any(
         "Cascade delete failed" in r.message for r in caplog.records
     ), "expected an error log for the failed cascade"
+
+
+def test_the_cascade_uses_the_test_runs_own_client(motor_reinit_db):
+    """``book.py`` binds ``_client`` when it is imported. Left at that, it is a
+    client from another event loop: the replica-set probe raises on it, the
+    error is swallowed, and the cascade quietly takes the path without a
+    transaction, on a replica set too (#839)."""
+    assert book_dao._client is base._client
+
+
+@pytest.fixture
+async def replica_set(motor_reinit_db):
+    """Skip on a standalone server. A run that says it has a replica set and has not is a failure."""
+    if (await base._client.admin.command("hello")).get("setName") is None:
+        if os.environ.get("REQUIRE_REPLICA_SET"):
+            pytest.fail("REQUIRE_REPLICA_SET is set, and the test database is not a replica set")
+        pytest.skip("needs a replica set: transactions do not exist on a standalone server")
+
+
+@pytest.fixture
+def cascade_sessions(monkeypatch):
+    """What ``delete_book`` hands the cascade as its session, and whether a transaction was open then."""
+    seen = []
+    real = book_dao._delete_books_internal
+
+    async def watched(book_ids, user_auth_id, session):
+        seen.append((session, session is not None and session.in_transaction))
+        return await real(book_ids, user_auth_id, session)
+
+    monkeypatch.setattr(book_dao, "_delete_books_internal", watched)
+    return seen
+
+
+@pytest.mark.asyncio
+async def test_on_a_replica_set_the_cascade_runs_in_a_transaction(replica_set, cascade_sessions):
+    owner = "owner-rs-1"
+    book_id = await _seed_book_with_children(owner)
+
+    assert await delete_book(book_id, owner) is True
+
+    [(session, in_transaction)] = cascade_sessions
+    assert session is not None
+    assert in_transaction is True
+    for name in ("books", "questions", "question_responses", "question_ratings", "chapter_access_logs"):
+        assert await (await get_collection(name)).count_documents({}) == 0, name
+
+
+@pytest.mark.asyncio
+async def test_on_a_replica_set_a_failure_puts_back_what_was_already_deleted(
+    replica_set, cascade_sessions, monkeypatch
+):
+    """The access logs are deleted before the step that fails. Without a
+    transaction they stay deleted; with one, the failure undoes them."""
+    owner = "owner-rs-2"
+    book_id = await _seed_book_with_children(owner)
+    _fail_response_deletes(monkeypatch)
+
+    with pytest.raises(RuntimeError, match="simulated mongo failure"):
+        await delete_book(book_id, owner)
+
+    assert [session is not None for session, _ in cascade_sessions] == [True]
+    for name in ("books", "questions", "question_responses", "question_ratings", "chapter_access_logs"):
+        assert await (await get_collection(name)).count_documents({}) == 1, name
