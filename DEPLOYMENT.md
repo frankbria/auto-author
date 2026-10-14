@@ -1,10 +1,10 @@
 # Deployment and Development Setup
 
-**Stack**: Next.js (frontend) + FastAPI (backend) + MongoDB, authenticated with better-auth, deployed to a shared VPS under PM2 behind nginx.
+**Stack**: Next.js (frontend) + FastAPI (backend) + MongoDB, authenticated with better-auth, deployed to a shared VPS as Docker containers behind nginx.
 
-> The authoritative description of a deploy is `.github/workflows/deploy-staging.yml`.
+> The authoritative description of a deploy is `.github/workflows/deploy-staging-containers.yml`.
 > If this document and that workflow ever disagree, the workflow is right — fix this file.
-> GitHub Secrets required by the workflow are documented in [`.github/DEPLOYMENT.md`](.github/DEPLOYMENT.md).
+> Secrets, variables and the box `.env` keys are documented in [`.github/DEPLOYMENT.md`](.github/DEPLOYMENT.md).
 
 ---
 
@@ -13,7 +13,7 @@
 | Stage | Where | How it is deployed |
 |-------|-------|--------------------|
 | **Local development** | Your machine | `npm run dev` + `uvicorn --reload` (below) |
-| **Staging** | https://dev.autoauthor.app (API: https://api.dev.autoauthor.app) | `deploy-staging.yml`, automatically after "Tests and Quality Checks" passes on `main` |
+| **Staging** | https://dev.autoauthor.app (API: https://api.dev.autoauthor.app) | `deploy-staging-containers.yml`, dispatched with an image tag (below) |
 | **Production** | Not yet provisioned | — |
 
 Staging runs on a **shared VPS** — other applications live on the same box. The
@@ -24,13 +24,12 @@ current truth before assuming a port is free.
 
 ## 🚀 Prerequisites
 
-- **Node.js**: 20.x (CI tests on 20; the deploy workflow currently builds on 18)
+- **Node.js**: 24.x (`frontend/package.json` `engines`, CI and the image all use 24)
 - **Python**: 3.13 or higher (`backend/pyproject.toml` sets `requires-python = ">=3.13"`)
 - **uv**: Python package manager — `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - **MongoDB**: 7.x locally, or a MongoDB Atlas cluster for staging/production
 
-There is no PostgreSQL, no Docker image, and no Alembic migration chain in this
-project. MongoDB collections and indexes are created by the application at
+There is no PostgreSQL and no Alembic migration chain in this project. MongoDB collections and indexes are created by the application at
 startup.
 
 ---
@@ -167,58 +166,42 @@ likewise deliberately *not* `NEXT_PUBLIC_`.
 
 ## 🚢 Deploying to Staging
 
-Deploys are automated. `.github/workflows/deploy-staging.yml` runs when the
-"Tests and Quality Checks" workflow succeeds on `main`, or on manual
-`workflow_dispatch`. Deploys are serialized (`concurrency: deploy-staging`) so
-two merges a minute apart cannot overlap SSH bursts on the shared box.
+Staging runs two containers (backend on `127.0.0.1:8000`, frontend on
+`127.0.0.1:3002`) from images built in CI; nothing is built on the box.
 
-What the workflow does, in order:
+1. A merge to `main` that touches `backend/`, `frontend/` or a compose file runs
+   `build-images.yml`, which smoke-tests, scans and publishes
+   `ghcr.io/frankbria/auto-author-backend:sha-<short>` and the frontend's
+   `sha-<short>-staging`. The tag **is** the release id.
+2. Deploy that tag:
 
-1. Checks out **the exact commit that passed tests** (`workflow_run.head_sha`), not current `main`.
-2. Builds the frontend on the runner to fail fast on build errors.
-3. `rsync` + `tar` a deployment package and `scp` it to the server (retried 3× — the host's fail2ban is aggressive).
-4. Refuses to continue if `BYPASS_AUTH` is set to `true` in the deployment environment.
-5. Over SSH, on the server:
-   - unpacks into `/opt/auto-author/releases/<timestamp>/`
-   - `uv venv && uv sync` for the backend
-   - writes `backend/.env` and `frontend/.env.production` from GitHub Secrets
-   - `npm ci --include=dev && npm run build` (dev deps are needed — `next build` loads `next.config.ts` via typescript)
-   - flips `/opt/auto-author/current` to the new release **atomically** (`ln -snf` + `mv -Tf`)
-   - renders `ecosystem.config.template.js` → `ecosystem.config.js` and restarts both PM2 apps
-   - health-checks `localhost:8000/api/v1/health` and `localhost:3002` with retries
-   - prunes all but the 5 most recent releases
-6. Re-checks health, CORS headers, and `/docs` from outside.
+   ```bash
+   gh workflow run deploy-staging-containers.yml -f image_tag=sha-<short>
+   ```
 
-### Manual re-deploy
+   The workflow joins Tailscale, copies the compose files to `/opt/auto-author`,
+   pulls the images, runs `docker compose up -d` with `IMAGE_TAG` and
+   `ENVIRONMENT=staging`, and waits for both containers to answer. Deploys are
+   serialized (`concurrency: deploy-staging`).
+3. A successful deploy triggers `e2e-staging-tests.yml`, with the specs from the
+   commit the deploy was dispatched from (after a rollback to an older tag, those
+   are newer than the build).
 
-```bash
-gh workflow run deploy-staging.yml
-```
+Application secrets come from `/opt/auto-author/.env` on the box. Only
+`sync-staging-env.yml` writes to it, and only the `MONGODB_URI` key; see
+[`.github/DEPLOYMENT.md`](.github/DEPLOYMENT.md).
 
-Prefer this over hand-running commands on the server. There is intentionally no
-standalone deploy script in `scripts/` — the workflow is the single deploy path,
-and a second one drifts (the previous `scripts/deploy.sh` and
-`deploy-fixed.sh` were removed for exactly this reason: they still configured
-Clerk, long after the migration to better-auth).
+### Rolling back
 
-### On the server
+Dispatch the deploy with the previous tag:
 
 ```bash
-pm2 list
-pm2 logs auto-author-backend --lines 50
-pm2 logs auto-author-frontend --lines 50
-
-readlink -f /opt/auto-author/current    # which release is live
-ls -t /opt/auto-author/releases          # available releases
+gh workflow run deploy-staging-containers.yml -f image_tag=sha-<previous>
 ```
 
-To roll back, point the symlink at a previous release and restart PM2:
-
-```bash
-ln -snf /opt/auto-author/releases/<previous> /opt/auto-author/current.tmp
-mv -Tf /opt/auto-author/current.tmp /opt/auto-author/current
-cd /opt/auto-author/current && pm2 restart ecosystem.config.js
-```
+The workflow pulls the tag from GHCR, and its prune (after a healthy deploy)
+removes only untagged images older than 14 days. Running compose by hand on the box, and its caveats, are in
+`docs/STAGING-DEPLOYMENT.md` → Rolling back.
 
 ---
 
@@ -226,14 +209,14 @@ cd /opt/auto-author/current && pm2 restart ecosystem.config.js
 
 ### Backend will not start
 
-- **`BETTER_AUTH_SECRET` missing or weak** — production rejects default/short values at startup by design; check `pm2 logs auto-author-backend`. In staging the same condition does *not* raise, so a backend that starts fine may still be running on the repo's CI default — confirm the value was actually written (see `.github/DEPLOYMENT.md` for a check that does not print it).
-- **MongoDB unreachable** — verify `DATABASE_URL`; for Atlas confirm the server's IP is on the cluster allowlist.
+- **`BETTER_AUTH_SECRET` missing or weak** — deployed environments reject the repo's default and short values at startup by design; check the backend container's logs (`docker compose … logs backend`, see `docs/STAGING-DEPLOYMENT.md`). To confirm the box has the key without printing it, see `.github/DEPLOYMENT.md`.
+- **MongoDB unreachable** — verify `MONGODB_URI`; for Atlas confirm the server's IP is on the cluster allowlist.
 - **`ModuleNotFoundError`** — the venv is stale or was built from something other than the lockfile. Rebuild: `cd backend && uv sync`.
 
 ### CORS errors
 
-`BACKEND_CORS_ORIGINS` accepts a plain comma-separated list or a JSON array. The
-deploy workflow writes it **comma-separated on purpose**: a quoted JSON array
+`BACKEND_CORS_ORIGINS` accepts a plain comma-separated list or a JSON array.
+Write it **comma-separated** in the box `.env`: a quoted JSON array
 gets its quotes mangled by the dotenv reader into invalid JSON, which crashes
 `Settings()` at startup. Verify with:
 
@@ -246,7 +229,7 @@ curl -s -D - -o /dev/null -X OPTIONS https://api.dev.autoauthor.app/api/v1/books
 ### Frontend build fails with "Cannot find module 'typescript'"
 
 `NODE_ENV=production` makes `npm ci` skip devDependencies. Install with
-`npm ci --include=dev`, as the workflow does.
+`npm ci --include=dev`, as the image build does.
 
 ### Port already in use
 
@@ -255,14 +238,11 @@ process on 3002 is not necessarily ours:
 
 ```bash
 lsof -i:3002 -sTCP:LISTEN        # who holds it — command, PID, user
-pm2 list                          # is it one of our PM2 apps?
+docker ps --format '{{.Names}} {{.Ports}}'   # is it one of our containers?
 ```
 
-If it is our app, restart it through PM2 rather than signalling the PID:
-
-```bash
-pm2 restart auto-author-frontend
-```
+If it is our container, restart it through compose (in `/opt/auto-author`, with
+`IMAGE_TAG` and `ENVIRONMENT` exported) rather than signalling the PID.
 
 If it belongs to something else, leave it alone and pick a different port —
 never blanket-kill by port number on a shared host.
@@ -297,7 +277,7 @@ adding it to `security-baseline.json` with a stated reason.
 
 ## 📚 Additional Resources
 
-- **GitHub Secrets required for deploys**: [`.github/DEPLOYMENT.md`](.github/DEPLOYMENT.md)
+- **Secrets, variables and box `.env` keys**: [`.github/DEPLOYMENT.md`](.github/DEPLOYMENT.md)
 - **API documentation**: `/docs` on the running backend
 - **Development guidelines**: `CLAUDE.md`
 - **Quality gates & PR checklist**: `docs/references/quality-standards.md`
