@@ -6,6 +6,8 @@ import { useSession } from '@/lib/auth-client';
 import bookClient from '@/lib/api/bookClient';
 import { toast } from '@/lib/toast';
 import { downloadBlob as saveBlob, filenameStem } from '@/components/export/exportHelpers';
+import { ExportFormatPicker } from '@/components/export/ExportFormatPicker';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BookProject } from '@/components/BookCard';
 import { LoadingStateManager } from '@/components/loading';
 import { createProgressTracker } from '@/lib/loading';
@@ -33,6 +35,8 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
   const router = useRouter();
   const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [book, setBook] = useState<BookProject | null>(null);
   const [formats, setFormats] = useState<ExportFormat[]>([]);
   const [selectedFormat, setSelectedFormat] = useState<string>('');
@@ -100,13 +104,13 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
 
       } catch (error) {
         console.error('Error fetching book details:', error);
-        toast.error({ title: 'Failed to load export options. Please try again.' });
+        setLoadFailed(true);
       } finally {
         setIsLoading(false);
       }
     };
       fetchBookDetails();
-  }, [bookId, session]);
+  }, [bookId, session, loadAttempt]);
 
   const handleExport = async () => {
 
@@ -201,7 +205,24 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
         </button>
       </div>
 
-      {exportComplete ? (
+      {loadFailed ? (
+        <Alert variant="destructive">
+          <AlertTitle>We could not load the export options</AlertTitle>
+          <AlertDescription>
+            <p>Nothing has been exported. Check your connection and try again.</p>
+            <button
+              onClick={() => {
+                setLoadFailed(false);
+                setIsLoading(true);
+                setLoadAttempt(attempt => attempt + 1);
+              }}
+              className="mt-2 px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md"
+            >
+              Retry
+            </button>
+          </AlertDescription>
+        </Alert>
+      ) : exportComplete ? (
         // Export Complete View
         <div className="bg-muted border border-border rounded-lg p-8 text-center">
           <div className="w-16 h-16 mx-auto bg-green-50 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
@@ -241,30 +262,13 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
           {/* Export Format Selection */}
           <div className="lg:col-span-2">
             <div className="bg-muted border border-border rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold text-foreground mb-4">1. Choose Export Format</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {formats.map(format => (
-                  <div
-                    key={format.format}
-                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                      selectedFormat === format.format
-                        ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20'
-                        : 'border-border hover:bg-secondary/50'
-                    } ${!format.available ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onClick={() => format.available && setSelectedFormat(format.format)}
-                  >
-                    <div className="flex items-center mb-2">
-                      <span className="text-2xl mr-3">{format.icon}</span>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-foreground">{format.name}</h3>
-                        <p className="text-muted-foreground text-xs">{format.extension}</p>
-                      </div>
-                      <div className={`w-4 h-4 rounded-full ${selectedFormat === format.format ? 'bg-indigo-500' : 'bg-secondary'}`}></div>
-                    </div>
-                    <p className="text-muted-foreground text-sm">{format.description}</p>
-                  </div>
-                ))}
-              </div>
+              <h2 id="export-format-heading" className="text-xl font-semibold text-foreground mb-4">1. Choose Export Format</h2>
+              <ExportFormatPicker
+                formats={formats}
+                value={selectedFormat}
+                onChange={setSelectedFormat}
+                labelledBy="export-format-heading"
+              />
             </div>
 
             {/* Export Options */}
