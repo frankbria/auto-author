@@ -117,3 +117,24 @@ cd /home/frankbria/projects/worktrees/issue-835-nonfiction-question-fallbacks/ba
 ```output
 58 passed
 ```
+
+## Added in review: a focus that names a type twice
+
+The review pointed out that the API takes the focus as a list and does not remove duplicates, so a focus of plot and plot gave both slots the same plot question. Each type now counts the templates it has used. The file has 15 tests where the run above shows 13; these are the two that were added, and then all of it.
+
+```bash
+cd /home/frankbria/projects/worktrees/issue-835-nonfiction-question-fallbacks/backend && ENVIRONMENT=test TEST_MONGO_URI=mongodb://localhost:27017/auto-author-test-demo835 uv run pytest -p no:cacheprovider --no-cov tests/test_services/test_question_fallbacks_nonfiction.py -v -k named_twice 2>&1 | grep -E 'PASSED|FAILED' | sed -e 's/^tests.test_services.test_question_fallbacks_nonfiction.py:://' -e 's/ *\[ *[0-9]*%\]//'
+```
+
+```output
+TestTheTemplateQuestionsAreForNonFiction::test_a_type_named_twice_in_the_focus_does_not_get_the_same_question_twice[focus0] PASSED
+TestTheTemplateQuestionsAreForNonFiction::test_a_type_named_twice_in_the_focus_does_not_get_the_same_question_twice[focus1] PASSED
+```
+
+```bash
+cd /home/frankbria/projects/worktrees/issue-835-nonfiction-question-fallbacks/backend && ENVIRONMENT=test TEST_MONGO_URI=mongodb://localhost:27017/auto-author-test-demo835 uv run pytest -p no:cacheprovider --no-cov tests/test_services/test_question_fallbacks_nonfiction.py tests/test_services/test_question_generation_service.py tests/test_api/test_question_regeneration.py -q 2>&1 | tail -1 | sed -e 's/^=* //' -e 's/ =*$//' -e 's/, [0-9]* warnings//' -e 's/ in [0-9.]*s//'
+```
+
+```output
+73 passed
+```
