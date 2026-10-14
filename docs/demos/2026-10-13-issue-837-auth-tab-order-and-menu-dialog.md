@@ -195,3 +195,36 @@ cd /home/frankbria/projects/worktrees/issue-837-auth-tab-order-drawer-dialog/fro
 ```output
 Tests: 2 skipped, 78 passed, 80 total
 ```
+
+## Found in review: the menu when the window becomes desktop-wide
+
+The reviewer pointed out that the sheet is drawn in a portal, outside the `md:hidden` wrapper that hid the old drawer, so a menu left open would stay up, modal, over the desktop layout: a tablet turned on its side. Reproduced in the browser on the code as reviewed: at 1280 pixels the menu was still "showing, 256 pixels wide, over the page". The menu is now open only below the `md` breakpoint.
+
+The menu is opened at 390 pixels and the window widened to 1280. Main first, where the old drawer is hidden by its stylesheet; then this branch, where the sheet is taken off the page.
+
+```bash
+bash /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo837/resize.sh 3130 < /dev/null
+```
+
+```output
+390 pixels wide, Enter on the toggle: the menu is showing, 256 pixels wide, over the page
+1280 pixels wide: the menu is on the page but not showing; the desktop navigation is showing
+```
+
+```bash
+bash /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo837/resize.sh 3131 < /dev/null
+```
+
+```output
+390 pixels wide, Enter on the toggle: the menu is showing, 256 pixels wide, over the page
+1280 pixels wide: the menu is not on the page; the desktop navigation is showing
+```
+
+```bash
+cd /home/frankbria/projects/worktrees/issue-837-auth-tab-order-drawer-dialog/frontend && npx jest src/__tests__/AuthPagesKeyboard src/app/dashboard/__tests__/layout.mobileDrawer --coverage=false --json --outputFile=/tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo837/jest.json >/dev/null 2>&1; python3 /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo837/names.py /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo837/jest.json | grep -E 'desktop-wide|both new'
+```
+
+```output
+passed: the mobile menu with the keyboard (#837) is taken down when the window becomes desktop-wide, as when a tablet is turned
+both new files: 16 passed, 0 failed
+```
