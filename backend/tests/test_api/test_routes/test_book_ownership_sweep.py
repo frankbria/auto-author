@@ -51,7 +51,9 @@ REQUESTS: dict[tuple[str, str], dict] = {
     ("POST", "/analyze-summary"): {"json": {}},
     ("GET", "/summary"): {},
     ("PUT", "/summary"): {"json": {"summary": "A summary of somebody else's book, long enough to be one."}},
-    ("PATCH", "/summary"): {"json": {"summary": "A summary of somebody else's book, long enough to be one."}},
+    # With no summary in it, this route answers with the one the book has. Its write is tied to the
+    # owner in the database as well; this reading path has only the route's own check, so it is the one swept.
+    ("PATCH", "/summary"): {"json": {}},
     ("POST", "/generate-questions"): {"json": {}},
     ("GET", "/question-responses"): {},
     ("PUT", "/question-responses"): {"json": {"responses": [{"question": "Who is it for?", "answer": "Managers."}]}},

@@ -4,6 +4,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **Every route under a book refuses someone who does not own it (#840, P1.58)**:
+  - **Problem.** Whether a route checks whose book it is was tested route by route, by whoever wrote the route. `export/docx` and `export/formats` had no such test, and nothing would have noticed a new route that forgot the check.
+  - **Fix.** `tests/test_api/test_routes/test_book_ownership_sweep.py` reads the application's route table and holds one request for each of the 48 routes with `{book_id}` in its path. For each, another signed-in user sends a request the owner could have sent and must be answered 403 or 404, with the book's content as it was and the model not reached. The owner then sends the same request and must get through, so a refusal cannot be for a missing chapter or a bad body. Both users have real session cookies (#838). `test_every_book_route_is_in_the_sweep` fails, naming the route, when a route under a book has no request in the table, and when the table names a route that is gone.
+  - **What it found.** Nothing: all 48 routes refuse. No application code changes.
+  - **Found by a mutation.** With the route's own check taken out of `PATCH /summary`, the sweep still passed. The write is tied to the owner in the database as well, so the stranger was still refused. But with no summary in the body that route answers with the book's summary, and that path has only the route's check. The sweep now sends that request, and the mutation fails.
+  - **Limit.** One request per route. A route with two paths through it is swept on one of them.
+  - Demo: `docs/demos/2026-10-13-issue-840-book-ownership-sweep.md`.
+
 - **Routes are tested with real session cookies, and the stand-in for sign-in is strict (#838, P1.56)**:
   - **Problem.** Almost every backend route test replaces `get_current_user_from_session` with a stand-in from `tests/conftest.py`. The stand-in answered a missing or unknown cookie with the first user any client had been made for, so a test that forgot its cookie or sent the wrong one was quietly signed in. It answered with the dictionary the user was seeded from, so a change to the user in the database was never seen. And `_sync_sessions` pointed at `sessions`, a collection nothing writes (better-auth's is `session`).
   - **Found on the way.** There were two copies of the stand-in, one per client factory. The second declared `request=None` with no type, which FastAPI reads as a query parameter and never fills with the request. Under `async_client_factory` every client had always been the first user.

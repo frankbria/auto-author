@@ -1729,3 +1729,7 @@ The old drawer's close button was 44 by 44 pixels on a phone. The shared sheet's
 ### A stand-in for a dependency needs the dependency's types, and its own tests (#838)
 The test stand-in for the sign-in check was written twice. One copy declared `request: Request = None`, the other `request=None`. FastAPI fills a parameter with the request only when it is typed as one; untyped, it is a query parameter, always `None` here, and that copy's "no request" branch returned the first user. Every multi-user test on that factory had been one user, and passed.
 **Rule:** a stand-in that everything else is tested through gets tests of its own (two clients are two users; no cookie is nobody). And when a helper exists twice, diff the copies before trusting either.
+
+### One request per route sweeps one path through the route (#840)
+The ownership sweep sent `PATCH /summary` a new summary. With the route's ownership check removed it still passed, because the write is scoped to the owner in the database too. The same route, sent no summary, answers with the book's summary, and nothing but the route's check guards that. The sweep had been pointed at the path with two locks.
+**Rule:** when a mutation shows a second layer doing the refusing, look for the path through the same route that the second layer does not cover, and sweep that one. A table of one request per route is a table of one path per route; say so where the table is.
