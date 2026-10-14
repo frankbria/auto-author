@@ -133,35 +133,18 @@ uvicorn app.main:app --reload
 
 #### 4. Set Environment Variables
 
-Create `.env` files for both frontend and backend:
+Copy the two examples. Unchanged, they give a working local setup against MongoDB on `localhost:27017`:
 
-**`.env.local` (frontend)**
-
-```
-NEXT_PUBLIC_API_URL=http://localhost:8000
-# Must match the backend BETTER_AUTH_SECRET exactly
-BETTER_AUTH_SECRET=your-secure-secret-key-here-replace-with-generated-value
-NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
-# Development only - NEVER use in production
-# Requires E2E_ALLOW_BYPASS=1 alongside it in every environment (#272)
-# BYPASS_AUTH=true
-# E2E_ALLOW_BYPASS=1
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
 ```
 
-**`.env` (backend)**
-
-```
-MONGODB_URI=mongodb://localhost:27017/auto_author
-BETTER_AUTH_SECRET=your-secure-secret-key-here-replace-with-generated-value
-BETTER_AUTH_URL=http://localhost:3000
-OPENAI_API_KEY=sk-...
-AI_MAX_RETRIES=3
-# Development only - NEVER use in production
-# Backend: requires E2E_ALLOW_BYPASS=1 alongside it in every non-production
-# environment (#307); production stays hard-blocked regardless
-# BYPASS_AUTH=true
-# E2E_ALLOW_BYPASS=1
-```
+- The two `DATABASE_NAME` values must stay the same: the backend reads the sessions better-auth writes there.
+- The two `BETTER_AUTH_SECRET` values must stay the same. The example's value is refused in staging and production; generate one there with `python -c 'import secrets; print(secrets.token_urlsafe(64))'`.
+- `NEXT_PUBLIC_API_URL` includes `/api/v1`.
+- Set `OPENAI_API_KEY` in `backend/.env` for the AI features. Without email settings, the sign-up verification link is printed in the frontend's terminal.
+- `BYPASS_AUTH` stays off. Turning it on also needs `E2E_ALLOW_BYPASS=1` (#272, #307), and production refuses it.
 
 ---
 

@@ -141,7 +141,7 @@ Create `.env.test` files for test-specific configuration:
 
 ### Frontend (.env.test)
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=test_key
 NODE_ENV=test
 ```
