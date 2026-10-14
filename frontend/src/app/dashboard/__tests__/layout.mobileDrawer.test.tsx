@@ -114,6 +114,14 @@ describe('the mobile menu with the keyboard (#837)', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('keeps a 44-pixel touch area on its close button, as the old one had', async () => {
+    const { menu } = await openWithTheKeyboard();
+
+    // jsdom does no layout: the class is what can be seen here, and the demo measures it in a browser.
+    // A 16-pixel icon and 14 pixels on every side.
+    expect(within(menu).getByRole('button', { name: 'Close' }).className).toContain("max-md:before:inset-[-14px]");
+  });
+
   it('has no axe violations when open', async () => {
     await openWithTheKeyboard();
 
