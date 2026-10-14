@@ -1733,3 +1733,7 @@ The test stand-in for the sign-in check was written twice. One copy declared `re
 ### A run that stalls against a container: look at the container first (#839)
 The whole backend suite against a replica set in Docker stopped producing output. I waited on it, then on a second command that needed the same server, for forty minutes between them. The container had exited within a minute of the first run starting: mongod aborts on "Too many open files", and a container's default limit is low. Every later command was waiting on a server that was not there.
 **Rule:** when a test run against a container goes quiet, `docker ps -a` before anything else. Give a database container `--ulimit nofile=64000:64000`. And a wait loop for a result gets a bound and says what it was waiting for when it gives up.
+
+### One request per route sweeps one path through the route (#840)
+The ownership sweep sent `PATCH /summary` a new summary. With the route's ownership check removed it still passed, because the write is scoped to the owner in the database too. The same route, sent no summary, answers with the book's summary, and nothing but the route's check guards that. The sweep had been pointed at the path with two locks.
+**Rule:** when a mutation shows a second layer doing the refusing, look for the path through the same route that the second layer does not cover, and sweep that one. A table of one request per route is a table of one path per route; say so where the table is.
