@@ -82,10 +82,8 @@ frontend/src/
 │   └── errors/
 │       └── types.ts                    # Error type definitions
 ├── components/
-│   ├── errors/
-│   │   └── ErrorNotification.tsx       # UI components for error display
-│   └── examples/
-│       └── AIErrorHandlingExample.tsx  # Usage examples
+│   └── errors/
+│       └── ErrorNotification.tsx       # UI components for error display
 └── tests/
     └── e2e/
         └── ai-error-handling.spec.ts   # E2E tests
@@ -425,7 +423,7 @@ Always test:
 
 ## Examples
 
-See `frontend/src/components/examples/AIErrorHandlingExample.tsx` for complete working examples:
+The example component that showed these was imported by nothing and was removed (#842). The flows themselves are the examples:
 
 - TOC Questions Generation
 - Chapter Draft Generation
@@ -493,9 +491,8 @@ if (isFromCache(result)) {
 For issues or questions:
 
 1. Check E2E tests for usage examples
-2. Review example components in `frontend/src/components/examples/`
-3. See unit tests for detailed behavior documentation
-4. Contact the development team
+2. See unit tests for detailed behavior documentation
+3. Contact the development team
 
 ## Changelog
 

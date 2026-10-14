@@ -24,10 +24,20 @@ const customJestConfig = {
     '.spec.ts',                          // Exclude Playwright spec files
     'responsive.spec.ts',                // Exclude Playwright E2E specs
   ],
+  // Every source file counts, whether a test imports it or not (#842). Without
+  // this, coverage measured only the files the tests happened to load, and a
+  // file no test reached was not 0%: it was not there.
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/__tests__/**',
+    '!src/**/*.{test,spec}.{ts,tsx}',
+    '!src/__mocks__/**',
+    '!src/e2e/**',
+    '!src/jest.setup.ts',
+  ],
   // Keep test infrastructure out of the coverage denominator (#328): these are
-  // fixtures/mocks that support tests, not shippable product code, and only ever
-  // appeared in coverage because they get imported during the run. Excluding them
-  // does not force-collect any new file (unlike collectCoverageFrom).
+  // fixtures/mocks that support tests, not shippable product code.
   coveragePathIgnorePatterns: [
     '/node_modules/',
     '<rootDir>/src/__tests__/fixtures/',
