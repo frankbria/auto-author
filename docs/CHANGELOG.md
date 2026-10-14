@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **A database that cannot be asked is not a book that is not there (#849, P2.3)**:
+  - **Problem.** `get_book_by_id`, `get_book_owner_id`, `get_book_fields` and `get_book_metadata_by_id` caught every exception and returned `None`, the answer for a missing book. During a MongoDB outage every book route answered 404 "Book not found" for a book that was still stored, so the client stopped retrying and the user was told their book was gone.
+  - **Fix.** They catch only what a malformed id raises (`InvalidId`, `TypeError`). A database error reaches the route, which answers its fixed 500 message with no MongoDB text. The other half of the issue, session validation answering 401 on a MongoDB error, shipped in #1007 (`SessionStoreUnavailable`, 503, `tests/test_core/test_session_store_unavailable.py`).
+  - **Found in review.** No route in the first test called `get_book_owner_id`; `/chapters/tab-state` does now.
+  - **Tests.** `tests/test_api/test_db_errors_not_404.py` (9): eight routes covering all four lookups answer a server error when `find_one` raises pymongo's `ServerSelectionTimeoutError`, and a malformed id is still 400/404. Five mutations caught.
+  - Demo: `docs/demos/2026-10-14-issue-849-db-errors-not-404.md`, with a real outage from MongoDB's `failCommand` failpoint on a scratch `mongod`.
+
 - **A write that succeeded answers success when its log or audit row cannot be written (#847, P2.1)**:
   - **Problem.** Access logs and audit rows are written after the work they record. When one failed, the route answered 500 for a chapter or book that existed, and the client's retry made a second one; a generated draft, already paid for, was thrown away.
   - **Fix.** `ChapterAccessService.log_access` is best effort; saving the tab state writes through the strict `_insert`, because there the row is the saved state. Post-write audit rows go through `audit_after_commit` (`app/api/dependencies.py`, every caller in `books.py` and `users.py`) and `audit_after_write` (`app/db/audit_log.py`, the nine post-write calls in `app/db/book.py` and `app/db/user.py`): a failure is logged and goes through `report_failure`. Billing's consent row keeps the strict `audit_request`, since it is written before the checkout on purpose. The 422 half of the issue shipped in #800 and now has its test.
