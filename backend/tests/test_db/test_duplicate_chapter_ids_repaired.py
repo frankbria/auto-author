@@ -84,3 +84,16 @@ async def test_after_the_repair_one_save_changes_one_chapter(motor_reinit_db):
 
     first, second = await _chapters(book_id)
     assert (first["content"], second["content"]) == ("edited", "second draft")
+
+
+@pytest.mark.asyncio
+async def test_a_malformed_toc_does_not_stop_the_repair_of_other_books(motor_reinit_db):
+    """Found in review: an AI TOC is stored as it came, nulls and all."""
+    await _book([None, _chapter("dup", "A", "a"), _chapter("dup", "B", "b")])
+    await tx.books_collection.insert_one({"_id": ObjectId(), "owner_id": OWNER, "table_of_contents": {"chapters": {"0": "x"}}})
+    later = await _book([_chapter("dup", "C", "c"), _chapter("dup", "D", "d")])
+
+    assert await repair_duplicate_chapter_ids() == 2
+
+    first, second = await _chapters(later)
+    assert first["id"] == "dup" and second["id"] != "dup"
