@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **A database that cannot be asked is not a book that is not there (#849, P2.3)**:
+  - **Problem.** `get_book_by_id`, `get_book_owner_id`, `get_book_fields` and `get_book_metadata_by_id` caught every exception and returned `None`, the answer for a missing book. During a MongoDB outage every book route answered 404 "Book not found" for a book that was still stored, so the client stopped retrying and the user was told their book was gone.
+  - **Fix.** They catch only what a malformed id raises (`InvalidId`, `TypeError`). A database error reaches the route, which answers its fixed 500 message with no MongoDB text. The other half of the issue, session validation answering 401 on a MongoDB error, shipped in #1007 (`SessionStoreUnavailable`, 503, `tests/test_core/test_session_store_unavailable.py`).
+  - **Found in review.** No route in the first test called `get_book_owner_id`; `/chapters/tab-state` does now.
+  - **Tests.** `tests/test_api/test_db_errors_not_404.py` (9): eight routes covering all four lookups answer a server error when `find_one` raises pymongo's `ServerSelectionTimeoutError`, and a malformed id is still 400/404. Five mutations caught.
+  - Demo: `docs/demos/2026-10-14-issue-849-db-errors-not-404.md`, with a real outage from MongoDB's `failCommand` failpoint on a scratch `mongod`.
+
 - **PATCH changes what it is sent and nothing else (#848, P2.2)**:
   - **Preferences.** `update_user` wrote a preferences object whole, so a PATCH that sent one key reset every key it left out to its default, and `"preferences": null` stored a null. It now sets each sent key as `preferences.<key>` and ignores a null object. A null already stored is replaced with `{}` first: found in review, it made every later preferences write fail. PATCH `/users/me` and PUT `/users/{id}` both go through it.
   - **Books.** `BookUpdate.title` was required, and the PATCH route dropped every null, so a subtitle, description, genre or target audience could never be cleared. Title is optional now and PATCH keeps the nulls it is sent. Title, metadata and published always have a value: their `None` default is never validated, so leaving them out passes and an explicit null is a 422 (`main` answered 200 and ignored it). The frontend form sends `''`, never null.
