@@ -19,7 +19,8 @@ under `Settings` → `Environments` → `staging` for environment-scoped ones.
 > **The one exception is `MONGODB_URI`.** `sync-staging-env.yml` (manual
 > dispatch, #537) writes the `staging` environment secret `MONGODB_URI` into
 > that file in place, leaving a timestamped `.env.bak.*` beside it and every
-> other key untouched, then recreates the containers. Dispatching it with a
+> other key untouched, then (unless dispatched with `recreate=false`) recreates
+> the containers on the running tag. Dispatching it with a
 > stale secret puts the stale credential on the box.
 >
 > No other GitHub secret named after an application value is read by anything.
@@ -138,21 +139,24 @@ degraded — which is worse than a loud failure. Set them.
 > Next.js inlines those into the client bundle at build time, publishing the
 > secret to every visitor.
 
-`BYPASS_AUTH` is not something to set on the box: the backend refuses it outside
-`E2E_ALLOW_BYPASS=1` and hard-blocks it in production.
+`BYPASS_AUTH` is not something to set on the box: the backend ignores it unless
+`E2E_ALLOW_BYPASS=1` is also set, and refuses to start with it in production.
 
 ---
 
 ## Verification
 
-1. Merge to `main`: `build-images.yml` publishes `sha-<short>` images.
+1. Merge to `main`: a change under `backend/`, `frontend/` or a compose file runs
+   `build-images.yml`, which publishes `sha-<short>` images. A docs-only merge
+   publishes nothing.
 2. Dispatch the deploy with that tag:
    `gh workflow run deploy-staging-containers.yml -f image_tag=sha-<short>`.
 3. The workflow waits for both containers to answer locally; then check
    `https://api.dev.autoauthor.app/api/v1/health` and
    `https://dev.autoauthor.app/api/health` from outside.
-4. `e2e-staging-tests.yml` runs against the deployed commit after a successful
-   deploy; wait for it before calling the deploy done.
+4. `e2e-staging-tests.yml` runs after a successful deploy, with the specs from
+   the commit the deploy was dispatched from (normally the deployed build; not
+   after a rollback to an older tag). Wait for it before calling the deploy done.
 
 ---
 
@@ -166,8 +170,9 @@ degraded — which is worse than a loud failure. Set them.
 ### Backend health check fails
 
 - `BETTER_AUTH_SECRET` unset or weak — the app deliberately refuses to start.
-- MongoDB unreachable — `/api/v1/health` says `OperationFailure` for bad
-  credentials, `ServerSelectionTimeout` for the IP allowlist or the cluster.
+- MongoDB unreachable — `/api/v1/health` reports `mongodb: error: OperationFailure`
+  for bad credentials and `error: TimeoutError` when the IP allowlist or the
+  cluster blocks it (the ping is cut off after 5 seconds).
 - `docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=100 backend`
   in `/opt/auto-author` (export `IMAGE_TAG` and `ENVIRONMENT` first; see
   `docs/STAGING-DEPLOYMENT.md`).

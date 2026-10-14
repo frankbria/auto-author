@@ -1741,3 +1741,7 @@ The ownership sweep sent `PATCH /summary` a new summary. With the route's owners
 ### Un-skip a test in the whole suite, not on its own (#841)
 The workflow test had been skipped without an API key, and its docstring said it was fully mocked. Run alone after the skip came off, it passed. In the commit hook's full run it failed: drafting a chapter was not stubbed and went to the real provider, and something earlier in the suite changed what that call met. The stubs were method by method, and one method was missing.
 **Rule:** a test coming out of a skip runs in the full suite before it is called passing. And a stand-in for an outside service goes at the client, where every call passes, with named stubs on top; a list of methods leaves out the one added next.
+
+### A doc rewrite needs its claims checked against the code, one by one (#846)
+I rewrote the deploy docs from reading the workflows and wrote six sentences the code does not support, among them a health-check error name I had also carried in memory for two months. A fresh agent given each claim and the files to check them against found all six in one pass.
+**Rule:** after rewriting operator docs, hand the added lines to a fresh agent with file targets and correct what it cannot confirm before the PR. A sentence that names an error, a trigger or a cleanup step is a claim about code.

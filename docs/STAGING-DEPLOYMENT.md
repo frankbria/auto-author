@@ -69,7 +69,8 @@ compose files and runs `docker compose up`; the values come from that file.
 **One workflow writes one key of it:** `sync-staging-env.yml` (manual dispatch,
 #537) copies the `staging` environment secret `MONGODB_URI` into the file in
 place, keeps a timestamped `.env.bak.*` (the five newest), leaves every other
-key alone, and recreates the containers. Dispatching it with a stale secret
+key alone, and (unless dispatched with `recreate=false`) recreates the
+containers on the running tag. Dispatching it with a stale secret
 puts the stale credential on the box. Every other key is edited by hand.
 
 Compose asserts the required ones with `${VAR:?...}`, so a missing key fails the

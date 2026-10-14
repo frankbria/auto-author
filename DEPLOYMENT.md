@@ -169,7 +169,8 @@ likewise deliberately *not* `NEXT_PUBLIC_`.
 Staging runs two containers (backend on `127.0.0.1:8000`, frontend on
 `127.0.0.1:3002`) from images built in CI; nothing is built on the box.
 
-1. A merge to `main` runs `build-images.yml`, which smoke-tests, scans and publishes
+1. A merge to `main` that touches `backend/`, `frontend/` or a compose file runs
+   `build-images.yml`, which smoke-tests, scans and publishes
    `ghcr.io/frankbria/auto-author-backend:sha-<short>` and the frontend's
    `sha-<short>-staging`. The tag **is** the release id.
 2. Deploy that tag:
@@ -182,8 +183,9 @@ Staging runs two containers (backend on `127.0.0.1:8000`, frontend on
    pulls the images, runs `docker compose up -d` with `IMAGE_TAG` and
    `ENVIRONMENT=staging`, and waits for both containers to answer. Deploys are
    serialized (`concurrency: deploy-staging`).
-3. A successful deploy triggers `e2e-staging-tests.yml` against the deployed
-   commit.
+3. A successful deploy triggers `e2e-staging-tests.yml`, with the specs from the
+   commit the deploy was dispatched from (after a rollback to an older tag, those
+   are newer than the build).
 
 Application secrets come from `/opt/auto-author/.env` on the box. Only
 `sync-staging-env.yml` writes to it, and only the `MONGODB_URI` key; see
@@ -197,8 +199,8 @@ Dispatch the deploy with the previous tag:
 gh workflow run deploy-staging-containers.yml -f image_tag=sha-<previous>
 ```
 
-The workflow keeps recent images on the box so a rollback target is never
-pruned first. Running compose by hand on the box, and its caveats, are in
+The workflow pulls the tag from GHCR, and its prune (after a healthy deploy)
+removes only untagged images older than 14 days. Running compose by hand on the box, and its caveats, are in
 `docs/STAGING-DEPLOYMENT.md` → Rolling back.
 
 ---
