@@ -51,7 +51,7 @@ def test_no_audit_call_site_records_a_title():
             if not isinstance(node, ast.Call):
                 continue
             name = getattr(node.func, "id", getattr(node.func, "attr", None))
-            if name not in {"audit_request", "audit_after_commit", "create_audit_log"}:
+            if name not in {"audit_request", "audit_after_commit", "audit_after_write", "create_audit_log"}:
                 continue
             calls += 1
             for kw in node.keywords:

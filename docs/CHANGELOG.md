@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **A write that succeeded answers success when its log or audit row cannot be written (#847, P2.1)**:
+  - **Problem.** Access logs and audit rows are written after the work they record. When one failed, the route answered 500 for a chapter or book that existed, and the client's retry made a second one; a generated draft, already paid for, was thrown away.
+  - **Fix.** `ChapterAccessService.log_access` is best effort; saving the tab state writes through the strict `_insert`, because there the row is the saved state. Post-write audit rows go through `audit_after_commit` (`app/api/dependencies.py`, every caller in `books.py` and `users.py`) and `audit_after_write` (`app/db/audit_log.py`, the nine post-write calls in `app/db/book.py` and `app/db/user.py`): a failure is logged and goes through `report_failure`. Billing's consent row keeps the strict `audit_request`, since it is written before the checkout on purpose. The 422 half of the issue shipped in #800 and now has its test.
+  - **Found in review and demo.** The first cut guarded only the draft's audit; review listed the other routes. The demo then found that `create_book` writes its own audit row in the DB layer, which the test's stand-in never reached; the tests now fail the audit collection itself.
+  - **Tests.** `tests/test_api/test_post_commit_logs.py` (6): a chapter and a book are created once, a profile update and a draft succeed, the tab state still fails, and duplicate `tab_order` answers 422. The test stubs and the audit-title scan follow the new names. Five mutations caught.
+  - Demo: `docs/demos/2026-10-14-issue-847-post-commit-logs.md`.
+
 - **Stripe billing edges left after #768: per-subscription watermark, the write decides the current subscription, one payable checkout, paused (#912, P1.73)**:
   - **Watermark.** The out-of-order guard is now one timestamp per subscription (`stripe_event_created_by_subscription.<id>`): with one per user, a re-subscriber's first event, created a moment before the old subscription's deletion landed, was refused and they stayed on free until their next event. The pre-#912 per-user `stripe_event_created` still guards a subscription with no mark of its own and is no longer written.
   - **Current subscription.** The webhook's write now also requires the stored subscription id to be the one it read, or this event's own; two first events for different subscriptions no longer both pass. On a miss caused by another subscription it decides once more against what is stored, which reports the second as a second live subscription.
