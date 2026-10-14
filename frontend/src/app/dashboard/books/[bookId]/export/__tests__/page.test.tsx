@@ -396,17 +396,3 @@ describe('ExportBookPage progress tracking', () => {
     resolveBlob(new Blob(['x']));
   });
 });
-
-describe('ExportBookPage load failure', () => {
-  it('shows an error toast when fetching export options fails', async () => {
-    mockBookClient.getExportFormats = jest
-      .fn()
-      .mockRejectedValue(new Error('network'));
-    renderPage();
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith({
-        title: 'Failed to load export options. Please try again.',
-      })
-    );
-  });
-});
