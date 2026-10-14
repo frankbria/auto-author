@@ -153,7 +153,8 @@ jobs:
           REQUIRE_REPLICA_SET: '1'
           TEST_MONGO_URI: mongodb://localhost:27018/auto-author-test?replicaSet=rs0
         run: |
-          docker run -d --name mongo-rs -p 27018:27018 mongo:7 --replSet rs0 --port 27018 --bind_ip_all
+          # The file limit: a container's default is low, and mongod aborts when it runs out.
+          docker run -d --name mongo-rs --ulimit nofile=64000:64000 -p 27018:27018 mongo:7 --replSet rs0 --port 27018 --bind_ip_all
           shell() { docker exec mongo-rs mongosh --quiet --port 27018 --eval "$1"; }
           for _ in $(seq 1 30); do shell 'db.adminCommand({ping: 1}).ok' >/dev/null 2>&1 && break; sleep 1; done
           shell 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27018"}]}).ok'
