@@ -1,6 +1,6 @@
 # Staging Deployment Guide
 
-**Last Updated**: 2026-08-13
+**Last Updated**: 2026-10-14
 **Deploy path**: containers, live since 2026-08-12 (#484)
 
 Staging is https://dev.autoauthor.app (frontend) and https://api.dev.autoauthor.app
@@ -8,8 +8,8 @@ Staging is https://dev.autoauthor.app (frontend) and https://api.dev.autoauthor.
 live on the same box, so every step here is a check, not an assumption.
 
 > The PM2/rsync deploy this replaced (build-on-the-VPS, `releases/<id>` symlinked
-> to `current`) is retired. Its workflow is kept as `deploy-staging.yml.disabled`
-> for rollback; see [Falling back to PM2](#falling-back-to-pm2).
+> to `current`) is gone: its workflow and the PM2 template were deleted (#656,
+> #846). Roll back by deploying an older image tag; see [Rolling back](#rolling-back).
 
 ---
 
@@ -63,9 +63,14 @@ The box is shared, so only nginx may face the internet:
 
 ## The box `.env` is the source of truth
 
-`/opt/auto-author/.env` carries every application secret. **No workflow writes
-it.** The deploy ships compose files and runs `docker compose up`; the values
-come from that file.
+`/opt/auto-author/.env` carries every application secret. The deploy ships
+compose files and runs `docker compose up`; the values come from that file.
+
+**One workflow writes one key of it:** `sync-staging-env.yml` (manual dispatch,
+#537) copies the `staging` environment secret `MONGODB_URI` into the file in
+place, keeps a timestamped `.env.bak.*` (the five newest), leaves every other
+key alone, and recreates the containers. Dispatching it with a stale secret
+puts the stale credential on the box. Every other key is edited by hand.
 
 Compose asserts the required ones with `${VAR:?...}`, so a missing key fails the
 deploy with a named error instead of starting a container that dies at first
@@ -375,26 +380,6 @@ cd /opt/auto-author
 docker compose -f docker-compose.yml -f docker-compose.staging.yml logs --tail=100 backend
 docker compose -f docker-compose.yml -f docker-compose.staging.yml ps
 ```
-
----
-
-## Falling back to PM2
-
-The retired path still exists: `deploy-staging.yml.disabled` regenerates
-`/opt/auto-author/current/backend/.env` and `frontend/.env.production` **from
-GitHub secrets** on every run, and manages processes with PM2. To use it, stop
-the containers first (`docker compose … down`), then re-enable the workflow.
-
-Two differences that bite:
-
-- it writes the connection string under the key `DATABASE_URL`, not
-  `MONGODB_URI` — the backend accepts both, preferring `MONGODB_URI`;
-- its secret values are whatever is in GitHub, which may have drifted from the
-  box `.env` that the containers have been using.
-
-Remove this path (and the `MONGODB_URI` / `DATABASE_NAME` GitHub secrets, and the
-PM2 ecosystem template) once containers have run without a rollback long enough
-to trust — #427 AC 8.
 
 ---
 

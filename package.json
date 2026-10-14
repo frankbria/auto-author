@@ -2,7 +2,6 @@
   "name": "auto-author",
   "version": "1.0.0",
   "description": "**Auto Author** is an AI-powered application designed to help users write long-form non-fiction books. It streamlines the writing process by guiding users from concept to draft using a unique combination of interactive interviews, voice/text input, and generative AI.",
-  "main": "ecosystem.config.js",
   "directories": {
     "doc": "docs"
   },
