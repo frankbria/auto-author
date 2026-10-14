@@ -4,6 +4,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict
 
+from app.core.reporting import report_failure
+
 from .base import audit_logs_collection
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,16 @@ async def create_audit_log(
         log_data["expires_at"] = now + AUDIT_LOG_RETENTION
     await audit_logs_collection.insert_one(log_data, session=session)
     return log_data
+
+
+async def audit_after_write(**kwargs) -> None:
+    """create_audit_log for a write that has already landed (#847): a failed row
+    is logged and reported, never raised into a write that succeeded."""
+    try:
+        await create_audit_log(**kwargs)
+    except Exception as error:
+        logger.error("Could not audit %s", kwargs.get("action"), exc_info=True)
+        report_failure("audit", error)
 
 
 async def ensure_audit_log_indexes() -> None:

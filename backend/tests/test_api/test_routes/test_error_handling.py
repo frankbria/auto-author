@@ -80,7 +80,7 @@ async def test_error_handling_race_condition(
     async def noop_audit(*args, **kwargs):
         return None
 
-    monkeypatch.setattr(users_endpoint, "audit_request", noop_audit)
+    monkeypatch.setattr(users_endpoint, "audit_after_commit", noop_audit)
 
     # 4) path the DB lookup to simulate: 1st call OK, 2nd call "deleted"
     get_user_mock = MagicMock(side_effect=[test_user, None])

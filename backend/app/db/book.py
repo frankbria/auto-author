@@ -9,7 +9,7 @@ from bson.objectid import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Tuple
 from motor.motor_asyncio import AsyncIOMotorClientSession
-from .audit_log import create_audit_log
+from .audit_log import audit_after_write
 from app.models.book import BookDB
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
         )
 
         # Create audit log entry
-        await create_audit_log(
+        await audit_after_write(
             action="book_create",
             actor_id=user_auth_id,
             target_id=str(book_obj.id),
@@ -177,7 +177,7 @@ async def update_book(
 
     # Create audit log entry if book was found and updated
     if updated_book:
-        await create_audit_log(
+        await audit_after_write(
             action="book_update",
             actor_id=user_auth_id,
             target_id=book_id,
@@ -321,7 +321,7 @@ async def update_book_summary_atomic(
     )
 
     if updated_book:
-        await create_audit_log(
+        await audit_after_write(
             action="book_update",
             actor_id=user_auth_id,
             target_id=book_id,
@@ -393,7 +393,7 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
 
     await _delete_cover_files(book)
 
-    await create_audit_log(
+    await audit_after_write(
         action="book_delete",
         actor_id=user_auth_id,
         target_id=book_id,
@@ -431,7 +431,7 @@ async def delete_all_user_books(user_auth_id: str) -> int:
         await _delete_cover_files(book)
 
     # One row for the account, without the titles a per-book row would keep.
-    await create_audit_log(
+    await audit_after_write(
         action="delete_books",
         actor_id=user_auth_id,
         target_id=user_auth_id,

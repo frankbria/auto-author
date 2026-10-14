@@ -1,9 +1,14 @@
 """Chapter access logging service for analytics and tab persistence"""
 
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
+
+from app.core.reporting import report_failure
 from app.models.chapter_access import ChapterAccessLog
 from app.db.database import get_collection
+
+logger = logging.getLogger(__name__)
 
 
 class ChapterAccessService:
@@ -24,9 +29,29 @@ class ChapterAccessService:
         session_id: Optional[str] = None,
         tab_order: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Log chapter access for analytics and tab persistence"""
+    ) -> Optional[str]:
+        """Record a chapter access for analytics. Best effort (#847): it runs
+        after the work it records, and a failed log must not turn a created
+        chapter into a 500 that the client retries into a second one."""
+        try:
+            return await self._insert(
+                user_id, book_id, chapter_id, access_type, session_id, tab_order, metadata
+            )
+        except Exception as error:
+            logger.error("Could not record a %s access", access_type, exc_info=True)
+            report_failure("access-log", error)
+            return None
 
+    async def _insert(
+        self,
+        user_id: str,
+        book_id: str,
+        chapter_id: Optional[str],
+        access_type: str,
+        session_id: Optional[str],
+        tab_order: Optional[int],
+        metadata: Optional[Dict[str, Any]],
+    ) -> str:
         log_entry = ChapterAccessLog(
             user_id=user_id,
             book_id=book_id,
@@ -119,13 +144,9 @@ class ChapterAccessService:
             "tab_order": tab_order,
         }
 
-        return await self.log_access(
-            user_id=user_id,
-            book_id=book_id,
-            chapter_id=active_chapter_id,
-            access_type="tab_state",
-            session_id=session_id,
-            metadata=tab_state_metadata,
+        # Not log_access: here the row IS the saved state, so a failure must fail the save.
+        return await self._insert(
+            user_id, book_id, active_chapter_id, "tab_state", session_id, None, tab_state_metadata
         )
 
 

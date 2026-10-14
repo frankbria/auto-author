@@ -13,6 +13,7 @@ from app.db.usage import increment_usage, refund_usage
 from app.services.ai_service import model_call_attempted
 from app.core.config import settings, is_production_env
 from app.core.security import get_current_user_from_session
+from app.core.reporting import report_failure
 
 logger = logging.getLogger(__name__)
 
@@ -390,3 +391,15 @@ async def audit_request(
 
     # Return user payload
     return user_payload
+
+
+async def audit_after_commit(**kwargs) -> None:
+    """audit_request for a write that has already happened (#847). A failed audit
+    row is reported, not raised: a 500 would undo nothing, and the client's retry
+    makes a second book or throws away a paid AI result. A write that must not
+    happen without its audit row (billing's consent) calls audit_request first."""
+    try:
+        await audit_request(**kwargs)
+    except Exception as error:
+        logger.error("Could not audit %s", kwargs.get("action"), exc_info=True)
+        report_failure("audit", error)
