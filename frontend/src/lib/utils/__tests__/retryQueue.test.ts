@@ -136,6 +136,59 @@ describe('RetryQueue', () => {
     });
   });
 
+  describe('groups (#873)', () => {
+    // Resolves when the test says so, recording the order writes land in.
+    const deferred = () => {
+      let resolve!: () => void;
+      const promise = new Promise<void>(r => { resolve = r; });
+      return { promise, resolve };
+    };
+
+    it('drains one group in the order it was queued', async () => {
+      const landed: string[] = [];
+      const slow = deferred();
+      const first = jest.fn(async () => { await slow.promise; landed.push('draft'); });
+      const second = jest.fn(async () => { landed.push('completed'); });
+      queue.add('save-draft-q1', first, { group: 'q1' });
+      queue.add('complete-q1', second, { group: 'q1' });
+
+      const draining = queue.processQueue();
+      await Promise.resolve();
+      expect(second).not.toHaveBeenCalled();
+      slow.resolve();
+      await draining;
+
+      expect(landed).toEqual(['draft', 'completed']);
+      expect(queue.size()).toBe(0);
+    });
+
+    it('runs different groups in parallel', async () => {
+      const slow = deferred();
+      const a = jest.fn(() => slow.promise);
+      const b = jest.fn().mockResolvedValue(undefined);
+      queue.add('a', a, { group: 'q1' });
+      queue.add('b', b, { group: 'q2' });
+
+      const draining = queue.processQueue();
+      await Promise.resolve();
+      expect(b).toHaveBeenCalled();
+      slow.resolve();
+      await draining;
+    });
+
+    it('holds back the rest of a group while its head waits for a retry', async () => {
+      const head = jest.fn().mockRejectedValue(new Error('boom'));
+      const next = jest.fn().mockResolvedValue(undefined);
+      queue.add('head', head, { group: 'q1', maxRetries: 3 });
+      queue.add('next', next, { group: 'q1' });
+
+      await queue.processQueue();
+
+      expect(next).not.toHaveBeenCalled();
+      expect(queue.getQueuedOperations()).toEqual(['head', 'next']);
+    });
+  });
+
   describe('getQueuedOperations', () => {
     it('should return all queued operation IDs', () => {
       queue.add('test-1', jest.fn());

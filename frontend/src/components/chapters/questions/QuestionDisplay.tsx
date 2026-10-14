@@ -66,6 +66,9 @@ export default function QuestionDisplay({
   const lastSavedTextRef = useRef('');
   // State for response completion
   const [isCompleted, setIsCompleted] = useState(false);
+  // A completion waiting in the offline queue locks the answer as a completed
+  // one does, so no later draft can follow it and undo it (#873).
+  const [completionQueued, setCompletionQueued] = useState(false);
   // State for word count
   // Derived during render (#584). A pure function of `responseText`, so the
   // effect that mirrored it into state bought an extra render per keystroke
@@ -111,6 +114,7 @@ export default function QuestionDisplay({
       lastSavedTextRef.current = '';
       setResponseText('');
       setIsCompleted(false);
+      setCompletionQueued(false);
       setSaveStatus('idle');
       setSaveError('');
       setRating(0);
@@ -255,6 +259,7 @@ export default function QuestionDisplay({
           queueId,
           () => saveOperation(ResponseStatus.DRAFT),
           {
+            group: question.id,
             onSuccess: () => {
               setSaveStatus('saved');
               setSaveError('');
@@ -372,12 +377,15 @@ export default function QuestionDisplay({
         // Queue the save operation
         const queueId = `complete-${question.id}-${Date.now()}`;
         lastSavedTextRef.current = responseText;
+        setCompletionQueued(true);
         retryQueue.add(
           queueId,
           () => saveOperation(ResponseStatus.COMPLETED),
           {
+            group: question.id,
             onSuccess: () => {
               setIsCompleted(true);
+              setCompletionQueued(false);
               setSaveStatus('saved');
               setSaveError('');
               setLastAction(null); // Clear last action on queued success
@@ -385,6 +393,7 @@ export default function QuestionDisplay({
               setTimeout(() => setSaveStatus(prev => (prev === 'saved' ? 'idle' : prev)), 3000);
             },
             onError: (error) => {
+              setCompletionQueued(false);
               setSaveStatus('error');
               const errorType = classifyError(error);
               const errorMessage = errorType === ErrorType.NETWORK
@@ -534,7 +543,7 @@ export default function QuestionDisplay({
             onChange={handleResponseChange}
             placeholder="Type your response here or use voice input..."
             className="min-h-[200px] min-w-[44px]"
-            disabled={isSaving || isCompleted}
+            disabled={isSaving || isCompleted || completionQueued}
             aria-label="Your response to the question"
           />
 
@@ -635,7 +644,7 @@ export default function QuestionDisplay({
                   variant="outline"
                   size="sm"
                   onClick={handleSaveDraft}
-                  disabled={isSaving || !responseText.trim()}
+                  disabled={isSaving || completionQueued || !responseText.trim()}
                   className="min-h-[44px] min-w-[44px]"
                 >
                   Save Draft
@@ -645,7 +654,7 @@ export default function QuestionDisplay({
                   variant="default"
                   size="sm"
                   onClick={handleMarkCompleted}
-                  disabled={isSaving || !responseText.trim()}
+                  disabled={isSaving || completionQueued || !responseText.trim()}
                   className="min-h-[44px] min-w-[44px]"
                 >
                   Complete Response
