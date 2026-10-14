@@ -168,24 +168,6 @@ test.describe('Chapter Editor Tabs Navigation', () => {
     });
   });
 
-  test.describe('Tab Content', () => {
-    // AI-dependent: exercising a real answer textarea requires generated
-    // questions (generate-questions is an AI call), which CI cannot run without
-    // an OpenAI key. Tab-switching state preservation is otherwise covered by
-    // the persistence tests above. Tracked with the journey spec (needs AI).
-    test.skip('tab switching does not lose question progress', async ({ page }) => {
-      await openFirstChapter(page);
-
-      const textarea = page.getByPlaceholder(/response/i);
-      await textarea.fill('Test response text');
-
-      await page.getByRole('tab', { name: /Chapter Editor/i }).click();
-      await page.getByRole('tab', { name: /Interview Questions/i }).click();
-
-      await expect(textarea).toHaveValue('Test response text');
-    });
-  });
-
   test.describe('Accessibility', () => {
     test('tabs have proper ARIA attributes', async ({ page }) => {
       await openFirstChapter(page);

@@ -176,10 +176,6 @@ describe('Component Accessibility Audit - Phase 1', () => {
       expect(results).toHaveNoViolations();
     });
 
-    it.skip('should pass accessibility scan for TipTap Editor', async () => {
-      // TODO: Import editor component - requires complex TipTap setup
-      // Skipping for now as TipTap editor has extensive dependencies
-    });
   });
 
   describe('4.4 Form Components', () => {
@@ -196,12 +192,6 @@ describe('Component Accessibility Audit - Phase 1', () => {
 
       const results = await axe(container);
       expect(results).toHaveNoViolations();
-    });
-  });
-
-  describe('4.5 Modal & Dialog Components', () => {
-    it.skip('should pass accessibility scan for generic modal pattern', async () => {
-      // TODO: Test Radix UI Dialog usage
     });
   });
 

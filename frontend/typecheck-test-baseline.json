@@ -10,7 +10,7 @@
       "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2345 ×18 — argument type mismatch — usually a partial fixture passed where the full shape is required."
     },
     "src/__tests__/ChapterQuestionsPerformance.test.tsx": {
-      "errors": 17,
+      "errors": 15,
       "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2339 ×13 — property does not exist on the type — a fixture or mock narrower than the real object."
     },
     "src/components/chapters/__tests__/ChapterEditor.localStorage.test.tsx": {

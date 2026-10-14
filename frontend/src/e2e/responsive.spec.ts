@@ -40,27 +40,6 @@ async function getElementSize(page: Page, selector: string) {
 }
 
 /**
- * Helper: Check if element meets touch target requirements
- */
-async function validateTouchTarget(page: Page, selector: string, name: string) {
-  const box = await getElementSize(page, selector);
-
-  if (!box) {
-    throw new Error(`Element not found or not visible: ${selector}`);
-  }
-
-  expect(box.width, `${name} width should be at least ${TOUCH_TARGET_MIN_SIZE}px`).toBeGreaterThanOrEqual(
-    TOUCH_TARGET_MIN_SIZE
-  );
-
-  expect(box.height, `${name} height should be at least ${TOUCH_TARGET_MIN_SIZE}px`).toBeGreaterThanOrEqual(
-    TOUCH_TARGET_MIN_SIZE
-  );
-
-  return box;
-}
-
-/**
  * Helper: Navigate to test page and wait for load
  */
 async function navigateToPage(page: Page, path: string) {
@@ -131,67 +110,6 @@ test.describe('Responsive Design - Touch Targets', () => {
     });
   });
 
-  test.describe('Chapter Tab Touch Targets', () => {
-    test.skip('should have adequate close button size on desktop', async ({ page }) => {
-      // Skip if chapter page requires specific book/chapter setup
-      await page.setViewportSize(VIEWPORTS.desktop);
-      await navigateToPage(page, '/dashboard/books/test-book/chapters/test-chapter');
-
-      const closeButton = page.locator('[aria-label="Close chapter"]').or(page.locator('[aria-label="Close"]'));
-
-      if ((await closeButton.count()) > 0) {
-        await validateTouchTarget(
-          page,
-          '[aria-label="Close chapter"]',
-          'Chapter tab close button'
-        );
-      }
-    });
-  });
-
-  test.describe('Modal Touch Targets', () => {
-    test.skip('should have adequate close button size in dialogs', async ({ page }) => {
-      // Skip if modal requires specific trigger
-      await page.setViewportSize(VIEWPORTS.mobile);
-      await navigateToPage(page, '/dashboard');
-
-      // Trigger a modal (example: delete book modal)
-      // const deleteButton = page.locator('[aria-label="Delete book"]').first();
-      // if (await deleteButton.isVisible()) {
-      //   await deleteButton.click();
-      //   await page.waitForSelector('[role="dialog"]');
-
-      //   const dialogCloseButton = page.locator('[role="dialog"] button[aria-label*="Close"]');
-      //   await validateTouchTarget(page, dialogCloseButton, 'Dialog close button');
-      // }
-    });
-  });
-
-  test.describe('Editor Toolbar Touch Targets', () => {
-    test.skip('should have adequate button sizes in editor toolbar', async ({ page }) => {
-      // Skip if editor requires specific chapter setup
-      await page.setViewportSize(VIEWPORTS.mobile);
-      await navigateToPage(page, '/dashboard/books/test-book/chapters/test-chapter');
-
-      // Wait for editor to load
-      await page.waitForSelector('.ProseMirror', { timeout: 5000 });
-
-      const toolbarButtons = page.locator('[data-testid="editor-toolbar"] button');
-      const count = await toolbarButtons.count();
-
-      expect(count, 'Editor toolbar should have buttons').toBeGreaterThan(0);
-
-      for (let i = 0; i < count; i++) {
-        const button = toolbarButtons.nth(i);
-        const box = await button.boundingBox();
-
-        if (box) {
-          expect(box.width, `Toolbar button ${i + 1} width`).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_SIZE);
-          expect(box.height, `Toolbar button ${i + 1} height`).toBeGreaterThanOrEqual(TOUCH_TARGET_MIN_SIZE);
-        }
-      }
-    });
-  });
 });
 
 test.describe('Responsive Design - Layout Adaptation', () => {
@@ -259,27 +177,6 @@ test.describe('Responsive Design - Layout Adaptation', () => {
       });
     });
   }
-});
-
-test.describe('Responsive Design - Mobile Specific', () => {
-  test('should show mobile chapter navigation on small viewports', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.mobile);
-    // Test would require navigating to a chapter page
-    // Skipped for now - implement when chapter pages are set up
-    test.skip();
-  });
-
-  test('should hide desktop chapter tabs on mobile', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.mobile);
-    // Test would require navigating to a chapter page
-    test.skip();
-  });
-
-  test('should show desktop chapter tabs on large viewports', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.desktop);
-    // Test would require navigating to a chapter page
-    test.skip();
-  });
 });
 
 test.describe('Responsive Design - Breakpoint Transitions', () => {

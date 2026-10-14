@@ -404,61 +404,6 @@ describe('Chapter Questions Performance Tests', () => {
       console.log(`Average navigation time: ${averageTime}ms`);
     });
 
-    test.skip('real-time auto-save performance', async () => {
-      // SKIPPED: This performance test is too flaky for CI (timing varies 57% across runs)
-      // Performance monitoring should be done with dedicated APM tools, not unit tests
-      // Observed timings: 6055ms, 9479ms, 9864ms - highly dependent on CI environment load
-      (bookClient.saveQuestionResponse as jest.Mock).mockImplementation(
-        () => new Promise((resolve) => {
-          setTimeout(() => resolve({ success: true }), 50);
-        })
-      );
-
-      const { rerender } = render(
-        <TestWrapper>
-          <QuestionDisplay
-            bookId="test-book"
-            chapterId="test-chapter"
-            question={{
-              id: 'test-question',
-              chapter_id: 'test-chapter',
-              question_text: 'Test question for auto-save',
-              question_type: QuestionType.CONTENT,
-              difficulty: QuestionDifficulty.MEDIUM,
-              category: 'test',
-              order: 1,
-              generated_at: new Date().toISOString(),
-              metadata: {},
-              has_response: false
-            }}
-            onResponseSaved={jest.fn()}
-            onRegenerateQuestion={jest.fn()}
-          />
-        </TestWrapper>
-      );
-
-      const textarea = screen.getByRole('textbox');
-
-      // Simulate rapid typing
-      const longText = 'This is a performance test for auto-save functionality. '.repeat(10);
-
-      performanceMonitor.start();
-
-      await userEvent.type(textarea, longText);
-
-      // Wait for auto-save debounce
-      await waitFor(() => {
-        expect(bookClient.saveQuestionResponse).toHaveBeenCalled();
-      }, { timeout: 5000 });
-
-      const performance = performanceMonitor.end();
-
-      // Auto-save should not significantly impact typing performance
-      // Note: In test environments, this includes debounce time (3s) + typing simulation
-      // Allow 8 seconds to account for test environment overhead and CI variability
-      // Test ensures auto-save doesn't take excessively long, not precise timing
-      expect(performance.duration).toBeLessThan(8000);
-    }, 10000);
   });
 
   describe('Memory Management Tests', () => {
