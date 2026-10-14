@@ -5,6 +5,7 @@ import logging
 from app.core.reporting import report_failure
 
 from .base import books_collection, users_collection, _client, get_collection
+from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Tuple
@@ -74,7 +75,7 @@ async def get_book_by_id(book_id: str) -> Optional[Dict]:
     try:
         book = await books_collection.find_one({"_id": ObjectId(book_id)})
         return book
-    except Exception:
+    except (InvalidId, TypeError):  # a malformed id names no book; a DB error is not that (#849)
         return None
 
 
@@ -91,7 +92,7 @@ async def get_book_owner_id(book_id: str) -> Optional[str]:
             {"_id": ObjectId(book_id)}, {"owner_id": 1}
         )
         return book.get("owner_id") if book else None
-    except Exception:
+    except (InvalidId, TypeError):  # a malformed id names no book; a DB error is not that (#849)
         return None
 
 
@@ -107,7 +108,7 @@ async def get_book_fields(book_id: str, *fields: str) -> Optional[Dict]:
         return await books_collection.find_one(
             {"_id": ObjectId(book_id)}, {field: 1 for field in fields}
         )
-    except Exception:
+    except (InvalidId, TypeError):  # a malformed id names no book; a DB error is not that (#849)
         return None
 
 
@@ -122,7 +123,7 @@ async def get_book_metadata_by_id(book_id: str) -> Optional[Dict]:
             {"_id": ObjectId(book_id)}, CONTENT_EXCLUDING_PROJECTION
         )
         return book
-    except Exception:
+    except (InvalidId, TypeError):  # a malformed id names no book; a DB error is not that (#849)
         return None
 
 
