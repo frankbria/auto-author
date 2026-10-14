@@ -25,14 +25,14 @@ jest.mock('@/components/ui/use-toast', () => ({
 
 const question: Question = {
   id: 'question-1',
-  book_id: 'book-1',
   chapter_id: 'chapter-1',
   question_type: QuestionType.CHARACTER,
   difficulty: QuestionDifficulty.MEDIUM,
+  category: 'audience',
+  order: 1,
   question_text: 'Who is this book for?',
   metadata: { help_text: '', examples: [], suggested_response_length: '' },
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
+  generated_at: new Date().toISOString(),
 };
 
 // What the server holds: the last write to land wins.
