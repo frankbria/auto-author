@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **The first save of a book's TOC is guarded like every later one (#871, P1.65)**:
+  - **Problem.** For a book with no TOC, `GET /books/{id}/toc` said version 0 while `PUT` counted a missing version as 1, so sending 0 back made the first save a 409 and the Edit TOC page sent no `expected_version` on a first save. And `PUT` added its version filter to the write only when a TOC already existed. Two first saves, from two tabs or the wizard and Edit TOC, both landed, and the second silently replaced the first.
+  - **Fix.** `GET` reports 1 for a book with no TOC, as `PUT`, generate-toc's `base_version` and a TOC without a version all count it. `_update_toc_internal` always filters its write on the version it read, through the existing `_version_guard`, which matches a missing version on its absence. The Edit TOC page sends the version it read on every save. The wizard already did.
+  - **Tests.** `tests/test_db/test_first_toc_save_guarded.py` (3, real MongoDB): two first saves that both read before either writes end in one landing and one conflict; a second first save from the same read is a conflict; GET's version sent back to PUT lands. `test_not_generated_returns_empty_structure` now expects 1, and the Edit TOC test that pinned "no expected_version on a first save" is replaced by one that expects it. 3 mutations, all caught.
+  - Demo: `docs/demos/2026-10-13-issue-871-first-toc-save-guarded.md`.
+
 - **The env examples, copied unchanged, give a working local setup (#845, P1.63)**:
   - **Problem.** `backend/.env.example` set `DATABASE_NAME=auto_author_test` and the frontend's `auto_author`: better-auth wrote sessions to one database and the backend looked in the other, so every API call was 401. `frontend/.env.example` set `NEXT_PUBLIC_API_URL=http://localhost:8000`, without `/api/v1`, so every call the browser made was 404. The backend example used the legacy `DATABASE_URL` and `OPENAI_AUTOAUTHOR_API_KEY`, and with it as the compose `.env`, `docker compose config` failed on the `MONGODB_URI` and `OPENAI_API_KEY` it requires. The README's inline `.env` blocks set yet other values.
   - **Fix.** The backend example uses `MONGODB_URI` and `OPENAI_API_KEY` and `DATABASE_NAME=auto_author`; the frontend example's API address has `/api/v1`; each says the database name must match the other's. The README and `frontend/README.md` say to copy the two files, not to type values; `docs/testing/README.md`'s address gets the prefix.
