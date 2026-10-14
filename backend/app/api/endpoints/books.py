@@ -2623,29 +2623,34 @@ async def generate_chapter_draft(
                 detail=f"Failed to generate draft: {result.get('error', 'Unknown error')}"
             )
 
-        # Log the draft generation
-        await audit_request(
-            request=Request(
-                {
-                    "type": "http",
-                    "method": "POST",
-                    "url": f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-draft",
-                    "headers": {},
-                    "path": f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-draft"
+        # The draft is not stored here and the model call is paid for: a failed
+        # audit row is reported, and the draft still goes back (#847).
+        try:
+            await audit_request(
+                request=Request(
+                    {
+                        "type": "http",
+                        "method": "POST",
+                        "url": f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-draft",
+                        "headers": {},
+                        "path": f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-draft"
+                    }
+                ),
+                current_user=current_user,
+                action="generate_chapter_draft",
+                resource_type="chapter",
+                target_id=chapter_id,
+                metadata={
+                    "book_id": book_id,
+                    "question_count": len(question_responses),
+                    "target_length": target_length,
+                    "actual_length": result["metadata"].get("word_count", 0),
+                    "writing_style": writing_style or "default"
                 }
-            ),
-            current_user=current_user,
-            action="generate_chapter_draft",
-            resource_type="chapter",
-            target_id=chapter_id,
-            metadata={
-                "book_id": book_id,
-                "question_count": len(question_responses),
-                "target_length": target_length,
-                "actual_length": result["metadata"].get("word_count", 0),
-                "writing_style": writing_style or "default"
-            }
-        )
+            )
+        except Exception as error:
+            logger.error("Could not audit a generated draft", exc_info=True)
+            report_failure("audit-draft", error)
 
         return {
             "success": True,
