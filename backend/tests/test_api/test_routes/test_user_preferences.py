@@ -96,7 +96,6 @@ async def test_preferences_default_values(auth_client_factory):
     user_without_preferences = {
         "id": "user_123",
         "_id": "user_123",
-        "clerk_id": "clerk_user_123",
         "email": "test@example.com",
         "first_name": "Test",
         "last_name": "User",

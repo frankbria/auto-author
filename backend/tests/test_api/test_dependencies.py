@@ -5,36 +5,14 @@ Tests rate limiting, input sanitization, API keys, and better-auth integration.
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 from fastapi import HTTPException, Request
 
 import app.api.dependencies as deps
 from app.api.dependencies import (
     sanitize_input,
     audit_request,
-    get_database_collection,
-    SanitizedModel,
 )
-
-
-@pytest.mark.asyncio
-async def test_get_database_collection_delegates():
-    """get_database_collection forwards to the db layer's get_collection."""
-    with patch("app.api.dependencies.get_collection", AsyncMock(return_value="coll")) as mock_get:
-        result = await get_database_collection("books")
-    assert result == "coll"
-    mock_get.assert_awaited_once_with("books")
-
-
-class TestSanitizedModel:
-    def test_string_fields_are_sanitized_on_init(self):
-        class Demo(SanitizedModel):
-            name: str
-            count: int
-
-        demo = Demo(name="<b>Bob</b>  Smith", count=3)
-        assert demo.name == "Bob Smith"  # HTML stripped, whitespace collapsed
-        assert demo.count == 3  # non-string untouched
 
 
 class TestInputSanitization:
@@ -463,7 +441,7 @@ class TestAuditRequest:
     @patch("app.api.dependencies.create_audit_log")
     async def test_audit_request_with_no_request_object(self, mock_create_audit):
         """audit_request tolerates request=None (used in non-HTTP contexts)."""
-        current_user = {"clerk_id": "legacy_user", "email": "legacy@example.com"}
+        current_user = {"id": "legacy_user", "email": "legacy@example.com"}
 
         result = await audit_request(
             request=None,
@@ -472,7 +450,7 @@ class TestAuditRequest:
             resource_type="session",
         )
 
-        # Falls back to clerk_id and defaults target_id to "unknown"
+        # Falls back to id and defaults target_id to "unknown"
         assert result["sub"] == "legacy_user"
         call_kwargs = mock_create_audit.call_args.kwargs
         assert call_kwargs["actor_id"] == "legacy_user"

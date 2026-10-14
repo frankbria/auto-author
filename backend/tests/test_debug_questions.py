@@ -76,7 +76,7 @@ async def test_question_generation_direct(motor_reinit_db):  # Use correct fixtu
             difficulty="medium",
             focus=None,
             user_id="test_user",
-            current_user={"clerk_id": "test_user"}
+            current_user={"auth_id": "test_user"}
         )
 
         print(f"Success! Generated {len(result.questions)} questions")

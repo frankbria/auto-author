@@ -63,7 +63,7 @@ def test_concurrent_profile_edits(auth_client_factory, test_user):
     mock_db_lock = asyncio.Lock()
     processed_updates = []
 
-    async def mock_update_user(clerk_id, user_data, actor_id=None):
+    async def mock_update_user(auth_id, user_data, actor_id=None):
         """Mock database update with locking behavior"""
         async with mock_db_lock:
             # Simulate some processing time
@@ -123,7 +123,7 @@ def test_concurrent_conflicting_edits(auth_client_factory, test_user):
     second_updated_user["updated_at"] = datetime.now(timezone.utc)
 
     # Mock database update function
-    async def mock_update_user(clerk_id, user_data, actor_id=None):
+    async def mock_update_user(auth_id, user_data, actor_id=None):
         nonlocal update_counter
         update_counter += 1
 
@@ -174,7 +174,7 @@ def test_concurrent_edits_different_fields(auth_client_factory, test_user):
     update_sequence = []
 
     # Mock database update function
-    async def mock_update_user(clerk_id, user_data, actor_id=None):
+    async def mock_update_user(auth_id, user_data, actor_id=None):
         # Record what fields are being updated
         update_sequence.append(list(user_data.keys()))
 

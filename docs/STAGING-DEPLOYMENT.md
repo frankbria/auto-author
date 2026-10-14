@@ -90,8 +90,8 @@ knows one secret only: better-auth's rotation list (`BETTER_AUTH_SECRETS`) is
 not supported until the backend check is taught it.
 
 The **backend** gets everything else in the file wholesale via `env_file:` — it
-also needs `AWS_*`, `CLOUDINARY_*`, `BETTER_AUTH_ISSUER` and
-`BACKEND_CORS_ORIGINS`, which an explicit allowlist would have silently dropped.
+also needs `AWS_*`, `CLOUDINARY_*` and `BACKEND_CORS_ORIGINS`, which an explicit
+allowlist would have silently dropped.
 
 **Upload storage must be configured on a deployed backend** (#806). The backend
 uses Cloudinary when `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and

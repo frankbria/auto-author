@@ -14,7 +14,6 @@ from app.schemas.book import (
     GenerateQuestionsResponse,
     QuestionType,
     QuestionDifficulty,
-    ResponseStatus,
     QuestionMetadata
 )
 from app.schemas.ai_input import MAX_CHAPTER_TITLE_CHARS
@@ -940,44 +939,6 @@ class QuestionGenerationService:
             return "200-300 words"
         else:  # HARD
             return "300-500 words"
-
-    async def get_question_progress(
-        self,
-        questions: List[Dict[str, Any]]
-    ) -> QuestionProgressResponse:
-        """Calculate question progress from a list of questions."""
-
-        total = len(questions)
-        completed = 0
-        in_progress = 0
-
-        for question in questions:
-            response_status = question.get("response_status")
-            if response_status == ResponseStatus.COMPLETED:
-                completed += 1
-            elif response_status == ResponseStatus.DRAFT:
-                in_progress += 1
-
-        # Calculate progress percentage
-        progress = float(completed) / total if total > 0 else 0.0
-
-        # Determine overall status
-        if completed == total:
-            status = "completed"
-        elif completed > 0 or in_progress > 0:
-            status = "in-progress"
-        else:
-            status = "not-started"
-
-        return QuestionProgressResponse(
-            total=total,
-            completed=completed,
-            in_progress=in_progress,
-            progress=progress,
-            status=status
-        )
-
-
 
 # Factory function to create a QuestionGenerationService instance
 def get_question_generation_service(db=None):

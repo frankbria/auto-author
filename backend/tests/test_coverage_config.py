@@ -53,10 +53,10 @@ def test_the_bypass_validator_is_measured(left_out):
 
 
 def test_a_line_that_says_only_pass_is_still_left_out(left_out):
-    # What the pattern was for: a placeholder body, here an empty subclass.
-    path = APP / "models" / "book.py"
+    # What the pattern was for: a placeholder body, here an except that does nothing.
+    path = APP / "db" / "indexing_strategy.py"
     text = path.read_text().splitlines()
     bare = [n for n, line in enumerate(text, 1) if line.strip() == "pass"]
 
-    assert bare, "no bare `pass` left in models/book.py to check the pattern against"
+    assert bare, "no bare `pass` left in db/indexing_strategy.py to check the pattern against"
     assert set(bare) <= left_out(path)

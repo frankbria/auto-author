@@ -31,7 +31,7 @@ from app.utils.error_handlers import (
     generate_request_id,
 )
 
-from app.core.security import get_current_user_from_session, SessionRoleChecker
+from app.core.security import get_current_user_from_session
 from app.schemas.book import (
     BookCreate,
     BookUpdate,
@@ -98,10 +98,6 @@ from bson import ObjectId
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Role-based access controls
-allow_users_and_admins = SessionRoleChecker(["user", "admin"])
-
 
 # Helper to load offensive words from JSON
 OFFENSIVE_WORDS_PATH = os.path.join(

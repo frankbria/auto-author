@@ -7,7 +7,6 @@ the shipped services actually implement:
 
 - Chapter access logging + recent-chapter retrieval (``ChapterAccessService``)
 - Tab-state persistence and restore (``ChapterAccessService``)
-- Status transition / bulk-update validation (``ChapterStatusService``)
 - Index creation (``ChapterTabIndexManager``)
 
 This replaces an older ``run_test_*`` file (never collected by pytest) that was
@@ -23,7 +22,6 @@ from bson import ObjectId
 from app.db import base
 from app.schemas.book import ChapterStatus
 from app.services.chapter_access_service import ChapterAccessService
-from app.services.chapter_status_service import ChapterStatusService
 from app.db.indexing_strategy import ChapterTabIndexManager
 
 USER_ID = "test-user-123"
@@ -38,11 +36,6 @@ def database(motor_reinit_db):
 @pytest.fixture
 def access_service():
     return ChapterAccessService()
-
-
-@pytest.fixture
-def status_service():
-    return ChapterStatusService()
 
 
 @pytest.fixture
@@ -105,33 +98,6 @@ async def test_tab_state_save_and_restore(access_service, test_book):
 
 
 # --- Status validation (pure logic) ------------------------------------------
-
-@pytest.mark.asyncio
-async def test_status_transitions(status_service):
-    assert status_service.is_valid_transition(ChapterStatus.DRAFT, ChapterStatus.IN_PROGRESS)
-    assert status_service.is_valid_transition(ChapterStatus.IN_PROGRESS, ChapterStatus.COMPLETED)
-    assert not status_service.is_valid_transition(ChapterStatus.DRAFT, ChapterStatus.PUBLISHED)
-
-    assert status_service.validate_status_data("draft") == ChapterStatus.DRAFT
-    with pytest.raises(ValueError):
-        status_service.validate_status_data("invalid-status")
-
-
-@pytest.mark.asyncio
-async def test_bulk_status_update_validation(status_service):
-    valid = status_service.validate_bulk_update([
-        {"chapter_id": "ch-1", "status": ChapterStatus.IN_PROGRESS},
-        {"chapter_id": "ch-2", "status": ChapterStatus.COMPLETED},
-    ])
-    assert valid["valid"] is True
-    assert valid["invalid_count"] == 0
-
-    invalid = status_service.validate_bulk_update([
-        {"chapter_id": "ch-1", "status": "invalid-status"},
-    ])
-    assert invalid["valid"] is False
-    assert invalid["invalid_count"] == 1
-
 
 # --- Indexing (real DB) -------------------------------------------------------
 

@@ -2,7 +2,7 @@
 
 import logging
 
-from .base import users_collection, books_collection, get_collection
+from .base import users_collection, get_collection
 from bson.objectid import ObjectId
 from pymongo import ReturnDocument
 from datetime import datetime, timedelta, timezone
@@ -239,13 +239,10 @@ async def delete_better_auth_identity(auth_id: str) -> None:
     await better_auth_users.delete_many({"$or": [{"_id": {"$in": ids}}, {"id": auth_id}]})
 
 
-async def delete_user(
-    auth_id: str, actor_id: str = None, soft_delete: bool = True
-) -> bool:
-    """Deactivate a user (soft delete, the default) and revoke their better-auth
-    identity.
+async def delete_user(auth_id: str, actor_id: str = None) -> bool:
+    """Deactivate a user and revoke their better-auth identity.
 
-    A soft delete replaces the record with auth_id, deleted_at, purge_at and the
+    Deactivating replaces the record with auth_id, deleted_at, purge_at and the
     RETAINED_FIELDS under ``retained`` (#954): replacing, not unsetting, erases
     every other field, including ones added later. deleted_at keeps the session
     resolver rejecting that id and stops the auto-create path, update_user and
@@ -253,30 +250,26 @@ async def delete_user(
     unique index, so the same address can sign up again (#763) without the new
     account colliding with this record or release_email stripping it.
     """
-    if soft_delete:
-        now = datetime.now(timezone.utc)
-        previous = await users_collection.find_one_and_update(
-            {"auth_id": auth_id, "deleted_at": {"$exists": False}},
-            [
-                {
-                    "$replaceWith": {
-                        "_id": "$_id",
-                        "auth_id": "$auth_id",
-                        "deleted_at": now,
-                        "purge_at": now + RETENTION,
-                        # A field the record lacks, or holds as null (an
-                        # account with no Terms record), is left out.
-                        "retained": {
-                            field: {"$ifNull": [f"${field}", "$$REMOVE"]}
-                            for field in RETAINED_FIELDS
-                        },
-                    }
+    now = datetime.now(timezone.utc)
+    previous = await users_collection.find_one_and_update(
+        {"auth_id": auth_id, "deleted_at": {"$exists": False}},
+        [
+            {
+                "$replaceWith": {
+                    "_id": "$_id",
+                    "auth_id": "$auth_id",
+                    "deleted_at": now,
+                    "purge_at": now + RETENTION,
+                    # A field the record lacks, or holds as null (an
+                    # account with no Terms record), is left out.
+                    "retained": {
+                        field: {"$ifNull": [f"${field}", "$$REMOVE"]}
+                        for field in RETAINED_FIELDS
+                    },
                 }
-            ],
-        )
-    else:
-        # Hard delete
-        previous = await users_collection.find_one_and_delete({"auth_id": auth_id})
+            }
+        ],
+    )
     success = previous is not None
 
     # The returned pre-image is the last place the avatar URL exists (#785).
@@ -304,7 +297,6 @@ async def delete_user(
             or auth_id,  # If no actor specified, user deleted themselves
             target_id=auth_id,
             resource_type="user",
-            details={"soft_delete": soft_delete},
         )
         return True
     return False
@@ -367,49 +359,3 @@ async def erase_stranded_identities() -> int:
             await delete_better_auth_identity(auth_id)
             finished += 1
     return finished
-
-
-async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
-    """
-    Delete books associated with a user
-
-    NB: raw ``delete_many`` on the books collection only — questions, responses,
-    ratings and access logs survive. For account deletion use
-    ``app.db.book.delete_all_user_books``, which cascades (#179).
-
-    Args:
-        user_id: The user's ID (auth_id or MongoDB _id)
-        book_ids: Optional list of specific book IDs to delete. If None, deletes all user's books.
-
-    Returns:
-        bool: True if deletion was successful, False otherwise
-    """
-    try:
-        # Books store their owner as owner_id (see create_book) — a user_id
-        # filter matches nothing (issue #179).
-        if book_ids:
-            # Delete specific books for the user
-            query = {
-                "owner_id": user_id,
-                "_id": {"$in": [ObjectId(bid) for bid in book_ids]},
-            }
-        else:
-            # Delete all books for the user
-            query = {"owner_id": user_id}
-
-        # Delete the books
-        result = await books_collection.delete_many(query)
-
-        # Log the action
-        await audit_after_write(
-            action="delete_books",
-            actor_id=user_id,
-            target_id=user_id,
-            resource_type="books",
-            details={"deleted_count": result.deleted_count},
-        )
-
-        return result.deleted_count > 0
-    except Exception:
-        logger.error("Failed to delete user books", exc_info=True)
-        return False

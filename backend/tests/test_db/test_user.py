@@ -1,15 +1,12 @@
 """
-Direct DB-layer tests for app/db/user.py (user CRUD + book deletion).
+Direct DB-layer tests for app/db/user.py (user CRUD and deletion).
 
-Uses a real local MongoDB via the motor_reinit_db fixture. The conftest rebinds
-users_dao.users_collection per test but NOT users_dao.books_collection, so the
-delete_user_books tests rebind it explicitly to the fresh per-test collection.
+Uses a real local MongoDB via the motor_reinit_db fixture.
 """
 
 import pytest
 from datetime import datetime, timedelta, timezone
 
-from bson import ObjectId
 
 import app.db.user as user_dao
 from app.db import base
@@ -20,7 +17,6 @@ from app.db.user import (
     create_user,
     update_user,
     delete_user,
-    delete_user_books,
     erase_deactivated_user,
     purge_expired_users,
 )
@@ -29,13 +25,6 @@ pytestmark = pytest.mark.asyncio
 
 TOMBSTONE_KEYS = {"_id", "auth_id", "deleted_at"}
 DEACTIVATED_KEYS = TOMBSTONE_KEYS | {"purge_at", "retained"}
-
-
-@pytest.fixture
-def bind_books(motor_reinit_db, monkeypatch):
-    """Rebind the books_collection captured by user.py at import time to the
-    fresh per-test collection (conftest only rebinds users_collection there)."""
-    monkeypatch.setattr(user_dao, "books_collection", base.books_collection)
 
 
 async def _make_user(**overrides):
@@ -120,8 +109,7 @@ class TestDeleteUser:
             "terms_accepted_at": datetime(2026, 10, 11, 12, 0),
         }
         assert doc["purge_at"] - doc["deleted_at"] == timedelta(days=548)
-        log = await base.audit_logs_collection.find_one({"action": "user_delete"})
-        assert log["details"]["soft_delete"] is True
+        assert await base.audit_logs_collection.find_one({"action": "user_delete", "target_id": "auth-soft"})
 
     async def test_deleting_a_tombstone_again_reports_not_found(self, motor_reinit_db):
         await _make_user(auth_id="auth-twice")
@@ -138,15 +126,6 @@ class TestDeleteUser:
 
     async def test_soft_delete_missing_returns_false(self, motor_reinit_db):
         assert await delete_user("absent") is False
-
-    async def test_hard_delete_removes_document(self, motor_reinit_db):
-        await _make_user(auth_id="auth-hard")
-        ok = await delete_user("auth-hard", soft_delete=False)
-        assert ok is True
-        assert await get_user_by_auth_id("auth-hard") is None
-
-    async def test_hard_delete_missing_returns_false(self, motor_reinit_db):
-        assert await delete_user("absent", soft_delete=False) is False
 
     async def test_in_flight_book_create_adds_nothing_to_a_tombstone(
         self, motor_reinit_db
@@ -228,38 +207,3 @@ class TestEraseAndPurge:
         for auth_id, before in untouched.items():
             assert await get_user_by_auth_id(auth_id) == before
         assert await purge_expired_users() == 0
-
-
-class TestDeleteUserBooks:
-    async def test_delete_all_user_books(self, bind_books):
-        # Books are stored with owner_id (see create_book); seeding user_id here
-        # used to mask the #179 wrong-field bug.
-        uid = "owner-1"
-        await base.books_collection.insert_many(
-            [{"owner_id": uid, "title": "A"}, {"owner_id": uid, "title": "B"}]
-        )
-        ok = await delete_user_books(uid)
-        assert ok is True
-        assert await base.books_collection.count_documents({"owner_id": uid}) == 0
-
-    async def test_delete_specific_books(self, bind_books):
-        uid = "owner-2"
-        keep = ObjectId()
-        drop = ObjectId()
-        await base.books_collection.insert_many(
-            [
-                {"_id": keep, "owner_id": uid, "title": "keep"},
-                {"_id": drop, "owner_id": uid, "title": "drop"},
-            ]
-        )
-        ok = await delete_user_books(uid, book_ids=[str(drop)])
-        assert ok is True
-        remaining = await base.books_collection.find({"owner_id": uid}).to_list(None)
-        assert {b["_id"] for b in remaining} == {keep}
-
-    async def test_delete_no_books_returns_false(self, bind_books):
-        assert await delete_user_books("owner-empty") is False
-
-    async def test_invalid_book_id_is_handled(self, bind_books):
-        # Non-hex book id raises inside the try -> returns False, no crash
-        assert await delete_user_books("owner-x", book_ids=["not-an-objectid"]) is False

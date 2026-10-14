@@ -505,41 +505,6 @@ async def get_chapter_question_progress(
     )
 
 
-async def delete_questions_for_book(
-    book_id: str,
-    user_id: str
-) -> int:
-    """Delete all questions and responses for a book (cascade deletion)."""
-    questions_collection = await get_collection("questions")
-    responses_collection = await get_collection("question_responses")
-
-    # Get all questions for the book
-    questions = await questions_collection.find({
-        "book_id": book_id,
-        "user_id": user_id
-    }).to_list(length=None)
-
-    # Extract question IDs
-    question_ids = [str(q["_id"]) for q in questions]
-
-    # Delete all responses for these questions
-    if question_ids:
-        await responses_collection.delete_many({
-            "question_id": {"$in": question_ids},
-            "user_id": user_id
-        })
-
-    # Delete all questions for the book
-    result = await questions_collection.delete_many({
-        "book_id": book_id,
-        "user_id": user_id
-    })
-
-    logger.info(f"Cascade delete: Removed {result.deleted_count} questions and their responses for book {book_id}")
-
-    return result.deleted_count
-
-
 async def delete_questions_for_chapters(
     book_id: str,
     chapter_ids: Iterable[str],
