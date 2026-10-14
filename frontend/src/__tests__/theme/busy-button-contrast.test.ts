@@ -201,8 +201,9 @@ describe('every busy-labelled Button declares it (#642)', () => {
       )
     );
 
-    // 23 until #842 removed the unrouted AI error-handling example, which had three.
-    expect(busyButtons.length).toBeGreaterThanOrEqual(20);
+    // 23 until #842 removed the unrouted AI error-handling example, which had three,
+    // and 20 until #853 removed the unimported DataRecoveryModal ("Restoring...").
+    expect(busyButtons.length).toBeGreaterThanOrEqual(19);
   });
 
   it('no shipped Button shows a busy label without `busy`', () => {

@@ -22,13 +22,6 @@ jest.mock('@/lib/api/bookClient', () => ({
   }
 }));
 
-// Mock Toast notifications
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({
-    toast: jest.fn()
-  })
-}));
-
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(() => ({

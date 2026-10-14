@@ -33,13 +33,6 @@ jest.mock('@/lib/api/bookClient', () => ({
   }
 }));
 
-// Mock Toast notifications
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({
-    toast: jest.fn()
-  })
-}));
-
 // Performance monitoring utilities
 const performanceMonitor = {
   startTime: 0,

@@ -117,12 +117,6 @@ jest.mock('web-vitals', () => ({
   onTTFB: jest.fn(),
 }), { virtual: true });
 
-// Mock date-fns for DataRecoveryModal tests
-jest.mock('date-fns', () => ({
-  formatDistanceToNow: jest.fn(() => '5 minutes ago'),
-  format: jest.fn((date) => new Date(date).toISOString()),
-}), { virtual: true });
-
 // Mock pointer-capture + scrollIntoView for Radix UI Select components
 if (typeof Element !== 'undefined') {
   if (typeof Element.prototype.hasPointerCapture === 'undefined') {

@@ -35,13 +35,6 @@ jest.mock('@/lib/api/bookClient', () => ({
   }
 }));
 
-// Mock toast notifications
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({
-    toast: jest.fn()
-  })
-}));
-
 // Viewport size utilities
 const setViewportSize = (width: number, height: number) => {
   Object.defineProperty(window, 'innerWidth', {

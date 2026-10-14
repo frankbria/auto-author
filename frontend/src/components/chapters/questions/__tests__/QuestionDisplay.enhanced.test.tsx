@@ -19,12 +19,6 @@ jest.mock('@/hooks/useOnlineStatus', () => ({
 
 // Mock toast
 const mockToast = jest.fn();
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({
-    toast: mockToast,
-  }),
-}));
-
 const mockQuestion: Question = {
   id: 'question-1',
   book_id: 'book-1',

@@ -161,13 +161,6 @@
         "text-gray-200": 1
       },
       "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
-    },
-    "src/components/ui/styled-avatar.tsx": {
-      "literals": {
-        "bg-gray-800": 1,
-        "text-gray-100": 1
-      },
-      "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
     }
   }
 }
