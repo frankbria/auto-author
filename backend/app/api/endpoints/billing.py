@@ -337,23 +337,30 @@ async def _close_the_earlier_checkout(auth_id: str, session_id: str) -> None:
     earlier_id = await swap_checkout_session(auth_id, session_id)
     if not earlier_id or earlier_id == session_id:
         return
-    earlier = await asyncio.to_thread(
-        stripe.checkout.Session.retrieve, earlier_id, api_key=settings.STRIPE_SECRET_KEY
-    )
-    if earlier.status == "open":
-        await asyncio.to_thread(
-            stripe.checkout.Session.expire, earlier_id, api_key=settings.STRIPE_SECRET_KEY
-        )
-    elif earlier.status == "complete":
-        await asyncio.to_thread(
-            stripe.checkout.Session.expire, session_id, api_key=settings.STRIPE_SECRET_KEY
-        )
-        # Keep the paid one as the user's checkout, so a third try is refused too.
+    key = settings.STRIPE_SECRET_KEY
+    try:
+        earlier = await asyncio.to_thread(stripe.checkout.Session.retrieve, earlier_id, api_key=key)
+        if earlier.status == "open":
+            await asyncio.to_thread(stripe.checkout.Session.expire, earlier_id, api_key=key)
+            return
+        if earlier.status != "complete":
+            return
+        await asyncio.to_thread(stripe.checkout.Session.expire, session_id, api_key=key)
+    except stripe.StripeError:
+        # The earlier one may still be payable (or paid): keep it as the user's
+        # checkout so a retry deals with it, and close the new one if Stripe lets us.
         await swap_checkout_session(auth_id, earlier_id)
-        raise HTTPException(
-            status_code=409,
-            detail="You have already subscribed. It can take a minute to show here.",
-        )
+        try:
+            await asyncio.to_thread(stripe.checkout.Session.expire, session_id, api_key=key)
+        except stripe.StripeError:
+            logger.warning("Could not expire checkout session for user %s", auth_id, exc_info=True)
+        raise
+    # Paid, its webhook not here yet. Keep it recorded, so a third try is refused too.
+    await swap_checkout_session(auth_id, earlier_id)
+    raise HTTPException(
+        status_code=409,
+        detail="You have already subscribed. It can take a minute to show here.",
+    )
 
 
 # #771: the portal's behaviour is pinned in code, not in unversioned dashboard

@@ -85,3 +85,56 @@ async def test_a_paused_subscriber_is_sent_to_resume_it(auth_client_factory, str
     assert response.status_code == 409
     assert "paused" in response.json()["detail"].lower()
     assert sessions["made"] == 0
+
+
+async def test_a_paid_checkout_from_before_a_cancellation_does_not_block_a_new_one(
+    auth_client_factory, stripe_configured, sessions, monkeypatch  # noqa: F811
+):
+    """Found in review: the paid session stayed recorded, and every later
+    checkout was refused as 'already subscribed'."""
+    from tests.test_api.test_stripe_webhook import TEST_PRO_PRICE_ID, subscription_event
+    from app.api.endpoints import webhooks
+    import json
+
+    api = await auth_client_factory(overrides={"stripe_customer_id": "cus_back"})
+    await api.post("/api/v1/billing/checkout", json=await consenting(api))
+    sessions["status"]["cs_test_1"] = "complete"
+    monkeypatch.setattr(webhooks.settings, "STRIPE_PRICE_ID_PRO", TEST_PRO_PRICE_ID)
+    auth_id = (await api.get("/api/v1/users/me")).json()["auth_id"]
+    for payload in (
+        subscription_event(event_id="evt_on", customer="cus_back", subscription_id="sub_1",
+                           metadata={"auth_id": auth_id}),
+        subscription_event(event_id="evt_off", customer="cus_back", subscription_id="sub_1",
+                           event_type="customer.subscription.deleted", status="canceled"),
+    ):
+        event = json.loads(payload)
+        result = await webhooks._apply_subscription_event(
+            event["type"], event["data"]["object"], event["id"], event["created"])
+        assert result["status"] == "processed"
+
+    again = await api.post("/api/v1/billing/checkout", json=await consenting(api))
+
+    assert again.status_code == 200, again.text
+
+
+async def test_a_stripe_error_after_the_swap_keeps_the_earlier_checkout_recorded(
+    auth_client_factory, stripe_configured, sessions, monkeypatch  # noqa: F811
+):
+    """Found in review: the earlier, still payable session was dropped from the
+    record, so a retry could not close it."""
+    api = await auth_client_factory()
+    await api.post("/api/v1/billing/checkout", json=await consenting(api))
+    real_retrieve = stripe.checkout.Session.retrieve
+
+    def unreachable(sid, **kwargs):
+        raise stripe.APIConnectionError("Stripe is unreachable")
+
+    monkeypatch.setattr(stripe.checkout.Session, "retrieve", unreachable)
+    failed = await api.post("/api/v1/billing/checkout", json=await consenting(api))
+    assert failed.status_code == 502
+    assert sessions["expired"] == ["cs_test_2"]  # the new one cannot be paid
+
+    monkeypatch.setattr(stripe.checkout.Session, "retrieve", real_retrieve)
+    retried = await api.post("/api/v1/billing/checkout", json=await consenting(api))
+    assert retried.status_code == 200
+    assert "cs_test_1" in sessions["expired"]  # the retry closed the earlier one

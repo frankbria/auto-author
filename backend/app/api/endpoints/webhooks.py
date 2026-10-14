@@ -313,6 +313,10 @@ async def _apply_subscription_event(
             "stripe_customer_id": customer_id,
             "stripe_subscription_id": subscription_id,
             "stripe_subscription_status": status,
+            # The checkout it came from is settled: from here on the subscription
+            # decides, and a paid session from before a cancellation must not
+            # block the next checkout (#912).
+            "stripe_checkout_session_id": None,
             # Watermark the ordering filter above compares against. A keep
             # (past_due) write sets no plan, so it doesn't advance it: otherwise
             # a resent older `active` (its first delivery lost) would be
@@ -328,14 +332,19 @@ async def _apply_subscription_event(
         extra_filter=write_filter,
     )
 
-    if updated is None and not _again:
+    if updated is None:
         # Another event changed the current subscription since the read:
         # decide again against what is stored now, once.
         now = await get_user_by_auth_id(user["auth_id"])
         if (now or {}).get("stripe_subscription_id") not in (current_id, event_subscription_id):
+            if _again:
+                return {"status": "not_current_subscription", "event_id": event_id}
             return await _apply_subscription_event(
                 event_type, subscription, event_id, event_created, _again=True
             )
+        if ordering_filter is None:
+            # Nothing written and nothing to say why: no marker, so a resend retries.
+            return {"status": "not_applied", "event_id": event_id}
 
     if updated is None and ordering_filter is not None:
         # The user exists (looked up above), so a no-match means the ordering
