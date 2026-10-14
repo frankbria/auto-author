@@ -112,6 +112,7 @@ def _mock_request(path: str = "/api/test", ip: str = "10.0.0.1") -> Mock:
     request.client.host = ip
     request.url = Mock()
     request.url.path = path
+    request.method = "GET"
     # No matched route, as for a request outside any router: the limiter falls
     # back to the path (#798).
     request.scope = {}

@@ -264,17 +264,31 @@ class TestRateLimitsAreKeyedOnTheRouteNotTheResource:
         assert statuses == [200] * 10 + [429]
         # One bucket, named for the route; no book id in the key.
         [key] = await _rate_limit_keys()
-        assert ":rl:/books/{book_id}/export/markdown:" in key
+        assert ":rl:GET /books/{book_id}/export/markdown:" in key
         assert not any(book_id in key for book_id in books)
+
+    async def test_two_methods_on_one_path_have_their_own_buckets(
+        self, auth_client_factory, arm_real_rate_limiter
+    ):
+        """GET, PATCH and DELETE /users/me shared one bucket, so loading the
+        profile page a few times refused the account deletion with a 429 (#886)."""
+        api = await auth_client_factory()
+        arm_real_rate_limiter(2)
+
+        reads = [(await api.get("/api/v1/users/me")).status_code for _ in range(2)]
+        update = await api.patch("/api/v1/users/me", json={"bio": "Writes about small changes."})
+
+        assert reads == [200, 200]
+        assert update.status_code == 200, update.text
 
     async def test_a_request_with_no_matched_route_falls_back_to_its_path(
         self, motor_reinit_db, monkeypatch
     ):
         monkeypatch.setattr(deps.settings, "BYPASS_AUTH", False)
         limiter = real_get_rate_limiter(limit=5, window=60)
-        request = Request({"type": "http", "path": "/somewhere/odd", "headers": [], "query_string": b""})
+        request = Request({"type": "http", "method": "GET", "path": "/somewhere/odd", "headers": [], "query_string": b""})
 
         await limiter(request, current_user={"auth_id": "u1"})
 
         [key] = await _rate_limit_keys()
-        assert ":rl:/somewhere/odd:" in key
+        assert ":rl:GET /somewhere/odd:" in key
