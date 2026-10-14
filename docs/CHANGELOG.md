@@ -4,6 +4,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Question regeneration reports what it did, and the parsers keep what the model wrote (#850, P2.4)**:
+  - **Regeneration.** `generate_questions_for_chapter` floored every request at 3, so regenerating one unanswered question made three and the chapter grew. The response then reported `count - deleted` as preserved, the requested count rather than what the chapter held: 2 answered and 1 unanswered came back as 9 preserved, 10 in all. The floor is 1, as the request schema allows. Preserved is the chapter's questions before, minus those deleted, and new is the number actually made.
+  - **Verification.** The post-insert check counted every question in the chapter, old ones included, so it could not fail. It is gone: `insert_many(ordered=True)` already raises if any insert fails.
+  - **Parsers.** The question fallback stripped one character of a list marker ("10." became "0.", "2)" became ")"), and now uses the existing `LIST_MARKER`. Suggestions were split at every full stop ("Dr.", "10.5%"), and now split at sentence ends (`SENTENCE_END`).
+  - **Already fixed.** The whole-TOC save uses the version guard (#871), and `AI_MAX_RETRIES` has a floor of 1 (#352). The versionless whole-TOC save had no test; it has one now.
+  - **Tests.** `tests/test_services/test_regeneration_and_parsers.py` (7, real MongoDB, the model the only stand-in), and a versionless whole-TOC save in `test_toc_transactions.py`. The tests of the removed verification are deleted (one in `test_question_generation_service.py`, and `tests/test_question_verification.py`, which tested nothing else), and the mock test that pinned `5 - 2` now pins what the chapter keeps.
+  - Demo: `docs/demos/2026-10-14-issue-850-regeneration-and-parsers.md`.
+
 - **PATCH changes what it is sent and nothing else (#848, P2.2)**:
   - **Preferences.** `update_user` wrote a preferences object whole, so a PATCH that sent one key reset every key it left out to its default, and `"preferences": null` stored a null. It now sets each sent key as `preferences.<key>` and ignores a null object. A null already stored is replaced with `{}` first: found in review, it made every later preferences write fail. PATCH `/users/me` and PUT `/users/{id}` both go through it.
   - **Books.** `BookUpdate.title` was required, and the PATCH route dropped every null, so a subtitle, description, genre or target audience could never be cleared. Title is optional now and PATCH keeps the nulls it is sent. Title, metadata and published always have a value: their `None` default is never validated, so leaving them out passes and an explicit null is a 422 (`main` answered 200 and ignored it). The frontend form sends `''`, never null.

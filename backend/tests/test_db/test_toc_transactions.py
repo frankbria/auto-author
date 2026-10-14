@@ -729,3 +729,14 @@ async def test_audit_failure_does_not_fail_a_committed_toc_update(
     stored = await _get_toc(book_id)
     assert stored["chapters"][0]["title"] == "Renamed"
     assert stored["version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_a_whole_toc_update_writes_over_a_versionless_toc(seed_book):
+    """The whole-TOC save on a legacy TOC with no `version` field (#850)."""
+    book_id, owner = await seed_book(toc={"chapters": [{"id": "c1", "title": "Original"}]})
+
+    await tx.update_toc_with_transaction(book_id, {"chapters": [{"id": "c1", "title": "Whole"}]}, owner)
+
+    stored = await _get_toc(book_id)
+    assert (stored["chapters"][0]["title"], stored["version"]) == ("Whole", 2)
