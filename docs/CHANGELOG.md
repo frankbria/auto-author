@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Refused AI requests cost no quota: the two tests #883 still asked for (#883, P1.67)**:
+  - **State.** #798 (PR #979) already charges the quota up front and refunds a request that failed before any model call, and #803 surfaced `X-AI-Quota-*` to the client. What #883's definition of done still lacked was proof for N rate-limited requests and for a refusal by the entitlement gate.
+  - **Tests.** `tests/test_api/test_ai_quota_charging.py`: six requests through a 1-per-window limiter (one 200, five 429) leave one charge; the free plan stripped of `analyze_summary` but keeping its quota gets the gate's 402 and is charged nothing, with the model never called. No production code changed.
+  - **Mutations.** Removing the refund fails both; refunding only a 429 fails the gate test while every rate-limit test passes.
+  - Demo: `docs/demos/2026-10-14-issue-883-quota-refusals.md`.
+
 - **The deploy docs describe the container deploy and the one workflow that writes the box `.env` (#846, P1.64)**:
   - **Problem.** `CLAUDE.md`, `.github/DEPLOYMENT.md` and `docs/STAGING-DEPLOYMENT.md` said no workflow writes `/opt/auto-author/.env`, while `sync-staging-env.yml` writes its `MONGODB_URI` key (the #537 trap, inverted). They pointed at a `deploy-staging.yml.disabled` rollback that #656 deleted, and `DEPLOYMENT.md` described PM2, Node 20 and "no Docker image".
   - **Fix.** `.github/DEPLOYMENT.md` is rewritten around what the live workflows read (server-access secrets, the staging build variables) and the keys the box `.env` needs. `DEPLOYMENT.md` describes the image build, the dispatched deploy and rollback by image tag. `STAGING-DEPLOYMENT.md` documents `sync-staging-env.yml` and drops the PM2 fallback. `ecosystem.config.template.js` is deleted with its `.gitignore` and `package.json` entries; two PM2-era plans moved to `archive/`. The issue said "blocked by #782"; #782 is production-only and gates nothing, so this went ahead.
