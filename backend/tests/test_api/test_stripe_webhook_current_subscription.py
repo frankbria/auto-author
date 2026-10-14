@@ -198,14 +198,14 @@ class TestKeepDoesNotAdvanceTheWatermark:
         assert resp.json()["status"] == "stale_event"
         user = await get_user_by_auth_id("auth-stripe-1")
         assert (user["plan"], user["stripe_subscription_status"]) == ("restricted", "unpaid")
-        assert user["stripe_event_created"] == 3_000
+        assert user["stripe_event_created_by_subscription"]["sub_test_1"] == 3_000
 
     async def test_plan_setting_events_still_advance_the_watermark(self, webhook_client):
         await _seed_user(stripe_customer_id="cus_test_1", plan="free")
         await _post_signed(webhook_client, event(event_id="evt_a", status="active", created=1_000))
         await _post_signed(webhook_client, event(event_id="evt_pd", status="past_due", created=2_000))
         user = await get_user_by_auth_id("auth-stripe-1")
-        assert user["stripe_event_created"] == 1_000
+        assert user["stripe_event_created_by_subscription"]["sub_test_1"] == 1_000
         assert user["stripe_subscription_status"] == "past_due"
 
         resp = await _post_signed(

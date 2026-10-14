@@ -110,7 +110,7 @@ class TestOutOfOrderDelivery:
 
         assert resp.json() == {"status": "stale_event", "event_id": "evt_old"}
         user = await get_user_by_auth_id("auth-stripe-1")
-        assert (user["plan"], user["stripe_event_created"]) == ("pro", 2_000)
+        assert (user["plan"], user["stripe_event_created_by_subscription"]["sub_test_1"]) == ("pro", 2_000)
         # Nothing was applied, so nothing is recorded: a redelivery re-checks.
         assert (await _post_signed(webhook_client, old)).json()["status"] == "stale_event"
 
@@ -138,7 +138,7 @@ class TestOutOfOrderDelivery:
         async def lookup_then_newer_event_lands(customer_id):
             snapshot = await real_lookup(customer_id)
             await db_base.users_collection.update_one(
-                {"auth_id": "auth-stripe-1"}, {"$set": {"stripe_event_created": 9_000}}
+                {"auth_id": "auth-stripe-1"}, {"$set": {"stripe_event_created_by_subscription.sub_test_1": 9_000}}
             )
             return snapshot  # the handler now holds a stale read
 
