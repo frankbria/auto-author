@@ -90,3 +90,30 @@ async def test_get_and_put_agree_on_the_version_of_a_book_with_no_toc(auth_clien
     assert read.json()["status"] == "not_generated"
     assert first_save.status_code == 200, first_save.text
     assert second_save.status_code == 409, second_save.text
+
+
+@pytest.mark.asyncio
+async def test_a_legacy_toc_given_a_version_meanwhile_is_a_conflict_not_a_failure(motor_reinit_db, monkeypatch):
+    """Found in review. A TOC from before versions has none; a chapter autosave between the
+    read and the write gives it version 1 ($inc). The write, guarded on the version being
+    absent, then misses, and that is a conflict the editor can reload from, not a 400."""
+    book_id = ObjectId()
+    await tx.books_collection.insert_one({
+        "_id": book_id, "owner_id": OWNER, "title": "Old book",
+        "table_of_contents": {"chapters": [{"id": "c1", "title": "Old chapter", "description": "", "level": 1, "order": 1, "subchapters": []}]},
+    })
+    real_find_one = tx.books_collection.find_one
+    calls = 0
+
+    async def find_one_then_autosave(*args, **kwargs):
+        nonlocal calls
+        found = await real_find_one(*args, **kwargs)
+        calls += 1
+        if calls == 1:  # the read the write is guarded on; the autosave lands after it
+            await tx.books_collection.update_one({"_id": book_id}, {"$inc": {"table_of_contents.version": 1}})
+        return found
+
+    monkeypatch.setattr(tx.books_collection, "find_one", find_one_then_autosave)
+
+    with pytest.raises(ValueError, match="Version conflict"):
+        await update_toc_with_transaction(str(book_id), _toc("Edited"), OWNER)

@@ -314,9 +314,12 @@ async def _update_toc_internal(
             {"_id": book_oid},
             session=session
         )
+        # Compared as stored, absence included: a TOC with no version that gained
+        # one meanwhile (a chapter autosave's $inc) has changed, though both read
+        # as 1 under the default (#871).
         if current_book:
-            current_v = current_book.get("table_of_contents", {}).get("version", 1)
-            if current_v != current_version:
+            stored = current_book.get("table_of_contents", {})
+            if ("version" in stored, stored.get("version")) != ("version" in current_toc, current_toc.get("version")):
                 raise ValueError("Version conflict: TOC was updated by another process")
         raise ValueError("Failed to update TOC")
 
