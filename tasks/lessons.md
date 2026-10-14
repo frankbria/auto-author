@@ -1761,3 +1761,7 @@ The jest test for "sign out lands home" passed after the ProtectedRoute fix. The
 ### A delete that lands after an await must read the latest state (#906)
 Asking before a delete made the delete asynchronous: it waits for the answer count. The existing `deleteChapter` built the new tree from the `toc` the click handler had captured, so a chapter added during the wait vanished with the delete. A title edit did not show the bug, because the page mutates chapter objects in place and the stale array still held them; only a new array element exposed it, and the review's suggested test passed until I changed the edit to an add.
 **Rule:** when a state update moves behind an `await`, write it as a functional update (`setX(current => ...)`), and test the race with an edit that replaces the array, not one that mutates an element.
+
+### A record that blocks an action needs a way to stop blocking (#912)
+To stop two checkout tabs from both being paid, I recorded the user's newest Checkout session and refused a new checkout while the recorded one was paid but its webhook had not landed. Nothing ever cleared the record, so a user who cancelled months later could never subscribe again: the old session was still 'complete'. The reviewer found it, and so did I once I asked what happens a month later.
+**Rule:** for any stored marker that refuses an action, name the event that retires it and test the action after that event. "Pending until X" needs X to clear it.

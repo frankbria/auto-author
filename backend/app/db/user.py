@@ -176,6 +176,18 @@ async def update_user(
     return updated_user
 
 
+async def swap_checkout_session(auth_id: str, session_id: str) -> Optional[str]:
+    """Store the user's newest Stripe Checkout session and return the one it
+    replaces (#912). One atomic write, so two tabs at once each see the other's."""
+    before = await users_collection.find_one_and_update(
+        {"auth_id": auth_id},
+        {"$set": {"stripe_checkout_session_id": session_id}},
+        projection={"stripe_checkout_session_id": 1},
+        return_document=ReturnDocument.BEFORE,
+    )
+    return (before or {}).get("stripe_checkout_session_id")
+
+
 async def grandfather_unverified_accounts() -> int:
     """Mark better-auth users that predate the email-verification requirement
     (#792) as verified. They never had a way to verify, so requiring it would

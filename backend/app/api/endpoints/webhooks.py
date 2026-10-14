@@ -136,7 +136,7 @@ async def stripe_webhook(request: Request):
 
 async def _apply_subscription_event(
     event_type: str, subscription: dict, event_id: str,
-    event_created: int | None = None,
+    event_created: int | None = None, _again: bool = False,
 ) -> dict:
     """Resolve the plan for a verified customer.subscription.* event and persist it.
 
@@ -147,7 +147,7 @@ async def _apply_subscription_event(
     ignored.
     """
     customer_id = subscription.get("customer")
-    subscription_id = subscription.get("id")
+    subscription_id = event_subscription_id = subscription.get("id")
     status = subscription.get("status")
     deleted = event_type == "customer.subscription.deleted"
 
@@ -264,15 +264,37 @@ async def _apply_subscription_event(
     # for the same customer carry DIFFERENT event ids, so nothing serializes
     # them: a read-then-write check lets both pass and the older one land last.
     # The condition goes in the query instead.
+    #
+    # One watermark per subscription (#912): with one per user, a new
+    # subscription's first event, created a moment before the old one's deletion
+    # landed, was refused as stale and the subscriber left on free. The per-user
+    # `stripe_event_created` written before #912 still guards a subscription
+    # that has no mark of its own yet.
     ordering_filter = None
-    if event_created is not None:
+    mark = f"stripe_event_created_by_subscription.{event_subscription_id}"
+    if event_created is not None and event_subscription_id:
         ordering_filter = {
             "$or": [
-                {"stripe_event_created": {"$exists": False}},
-                {"stripe_event_created": None},
-                {"stripe_event_created": {"$lte": event_created}},
+                {mark: {"$lte": event_created}},
+                {
+                    "$and": [
+                        {mark: {"$exists": False}},
+                        {
+                            "$or": [
+                                {"stripe_event_created": {"$exists": False}},
+                                {"stripe_event_created": None},
+                                {"stripe_event_created": {"$lte": event_created}},
+                            ]
+                        },
+                    ]
+                },
             ]
         }
+    # The current subscription is still the one read above, or already this
+    # one (#912): two first events for different subscriptions otherwise both
+    # pass the check and either is stored. A missing id matches None.
+    current_filter = {"stripe_subscription_id": {"$in": [current_id, event_subscription_id]}}
+    write_filter = {"$and": [current_filter, ordering_filter]} if ordering_filter else current_filter
 
     # If a concurrent request linked this stripe_customer_id to a DIFFERENT user
     # between our lookup and this write (TOCTOU — the only way to reach it, since
@@ -291,20 +313,38 @@ async def _apply_subscription_event(
             "stripe_customer_id": customer_id,
             "stripe_subscription_id": subscription_id,
             "stripe_subscription_status": status,
+            # The checkout it came from is settled: from here on the subscription
+            # decides, and a paid session from before a cancellation must not
+            # block the next checkout (#912).
+            "stripe_checkout_session_id": None,
             # Watermark the ordering filter above compares against. A keep
             # (past_due) write sets no plan, so it doesn't advance it: otherwise
             # a resent older `active` (its first delivery lost) would be
             # rejected as stale and a paying user left on free (#768). The
             # filter still guards the keep write itself.
             **(
-                {"stripe_event_created": event_created}
-                if event_created is not None and plan is not None
+                {mark: event_created}
+                if event_created is not None and event_subscription_id and plan is not None
                 else {}
             ),
         },
         actor_id=f"stripe:{event_id}",
-        extra_filter=ordering_filter,
+        extra_filter=write_filter,
     )
+
+    if updated is None:
+        # Another event changed the current subscription since the read:
+        # decide again against what is stored now, once.
+        now = await get_user_by_auth_id(user["auth_id"])
+        if (now or {}).get("stripe_subscription_id") not in (current_id, event_subscription_id):
+            if _again:
+                return {"status": "not_current_subscription", "event_id": event_id}
+            return await _apply_subscription_event(
+                event_type, subscription, event_id, event_created, _again=True
+            )
+        if ordering_filter is None:
+            # Nothing written and nothing to say why: no marker, so a resend retries.
+            return {"status": "not_applied", "event_id": event_id}
 
     if updated is None and ordering_filter is not None:
         # The user exists (looked up above), so a no-match means the ordering
