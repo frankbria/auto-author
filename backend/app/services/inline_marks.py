@@ -36,12 +36,18 @@ def inline(marks):
 
 
 def _balanced(text: str) -> str:
-    # A span cut by a paragraph break leaves half a pair in each block: drop
-    # that kind of mark from the block rather than hand a builder open tags.
+    """Keep only the marks that pair up in order. A span cut by a paragraph
+    break leaves half a pair in a block, and a close can come before an open:
+    either would hand a builder a stray or unclosed tag (#1030)."""
+    keep = set()
     for on, off in (BOLD, ITALIC):
-        if text.count(on) != text.count(off):
-            text = text.replace(on, "").replace(off, "")
-    return text
+        opened = []
+        for i, ch in enumerate(text):
+            if ch == on:
+                opened.append(i)
+            elif ch == off and opened:
+                keep.update((opened.pop(), i))
+    return "".join(ch for i, ch in enumerate(text) if ch not in _ALL or i in keep)
 
 
 def as_tags(escaped: str, bold: tuple, italic: tuple) -> str:
@@ -55,12 +61,11 @@ def as_tags(escaped: str, bold: tuple, italic: tuple) -> str:
 
 def add_runs(paragraph, text: str) -> None:
     """The text as python-docx runs, bold and italic where the marks say."""
-    bold = italic = False
+    depth = {mark: 0 for mark in _ALL}
     for piece in re.split(f"({_ANY.pattern})", _balanced(text)):
-        if piece in BOLD:
-            bold = piece == BOLD[0]
-        elif piece in ITALIC:
-            italic = piece == ITALIC[0]
+        if piece in _ALL:
+            depth[piece] += 1  # opens minus closes, so <b><strong>x</strong> y</b> stays bold
         elif piece:
             run = paragraph.add_run(piece)
-            run.bold, run.italic = bold or None, italic or None
+            run.bold = (depth[BOLD[0]] > depth[BOLD[1]]) or None
+            run.italic = (depth[ITALIC[0]] > depth[ITALIC[1]]) or None

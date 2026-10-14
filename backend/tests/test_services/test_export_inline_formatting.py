@@ -123,3 +123,19 @@ async def test_mark_characters_typed_into_a_chapter_make_nothing_bold():
     (pasted from anywhere) must not turn its own text bold."""
     paragraph = await _docx_paragraph("<p>not bold at all</p>", "not bold at all")
     assert not any(bold for _, bold, _ in _styled_runs(paragraph))
+
+
+async def test_a_close_before_an_open_is_dropped_too():
+    """Found in review: equal counts in the wrong order passed, `B</b>C<b>`."""
+    from app.services import inline_marks
+
+    on, off = inline_marks.BOLD
+    assert inline_marks.as_tags(f"B{off}C{on}", ("<b>", "</b>"), ("<i>", "</i>")) == "BC"
+
+
+async def test_bold_inside_bold_stays_bold_in_docx():
+    """Found in review: the first close of a nested pair ended the bold early."""
+    paragraph = await _docx_paragraph("<p><b>a <strong>x</strong> b</b> c</p>", "a x b c")
+    assert [(text, bold) for text, bold, _ in _styled_runs(paragraph)] == [
+        ("a ", True), ("x", True), (" b", True), (" c", False)
+    ]

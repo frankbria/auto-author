@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Bold and italic are bold and italic in the PDF, DOCX and EPUB (#1030, P1.75)**:
+  - **Problem.** The builders were handed chapter text with Markdown's `**` and `_` around the words the author had made bold or italic, and printed them: "Some **bold** and _italic_ text." in every export but Markdown.
+  - **Fix.** In the builders' conversion only, `<b>`/`<strong>` and `<em>`/`<i>` become private-use characters (`backend/app/services/inline_marks.py`) that nothing typed can produce: they are removed from chapter text first, so `__init__` and `2 * 3 * 4` stay text. ReportLab gets `<b>`/`<i>`, python-docx bold and italic runs, the EPUB `<strong>`/`<em>`; headings and list items alike. Marks that do not pair up in order inside a block (a span cut by a paragraph break) are dropped rather than leave a builder a stray tag. The Markdown export keeps its markers.
+  - **Found in review.** The first balancing counted marks, so a close before an open passed and would have given ReportLab a stray `</b>`; it now keeps only pairs in order. DOCX ended bold at the first close of `<b><strong>x</strong> y</b>`; runs now follow nesting depth.
+  - **Tests.** `tests/test_services/test_export_inline_formatting.py` (14): each format read back (DOCX runs, EPUB XHTML, the PDF's fonts per run), look-alike text as typed, headings and list items, marks typed into a chapter, the Markdown export unchanged. Two existing tests now expect marks where they pinned `**`. Six mutations caught.
+  - Demo: `docs/demos/2026-10-14-issue-1030-inline-formatting.md`.
+
 - **A deleted account cannot sign back in, and its other sessions are gone, in a real browser (#887, P1.70)**:
   - **Test.** `frontend/src/e2e/real-auth/deleted-account-locked-out.spec.ts`, in the real-auth suite (#843, the required Playwright job): sign up and verify, sign in from a second device, delete the account from the profile page; the second device's session is refused by the backend and unknown to better-auth, better-auth's own sign-in refuses the old password, and the sign-in page shows an error and signs nobody in. No production code changed.
   - **Where.** The issue asked for the staging suite, but a staging sign-up needs a mailbox to verify a throwaway account (#971); this suite reads the link from its own server's log.
