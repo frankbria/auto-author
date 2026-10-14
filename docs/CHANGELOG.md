@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **Frontend coverage counts every source file (#842, P1.60)**:
+  - **Problem.** `frontend/jest.config.cjs` had no `collectCoverageFrom`, so coverage counted only the files a test happened to import: 173. A file no test loaded was not 0%, it was absent, and the 85% gate never saw it. (The issue counted 29 files and 3.7k lines at the review; by now 20 files, 267 lines, 75 functions, none of them run.)
+  - **Fix.** `collectCoverageFrom` is every `src/**/*.{ts,tsx}` apart from tests, mocks, e2e, type declarations and `jest.setup.ts`: 190 files. Counted that way, functions came to 84.35%, under the gate. Two of the uncounted files are imported by nothing and named for removal by #853, and they are removed: `components/examples/ai-error-handling-example.tsx` and `lib/api/chapter-tabs-old.ts`. Every threshold then holds as it was: lines 89.14, statements 88.13, branches 82.83, functions 85.33. None is lowered.
+  - **Also.** The theme ledgers (`gray-literal-baseline.json`, `spinner-baseline.json`) drop the example's entries, and the busy-button guard's floor drops from 23 to 20, the example's three. `frontend/docs/AI_ERROR_HANDLING.md` no longer points at the example.
+  - **Margin.** Functions are 0.33 points over the gate. The other 18 uncounted files are still at 0% and in the count; #853 removes more of them.
+  - Demo: `docs/demos/2026-10-13-issue-842-frontend-coverage-every-file.md`.
+
 - **Four backend tests that could not fail can (#841, P1.59)**:
   - **The coverage pattern.** `.coveragerc` excluded lines matching `pass`, meant for a line that says only `pass`. It matched "bypass", and a matching `def` takes its whole body out of the count: the validator that keeps BYPASS_AUTH out of production, 29 lines of `app/core/config.py`, was never measured. The pattern is `^\s*pass\s*$`. `tests/test_coverage_config.py` asks coverage itself which lines it leaves out: none that mention the bypass, none of the validator, and still a bare `pass`.
   - **The script that swallowed its failures.** `tests/test_file_upload_service.py` caught each check's exception and printed it. On main four of its five checks fail (`UploadFile` no longer takes `content_type`) and it passes. Deleted; `tests/test_services/test_file_upload_service.py` (20 tests) is the real one.
