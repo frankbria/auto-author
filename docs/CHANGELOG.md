@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **A deleted account cannot sign back in, and its other sessions are gone, in a real browser (#887, P1.70)**:
+  - **Test.** `frontend/src/e2e/real-auth/deleted-account-locked-out.spec.ts`, in the real-auth suite (#843, the required Playwright job): sign up and verify, sign in from a second device, delete the account from the profile page; the second device's session is refused by the backend and unknown to better-auth, better-auth's own sign-in refuses the old password, and the sign-in page shows an error and signs nobody in. No production code changed.
+  - **Where.** The issue asked for the staging suite, but a staging sign-up needs a mailbox to verify a throwaway account (#971); this suite reads the link from its own server's log.
+  - **Mutations.** The first version passed with the better-auth purge removed: the cookie it kept was the one the sign-out after the delete had already ended, and the backend refuses a deactivated account whatever better-auth says. It now checks a second device's session and better-auth's sign-in endpoint, and catches the purge being removed. Keeping the session and account rows while deleting the better-auth user still locks the account out (better-auth refuses a session without its user), so only `test_deleted_account_is_locked_out_and_its_better_auth_docs_are_gone` catches that one, as it should.
+  - Demo: `docs/demos/2026-10-14-issue-887-deleted-account-locked-out.md`.
+
 - **Signing out of a protected page, or deleting the account, lands on the home page (#886, P1.69)**:
   - **Problem.** The session store drops the session as soon as sign-out starts, and `ProtectedRoute` redirected before the caller's `router.push('/')`: the user landed on `/auth/sign-in?redirect=<the page they left>`.
   - **Fix.** `frontend/src/lib/sign-out.ts` marks a sign-out the user asked for as underway, while the request runs and for five seconds after it succeeds; `ProtectedRoute` and the shared 401 handler leave the navigation to the caller meanwhile. A session that ends any other way still goes to sign-in with a way back. The profile page's delete now goes through `signOutOrNotify({ quiet: true })`.
