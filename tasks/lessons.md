@@ -1717,3 +1717,11 @@ A Radix radio group moves focus a tick after the arrow key goes down and chooses
 ### The keyboard driver pressed Enter on whatever had the focus (#836)
 The demo's loop pressed Tab six times looking for Retry, which is the seventh stop, then pressed Enter anyway. Enter landed on "Back to Book", the browser left the page, and the script printed a state that looked like a failed retry.
 **Rule:** a driver that presses a key to act says what has the focus first and stops if it is not the thing it meant.
+
+### A mutation that passes may not be a mutation; find what the property buys (#837)
+To check the test "Tab stays inside the menu" I broke the focus trap twice. The first break did not break it (a handler on the same element is not stopped by `stopPropagation`). The second made the sheet non-modal, and every test still passed, because a Radix dialog loops Tab whether it is modal or not. What modal buys is something else: the page behind is hidden from assistive technology. Nothing asserted that, and it is the half a screen reader user needs.
+**Rule:** when a mutation survives, first ask whether it changes the behaviour the test names. If it does not, ask what the mutated property is for, and assert that.
+
+### Swapping a hand-written control for the shared one can drop what the old one had (#837)
+The old drawer's close button was 44 by 44 pixels on a phone. The shared sheet's is a 16-pixel icon. The swap passed every test and axe; a measurement in the browser found it.
+**Rule:** before replacing a control, list what the old one gives a user (size, label, focus, keys) and measure each on the new one. Fix the gap in the shared component, where its other users get it too.

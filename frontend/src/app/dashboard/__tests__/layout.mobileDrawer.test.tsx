@@ -75,6 +75,9 @@ describe('the mobile menu with the keyboard (#837)', () => {
 
     expect(menu).toContainElement(document.activeElement as HTMLElement);
     expect(toggle()).toHaveAttribute('aria-expanded', 'true');
+    // Modal: what is behind the menu is hidden from assistive technology, so a screen reader cannot wander out of it.
+    expect(screen.queryByRole('button', { name: 'Toggle mobile menu' })).not.toBeInTheDocument();
+    expect(screen.queryByText('The page')?.closest('[aria-hidden="true"]')).not.toBeNull();
     expect(within(menu).getAllByRole('link').map(link => link.textContent)).toEqual(['Dashboard', 'Settings', 'Help']);
   });
 
