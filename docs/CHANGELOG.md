@@ -4,6 +4,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-13
 
+- **Four backend tests that could not fail can (#841, P1.59)**:
+  - **The coverage pattern.** `.coveragerc` excluded lines matching `pass`, meant for a line that says only `pass`. It matched "bypass", and a matching `def` takes its whole body out of the count: the validator that keeps BYPASS_AUTH out of production, 29 lines of `app/core/config.py`, was never measured. The pattern is `^\s*pass\s*$`. `tests/test_coverage_config.py` asks coverage itself which lines it leaves out: none that mention the bypass, none of the validator, and still a bare `pass`.
+  - **The script that swallowed its failures.** `tests/test_file_upload_service.py` caught each check's exception and printed it. On main four of its five checks fail (`UploadFile` no longer takes `content_type`) and it passes. Deleted; `tests/test_services/test_file_upload_service.py` (20 tests) is the real one.
+  - **The skipped workflow test.** `test_complete_system_workflow` was skipped without `OPENAI_API_KEY`, as in CI. Un-skipped, it was not "fully mocked": drafting the chapter went to the real provider, and in the full suite it failed. Its fixture now stands in for the provider client as well, so nothing it does not stub by name leaves the process.
+  - **The export checks.** "The empty chapter is excluded" was checked by looking for its title in the bytes of the EPUB and the PDF, which are compressed, so it could never be found. The EPUB is unpacked; the PDF's page streams are decoded (ASCII85 and deflate) by `_pdf_page_text` in the test file. With the export made to keep empty chapters, main's tests pass and these fail.
+  - **Not changed.** The `timeout` marks in `test_system_e2e.py` still do nothing: pytest-timeout is not installed.
+  - Demo: `docs/demos/2026-10-13-issue-841-tests-that-cannot-fail.md`.
+
 - **Every route under a book refuses someone who does not own it (#840, P1.58)**:
   - **Problem.** Whether a route checks whose book it is was tested route by route, by whoever wrote the route. `export/docx` and `export/formats` had no such test, and nothing would have noticed a new route that forgot the check.
   - **Fix.** `tests/test_api/test_routes/test_book_ownership_sweep.py` reads the application's route table and holds one request for each of the 48 routes with `{book_id}` in its path. For each, another signed-in user sends a request the owner could have sent and must be answered 403 or 404, with the book's content as it was and the model not reached. The owner then sends the same request and must get through, so a refusal cannot be for a missing chapter or a bad body. Both users have real session cookies (#838). `test_every_book_route_is_in_the_sweep` fails, naming the route, when a route under a book has no request in the table, and when the table names a route that is gone.

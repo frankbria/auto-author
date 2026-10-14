@@ -1737,3 +1737,7 @@ The whole backend suite against a replica set in Docker stopped producing output
 ### One request per route sweeps one path through the route (#840)
 The ownership sweep sent `PATCH /summary` a new summary. With the route's ownership check removed it still passed, because the write is scoped to the owner in the database too. The same route, sent no summary, answers with the book's summary, and nothing but the route's check guards that. The sweep had been pointed at the path with two locks.
 **Rule:** when a mutation shows a second layer doing the refusing, look for the path through the same route that the second layer does not cover, and sweep that one. A table of one request per route is a table of one path per route; say so where the table is.
+
+### Un-skip a test in the whole suite, not on its own (#841)
+The workflow test had been skipped without an API key, and its docstring said it was fully mocked. Run alone after the skip came off, it passed. In the commit hook's full run it failed: drafting a chapter was not stubbed and went to the real provider, and something earlier in the suite changed what that call met. The stubs were method by method, and one method was missing.
+**Rule:** a test coming out of a skip runs in the full suite before it is called passing. And a stand-in for an outside service goes at the client, where every call passes, with named stubs on top; a list of methods leaves out the one added next.
