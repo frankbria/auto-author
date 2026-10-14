@@ -4,6 +4,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Signing out of a protected page, or deleting the account, lands on the home page (#886, P1.69)**:
+  - **Problem.** The session store drops the session as soon as sign-out starts, and `ProtectedRoute` redirected before the caller's `router.push('/')`: the user landed on `/auth/sign-in?redirect=<the page they left>`.
+  - **Fix.** `frontend/src/lib/sign-out.ts` marks a sign-out the user asked for as underway, while the request runs and for five seconds after it succeeds; `ProtectedRoute` and the shared 401 handler leave the navigation to the caller meanwhile. A session that ends any other way still goes to sign-in with a way back. The profile page's delete now goes through `signOutOrNotify({ quiet: true })`.
+  - **Found by the real-auth browser test.** Deleting the account still ended elsewhere, twice over: the profile page refetched `/users/me` once the session was gone and the 401 handler won (fixed above), and `DELETE /users/me` answered 429 to a user who had only loaded the profile, because the rate limiter keyed buckets on the declared path, which in FastAPI 0.141 carries neither the router prefix nor the method, so GET, PATCH and DELETE `/users/me` shared one bucket (#798's keying). The key now starts with the method; no two routers declare the same method and path (all 64 checked).
+  - **Found in review.** The first version left the flag set after a successful sign-out, so a protected page reached later could wait forever and a later 401 was ignored; it is now bounded.
+  - **Tests.** `src/__tests__/SignOutLandsHome.test.tsx` (6), `src/e2e/real-auth/sign-out-lands-home.spec.ts` (2, real better-auth, in the required Playwright job: both failed against main's code, landing on `sign-in?redirect=%2Fdashboard` and staying on `/profile`), `test_two_methods_on_one_path_have_their_own_buckets`.
+  - Demo: `docs/demos/2026-10-14-issue-886-sign-out-lands-home.md`.
+
 - **Refused AI requests cost no quota: the two tests #883 still asked for (#883, P1.67)**:
   - **State.** #798 (PR #979) already charges the quota up front and refunds a request that failed before any model call, and #803 surfaced `X-AI-Quota-*` to the client. What #883's definition of done still lacked was proof for N rate-limited requests and for a refusal by the entitlement gate.
   - **Tests.** `tests/test_api/test_ai_quota_charging.py`: six requests through a 1-per-window limiter (one 200, five 429) leave one charge; the free plan stripped of `analyze_summary` but keeping its quota gets the gate's 402 and is charged nothing, with the model never called. No production code changed.

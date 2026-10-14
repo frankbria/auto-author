@@ -128,3 +128,22 @@ it('a 401 that arrives while signing out does not send the user to sign-in', asy
   await new Promise((r) => setTimeout(r, 0));
   expect(go).not.toHaveBeenCalled();
 });
+
+it('a protected page reached a while after signing out still redirects (found in review)', async () => {
+  const now = jest.spyOn(Date, 'now');
+  now.mockReturnValue(1_000_000);
+  const { unmount } = render(<SignOutButton />);
+  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+  await waitFor(() => expect(router.push).toHaveBeenCalledWith('/'));
+  unmount();
+  router.push.mockClear();
+
+  // Back to a protected page later in the same tab: no session, nobody navigating.
+  now.mockReturnValue(1_000_000 + 60_000);
+  renderPage();
+
+  await waitFor(() =>
+    expect(router.push).toHaveBeenCalledWith('/auth/sign-in?redirect=%2Fdashboard%2Fbooks%2Fb1')
+  );
+  now.mockRestore();
+});

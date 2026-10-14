@@ -1,17 +1,21 @@
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
 
-let underway = false;
+// Until when a sign-out the user asked for owns the navigation: open-ended
+// while the request runs, then long enough for the caller's router.push.
+const CALLER_NAVIGATES_WITHIN_MS = 5000;
+let underwayUntil = 0;
 
 /**
- * True from the moment a sign-out the user asked for starts until a session is
- * seen again. ProtectedRoute leaves the navigation to the caller meanwhile, or
- * its own redirect would win the race and send the user to sign-in with a way
- * back to the page they just left (#886).
+ * True while a sign-out the user asked for is running and for a few seconds
+ * after it succeeds. ProtectedRoute and the 401 handler leave the navigation
+ * to the caller meanwhile, or their own redirect would win the race and send
+ * the user to sign-in with a way back to the page they just left (#886).
+ * Bounded, so a protected page reached later redirects as usual.
  */
-export const signOutUnderway = () => underway;
+export const signOutUnderway = () => Date.now() < underwayUntil;
 export const endSignOut = () => {
-  underway = false;
+  underwayUntil = 0;
 };
 
 /**
@@ -21,12 +25,12 @@ export const endSignOut = () => {
  * if it had worked. Returns whether the sign-out happened.
  */
 export async function signOutOrNotify({ quiet = false } = {}): Promise<boolean> {
-  underway = true;
+  underwayUntil = Infinity;
   const failed = await authClient.signOut().then(
     ({ error }) => Boolean(error),
     () => true
   );
-  if (failed) underway = false;
+  underwayUntil = failed ? 0 : Date.now() + CALLER_NAVIGATES_WITHIN_MS;
   if (failed && !quiet) {
     toast({
       title: "Could not sign out",
