@@ -332,6 +332,33 @@ async def purge_expired_users() -> int:
     return result.modified_count
 
 
+async def erase_stranded_identities() -> int:
+    """Finish deletions that stopped between the tombstone and the identity
+    erasure (#935): a crash or failover there left the better-auth user and
+    account (email, name, password hash), and the user cannot retry because the
+    tombstone refuses their session. Idempotent; run by the housekeeping task,
+    at start-up and then daily.
+
+    shortcut: one lookup per tombstone on every run; keep a "fully erased" flag
+    on the tombstone if the number of deleted accounts grows large.
+    """
+    ba_users = await get_collection("user")
+    accounts = await get_collection("account")
+    finished = 0
+    async for doc in users_collection.find({"deleted_at": {"$exists": True}}, {"auth_id": 1}):
+        auth_id = doc.get("auth_id")
+        if not auth_id:
+            continue
+        ids: List = [auth_id] + ([ObjectId(auth_id)] if ObjectId.is_valid(auth_id) else [])
+        left = await ba_users.find_one(
+            {"$or": [{"_id": {"$in": ids}}, {"id": auth_id}]}, {"_id": 1}
+        ) or await accounts.find_one({"userId": {"$in": ids}}, {"_id": 1})
+        if left:
+            await delete_better_auth_identity(auth_id)
+            finished += 1
+    return finished
+
+
 async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
     """
     Delete books associated with a user

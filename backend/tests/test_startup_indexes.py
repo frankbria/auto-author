@@ -290,3 +290,25 @@ async def test_lifespan_repairs_duplicate_chapter_ids(motor_reinit_db):
     book = await base._db.books.find_one({"_id": book_id})
     first, second = book["table_of_contents"]["chapters"]
     assert first["id"] == "dup" and second["id"] != "dup"
+
+
+@pytest.mark.asyncio
+async def test_lifespan_finishes_a_deletion_that_died_half_way(motor_reinit_db):
+    """A tombstone whose better-auth user and password survived (#935)."""
+    from app.db.user import create_user
+
+    oid = ObjectId()
+    await base._db.get_collection("user").insert_one({"_id": oid, "email": "half@example.com", "name": "Half"})
+    await base._db.get_collection("account").insert_one({"userId": oid, "password": "hash"})
+    await create_user({"auth_id": str(oid), "email": "half@example.com", "plan": "free", "is_active": True})
+    await base._db.users.update_one({"auth_id": str(oid)}, {"$set": {"deleted_at": datetime.now()}})
+
+    async with app.router.lifespan_context(app):
+        # The sweep runs in the daily housekeeping task, beside the server.
+        for _ in range(100):
+            if await base._db.get_collection("account").count_documents({"userId": oid}) == 0:
+                break
+            await asyncio.sleep(0.05)
+
+    assert await base._db.get_collection("user").count_documents({"_id": oid}) == 0
+    assert await base._db.get_collection("account").count_documents({"userId": oid}) == 0
