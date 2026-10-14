@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Books that already store duplicate chapter ids are repaired at start-up (#885, P1.68)**:
+  - **Problem.** #754 refuses new duplicate chapter ids, but a book stored before it can hold two chapters with one id. The autosave writes with `array_filters` on the id, so one save overwrote both chapters, and PUT /toc refused every save of that book with a 400 that Edit TOC showed as a generic failure.
+  - **Fix.** `backend/app/db/toc_repair.py` `repair_duplicate_chapter_ids()` runs with the other start-up steps (never fatal, reported through `report_failure`): every later occurrence of an id gets a fresh uuid4, and the first keeps its id, draft, questions and tab state. It reads only ids (two levels, the data model's depth), then the whole TOC of a book that needs it; the write is guarded on the TOC version and bumps it. Idempotent. Edit TOC names a duplicate-id refusal (400 plus the server's message) and says to reload. The autosave guard the issue offered as an alternative is not added: new duplicates are refused since #754 and stored ones are repaired.
+  - **Found in review.** One malformed TOC (a null chapter, `chapters` not a list) raised and stopped the repair for every later book; each book is now checked on its own. Empty ids no longer count, matching #754's rule.
+  - **Tests.** `tests/test_db/test_duplicate_chapter_ids_repaired.py` (4, real MongoDB), `test_lifespan_repairs_duplicate_chapter_ids` in `tests/test_startup_indexes.py`, `edit-toc.status.test.tsx`. Four mutations caught. Filed #1071 `[P2.60]`: a test that runs the app lifespan shuts the export executor for every later test, so the start-up test lives beside the other lifespan tests.
+  - Demo: `docs/demos/2026-10-14-issue-885-duplicate-chapter-ids.md` (real browser: main's page says "Failed to save", the branch's names the cause; after a restart on the branch the save goes through).
+
 - **Refused AI requests cost no quota: the two tests #883 still asked for (#883, P1.67)**:
   - **State.** #798 (PR #979) already charges the quota up front and refunds a request that failed before any model call, and #803 surfaced `X-AI-Quota-*` to the client. What #883's definition of done still lacked was proof for N rate-limited requests and for a refusal by the entitlement gate.
   - **Tests.** `tests/test_api/test_ai_quota_charging.py`: six requests through a 1-per-window limiter (one 200, five 429) leave one charge; the free plan stripped of `analyze_summary` but keeping its quota gets the gate's 402 and is charged nothing, with the model never called. No production code changed.

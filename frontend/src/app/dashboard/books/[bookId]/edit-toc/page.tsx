@@ -444,6 +444,10 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       if ((err as { statusCode?: number }).statusCode === 409) {
         setConflict(true);
         setError('This table of contents changed elsewhere since you opened it. Reload to see the latest version; your unsaved edits here will be discarded.');
+      } else if ((err as { statusCode?: number }).statusCode === 400 && /must be unique/.test((err as Error).message ?? '')) {
+        // A book stored before #754 can hold two chapters with one id; start-up repairs them (#885).
+        setConflict(false);
+        setError('Two chapters share an id, so this table of contents could not be saved. Reload the page to get the repaired chapters, then make your changes again.');
       } else {
         setConflict(false);
         setError('Failed to save the table of contents. Please try again.');

@@ -183,6 +183,7 @@ async def lifespan(app: FastAPI):
         grandfather_unverified_accounts,
         purge_expired_users,
     )
+    from app.db.toc_repair import repair_duplicate_chapter_ids
 
     async def database_answers() -> bool:
         try:
@@ -246,6 +247,15 @@ async def lifespan(app: FastAPI):
         except Exception as error:
             logger.error("Marking existing accounts as verified failed", exc_info=True)
             report_failure("startup-verify-accounts", error)
+
+        # Books stored before #754 may hold duplicate chapter ids (#885). Never fatal.
+        try:
+            repaired = await repair_duplicate_chapter_ids()
+            if repaired:
+                logger.info("Gave duplicate chapter ids fresh ids in %d book(s)", repaired)
+        except Exception as error:
+            logger.error("Repairing duplicate chapter ids failed", exc_info=True)
+            report_failure("startup-duplicate-chapter-ids", error)
 
     # On the app, so that a test (or anything else) can wait for it.
     app.state.database_prepared = asyncio.create_task(prepare_database_when_it_is_there())
