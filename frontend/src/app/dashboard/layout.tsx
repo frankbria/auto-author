@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 export default function DashboardLayout({
   children,
@@ -13,6 +15,8 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // The sheet is drawn in a portal, outside the md:hidden wrapper: Tailwind's md breakpoint takes it down instead.
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   // Navigation items with active state detection
   const navItems = [
@@ -21,13 +25,6 @@ export default function DashboardLayout({
     { name: 'Help', href: '/dashboard/help', active: pathname === '/dashboard/help' },
   ];
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  const closeMobileMenu = () => {
-    setIsMobileMenuOpen(false);
-  };
   return (
     <ProtectedRoute>
       <div className="flex flex-col min-h-screen">
@@ -63,59 +60,29 @@ export default function DashboardLayout({
             {/* Mobile Navigation */}
             <div className="md:hidden flex items-center gap-4">
               <UserButton />
-              <button
-                onClick={toggleMobileMenu}
-                className="flex items-center justify-center min-h-11 min-w-11 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Toggle mobile menu"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  {isMobileMenuOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  )}
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Menu Drawer */}
-          {isMobileMenuOpen && (
-            <>
-              {/* Backdrop */}
-              <div
-                className="fixed inset-0 bg-black/50 z-40 md:hidden"
-                onClick={closeMobileMenu}
-              />
-
-              {/* Menu Panel */}
-              <div className="fixed top-0 right-0 h-full w-64 bg-card border-l border-border z-50 md:hidden transform transition-transform duration-300 ease-in-out">
-                <div className="p-6">
-                  <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-lg font-semibold text-foreground">Menu</h2>
-                    <button
-                      onClick={closeMobileMenu}
-                      className="flex items-center justify-center min-h-11 min-w-11 text-muted-foreground hover:text-foreground transition-colors"
-                      aria-label="Close menu"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <nav aria-label="Mobile navigation">
+              {/* The Radix sheet gives the drawer its dialog role, focus trap, Escape and aria-expanded (#837) */}
+              <Sheet open={isMobileMenuOpen && !isDesktop} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <button
+                    className="flex items-center justify-center min-h-11 min-w-11 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Toggle mobile menu"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-64 bg-card" aria-describedby={undefined}>
+                  <SheetHeader className="px-6 pt-6 pb-2">
+                    <SheetTitle className="text-lg">Menu</SheetTitle>
+                  </SheetHeader>
+                  <nav aria-label="Mobile navigation" className="px-6">
                     <ul className="space-y-4">
                       {navItems.map((item) => (
                         <li key={item.name}>
                           <Link
                             href={item.href}
-                            onClick={closeMobileMenu}
+                            onClick={() => setIsMobileMenuOpen(false)}
                             className={`block py-3 px-4 rounded-lg transition-colors ${
                               item.active
                                 ? 'bg-primary text-primary-foreground font-medium'
@@ -128,10 +95,10 @@ export default function DashboardLayout({
                       ))}
                     </ul>
                   </nav>
-                </div>
-              </div>
-            </>
-          )}
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
         </header>
 
         {/* Main Content */}

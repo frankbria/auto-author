@@ -175,7 +175,6 @@ function SignInForm() {
                 <Link
                   href="/auth/forgot-password"
                   className="text-sm text-blue-600 hover:underline dark:text-blue-400"
-                  tabIndex={-1}
                 >
                   Forgot password?
                 </Link>
@@ -196,7 +195,6 @@ function SignInForm() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 max-md:min-h-11 max-md:min-w-11"
                   aria-label={showPassword ? "Hide password" : "Show password"}
-                  tabIndex={-1}
                 >
                   {showPassword ? (
                     <HugeiconsIcon icon={ViewOffIcon} size={16} />
