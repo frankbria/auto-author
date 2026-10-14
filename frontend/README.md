@@ -88,14 +88,10 @@ frontend/
 # Install dependencies
 npm install
 
-# Set up environment variables
+# Set up environment variables. Unchanged, the example works with the backend's
+# own example (backend/.env.example): same DATABASE_NAME, same BETTER_AUTH_SECRET,
+# and NEXT_PUBLIC_API_URL includes /api/v1.
 cp .env.example .env.local
-
-# Configure .env.local:
-NEXT_PUBLIC_API_URL=http://localhost:8000
-# Must match the backend BETTER_AUTH_SECRET exactly
-BETTER_AUTH_SECRET=your-secure-secret-key-here-replace-with-generated-value
-NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 ```
 
 ### Development Commands
