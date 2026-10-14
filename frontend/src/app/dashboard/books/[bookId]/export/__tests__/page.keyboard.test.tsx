@@ -195,6 +195,24 @@ describe('when the export page cannot load (#836)', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
+  it('takes the alert down when a later load succeeds without Retry, as when the session arrives', async () => {
+    // The page loads again whenever the session changes. A first load that failed must not outlive a second that worked.
+    mockBookClient.getExportFormats.mockRejectedValueOnce(new Error('not signed in yet'));
+    (useSession as jest.Mock).mockReturnValue({ data: null });
+    const page = renderPage();
+    await screen.findByRole('alert');
+
+    (useSession as jest.Mock).mockReturnValue({ data: { user: { id: 'u1' } } });
+    page.rerender(
+      <Suspense fallback={null}>
+        <ExportBookPage params={fulfilledParams({ bookId: 'book-1' })} />
+      </Suspense>
+    );
+
+    expect(await screen.findByRole('radiogroup')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('has no axe violations', async () => {
     mockBookClient.getExportFormats.mockRejectedValue(new Error('boom'));
     const { container } = renderPage();

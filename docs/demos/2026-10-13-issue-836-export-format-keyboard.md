@@ -182,3 +182,16 @@ passed: when the export page cannot load (#836) shows the alert again when the r
 passed: when the export page cannot load (#836) has no axe violations
 all of the export page's tests: 34 passed, 0 failed
 ```
+
+## Added after the recording: a failure that a later load outlives
+
+The page loads again whenever the session changes, not only on Retry. As first written, a load that failed and was followed by one that worked left the alert up over data that had arrived. Any load that works now clears the failure. This is the test for it, which failed before the fix, and then all of the page's tests, of which there are now 35.
+
+```bash
+cd /home/frankbria/projects/worktrees/issue-836-export-format-radiogroup/frontend && npx jest 'src/app/dashboard/books/\[bookId\]/export' --coverage=false --json --outputFile=/tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo836/jest.json >/dev/null 2>&1; python3 /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo836/names.py /tmp/claude-1000/-home-frankbria-projects-auto-author/37b63b79-18ca-4958-9013-d3974f437927/scratchpad/demo836/jest.json | grep -E 'session arrives|all of'
+```
+
+```output
+passed: when the export page cannot load (#836) takes the alert down when a later load succeeds without Retry, as when the session arrives
+all of the export page's tests: 35 passed, 0 failed
+```

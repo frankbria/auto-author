@@ -101,6 +101,8 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
         }));
 
         setChapters(chaptersFormatted);
+        // Any load that works clears an earlier failure: the page also loads again when the session changes.
+        setLoadFailed(false);
 
       } catch (error) {
         console.error('Error fetching book details:', error);
@@ -212,7 +214,6 @@ export default function ExportBookPage({ params }: { params: Promise<{ bookId: s
             <p>Nothing has been exported. Check your connection and try again.</p>
             <button
               onClick={() => {
-                setLoadFailed(false);
                 setIsLoading(true);
                 setLoadAttempt(attempt => attempt + 1);
               }}
