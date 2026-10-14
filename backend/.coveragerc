@@ -14,5 +14,6 @@ exclude_lines =
     def __str__
     raise NotImplementedError
     if __name__ == .__main__.:
-    pass
+    # Anchored: the bare `pass` matched "bypass" and left the BYPASS_AUTH validator out (#841).
+    ^\s*pass\s*$
     raise ImportError
