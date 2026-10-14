@@ -324,10 +324,11 @@ async def erase_stranded_identities() -> int:
     """Finish deletions that stopped between the tombstone and the identity
     erasure (#935): a crash or failover there left the better-auth user and
     account (email, name, password hash), and the user cannot retry because the
-    tombstone refuses their session. Idempotent; run at start-up.
+    tombstone refuses their session. Idempotent; run by the housekeeping task,
+    at start-up and then daily.
 
-    shortcut: one lookup per tombstone at every start-up; keep a "fully erased"
-    flag on the tombstone if the number of deleted accounts grows large.
+    shortcut: one lookup per tombstone on every run; keep a "fully erased" flag
+    on the tombstone if the number of deleted accounts grows large.
     """
     ba_users = await get_collection("user")
     accounts = await get_collection("account")

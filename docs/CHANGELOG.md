@@ -4,6 +4,12 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **A deletion that died between the tombstone and the identity erasure is finished automatically (#935, P1.74)**:
+  - **Problem.** `delete_user` writes the tombstone, then erases the better-auth session, account, twoFactor and user documents one collection at a time. A crash or failover in between left the email, name and password hash behind, the user could not retry (the tombstone refuses their session), and only an admin call someone had to know about recovered it.
+  - **Fix.** `erase_stranded_identities()` in `backend/app/db/user.py` finds every tombstone whose better-auth user or account still exists and re-runs the identity erasure. It runs in the existing housekeeping task beside the purge (at start-up, then daily), never fatal, reported through `report_failure`. Idempotent, and it also repairs a strand that already happened. The transaction option was not taken: that branch never runs in CI (#839), and the sweep covers standalone Mongo too.
+  - **Tests.** `tests/test_db/test_stranded_identity_sweep.py` (3, real MongoDB): a failure injected between the tombstone and the erasure leaves the strand, and the sweep removes it while a live account keeps all four documents; a second sweep finds nothing; an account (password hash) left without its user is found too. `test_lifespan_finishes_a_deletion_that_died_half_way` shows the housekeeping task runs it. Four mutations caught.
+  - Demo: `docs/demos/2026-10-14-issue-935-stranded-identity-sweep.md`.
+
 - **Edit TOC asks before deleting a chapter that holds writing or answers (#906, P1.71)**:
   - **Problem.** Deleting a chapter was one click, and since #755 saving the TOC without it also deletes its questions and answers: a mis-click and Save destroyed the draft and every answer behind it.
   - **Fix.** `edit-toc/ConfirmChapterDelete.tsx`: deleting a chapter adds up its words and its subchapters' (`word_count` from GET /toc) and their answers, completed and in progress, from `question-progress` for chapters the server has stored. Nothing to lose: it goes at once. Otherwise a Radix alert dialog names both numbers; when the answers cannot be counted it still asks. Beside Save, the page lists the stored chapters the save will remove (an always-mounted status line).

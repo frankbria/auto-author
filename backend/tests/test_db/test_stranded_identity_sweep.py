@@ -38,10 +38,10 @@ async def test_a_deletion_that_died_after_the_tombstone_is_finished_by_the_sweep
     async def dies(auth_id):
         raise RuntimeError("the process died here")
 
-    monkeypatch.setattr(users_dao, "delete_better_auth_identity", dies)
-    with pytest.raises(RuntimeError):
-        await delete_user(victim["user_id"])
-    monkeypatch.undo()
+    with monkeypatch.context() as patched:
+        patched.setattr(users_dao, "delete_better_auth_identity", dies)
+        with pytest.raises(RuntimeError):
+            await delete_user(victim["user_id"])
     assert await _better_auth_docs(victim["oid"]) == ALL_THERE  # the strand #935 describes
 
     assert await erase_stranded_identities() == 1
@@ -50,9 +50,30 @@ async def test_a_deletion_that_died_after_the_tombstone_is_finished_by_the_sweep
     assert await _better_auth_docs(bystander["oid"]) == ALL_THERE
 
 
-async def test_the_sweep_is_idempotent(motor_reinit_db):
-    victim = await _account("done@example.com")
-    await delete_user(victim["user_id"])
+async def test_the_sweep_is_idempotent(motor_reinit_db, monkeypatch):
+    victim = await _account("twice@example.com")
 
+    async def dies(auth_id):
+        raise RuntimeError("the process died here")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(users_dao, "delete_better_auth_identity", dies)
+        with pytest.raises(RuntimeError):
+            await delete_user(victim["user_id"])
+
+    assert await erase_stranded_identities() == 1
     assert await erase_stranded_identities() == 0
+    assert await _better_auth_docs(victim["oid"]) == NONE_LEFT
+
+
+async def test_a_password_left_without_its_user_is_found_too(motor_reinit_db):
+    """The erasure deletes the better-auth user last; a strand may still hold
+    only the account (the password hash) if that order ever changes."""
+    from app.db.base import get_collection
+
+    victim = await _account("account-only@example.com")
+    await delete_user(victim["user_id"])
+    await (await get_collection("account")).insert_one({"userId": victim["oid"], "password": "hash"})
+
+    assert await erase_stranded_identities() == 1
     assert await _better_auth_docs(victim["oid"]) == NONE_LEFT
