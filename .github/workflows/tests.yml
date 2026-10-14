@@ -142,6 +142,25 @@ jobs:
           uv run pytest --cov=app tests/ --cov-fail-under=85
         # Enforced (#118): gate is green at baseline, so a coverage regression must fail CI.
 
+      # The Mongo service above is standalone, and a standalone server has no
+      # transactions: delete_book's transaction branch, the one Atlas runs, had
+      # never executed here (#839). A service container takes no command, so
+      # the replica set is started by hand, on its own port. REQUIRE_REPLICA_SET
+      # turns the skip those tests take on a standalone server into a failure.
+      - name: Cascade delete on a single-node replica set
+        working-directory: backend
+        env:
+          REQUIRE_REPLICA_SET: '1'
+          TEST_MONGO_URI: mongodb://localhost:27018/auto-author-test?replicaSet=rs0
+        run: |
+          docker run -d --name mongo-rs -p 27018:27018 mongo:7 --replSet rs0 --port 27018 --bind_ip_all
+          shell() { docker exec mongo-rs mongosh --quiet --port 27018 --eval "$1"; }
+          for _ in $(seq 1 30); do shell 'db.adminCommand({ping: 1}).ok' >/dev/null 2>&1 && break; sleep 1; done
+          shell 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27018"}]}).ok'
+          for _ in $(seq 1 30); do [ "$(shell 'db.hello().isWritablePrimary')" = true ] && break; sleep 1; done
+          [ "$(shell 'db.hello().isWritablePrimary')" = true ] || { echo "::error::the replica set has no primary"; exit 1; }
+          uv run pytest tests/test_db/test_cascade_delete_atomic.py --no-cov -v
+
       - name: Upload coverage reports
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         if: always()
