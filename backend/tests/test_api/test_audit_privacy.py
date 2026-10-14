@@ -1,6 +1,6 @@
 """Audit rows carry no book titles and no per-read rows (issue #787).
 
-Uses the REAL audit_request: auth_client_factory stubs it out, so it is put back.
+Uses the REAL audit_after_commit: auth_client_factory stubs it out, so it is put back.
 """
 
 import ast
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from app.api.dependencies import audit_request
+from app.api.dependencies import audit_after_commit
 from app.api.endpoints import books as books_endpoint
 from app.api.endpoints import users as users_endpoint
 from tests.conftest import _sync_logs
@@ -22,8 +22,8 @@ async def test_audit_rows_have_no_title_and_no_read_rows(
     auth_client_factory, test_book, monkeypatch
 ):
     api = await auth_client_factory()
-    monkeypatch.setattr(users_endpoint, "audit_request", audit_request)
-    monkeypatch.setattr(books_endpoint, "audit_request", audit_request)
+    monkeypatch.setattr(users_endpoint, "audit_after_commit", audit_after_commit)
+    monkeypatch.setattr(books_endpoint, "audit_after_commit", audit_after_commit)
 
     payload = {"title": TITLE, "genre": test_book.get("genre", "Non-Fiction")}
     resp = await api.post("/api/v1/books/", json=payload)
@@ -51,7 +51,7 @@ def test_no_audit_call_site_records_a_title():
             if not isinstance(node, ast.Call):
                 continue
             name = getattr(node.func, "id", getattr(node.func, "attr", None))
-            if name not in {"audit_request", "create_audit_log"}:
+            if name not in {"audit_request", "audit_after_commit", "create_audit_log"}:
                 continue
             calls += 1
             for kw in node.keywords:

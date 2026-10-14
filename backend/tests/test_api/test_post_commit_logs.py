@@ -1,10 +1,11 @@
 """A log written after the work is done cannot turn the work into a 500 (#847).
 
 A chapter was created, then its access log failed and the request answered
-500: the client retried and made the chapter twice. A draft was generated
-(and the AI call paid for), then its audit row failed and the draft was
-thrown away. Saving the tab state is different: the access log IS the saved
-state there, so its failure must still fail the request.
+500: the client retried and made the chapter twice. A book's audit row failed
+the same way after the book existed. A draft was generated (and the AI call
+paid for), then its audit row failed and the draft was thrown away. Saving the
+tab state is different: the access log IS the saved state there, so its
+failure must still fail the request.
 
 Real routes and real MongoDB; the failing write is the only stand-in.
 """
@@ -13,7 +14,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.api.endpoints import books as books_endpoint
+from app.api import dependencies
+from app.api.endpoints import books as books_endpoint, users as users_endpoint
 from app.services.chapter_access_service import chapter_access_service
 from tests.test_api.test_routes.test_books_chapters_crud_coverage import create_book
 
@@ -31,6 +33,21 @@ def access_log_down(monkeypatch):
         return _Refuses()
 
     monkeypatch.setattr(chapter_access_service, "_get_collection", refusing_collection)
+
+
+@pytest.fixture
+def audit_log_down(monkeypatch):
+    """Call after creating the client: the factory stubs the audit out, and these
+    tests need the real one running into a failing write."""
+    async def refusing(**kwargs):
+        raise RuntimeError("the audit write failed")
+
+    def arm():
+        for module in (books_endpoint, users_endpoint):
+            monkeypatch.setattr(module, "audit_after_commit", dependencies.audit_after_commit)
+        monkeypatch.setattr(dependencies, "create_audit_log", refusing)
+
+    return arm
 
 
 async def test_a_chapter_is_created_once_even_when_its_access_log_fails(auth_client_factory, access_log_down):
@@ -56,16 +73,34 @@ async def test_saving_the_tab_state_still_fails_when_its_write_fails(auth_client
     assert saved.status_code >= 500, saved.text
 
 
-async def test_a_generated_draft_is_returned_even_when_its_audit_row_fails(auth_client_factory, monkeypatch):
+async def test_a_book_is_created_once_even_when_its_audit_row_fails(auth_client_factory, audit_log_down):
     api = await auth_client_factory()
+    audit_log_down()
+
+    created = await api.post("/api/v1/books/", json={"title": "Only once"})
+
+    assert created.status_code == 201, created.text
+    titles = [b["title"] for b in (await api.get("/api/v1/books/")).json()]
+    assert titles.count("Only once") == 1
+
+
+async def test_a_profile_update_succeeds_even_when_its_audit_row_fails(auth_client_factory, audit_log_down):
+    api = await auth_client_factory()
+    audit_log_down()
+
+    updated = await api.patch("/api/v1/users/me", json={"bio": "Saved once."})
+
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["bio"] == "Saved once."
+
+
+async def test_a_generated_draft_is_returned_even_when_its_audit_row_fails(auth_client_factory, audit_log_down):
+    api = await auth_client_factory()
+    audit_log_down()
     book = {"_id": "b1", "owner_id": "test-auth-id-123", "title": "T",
             "table_of_contents": {"chapters": [{"id": "ch1", "title": "One", "level": 1, "order": 1, "subchapters": []}]}}
     draft = {"success": True, "draft": "The draft.", "metadata": {"word_count": 2}, "suggestions": []}
 
-    async def audit_fails(**kwargs):
-        raise RuntimeError("the audit write failed")
-
-    monkeypatch.setattr(books_endpoint, "audit_request", audit_fails)
     with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=book)), \
             patch("app.api.endpoints.books.ai_service.generate_chapter_draft", AsyncMock(return_value=draft)):
         response = await api.post(
@@ -75,3 +110,17 @@ async def test_a_generated_draft_is_returned_even_when_its_audit_row_fails(auth_
 
     assert response.status_code == 200, response.text
     assert response.json()["draft"] == "The draft."
+
+
+async def test_a_custom_validator_error_answers_422_not_500(auth_client_factory):
+    # The 422 handler used to serialize the ValueError in the error's ctx and answer 500.
+    api = await auth_client_factory()
+    book_id = await create_book(api)
+
+    saved = await api.post(
+        f"/api/v1/books/{book_id}/chapters/tab-state",
+        json={"active_chapter_id": "c1", "open_tab_ids": ["c1"], "tab_order": ["c1", "c1"]},
+    )
+
+    assert saved.status_code == 422, saved.text
+    assert "duplicate entries" in saved.text

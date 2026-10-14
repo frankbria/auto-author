@@ -98,7 +98,7 @@ async def test_the_audit_row_records_the_client_the_proxy_named(
 
     api = await auth_client_factory()
     # The factory stands in for the audit; this test is about the real one.
-    monkeypatch.setattr(users_endpoint, "audit_request", dependencies.audit_request)
+    monkeypatch.setattr(users_endpoint, "audit_after_commit", dependencies.audit_after_commit)
     served = ProxyHeadersMiddleware(app, trusted_hosts=_allowed())
     transport = ASGITransport(app=served, client=(peer, 40000))
     async with AsyncClient(transport=transport, base_url="http://api.example.test", cookies=api.cookies) as client:
