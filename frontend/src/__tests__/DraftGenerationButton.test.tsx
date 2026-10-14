@@ -14,13 +14,6 @@ jest.mock('@/lib/api/bookClient', () => ({
   }
 }));
 
-// Mock Toast notifications
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({
-    toast: jest.fn()
-  })
-}));
-
 // Mock loading components
 jest.mock('@/components/loading', () => ({
   LoadingStateManager: ({ isLoading, message }: { isLoading: boolean; message: string }) => (

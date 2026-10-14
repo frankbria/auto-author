@@ -19,10 +19,6 @@ jest.mock('@/lib/api/bookClient');
 jest.mock('@/hooks/useOnlineStatus', () => ({
   useOnlineStatus: jest.fn(() => ({ isOnline: false, wasOffline: false })),
 }));
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({ toast: jest.fn() }),
-}));
-
 const question: Question = {
   id: 'question-1',
   chapter_id: 'chapter-1',
