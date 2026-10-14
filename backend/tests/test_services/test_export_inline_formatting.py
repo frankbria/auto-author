@@ -116,3 +116,10 @@ async def test_half_a_pair_is_dropped_rather_than_left_open():
     on, off = inline_marks.BOLD
     assert inline_marks.as_tags(f"one {on}half", ("<b>", "</b>"), ("<i>", "</i>")) == "one half"
     assert inline_marks.as_tags(f"{on}whole{off}", ("<b>", "</b>"), ("<i>", "</i>")) == "<b>whole</b>"
+
+
+async def test_mark_characters_typed_into_a_chapter_make_nothing_bold():
+    """The marks are private-use characters; a chapter that contains them
+    (pasted from anywhere) must not turn its own text bold."""
+    paragraph = await _docx_paragraph("<p>not bold at all</p>", "not bold at all")
+    assert not any(bold for _, bold, _ in _styled_runs(paragraph))
