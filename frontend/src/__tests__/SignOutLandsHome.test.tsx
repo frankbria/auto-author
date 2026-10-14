@@ -10,6 +10,7 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useRouter, usePathname } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { signOutOrNotify } from '@/lib/sign-out';
+import { apiFetch, browser, resetUnauthorizedForTests } from '@/lib/api/unauthorized';
 
 let session: { user: { id: string } } | null;
 const listeners = new Set<() => void>();
@@ -107,4 +108,23 @@ it('a sign-out that fails leaves the guard as it was', async () => {
   await waitFor(() =>
     expect(router.push).toHaveBeenCalledWith('/auth/sign-in?redirect=%2Fdashboard%2Fbooks%2Fb1')
   );
+});
+
+it('a 401 that arrives while signing out does not send the user to sign-in', async () => {
+  // Deleting the account: the page refetches the profile once the session is
+  // gone, the backend answers 401, and the shared handler used to win.
+  resetUnauthorizedForTests();
+  const go = jest.spyOn(browser, 'go').mockImplementation(() => {});
+  global.fetch = jest.fn().mockResolvedValue({ status: 401 }) as unknown as typeof fetch;
+  mockSignOut.mockImplementation(async () => {
+    setSession(null);
+    await apiFetch('/api/v1/users/me');
+    return { error: null };
+  });
+  renderPage();
+  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+  await waitFor(() => expect(router.push).toHaveBeenCalledWith('/'));
+  await new Promise((r) => setTimeout(r, 0));
+  expect(go).not.toHaveBeenCalled();
 });
