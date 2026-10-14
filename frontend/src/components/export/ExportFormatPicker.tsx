@@ -51,7 +51,7 @@ export function ExportFormatPicker({ formats, value, onChange, labelledBy }: Exp
               <span id={`export-format-${format.format}-name`} className="block font-medium text-foreground">{format.name}</span>
               <span className="block text-muted-foreground text-xs">{format.extension}</span>
             </span>
-            <span aria-hidden="true" className={`w-4 h-4 rounded-full ${value === format.format ? 'bg-indigo-500' : 'bg-secondary'}`}></span>
+            <span aria-hidden="true" className={`w-4 h-4 shrink-0 rounded-full ${value === format.format ? 'bg-indigo-500' : 'bg-secondary'}`}></span>
           </span>
           <span id={`export-format-${format.format}-description`} className="block text-muted-foreground text-sm">{format.description}</span>
         </RadioGroupPrimitive.Item>
