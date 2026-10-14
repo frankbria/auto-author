@@ -94,6 +94,13 @@ export class RetryQueue {
   }
 
   /**
+   * Check if any queued operation's id starts with a prefix
+   */
+  hasPrefix(prefix: string): boolean {
+    return Array.from(this.queue.keys()).some(id => id.startsWith(prefix));
+  }
+
+  /**
    * Process all queued operations
    */
   async processQueue(): Promise<void> {
@@ -103,6 +110,7 @@ export class RetryQueue {
     }
 
     this.processing = true;
+    const drained = new Set(this.queue.keys());
 
     try {
       // Groups run in parallel; a group runs in the order it was queued
@@ -122,6 +130,12 @@ export class RetryQueue {
       );
     } finally {
       this.processing = false;
+    }
+
+    // Queued during the drain: nothing else would start them until the next
+    // `online` event (#873).
+    if (Array.from(this.queue.keys()).some(id => !drained.has(id))) {
+      await this.processQueue();
     }
   }
 

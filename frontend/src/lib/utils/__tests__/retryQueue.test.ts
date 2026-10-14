@@ -176,6 +176,20 @@ describe('RetryQueue', () => {
       await draining;
     });
 
+    it('drains an operation queued while a drain is running', async () => {
+      const slow = deferred();
+      const late = jest.fn().mockResolvedValue(undefined);
+      queue.add('first', jest.fn(() => slow.promise), { group: 'q1' });
+
+      const draining = queue.processQueue();
+      queue.add('late', late, { group: 'q1' });
+      slow.resolve();
+      await draining;
+
+      expect(late).toHaveBeenCalled();
+      expect(queue.size()).toBe(0);
+    });
+
     it('holds back the rest of a group while its head waits for a retry', async () => {
       const head = jest.fn().mockRejectedValue(new Error('boom'));
       const next = jest.fn().mockResolvedValue(undefined);

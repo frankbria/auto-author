@@ -99,3 +99,16 @@ it('editing after a queued Complete Response does not turn it back into a draft'
   await reconnect();
   expect(stored?.status).toBe(ResponseStatus.COMPLETED);
 }, 15000);
+
+it('a queued completion still locks the answer after switching question and back', async () => {
+  const props = { bookId: 'book-1', chapterId: 'chapter-1', onResponseSaved: jest.fn(), onRegenerateQuestion: jest.fn() };
+  const { rerender } = render(<QuestionDisplay {...props} question={question} />);
+  fireEvent.change(screen.getByLabelText(/your response/i), { target: { value: 'Busy founders' } });
+  fireEvent.click(screen.getByRole('button', { name: /complete response/i }));
+  await waitFor(() => expect(retryQueue.size()).toBe(1));
+
+  rerender(<QuestionDisplay {...props} question={{ ...question, id: 'question-2' }} />);
+  rerender(<QuestionDisplay {...props} question={question} />);
+
+  await waitFor(() => expect(screen.getByLabelText(/your response/i)).toBeDisabled());
+});

@@ -107,6 +107,8 @@ export default function QuestionDisplay({
 
     if (question.id) {
       fetchResponse();
+      // Coming back to a question whose completion is still queued (#873).
+      setCompletionQueued(retryQueue.hasPrefix(`complete-${question.id}-`));
     }
 
     // Reset states when question changes
