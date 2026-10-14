@@ -115,6 +115,7 @@ it('lists the saved chapters the save will remove, but not a chapter added and r
   const summary = await screen.findByText(/saving will remove/i);
   expect(summary).toHaveTextContent('Gone');
   expect(summary).not.toHaveTextContent('New Chapter');
+  expect(summary).not.toHaveTextContent('Keep');
 });
 
 it('an edit made while the answers are being counted survives the delete (found in review)', async () => {
