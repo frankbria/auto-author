@@ -2,9 +2,12 @@
 Test Export Service functionality
 """
 import asyncio
+import base64
 import re
 import logging
 import threading
+import zipfile
+import zlib
 import pytest
 from io import BytesIO
 from unittest.mock import patch
@@ -17,6 +20,24 @@ from app.services.export_service import (
     ExportTimeoutError,
 )
 from docx import Document
+
+# A ReportLab page is drawn by a content stream stored ASCII85-encoded and deflated:
+# searching the file's bytes for a title finds it in no page, drawn or not (#841).
+_PDF_STREAM = re.compile(rb"/Filter \[ ([^\]]*)\] /Length (\d+)\s*>>\s*stream\r?\n")
+
+
+def _pdf_page_text(pdf_bytes: bytes) -> bytes:
+    """Every stream in the PDF, decoded: the drawing commands, text included."""
+    decoded = []
+    for found in _PDF_STREAM.finditer(pdf_bytes):
+        data = pdf_bytes[found.end(): found.end() + int(found.group(2))]
+        if b"ASCII85Decode" in found.group(1):
+            data = base64.a85decode(data.strip().removesuffix(b"~>"))
+        if b"FlateDecode" in found.group(1):
+            data = zlib.decompress(data)
+        decoded.append(data)
+    assert decoded, "found no stream in the PDF: the decoder no longer fits what ReportLab writes"
+    return b"\n".join(decoded)
 
 
 class TestExportService:
@@ -214,8 +235,12 @@ class TestExportService:
         assert isinstance(epub_bytes, bytes)
         assert len(epub_bytes) > 1000
         assert epub_bytes.startswith(b'PK')
-        # Empty chapters excluded by default — the empty chapter has no content.
-        assert b"Empty Chapter" not in epub_bytes
+        # Empty chapters excluded by default. The archive is compressed: the
+        # title is looked for in its files, where it would be (#841).
+        with zipfile.ZipFile(BytesIO(epub_bytes)) as zf:
+            unpacked = b"".join(zf.read(name) for name in zf.namelist())
+        assert b"Introduction" in unpacked
+        assert b"Empty Chapter" not in unpacked
 
     @pytest.mark.asyncio
     async def test_generate_markdown_single_file(self, sample_book_data):
@@ -291,9 +316,10 @@ class TestExportService:
             include_empty_chapters=False
         )
 
-        # The PDF should not contain "Empty Chapter" text
-        # This is a basic check - in reality you'd parse the PDF
-        assert b"Empty Chapter" not in pdf_bytes
+        # The page text is compressed: it is looked for where it is drawn (#841).
+        text = _pdf_page_text(pdf_bytes)
+        assert b"Introduction" in text
+        assert b"Empty Chapter" not in text
 
     @pytest.mark.asyncio
     async def test_export_invalid_format(self, sample_book_data):

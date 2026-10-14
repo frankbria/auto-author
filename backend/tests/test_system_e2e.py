@@ -22,7 +22,6 @@ import pytest
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Any
-import os
 
 import httpx
 
@@ -380,8 +379,16 @@ class SystemE2ETest:
 @pytest.fixture
 def mock_ai_service(monkeypatch):
     """Mock the AI service to return predictable responses"""
-    from app.services.ai_service import AIService
+    from app.services.ai_service import AIService, ai_service
     from app.api.endpoints import books as books_endpoint
+    from tests.test_services.openai_autospec import autospec_openai_client
+
+    # Whatever is not stood in for below reaches this provider, never a real one: drafting a
+    # chapter was not, and called whatever key the environment had (#841).
+    monkeypatch.setattr(ai_service, "client", autospec_openai_client(content=(
+        "<p>A habit holds when the first step is small enough to take on a bad day. "
+        "The chapter follows three managers who tried a large change, and one who tried a small one.</p>"
+    )))
 
     # Mock question generation
     async def mock_generate_clarifying_questions(self, *args, **kwargs):
@@ -594,10 +601,6 @@ The key to habit change isn't massive transformation but small, consistent adjus
 # Pytest test cases
 @pytest.mark.asyncio
 @pytest.mark.timeout(TEST_TIMEOUT)
-@pytest.mark.skipif(
-    not os.getenv("OPENAI_API_KEY"),
-    reason="Requires OpenAI API key - skipping in CI/CD without key"
-)
 async def test_complete_system_workflow(auth_client_factory, mock_ai_service):
     """Test the complete authoring workflow from book creation to chapter draft"""
     client = await auth_client_factory()
