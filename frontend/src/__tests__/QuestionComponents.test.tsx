@@ -17,13 +17,6 @@ jest.mock('@/lib/api/bookClient', () => ({
   }
 }));
 
-// Mock the Toast component
-jest.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({
-    toast: jest.fn()
-  })
-}));
-
 describe('Question Components', () => {
   beforeEach(() => {
     jest.clearAllMocks();

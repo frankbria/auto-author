@@ -19,11 +19,9 @@ This error handler provides unified error handling with automatic retry logic, e
 
 ```typescript
 import { handleApiError } from '@/lib/errors';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 
 function MyComponent() {
-  const { toast } = useToast();
-
   const fetchData = async () => {
     try {
       const result = await handleApiError(
@@ -71,7 +69,7 @@ High-level API for handling errors with automatic retries and toast notification
 
 **Parameters:**
 - `operation: () => Promise<T>` - The async operation to execute
-- `toast: ToastFunction` - Toast notification function from useToast hook
+- `toast: ToastFunction` - the `toast` function from `@/lib/toast`
 - `options?: { customMessage?: string }` - Optional custom error message
 
 **Returns:** `Promise<T>` - Result of the operation
@@ -171,11 +169,9 @@ Formula: `delay = min(baseDelay * 2^attempt, maxDelay)`
 
 ```typescript
 import { handleApiError } from '@/lib/errors';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 
 async function createBook(data: BookData) {
-  const { toast } = useToast();
-
   const result = await handleApiError(
     () => fetch('/api/books', {
       method: 'POST',

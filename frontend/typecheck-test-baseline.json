@@ -105,10 +105,6 @@
       "errors": 1,
       "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2339 ×1 — property does not exist on the type — a fixture or mock narrower than the real object."
     },
-    "tests/e2e/ai-error-handling.spec.ts": {
-      "errors": 1,
-      "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2345 ×1 — argument type mismatch — usually a partial fixture passed where the full shape is required."
-    },
     "tests/e2e/staging/playwright.config.ts": {
       "errors": 1,
       "reason": "Pre-existing at the time #625 turned this gate on. Dominant: TS2769 ×1 — no overload matches this call."

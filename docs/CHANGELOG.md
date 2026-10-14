@@ -4,6 +4,14 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Unimported frontend modules, inert mocks and the orphaned Playwright suites are gone (#853, P2.7)**:
+  - **Modules.** `ChapterQuestions`, `DataRecoveryModal`, `components/ui/use-toast.ts`, `lib/cache/chapter-content-cache.ts`, `components/ui/form-components.tsx` and `components/ui/styled-avatar.tsx`: nothing outside tests imported any of them (`chapter-tabs-old` and `examples/` went in #842). `alert-dialog` stays: #906's `ConfirmChapterDelete` uses it.
+  - **Dependency.** `date-fns`, whose only importer was `DataRecoveryModal`. The lockfile was regenerated with CI's npm (11.19.0) and drops only `date-fns`; a clean-room `npm ci` with that npm passes.
+  - **Mocks.** The `jest.mock('@/components/ui/use-toast')` blocks in seven test files, which mocked a module nothing they rendered imported, and the global `date-fns` mock in `jest.setup.ts`. The app's toast is `@/lib/toast`; `lib/errors/README.md` now shows that.
+  - **Tests.** `ChapterQuestionsTabs.test.tsx` and the `ChapterQuestions` half of `KeyboardNavigation.test.tsx` (its `ChapterTabs` half stays), and `DataRecoveryModal.test.tsx`.
+  - **Playwright.** `tests/e2e/deployment` (asserted a Clerk CSP), with the `page-objects`, `fixtures` and `helpers` only it used, and `tests/e2e/ai-error-handling.spec.ts`: no config's `testDir` reaches any of them. The staging suite has its own fixtures under `tests/e2e/staging`.
+  - **Ledgers and floors.** `styled-avatar.tsx` leaves `gray-literal-baseline.json`, and `ai-error-handling.spec.ts` leaves `typecheck-test-baseline.json`. The busy-button guard's floor drops from 20 to 19: `DataRecoveryModal`'s "Restoring..." was one of the buttons it counts. Coverage stays above every threshold (lines 90.09%, functions 87.34%).
+
 - **Question regeneration reports what it did, and the parsers keep what the model wrote (#850, P2.4)**:
   - **Regeneration.** `generate_questions_for_chapter` floored every request at 3, so regenerating one unanswered question made three and the chapter grew. The response then reported `count - deleted` as preserved, the requested count rather than what the chapter held: 2 answered and 1 unanswered came back as 9 preserved, 10 in all. The floor is 1, as the request schema allows. Preserved is the chapter's questions before, minus those deleted, and new is the number actually made.
   - **Verification.** The post-insert check counted every question in the chapter, old ones included, so it could not fail. It is gone: `insert_many(ordered=True)` already raises if any insert fails.
