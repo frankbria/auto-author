@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import List, Optional, Dict, Any
 import logging
 from datetime import datetime, timezone
@@ -891,16 +892,19 @@ class QuestionGenerationService:
 
         # Generate questions
         questions = []
+        used: Counter = Counter()
         for i in range(count):
             # Select question type from focus types (cycling through them)
             question_type = focus_types[i % len(focus_types)]
 
             # Select question template
-            # The nth time a type comes round it takes its nth template. `i % 5`
-            # picked the same one every time when all five types were in play, so
-            # ten questions were five questions twice (#835).
+            # The nth time a type comes round it takes its nth template, counted
+            # for that type: the focus list can name a type twice. `i % 5` picked
+            # the same one every time when all five types were in play, so ten
+            # questions were five questions twice (#835).
             templates_for_type = templates[question_type]
-            template_idx = (i // len(focus_types)) % len(templates_for_type)
+            template_idx = used[question_type] % len(templates_for_type)
+            used[question_type] += 1
             question_text = templates_for_type[template_idx]
 
             # Get helper metadata

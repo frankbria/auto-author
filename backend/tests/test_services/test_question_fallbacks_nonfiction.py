@@ -46,6 +46,15 @@ class TestTheTemplateQuestionsAreForNonFiction:
             assert len({q.question_text for q in questions}) == 5
             assert all(q.is_fallback for q in questions)
 
+    @pytest.mark.parametrize("focus", [
+        [QuestionType.PLOT, QuestionType.PLOT],
+        [QuestionType.THEME, QuestionType.PLOT, QuestionType.THEME],
+    ])
+    def test_a_type_named_twice_in_the_focus_does_not_get_the_same_question_twice(self, service, focus):
+        questions = service._generate_fallback_questions("b1", "c1", "Why Habits Stick", count=5, focus_types=focus)
+
+        assert len({q.question_text for q in questions}) == 5, [q.question_text for q in questions]
+
     def test_one_of_them_names_the_chapter(self, service):
         questions = service._generate_fallback_questions("b1", "c1", "Why Habits Stick", count=25)
 
