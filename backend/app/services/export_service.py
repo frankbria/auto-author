@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, BinaryIO
 import re
 import textwrap
 
+from app.services import inline_marks
 from app.core.config import settings
 from app.services.epub_writer import write_epub
 from app.services.export_templates import PAGE_SIZES_INCHES, resolve_template
@@ -125,8 +126,13 @@ def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
     below_the_chapter_heading = 2 if for_a_markdown_reader else 0
 
     class _Chapter(MarkdownConverter):
-        # `_italic_` beside `**bold**`, as every export has had it until now.
-        convert_em = convert_i = abstract_inline_conversion(lambda self: "_")
+        if for_a_markdown_reader:
+            # `_italic_` beside `**bold**`, as every export has had it until now.
+            convert_em = convert_i = abstract_inline_conversion(lambda self: "_")
+        else:
+            # Marks the builders turn into formatting, not `**` printed (#1030).
+            convert_b = convert_strong = inline_marks.inline(inline_marks.BOLD)
+            convert_em = convert_i = inline_marks.inline(inline_marks.ITALIC)
 
         def convert_hN(self, n, el, text, parent_tags):
             # markdownify stops at the sixth level itself.
@@ -143,8 +149,9 @@ def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
         escape_underscores=for_a_markdown_reader,
         escape_misc=for_a_markdown_reader,
     )
-    # The editor writes &nbsp; for a second space in a row.
-    return converter.convert(content).replace("\xa0", " ")
+    # The editor writes &nbsp; for a second space in a row. Marks typed into
+    # the text itself are removed, so only the converter can make one (#1030).
+    return converter.convert(inline_marks.without_marks(content)).replace("\xa0", " ")
 
 
 def _blocks_for_the_builders(markdown: str) -> str:
@@ -177,6 +184,11 @@ class ExportValidationError(ValueError):
 def _pdf_text(value) -> str:
     """Escape user text for ReportLab Paragraph(), which parses XML-like markup (#752)."""
     return html.escape(str(value), quote=False)
+
+
+def _pdf_inline(value) -> str:
+    """Chapter text for Paragraph(): escaped, with its bold and italic (#1030)."""
+    return inline_marks.as_tags(_pdf_text(value), ("<b>", "</b>"), ("<i>", "</i>"))
 
 
 class ExportTimeoutError(TimeoutError):
@@ -511,13 +523,13 @@ class ExportService:
 
                 for para in formatted_content:
                     if para['style'] == 'heading1':
-                        story.append(Paragraph(_pdf_text(para['text']), chapter_title_style))
+                        story.append(Paragraph(_pdf_inline(para['text']), chapter_title_style))
                     elif para['style'] == 'heading2':
-                        story.append(Paragraph(_pdf_text(para['text']), heading2_style))
+                        story.append(Paragraph(_pdf_inline(para['text']), heading2_style))
                     elif para['style'] == 'heading3':
-                        story.append(Paragraph(_pdf_text(para['text']), heading3_style))
+                        story.append(Paragraph(_pdf_inline(para['text']), heading3_style))
                     else:
-                        story.append(Paragraph(_pdf_text(para['text']), body_style))
+                        story.append(Paragraph(_pdf_inline(para['text']), body_style))
             elif not chapter.get('heading_only'):
                 story.append(Paragraph("(No content yet)", styles['Italic']))
 
@@ -695,14 +707,12 @@ class ExportService:
                 formatted_content = self._extract_text_formatting(content)
 
                 for para in formatted_content:
-                    if para['style'] == 'heading1':
-                        doc.add_heading(para['text'], 1)
-                    elif para['style'] == 'heading2':
-                        doc.add_heading(para['text'], 2)
-                    elif para['style'] == 'heading3':
-                        doc.add_heading(para['text'], 3)
+                    level = {'heading1': 1, 'heading2': 2, 'heading3': 3}.get(para['style'])
+                    if level:
+                        inline_marks.add_runs(doc.add_heading('', level), para['text'])
                     else:
-                        p = doc.add_paragraph(para['text'])
+                        p = doc.add_paragraph()
+                        inline_marks.add_runs(p, para['text'])
                         p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             elif not chapter.get('heading_only'):
                 doc.add_paragraph("(No content yet)")
@@ -762,7 +772,9 @@ class ExportService:
         if content:
             heading_tag = {"heading1": "h2", "heading2": "h3", "heading3": "h4"}
             for para in self._extract_text_formatting(content):
-                text = html.escape(para["text"])
+                text = inline_marks.as_tags(
+                    html.escape(para["text"]), ("<strong>", "</strong>"), ("<em>", "</em>")
+                )
                 tag = heading_tag.get(para["style"], "p")
                 parts.append(f"<{tag}>{text}</{tag}>")
         elif not chapter.get("heading_only"):
