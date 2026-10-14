@@ -154,10 +154,13 @@ async def update_user(
 
     # Preferences are set key by key (#848): written whole, a partial object
     # dropped the keys it left out, and null wiped them all.
-    # shortcut: a stored null preferences (only an API client could write one
-    # before #848) makes this write fail; repair such users if one turns up.
     preferences = user_data.pop("preferences", None) or {}
     user_data.update({f"preferences.{key}": value for key, value in preferences.items()})
+    if preferences:
+        # A null stored before #848 has no key to set into, so Mongo refuses the write.
+        await users_collection.update_one(
+            {"auth_id": auth_id, "preferences": {"$type": "null"}}, {"$set": {"preferences": {}}}
+        )
 
     # A tombstone (deleted account, #784) never matches, so a late Stripe event
     # or an admin edit can't write personal data back onto it.

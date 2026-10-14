@@ -4,6 +4,13 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **PATCH changes what it is sent and nothing else (#848, P2.2)**:
+  - **Preferences.** `update_user` wrote a preferences object whole, so a PATCH that sent one key reset every key it left out to its default, and `"preferences": null` stored a null. It now sets each sent key as `preferences.<key>` and ignores a null object. A null already stored is replaced with `{}` first: found in review, it made every later preferences write fail. PATCH `/users/me` and PUT `/users/{id}` both go through it.
+  - **Books.** `BookUpdate.title` was required, and the PATCH route dropped every null, so a subtitle, description, genre or target audience could never be cleared. Title is optional now and PATCH keeps the nulls it is sent. Title, metadata and published always have a value: their `None` default is never validated, so leaving them out passes and an explicit null is a 422 (`main` answered 200 and ignored it). The frontend form sends `''`, never null.
+  - **Prompts.** The AI prompt builders read `get("genre", "")`, which returns `None` for a stored null and wrote "Genre: None" into the prompt; they read `get("genre") or ""` now (found in review; a null genre was already possible on create).
+  - **Tests.** `tests/test_api/test_partial_patch.py` (9): a partial preferences PATCH keeps the rest, null preferences write nothing, a pre-#848 null is repaired, a title-less book PATCH clears a subtitle, null title/metadata/published are 422, and no prompt builder writes "None". `test_validate_book_update_data` pinned "an update without a title raises" and now pins the partial contract. Ten mutations caught.
+  - Demo: `docs/demos/2026-10-14-issue-848-partial-patch.md`.
+
 - **Bold and italic are bold and italic in the PDF, DOCX and EPUB (#1030, P1.75)**:
   - **Problem.** The builders were handed chapter text with Markdown's `**` and `_` around the words the author had made bold or italic, and printed them: "Some **bold** and _italic_ text." in every export but Markdown.
   - **Fix.** In the builders' conversion only, `<b>`/`<strong>` and `<em>`/`<i>` become private-use characters (`backend/app/services/inline_marks.py`) that nothing typed can produce: they are removed from chapter text first, so `__init__` and `2 * 3 * 4` stay text. ReportLab gets `<b>`/`<i>`, python-docx bold and italic runs, the EPUB `<strong>`/`<em>`; headings and list items alike. Marks that do not pair up in order inside a block (a span cut by a paragraph break) are dropped rather than leave a builder a stray tag. The Markdown export keeps its markers.

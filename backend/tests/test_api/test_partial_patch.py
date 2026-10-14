@@ -65,3 +65,29 @@ async def test_a_book_patch_cannot_null_a_field_that_must_have_a_value(auth_clie
     patched = await api.patch(f"/api/v1/books/{book_id}", json={field: None})
 
     assert patched.status_code == 422, patched.text
+
+
+async def test_a_user_whose_preferences_were_nulled_before_848_can_set_one_again(auth_client_factory):
+    api = await auth_client_factory(overrides={"preferences": None})
+
+    patched = await api.patch("/api/v1/users/me", json={"preferences": {"theme": "system"}})
+
+    assert patched.status_code == 200, patched.text
+    assert await _stored_preferences(api) == {"theme": "system"}
+
+
+async def test_a_null_genre_or_audience_never_reaches_a_prompt_as_none():
+    from app.services.ai_service import AIService
+    from app.services.question_generation_service import QuestionGenerationService
+
+    meta = {"title": "T", "genre": None, "target_audience": None, "audience": None}
+    ai = AIService()
+    prompts = [
+        ai._build_summary_analysis_prompt("A summary.", meta),
+        ai._build_questions_prompt("A summary.", meta, 3),
+        ai._build_toc_generation_prompt("A summary.", [], meta),
+        ai._build_draft_generation_prompt("One", "", [], meta, None, 500),
+        QuestionGenerationService(ai)._build_question_generation_prompt("One", "", meta, 3),
+    ]
+
+    assert [p for p in prompts if "None" in p] == []
