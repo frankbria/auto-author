@@ -235,7 +235,8 @@ async def test_the_owner_is_not_refused_the_same_request(motor_reinit_db, the_mo
         answer = await ada.request(method, (BOOK_ROUTE + path).format(**ids), **_filled(REQUESTS[(method, path)], ids))
 
         # Through means answered, or passed on to the model: what the stand-in model says back is
-        # not usable by every route, and that is not a refusal.
+        # not usable by every route, and that is not a refusal. A refusal is one whenever it comes.
+        assert answer.status_code not in (401, 403, 404, 422), f"{answer.status_code}: {answer.text[:300]}"
         assert answer.status_code < 400 or the_model.called, f"{answer.status_code}: {answer.text[:300]}"
     finally:
         await ada.aclose()
