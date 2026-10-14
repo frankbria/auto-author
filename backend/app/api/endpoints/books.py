@@ -63,7 +63,7 @@ from app.db.toc_transactions import (
     _walk_toc,
 )
 from app.api.dependencies import (
-    audit_request, get_rate_limiter, get_ai_usage_quota,
+    audit_after_commit, get_rate_limiter, get_ai_usage_quota,
     get_entitlement_checker
 )
 from pydantic import ValidationError
@@ -137,7 +137,7 @@ async def create_new_book(
         )
 
         # Log the book creation
-        await audit_request(
+        await audit_after_commit(
             request=request,
             current_user=current_user,
             action="book_create",
@@ -308,7 +308,7 @@ async def update_book_details(
             del updated_book["_id"]  # Remove raw ObjectId for JSON serialization
 
         # Log the book update
-        await audit_request(
+        await audit_after_commit(
             request=request,
             current_user=current_user,
             action="book_update",
@@ -397,7 +397,7 @@ async def patch_book_details(
             updated_book["id"] = str(updated_book["_id"])
             del updated_book["_id"]  # Remove raw ObjectId for JSON serialization
 
-        await audit_request(
+        await audit_after_commit(
             request=request,
             current_user=current_user,
             action="book_patch_update",
@@ -488,7 +488,7 @@ async def delete_book_endpoint(
             )
 
         # Log the book deletion
-        await audit_request(
+        await audit_after_commit(
             request=request,
             current_user=current_user,
             action="book_delete",
@@ -575,7 +575,7 @@ async def upload_book_cover_image(
 
         # Log the upload
         if request:
-            await audit_request(
+            await audit_after_commit(
                 request=request,
                 current_user=current_user,
                 action="cover_image_upload",
@@ -1826,7 +1826,7 @@ async def generate_chapter_questions(
         )
 
         # Log question generation
-        await audit_request(
+        await audit_after_commit(
             request=None,  # Request object not available in this context
             current_user=current_user,
             action="generate_questions",
@@ -2033,7 +2033,7 @@ async def save_question_response(
         word_count = len(response_data.response_text.split()) if response_data.response_text else 0
 
         # Log response save
-        await audit_request(
+        await audit_after_commit(
             request=None,
             current_user=current_user,
             action="save_question_response",
@@ -2207,7 +2207,7 @@ async def rate_question(
         )
 
         # Log rating
-        await audit_request(
+        await audit_after_commit(
             request=None,
             current_user=current_user,
             action="rate_question",
@@ -2302,7 +2302,7 @@ async def regenerate_single_question(
             focus=request_data.focus.value if request_data.focus else None,
         )
 
-        await audit_request(
+        await audit_after_commit(
             request=None,
             current_user=current_user,
             action="regenerate_single_question",
@@ -2486,7 +2486,7 @@ async def regenerate_chapter_questions(
         )
 
         # Log question regeneration
-        await audit_request(
+        await audit_after_commit(
             request=None,
             current_user=current_user,
             action="regenerate_questions",
@@ -2624,7 +2624,7 @@ async def generate_chapter_draft(
             )
 
         # Log the draft generation
-        await audit_request(
+        await audit_after_commit(
             request=Request(
                 {
                     "type": "http",
@@ -3010,7 +3010,7 @@ async def save_question_responses_batch_endpoint(
         )
 
         # Log batch save operation
-        await audit_request(
+        await audit_after_commit(
             request=None,
             current_user=current_user,
             action="save_question_responses_batch",

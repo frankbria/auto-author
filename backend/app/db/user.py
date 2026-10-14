@@ -7,7 +7,7 @@ from bson.objectid import ObjectId
 from pymongo import ReturnDocument
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
-from .audit_log import create_audit_log
+from .audit_log import audit_after_write
 from app.core.reporting import report_failure
 
 logger = logging.getLogger(__name__)
@@ -165,7 +165,7 @@ async def update_user(
 
     # Log the change if user was found and updated
     if updated_user and actor_id:
-        await create_audit_log(
+        await audit_after_write(
             action="user_update",
             actor_id=actor_id,
             target_id=auth_id,
@@ -288,7 +288,7 @@ async def delete_user(
 
     # Log the deletion
     if success:
-        await create_audit_log(
+        await audit_after_write(
             action="user_delete",
             actor_id=actor_id
             or auth_id,  # If no actor specified, user deleted themselves
@@ -310,7 +310,7 @@ async def erase_deactivated_user(auth_id: str, actor_id: str) -> bool:
     )
     if not result.modified_count:
         return False
-    await create_audit_log(
+    await audit_after_write(
         action="user_erase",
         actor_id=actor_id,
         target_id=auth_id,
@@ -391,7 +391,7 @@ async def delete_user_books(user_id: str, book_ids: List[str] = None) -> bool:
         result = await books_collection.delete_many(query)
 
         # Log the action
-        await create_audit_log(
+        await audit_after_write(
             action="delete_books",
             actor_id=user_id,
             target_id=user_id,

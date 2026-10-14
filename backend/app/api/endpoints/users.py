@@ -20,7 +20,7 @@ from app.db.database import (
     get_collection,  # Added missing import
 )
 from app.api.dependencies import (
-    audit_request,
+    audit_after_commit,
     sanitize_input,
     get_rate_limiter,
 )
@@ -147,7 +147,7 @@ async def update_profile(
         )
 
     # Log the profile update
-    await audit_request(
+    await audit_after_commit(
         request=request,
         current_user=current_user,
         action="profile_update",
@@ -262,7 +262,7 @@ async def delete_profile(
         )
 
     # Log the account deletion
-    await audit_request(
+    await audit_after_commit(
         request=request,
         current_user=current_user,
         action="account_delete",
@@ -325,7 +325,7 @@ async def upload_profile_picture(
             )
 
         if request:
-            await audit_request(
+            await audit_after_commit(
                 request=request,
                 current_user=current_user,
                 action="avatar_upload",

@@ -402,8 +402,8 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
         ):
             return None
 
-        monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit_request)
-        monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit_request)
+        monkeypatch.setattr(users_endpoint, "audit_after_commit", _noop_audit_request)
+        monkeypatch.setattr(books_endpoint, "audit_after_commit", _noop_audit_request)
 
         cookies = {}
         if auth:
@@ -501,8 +501,8 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
         async def _noop_audit(*args, **kwargs):
             return None
 
-        monkeypatch.setattr(users_endpoint, "audit_request", _noop_audit)
-        monkeypatch.setattr(books_endpoint, "audit_request", _noop_audit)
+        monkeypatch.setattr(users_endpoint, "audit_after_commit", _noop_audit)
+        monkeypatch.setattr(books_endpoint, "audit_after_commit", _noop_audit)
 
         cookies = {}
         if auth:
