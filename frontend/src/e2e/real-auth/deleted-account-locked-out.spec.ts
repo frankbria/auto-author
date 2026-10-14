@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { API, WEB } from '../../../playwright.real-auth.config';
-import { STRONG, signUpAndVerify } from './helpers';
+import { SAME_ORIGIN, STRONG, signUpAndVerify } from './helpers';
 
 /**
  * A deleted account is locked out (#763, #887): its old session cookie is
@@ -17,8 +17,15 @@ test('a deleted account cannot sign back in, and its old session cookie is refus
 }) => {
   const email = `deleted-locked-out-${Date.now()}@example.com`;
   await signUpAndVerify(page, email);
-  const oldCookies = await page.context().cookies();
-  expect((await page.request.get(`${API}/users/me`)).status()).toBe(200);
+  // A second device is signed in too. The sign-out after the delete ends only
+  // this browser's session, so this one shows whether the delete revoked them all.
+  const other = await browser.newContext();
+  const signedIn = await other.request.post(`${WEB}/api/auth/sign-in/email`, {
+    headers: SAME_ORIGIN,
+    data: { email, password: STRONG },
+  });
+  expect(signedIn.status()).toBe(200);
+  expect((await other.request.get(`${API}/users/me`)).status()).toBe(200);
 
   await page.goto('/profile');
   await page.getByRole('button', { name: 'Delete Account' }).click();
@@ -26,14 +33,20 @@ test('a deleted account cannot sign back in, and its old session cookie is refus
   await page.getByRole('button', { name: 'Deactivate account and delete books' }).click();
   await expect(page).toHaveURL(`${WEB}/`);
 
-  // Someone kept a copy of the cookie: the backend refuses it.
-  const kept = await browser.newContext();
-  await kept.addCookies(oldCookies);
-  expect((await kept.request.get(`${API}/users/me`)).status()).toBe(401);
-  expect(await (await kept.request.get(`${WEB}/api/auth/get-session`)).json()).toBeNull();
-  await kept.close();
+  // The other device's session is gone in better-auth, not only refused by the backend.
+  expect((await other.request.get(`${API}/users/me`)).status()).toBe(401);
+  expect(await (await other.request.get(`${WEB}/api/auth/get-session`)).json()).toBeNull();
+  await other.close();
 
-  // The old password, through the sign-in page.
+  // The old password: better-auth itself no longer knows it. The backend
+  // would refuse the deactivated account anyway, so ask better-auth directly.
+  const again = await page.request.post('/api/auth/sign-in/email', {
+    headers: SAME_ORIGIN,
+    data: { email, password: STRONG },
+  });
+  expect(again.status()).not.toBe(200);
+
+  // And through the sign-in page, as the user would.
   await page.goto('/auth/sign-in');
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(STRONG);
