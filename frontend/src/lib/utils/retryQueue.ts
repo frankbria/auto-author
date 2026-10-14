@@ -11,6 +11,8 @@ export interface QueuedOperation<T> {
   operation: () => Promise<T>;
   retryCount: number;
   maxRetries: number;
+  /** Operations sharing a group run one at a time, in the order queued (#873). */
+  group: string;
   onSuccess?: (result: T) => void;
   onError?: (error: unknown) => void;
 }
@@ -47,6 +49,7 @@ export class RetryQueue {
     operation: () => Promise<T>,
     options: {
       maxRetries?: number;
+      group?: string;
       onSuccess?: (result: T) => void;
       onError?: (error: unknown) => void;
     } = {}
@@ -56,6 +59,7 @@ export class RetryQueue {
       operation,
       retryCount: 0,
       maxRetries: options.maxRetries ?? 3,
+      group: options.group ?? id,
       onSuccess: options.onSuccess,
       onError: options.onError,
     });
@@ -90,6 +94,13 @@ export class RetryQueue {
   }
 
   /**
+   * Check if any queued operation's id starts with a prefix
+   */
+  hasPrefix(prefix: string): boolean {
+    return Array.from(this.queue.keys()).some(id => id.startsWith(prefix));
+  }
+
+  /**
    * Process all queued operations
    */
   async processQueue(): Promise<void> {
@@ -99,15 +110,32 @@ export class RetryQueue {
     }
 
     this.processing = true;
+    const drained = new Set(this.queue.keys());
 
     try {
-      // Process operations in parallel
-      const operations = Array.from(this.queue.values());
+      // Groups run in parallel; a group runs in the order it was queued
+      // (Map keeps insertion order), so an older save cannot land last (#873).
+      const groups = new Map<string, QueuedOperation<any>[]>();
+      for (const op of this.queue.values()) {
+        groups.set(op.group, [...(groups.get(op.group) ?? []), op]);
+      }
       await Promise.allSettled(
-        operations.map(op => this.processOperation(op))
+        Array.from(groups.values()).map(async ops => {
+          for (const op of ops) {
+            await this.processOperation(op);
+            // Still queued: it waits for a retry, and so does the rest of its group.
+            if (this.queue.has(op.id)) break;
+          }
+        })
       );
     } finally {
       this.processing = false;
+    }
+
+    // Queued during the drain: nothing else would start them until the next
+    // `online` event (#873).
+    if (Array.from(this.queue.keys()).some(id => !drained.has(id))) {
+      await this.processQueue();
     }
   }
 

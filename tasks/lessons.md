@@ -1745,3 +1745,7 @@ The workflow test had been skipped without an API key, and its docstring said it
 ### A doc rewrite needs its claims checked against the code, one by one (#846)
 I rewrote the deploy docs from reading the workflows and wrote six sentences the code does not support, among them a health-check error name I had also carried in memory for two months. A fresh agent given each claim and the files to check them against found all six in one pass.
 **Rule:** after rewriting operator docs, hand the added lines to a fresh agent with file targets and correct what it cannot confirm before the PR. A sentence that names an error, a trigger or a cleanup step is a claim about code.
+
+### Ordering fixes one trigger; check every trigger the issue names (#873)
+The issue named two ways a draft could overwrite a completion. Draining a question's saves in order fixes the first. The second, a draft made after an offline Complete Response, is queued after the completion, so in-order draining lands it last: ordering makes that one certain instead of racy. A test per trigger, both seen failing, showed it before any code was written.
+**Rule:** when an issue lists triggers, write one failing test per trigger and run the proposed fix against each before calling the root cause found. And a lock kept in component state must be read back from where the pending work lives, or a remount or prop change clears it while the work is still pending.
