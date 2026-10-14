@@ -640,8 +640,8 @@ class QuestionGenerationService:
         """Build the prompt for generating questions."""
 
         # Extract relevant metadata
-        genre = (book_metadata.get("genre") or "")
-        audience = (book_metadata.get("audience") or "")
+        genre = book_metadata.get("genre", "")
+        audience = book_metadata.get("audience", "")
         book_title = book_metadata.get("title", "")
 
         # Create base prompt
