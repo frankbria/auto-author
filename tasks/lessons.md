@@ -1757,3 +1757,7 @@ I added a start-up test beside the feature's own tests in `tests/test_db/`. The 
 ### A browser test of the whole path finds what the unit test framed out (#886)
 The jest test for "sign out lands home" passed after the ProtectedRoute fix. The real-auth Playwright test of the same two paths found two more failures on the deletion path that no unit test could see: the page's own refetch got a 401 and the shared handler redirected, and the delete was refused with a 429 because three different routes shared one rate-limit bucket. The bucket bug had shipped in #798 with tests that armed one limit for every route.
 **Rule:** for a fix about where the user ends up, run the real path in a browser against real auth before calling it done; the repo has a real-auth Playwright suite for exactly this. And a rate-limit key is only per-route if it names the method and the full path; check what the framework's `route.path` actually holds.
+
+### A record that blocks an action needs a way to stop blocking (#912)
+To stop two checkout tabs from both being paid, I recorded the user's newest Checkout session and refused a new checkout while the recorded one was paid but its webhook had not landed. Nothing ever cleared the record, so a user who cancelled months later could never subscribe again: the old session was still 'complete'. The reviewer found it, and so did I once I asked what happens a month later.
+**Rule:** for any stored marker that refuses an action, name the event that retires it and test the action after that event. "Pending until X" needs X to clear it.

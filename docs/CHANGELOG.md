@@ -4,6 +4,15 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Stripe billing edges left after #768: per-subscription watermark, the write decides the current subscription, one payable checkout, paused (#912, P1.73)**:
+  - **Watermark.** The out-of-order guard is now one timestamp per subscription (`stripe_event_created_by_subscription.<id>`): with one per user, a re-subscriber's first event, created a moment before the old subscription's deletion landed, was refused and they stayed on free until their next event. The pre-#912 per-user `stripe_event_created` still guards a subscription with no mark of its own and is no longer written.
+  - **Current subscription.** The webhook's write now also requires the stored subscription id to be the one it read, or this event's own; two first events for different subscriptions no longer both pass. On a miss caused by another subscription it decides once more against what is stored, which reports the second as a second live subscription.
+  - **Checkout.** `swap_checkout_session` records the user's newest Checkout session atomically and the earlier one is expired if still open, so two tabs cannot both be paid; if the earlier one was already paid (its webhook not in yet) the new one is expired and the user gets a 409. A webhook that applies any subscription event clears the record.
+  - **Paused (decision).** A paused subscription is not billed but resumes once its payment method is fixed; a second one would then bill twice. Checkout refuses a paused subscriber and points to Manage billing.
+  - **Found in review.** A paid session stayed recorded and refused every checkout after a cancellation (now cleared by the webhook); a Stripe error after the swap dropped the earlier, possibly payable, session from the record (now put back before the 502); a refused webhook write with no ordering filter answered "processed" and recorded the replay marker (now `not_applied`).
+  - **Tests.** `test_stripe_webhook_subscription_edges.py` (4) and `test_billing_checkout_tabs.py` (6), signed webhooks and real MongoDB, Stripe's SDK stubbed; four existing tests read the per-subscription mark. Six mutations caught. `Session.retrieve`/`expire` checked against the installed stripe 15.6.1.
+  - Demo: `docs/demos/2026-10-14-issue-912-stripe-edges.md`.
+
 - **Signing out of a protected page, or deleting the account, lands on the home page (#886, P1.69)**:
   - **Problem.** The session store drops the session as soon as sign-out starts, and `ProtectedRoute` redirected before the caller's `router.push('/')`: the user landed on `/auth/sign-in?redirect=<the page they left>`.
   - **Fix.** `frontend/src/lib/sign-out.ts` marks a sign-out the user asked for as underway, while the request runs and for five seconds after it succeeds; `ProtectedRoute` and the shared 401 handler leave the navigation to the caller meanwhile. A session that ends any other way still goes to sign-in with a way back. The profile page's delete now goes through `signOutOrNotify({ quiet: true })`.
