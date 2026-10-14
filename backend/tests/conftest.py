@@ -24,7 +24,7 @@ for _storage_field in (
 
 
 import app.api.dependencies as deps
-from fastapi import Request
+from fastapi import HTTPException, Request
 import motor.motor_asyncio
 import app.db.user as users_dao
 import app.db.book as books_dao
@@ -53,7 +53,8 @@ _sync_db = _sync_client.get_default_database()
 _sync_users = _sync_db.get_collection("users")
 _sync_books = _sync_db.get_collection("books")
 _sync_logs = _sync_db.get_collection("audit_logs")
-_sync_sessions = _sync_db.get_collection("sessions")
+# better-auth's own name for it. It was "sessions", a collection nothing writes (#838).
+_sync_sessions = _sync_db.get_collection("session")
 
 async def noop_rate_limiter(request: Request):
     """Shared no-op limiter dependency. Deliberately ONE module-level function
@@ -341,6 +342,26 @@ def fake_user():
     }
 
 
+def _signed_in_as(user_map: dict):
+    """The stand-in both client factories put in place of the sign-in check (#838).
+
+    It is as strict as the real one. The cookie must be one a client was given:
+    a missing or unknown cookie is refused, where it used to be signed in as the
+    first user any client was made for. And the user is read from the database
+    on every request, as the real check reads it, so a test that changes or
+    removes the user sees that on its next request.
+    """
+
+    async def _get_user_from_session(request: Request):
+        seeded = user_map.get(request.cookies.get("better-auth.session_token"))
+        user = _sync_users.find_one({"_id": seeded["_id"]}) if seeded else None
+        if not user:
+            raise HTTPException(status_code=401, detail="Not authenticated. Please sign in.")
+        return user
+
+    return _get_user_from_session
+
+
 @pytest_asyncio.fixture(scope="function")
 async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
     """
@@ -356,7 +377,6 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
     """
     created_clients = []
     user_map = {}  # Map from session_token to user
-    override_installed = False
 
     def _seed_user(overrides: dict = None):
         user = test_user.copy()
@@ -368,9 +388,6 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
         return user
 
     async def make_client(*, overrides: dict = None, auth: bool = True):
-        nonlocal override_installed
-        from fastapi import Request as FastAPIRequest
-
         user = _seed_user(overrides)
 
         async def _noop_audit_request(
@@ -394,29 +411,7 @@ async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
             # Store user in map keyed by session token for multi-user tests
             user_map[session_token] = user
 
-            # Only install the dependency override once
-            # The override reads the session cookie to determine which user to return
-            if not override_installed:
-                async def _get_user_from_session(request: FastAPIRequest = None):
-                    """Return test user based on session cookie (simulating cookie-based auth)."""
-                    if request is None:
-                        # If no request, return the first user in the map
-                        if user_map:
-                            return next(iter(user_map.values()))
-                        return None
-
-                    # Get session token from cookies
-                    session_token = request.cookies.get("better-auth.session_token")
-                    if session_token and session_token in user_map:
-                        return user_map[session_token]
-
-                    # Fallback: return first user (for backward compatibility)
-                    if user_map:
-                        return next(iter(user_map.values()))
-                    return None
-
-                app.dependency_overrides[get_current_user_from_session] = _get_user_from_session
-                override_installed = True
+            app.dependency_overrides[get_current_user_from_session] = _signed_in_as(user_map)
 
             monkeypatch.setattr(
                 users_dao, "get_user_by_auth_id", lambda auth_id: next(
@@ -488,7 +483,6 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
     """
     created_clients = []
     user_map = {}  # Map from session_token to user
-    override_installed = False
 
     def _seed_user(overrides: dict | None):
         user = test_user.copy()
@@ -500,7 +494,6 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
         return user
 
     async def make_client(*, overrides: dict | None = None, auth: bool = True):
-        nonlocal override_installed
         user = _seed_user(overrides)
 
         async def _noop_audit(*args, **kwargs):
@@ -519,28 +512,7 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
             # Store user in map keyed by session token for multi-user tests
             user_map[session_token] = user
 
-            # Only install the dependency override once
-            # The override reads the session cookie to determine which user to return
-            if not override_installed:
-                async def _get_user_from_session(request=None):
-                    """Return test user based on session cookie."""
-                    if request is None:
-                        if user_map:
-                            return next(iter(user_map.values()))
-                        return None
-
-                    # Get session token from cookies
-                    session_token = request.cookies.get("better-auth.session_token")
-                    if session_token and session_token in user_map:
-                        return user_map[session_token]
-
-                    # Fallback: return first user
-                    if user_map:
-                        return next(iter(user_map.values()))
-                    return None
-
-                app.dependency_overrides[get_current_user_from_session] = _get_user_from_session
-                override_installed = True
+            app.dependency_overrides[get_current_user_from_session] = _signed_in_as(user_map)
 
             monkeypatch.setattr(
                 users_dao, "get_user_by_auth_id", lambda auth_id: next(
