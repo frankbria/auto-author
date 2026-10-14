@@ -849,7 +849,7 @@ export class BookClient {
       estimated_pages: number;
       structure_notes: string;
     } | null;
-    /** Stored TOC version (0 when no TOC exists yet); send back as expected_version on PUT. */
+    /** Stored TOC version (1 when no TOC exists yet, #871); send back as expected_version on PUT. */
     version?: number;
   }> {
     const response = await apiFetch(`${this.baseUrl}/books/${bookId}/toc`, {

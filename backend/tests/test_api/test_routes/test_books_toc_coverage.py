@@ -451,7 +451,8 @@ class TestGetToc:
         body = resp.json()
         assert body["book_id"] == book_id
         assert body["status"] == "not_generated"
-        assert body["version"] == 0
+        # The version a first save expects: a TOC with no version counts as 1 (#871).
+        assert body["version"] == 1
         assert body["generated_at"] is None
         assert body["updated_at"] is None
         assert body["toc"]["chapters"] == []

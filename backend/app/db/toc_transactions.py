@@ -288,16 +288,14 @@ async def _update_toc_internal(
     # client value only created a way for the two to disagree.
     updated_toc["total_chapters"] = len(updated_toc.get("chapters", []))
 
-    # Update the book with the new TOC
-    # For new books without TOC, don't check version
+    # Write only over the TOC that was read. A book with no TOC, or a TOC with no
+    # version, is matched on the field's absence: the first save is guarded like
+    # every other, and of two first saves only one lands (#871).
     update_query = {
         "_id": book_oid,
-        "owner_id": user_auth_id
+        "owner_id": user_auth_id,
+        "table_of_contents.version": _version_guard(current_toc),
     }
-
-    # Only add version check if TOC exists
-    if current_toc:
-        update_query["table_of_contents.version"] = current_version
 
     update_result = await books_collection.update_one(
         update_query,

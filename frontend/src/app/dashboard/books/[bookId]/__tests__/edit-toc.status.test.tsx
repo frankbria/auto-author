@@ -173,13 +173,13 @@ describe('Edit TOC page: optimistic lock (#750)', () => {
     expect(mockBookClient.updateToc.mock.calls[0][1]).toEqual(expect.objectContaining({ expected_version: 4 }));
   });
 
-  it('omits expected_version when no TOC exists yet (version 0)', async () => {
-    mockBookClient.getToc.mockResolvedValue(tocWith([chapter('c1', 'One', 1, 'draft')], 0));
+  it('sends expected_version on a first save too: a book with no TOC yet is version 1 (#871)', async () => {
+    mockBookClient.getToc.mockResolvedValue(tocWith([chapter('c1', 'One', 1, 'draft')], 1));
     renderPage();
     await screen.findByDisplayValue('One');
     fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
     await waitFor(() => expect(mockBookClient.updateToc).toHaveBeenCalled());
-    expect(mockBookClient.updateToc.mock.calls[0][1]).not.toHaveProperty('expected_version');
+    expect(mockBookClient.updateToc.mock.calls[0][1]).toEqual(expect.objectContaining({ expected_version: 1 }));
   });
 
   it('on a 409 says the TOC changed elsewhere and Reload refetches the new version', async () => {
