@@ -152,6 +152,16 @@ async def update_user(
     # Add updated_at timestamp
     user_data["updated_at"] = datetime.now(timezone.utc)
 
+    # Preferences are set key by key (#848): written whole, a partial object
+    # dropped the keys it left out, and null wiped them all.
+    preferences = user_data.pop("preferences", None) or {}
+    user_data.update({f"preferences.{key}": value for key, value in preferences.items()})
+    if preferences:
+        # A null stored before #848 has no key to set into, so Mongo refuses the write.
+        await users_collection.update_one(
+            {"auth_id": auth_id, "preferences": {"$type": "null"}}, {"$set": {"preferences": {}}}
+        )
+
     # A tombstone (deleted account, #784) never matches, so a late Stripe event
     # or an admin edit can't write personal data back onto it.
     query: Dict = {"auth_id": auth_id, "deleted_at": {"$exists": False}}

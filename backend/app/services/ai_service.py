@@ -500,8 +500,8 @@ class AIService:
         metadata_context = ""
         if book_metadata:
             title = book_metadata.get("title", "")
-            genre = book_metadata.get("genre", "")
-            audience = book_metadata.get("target_audience", "")
+            genre = (book_metadata.get("genre") or "")
+            audience = (book_metadata.get("target_audience") or "")
             metadata_context = (
                 f"\nBook Title: {title}\nGenre: {genre}\nTarget Audience: {audience}\n"
             )
@@ -536,7 +536,7 @@ Keep your response concise and actionable.
         metadata_context = ""
         if book_metadata:
             title = book_metadata.get("title", "")
-            genre = book_metadata.get("genre", "")
+            genre = (book_metadata.get("genre") or "")
             metadata_context = f"\nBook Title: {title}\nGenre: {genre}\n"
 
         return f"""
@@ -728,8 +728,8 @@ Make questions specific, actionable, and focused on content structure rather tha
         metadata_context = ""
         if book_metadata:
             title = book_metadata.get("title", "")
-            genre = book_metadata.get("genre", "")
-            audience = book_metadata.get("target_audience", "")
+            genre = (book_metadata.get("genre") or "")
+            audience = (book_metadata.get("target_audience") or "")
             metadata_context = (
                 f"\nBook Title: {title}\nGenre: {genre}\nTarget Audience: {audience}\n"
             )
@@ -1456,8 +1456,8 @@ Ensure the TOC is comprehensive, logically ordered, and matches the book's scope
         metadata_context = ""
         if book_metadata:
             title = book_metadata.get("title", "")
-            genre = book_metadata.get("genre", "")
-            audience = book_metadata.get("target_audience", "")
+            genre = (book_metadata.get("genre") or "")
+            audience = (book_metadata.get("target_audience") or "")
             metadata_context = f"""
 Book Context:
 - Title: {title}
