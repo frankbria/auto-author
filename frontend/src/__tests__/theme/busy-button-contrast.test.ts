@@ -201,7 +201,8 @@ describe('every busy-labelled Button declares it (#642)', () => {
       )
     );
 
-    expect(busyButtons.length).toBeGreaterThanOrEqual(23);
+    // 23 until #842 removed the unrouted AI error-handling example, which had three.
+    expect(busyButtons.length).toBeGreaterThanOrEqual(20);
   });
 
   it('no shipped Button shows a busy label without `busy`', () => {

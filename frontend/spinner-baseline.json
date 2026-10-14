@@ -49,12 +49,6 @@
       "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. Default variant on the confirm button.",
       "count": 1
     },
-    "src/components/examples/ai-error-handling-example.tsx": {
-      "inherits": "text-primary-foreground",
-      "surface": "primary",
-      "reason": "The icon is `currentColor` inside a <Button>, so it paints the button's own foreground on the button's own background \u2014 a pair shadcn defines together in `button.tsx`, not a colour that lands on a page surface. Three default-variant buttons in the same demo component.",
-      "count": 3
-    },
     "src/components/chapters/ChapterEditor.tsx": {
       "inherits": "text-muted-foreground",
       "surface": "muted",

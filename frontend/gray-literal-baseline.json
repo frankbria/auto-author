@@ -141,15 +141,6 @@
       },
       "reason": "Shared UI primitive used across themed and unthemed surfaces. Convert with its consumers."
     },
-    "src/components/examples/ai-error-handling-example.tsx": {
-      "literals": {
-        "bg-gray-800": 3,
-        "border-gray-700": 3,
-        "text-gray-300": 2,
-        "text-gray-400": 1
-      },
-      "reason": "Developer example component, not routed in the app. Lowest burn-down priority; a candidate for deletion instead."
-    },
     "src/components/export/ExportOptionsModal.tsx": {
       "literals": {
         "text-gray-500": 1
