@@ -1,4 +1,5 @@
 import { ChapterStatus, ChapterTabMetadata } from '@/types/chapter-tabs';
+import bookClient from '@/lib/api/bookClient';
 
 export const createMockChapter = (id: string, title: string, overrides = {}): ChapterTabMetadata => ({
   id,
@@ -94,6 +95,14 @@ export const setupTestEnvironment = () => {
     unobserve: jest.fn(),
     disconnect: jest.fn(),
   }));
+
+  // The active tab opens the editor, which loads its chapter. It went to the
+  // network and was answered by the global fetch stand-in until that stopped
+  // answering requests nobody stood in for (#844). A suite that mocks the client
+  // itself has already decided what this returns.
+  if (!jest.isMockFunction(bookClient.getChapterContent) && typeof bookClient.getChapterContent === 'function') {
+    jest.spyOn(bookClient, 'getChapterContent').mockResolvedValue({ content: '<p>Chapter text.</p>' } as never);
+  }
 };
 
 describe('chapterTabsFixtures', () => {

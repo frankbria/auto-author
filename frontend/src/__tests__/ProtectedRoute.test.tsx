@@ -127,7 +127,7 @@ describe('ProtectedRoute Component', () => {
     expect(screen.getByText('Protected Content')).toBeInTheDocument();
   });
 
-  test.skip('handles auth state changes correctly', async () => {
+  test('handles auth state changes correctly', async () => {
     // First render with loading state
     (useSession as jest.Mock).mockReturnValue({
       data: null,

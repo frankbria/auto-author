@@ -34,18 +34,24 @@ if (hasWindow) Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Add a fetch polyfill for tests
-global.fetch = jest.fn().mockImplementation(() =>
-  Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({}),
-    text: () => Promise.resolve(''),
-    status: 200,
-    statusText: 'OK',
-    headers: new Headers(),
-    clone: function() { return this; }
-  })
-);
+// A request no test asked for is a failure, not a 200 with an empty body (#844).
+// The old default answered `200 {}` to any URL, so a component that fetched the
+// wrong thing, or a test that forgot to stand in for a call, passed on nothing.
+// The call is refused, and the test that made it fails afterwards even if the
+// component swallowed the refusal. A test that expects a request stands in for
+// fetch itself, which replaces this default for that test file.
+const unexpectedFetches: string[] = [];
+global.fetch = jest.fn().mockImplementation((input: RequestInfo | URL) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  unexpectedFetches.push(url);
+  return Promise.reject(new Error(`A test made a request nothing stands in for: ${url}`));
+});
+afterEach(() => {
+  const made = unexpectedFetches.splice(0);
+  if (made.length) {
+    throw new Error(`Requests nothing stands in for (#844): ${made.join(', ')}`);
+  }
+});
 
 // Mock Speech Recognition API
 class MockSpeechRecognition {
