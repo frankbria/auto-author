@@ -95,3 +95,16 @@ async def test_suggestions_split_into_sentences_not_at_every_full_stop():
     suggestions = AIService()._parse_analysis_response(text, "A summary.")["suggestions"]
 
     assert suggestions == ["Cite Dr. Reyes on the 10.5% figure", "Name the audience, e.g. new managers"]
+
+
+async def test_a_model_that_returns_fewer_is_reported_as_fewer(service):
+    book_id = await _chapter_with(answered=1, unanswered=3)
+
+    async def model_short(*, book_id, count, **_):
+        return [_question(book_id, 100, "A fresh question about this chapter")]
+
+    service.generate_chapter_questions = model_short
+    result = await service.regenerate_chapter_questions(book_id, "ch1", count=10, user_id=OWNER)
+
+    assert (result.preserved_count, result.new_count, result.total) == (1, 1, 2)
+    assert await _stored(book_id) == 2
