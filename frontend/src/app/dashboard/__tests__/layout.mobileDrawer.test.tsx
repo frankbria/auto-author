@@ -9,7 +9,7 @@
  * No test here clicks.
  */
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import DashboardLayout from '../layout';
@@ -56,6 +56,20 @@ async function openWithTheKeyboard() {
   await user.keyboard('{Enter}');
   return { user, menu: await screen.findByRole('dialog', { name: 'Menu' }) };
 }
+
+// The window's width, as the layout learns it: a media query that can be changed and says so.
+let desktopWide = false;
+const widthListeners = new Set<() => void>();
+beforeEach(() => {
+  desktopWide = false;
+  widthListeners.clear();
+  window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+    matches: query === '(min-width: 768px)' && desktopWide,
+    media: query,
+    addEventListener: (_: string, listener: () => void) => widthListeners.add(listener),
+    removeEventListener: (_: string, listener: () => void) => widthListeners.delete(listener),
+  })) as never;
+});
 
 describe('the mobile menu with the keyboard (#837)', () => {
   it('has a toggle that says the menu is closed', () => {
@@ -113,6 +127,16 @@ describe('the mobile menu with the keyboard (#837)', () => {
     expect(settings).toHaveFocus();
 
     await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('is taken down when the window becomes desktop-wide, as when a tablet is turned', async () => {
+    // The sheet is drawn outside the header that is hidden at desktop widths, so nothing else would hide it.
+    await openWithTheKeyboard();
+
+    desktopWide = true;
+    act(() => widthListeners.forEach(listener => listener()));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });

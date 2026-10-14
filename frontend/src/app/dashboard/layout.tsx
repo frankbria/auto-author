@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 export default function DashboardLayout({
   children,
@@ -14,6 +15,8 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // The sheet is drawn in a portal, outside the md:hidden wrapper: Tailwind's md breakpoint takes it down instead.
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   // Navigation items with active state detection
   const navItems = [
@@ -58,7 +61,7 @@ export default function DashboardLayout({
             <div className="md:hidden flex items-center gap-4">
               <UserButton />
               {/* The Radix sheet gives the drawer its dialog role, focus trap, Escape and aria-expanded (#837) */}
-              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <Sheet open={isMobileMenuOpen && !isDesktop} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <button
                     className="flex items-center justify-center min-h-11 min-w-11 text-muted-foreground hover:text-foreground transition-colors"
