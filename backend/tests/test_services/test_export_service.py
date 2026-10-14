@@ -102,7 +102,8 @@ class TestExportService:
         result = export_service._clean_html_content(html)
 
         assert "# Title" in result
-        assert "This is a **bold** paragraph." in result
+        # The builders get marks they turn into bold, not `**` they would print (#1030).
+        assert "This is a \ue000bold\ue001 paragraph." in result
 
     def test_extract_text_formatting(self):
         """Test text formatting extraction."""
@@ -874,11 +875,13 @@ class TestHtmlBecomesMarkdownWithoutHtml2text:
         assert self._exported("<p>one&nbsp; two</p>") == "one  two"
 
     def test_emphasis_is_marked_as_it_always_was(self):
-        """`_italic_` beside `**bold**`. markdownify's default is `*italic*`; every export
-        until now has had the other, and the builders print the markers as they come."""
+        """The Markdown export: `_italic_` beside `**bold**`, as it always was. The
+        builders get marks they set as bold and italic instead (#1030)."""
         html = "<p>Some <strong>bold</strong>, some <em>italic</em>, <i>too</i>.</p>"
 
-        assert self._builders_get(html) == [("normal", "Some **bold**, some _italic_, _too_.")]
+        assert self._builders_get(html) == [
+            ("normal", "Some \ue000bold\ue001, some \ue002italic\ue003, \ue002too\ue003.")
+        ]
         assert self._exported(html) == "Some **bold**, some _italic_, _too_."
 
     def test_a_link_keeps_its_address(self):
