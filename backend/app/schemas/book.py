@@ -183,15 +183,18 @@ class BookCreate(BookBase):
 
 
 class BookUpdate(BaseModel):
-    """Schema for updating an existing book"""
+    """Schema for updating an existing book. PATCH is partial (#848): a field
+    left out is unchanged and null clears it, except title, metadata and
+    published, which a book always has: their None default is never validated,
+    so leaving them out passes and an explicit null is refused."""
 
-    title: Optional[str] = Field(..., min_length=1, max_length=100)
+    title: str = Field(None, min_length=1, max_length=100)
     subtitle: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = Field(None, max_length=5000)
     genre: Optional[str] = Field(None, max_length=100)
     target_audience: Optional[str] = Field(None, max_length=100)
-    metadata: Optional[Dict[str, Any]] = None
-    published: Optional[bool] = None
+    metadata: Dict[str, Any] = None
+    published: bool = None
 
     model_config = ConfigDict(
         json_schema_extra={

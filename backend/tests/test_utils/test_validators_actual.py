@@ -67,11 +67,10 @@ def test_validate_book_update_data():
             "title": ""  # Empty string fails min_length=1
         })
 
-    # Invalid data - missing required title
+    # An update is partial: no title is fine (#848), a null one is not
+    assert validate_book_update_data({"genre": "Fiction"}) == {"genre": "Fiction"}
     with pytest.raises(ValidationError):
-        validate_book_update_data({
-            "genre": "Fiction"  # Title is required
-        })
+        validate_book_update_data({"title": None})
 
 
 def test_validate_toc_item_data():

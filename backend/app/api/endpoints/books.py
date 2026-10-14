@@ -373,12 +373,8 @@ async def patch_book_details(
                 detail="Invalid book ID format",
             )
 
-        # Only include provided fields
-        update_data = {
-            k: v
-            for k, v in book_update.model_dump(exclude_unset=True).items()
-            if v is not None
-        }
+        # Only the fields sent; a null among them clears that field (#848)
+        update_data = book_update.model_dump(exclude_unset=True)
         update_data["updated_at"] = datetime.now(timezone.utc)
 
         updated_book = await update_book(
