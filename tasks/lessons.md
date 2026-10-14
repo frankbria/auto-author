@@ -1706,3 +1706,14 @@ The test: answers that arrive after the writer has started typing must not write
 A test asserted that the prompt mentions non-fiction. I had added two sentences that do, and the test was for the first; a mutation that removed it passed, on the strength of the second. And the demo counted lines of the new templates file that contain a fiction word and printed 7: the dictionary keys (`QuestionType.CHARACTER`) and the docstring that explains them, not one template. The same shape as the address found elsewhere in an entry (#825).
 **Rule:** assert the particular sentence, and search the values a reader is shown, not the source file that holds them. When a count is meant to be nought, see first that it counts what it claims on something that is not.
 
+### The helper that commits everything committed the scratch file too (#836)
+For a browser scan I copy axe's bundle into `frontend/public/`. My commit helper runs `git add -A`, and the 580 KB bundle went into a commit; the large-file hook did not stop it. It was caught by a `git status` that was clean when it should have shown one untracked file, before anything was pushed.
+**Rule:** a helper that stages everything refuses while a known scratch file is in the tree (it now does), and `git show --stat HEAD` is read after every helper commit, before the push. A clean status is evidence only if you know what it should have listed.
+
+### user-event lets go of an arrow key before Radix has moved the focus (#836)
+A Radix radio group moves focus a tick after the arrow key goes down and chooses the radio only if the key is still down then. `user.keyboard('{ArrowRight}')` presses and releases at once, so in jest the focus moved and nothing was chosen, while a real key in a real browser chose. The test now holds the key (`{ArrowRight>}`), waits for the focus, and releases.
+**Rule:** when a keyboard test and the browser disagree, find out which one is like a finger before changing the component. Hold keys for components that act on focus.
+
+### The keyboard driver pressed Enter on whatever had the focus (#836)
+The demo's loop pressed Tab six times looking for Retry, which is the seventh stop, then pressed Enter anyway. Enter landed on "Back to Book", the browser left the page, and the script printed a state that looked like a failed retry.
+**Rule:** a driver that presses a key to act says what has the focus first and stops if it is not the thing it meant.
