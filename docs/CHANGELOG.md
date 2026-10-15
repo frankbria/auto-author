@@ -4,6 +4,27 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Dead backend tests and scripts are gone, and CI runs each suite once (#852, P2.6)**:
+  - **Removed.**
+    - `scripts/test_data_manager.py` and `tests/factories` (both needed factory_boy, which was never installed);
+    - `archived_tests/`;
+    - the three `*.disabled` suites;
+    - `tests/test_config.py`, a print script with no test;
+    - `test_concurrent_profile_edits.py`, which skipped itself at import;
+    - `test_e2e_no_mocks.py`, which asserted nothing;
+    - the scratch `test_debug_questions.py`, `test_debug_questions_simple.py` and `test_services_isolated.py`, the last of which set `os.environ` at import for every later test;
+    - the three skipped tests in `test_error_handling.py`;
+    - the hello-world `backend/main.py`;
+    - `tests/load/locustfile.py` and `tests/performance/benchmark.py`, which called routes that do not exist (and `aiohttp`, which is not installed);
+    - `faker`, which nothing imported once the factories were gone. `tzdata` left the lock with it, test-only, and nothing uses `zoneinfo`.
+  - **Kept.** `tests/load/staging_smoke.py`, which CI runs after each staging deploy, and the `coverage.xml` ignore, which is correct (a generated file once got staged by accident).
+  - **CI.**
+    - The backend job set up Python 3.11 while `pyproject.toml` requires 3.13, so uv fetched 3.13 anyway. It now reads `backend/.python-version`.
+    - The backend and frontend jobs each ran their whole suite twice, once for the report and again for the threshold. Each runs once now, with the threshold in that run.
+  - **Coverage.** A full run with and without the three debug files: 94.29% both times, and no line of `app/` executed only by them.
+  - **Docs.** `docs/testing/test-data-management.md` is removed: it documented the factory system, and its snippets did not import. The two `.tbd` workflow drafts that named the removed tools are removed too. `final-integration-guide.md` now shows the staging smoke instead. Dated reports that name the removed files are left to #854.
+  - Demo: `docs/demos/2026-10-14-issue-852-dead-tests-and-scripts.md`.
+
 - **Dead and Clerk-era backend code is gone (#851, P2.5; also closes #946, P2.22)**:
   - **Routes.** The unauthenticated no-op `POST /webhooks/better-auth`, and `PUT /users/{auth_id}`, which duplicated PATCH `/users/me` without its rate limit or audit. A test pins that they answer 404 and 405. **Kept:** `DELETE /users/{auth_id}`. Since #954 it is how support erases a deactivated account early, a decision made after the review that listed it.
   - **DB.** `delete_user_books` and `delete_questions_for_book`, cascade-skipping and without callers, and the hard-delete branch of `delete_user`, which no route took. The #179 wrong-field guard those tests pinned is held by the account-cascade tests.

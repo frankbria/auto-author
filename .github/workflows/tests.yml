@@ -58,13 +58,10 @@ jobs:
         working-directory: frontend
         run: npm run typecheck:tests
 
-      - name: Run unit tests
-        working-directory: frontend
-        run: npm test -- --coverage --passWithNoTests
-
-      - name: Check coverage threshold
+      - name: Run unit tests with coverage threshold
         working-directory: frontend
         run: npm test -- --coverage --coverageThreshold='{"global":{"lines":85,"statements":85,"branches":75,"functions":85}}'
+        # One run (#852): the gate used to be a second full pass of the suite.
         # Enforced (#118): gate is green at baseline, so a coverage regression must fail CI.
         # #328: global functions had drifted to ~84.6% (main failed its own gate, forcing
         # --admin overrides on every frontend PR). Fixed by dropping test-infra files from the
@@ -102,7 +99,9 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.11'
+          # The version the backend declares, not a copy of it: this said 3.11
+          # while pyproject requires >=3.13, so uv fetched 3.13 anyway (#852).
+          python-version-file: backend/.python-version
 
       # The pinned action, not `curl … | sh` (#819): that ran whatever the
       # address served on the day, with this job's token. And the version the
@@ -134,13 +133,9 @@ jobs:
         env:
           MONGODB_URL: mongodb://localhost:27017/autoauthor_test
         run: |
-          uv run pytest tests/ --cov=app --cov-report=xml --cov-report=term
-
-      - name: Check coverage threshold
-        working-directory: backend
-        run: |
-          uv run pytest --cov=app tests/ --cov-fail-under=85
+          uv run pytest tests/ --cov=app --cov-report=xml --cov-report=term --cov-fail-under=85
         # Enforced (#118): gate is green at baseline, so a coverage regression must fail CI.
+        # One run (#852): the gate used to be a second full pass of the suite.
 
       # The Mongo service above is standalone, and a standalone server has no
       # transactions: delete_book's transaction branch, the one Atlas runs, had

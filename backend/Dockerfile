@@ -73,6 +73,4 @@ EXPOSE 8000
 ARG GIT_SHA=""
 ENV GIT_SHA=${GIT_SHA}
 
-# app.main:app — note backend/main.py is an unrelated stub (`print("Hello from
-# backend!")`), not the server entrypoint.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

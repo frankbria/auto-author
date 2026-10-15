@@ -89,25 +89,10 @@ python -m pytest tests/ -v
 # Integration tests
 python -m pytest tests/integration/ -v
 
-# Performance tests
-python tests/performance/benchmark.py
-
-# Load tests
-locust -f tests/load/locustfile.py --headless -u 10 -r 2 -t 60s
-```
-
-### Test Data Management
-```bash
-cd backend
-
-# Seed test data
-python scripts/test_data_manager.py seed --env testing
-
-# Clean test data
-python scripts/test_data_manager.py clean --env testing
-
-# Reset test database
-python scripts/test_data_manager.py reset --env testing
+# Staging load smoke: CI runs it after each staging deploy, with the staging
+# test account in STAGING_TEST_EMAIL / STAGING_TEST_PASSWORD (see e2e-staging-tests.yml)
+uv sync --extra load
+uv run locust -f tests/load/staging_smoke.py StagingSmokeUser --headless --host=https://dev.autoauthor.app
 ```
 
 ## 🔧 Configuration Files
@@ -123,9 +108,7 @@ python scripts/test_data_manager.py reset --env testing
 #### Backend
 - `backend/pyproject.toml` - Faker in the `test` extra; Locust in the `load` extra (both via `--extra dev`)
 - `backend/tests/conftest.py` - PyTest configuration (existing)
-- `backend/tests/factories/models.py` - Test data factories
-- `backend/tests/load/locustfile.py` - Load testing scenarios
-- `backend/scripts/test_data_manager.py` - Test data management CLI
+- `backend/tests/load/staging_smoke.py` - Staging load smoke
 
 #### CI/CD
 - `.github/workflows/test-suite.yml` - Comprehensive test automation
