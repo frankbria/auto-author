@@ -47,7 +47,6 @@ test = [
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "pytest-mock==3.15.1",
-    "faker==40.39.0",
     "coverage[toml]==7.16.1",
     "httpx==0.28.1",  # used only by tests; not imported by app/
     "ruff==0.16.9",  # the backend-lint pre-commit hook runs this (#561)

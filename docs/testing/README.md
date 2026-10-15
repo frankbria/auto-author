@@ -42,7 +42,6 @@ python -m pytest tests/integration/ # Integration tests only
 - **[Accessibility Testing](./accessibility-testing.md)** - Accessibility compliance testing
 - **[Mobile Testing](./mobile-testing.md)** - Mobile and responsive testing
 - **[CI/CD Integration](./cicd-integration.md)** - Continuous integration setup
-- **[Test Data Management](./test-data-management.md)** - Test data and fixtures
 
 ## Test Coverage
 

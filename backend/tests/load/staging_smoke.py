@@ -1,9 +1,8 @@
 """Low-impact staging load smoke for GitHub Actions.
 
-This file is intentionally separate from ``locustfile.py`` because staging uses
-Better Auth cookie sessions and the public frontend/API hosts. It exercises the
-staging auth boundary plus cheap API endpoints without repeatedly triggering AI
-work or creating high request volume.
+Staging uses Better Auth cookie sessions and the public frontend/API hosts. This
+exercises the staging auth boundary plus cheap API endpoints without repeatedly
+triggering AI work or creating high request volume.
 """
 
 from __future__ import annotations

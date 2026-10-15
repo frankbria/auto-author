@@ -298,7 +298,7 @@ cd backend
 python -m pytest
 
 # Specific test files
-python -m pytest tests/test_api/test_chapter_questions_api.py
+python -m pytest tests/test_api/test_partial_patch.py
 
 # With coverage
 python -m pytest --cov
