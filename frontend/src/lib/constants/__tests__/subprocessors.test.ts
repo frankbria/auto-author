@@ -11,14 +11,12 @@ import { FRONTEND_ROOT, shippedSources } from '@/__tests__/theme/helpers/sources
  */
 const CREDENTIAL = /_(KEY|KEY_ID|SECRET|DSN|URI|URL|TOKEN|PASSWORD)$/;
 
-// Sent to no one: our own signing secret, our own origins, and the password
-// the dev seed script gives its user.
+// Sent to no one: our own signing secret and our own origins.
 const FIRST_PARTY = [
   'BETTER_AUTH_SECRET',
   'BETTER_AUTH_URL',
   'NEXT_PUBLIC_BETTER_AUTH_URL',
   'NEXT_PUBLIC_API_URL',
-  'SEED_USER_PASSWORD',
 ];
 
 const BACKEND_APP = join(FRONTEND_ROOT, '..', 'backend/app');
@@ -28,7 +26,7 @@ const backendSettings = [
 ].map((m) => m[1]);
 
 // Reads that bypass Settings are swept too. cloud_storage_service.py did until
-// #806; the seed script still does.
+// #806, and the seed script until #851; main.py still reads ENVIRONMENT this way.
 const backendEnv = (readdirSync(BACKEND_APP, { recursive: true }) as string[])
   .filter((file) => file.endsWith('.py'))
   .flatMap((file) =>
@@ -55,7 +53,7 @@ describe('subprocessor inventory (#788)', () => {
   it('finds the settings it is meant to sweep', () => {
     expect(backendSettings).toContain('STRIPE_SECRET_KEY');
     expect(backendSettings).toContain('CLOUDINARY_API_SECRET');
-    expect(backendEnv).toContain('SEED_USER_PASSWORD');
+    expect(backendEnv).toContain('ENVIRONMENT');
     expect(frontendEnv).toContain('EMAIL_SERVICE_API_KEY');
     expect(credentials.length).toBeGreaterThan(FIRST_PARTY.length);
   });
