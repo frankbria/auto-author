@@ -1765,3 +1765,7 @@ Asking before a delete made the delete asynchronous: it waits for the answer cou
 ### A record that blocks an action needs a way to stop blocking (#912)
 To stop two checkout tabs from both being paid, I recorded the user's newest Checkout session and refused a new checkout while the recorded one was paid but its webhook had not landed. Nothing ever cleared the record, so a user who cancelled months later could never subscribe again: the old session was still 'complete'. The reviewer found it, and so did I once I asked what happens a month later.
 **Rule:** for any stored marker that refuses an action, name the event that retires it and test the action after that event. "Pending until X" needs X to clear it.
+
+### A backend deletion can break a frontend test (#851)
+Removing the backend seed script broke `subprocessors.test.ts`, a frontend test that sweeps `backend/app` for `os.getenv` reads and pins `SEED_USER_PASSWORD` as its sentinel. The commit hook runs only the hooks whose paths changed, so a backend-only commit never ran it; CI's Frontend Tests found it after the PR was open. Earlier, the backend hook also caught two tests the targeted runs had missed (a PUT twin of a PATCH test, and a coverage-config test that pointed at a `pass` line in a deleted class).
+**Rule:** before committing a deletion, `git grep` the deleted file's name and every name it defines across the whole repo, tests and other stacks included, and run whatever turns up; a targeted test run is not the inventory.

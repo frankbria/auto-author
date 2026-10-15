@@ -22,7 +22,6 @@ from app.services.question_generation_service import (
 from app.schemas.book import (
     QuestionType,
     QuestionDifficulty,
-    ResponseStatus,
     QuestionResponseCreate,
     QuestionRating,
     QuestionCreate,
@@ -71,48 +70,6 @@ class TestSuggestedLength:
         assert service._get_suggested_length(QuestionDifficulty.MEDIUM) == "200-300 words"
         # HARD branch (line 754)
         assert service._get_suggested_length(QuestionDifficulty.HARD) == "300-500 words"
-
-
-class TestGetQuestionProgress:
-    async def test_mixed_statuses(self, service):
-        questions = [
-            {"response_status": ResponseStatus.COMPLETED},
-            {"response_status": ResponseStatus.DRAFT},
-            {"response_status": None},
-        ]
-        result = await service.get_question_progress(questions)
-        assert isinstance(result, QuestionProgressResponse)
-        assert result.total == 3
-        assert result.completed == 1
-        # Regression: in_progress must survive serialization (schema field exists)
-        assert result.in_progress == 1
-        assert result.progress == pytest.approx(1 / 3)
-        assert result.status == "in-progress"
-
-    async def test_all_completed(self, service):
-        questions = [{"response_status": ResponseStatus.COMPLETED} for _ in range(2)]
-        result = await service.get_question_progress(questions)
-        assert result.completed == 2
-        assert result.progress == 1.0
-        assert result.status == "completed"
-
-    async def test_all_unanswered_not_started(self, service):
-        questions = [{"response_status": None}, {"response_status": "not_answered"}]
-        result = await service.get_question_progress(questions)
-        assert result.total == 2
-        assert result.completed == 0
-        assert result.in_progress == 0
-        assert result.progress == 0.0
-        assert result.status == "not-started"
-
-    async def test_empty_is_vacuously_complete(self, service):
-        # Pre-existing behavior (mirrored in app/db/questions.py): with no questions
-        # ``completed == total == 0`` so status is "completed". Documented, not asserted
-        # as desired — changing it is out of scope for a coverage task.
-        result = await service.get_question_progress([])
-        assert result.total == 0
-        assert result.progress == 0.0
-        assert result.status == "completed"
 
 
 class TestFallbackQuestions:

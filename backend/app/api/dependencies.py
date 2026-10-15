@@ -3,11 +3,9 @@ from typing import Dict, Optional, Any
 import logging
 import time
 import re
-from pydantic import BaseModel
 
 from datetime import datetime, timezone
 
-from app.db.database import get_collection
 from app.db.database import create_audit_log
 from app.db.usage import increment_usage, refund_usage
 from app.services.ai_service import model_call_attempted
@@ -39,12 +37,6 @@ def _is_exempt_e2e_user(current_user: Dict) -> bool:
     return email in {e.strip().lower() for e in exempt.split(",") if e.strip()}
 
 
-# MongoDB collection dependency
-async def get_database_collection(collection_name: str):
-    """Get a MongoDB collection"""
-    return await get_collection(collection_name)
-
-
 def sanitize_input(text: str) -> str:
     """Basic sanitization of user input"""
     if not text:
@@ -60,17 +52,6 @@ def sanitize_input(text: str) -> str:
     text = re.sub(r"\s+", " ", text)
 
     return text.strip()
-
-
-class SanitizedModel(BaseModel):
-    """Base class for models that automatically sanitize string fields"""
-
-    def __init__(self, **data):
-        # Sanitize any string fields before initialization
-        for field_name, field_value in data.items():
-            if isinstance(field_value, str):
-                data[field_name] = sanitize_input(field_value)
-        super().__init__(**data)
 
 
 def get_rate_limiter(limit: int = 10, window: int = 60):
@@ -112,7 +93,6 @@ def get_rate_limiter(limit: int = 10, window: int = 60):
         subject = (
             current_user.get("auth_id")
             or current_user.get("id")
-            or current_user.get("clerk_id")
             or (request.client.host if request.client else "unknown")
         )
 
@@ -222,7 +202,6 @@ def get_ai_usage_quota():
         user_id = (
             current_user.get("auth_id")
             or current_user.get("id")
-            or current_user.get("clerk_id")
         )
         if not user_id:
             # Auth runs before this dependency, so an authenticated user always
@@ -340,7 +319,7 @@ async def audit_request(
     """
     # Create user payload from current_user (already authenticated via session)
     user_payload = {
-        "sub": current_user.get("auth_id") or current_user.get("clerk_id") or current_user.get("id"),
+        "sub": current_user.get("auth_id") or current_user.get("id"),
         "email": current_user.get("email", "")
     }
 
@@ -376,9 +355,7 @@ async def audit_request(
     if metadata:
         details.update(metadata)
 
-    # Get user ID - better-auth uses auth_id instead of clerk_id
-    # Support both for migration period
-    user_id = current_user.get("auth_id") or current_user.get("clerk_id") or current_user.get("id")
+    user_id = current_user.get("auth_id") or current_user.get("id")
 
     # Create audit log
     await create_audit_log(

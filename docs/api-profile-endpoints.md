@@ -63,7 +63,7 @@ Retrieves the authenticated user's profile information.
 ```json
 {
   "id": "6457922acf1d345678abcdef",
-  "clerk_id": "user_2NxAa1pyy8THf937QUAhKR2tXCI",
+  "auth_id": "Xf3kq9TzR2bLw8NmPa1cVy7D",
   "email": "user@example.com",
   "first_name": "Jane", 
   "last_name": "Doe",
@@ -230,51 +230,6 @@ curl -X DELETE "http://localhost:8000/api/users/me" \
 
 ---
 
-### Get Clerk User Data
-
-Retrieves user data directly from Clerk. Only administrators can access data for other users.
-
-**Endpoint**: `GET /users/clerk/{clerk_id}`
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `clerk_id`: The Clerk user ID
-
-**Response Format**:
-```json
-{
-  "id": "user_2NxAa1pyy8THf937QUAhKR2tXCI",
-  "email_addresses": [
-    {
-      "id": "idn_1234567890",
-      "email_address": "user@example.com",
-      "verification": {
-        "status": "verified",
-        "strategy": "email_code"
-      }
-    }
-  ],
-  "first_name": "Jane",
-  "last_name": "Doe",
-  "profile_image_url": "https://img.clerk.com/user_avatar.jpg"
-}
-```
-
-**Status Codes**:
-- `200 OK`: Data retrieved successfully
-- `401 Unauthorized`: Invalid or missing authentication token
-- `403 Forbidden`: Insufficient permissions (non-admin trying to access another user's data)
-- `404 Not Found`: User not found in Clerk
-
-**Example Request**:
-```bash
-curl -X GET "http://localhost:8000/api/users/clerk/user_2NxAa1pyy8THf937QUAhKR2tXCI" \
-  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..."
-```
-
----
-
 ### Administrator Endpoints
 
 The following endpoints are available only to users with administrator permissions:
@@ -291,33 +246,6 @@ The following endpoints are available only to users with administrator permissio
 ```bash
 curl -X GET "http://localhost:8000/api/users/admin/users" \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..."
-```
-
-#### Update Any User
-
-**Endpoint**: `PUT /users/{clerk_id}`
-
-**Authentication**: Required (admin or self only)
-
-**Path Parameters**:
-- `clerk_id`: The Clerk user ID
-
-**Request Body**: Same format as PATCH /users/me
-
-> **Note**: `role` is not writable through the API (issue #244). A `role` key
-> (or any other undeclared field) in the request body is rejected with a 422
-> error; roles are managed directly in the database.
-
-**Response**: Updated user object
-
-**Example Request**:
-```bash
-curl -X PUT "http://localhost:8000/api/users/user_2NxAa1pyy8THf937QUAhKR2tXCI" \
-  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "bio": "Admin user"
-  }'
 ```
 
 #### Deactivate or Erase Any User

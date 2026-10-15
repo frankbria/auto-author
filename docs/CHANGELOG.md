@@ -4,6 +4,16 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Dead and Clerk-era backend code is gone (#851, P2.5; also closes #946, P2.22)**:
+  - **Routes.** The unauthenticated no-op `POST /webhooks/better-auth`, and `PUT /users/{auth_id}`, which duplicated PATCH `/users/me` without its rate limit or audit. A test pins that they answer 404 and 405. **Kept:** `DELETE /users/{auth_id}`. Since #954 it is how support erases a deactivated account early, a decision made after the review that listed it.
+  - **DB.** `delete_user_books` and `delete_questions_for_book`, cascade-skipping and without callers, and the hard-delete branch of `delete_user`, which no route took. The #179 wrong-field guard those tests pinned is held by the account-cascade tests.
+  - **Helpers.** Five of the six functions in `app/utils/validators.py` (`validate_text_safety` is live), `SanitizedModel`, `get_database_collection`, five unused `ChapterStatusService` methods, `get_question_progress`, `OPTIMIZED_QUERIES`, `PERFORMANCE_MONITORING`, `get_index_usage_stats`, and both `allow_users_and_admins`.
+  - **Models.** `app/models/user.py` (no importer) and the `app/models/book.py` classes that duplicate `app/schemas`. `TocItem`, `BookBase` and `BookDB` stay.
+  - **Config.** `JWT_ALGORITHM`, `BETTER_AUTH_ISSUER` (and its `.env.example` and setup-doc lines), the unused `HTTPBearer`, every `clerk_id` fallback, and compose's `CORS_ORIGINS`, which nothing read (`BACKEND_CORS_ORIGINS` is the variable).
+  - **Image.** `app/populate_db_test_data.py`, a seed script that wrote an admin user and shipped in the image under `app/`. Nothing ran it.
+  - **Tests.** Each removed symbol's own tests went with it. The PUT test that also pinned PATCH's sanitising (#265) keeps that half, and the #244 role guard was already pinned on PATCH. `git grep -w` finds none of the removed symbols outside dated records (this file, demos, `claudedocs/`, `archive/`). Clerk-era wording in the analysis docs is left to #854.
+  - Demo: `docs/demos/2026-10-14-issue-851-dead-backend-code.md`.
+
 - **Unimported frontend modules, inert mocks and the orphaned Playwright suites are gone (#853, P2.7)**:
   - **Modules.** `ChapterQuestions`, `DataRecoveryModal`, `components/ui/use-toast.ts`, `lib/cache/chapter-content-cache.ts`, `components/ui/form-components.tsx` and `components/ui/styled-avatar.tsx`: nothing outside tests imported any of them (`chapter-tabs-old` and `examples/` went in #842). `alert-dialog` stays: #906's `ConfirmChapterDelete` uses it.
   - **Dependency.** `date-fns`, whose only importer was `DataRecoveryModal`. The lockfile was regenerated with CI's npm (11.19.0) and drops only `date-fns`; a clean-room `npm ci` with that npm passes.

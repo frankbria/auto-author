@@ -43,8 +43,6 @@ a coverage omit for the test-data seeder.
 | `services/chapter_soft_delete_service.py` | 68 | no |
 | **Total** | **1,909** | |
 
-Plus `app/populate_db_test_data.py` (34 stmts) is a seed script — it should be added to
-`.coveragerc` `omit`, not tested.
 
 **Effect of removal/omit:** denominator drops to ~4,775; coverage rises **50% → ~70%** with
 zero new tests. This is the single highest-leverage step toward the 85% gate.

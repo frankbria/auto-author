@@ -147,8 +147,6 @@ class Settings(BaseSettings):
         description="JWT signing secret - MUST be strong random value, minimum 32 characters"
     )
     BETTER_AUTH_URL: str = Field("http://localhost:3000", repr=False)  # Base URL of the application
-    BETTER_AUTH_ISSUER: str = "better-auth"  # Issuer identifier for JWT tokens
-    JWT_ALGORITHM: str = "HS256"  # Changed from RS256 (Clerk) to HS256 (better-auth)
 
     # API Settings
     API_V1_PREFIX: str = "/api/v1"

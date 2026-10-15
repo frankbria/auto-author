@@ -4,7 +4,6 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from fastapi.security import HTTPBearer
 from typing import List, Dict
 from datetime import datetime, timezone
 
@@ -12,7 +11,6 @@ from app.api.endpoints.billing import cancel_subscription_for_deletion
 from app.core.security import get_current_user_from_session, SessionRoleChecker
 from app.schemas.user import UserUpdate, UserResponse
 from app.db.database import (
-    get_user_by_auth_id,
     update_user,
     delete_user,
     erase_deactivated_user,
@@ -26,21 +24,15 @@ from app.api.dependencies import (
 )
 
 router = APIRouter()
-security = HTTPBearer()
 
 logger = logging.getLogger(__name__)
 
 # Role-based access controls
 allow_admins = SessionRoleChecker(["admin"])
-allow_users_and_admins = SessionRoleChecker(["user", "admin"])
 
 
 def sanitize_string_fields(data: Dict) -> Dict:
-    """Sanitize every string value in an update payload (#265).
-
-    Shared by PATCH /me and PUT /{auth_id} so both endpoints store profile
-    strings with the same sanitization.
-    """
+    """Sanitize every string value in an update payload (#265)."""
     return {
         k: sanitize_input(v) if isinstance(v, str) else v for k, v in data.items()
     }
@@ -343,66 +335,6 @@ async def upload_profile_picture(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload profile picture",
-        )
-
-
-@router.put("/{auth_id}", response_model=UserResponse)
-async def update_user_data(
-    auth_id: str,
-    user_update: UserUpdate,
-    current_user: Dict = Depends(get_current_user_from_session),
-):
-    """Update a user's information
-
-    Regular users can only update their own information
-    Admin users can update any user's information
-    """
-    # Check permissions - users can only update their own data unless they're admins
-    if current_user["auth_id"] != auth_id and current_user["role"] != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to update this user",
-        )
-
-    # Check if user exists
-    try:
-        existing_user = await get_user_by_auth_id(auth_id)
-    except Exception:
-        logger.error("Database operation timed out while fetching user", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="Database operation timed out",
-        )
-    if not existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-
-    # Update with current timestamp (sanitized like PATCH /me — #265)
-    update_data = sanitize_string_fields(
-        {
-            k: v
-            for k, v in user_update.model_dump(exclude_unset=True).items()
-            if v is not None
-        }
-    )
-    update_data["updated_at"] = datetime.now(timezone.utc)
-
-    try:
-        updated_user = await update_user(auth_id, update_data)
-        if not updated_user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
-
-        return updated_user
-    except HTTPException:
-        raise
-    except Exception:
-        logger.error("Error updating user", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error updating user",
         )
 
 

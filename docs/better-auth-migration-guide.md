@@ -343,7 +343,6 @@ DATABASE_NAME=auto_author
 # Better-Auth (REQUIRED)
 BETTER_AUTH_SECRET=<generated-secret-min-32-chars>  # Use: python -c 'import secrets; print(secrets.token_urlsafe(32))'
 BETTER_AUTH_URL=http://localhost:3000
-BETTER_AUTH_ISSUER=better-auth
 
 # CORS
 BACKEND_CORS_ORIGINS=["http://localhost:3000"]

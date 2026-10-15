@@ -1,5 +1,9 @@
 # Environment Variable Refactoring Summary
 
+## Removed settings (2026-10-14)
+
+Issue #851: **BETTER_AUTH_ISSUER** and **JWT_ALGORITHM** are no longer read. Nothing used either, so a value left in an `.env` is ignored and can be deleted. Compose's **CORS_ORIGINS** was never read: **BACKEND_CORS_ORIGINS** is the variable. The sections below describe these settings as they were.
+
 ## Stripe Tax (2026-10-09)
 
 Issue #783: **STRIPE_AUTOMATIC_TAX** (bool, default `false`) sets `automatic_tax.enabled` on Checkout Sessions. Set it to `true` only after Stripe Tax is activated in the Dashboard (origin address and registrations), or Stripe rejects every checkout. A billing address and tax IDs are collected either way.

@@ -39,20 +39,6 @@ def _report(kind: str, message: str, *args, anyone_can_cause_it: bool = False) -
     report_failure(kind, message=message % args, every_time=not anyone_can_cause_it, group="stripe-webhook")
 router = APIRouter()
 
-# Clerk webhooks are deprecated - users are now created automatically on better-auth signup
-
-@router.post("/better-auth", status_code=200)
-async def better_auth_webhook():
-    """
-    Better-auth webhook handler.
-
-    Note: better-auth typically handles user creation/updates automatically,
-    so explicit webhook handlers may not be necessary. This endpoint is a placeholder
-    for future webhook implementations if needed.
-    """
-    logger.info("better-auth webhook received (no-op)")
-    return {"message": "better-auth webhook processed"}
-
 
 @router.post("/stripe", status_code=200)
 async def stripe_webhook(request: Request):

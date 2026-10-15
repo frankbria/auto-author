@@ -1,8 +1,7 @@
 """
 Integration coverage tests for app/api/endpoints/users.py.
 
-Covers the previously-untested endpoints (update_user_data, get_all_users,
-delete_user_account) plus the error branches of read_users_me,
+Covers the previously-untested endpoints (get_all_users, delete_user_account) plus the error branches of read_users_me,
 update_profile, and delete_profile. Real MongoDB is used (session auth mocked
 via auth_client_factory); only the DB helper calls that simulate failures are
 patched per-test.
@@ -133,51 +132,27 @@ async def test_post_users_route_is_gone_even_authenticated(auth_client_factory):
     assert resp.status_code in (404, 405)
 
 
-# ---------------------------------------------------------------------------
-# update_user_data (PUT /{auth_id})
-# ---------------------------------------------------------------------------
-async def test_put_user_self_happy_path(auth_client_factory):
+async def test_put_users_by_id_and_the_better_auth_webhook_are_gone(auth_client_factory):
+    # #851: PUT /users/{auth_id} duplicated PATCH /me without its rate limit or
+    # audit, and the better-auth webhook was an unauthenticated no-op.
     client = await auth_client_factory()
-    resp = await client.put(
-        "/api/v1/users/test-auth-id-123", json={"first_name": "Updated"}
-    )
-    assert resp.status_code == 200
-    assert resp.json()["first_name"] == "Updated"
+    put = await client.put("/api/v1/users/test-auth-id-123", json={"bio": "x"})
+    hook = await client.post("/api/v1/webhooks/better-auth", json={})
+    assert (put.status_code, hook.status_code) == (405, 404)
 
 
 MARKUP_BIO = "<script>alert(1)</script><b>bold</b>  claim"
 
 
-async def test_put_sanitizes_strings_same_as_patch(auth_client_factory):
-    """AC (#265): a string field containing markup is stored identically
-    (sanitized) whether written via PATCH /me or PUT /{auth_id}."""
+async def test_patch_sanitizes_strings(auth_client_factory):
+    """AC (#265): a string field containing markup is stored sanitized."""
     from app.db import base
 
     client = await auth_client_factory()
     resp = await client.patch("/api/v1/users/me", json={"bio": MARKUP_BIO})
     assert resp.status_code == 200
-    via_patch = (await base.users_collection.find_one({"auth_id": "test-auth-id-123"}))["bio"]
-    assert "<" not in via_patch  # PATCH already sanitizes — pin it
-
-    resp = await client.put(
-        "/api/v1/users/test-auth-id-123", json={"bio": "different"}
-    )
-    assert resp.status_code == 200
-    resp = await client.put(
-        "/api/v1/users/test-auth-id-123", json={"bio": MARKUP_BIO}
-    )
-    assert resp.status_code == 200
-    via_put = (await base.users_collection.find_one({"auth_id": "test-auth-id-123"}))["bio"]
-    assert via_put == via_patch
-
-
-async def test_put_user_other_non_admin_returns_403(auth_client_factory):
-    client = await auth_client_factory()
-    resp = await client.put(
-        "/api/v1/users/someone-else", json={"first_name": "Nope"}
-    )
-    assert resp.status_code == 403
-    assert "permissions" in resp.json()["detail"]
+    stored = (await base.users_collection.find_one({"auth_id": "test-auth-id-123"}))["bio"]
+    assert "<" not in stored
 
 
 # ---------------------------------------------------------------------------
@@ -229,74 +204,6 @@ async def test_patch_me_declared_fields_still_persist(auth_client_factory):
     stored = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
     assert stored["first_name"] == "Ada"
     assert stored["bio"] == "Mathematician"
-
-
-async def test_put_user_role_rejected_and_not_persisted(auth_client_factory):
-    """#244: role is unwritable via PUT /users/{auth_id} as well."""
-    from app.db import base
-
-    client = await auth_client_factory()
-    resp = await client.put(
-        "/api/v1/users/test-auth-id-123",
-        json={"role": "admin", "first_name": "Kept"},
-    )
-    assert resp.status_code == 422
-    stored = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
-    assert stored["role"] == "user"
-    assert stored["first_name"] != "Kept"
-
-
-async def test_put_user_role_rejected_even_for_admin(auth_client_factory):
-    """#244: no API path writes role — an admin PUT targeting another user is
-    422 too; roles are managed directly in the database."""
-    from app.db import base
-
-    admin_client = await auth_client_factory(
-        overrides={"role": "admin", "auth_id": "admin-244"}
-    )
-    await auth_client_factory()  # seeds the default test-auth-id-123 user
-    resp = await admin_client.put(
-        "/api/v1/users/test-auth-id-123", json={"role": "superadmin"}
-    )
-    assert resp.status_code == 422
-    stored = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
-    assert stored["role"] == "user"
-
-
-async def test_put_user_fetch_error_returns_504(auth_client_factory):
-    client = await auth_client_factory()
-    with patch(f"{USERS}.get_user_by_auth_id", AsyncMock(side_effect=Exception("timeout"))):
-        resp = await client.put(
-            "/api/v1/users/test-auth-id-123", json={"first_name": "X"}
-        )
-    assert resp.status_code == 504
-
-
-async def test_put_user_admin_target_missing_returns_404(auth_client_factory):
-    client = await auth_client_factory(overrides={"role": "admin", "auth_id": "admin-1"})
-    resp = await client.put(
-        "/api/v1/users/ghost-user", json={"first_name": "X"}
-    )
-    assert resp.status_code == 404
-
-
-async def test_put_user_update_returns_none_404(auth_client_factory):
-    """update_user returning None yields 404 (now that HTTPException isn't swallowed)."""
-    client = await auth_client_factory()
-    with patch(f"{USERS}.update_user", AsyncMock(return_value=None)):
-        resp = await client.put(
-            "/api/v1/users/test-auth-id-123", json={"first_name": "X"}
-        )
-    assert resp.status_code == 404
-
-
-async def test_put_user_update_error_returns_500(auth_client_factory):
-    client = await auth_client_factory()
-    with patch(f"{USERS}.update_user", AsyncMock(side_effect=Exception("db down"))):
-        resp = await client.put(
-            "/api/v1/users/test-auth-id-123", json={"first_name": "X"}
-        )
-    assert resp.status_code == 500
 
 
 # ---------------------------------------------------------------------------

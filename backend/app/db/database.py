@@ -29,7 +29,6 @@ from .user import (
     create_user,
     update_user,
     delete_user,
-    delete_user_books,
     erase_deactivated_user,
 )
 
@@ -84,7 +83,6 @@ __all__ += [
     "create_user",
     "update_user",
     "delete_user",
-    "delete_user_books",
     "erase_deactivated_user",
     # Book DAOs
     "create_book",

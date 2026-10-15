@@ -177,7 +177,7 @@ OPENAI_API_KEY=test_key_openai
 ANTHROPIC_API_KEY=test_key_anthropic
 ENVIRONMENT=test
 LOG_LEVEL=WARNING
-CORS_ORIGINS=["http://localhost:3000"]
+BACKEND_CORS_ORIGINS=["http://localhost:3000"]
 ```
 
 ### 5. Test Database Setup

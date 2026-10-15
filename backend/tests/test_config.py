@@ -3,7 +3,6 @@ import os
 os.environ['OPENAI_AUTOAUTHOR_API_KEY'] = 'test-key'
 os.environ['BETTER_AUTH_SECRET'] = 'test-secret-for-ci-minimum-32-characters-long-safe-for-testing'
 os.environ['BETTER_AUTH_URL'] = 'http://localhost:3000'
-os.environ['BETTER_AUTH_ISSUER'] = 'better-auth'
 
 try:
     from app.core.config import settings

@@ -163,12 +163,11 @@ async def test_delete_all_user_books_removes_every_cover_of_that_owner(
 # --- account deletion --------------------------------------------------------
 
 
-@pytest.mark.parametrize("soft_delete", [True, False])
-async def test_delete_user_removes_the_avatar(motor_reinit_db, uploads, soft_delete):
+async def test_delete_user_removes_the_avatar(motor_reinit_db, uploads):
     await _user_with_avatar(uploads, "gone")
     await _user_with_avatar(uploads, "bystander")
 
-    assert await delete_user("gone", soft_delete=soft_delete) is True
+    assert await delete_user("gone") is True
 
     assert _names(uploads.avatars) == [_avatar_file("bystander")]
 
