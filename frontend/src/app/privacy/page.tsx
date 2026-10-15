@@ -12,7 +12,7 @@ export const metadata = {
 // review before public launch. References the account-deletion / cascade-delete
 // path (#179) and the 18-month deactivated record (#954): deleting your account
 // deletes your books at once and keeps the account and billing record.
-const LAST_UPDATED = 'October 11, 2026';
+const LAST_UPDATED = 'October 15, 2026';
 
 export default function PrivacyPage() {
   return (
@@ -219,7 +219,8 @@ export default function PrivacyPage() {
               text and book summaries) so that work is not lost if a save
               fails. Local storage stays on your device until you clear it in
               your browser settings, and session storage until you close the
-              tab; signing out removes neither.
+              tab; signing out removes neither. Deleting your account removes
+              those copies of your writing from the browser you delete it in.
             </p>
           </section>
 

@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSession } from '@/lib/auth-client';
 import { signOutOrNotify } from '@/lib/sign-out';
+import { clearLocalWriting } from '@/lib/storage/localWriting';
 import useProfileApi, { ACCOUNT_EXPORT_URL, type UserPreferences } from '@/hooks/useProfileApi';
 import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
 import { FormField } from '@/components/ui/form';
@@ -183,6 +184,8 @@ export default function UserProfile() {
     setDeleting(true);
     try {
       await deleteUserAccount();
+      // No editor is open on this page, so nothing writes a backup after this (#855).
+      clearLocalWriting();
       toast.success({ title: 'Account deactivated' });
       // The server already revoked every session (#763); this clears the
       // cookies and the client session cache. The account is gone either way,
