@@ -3,9 +3,8 @@
 import { logger } from '@/lib/logger';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
 import './editor.css';
@@ -145,6 +144,10 @@ export function ChapterEditor({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [autoSavePending, setAutoSavePending] = useState(false);
+  // Consecutive failed autosaves: each one doubles the wait before the next try,
+  // up to 30s, so an outage is not a request every few seconds (#855). Any save
+  // that works resets it, and so does a change of chapter.
+  const autoSaveFailuresRef = useRef(0);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
   const backupKey = chapterBackupKey(bookId, chapterId);
   const droppedKey = chapterDroppedKey(bookId, chapterId);
@@ -230,7 +233,6 @@ export function ChapterEditor({
       // dependency upgrade is the wrong place to make one; enabling it is a
       // product decision with a migration behind it (#385).
       StarterKit.configure({ trailingNode: false }),
-      Underline,
       Placeholder.configure({
         placeholder: 'Start writing your chapter content...',
       }),
@@ -245,6 +247,11 @@ export function ChapterEditor({
       if (loadFailed) return;
       // Tagged with its chapter now, so a flush can never send it to the next one.
       unsavedRef.current = html !== lastAutoSavedContent ? { bookId, chapterId, content: html } : null;
+      // While saves are failing, each edit refreshes the backup: the next try may be
+      // up to 30s away, and a crash before it would lose what was typed since (#855).
+      if (autoSaveFailuresRef.current > 0 && unsavedRef.current) {
+        backupChapterContent(unsavedRef.current, new Error('Not saved yet: autosave is retrying'));
+      }
       if (html !== lastAutoSavedContent) {
         setAutoSavePending(true);
         setHasUnsavedChanges(true);
@@ -257,6 +264,13 @@ export function ChapterEditor({
     },
     // Set this to false to avoid SSR hydration issues
     immediatelyRender: false,
+  });
+
+  // useEditor does not re-render on transactions, so a count read straight off
+  // the editor in render froze at the first keystroke (#855).
+  const characters = useEditorState({
+    editor,
+    selector: ({ editor: current }) => current?.storage.characterCount.characters() ?? 0,
   });
 
   // Warn user before leaving page with unsaved changes
@@ -325,6 +339,7 @@ export function ChapterEditor({
     () => () => {
       const edit = unsavedRef.current;
       unsavedRef.current = null;
+      autoSaveFailuresRef.current = 0;
       if (edit) void flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
     },
     [bookId, chapterId]
@@ -350,6 +365,7 @@ export function ChapterEditor({
   // autosave effect re-arms for it because lastAutoSavedContent changed (#757).
   const markSaved = (content: string) => {
     saveSucceeded();
+    autoSaveFailuresRef.current = 0;
     setLastAutoSavedContent(content);
     if (editor?.getHTML() !== content) return;
     unsavedRef.current = null;
@@ -407,6 +423,7 @@ export function ChapterEditor({
   useEffect(() => {
     if (!autoSavePending || !editor || isSaving || loadFailed || conflict) return;
 
+    const delay = Math.max(autoSaveDelayMs, Math.min(autoSaveDelayMs * 2 ** autoSaveFailuresRef.current, 30_000));
     const timer = setTimeout(async () => {
       const content = editor.getHTML();
       if (content === lastAutoSavedContent) {
@@ -439,6 +456,7 @@ export function ChapterEditor({
           return;
         }
         reportSaveFailure('auto-save', err);
+        autoSaveFailuresRef.current += 1;
         if (backupChapterContent({ bookId, chapterId, content }, err)) {
           noteBackupWrite();
           setError('Failed to auto-save. Content backed up locally.');
@@ -448,7 +466,7 @@ export function ChapterEditor({
       } finally {
         setIsSaving(false);
       }
-    }, autoSaveDelayMs);
+    }, delay);
 
     return () => clearTimeout(timer);
   }, [autoSavePending, autoSaveDelayMs, bookId, chapterId, conflict, editor, isSaving, lastAutoSavedContent, loadFailed]);
@@ -809,7 +827,7 @@ export function ChapterEditor({
       <div className="border-t border-border p-4 flex justify-between items-center bg-muted/20">
         <div className="flex items-center gap-4">
           <span className="text-sm text-foreground">
-            {editor?.storage.characterCount.characters() ?? 0} characters
+            {characters ?? 0} characters
           </span>
           {/* Autosave result is otherwise a purely visual cue. Polite so it
               never interrupts typing — which is precisely what the user is

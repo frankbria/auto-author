@@ -55,39 +55,6 @@ describe('Navigation Fix', () => {
     expect(mockPush).not.toHaveBeenCalledWith(expect.stringContaining('/chapters'));
   });
 
-  it('should handle chapter page redirect to tabbed interface', () => {
-    // Test that individual chapter pages redirect to book page with chapter query param
-    const ChapterPage = ({ chapterId }: { chapterId: string }) => {
-      const router = useRouter();
-
-      React.useEffect(() => {
-        // Set active chapter in localStorage
-        localStorage.setItem(`chapter-tabs-bookId123`, JSON.stringify({
-          active_chapter_id: chapterId,
-          timestamp: Date.now()
-        }));
-
-        // Redirect to book page with chapter query param
-        router.replace(`/dashboard/books/bookId123?chapter=${chapterId}`);
-      }, [chapterId, router]);
-
-      return <div>Redirecting to tabbed interface...</div>;
-    };
-
-    const { rerender } = render(<ChapterPage chapterId="chapter456" />);
-
-    // Check localStorage was set
-    const stored = localStorage.getItem('chapter-tabs-bookId123');
-    expect(stored).toBeTruthy();
-    const parsed = JSON.parse(stored!);
-    expect(parsed.active_chapter_id).toBe('chapter456');
-
-    // Check redirect was called
-    expect(mockPush.mock.calls[0] || []).toEqual([]);
-    const mockReplace = (useRouter as jest.Mock)().replace;
-    expect(mockReplace).toHaveBeenCalledWith('/dashboard/books/bookId123?chapter=chapter456');
-  });
-
   it('should preserve chapter context in breadcrumb navigation', () => {
     const BookPage = ({ chapterId }: { chapterId?: string }) => {
       const showChapterContext = !!chapterId;

@@ -36,7 +36,6 @@ export function ChapterBreadcrumb({
   const isEditTocPage = pathname.includes('/edit-toc');
   const isSummaryPage = pathname.includes('/summary');
   const isGenerateTocPage = pathname.includes('/generate-toc');
-  const isExportPage = pathname.includes('/export');
 
   return (
     <Breadcrumb className="mb-4">
@@ -88,12 +87,6 @@ export function ChapterBreadcrumb({
         {isEditTocPage && (
           <BreadcrumbItem>
             <BreadcrumbPage className="text-foreground">Edit TOC</BreadcrumbPage>
-          </BreadcrumbItem>
-        )}
-
-        {isExportPage && (
-          <BreadcrumbItem>
-            <BreadcrumbPage className="text-foreground">Export Book</BreadcrumbPage>
           </BreadcrumbItem>
         )}
 

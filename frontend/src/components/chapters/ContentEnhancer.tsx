@@ -97,7 +97,7 @@ export function ContentEnhancer({
       // The shared handler classifies the refusal and announces it once: an
       // Upgrade link for a plan refusal, the allowance for a quota, a retry
       // for a rate limit (#803). The dialog shows its readable message.
-      const { error: message } = await handleAIServiceError(err);
+      const { error: message } = await handleAIServiceError(err, handleEnhance); // a rate limit offers this as its retry (#855)
       setError(message ?? 'Failed to enhance text');
       setStep('options');
     }

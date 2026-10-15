@@ -171,6 +171,21 @@ describe("ResetPasswordPage", () => {
     expect(await screen.findByText(/password has been successfully reset/i)).toBeInTheDocument();
   });
 
+  it("does not redirect from a page that has unmounted (#855)", async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    const { unmount } = render(<ResetPasswordPage />);
+
+    await user.type(screen.getByLabelText("New Password"), "ValidPass1");
+    await user.type(screen.getByLabelText("Confirm New Password"), "ValidPass1");
+    await user.click(screen.getByRole("button", { name: /reset password/i }));
+    await screen.findByText(/password has been successfully reset/i);
+
+    unmount();
+    jest.advanceTimersByTime(5000);
+
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it("redirects to sign-in after success", async () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<ResetPasswordPage />);

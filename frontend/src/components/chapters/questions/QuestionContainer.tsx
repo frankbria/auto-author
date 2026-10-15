@@ -48,6 +48,8 @@ export default function QuestionContainer({
   const [manualLoading, setManualLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whether trying again could help with `error`; a refusal says it cannot (#855).
+  const [canRetry, setCanRetry] = useState(true);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [progress, setProgress] = useState<QuestionProgressResponse | null>(null);
@@ -127,6 +129,7 @@ export default function QuestionContainer({
     }
 
     setError(errorMessage);
+    setCanRetry(true);
 
     toast({
       title: 'Error Loading Questions',
@@ -211,8 +214,9 @@ export default function QuestionContainer({
       console.error('Error generating questions:', err);
       // Classified and announced once by the shared handler: an Upgrade link
       // for a plan refusal, the allowance for a quota (#803).
-      const { error: message } = await handleAIServiceError(err);
+      const { error: message, canRetry } = await handleAIServiceError(err);
       setError(message ?? 'Failed to generate questions. Please try again.');
+      setCanRetry(canRetry ?? true);
     } finally {
       setIsGenerating(false);
     }
@@ -372,6 +376,7 @@ export default function QuestionContainer({
           onGenerate={handleRetryOrGenerate}
           isGenerating={isGenerating || loading}
           error={error}
+          canRetry={canRetry}
         />
       </div>
     );

@@ -140,6 +140,12 @@ describe('QuestionGenerator - rendering', () => {
     expect(screen.getByText('Failed to generate')).toBeInTheDocument();
   });
 
+  it('keeps the "Generate" label after an error that a retry cannot change (#855)', () => {
+    render(<QuestionGenerator {...defaultProps} error="Your plan does not include this feature." canRetry={false} />);
+    expect(screen.queryByRole('button', { name: /Retry/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate Interview Questions/i })).toBeInTheDocument();
+  });
+
   it('renders "Retry" button text when error is present', () => {
     render(<QuestionGenerator {...defaultProps} error="An error occurred" />);
     expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument();

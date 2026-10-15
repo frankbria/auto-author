@@ -175,6 +175,12 @@ export default function Dashboard() {
     setIsBookDialogOpen(true);
   };
 
+  // The post-create redirect is cancelled if the dashboard is gone by then (#855).
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (redirectTimer.current) clearTimeout(redirectTimer.current);
+  }, []);
+
   const handleBookCreated = (bookId: string) => {
     toast.success({ title: 'Your book has been created! Click "Open Project" to start writing.' });
     // The list is newest-first, so a new book lands on page 1. Jumping there lets the
@@ -186,7 +192,7 @@ export default function Dashboard() {
     }
 
     // Redirect after a short delay to allow the user to see the success toast
-    setTimeout(() => {
+    redirectTimer.current = setTimeout(() => {
       router.push(`/dashboard/books/${bookId}`);
     }, 1500);
   };

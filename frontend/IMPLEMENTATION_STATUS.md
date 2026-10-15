@@ -44,7 +44,7 @@ This report provides a comprehensive overview of all implemented components, pag
 - Chapter reordering
 - Add/remove chapters
 
-### 7. Export Page (`app/dashboard/books/[bookId]/export/page.tsx`)
+### 7. Export Page (removed in #855: export runs from the book page's Export Book dialog)
 - **Comprehensive export interface**
 - Multiple format support (PDF, DOCX)
 - Export options (page size, include empty chapters)

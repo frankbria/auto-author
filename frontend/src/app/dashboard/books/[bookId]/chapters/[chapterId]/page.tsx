@@ -23,13 +23,8 @@ export default function ChapterContentPage({ params }: ChapterContentPageProps) 
   // Auto-redirect to tabbed interface after a short delay
   useEffect(() => {
     const timer = setTimeout(() => {
-      // Set the active chapter in localStorage so tabs open with the right chapter
-      localStorage.setItem(`chapter-tabs-${bookId}`, JSON.stringify({
-        active_chapter_id: chapterId,
-        timestamp: Date.now()
-      }));
-
-      // Redirect to book page with tabs
+      // The book page opens the chapter named in ?chapter= (#855: a localStorage
+      // key written here was never read).
       router.replace(`/dashboard/books/${bookId}?chapter=${chapterId}`);
     }, 2000); // 2 second delay to show the redirect message
 
@@ -49,10 +44,6 @@ export default function ChapterContentPage({ params }: ChapterContentPageProps) 
               </div>
             <Button
               onClick={() => {
-                localStorage.setItem(`chapter-tabs-${bookId}`, JSON.stringify({
-                  active_chapter_id: chapterId,
-                  timestamp: Date.now()
-                }));
                 router.replace(`/dashboard/books/${bookId}?chapter=${chapterId}`);
               }}
               size="sm"

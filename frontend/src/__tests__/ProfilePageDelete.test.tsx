@@ -114,6 +114,43 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'));
   });
 
+  // Chapter backups and summary drafts outlived the account in the browser, so
+  // the next person on a shared device could read them (#855).
+  const seedWriting = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    for (const key of ['chapter-backup-b1-c1', 'chapter-dropped-b1-c1', 'book-summary-b1',
+      'book-summary-unsaved-b1', 'tabState_b1', 'toc-updated-b1']) {
+      localStorage.setItem(key, 'x');
+    }
+    localStorage.setItem('theme', 'dark');
+    sessionStorage.setItem('chapterQuestionsTab_b1_c1', 'questions');
+  };
+
+  it('clears the writing it kept in this browser once the account is deleted (#855)', async () => {
+    seedWriting();
+    const { input, confirmButton } = await openDeleteDialog();
+    fireEvent.change(input, { target: { value: SESSION_EMAIL } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'));
+    expect(Object.keys(localStorage)).toEqual(['theme']);
+    expect(Object.keys(sessionStorage)).toEqual([]);
+  });
+
+  it('keeps that writing when the delete fails (#855)', async () => {
+    seedWriting();
+    const { input, confirmButton } = await openDeleteDialog();
+    mockAuthFetch.mockRejectedValueOnce(new Error('Server error'));
+    fireEvent.change(input, { target: { value: SESSION_EMAIL } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(deleteCall()).toBeDefined());
+    await waitFor(() => expect(screen.queryByRole('button', { name: /deactivate account and delete books/i })).not.toBeInTheDocument());
+    expect(localStorage.getItem('chapter-backup-b1-c1')).toBe('x');
+    expect(sessionStorage.getItem('chapterQuestionsTab_b1_c1')).toBe('questions');
+  });
+
   it('signs out after the DELETE succeeds and before redirecting (#763)', async () => {
     const signOut = authClient.signOut as jest.Mock;
     signOut.mockClear();
@@ -136,6 +173,7 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     const signOut = authClient.signOut as jest.Mock;
     signOut.mockRejectedValueOnce(new Error('network'));
     const { toast } = jest.requireMock('@/lib/toast');
+    toast.error.mockClear(); // nothing else resets it between tests
     const { input, confirmButton } = await openDeleteDialog();
     fireEvent.change(input, { target: { value: SESSION_EMAIL } });
     fireEvent.click(confirmButton);

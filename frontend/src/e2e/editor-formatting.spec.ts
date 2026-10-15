@@ -127,4 +127,34 @@ test.describe('Rich-text formatting', () => {
     await expect(page.locator('.tiptap')).toContainText(text);
     await expectSavedContentToContain(page, bookId, chapterId, `<p>${text}</p>`);
   });
+
+  test('Underline produces a <u> mark that persists (#855)', async ({ page }) => {
+    // StarterKit 3 bundles Underline; registering it again made TipTap warn
+    // "Duplicate extension names found". The toolbar button must still work
+    // with the bundled one, and the editor must mount without that warning.
+    const messages: string[] = [];
+    page.on('console', (message) => messages.push(message.text()));
+    await page.reload();
+    await openFirstChapter(page);
+    expect(messages.filter((m) => m.includes('Duplicate extension names'))).toEqual([]);
+
+    const text = 'Underlined by the bundled extension.';
+    await typeAndSelectAll(page, text);
+
+    await page.getByRole('button', { name: 'Underline', exact: true }).click();
+
+    await expect(page.locator('.tiptap u')).toHaveText(text);
+    await expectSavedContentToContain(page, bookId, chapterId, `<u>${text}</u>`);
+  });
+
+  test('the character count follows each keystroke, not the next save (#855)', async ({ page }) => {
+    // useEditor does not re-render on transactions, so a count read in render
+    // froze at "1 characters" after the first keystroke until the 3s auto-save
+    // re-rendered. Only a real browser shows it: the jest stand-in re-renders
+    // on every change.
+    await page.locator('.tiptap').click();
+    await page.keyboard.type('Habits form');
+
+    await expect(page.getByText(/^\d+ characters$/)).toHaveText('11 characters', { timeout: 1500 });
+  });
 });
