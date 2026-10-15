@@ -20,7 +20,6 @@ import bookClient from '@/lib/api/bookClient';
 
 jest.unmock('@tiptap/react');
 jest.unmock('@tiptap/starter-kit');
-jest.unmock('@tiptap/extension-underline');
 jest.unmock('@tiptap/extension-placeholder');
 jest.unmock('@tiptap/extension-character-count');
 

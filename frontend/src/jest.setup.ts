@@ -544,10 +544,6 @@ jest.mock('@tiptap/starter-kit', () => {
   return starterKit;
 });
 
-jest.mock('@tiptap/extension-underline', () => {
-  return jest.fn(() => ({ name: 'underline' }));
-});
-
 jest.mock('@tiptap/extension-placeholder', () => {
   return {
     configure: jest.fn(() => ({ name: 'placeholder' })),

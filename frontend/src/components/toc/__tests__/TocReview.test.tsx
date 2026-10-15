@@ -174,3 +174,26 @@ describe('TocReview structure rendering', () => {
     expect(screen.getByText(/History/i)).toBeInTheDocument();
   });
 });
+
+describe('TocReview counts that are zero (#855)', () => {
+  const withChapters = (chapters: object[]) =>
+    render(
+      <TocReview
+        tocResult={{ ...tocResult, toc: { ...tocResult.toc, chapters } } as unknown as TocGenerationResult}
+        onAccept={jest.fn()}
+        onRegenerate={jest.fn()}
+        isLoading={false}
+      />
+    );
+
+  it('renders no stray "0" for a chapter with no words or no reading time', () => {
+    const { container } = withChapters([
+      { id: 'c1', title: 'Empty', description: '', subchapters: [], word_count: 0, estimated_reading_time: 0 },
+      { id: 'c2', title: 'Short', description: '', subchapters: [], word_count: 120, estimated_reading_time: 0 },
+    ]);
+
+    expect(screen.getByText('120 words')).toBeInTheDocument();
+    const text = container.textContent ?? '';
+    expect(text).not.toMatch(/Empty0|0min|words0/);
+  });
+});

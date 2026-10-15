@@ -3,9 +3,8 @@
 import { logger } from '@/lib/logger';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
 import './editor.css';
@@ -230,7 +229,6 @@ export function ChapterEditor({
       // dependency upgrade is the wrong place to make one; enabling it is a
       // product decision with a migration behind it (#385).
       StarterKit.configure({ trailingNode: false }),
-      Underline,
       Placeholder.configure({
         placeholder: 'Start writing your chapter content...',
       }),
@@ -257,6 +255,13 @@ export function ChapterEditor({
     },
     // Set this to false to avoid SSR hydration issues
     immediatelyRender: false,
+  });
+
+  // useEditor does not re-render on transactions, so a count read straight off
+  // the editor in render froze at the first keystroke (#855).
+  const characters = useEditorState({
+    editor,
+    selector: ({ editor: current }) => current?.storage.characterCount.characters() ?? 0,
   });
 
   // Warn user before leaving page with unsaved changes
@@ -809,7 +814,7 @@ export function ChapterEditor({
       <div className="border-t border-border p-4 flex justify-between items-center bg-muted/20">
         <div className="flex items-center gap-4">
           <span className="text-sm text-foreground">
-            {editor?.storage.characterCount.characters() ?? 0} characters
+            {characters ?? 0} characters
           </span>
           {/* Autosave result is otherwise a purely visual cue. Polite so it
               never interrupts typing — which is precisely what the user is
