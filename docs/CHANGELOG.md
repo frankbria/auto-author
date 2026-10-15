@@ -30,7 +30,7 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
       - #1093 `[P2.64]`: the single-question regeneration 429s;
       - #1094 `[P2.65]`: the legacy chapter URL as a plain redirect, which waits on three Playwright specs that use it as a harness.
   - **Found in review.** The backoff first went to 32x and left the backup as it was at the last failed try, and a manual save did not reset it. Now it is capped at 30s, the backup follows each edit, and the reset is in `markSaved`.
-  - **Tests.** Each change has a test that failed first, and 14 mutations were all caught. Five tests that pinned the old behaviour (an immediate tab save, a 3s retry) now pin the new. Two tests that only checked their own stand-ins are gone.
+  - **Tests.** Each change has a test that failed first. 12 jest mutations were all caught, and the two browser tests fail on `main`. Five tests that pinned the old behaviour (an immediate tab save, a 3s retry) now pin the new. Two tests that only checked their own stand-ins are gone.
   - Demo: `docs/demos/2026-10-14-issue-855-frontend-minor-bugs.md`.
 
 - **Dead and Clerk-era backend code is gone (#851, P2.5; also closes #946, P2.22)**:
