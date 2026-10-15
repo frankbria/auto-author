@@ -4,6 +4,35 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-14
 
+- **Frontend minor bugs (#855, P2.9)**:
+  - **Editor.**
+    - The footer's character count froze at "1 characters" after the first keystroke. It is read through `useEditorState` now.
+    - StarterKit 3 already bundles Underline, and registering it again made TipTap warn on every mount. The explicit extension and its direct dependency are gone.
+    - Both show only in a real browser, so two tests in `editor-formatting.spec.ts` pin them.
+  - **TOC review.** An empty chapter no longer shows a stray "0" (`> 0` instead of truthiness).
+  - **Timing.**
+    - A tab click saved the previous tab at once, from stale state, and then the right one a second later. The hook's debounced save is the only one now.
+    - The reset-password and new-book redirect timers are cleared on unmount.
+    - A failed autosave waits twice as long before each retry, up to 30s. Any save that works, manual or automatic, resets the wait, and so does a chapter change. While it backs off, each edit refreshes the local backup, so the longer wait cannot lose text.
+  - **AI errors.**
+    - After a refusal a retry cannot change (plan or allowance), the questions panel no longer says "Retry".
+    - The three rewrite dialogs' rate-limit notice offers a retry.
+  - **Removed.**
+    - The legacy chapter page's `chapter-tabs-*` localStorage writes, which nothing read.
+    - The unlinked `/dashboard/books/[bookId]/export` page, which ignored the user's export defaults. The Export Book dialog applies them and is the export UI.
+  - **Account deletion** clears the user's writing from that browser: chapter backups, refused edits, summary drafts, tab state, TOC markers and the questions toggle. The theme stays. The Privacy Policy says so.
+  - **Not done here.**
+    - The cover-image bullet was superseded by #797/#941.
+    - The deletion redirect was fixed by #886.
+    - Filed as follow-ups:
+      - #1091 `[P2.62]`, needs owner: whether sign-out should clear writing too, since that discards unsaved backups;
+      - #1092 `[P2.63]`: Book Stats;
+      - #1093 `[P2.64]`: the single-question regeneration 429s;
+      - #1094 `[P2.65]`: the legacy chapter URL as a plain redirect, which waits on three Playwright specs that use it as a harness.
+  - **Found in review.** The backoff first went to 32x and left the backup as it was at the last failed try, and a manual save did not reset it. Now it is capped at 30s, the backup follows each edit, and the reset is in `markSaved`.
+  - **Tests.** Each change has a test that failed first, and 14 mutations were all caught. Five tests that pinned the old behaviour (an immediate tab save, a 3s retry) now pin the new. Two tests that only checked their own stand-ins are gone.
+  - Demo: `docs/demos/2026-10-14-issue-855-frontend-minor-bugs.md`.
+
 - **Dead and Clerk-era backend code is gone (#851, P2.5; also closes #946, P2.22)**:
   - **Routes.** The unauthenticated no-op `POST /webhooks/better-auth`, and `PUT /users/{auth_id}`, which duplicated PATCH `/users/me` without its rate limit or audit. A test pins that they answer 404 and 405. **Kept:** `DELETE /users/{auth_id}`. Since #954 it is how support erases a deactivated account early, a decision made after the review that listed it.
   - **DB.** `delete_user_books` and `delete_questions_for_book`, cascade-skipping and without callers, and the hard-delete branch of `delete_user`, which no route took. The #179 wrong-field guard those tests pinned is held by the account-cascade tests.

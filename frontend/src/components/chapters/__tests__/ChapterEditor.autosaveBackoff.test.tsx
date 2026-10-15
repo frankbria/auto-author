@@ -88,4 +88,47 @@ describe('ChapterEditor autosave backoff (#855)', () => {
     await advance(3000);
     await waitFor(() => expect(saves()).toBe(3));
   });
+
+  it('never waits more than 30 seconds', async () => {
+    mockBookClient.saveChapterContent.mockRejectedValue(new Error('Failed to save chapter content: 503'));
+    await typeSomething();
+
+    // Tries at 3s, then 6s, 12s and 24s later; the next is capped at 30s, not 48s.
+    for (const [wait, attempts] of [[3000, 1], [6000, 2], [12000, 3], [24000, 4], [30000, 5]] as const) {
+      await advance(wait);
+      await waitFor(() => expect(saves()).toBe(attempts));
+    }
+  });
+
+  it('goes back to the normal delay after a manual save that works', async () => {
+    mockBookClient.saveChapterContent
+      .mockRejectedValueOnce(new Error('Failed to save chapter content: 503'))
+      .mockResolvedValue({} as Saved);
+    const user = await typeSomething();
+    await advance(3000);
+    await waitFor(() => expect(saves()).toBe(1));
+
+    await act(async () => {
+      screen.getByRole('button', { name: /^save$/i }).click();
+    });
+    await waitFor(() => expect(saves()).toBe(2));
+
+    await user.type(screen.getByRole('textbox'), ' and more');
+    await advance(3000);
+    await waitFor(() => expect(saves()).toBe(3));
+  });
+
+  it('keeps the backup current while saves are failing', async () => {
+    mockBookClient.saveChapterContent.mockRejectedValue(new Error('Failed to save chapter content: 503'));
+    const user = await typeSomething();
+    await advance(3000);
+    await waitFor(() => expect(saves()).toBe(1));
+
+    // The next try is 6s away; what is typed meanwhile is backed up at once.
+    await user.type(screen.getByRole('textbox'), ' typed during the wait');
+
+    const backup = JSON.parse(localStorage.getItem('chapter-backup-book-1-chapter-1') ?? '{}');
+    expect(backup.content).toContain('typed during the wait');
+    expect(saves()).toBe(1);
+  });
 });

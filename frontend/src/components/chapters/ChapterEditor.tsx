@@ -145,7 +145,8 @@ export function ChapterEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [autoSavePending, setAutoSavePending] = useState(false);
   // Consecutive failed autosaves: each one doubles the wait before the next try,
-  // up to 32x, so an outage is not a request every few seconds (#855).
+  // up to 30s, so an outage is not a request every few seconds (#855). Any save
+  // that works resets it, and so does a change of chapter.
   const autoSaveFailuresRef = useRef(0);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
   const backupKey = chapterBackupKey(bookId, chapterId);
@@ -246,6 +247,11 @@ export function ChapterEditor({
       if (loadFailed) return;
       // Tagged with its chapter now, so a flush can never send it to the next one.
       unsavedRef.current = html !== lastAutoSavedContent ? { bookId, chapterId, content: html } : null;
+      // While saves are failing, each edit refreshes the backup: the next try may be
+      // up to 30s away, and a crash before it would lose what was typed since (#855).
+      if (autoSaveFailuresRef.current > 0 && unsavedRef.current) {
+        backupChapterContent(unsavedRef.current, new Error('Not saved yet: autosave is retrying'));
+      }
       if (html !== lastAutoSavedContent) {
         setAutoSavePending(true);
         setHasUnsavedChanges(true);
@@ -333,6 +339,7 @@ export function ChapterEditor({
     () => () => {
       const edit = unsavedRef.current;
       unsavedRef.current = null;
+      autoSaveFailuresRef.current = 0;
       if (edit) void flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
     },
     [bookId, chapterId]
@@ -358,6 +365,7 @@ export function ChapterEditor({
   // autosave effect re-arms for it because lastAutoSavedContent changed (#757).
   const markSaved = (content: string) => {
     saveSucceeded();
+    autoSaveFailuresRef.current = 0;
     setLastAutoSavedContent(content);
     if (editor?.getHTML() !== content) return;
     unsavedRef.current = null;
@@ -415,7 +423,7 @@ export function ChapterEditor({
   useEffect(() => {
     if (!autoSavePending || !editor || isSaving || loadFailed || conflict) return;
 
-    const delay = autoSaveDelayMs * 2 ** Math.min(autoSaveFailuresRef.current, 5);
+    const delay = Math.max(autoSaveDelayMs, Math.min(autoSaveDelayMs * 2 ** autoSaveFailuresRef.current, 30_000));
     const timer = setTimeout(async () => {
       const content = editor.getHTML();
       if (content === lastAutoSavedContent) {
@@ -436,7 +444,6 @@ export function ChapterEditor({
         }, { bookId, chapterId, contentLength: content.length }));
         setLastSaved(new Date());
         markSaved(content);
-        autoSaveFailuresRef.current = 0;
 
         // Clear backup after successful save
         localStorage.removeItem(chapterBackupKey(bookId, chapterId));
