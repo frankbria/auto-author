@@ -22,6 +22,8 @@ interface QuestionGeneratorProps {
   ) => Promise<void>;
   isGenerating: boolean;
   error: string | null;
+  /** False after a refusal that trying again cannot change: a plan or an exhausted allowance (#855). */
+  canRetry?: boolean;
 }
 
 export default function QuestionGenerator({
@@ -32,7 +34,8 @@ export default function QuestionGenerator({
   chapterId,
   onGenerate,
   isGenerating,
-  error
+  error,
+  canRetry = true
 }: QuestionGeneratorProps) {
   // State for generation options
   const [questionCount, setQuestionCount] = useState<number>(10);
@@ -220,7 +223,7 @@ export default function QuestionGenerator({
               <span className="animate-spin mr-2">◌</span>
               Generating Questions...
             </>
-          ) : error ? (
+          ) : error && canRetry ? (
             <>Retry</>
           ) : (
             <>Generate Interview Questions</>

@@ -58,8 +58,8 @@ jest.mock('@/lib/errors/errorHandler', () => {
 // Mock sub-components with simple test doubles that expose handlers as buttons
 jest.mock('../QuestionGenerator', () => ({
   __esModule: true,
-  default: ({ onGenerate, isGenerating, error }: any) => (
-    <div data-testid="question-generator">
+  default: ({ onGenerate, isGenerating, error, canRetry }: any) => (
+    <div data-testid="question-generator" data-can-retry={String(canRetry)}>
       <button
         data-testid="generator-btn"
         onClick={() => onGenerate(5, undefined, undefined)}
@@ -852,6 +852,17 @@ describe('QuestionContainer - what a refusal shows', () => {
       expect.objectContaining({ message: 'Daily AI limit reached', retryable: false }),
       expect.anything()
     );
+  });
+
+  // A refusal that trying again cannot change gets no "Retry" button (#855).
+  it.each([
+    ['a plan refusal', refusal('Your plan does not include this feature.', { statusCode: 402 }), 'false'],
+    ['an exhausted allowance', refusal(QUOTA, { statusCode: 429, quotaPeriod: 'day' }), 'false'],
+    ['a service outage', refusal('Service unavailable', { statusCode: 503 }), 'true'],
+  ])('generating: after %s the generator is told whether a retry can help', async (_name, error, canRetry) => {
+    await generate(error);
+
+    expect(screen.getByTestId('question-generator')).toHaveAttribute('data-can-retry', canRetry);
   });
 
   it('regenerating all: a plan refusal (402) goes to the Upgrade notification', async () => {

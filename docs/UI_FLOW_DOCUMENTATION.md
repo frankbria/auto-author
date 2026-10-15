@@ -106,14 +106,10 @@ Auto-Author is a web application for AI-assisted book writing. The application g
   - Generates relevant questions for chapter
   - Collects answers to guide AI
 
-### 9. Export (`/dashboard/books/[bookId]/export`)
-**Purpose**: Export book in various formats
-- **Formats**: PDF, DOCX (others shown but not implemented)
-- **Options**:
-  - Include empty chapters
-  - Page size selection
-  - Chapter selection
-- **Status**: Partially implemented (backend complete)
+### 9. Export (the book page's **Export Book** dialog)
+**Purpose**: Export the book as PDF, DOCX, EPUB or Markdown
+- **Options**: format, page size and empty chapters, starting from the user's export defaults in Settings
+- The standalone `/dashboard/books/[bookId]/export` page, linked from nowhere, was removed in #855
 
 ### Alternative Flow: Interview Questions (`/dashboard/books/[bookId]/chapters`)
 **Purpose**: Alternative content creation approach using interview-style questions

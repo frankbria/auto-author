@@ -6,7 +6,7 @@
  * notification and an exhausted allowance looked like any other failure.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StyleTransformer } from '@/components/chapters/StyleTransformer';
 import { ContentEnhancer } from '@/components/chapters/ContentEnhancer';
@@ -127,5 +127,20 @@ describe.each(DIALOGS)('%s', (_name, mount) => {
       expect.anything()
     );
     expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('offers a retry for a rate limit, and the retry sends the request again (#855)', async () => {
+    const dialog = mount();
+    dialog.call.mockRejectedValueOnce(refusal('Too many requests', { statusCode: 429 }));
+
+    await dialog.open();
+    await waitFor(() => expect(showErrorNotification).toHaveBeenCalled());
+
+    const [, options] = (showErrorNotification as jest.Mock).mock.calls.at(-1);
+    expect(options?.onRetry).toEqual(expect.any(Function));
+    await act(async () => {
+      await options.onRetry();
+    });
+    expect(dialog.call).toHaveBeenCalledTimes(2);
   });
 });

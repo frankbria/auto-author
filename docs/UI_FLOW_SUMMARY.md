@@ -26,9 +26,7 @@
    - Location: `/dashboard/books/[bookId]/page.tsx` line 486
    - Backend: `/api/v1/books/{bookId}/export/pdf`
    
-2. **Export Page Integration** - Page exists but uses mock data
-   - Location: `/dashboard/books/[bookId]/export/page.tsx`
-   - Needs: API client methods for export endpoints
+2. **Export Page Integration** - Removed in #855: export runs from the book page's Export Book dialog
 
 3. **Voice Input Production Service** - Currently using browser API
    - AWS Transcribe backend ready

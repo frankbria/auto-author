@@ -86,7 +86,7 @@ const timeString = formatTime(estimate.average);
 
 **Integrated Operations**:
 - **TOC Generation**: `components/toc/TocGenerating.tsx` - 10-30 seconds
-- **Export Operations**: `app/dashboard/books/[bookId]/export/page.tsx` - 5-20 seconds
+- **Export Operations**: `components/export/ExportProgressModal.tsx` (opened from the book page's Export Book button) - 5-20 seconds
 - **Draft Generation**: `components/chapters/DraftGenerator.tsx` - 10-30 seconds
 
 **Test Coverage**: 100% (53 tests, 100% pass rate)
