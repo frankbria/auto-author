@@ -292,19 +292,21 @@ describe('ChapterTabs', () => {
   // -------------------------------------------------------------------------
 
   describe('handleTabSelect', () => {
-    it('calls setActiveChapter and saveTabState when a tab is selected', () => {
+    // The hook's debounced effect persists the new state. Saving here as well
+    // ran before the state update landed, so it sent the previous tab (#855).
+    it('sets the active chapter and leaves saving to the hook when a tab is selected', () => {
       render(<ChapterTabs bookId="book-1" />);
       fireEvent.click(screen.getByTestId('tab-select-ch-1'));
       expect(mockActions.setActiveChapter).toHaveBeenCalledWith('ch-1');
-      expect(mockActions.saveTabState).toHaveBeenCalled();
+      expect(mockActions.saveTabState).not.toHaveBeenCalled();
     });
 
-    it('calls setActiveChapter and saveTabState via MobileChapterTabs on mobile', () => {
+    it('sets the active chapter and leaves saving to the hook on mobile', () => {
       mockUseMediaQuery.mockReturnValue(true);
       render(<ChapterTabs bookId="book-1" />);
       fireEvent.click(screen.getByTestId('mobile-tab-ch-2'));
       expect(mockActions.setActiveChapter).toHaveBeenCalledWith('ch-2');
-      expect(mockActions.saveTabState).toHaveBeenCalled();
+      expect(mockActions.saveTabState).not.toHaveBeenCalled();
     });
   });
 
@@ -471,7 +473,7 @@ describe('ChapterTabs', () => {
         fireEvent.keyDown(document, { key: '1', ctrlKey: true });
       });
       expect(mockActions.setActiveChapter).toHaveBeenCalledWith('ch-1');
-      expect(mockActions.saveTabState).toHaveBeenCalled();
+      expect(mockActions.saveTabState).not.toHaveBeenCalled(); // the hook saves, debounced (#855)
     });
 
     it('Ctrl+2 selects the second chapter in tab_order', () => {

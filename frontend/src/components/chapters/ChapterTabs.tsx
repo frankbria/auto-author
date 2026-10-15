@@ -113,10 +113,11 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
     // Removed pollInterval - polling disabled by default
   });
 
+  // useChapterTabs persists the new state on its own, debounced. Saving here as
+  // well ran before the state update landed, so it sent the previous tab (#855).
   const handleTabSelect = useCallback((chapterId: string) => {
     setActiveChapter(chapterId);
-    saveTabState(); // Persist state
-  }, [setActiveChapter, saveTabState]);
+  }, [setActiveChapter]);
 
   // Mobile swipe navigation: left → next chapter, right → previous (clamped at ends).
   // Walk the full chapter list (what the mobile selector shows), not tab_order —

@@ -381,7 +381,7 @@ describe('ChapterEditor localStorage backup', () => {
       await user.type(editor, ' Second attempt');
 
       await act(async () => {
-        jest.advanceTimersByTime(3000);
+        jest.advanceTimersByTime(6000); // after a failure the next try waits twice as long (#855)
         await Promise.resolve();
       });
 

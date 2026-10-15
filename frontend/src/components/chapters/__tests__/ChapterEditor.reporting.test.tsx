@@ -67,14 +67,14 @@ describe('ChapterEditor reports what it could not save', () => {
     expect(captured).toHaveBeenCalledWith(failure, { tags: { feature: 'autosave', operation: 'auto-save' } });
   });
 
-  it('once for a run of failed autosaves, which retry every few seconds while the server is away', async () => {
+  it('once for a run of failed autosaves, which retry, backing off, while the server is away', async () => {
     mockBookClient.saveChapterContent.mockRejectedValue(new Error('Failed to save chapter content: 500'));
 
     await typeAndWaitForAutosave();
     await waitFor(() => expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1));
     for (const attempt of [2, 3]) {
       await act(async () => {
-        jest.advanceTimersByTime(3000);
+        jest.advanceTimersByTime(3000 * 2 ** (attempt - 1)); // each failure doubles the wait (#855)
         await Promise.resolve();
       });
       await waitFor(() => expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(attempt));
@@ -93,7 +93,7 @@ describe('ChapterEditor reports what it could not save', () => {
     await waitFor(() => expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1));
     for (const attempt of [2, 3]) {
       await act(async () => {
-        jest.advanceTimersByTime(3000);
+        jest.advanceTimersByTime(3000 * 2 ** (attempt - 1)); // each failure doubles the wait (#855)
         await Promise.resolve();
       });
       await waitFor(() => expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(attempt));
@@ -127,7 +127,7 @@ describe('ChapterEditor reports what it could not save', () => {
     const user = await typeAndWaitForAutosave();
     await waitFor(() => expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1));
     await act(async () => {
-      jest.advanceTimersByTime(3000);
+      jest.advanceTimersByTime(6000); // the retry after one failure waits twice as long (#855)
       await Promise.resolve();
     });
     await waitFor(() => expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(2));

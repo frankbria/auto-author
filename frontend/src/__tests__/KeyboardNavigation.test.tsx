@@ -57,7 +57,7 @@ describe('Keyboard Navigation', () => {
 
     // Verify correct tab was selected
     expect(setActiveChapterMock).toHaveBeenCalledWith('ch-3');
-    expect(saveTabStateMock).toHaveBeenCalled();
+    expect(saveTabStateMock).not.toHaveBeenCalled(); // the hook saves, debounced (#855)
   });
 
   test('handles out-of-range keyboard shortcuts gracefully', () => {

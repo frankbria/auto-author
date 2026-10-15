@@ -144,6 +144,9 @@ export function ChapterEditor({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [autoSavePending, setAutoSavePending] = useState(false);
+  // Consecutive failed autosaves: each one doubles the wait before the next try,
+  // up to 32x, so an outage is not a request every few seconds (#855).
+  const autoSaveFailuresRef = useRef(0);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
   const backupKey = chapterBackupKey(bookId, chapterId);
   const droppedKey = chapterDroppedKey(bookId, chapterId);
@@ -412,6 +415,7 @@ export function ChapterEditor({
   useEffect(() => {
     if (!autoSavePending || !editor || isSaving || loadFailed || conflict) return;
 
+    const delay = autoSaveDelayMs * 2 ** Math.min(autoSaveFailuresRef.current, 5);
     const timer = setTimeout(async () => {
       const content = editor.getHTML();
       if (content === lastAutoSavedContent) {
@@ -432,6 +436,7 @@ export function ChapterEditor({
         }, { bookId, chapterId, contentLength: content.length }));
         setLastSaved(new Date());
         markSaved(content);
+        autoSaveFailuresRef.current = 0;
 
         // Clear backup after successful save
         localStorage.removeItem(chapterBackupKey(bookId, chapterId));
@@ -444,6 +449,7 @@ export function ChapterEditor({
           return;
         }
         reportSaveFailure('auto-save', err);
+        autoSaveFailuresRef.current += 1;
         if (backupChapterContent({ bookId, chapterId, content }, err)) {
           noteBackupWrite();
           setError('Failed to auto-save. Content backed up locally.');
@@ -453,7 +459,7 @@ export function ChapterEditor({
       } finally {
         setIsSaving(false);
       }
-    }, autoSaveDelayMs);
+    }, delay);
 
     return () => clearTimeout(timer);
   }, [autoSavePending, autoSaveDelayMs, bookId, chapterId, conflict, editor, isSaving, lastAutoSavedContent, loadFailed]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,13 @@ function ResetPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // Redirect to sign-in 3 seconds after success, unless the page is gone by then (#855).
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => router.push("/auth/sign-in"), 3000);
+    return () => clearTimeout(timer);
+  }, [success, router]);
+
   // Check for missing token
   const hasValidToken = token && !urlError;
 
@@ -108,10 +115,6 @@ function ResetPasswordForm() {
       }
 
       setSuccess(true);
-      // Redirect to sign-in after 3 seconds
-      setTimeout(() => {
-        router.push("/auth/sign-in");
-      }, 3000);
     } catch (err) {
       if (err instanceof Error) {
         if (err.message.includes("network") || err.message.includes("fetch")) {
