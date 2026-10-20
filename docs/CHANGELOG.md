@@ -2,6 +2,12 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-20
+
+- **Beads and speckit removed**:
+  - The bd tracker is gone: `.beads/`, its git attributes and ignore lines, the two manual pre-commit export hooks and the three `scripts/*sprint*`/`export-implementation-plan.sh` exporters, the generated `CURRENT_SPRINT.md` and `IMPLEMENTATION_PLAN.md`, `docs/references/beads-workflow.md` and `docs/AUTOMATION_SETUP.md`. GitHub issues with a `[PX.Y]` prefix are the only task tracker; `quality-standards.md` and `CLAUDE.md` say so.
+  - Speckit is gone: `.specify/`, `specs/` and the eight project-local `.claude/commands/speckit.*` commands.
+
 ### 2026-10-14
 
 - **Frontend minor bugs (#855, P2.9)**:

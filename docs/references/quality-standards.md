@@ -104,12 +104,9 @@ Before moving to the next feature, ALL changes must be:
    - Branch naming convention: `feature/<feature-name>`, `fix/<issue-name>`, `docs/<doc-update>`
    - Create pull requests for all significant changes
 
-4. **Task Tracking (bd)**:
-   - Create or update the bd issue before starting work (`bd ready`, `bd create`)
-   - Move to in-progress when beginning implementation
-   - Close on completion: `bd close <id> --reason "Completed in PR #123"`
-   - Reference issue IDs in commit messages
-   - `CURRENT_SPRINT.md` / `IMPLEMENTATION_PLAN.md` are generated snapshots — edit bd, not the markdown
+4. **Task Tracking (GitHub Issues)**:
+   - Every task is a GitHub issue with a `[PX.Y]` priority prefix in its title
+   - Reference the issue in the PR body (`Closes #123`) so merging closes it
 
 ## Dependency Batches
 
@@ -447,7 +444,6 @@ Two things that follow:
 
 3. **Implementation Documentation**:
    - Update relevant sections in CLAUDE.md file
-   - Update IMPLEMENTATION_PLAN.md when scope changes
    - Keep architecture diagrams current
    - Update configuration examples when defaults change
    - Document breaking changes prominently
@@ -461,7 +457,6 @@ Two things that follow:
 5. **Decision Records**:
    - Create architecture decision records for significant changes
    - Document technical choices and trade-offs
-   - Update bd issue descriptions with implementation notes
 
 ## Feature Completion Checklist
 
@@ -475,7 +470,7 @@ Before marking ANY feature as complete, verify:
 - [ ] All changes committed with conventional commit messages
 - [ ] All commits pushed to remote repository
 - [ ] E2E test added for user-facing changes (all five coverage requirements above)
-- [ ] bd issue closed with the PR number
+- [ ] PR body references the issue it closes
 - [ ] API documentation updated (if applicable)
 - [ ] Implementation documentation updated
 - [ ] Inline code comments updated or added

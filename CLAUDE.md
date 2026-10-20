@@ -18,7 +18,6 @@ Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append n
 
 | When | File |
 |------|------|
-| Creating/checking tasks (bd is the source of truth) | `docs/references/beads-workflow.md` |
 | Creating or reorganizing documentation | `docs/references/documentation-management.md` |
 | Using LoadingStateManager, ProgressIndicator, DeleteBookModal | `docs/references/component-documentation.md` |
 | Completing a feature / opening a PR | `docs/references/quality-standards.md` |
@@ -33,10 +32,6 @@ Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append n
 Root `package.json` has only `npm test` (→ `scripts/test-all.sh`). Everything else runs inside `frontend/` or `backend/`.
 
 ```bash
-# Tasks
-bd ready                                   # unblocked work
-bd close <id> --reason "Completed in PR #123"
-
 # Frontend
 cd frontend && npm run lint && npm run typecheck && npm test
 npm run test:coverage
@@ -102,7 +97,6 @@ Files under 500 lines. Never hardcode secrets. Tests before implementation. WCAG
 - `BYPASS_AUTH=true` only takes effect alongside `E2E_ALLOW_BYPASS=1` in **every** environment (frontend middleware #272, backend FastAPI #307). Backend production is hard-blocked regardless. Never use in production.
 - **`ENVIRONMENT` is required by the backend** (`development|test|staging|production`, #777): missing or unknown refuses to start, and compose has no default. Local runs need it in `backend/.env` or the shell; the staging workflows export `staging`.
 - Otherwise standard Next.js / FastAPI vars — see `.env.example`.
-- `CURRENT_SPRINT.md` and `IMPLEMENTATION_PLAN.md` are auto-generated bd snapshots; edit bd, not the markdown.
 
 ---
 
