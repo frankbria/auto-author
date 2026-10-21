@@ -403,6 +403,23 @@ describe('QuestionDisplay - rating', () => {
     });
   });
 
+  it('keeps a newer rating that saved when an older one fails afterwards (#1117)', async () => {
+    let failFirst: (error: Error) => void = () => {};
+    mockedBookClient.rateQuestion
+      .mockImplementationOnce(() => new Promise((_, reject) => { failFirst = reject; }))
+      .mockResolvedValueOnce({} as any);
+
+    render(<QuestionDisplay {...defaultProps} />);
+    fireEvent.click(screen.getByLabelText('Rate question as poor'));
+    fireEvent.click(screen.getByLabelText('Rate question as good'));
+    await waitFor(() => expect(mockedBookClient.rateQuestion).toHaveBeenCalledTimes(2));
+
+    await act(async () => failFirst(new Error('Network down')));
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Rate question as good')).toHaveClass('bg-green-100');
+  });
+
   it('tells the user a rating failed and clears the rating it showed (#1117)', async () => {
     mockedBookClient.rateQuestion.mockRejectedValue(new Error('Rate limit exceeded'));
 

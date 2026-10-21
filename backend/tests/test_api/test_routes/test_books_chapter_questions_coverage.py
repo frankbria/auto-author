@@ -561,7 +561,7 @@ async def test_rate_question_stores_the_body_the_editor_sends(auth_client_factor
     )
     assert resp.status_code == 200, resp.text
 
-    ratings = await (await get_collection("question_ratings")).find({}).to_list(None)
+    ratings = await (await get_collection("question_ratings")).find({"user_id": test_user["auth_id"]}).to_list(None)
     assert [(r["question_id"], r["user_id"], r["rating"]) for r in ratings] == [
         (qid, test_user["auth_id"], 4)
     ]

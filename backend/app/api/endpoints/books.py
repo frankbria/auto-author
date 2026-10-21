@@ -2157,21 +2157,12 @@ async def rate_question(
 
     Error Codes:
         - BOOK_NOT_FOUND (404): Book does not exist
-        - QUESTION_NOT_FOUND (404): Question does not exist
         - FORBIDDEN_OPERATION (403): User is not the book owner
-        - VALIDATION_FAILED (422): Invalid rating value
+        - VALIDATION_FAILED (422): Rating outside 1-5 (schema), or the question
+          does not exist or is not the user's
         - RATING_SAVE_FAILED (500): Error saving rating
     """
     request_id = generate_request_id()
-
-    # Validate rating value
-    if rating_data.rating < 1 or rating_data.rating > 5:
-        raise handle_validation_error(
-            field="rating",
-            message="Rating must be between 1 and 5",
-            value=rating_data.rating,
-            request_id=request_id
-        )
 
     # Get the book and verify ownership
     owner_id = await get_book_owner_id(book_id)
