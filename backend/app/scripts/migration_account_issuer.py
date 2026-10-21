@@ -87,7 +87,7 @@ import sys
 from collections import defaultdict
 
 import certifi
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +276,7 @@ async def _main(argv=None) -> int:
         logger.error("%s", exc)
         return 2
 
-    client = AsyncIOMotorClient(uri, **_client_kwargs(uri))
+    client = AsyncMongoClient(uri, **_client_kwargs(uri))
     try:
         stats = await backfill_account_issuer(client[database], dry_run=not args.apply)
     except AccountIssuerBackfillError as exc:
@@ -289,7 +289,7 @@ async def _main(argv=None) -> int:
         logger.error("Backfill failed: %s", exc)
         return 2
     finally:
-        client.close()
+        await client.close()
 
     logger.info(
         "%s: scanned=%d already_migrated=%d issuer_backfilled=%d account_id_repaired=%d",

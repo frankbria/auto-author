@@ -39,7 +39,7 @@ async def _stored_titles(book_id: str) -> list[str]:
 
 
 @pytest.mark.asyncio
-async def test_two_first_saves_that_both_read_before_either_writes_do_not_both_land(motor_reinit_db, monkeypatch):
+async def test_two_first_saves_that_both_read_before_either_writes_do_not_both_land(reinit_db, monkeypatch):
     """The race the version is for: each writer reads the book, then both write."""
     book_id = await _a_book_with_no_toc()
     both_have_read = asyncio.Barrier(2)
@@ -67,7 +67,7 @@ async def test_two_first_saves_that_both_read_before_either_writes_do_not_both_l
 
 
 @pytest.mark.asyncio
-async def test_a_second_first_save_with_the_same_expected_version_is_a_conflict(motor_reinit_db):
+async def test_a_second_first_save_with_the_same_expected_version_is_a_conflict(reinit_db):
     book_id = await _a_book_with_no_toc()
 
     await update_toc_with_transaction(book_id, _toc("From the wizard", expected_version=1), OWNER)
@@ -93,7 +93,7 @@ async def test_get_and_put_agree_on_the_version_of_a_book_with_no_toc(auth_clien
 
 
 @pytest.mark.asyncio
-async def test_a_legacy_toc_given_a_version_meanwhile_is_a_conflict_not_a_failure(motor_reinit_db, monkeypatch):
+async def test_a_legacy_toc_given_a_version_meanwhile_is_a_conflict_not_a_failure(reinit_db, monkeypatch):
     """Found in review. A TOC from before versions has none; a chapter autosave between the
     read and the write gives it version 1 ($inc). The write, guarded on the version being
     absent, then misses, and that is a conflict the editor can reload from, not a 400."""

@@ -41,7 +41,7 @@ async def verify_indexes():
         print("=" * 60)
 
         collection = await get_collection(collection_name)
-        indexes = await collection.list_indexes().to_list(length=None)
+        indexes = await (await collection.list_indexes()).to_list(length=None)
         index_names = [idx['name'] for idx in indexes]
 
         print(f"Found {len(indexes)} indexes:")
@@ -50,9 +50,9 @@ async def verify_indexes():
             if 'key' in idx:
                 print(f"    Keys: {list(idx['key'].items())}")
             if 'unique' in idx and idx['unique']:
-                print(f"    Unique: True")
+                print("    Unique: True")
             if 'background' in idx and idx['background']:
-                print(f"    Background: True")
+                print("    Background: True")
 
         # Verify expected indexes exist
         print("\nVerification:")

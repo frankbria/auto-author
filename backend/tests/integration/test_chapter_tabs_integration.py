@@ -2,7 +2,7 @@
 Chapter Tabs Integration Tests (issue #45)
 
 Integration tests for chapter-tabs functionality against a real local MongoDB
-(via the ``motor_reinit_db`` fixture from conftest). Covers the data flow that
+(via the ``reinit_db`` fixture from conftest). Covers the data flow that
 the shipped services actually implement:
 
 - Chapter access logging + recent-chapter retrieval (``ChapterAccessService``)
@@ -28,8 +28,8 @@ USER_ID = "test-user-123"
 
 
 @pytest.fixture
-def database(motor_reinit_db):
-    """Real test database (rebound by motor_reinit_db)."""
+def database(reinit_db):
+    """Real test database (rebound by reinit_db)."""
     return base._db
 
 

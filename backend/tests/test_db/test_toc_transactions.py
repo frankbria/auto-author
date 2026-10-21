@@ -2,7 +2,7 @@
 Integration tests for app/db/toc_transactions.py.
 
 Exercises the atomic TOC helpers against a real local MongoDB (via the
-motor_reinit_db fixture) — happy paths AND the data-integrity failure paths:
+reinit_db fixture) — happy paths AND the data-integrity failure paths:
 invalid IDs, missing/unauthorized books, optimistic-locking version conflicts,
 and missing chapters.
 
@@ -28,7 +28,7 @@ import app.db.toc_transactions as tx
 
 
 @pytest_asyncio.fixture
-async def seed_book(motor_reinit_db):
+async def seed_book(reinit_db):
     """Insert a book (optionally with a TOC) and return its id + owner."""
     owner = "owner-auth-123"
 
@@ -88,7 +88,7 @@ async def test_update_toc_invalid_book_id(seed_book):
 
 
 @pytest.mark.asyncio
-async def test_update_toc_book_not_found(motor_reinit_db):
+async def test_update_toc_book_not_found(reinit_db):
     with pytest.raises(ValueError, match="Book not found"):
         await tx.update_toc_with_transaction(str(ObjectId()), {}, "nobody")
 
@@ -154,7 +154,7 @@ async def test_add_subchapter_parent_not_found(seed_book):
 
 
 @pytest.mark.asyncio
-async def test_add_chapter_book_not_found(motor_reinit_db):
+async def test_add_chapter_book_not_found(reinit_db):
     with pytest.raises(ValueError, match="not authorized"):
         await tx.add_chapter_with_transaction(str(ObjectId()), {"title": "C"}, "nobody")
 
@@ -199,7 +199,7 @@ async def test_update_chapter_not_found(seed_book):
 
 
 @pytest.mark.asyncio
-async def test_update_chapter_book_not_found(motor_reinit_db):
+async def test_update_chapter_book_not_found(reinit_db):
     with pytest.raises(ValueError, match="not authorized"):
         await tx.update_chapter_with_transaction(str(ObjectId()), "c", {}, "nobody")
 
@@ -241,7 +241,7 @@ async def test_delete_chapter_not_found(seed_book):
 
 
 @pytest.mark.asyncio
-async def test_delete_chapter_book_not_found(motor_reinit_db):
+async def test_delete_chapter_book_not_found(reinit_db):
     with pytest.raises(ValueError, match="not authorized"):
         await tx.delete_chapter_with_transaction(str(ObjectId()), "c", "nobody")
 
@@ -283,7 +283,7 @@ async def test_reorder_chapters_ignores_unknown_ids(seed_book):
 
 
 @pytest.mark.asyncio
-async def test_reorder_chapters_book_not_found(motor_reinit_db):
+async def test_reorder_chapters_book_not_found(reinit_db):
     with pytest.raises(ValueError, match="not authorized"):
         await tx.reorder_chapters_with_transaction(str(ObjectId()), [], "nobody")
 
@@ -460,7 +460,7 @@ async def test_bulk_status_helper_timestamp_sets_last_modified(seed_book):
 
 
 @pytest.mark.asyncio
-async def test_bulk_status_helper_book_not_found(motor_reinit_db):
+async def test_bulk_status_helper_book_not_found(reinit_db):
     with pytest.raises(ValueError, match="Book not found"):
         await tx.update_chapter_statuses_with_version_guard(
             book_id=str(ObjectId()), chapter_ids=["c1"], new_status="in-progress",

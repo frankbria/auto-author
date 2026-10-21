@@ -77,7 +77,7 @@ def _values(explained, key):
     return []
 
 
-async def test_a_signed_in_request_reads_twice_and_writes_nothing(motor_reinit_db):
+async def test_a_signed_in_request_reads_twice_and_writes_nothing(reinit_db):
     request, oid = await _signed_in()
 
     async with _asked() as asked:
@@ -90,7 +90,7 @@ async def test_a_signed_in_request_reads_twice_and_writes_nothing(motor_reinit_d
     assert len(what) >= 2, f"the profiler recorded too little to count: {what}"
 
 
-async def test_nothing_it_asks_scans_a_collection(motor_reinit_db):
+async def test_nothing_it_asks_scans_a_collection(reinit_db):
     request, _ = await _signed_in()
 
     async with _asked() as asked:
@@ -102,7 +102,7 @@ async def test_nothing_it_asks_scans_a_collection(motor_reinit_db):
     assert [plan for collection, plan in plans if collection == "users" and "auth_id" in plan], plans
 
 
-async def test_the_user_is_found_through_the_index_on_its_id(motor_reinit_db):
+async def test_the_user_is_found_through_the_index_on_its_id(reinit_db):
     """The session's user is joined to it in the same read. explain() says how."""
     _, oid = await _signed_in()
 
@@ -119,7 +119,7 @@ async def test_the_user_is_found_through_the_index_on_its_id(motor_reinit_db):
     assert "NestedLoopJoin" not in _values(explained, "strategy")
 
 
-async def test_a_lookup_of_the_user_on_its_own_goes_by_id_too(motor_reinit_db):
+async def test_a_lookup_of_the_user_on_its_own_goes_by_id_too(reinit_db):
     """The fallback, for a session that holds its user id as text."""
     _, oid = await _signed_in()
 
@@ -131,7 +131,7 @@ async def test_a_lookup_of_the_user_on_its_own_goes_by_id_too(motor_reinit_db):
     assert len(asked) == 1, asked
 
 
-async def test_the_user_it_returns_does_not_carry_every_book_id(motor_reinit_db):
+async def test_the_user_it_returns_does_not_carry_every_book_id(reinit_db):
     request, _ = await _signed_in()
 
     user = await get_current_user_from_session(request)
@@ -142,7 +142,7 @@ async def test_the_user_it_returns_does_not_carry_every_book_id(motor_reinit_db)
     assert "book_ids" not in UserResponse.model_fields
 
 
-async def test_last_active_is_written_once_it_is_out_of_date(motor_reinit_db):
+async def test_last_active_is_written_once_it_is_out_of_date(reinit_db):
     """Settings shows a session's updatedAt as "Last active"."""
     request, oid = await _signed_in(last_active=timedelta(minutes=30))
     before = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(seconds=5)
@@ -154,7 +154,7 @@ async def test_last_active_is_written_once_it_is_out_of_date(motor_reinit_db):
     assert (await base._db["session"].find_one({"token": f"tok-{oid}"}))["updatedAt"] >= before
 
 
-async def test_a_session_whose_user_is_gone_is_refused(motor_reinit_db):
+async def test_a_session_whose_user_is_gone_is_refused(reinit_db):
     """A session that outlives its better-auth user is not a credential (#763)."""
     request, oid = await _signed_in()
     await base._db["user"].delete_one({"_id": oid})
@@ -165,7 +165,7 @@ async def test_a_session_whose_user_is_gone_is_refused(motor_reinit_db):
     assert refused.value.status_code == 401
 
 
-async def test_a_session_holding_its_user_id_as_text_still_signs_in(motor_reinit_db):
+async def test_a_session_holding_its_user_id_as_text_still_signs_in(reinit_db):
     """Not how better-auth writes it now. The join finds nothing; the user is looked up on its own."""
     request, oid = await _signed_in()
     await base._db["session"].update_one({"token": f"tok-{oid}"}, {"$set": {"userId": str(oid)}})
@@ -175,7 +175,7 @@ async def test_a_session_holding_its_user_id_as_text_still_signs_in(motor_reinit
     assert user["auth_id"] == str(oid)
 
 
-async def test_the_better_auth_email_is_still_mirrored(motor_reinit_db):
+async def test_the_better_auth_email_is_still_mirrored(reinit_db):
     """The joined user is the one whose email the application's record follows (#765)."""
     request, oid = await _signed_in()
     await base._db["user"].update_one({"_id": oid}, {"$set": {"email": "renamed@example.com"}})
@@ -186,7 +186,7 @@ async def test_the_better_auth_email_is_still_mirrored(motor_reinit_db):
     assert (await base.users_collection.find_one({"auth_id": str(oid)}))["email"] == "renamed@example.com"
 
 
-async def test_sessions_are_indexed_by_token(motor_reinit_db):
+async def test_sessions_are_indexed_by_token(reinit_db):
     await _signed_in()
 
     indexes = await base._db["session"].index_information()

@@ -59,7 +59,7 @@ def test_never_exempt_in_production():
 # --- Integration: an exempt user isn't metered past the AI quota cap -------
 
 @pytest.mark.asyncio
-async def test_exempt_user_skips_ai_quota(motor_reinit_db, real_ai_quota):
+async def test_exempt_user_skips_ai_quota(reinit_db, real_ai_quota):
     """With a daily cap of 1, the exempt user still passes on every call."""
     user = {"auth_id": "e2e-bot", "email": "e2e-bot@staging.example"}
     cfg_email, cfg_prod = _cfg()
@@ -74,7 +74,7 @@ async def test_exempt_user_skips_ai_quota(motor_reinit_db, real_ai_quota):
 
 
 @pytest.mark.asyncio
-async def test_non_exempt_user_still_capped(motor_reinit_db, real_ai_quota):
+async def test_non_exempt_user_still_capped(reinit_db, real_ai_quota):
     """The exemption is targeted: a normal user still hits 429 at the cap."""
     user = {"auth_id": "normal", "email": "real-user@example.com"}
     cfg_email, cfg_prod = _cfg()

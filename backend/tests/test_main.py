@@ -21,7 +21,7 @@ def test_health_check(client: TestClient):
 def _ok_db():
     """A db handle whose `.command('ping')` resolves — stand-in for a reachable
     Mongo, keeping the logic tests deterministic and event-loop independent (the
-    import-time motor client binds to the first sync-TestClient request's loop)."""
+    import-time async client binds to the first sync-TestClient request's loop)."""
     db = MagicMock()
     db.command = AsyncMock(return_value={"ok": 1})
     return db

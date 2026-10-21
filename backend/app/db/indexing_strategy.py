@@ -1,7 +1,7 @@
 # Database Indexing Strategy for Chapter Tabs Functionality
 # This file contains MongoDB index definitions to optimize chapter access patterns
 
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ class ChapterTabIndexManager:
     tab state management, and metadata queries.
     """
 
-    def __init__(self, database: AsyncIOMotorDatabase):
+    def __init__(self, database: AsyncDatabase):
         self.database = database
 
     async def create_chapter_access_indexes(self):
@@ -118,12 +118,12 @@ class ChapterTabIndexManager:
         Analyze and optimize existing indexes for better performance.
         """
         # Get existing indexes for analysis
-        books_indexes = await self.database.books.list_indexes().to_list(None)
+        books_indexes = await (await self.database.books.list_indexes()).to_list(None)
         access_logs_indexes = []
 
         try:
             access_logs_indexes = (
-                await self.database.chapter_access_logs.list_indexes().to_list(None)
+                await (await self.database.chapter_access_logs.list_indexes()).to_list(None)
             )
         except Exception:
             # Collection might not exist yet

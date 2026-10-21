@@ -10,9 +10,10 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 import pytest
+import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from app import main
 from app.db import base, questions
@@ -33,11 +34,11 @@ async def _warm_collections():
 
 
 async def _index_map(collection):
-    return {idx["name"]: idx for idx in await collection.list_indexes().to_list(None)}
+    return {idx["name"]: idx for idx in await (await collection.list_indexes()).to_list(None)}
 
 
 @pytest.mark.asyncio
-async def test_create_all_indexes_creates_owner_and_ttl_indexes(motor_reinit_db):
+async def test_create_all_indexes_creates_owner_and_ttl_indexes(reinit_db):
     await _warm_collections()
     result = await ChapterTabIndexManager(base._db).create_all_indexes()
     assert result["success"] is True
@@ -62,7 +63,7 @@ async def test_create_all_indexes_creates_owner_and_ttl_indexes(motor_reinit_db)
 
 
 @pytest.mark.asyncio
-async def test_create_all_indexes_is_idempotent(motor_reinit_db):
+async def test_create_all_indexes_is_idempotent(reinit_db):
     await _warm_collections()
     manager = ChapterTabIndexManager(base._db)
     assert (await manager.create_all_indexes())["success"] is True
@@ -75,7 +76,7 @@ async def test_create_all_indexes_is_idempotent(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_no_text_index_on_books(motor_reinit_db):
+async def test_no_text_index_on_books(reinit_db):
     """The unused chapter-content text index was removed (no $text queries;
     it re-tokenized full chapter content on every autosave), and a stale one
     left by an earlier manual run gets dropped."""
@@ -91,7 +92,7 @@ async def test_no_text_index_on_books(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_lifespan_creates_owner_and_ttl_indexes(motor_reinit_db):
+async def test_lifespan_creates_owner_and_ttl_indexes(reinit_db):
     """The actual #183 bug: app startup never created these indexes. Run the
     real lifespan and assert they exist afterwards."""
     await _warm_collections()
@@ -108,7 +109,7 @@ async def test_lifespan_creates_owner_and_ttl_indexes(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_lifespan_purges_expired_deactivated_accounts(motor_reinit_db):
+async def test_lifespan_purges_expired_deactivated_accounts(reinit_db):
     """#954: the 18-month purge needs no one to act. A running app does it."""
     users = base._db.users
     await users.insert_one(
@@ -138,7 +139,7 @@ def _assert_audit_indexes(indexes):
 
 
 @pytest.mark.asyncio
-async def test_ensure_audit_log_indexes_creates_ttl_and_actor_indexes(motor_reinit_db):
+async def test_ensure_audit_log_indexes_creates_ttl_and_actor_indexes(reinit_db):
     await _warm_collections()
     await ensure_audit_log_indexes()
     await ensure_audit_log_indexes()  # idempotent
@@ -146,7 +147,7 @@ async def test_ensure_audit_log_indexes_creates_ttl_and_actor_indexes(motor_rein
 
 
 @pytest.mark.asyncio
-async def test_lifespan_creates_audit_log_indexes(motor_reinit_db):
+async def test_lifespan_creates_audit_log_indexes(reinit_db):
     await _warm_collections()
     async with app.router.lifespan_context(app):
         await app.state.database_prepared
@@ -164,16 +165,16 @@ class TestStartingWhileTheDatabaseIsAway:
         """Shutdown closes the export pool; hand it one that no other test uses."""
         monkeypatch.setattr("app.services.export_service.export_executor", ThreadPoolExecutor(1))
 
-    @pytest.fixture
-    def away(self, monkeypatch):
+    @pytest_asyncio.fixture
+    async def away(self, monkeypatch):
         """Point the app at an address nothing listens on. Returns a function that brings the
         real database back."""
         real = base._db
-        client = AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")
+        client = AsyncMongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")
         monkeypatch.setattr(base, "_db", client["nowhere"])
         monkeypatch.setattr(main, "DATABASE_RETRY_SECONDS", 0.05)
         yield lambda: monkeypatch.setattr(base, "_db", real)
-        client.close()
+        await client.close()
 
     # Each of these enters the lifespan under a time limit: a start-up that waits for the
     # database would otherwise hang the run instead of failing it.
@@ -183,13 +184,13 @@ class TestStartingWhileTheDatabaseIsAway:
         # Its own absent database, slower to give up than the fixture's: one failed attempt
         # takes three seconds, so "under one" holds on a loaded machine and still cannot be
         # met by a start-up that makes even a single attempt first.
-        client = AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=3000")
+        client = AsyncMongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=3000")
         monkeypatch.setattr(base, "_db", client["nowhere"])
         started = time.monotonic()
         async with asyncio.timeout(30):
             async with main.lifespan(FastAPI()) as _:
                 took = time.monotonic() - started
-        client.close()
+        await client.close()
 
         assert took < 1, f"start-up took {took:.2f}s; one failed attempt at the database alone is 3s"
 
@@ -203,7 +204,7 @@ class TestStartingWhileTheDatabaseIsAway:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_the_indexes_are_created_when_it_comes_back_without_a_restart(self, motor_reinit_db, away, monkeypatch):
+    async def test_the_indexes_are_created_when_it_comes_back_without_a_restart(self, reinit_db, away, monkeypatch):
         reported = []
         monkeypatch.setattr(main, "report_failure", lambda kind, *args, **kwargs: reported.append(kind))
         bring_it_back = away
@@ -211,7 +212,8 @@ class TestStartingWhileTheDatabaseIsAway:
         await _warm_collections()
         await base._db.users.insert_one({"warm": True, "auth_id": "warm", "email": "warm@example.com"})
         await base._db.question_responses.insert_one({"warm": True})
-        monkeypatch.setattr(base, "_db", AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")["nowhere"])
+        nowhere = AsyncMongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")
+        monkeypatch.setattr(base, "_db", nowhere["nowhere"])
         served = FastAPI()
         # The first thing the work does. Asserting only on indexes afterwards cannot tell
         # waiting from going ahead: steps that fail while the database is away fail quietly,
@@ -240,9 +242,10 @@ class TestStartingWhileTheDatabaseIsAway:
         assert "auth_id_unique_idx" in await _index_map(base._db.users)
         assert "owner_book_id_idx" in await _index_map(base._db.books)
         assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)
+        await nowhere.close()
 
     @pytest.mark.asyncio
-    async def test_the_work_is_done_again_if_the_database_went_away_while_it_was_being_done(self, motor_reinit_db, away, monkeypatch):
+    async def test_the_work_is_done_again_if_the_database_went_away_while_it_was_being_done(self, reinit_db, away, monkeypatch):
         """Each step logs its own failure and carries on. A database that answers the first
         ping and then goes leaves every step "finished" and nothing created. Review found it."""
         reported = []
@@ -250,7 +253,7 @@ class TestStartingWhileTheDatabaseIsAway:
         bring_it_back = away
         bring_it_back()
         await _warm_collections()
-        gone = AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")["nowhere"]
+        gone = AsyncMongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")["nowhere"]
         passes = []
         first_step = questions.ensure_question_indexes
 
@@ -274,10 +277,11 @@ class TestStartingWhileTheDatabaseIsAway:
         assert len(passes) == 2
         assert "owner_book_id_idx" in await _index_map(base._db.books)
         assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)
+        await gone.client.close()
 
 
 @pytest.mark.asyncio
-async def test_lifespan_repairs_duplicate_chapter_ids(motor_reinit_db):
+async def test_lifespan_repairs_duplicate_chapter_ids(reinit_db):
     """A book stored before #754 with two chapters sharing an id (#885)."""
     book_id = ObjectId()
     chapters = [{"id": "dup", "title": t, "subchapters": []} for t in ("First", "Second")]
@@ -293,7 +297,7 @@ async def test_lifespan_repairs_duplicate_chapter_ids(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_lifespan_finishes_a_deletion_that_died_half_way(motor_reinit_db):
+async def test_lifespan_finishes_a_deletion_that_died_half_way(reinit_db):
     """A tombstone whose better-auth user and password survived (#935)."""
     from app.db.user import create_user
 

@@ -27,7 +27,7 @@ async def _users_doc_after_first_request(seeded: dict) -> dict:
 
 @pytest.mark.asyncio
 async def test_first_request_copies_terms_acceptance_onto_the_users_doc(
-    motor_reinit_db,
+    reinit_db,
 ):
     seeded = await _seed_better_auth_user("terms@example.com")
     accepted_at = datetime(2026, 10, 11, 12, 0, tzinfo=timezone.utc)
@@ -43,7 +43,7 @@ async def test_first_request_copies_terms_acceptance_onto_the_users_doc(
 
 
 @pytest.mark.asyncio
-async def test_an_account_with_no_recorded_acceptance_gets_none(motor_reinit_db):
+async def test_an_account_with_no_recorded_acceptance_gets_none(reinit_db):
     """An account created before #789 has nothing to copy; none is invented."""
     seeded = await _seed_better_auth_user("before-789@example.com")
 
@@ -63,7 +63,7 @@ async def _retained_after_deletion(seeded: dict) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_deactivation_keeps_the_terms_acceptance_record(motor_reinit_db):
+async def test_deactivation_keeps_the_terms_acceptance_record(reinit_db):
     """#960: the 18-month record can answer "I never agreed to the Terms"."""
     seeded = await _seed_better_auth_user("terms-kept@example.com")
     accepted_at = datetime(2026, 10, 11, 12, 0, tzinfo=timezone.utc)
@@ -80,7 +80,7 @@ async def test_deactivation_keeps_the_terms_acceptance_record(motor_reinit_db):
 
 @pytest.mark.asyncio
 async def test_deactivation_keeps_no_empty_entry_for_an_account_with_no_record(
-    motor_reinit_db,
+    reinit_db,
 ):
     """The users doc holds null for both; the retained record leaves them out."""
     seeded = await _seed_better_auth_user("before-789-deleted@example.com")

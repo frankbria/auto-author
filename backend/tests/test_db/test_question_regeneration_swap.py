@@ -40,7 +40,7 @@ async def _seed_response(question_id: str) -> None:
     )
 
 
-async def test_delete_excludes_given_ids(motor_reinit_db):
+async def test_delete_excludes_given_ids(reinit_db):
     keep = await _seed_question(ObjectId(), order=2)
     gone1 = await _seed_question(ObjectId(), order=1)
     gone3 = await _seed_question(ObjectId(), order=3)
@@ -60,7 +60,7 @@ async def test_delete_excludes_given_ids(motor_reinit_db):
     assert gone1 not in remaining and gone3 not in remaining
 
 
-async def test_count_questions_without_responses(motor_reinit_db):
+async def test_count_questions_without_responses(reinit_db):
     answered = await _seed_question(ObjectId(), order=1)
     await _seed_question(ObjectId(), order=2)  # unanswered
     await _seed_question(ObjectId(), order=3)  # unanswered
@@ -71,13 +71,13 @@ async def test_count_questions_without_responses(motor_reinit_db):
     assert await count_questions_without_responses(BOOK, CH, USER) == 2
 
 
-async def test_count_is_zero_when_all_answered(motor_reinit_db):
+async def test_count_is_zero_when_all_answered(reinit_db):
     q = await _seed_question(ObjectId())
     await _seed_response(q)
     assert await count_questions_without_responses(BOOK, CH, USER) == 0
 
 
-async def test_count_ignores_other_users_and_chapters(motor_reinit_db):
+async def test_count_ignores_other_users_and_chapters(reinit_db):
     await _seed_question(ObjectId())  # our unanswered question
     coll = await get_collection("questions")
     await coll.insert_one(

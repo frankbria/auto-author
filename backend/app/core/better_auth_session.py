@@ -27,6 +27,7 @@ from urllib.parse import unquote
 
 from bson import ObjectId
 from fastapi import Request
+from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import PyMongoError
 
 from app.core.config import is_deployed_env, settings
@@ -52,6 +53,10 @@ class SessionStoreUnavailable(Exception):
     by signing in, this one is ours. The app answers it 503, not 401, because
     the frontend ends the session in the browser on a 401 (#796, #1007).
     """
+
+
+async def _first_session_and_its_user(session_collection: AsyncCollection, session_token: str) -> List[Dict[str, Any]]:
+    return await (await session_collection.aggregate(_session_and_its_user(session_token))).to_list(1)
 
 
 def _in_time(lookup):
@@ -176,7 +181,7 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
         session_collection = await get_collection("session")
 
         # Find the session by its token, and its user with it
-        found = await _in_time(session_collection.aggregate(_session_and_its_user(session_token)).to_list(1))
+        found = await _in_time(_first_session_and_its_user(session_collection, session_token))
         session = found[0] if found else None
 
         if not session:

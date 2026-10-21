@@ -13,10 +13,11 @@ import time
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import pytest_asyncio
 import sentry_sdk
 from bson import ObjectId
 from httpx import ASGITransport, AsyncClient
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 from starlette.requests import Request
 
@@ -38,15 +39,15 @@ def _request() -> Request:
     return Request({"type": "http", "method": "GET", "path": "/", "headers": [(b"cookie", COOKIE.encode())]})
 
 
-@pytest.fixture
-def database_is_away(monkeypatch):
+@pytest_asyncio.fixture
+async def database_is_away(monkeypatch):
     """The session collections on a driver whose server is not there. The driver would
     wait its usual thirty seconds; the lookup's own limit is shortened to keep the test quick."""
-    away = AsyncIOMotorClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=30000")
+    away = AsyncMongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=30000")
     monkeypatch.setattr(sessions, "get_collection", AsyncMock(side_effect=lambda name: away["nowhere"][name]))
     monkeypatch.setattr(sessions, "SESSION_LOOKUP_TIMEOUT_SECONDS", 0.3)
     yield
-    away.close()
+    await away.close()
 
 
 class TestTheLookupSaysItCouldNotLook:

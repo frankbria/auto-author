@@ -1363,7 +1363,7 @@ async def update_book_toc(
 def _last_modified_token(value: Any) -> Optional[str]:
     """The chapter's save token (#759) as clients see it. The content PATCH
     stores an ISO string, but the bulk-status endpoint and the tab migration
-    store a BSON Date, so both are rendered as one string. Motor decodes a Date
+    store a BSON Date, so both are rendered as one string. PyMongo decodes a Date
     as naive UTC; the offset is added so both kinds read the same way. Clients
     must echo it verbatim: it is compared, not parsed."""
     if isinstance(value, datetime):

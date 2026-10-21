@@ -97,7 +97,7 @@ class ChapterAccessService:
             },
         ]
 
-        return await collection.aggregate(pipeline).to_list(None)
+        return await (await collection.aggregate(pipeline)).to_list(None)
 
     async def get_user_recent_chapters(
         self, user_id: str, book_id: str, limit: int = 10
@@ -125,7 +125,7 @@ class ChapterAccessService:
             {"$limit": limit},
         ]
 
-        return await collection.aggregate(pipeline).to_list(None)
+        return await (await collection.aggregate(pipeline)).to_list(None)
 
     async def save_tab_state(
         self,

@@ -2,7 +2,7 @@
 
 import logging
 
-import motor.motor_asyncio
+from pymongo import AsyncMongoClient
 import pytest
 import app.db.audit_log as audit_log_dao
 from app.api.endpoints.billing import RENEWAL_CONSENT_ACTION
@@ -64,13 +64,13 @@ async def test_create_audit_log():
 
 
 # ---------------------------------------------------------------------------
-# Retention (issue #787) — real MongoDB via motor_reinit_db
+# Retention (issue #787) — real MongoDB via reinit_db
 # ---------------------------------------------------------------------------
 NINETY_DAYS = timedelta(days=90)
 
 
 @pytest.mark.asyncio
-async def test_row_expires_ninety_days_after_timestamp(motor_reinit_db):
+async def test_row_expires_ninety_days_after_timestamp(reinit_db):
     await create_audit_log("book_create", "u1", "b1", "book")
     row = await audit_log_dao.audit_logs_collection.find_one({"actor_id": "u1"})
     assert AUDIT_LOG_RETENTION == NINETY_DAYS
@@ -78,7 +78,7 @@ async def test_row_expires_ninety_days_after_timestamp(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_renewal_consent_row_has_no_expiry(motor_reinit_db):
+async def test_renewal_consent_row_has_no_expiry(reinit_db):
     await create_audit_log(RENEWAL_CONSENT_ACTION, "u1", "u1", "billing")
     row = await audit_log_dao.audit_logs_collection.find_one({"actor_id": "u1"})
     assert "expires_at" not in row
@@ -89,7 +89,7 @@ def test_retained_actions_track_the_billing_consent_action():
 
 
 @pytest.mark.asyncio
-async def test_backfill_stamps_legacy_rows_only(motor_reinit_db):
+async def test_backfill_stamps_legacy_rows_only(reinit_db):
     coll = audit_log_dao.audit_logs_collection
     old = datetime(2026, 1, 1, tzinfo=timezone.utc)
     other = datetime(2030, 1, 1, tzinfo=timezone.utc)
@@ -120,7 +120,7 @@ async def test_backfill_stamps_legacy_rows_only(motor_reinit_db):
 @pytest.mark.asyncio
 async def test_unreachable_mongo_is_logged_and_never_fatal(monkeypatch, caplog):
     """Startup must survive: a real client pointed at a closed port fails all three steps."""
-    dead = motor.motor_asyncio.AsyncIOMotorClient(
+    dead = AsyncMongoClient(
         "mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=200"
     )
     monkeypatch.setattr(
@@ -128,7 +128,7 @@ async def test_unreachable_mongo_is_logged_and_never_fatal(monkeypatch, caplog):
     )
     with caplog.at_level(logging.ERROR, logger="app.db.audit_log"):
         await ensure_audit_log_indexes()
-    dead.close()
+    await dead.close()
 
     assert [r.getMessage() for r in caplog.records] == [
         "Failed to create TTL index on audit_logs.expires_at",
