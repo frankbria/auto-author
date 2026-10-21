@@ -449,20 +449,16 @@ export default function QuestionDisplay({
   };
 
   // Handle rating the question
-  const handleRateQuestion = async (rating: number) => {
-    setRating(rating);
+  const handleRateQuestion = async (newRating: number) => {
+    const previousRating = rating;
+    setRating(newRating);
 
     try {
-      await bookClient.rateQuestion(
-        bookId,
-        chapterId,
-        question.id,
-        {
-          rating
-        }
-      );
+      await bookClient.rateQuestion(bookId, chapterId, question.id, { rating: newRating });
     } catch (error) {
       console.error('Error rating question:', error);
+      setRating(previousRating);
+      toast.error({ title: 'Rating not saved', description: 'Please try again.' });
     }
   };
 

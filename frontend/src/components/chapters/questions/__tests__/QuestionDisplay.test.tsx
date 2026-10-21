@@ -15,6 +15,7 @@ import QuestionDisplay from '../QuestionDisplay';
 import { Question, QuestionType, QuestionDifficulty, ResponseStatus } from '@/types/chapter-questions';
 import { bookClient } from '@/lib/api/bookClient';
 import { retryQueue } from '@/lib/utils/retryQueue';
+import { toast } from '@/lib/toast';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -402,16 +403,20 @@ describe('QuestionDisplay - rating', () => {
     });
   });
 
-  it('handles rateQuestion API error gracefully without crashing (line 426)', async () => {
+  it('tells the user a rating failed and clears the rating it showed (#1117)', async () => {
     mockedBookClient.rateQuestion.mockRejectedValue(new Error('Rate limit exceeded'));
 
     render(<QuestionDisplay {...defaultProps} />);
-    fireEvent.click(screen.getByLabelText('Rate question as poor'));
+    const poor = screen.getByLabelText('Rate question as poor');
+    fireEvent.click(poor);
 
-    // Component should not crash and Save Draft button should still be present
     await waitFor(() => {
-      expect(screen.getByText('Save Draft')).toBeInTheDocument();
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Rating not saved' })
+      );
     });
+    expect(poor).not.toHaveClass('bg-red-100');
+    expect(screen.getByText('Save Draft')).toBeInTheDocument();
   });
 });
 

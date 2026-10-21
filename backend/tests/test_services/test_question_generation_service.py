@@ -721,7 +721,7 @@ class TestDelegators:
         question = {"book_id": "book-1", "chapter_id": "ch-1"}
         with patch(f"{MODULE}.get_question_by_id", AsyncMock(return_value=question)), \
              patch(f"{MODULE}.db_save_question_rating", AsyncMock(return_value={"id": "rat1"})) as m:
-            rating = QuestionRating(question_id="q1", user_id="u1", rating=4)
+            rating = QuestionRating(rating=4)
             result = await service.save_question_rating("q1", rating, "u1")
         assert result == {"id": "rat1"}
         m.assert_awaited_once()
@@ -729,7 +729,7 @@ class TestDelegators:
     async def test_save_question_rating_not_found(self, service):
         with patch(f"{MODULE}.get_question_by_id", AsyncMock(return_value=None)):
             with pytest.raises(ValueError, match="not found"):
-                rating = QuestionRating(question_id="q1", user_id="u1", rating=4)
+                rating = QuestionRating(rating=4)
                 await service.save_question_rating("q1", rating, "u1")
 
     async def test_get_chapter_question_progress(self, service):

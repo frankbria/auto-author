@@ -104,7 +104,7 @@ async def test_concurrent_first_ratings_produce_one_document(motor_reinit_db):
     results = await asyncio.gather(*(
         save_question_rating(
             question_id,
-            QuestionRating(question_id=question_id, user_id=user_id, rating=1 + i % 5),
+            QuestionRating(rating=1 + i % 5),
             user_id,
         )
         for i in range(CONCURRENT_SAVES)
@@ -201,11 +201,11 @@ async def test_batch_save_shares_the_edit_history_cap(motor_reinit_db):
 async def test_rerating_keeps_the_original_created_at(motor_reinit_db):
     user_id, question_id = "user-1", "q-1"
     first = await save_question_rating(
-        question_id, QuestionRating(question_id=question_id, user_id=user_id, rating=2), user_id
+        question_id, QuestionRating(rating=2), user_id
     )
     second = await save_question_rating(
         question_id,
-        QuestionRating(question_id=question_id, user_id=user_id, rating=5, feedback="better"),
+        QuestionRating(rating=5, feedback="better"),
         user_id,
     )
 
