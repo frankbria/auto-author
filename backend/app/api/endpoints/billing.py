@@ -109,8 +109,8 @@ async def get_plan_quotas(
 # --- Auto-renewal disclosure (#770, CA ARL / ROSCA) ---
 # The ONE place the renewal terms live: the settings page shows this text next
 # to the subscribe action, Stripe's hosted page repeats it, and the consent
-# record stores it. Wording is plain-language pending counsel review (#791);
-# bump the version whenever the template changes.
+# record stores it. Counsel signed off on this wording (#791); bump the version
+# whenever the template changes.
 RENEWAL_DISCLOSURE_VERSION = "2026-10-09"
 RENEWAL_DISCLOSURE_TEMPLATE = (
     "Auto Author Pro is {price} per {period} plus any applicable tax, charged "
