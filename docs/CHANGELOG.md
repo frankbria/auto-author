@@ -2,6 +2,10 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-20
+
+- **Pillow 13.0.0 and certifi 2026.10.19 (Security Audit red on new advisories)**: the audit gate failed every PR on 8 new pillow advisories (CVE-2026-112395, -112397, -112400, -112404, -112895, -112896, -112897, -112899; fixed in 13.0.0) and PYSEC-2026-4320 in certifi (fixed in 2026.10.19), with no code change. `pillow` is pinned to 13.0.0 in `backend/pyproject.toml`; certifi is transitive and moved in `uv.lock` only. The upload/export/cover test set (533 tests) passes on both; the gate reports no new advisories.
+
 ### 2026-10-14
 
 - **Frontend minor bugs (#855, P2.9)**:
