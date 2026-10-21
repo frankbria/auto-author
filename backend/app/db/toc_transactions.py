@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from bson.objectid import ObjectId
 import logging
 import uuid
-from motor.motor_asyncio import AsyncIOMotorClientSession
+from pymongo.asynchronous.client_session import AsyncClientSession
 
 from .base import books_collection
 from .audit_log import create_audit_log
@@ -34,7 +34,7 @@ async def _set_toc_guarded(
     user_auth_id: str,
     updated_toc: Dict[str, Any],
     version_guard: Any,
-    session: Optional[AsyncIOMotorClientSession] = None,
+    session: Optional[AsyncClientSession] = None,
 ) -> None:
     """Compare-and-swap the whole ``table_of_contents`` under an optimistic lock.
 
@@ -219,7 +219,7 @@ async def _update_toc_internal(
     book_id: str,
     toc_data: Dict[str, Any],
     user_auth_id: str,
-    session: Optional[AsyncIOMotorClientSession]
+    session: Optional[AsyncClientSession]
 ) -> Dict[str, Any]:
     """Internal function to update TOC with or without transaction"""
     # Get current book with version check
@@ -390,7 +390,7 @@ async def _add_chapter_internal(
     chapter_data: Dict[str, Any],
     user_auth_id: str,
     parent_chapter_id: Optional[str],
-    session: Optional[AsyncIOMotorClientSession]
+    session: Optional[AsyncClientSession]
 ) -> Dict[str, Any]:
     """Internal function to add chapter with or without transaction"""
     # Get the book
@@ -476,7 +476,7 @@ async def _update_chapter_internal(
     chapter_id: str,
     chapter_updates: Dict[str, Any],
     user_auth_id: str,
-    session: Optional[AsyncIOMotorClientSession]
+    session: Optional[AsyncClientSession]
 ) -> Dict[str, Any]:
     """Internal function to update chapter with or without transaction"""
     # Get the book
@@ -557,7 +557,7 @@ async def _delete_chapter_internal(
     book_id: str,
     chapter_id: str,
     user_auth_id: str,
-    session: Optional[AsyncIOMotorClientSession]
+    session: Optional[AsyncClientSession]
 ) -> bool:
     """Internal function to delete chapter with or without transaction"""
     # Get the book
@@ -731,7 +731,7 @@ async def _reorder_chapters_internal(
     book_id: str,
     chapter_orders: List[Dict[str, Any]],
     user_auth_id: str,
-    session: Optional[AsyncIOMotorClientSession]
+    session: Optional[AsyncClientSession]
 ) -> Dict[str, Any]:
     """Internal function to reorder chapters with or without transaction"""
     # Get the book

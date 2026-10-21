@@ -100,7 +100,7 @@ async def _generate_questions(client: AsyncClient, book_id: str, chapter_id: str
 
 
 @pytest.mark.asyncio
-async def test_regenerate_single_question_success(auth_client_factory, motor_reinit_db):
+async def test_regenerate_single_question_success(auth_client_factory, reinit_db):
     client = await auth_client_factory()
     book_id, chapter_id = await _create_book_with_chapter(client)
     questions = await _generate_questions(client, book_id, chapter_id)
@@ -126,7 +126,7 @@ async def test_regenerate_single_question_success(auth_client_factory, motor_rei
 
 
 @pytest.mark.asyncio
-async def test_regenerate_single_question_openai_outage_503(auth_client_factory, motor_reinit_db):
+async def test_regenerate_single_question_openai_outage_503(auth_client_factory, reinit_db):
     """A genuine AI outage during single-question regeneration surfaces as a
     structured 503, not a silent template replacement (#182)."""
     client = await auth_client_factory()
@@ -150,7 +150,7 @@ async def test_regenerate_single_question_openai_outage_503(auth_client_factory,
 
 
 @pytest.mark.asyncio
-async def test_regenerate_single_question_fallback_replacement_tagged(auth_client_factory, motor_reinit_db):
+async def test_regenerate_single_question_fallback_replacement_tagged(auth_client_factory, reinit_db):
     """When the AI responds but yields nothing usable, the in-place template
     replacement carries is_fallback=True instead of inheriting False (#182)."""
     client = await auth_client_factory()
@@ -174,7 +174,7 @@ async def test_regenerate_single_question_fallback_replacement_tagged(auth_clien
 
 
 @pytest.mark.asyncio
-async def test_regenerate_single_question_clears_stale_response(auth_client_factory, motor_reinit_db):
+async def test_regenerate_single_question_clears_stale_response(auth_client_factory, reinit_db):
     client = await auth_client_factory()
     book_id, chapter_id = await _create_book_with_chapter(client)
     questions = await _generate_questions(client, book_id, chapter_id)
@@ -201,7 +201,7 @@ async def test_regenerate_single_question_clears_stale_response(auth_client_fact
 
 
 @pytest.mark.asyncio
-async def test_regenerate_single_question_focus_override(auth_client_factory, motor_reinit_db):
+async def test_regenerate_single_question_focus_override(auth_client_factory, reinit_db):
     client = await auth_client_factory()
     book_id, chapter_id = await _create_book_with_chapter(client)
     questions = await _generate_questions(client, book_id, chapter_id)
@@ -215,7 +215,7 @@ async def test_regenerate_single_question_focus_override(auth_client_factory, mo
 
 
 @pytest.mark.asyncio
-async def test_regenerate_single_question_at_limit_returns_429(auth_client_factory, motor_reinit_db):
+async def test_regenerate_single_question_at_limit_returns_429(auth_client_factory, reinit_db):
     client = await auth_client_factory()
     book_id, chapter_id = await _create_book_with_chapter(client)
     questions = await _generate_questions(client, book_id, chapter_id)
@@ -234,7 +234,7 @@ async def test_regenerate_single_question_at_limit_returns_429(auth_client_facto
 
 
 @pytest.mark.asyncio
-async def test_regenerate_single_question_not_found_returns_404(auth_client_factory, motor_reinit_db):
+async def test_regenerate_single_question_not_found_returns_404(auth_client_factory, reinit_db):
     client = await auth_client_factory()
     book_id, chapter_id = await _create_book_with_chapter(client)
     await _generate_questions(client, book_id, chapter_id)
@@ -247,7 +247,7 @@ async def test_regenerate_single_question_not_found_returns_404(auth_client_fact
 
 
 @pytest.mark.asyncio
-async def test_regenerate_single_question_wrong_owner_returns_403(auth_client_factory, motor_reinit_db):
+async def test_regenerate_single_question_wrong_owner_returns_403(auth_client_factory, reinit_db):
     owner = await auth_client_factory()
     book_id, chapter_id = await _create_book_with_chapter(owner)
     questions = await _generate_questions(owner, book_id, chapter_id)

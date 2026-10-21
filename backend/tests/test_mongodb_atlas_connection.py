@@ -5,7 +5,7 @@ This test verifies that the certifi-based SSL/TLS configuration
 works correctly for MongoDB Atlas connections.
 """
 import pytest
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 import certifi
 import os
 import ssl
@@ -18,7 +18,7 @@ async def test_mongodb_atlas_connection_with_ssl():
 
     This test validates:
     1. certifi package provides valid CA certificates
-    2. Motor client can connect with TLS settings
+    2. The async client can connect with TLS settings
     3. Basic database operations work over SSL
     """
     # Get connection URL from environment
@@ -29,7 +29,7 @@ async def test_mongodb_atlas_connection_with_ssl():
         pytest.skip("Skipping Atlas test - not using mongodb+srv:// connection")
 
     # Create client with SSL/TLS configuration (same as base.py)
-    client = AsyncIOMotorClient(
+    client = AsyncMongoClient(
         database_url,
         tlsCAFile=certifi.where(),
         tls=True,
@@ -50,7 +50,7 @@ async def test_mongodb_atlas_connection_with_ssl():
         assert isinstance(collections, list), "Failed to list collections"
 
     finally:
-        client.close()
+        await client.close()
 
 
 @pytest.mark.asyncio
@@ -76,5 +76,4 @@ def test_ssl_configuration_parameters():
     assert _client is not None, "MongoDB client not initialized"
 
     # Verify client has proper timeout settings
-    # Note: Motor wraps PyMongo, so we check the underlying client options
     assert _client.options.server_selection_timeout == 30.0, "Server selection timeout incorrect"

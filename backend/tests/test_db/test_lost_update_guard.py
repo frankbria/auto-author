@@ -4,7 +4,7 @@ Regression tests for the #177 lost-update fix.
 The old autosave path rewrote the WHOLE ``table_of_contents`` (and the whole
 ``summary_history`` array) via a version-less ``$set``, so two concurrent writers
 silently clobbered each other — real data loss. These tests drive the new
-targeted helpers against a real local MongoDB (via ``motor_reinit_db``) and
+targeted helpers against a real local MongoDB (via ``reinit_db``) and
 assert that interleaved writers no longer lose each other's updates.
 
 ``apply_chapter_content_update`` uses a positional ``$set`` (arrayFilters) that
@@ -52,7 +52,7 @@ def _by_id(chapters, cid):
 # apply_chapter_content_update
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_updates_only_target_chapter_and_bumps_version(motor_reinit_db):
+async def test_updates_only_target_chapter_and_bumps_version(reinit_db):
     book_id = await _seed(
         toc={
             "version": 3,
@@ -78,7 +78,7 @@ async def test_updates_only_target_chapter_and_bumps_version(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_interleaved_writers_no_lost_update(motor_reinit_db):
+async def test_interleaved_writers_no_lost_update(reinit_db):
     """Two concurrent saves to DIFFERENT chapters must both persist."""
     book_id = await _seed(
         toc={
@@ -108,7 +108,7 @@ async def test_interleaved_writers_no_lost_update(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_subchapter_targeted_update(motor_reinit_db):
+async def test_subchapter_targeted_update(reinit_db):
     book_id = await _seed(
         toc={
             "version": 1,
@@ -133,7 +133,7 @@ async def test_subchapter_targeted_update(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_version_created_from_legacy_toc_without_version(motor_reinit_db):
+async def test_version_created_from_legacy_toc_without_version(reinit_db):
     book_id = await _seed(toc={"chapters": [{"id": "a", "content": "x"}]})
 
     await bookdao.apply_chapter_content_update(
@@ -144,7 +144,7 @@ async def test_version_created_from_legacy_toc_without_version(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_missing_chapter_no_match_does_not_bump_version(motor_reinit_db):
+async def test_missing_chapter_no_match_does_not_bump_version(reinit_db):
     """A chapter id that no longer exists must be a clean no-match (False),
     not a false success that only bumps the version (TOCTOU guard)."""
     book_id = await _seed(
@@ -160,7 +160,7 @@ async def test_missing_chapter_no_match_does_not_bump_version(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_missing_subchapter_no_match(motor_reinit_db):
+async def test_missing_subchapter_no_match(reinit_db):
     book_id = await _seed(
         toc={
             "version": 1,
@@ -175,7 +175,7 @@ async def test_missing_subchapter_no_match(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_stale_last_modified_is_a_no_match(motor_reinit_db):
+async def test_stale_last_modified_is_a_no_match(reinit_db):
     """#759: a writer that commits between the caller's read and its write
     turns the caller's write into a no-match, at the database, not in Python."""
     book_id = await _seed(
@@ -198,7 +198,7 @@ async def test_stale_last_modified_is_a_no_match(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_none_last_modified_matches_a_never_saved_chapter(motor_reinit_db):
+async def test_none_last_modified_matches_a_never_saved_chapter(reinit_db):
     book_id = await _seed(
         toc={"version": 1, "chapters": [{"id": "p", "subchapters": [{"id": "s"}]}]}
     )
@@ -213,7 +213,7 @@ async def test_none_last_modified_matches_a_never_saved_chapter(motor_reinit_db)
 
 
 @pytest.mark.asyncio
-async def test_wrong_owner_not_matched(motor_reinit_db):
+async def test_wrong_owner_not_matched(reinit_db):
     book_id = await _seed(
         toc={"version": 1, "chapters": [{"id": "a", "content": "x"}]}
     )
@@ -228,7 +228,7 @@ async def test_wrong_owner_not_matched(motor_reinit_db):
 # update_book_summary_atomic
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_summary_archives_current_revision(motor_reinit_db):
+async def test_summary_archives_current_revision(reinit_db):
     book_id = await _seed(summary="A", summary_history=[])
 
     updated = await bookdao.update_book_summary_atomic(book_id, "B", OWNER)
@@ -238,7 +238,7 @@ async def test_summary_archives_current_revision(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_summary_no_history_when_unchanged_or_empty(motor_reinit_db):
+async def test_summary_no_history_when_unchanged_or_empty(reinit_db):
     book_id = await _seed(summary="", summary_history=[])
     # First save: current summary is empty -> nothing archived.
     updated = await bookdao.update_book_summary_atomic(book_id, "A", OWNER)
@@ -251,7 +251,7 @@ async def test_summary_no_history_when_unchanged_or_empty(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_interleaved_summary_writers_keep_both_revisions(motor_reinit_db):
+async def test_interleaved_summary_writers_keep_both_revisions(reinit_db):
     """Concurrent edits (A->B, A->C) must not lose an archived revision.
 
     The pipeline archives the document's *current* summary at write time, so the
@@ -276,7 +276,7 @@ async def test_interleaved_summary_writers_keep_both_revisions(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_summary_with_leading_dollar_is_literal(motor_reinit_db):
+async def test_summary_with_leading_dollar_is_literal(reinit_db):
     """A summary starting with '$' must be stored verbatim, not interpreted as a
     MongoDB field path inside the aggregation-pipeline update."""
     book_id = await _seed(summary="A", summary_history=[])
@@ -293,7 +293,7 @@ async def test_summary_with_leading_dollar_is_literal(motor_reinit_db):
 
 @pytest.mark.asyncio
 async def test_summary_atomic_returns_none_for_missing_or_unowned_book(
-    motor_reinit_db,
+    reinit_db,
 ):
     # Nonexistent book -> None (the endpoint turns this into a 404).
     assert (
@@ -310,7 +310,7 @@ async def test_summary_atomic_returns_none_for_missing_or_unowned_book(
 
 
 @pytest.mark.asyncio
-async def test_summary_history_capped_at_20(motor_reinit_db):
+async def test_summary_history_capped_at_20(reinit_db):
     book_id = await _seed(
         summary="s20",
         summary_history=[{"summary": f"h{i}"} for i in range(20)],

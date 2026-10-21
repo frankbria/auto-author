@@ -9,7 +9,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
-async def test_create_and_get_book(motor_reinit_db):
+async def test_create_and_get_book(reinit_db):
     """Test creating and retrieving a book"""
     from app.db.book import create_book, get_book_by_id
 
@@ -39,7 +39,7 @@ async def test_create_and_get_book(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_get_books_by_user(motor_reinit_db):
+async def test_get_books_by_user(reinit_db):
     """Test retrieving all books for a user"""
     from app.db.book import create_book, get_books_by_user
 
@@ -68,7 +68,7 @@ async def test_get_books_by_user(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_update_book(motor_reinit_db):
+async def test_update_book(reinit_db):
     """Test updating a book"""
     from app.db.book import create_book, update_book
 
@@ -105,7 +105,7 @@ async def test_update_book(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_book(motor_reinit_db):
+async def test_delete_book(reinit_db):
     """Test deleting a book"""
     from app.db.book import create_book, delete_book, get_book_by_id
     from bson import ObjectId

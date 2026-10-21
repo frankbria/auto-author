@@ -37,7 +37,7 @@ async def _seed_toc(book_id: str, toc: dict) -> None:
     """Write a table_of_contents directly to the DB in production shape.
 
     Chapter content lives inline at table_of_contents.chapters[].content (the
-    same shape the content endpoint persists). Seeding via Motor avoids the
+    same shape the content endpoint persists). Seeding via the driver avoids the
     lossy book-PATCH/TOC HTTP path, which validates chapters through a model
     that drops the `content` field.
     """

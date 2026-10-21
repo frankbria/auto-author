@@ -67,12 +67,12 @@ AI_PATCH_TARGET = (
 
 
 @pytest.fixture(autouse=True)
-def _rebind_toc_transactions(motor_reinit_db):
+def _rebind_toc_transactions(reinit_db):
     """Rebind the globals captured by app.db.toc_transactions at import time.
 
     The PUT /toc handler delegates to update_toc_with_transaction, which uses the
     module-level `_client` / `books_collection` it imported from app.db.base. The
-    conftest `motor_reinit_db` fixture creates a fresh Motor client per test and
+    conftest `reinit_db` fixture creates a fresh client per test and
     rebinds `base.*` plus the DAO modules, but NOT toc_transactions — leaving it
     pointed at a client whose event loop has been closed. Rebind it here so the
     transaction layer uses the same live, per-test client as everything else.

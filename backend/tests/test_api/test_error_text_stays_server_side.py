@@ -12,7 +12,6 @@ A response now carries a fixed message and an id to quote; the text is logged.
 
 import json
 import logging
-from unittest.mock import AsyncMock
 
 import httpx
 import openai
@@ -26,7 +25,7 @@ from app.utils.error_handlers import (
     handle_rating_save_error,
     handle_response_save_error,
 )
-from tests.test_services.openai_autospec import autospec_openai_client
+from tests.test_services.openai_autospec import asyncio_without_retry_waits, autospec_openai_client
 
 pytestmark = pytest.mark.asyncio
 
@@ -67,7 +66,7 @@ def provider_fails(monkeypatch):
         client = autospec_openai_client()
         client.chat.completions.create.side_effect = error
         monkeypatch.setattr(ai_service, "client", client)
-        monkeypatch.setattr("app.services.ai_service.asyncio.sleep", AsyncMock())
+        monkeypatch.setattr("app.services.ai_service.asyncio", asyncio_without_retry_waits())
         return client.chat.completions.create
 
     return install

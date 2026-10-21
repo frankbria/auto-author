@@ -31,7 +31,7 @@ async def _account(email: str) -> dict:
     return seeded
 
 
-async def test_a_deletion_that_died_after_the_tombstone_is_finished_by_the_sweep(motor_reinit_db, monkeypatch):
+async def test_a_deletion_that_died_after_the_tombstone_is_finished_by_the_sweep(reinit_db, monkeypatch):
     victim = await _account("stranded@example.com")
     bystander = await _account("stays@example.com")
 
@@ -50,7 +50,7 @@ async def test_a_deletion_that_died_after_the_tombstone_is_finished_by_the_sweep
     assert await _better_auth_docs(bystander["oid"]) == ALL_THERE
 
 
-async def test_the_sweep_is_idempotent(motor_reinit_db, monkeypatch):
+async def test_the_sweep_is_idempotent(reinit_db, monkeypatch):
     victim = await _account("twice@example.com")
 
     async def dies(auth_id):
@@ -66,7 +66,7 @@ async def test_the_sweep_is_idempotent(motor_reinit_db, monkeypatch):
     assert await _better_auth_docs(victim["oid"]) == NONE_LEFT
 
 
-async def test_a_password_left_without_its_user_is_found_too(motor_reinit_db):
+async def test_a_password_left_without_its_user_is_found_too(reinit_db):
     """The erasure deletes the better-auth user last; a strand may still hold
     only the account (the password hash) if that order ever changes."""
     from app.db.base import get_collection

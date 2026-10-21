@@ -12,14 +12,14 @@ from tests.yield_dependencies import completes
 # --- DAO: atomic counter -------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_increment_usage_counts_up(motor_reinit_db):
+async def test_increment_usage_counts_up(reinit_db):
     """Repeated increments on the same key return a monotonically rising count."""
     counts = [await increment_usage("user-a", "day:2026-07-03", 3600) for _ in range(3)]
     assert counts == [1, 2, 3]
 
 
 @pytest.mark.asyncio
-async def test_increment_usage_keys_are_independent(motor_reinit_db):
+async def test_increment_usage_keys_are_independent(reinit_db):
     """Different users / windows never share a counter."""
     assert await increment_usage("user-a", "day:2026-07-03", 3600) == 1
     assert await increment_usage("user-b", "day:2026-07-03", 3600) == 1  # other user
@@ -28,7 +28,7 @@ async def test_increment_usage_keys_are_independent(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_increment_usage_sets_ttl(motor_reinit_db):
+async def test_increment_usage_sets_ttl(reinit_db):
     """The doc carries an expires_at so the TTL index can reap stale buckets."""
     from app.db.base import get_collection
 
@@ -41,7 +41,7 @@ async def test_increment_usage_sets_ttl(motor_reinit_db):
 # --- Dependency: 429 at the cap (the AC) ---------------------------------
 
 @pytest.mark.asyncio
-async def test_quota_rejects_n_plus_one_in_window(motor_reinit_db, real_ai_quota):
+async def test_quota_rejects_n_plus_one_in_window(reinit_db, real_ai_quota):
     """The (cap+1)th call in a window is rejected with 429; earlier calls pass.
 
     Daily cap = 2 → calls 1,2 allowed, call 3 → 429. Monthly disabled (<=0)."""
@@ -64,7 +64,7 @@ async def test_quota_rejects_n_plus_one_in_window(motor_reinit_db, real_ai_quota
 
 
 @pytest.mark.asyncio
-async def test_quota_logs_warning_before_429(motor_reinit_db, real_ai_quota, caplog):
+async def test_quota_logs_warning_before_429(reinit_db, real_ai_quota, caplog):
     """A quota 429 emits a warning naming subject/path/period/limit (#334)."""
     import logging
     from unittest.mock import Mock
@@ -94,7 +94,7 @@ async def test_quota_logs_warning_before_429(motor_reinit_db, real_ai_quota, cap
 
 @pytest.mark.asyncio
 async def test_quota_dep_registers_and_injects_request_via_http(
-    motor_reinit_db, real_ai_quota
+    reinit_db, real_ai_quota
 ):
     """Mounting the REAL quota dep on a route must register cleanly and inject
     the request (the 429 path reads request.url.path). Regression pin: a
@@ -127,7 +127,7 @@ async def test_quota_dep_registers_and_injects_request_via_http(
 
 
 @pytest.mark.asyncio
-async def test_quota_isolated_per_user(motor_reinit_db, real_ai_quota):
+async def test_quota_isolated_per_user(reinit_db, real_ai_quota):
     """One user hitting the cap doesn't block a different user."""
     with patch.object(deps.settings, "BYPASS_AUTH", False), \
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
@@ -142,7 +142,7 @@ async def test_quota_isolated_per_user(motor_reinit_db, real_ai_quota):
 
 
 @pytest.mark.asyncio
-async def test_quota_bypassed_when_disabled(motor_reinit_db, real_ai_quota):
+async def test_quota_bypassed_when_disabled(reinit_db, real_ai_quota):
     """Disabling the quota (or BYPASS_AUTH) short-circuits without counting."""
     with patch.object(deps.settings, "AI_QUOTA_ENABLED", False), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1):
@@ -152,7 +152,7 @@ async def test_quota_bypassed_when_disabled(motor_reinit_db, real_ai_quota):
 
 
 @pytest.mark.asyncio
-async def test_quota_monthly_window_enforced(motor_reinit_db, real_ai_quota):
+async def test_quota_monthly_window_enforced(reinit_db, real_ai_quota):
     """The monthly window rejects independently of the (higher) daily window."""
     with patch.object(deps.settings, "BYPASS_AUTH", False), \
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
@@ -180,7 +180,7 @@ def test_quota_settings_defaults():
 
 @pytest.mark.asyncio
 async def test_free_user_429s_at_free_cap_while_pro_passes_at_same_count(
-    motor_reinit_db, real_ai_quota
+    reinit_db, real_ai_quota
 ):
     """Same usage count, different plan: free is rejected at its cap, pro is not."""
     with patch.object(deps.settings, "BYPASS_AUTH", False), \
@@ -207,7 +207,7 @@ async def test_free_user_429s_at_free_cap_while_pro_passes_at_same_count(
 
 @pytest.mark.asyncio
 async def test_pro_at_cap_is_shown_the_cap_not_told_to_contact_support(
-    motor_reinit_db, real_ai_quota
+    reinit_db, real_ai_quota
 ):
     with patch.object(deps.settings, "BYPASS_AUTH", False), \
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
@@ -231,7 +231,7 @@ async def test_pro_at_cap_is_shown_the_cap_not_told_to_contact_support(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("plan", ["restricted", "enterprise-typo"])
-async def test_restricted_and_unknown_plans_get_zero(motor_reinit_db, real_ai_quota, plan):
+async def test_restricted_and_unknown_plans_get_zero(reinit_db, real_ai_quota, plan):
     with patch.object(deps.settings, "BYPASS_AUTH", False), \
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True):
         checker = completes(real_ai_quota())
@@ -242,7 +242,7 @@ async def test_restricted_and_unknown_plans_get_zero(motor_reinit_db, real_ai_qu
 
 
 @pytest.mark.asyncio
-async def test_missing_plan_is_metered_as_free(motor_reinit_db, real_ai_quota):
+async def test_missing_plan_is_metered_as_free(reinit_db, real_ai_quota):
     with patch.object(deps.settings, "BYPASS_AUTH", False), \
          patch.object(deps.settings, "AI_QUOTA_ENABLED", True), \
          patch.object(deps.settings, "AI_QUOTA_FREE_DAILY", 1), \
@@ -256,7 +256,7 @@ async def test_missing_plan_is_metered_as_free(motor_reinit_db, real_ai_quota):
 
 @pytest.mark.asyncio
 async def test_restricted_is_metered_like_free_when_plan_enforcement_is_off(
-    motor_reinit_db, real_ai_quota
+    reinit_db, real_ai_quota
 ):
     """PLAN_ENFORCEMENT_ENABLED=false is the documented kill switch for plan gating."""
     with patch.object(deps.settings, "BYPASS_AUTH", False), \

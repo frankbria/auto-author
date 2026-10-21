@@ -5,14 +5,14 @@ from app.db.base import get_collection
 
 
 @pytest.mark.asyncio
-async def test_ensure_question_indexes(motor_reinit_db):
+async def test_ensure_question_indexes(reinit_db):
     """Test that indexes are created successfully."""
     # Create indexes
     await ensure_question_indexes()
 
     # Verify indexes on questions collection
     questions_collection = await get_collection("questions")
-    indexes = await questions_collection.list_indexes().to_list(length=None)
+    indexes = await (await questions_collection.list_indexes()).to_list(length=None)
     index_names = [idx['name'] for idx in indexes]
 
     assert 'book_chapter_user_idx' in index_names, "Missing book_chapter_user_idx"
@@ -21,7 +21,7 @@ async def test_ensure_question_indexes(motor_reinit_db):
 
     # Verify indexes on question_responses collection
     responses_collection = await get_collection("question_responses")
-    indexes = await responses_collection.list_indexes().to_list(length=None)
+    indexes = await (await responses_collection.list_indexes()).to_list(length=None)
     index_names = [idx['name'] for idx in indexes]
 
     assert 'question_user_idx' in index_names, "Missing question_user_idx on responses"
@@ -29,14 +29,14 @@ async def test_ensure_question_indexes(motor_reinit_db):
 
     # Verify indexes on question_ratings collection
     ratings_collection = await get_collection("question_ratings")
-    indexes = await ratings_collection.list_indexes().to_list(length=None)
+    indexes = await (await ratings_collection.list_indexes()).to_list(length=None)
     index_names = [idx['name'] for idx in indexes]
 
     assert 'question_user_idx' in index_names, "Missing question_user_idx on ratings"
 
 
 @pytest.mark.asyncio
-async def test_indexes_are_idempotent(motor_reinit_db):
+async def test_indexes_are_idempotent(reinit_db):
     """Test that running ensure_question_indexes multiple times is safe."""
     # Run twice - should not raise any errors
     await ensure_question_indexes()
@@ -44,7 +44,7 @@ async def test_indexes_are_idempotent(motor_reinit_db):
 
     # Verify indexes still exist
     questions_collection = await get_collection("questions")
-    indexes = await questions_collection.list_indexes().to_list(length=None)
+    indexes = await (await questions_collection.list_indexes()).to_list(length=None)
     index_names = [idx['name'] for idx in indexes]
 
     # Should still have all expected indexes
@@ -54,7 +54,7 @@ async def test_indexes_are_idempotent(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_failing_index_does_not_skip_later_indexes(motor_reinit_db):
+async def test_failing_index_does_not_skip_later_indexes(reinit_db):
     """A mid-list index build failure must not skip the remaining indexes (#338).
 
     Pre-existing duplicate responses make the unique question_user_idx build
@@ -79,7 +79,7 @@ async def test_failing_index_does_not_skip_later_indexes(motor_reinit_db):
 
     response_indexes = [
         idx['name']
-        for idx in await responses_collection.list_indexes().to_list(length=None)
+        for idx in await (await responses_collection.list_indexes()).to_list(length=None)
     ]
     assert 'question_user_idx' not in response_indexes, (
         "unique index should have failed to build over duplicate docs"
@@ -91,7 +91,7 @@ async def test_failing_index_does_not_skip_later_indexes(motor_reinit_db):
     ratings_collection = await get_collection("question_ratings")
     rating_indexes = [
         idx['name']
-        for idx in await ratings_collection.list_indexes().to_list(length=None)
+        for idx in await (await ratings_collection.list_indexes()).to_list(length=None)
     ]
     assert 'question_user_idx' in rating_indexes, (
         "later collection's index was skipped"
@@ -99,7 +99,7 @@ async def test_failing_index_does_not_skip_later_indexes(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_question_query_uses_index(motor_reinit_db):
+async def test_question_query_uses_index(reinit_db):
     """Test that question queries can use the compound index."""
     questions_collection = await get_collection("questions")
 

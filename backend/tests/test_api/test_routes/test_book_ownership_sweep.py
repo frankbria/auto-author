@@ -204,7 +204,7 @@ def the_model(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("method,path", sorted(REQUESTS), ids=lambda part: part or "/")
-async def test_someone_who_does_not_own_the_book_is_refused(motor_reinit_db, the_model, method, path):
+async def test_someone_who_does_not_own_the_book_is_refused(reinit_db, the_model, method, path):
     assert get_current_user_from_session not in app.dependency_overrides
     ada = await _signed_in("ada@example.com")
     grace = await _signed_in("grace@example.com")
@@ -224,7 +224,7 @@ async def test_someone_who_does_not_own_the_book_is_refused(motor_reinit_db, the
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("method,path", sorted(REQUESTS), ids=lambda part: part or "/")
-async def test_the_owner_is_not_refused_the_same_request(motor_reinit_db, the_model, method, path):
+async def test_the_owner_is_not_refused_the_same_request(reinit_db, the_model, method, path):
     """The other half. A request that the owner is refused too proves nothing about the stranger:
     she may have been turned away for a missing chapter or an empty answer, by a route that never
     looked at whose book it was."""

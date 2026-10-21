@@ -6,9 +6,11 @@ Tests the AI service with comprehensive error handling.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 import openai
 import httpx
+
+from tests.test_services.openai_autospec import asyncio_without_retry_waits
 from app.services.ai_service import AIService
 from app.services.ai_errors import (
     AIServiceError,
@@ -247,7 +249,7 @@ class TestSingleRetryLayer:
         create_mock = MagicMock(side_effect=self._rate_limit_error())
         with patch.object(
             ai_service.client.chat.completions, 'create', create_mock
-        ), patch('app.services.ai_service.asyncio.sleep', new=AsyncMock()):
+        ), patch('app.services.ai_service.asyncio', new=asyncio_without_retry_waits()):
             with pytest.raises(AIRateLimitError):
                 await ai_service.generate_clarifying_questions(
                     summary="Test summary", num_questions=3
@@ -263,7 +265,7 @@ class TestSingleRetryLayer:
         create_mock = MagicMock(side_effect=self._rate_limit_error())
         with patch.object(
             ai_service.client.chat.completions, 'create', create_mock
-        ), patch('app.services.ai_service.asyncio.sleep', new=AsyncMock()):
+        ), patch('app.services.ai_service.asyncio', new=asyncio_without_retry_waits()):
             with pytest.raises(AIRateLimitError):
                 await ai_service.generate_toc_from_summary_and_responses(
                     summary="Test summary",
@@ -282,7 +284,7 @@ class TestSingleRetryLayer:
         with caplog.at_level(_logging.INFO, logger="app.services.ai_service"):
             with patch.object(
                 ai_service.client.chat.completions, 'create', create_mock
-            ), patch('app.services.ai_service.asyncio.sleep', new=AsyncMock()):
+            ), patch('app.services.ai_service.asyncio', new=asyncio_without_retry_waits()):
                 with pytest.raises(AIRateLimitError):
                     await ai_service.generate_clarifying_questions(
                         summary="Test summary", num_questions=3
@@ -302,7 +304,7 @@ class TestSingleRetryLayer:
         with caplog.at_level(_logging.INFO, logger="app.services.ai_service"):
             with patch.object(
                 ai_service.client.chat.completions, 'create', create_mock
-            ), patch('app.services.ai_service.asyncio.sleep', new=AsyncMock()):
+            ), patch('app.services.ai_service.asyncio', new=asyncio_without_retry_waits()):
                 with pytest.raises(AIRateLimitError):
                     await ai_service.generate_clarifying_questions(
                         summary="Test summary", num_questions=3

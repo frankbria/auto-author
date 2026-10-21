@@ -15,7 +15,7 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import patch
 from bson import ObjectId
-import motor.motor_asyncio
+from pymongo.asynchronous.collection import AsyncCollection
 
 from app.db.base import get_collection
 from app.db.questions import (
@@ -76,7 +76,7 @@ async def _seed_rating(question_id: str, rating: int) -> None:
 
 # --- N+1: correctness of the batched join ---------------------------------
 
-async def test_get_questions_attaches_correct_response_status(motor_reinit_db):
+async def test_get_questions_attaches_correct_response_status(reinit_db):
     q1 = await _seed_question(1)
     q2 = await _seed_question(2)
     await _seed_question(3)  # unanswered
@@ -92,7 +92,7 @@ async def test_get_questions_attaches_correct_response_status(motor_reinit_db):
     assert len(unanswered) == 1 and unanswered[0].response_status == "not_answered"
 
 
-async def test_get_ratings_for_chapter_batched_join(motor_reinit_db):
+async def test_get_ratings_for_chapter_batched_join(reinit_db):
     q1 = await _seed_question(1)
     q2 = await _seed_question(2)
     await _seed_question(3)  # no rating
@@ -109,7 +109,7 @@ async def test_get_ratings_for_chapter_batched_join(motor_reinit_db):
     assert by_text[q2_text]["rating"] == 2
 
 
-async def test_get_chapter_question_progress_counts(motor_reinit_db):
+async def test_get_chapter_question_progress_counts(reinit_db):
     q1 = await _seed_question(1)
     q2 = await _seed_question(2)
     await _seed_question(3)  # not started
@@ -126,7 +126,7 @@ async def test_get_chapter_question_progress_counts(motor_reinit_db):
 
 # --- N+1: the batching itself (find_one must not be called per-question) ---
 
-async def test_progress_does_not_issue_per_question_find_one(motor_reinit_db):
+async def test_progress_does_not_issue_per_question_find_one(reinit_db):
     """The old loop called find_one once per question; the batched version calls
     only find(). Raising on any find_one turns a reverted N+1 loop RED."""
     for i in range(1, 4):
@@ -134,7 +134,7 @@ async def test_progress_does_not_issue_per_question_find_one(motor_reinit_db):
         await _seed_response(qid, status="completed")
 
     with patch.object(
-        motor.motor_asyncio.AsyncIOMotorCollection,
+        AsyncCollection,
         "find_one",
         side_effect=AssertionError("N+1 regression: find_one called per question"),
     ):
@@ -145,7 +145,7 @@ async def test_progress_does_not_issue_per_question_find_one(motor_reinit_db):
 
 # --- projection: heavy chapter content excluded from the list --------------
 
-async def test_get_books_by_user_projects_out_chapter_content(motor_reinit_db):
+async def test_get_books_by_user_projects_out_chapter_content(reinit_db):
     books = await get_collection("books")
     await books.insert_one({
         "owner_id": USER,
@@ -219,7 +219,7 @@ async def _seed_book_with_heavy_chapters() -> ObjectId:
     return book_id
 
 
-async def test_get_book_owner_id_returns_only_the_owner(motor_reinit_db):
+async def test_get_book_owner_id_returns_only_the_owner(reinit_db):
     book_id = await _seed_book_with_heavy_chapters()
 
     owner = await get_book_owner_id(str(book_id))
@@ -227,7 +227,7 @@ async def test_get_book_owner_id_returns_only_the_owner(motor_reinit_db):
     assert owner == USER
 
 
-async def test_get_book_owner_id_fetches_nothing_but_the_owner(motor_reinit_db):
+async def test_get_book_owner_id_fetches_nothing_but_the_owner(reinit_db):
     """Pins the projection itself: dropping it makes this fail.
 
     Asserting on the return value alone would still pass if the projection were
@@ -237,14 +237,14 @@ async def test_get_book_owner_id_fetches_nothing_but_the_owner(motor_reinit_db):
     book_id = await _seed_book_with_heavy_chapters()
 
     captured = {}
-    real_find_one = motor.motor_asyncio.AsyncIOMotorCollection.find_one
+    real_find_one = AsyncCollection.find_one
 
     async def spy(self, filter=None, *args, **kwargs):
         doc = await real_find_one(self, filter, *args, **kwargs)
         captured["doc"] = doc
         return doc
 
-    with patch.object(motor.motor_asyncio.AsyncIOMotorCollection, "find_one", spy):
+    with patch.object(AsyncCollection, "find_one", spy):
         await get_book_owner_id(str(book_id))
 
     doc = captured["doc"]
@@ -254,13 +254,13 @@ async def test_get_book_owner_id_fetches_nothing_but_the_owner(motor_reinit_db):
     assert "title" not in doc
 
 
-async def test_get_book_owner_id_returns_none_for_missing_and_malformed_ids(motor_reinit_db):
+async def test_get_book_owner_id_returns_none_for_missing_and_malformed_ids(reinit_db):
     assert await get_book_owner_id(str(ObjectId())) is None
     # A non-ObjectId string must not raise — callers turn None into a 404.
     assert await get_book_owner_id("not-an-object-id") is None
 
 
-async def test_get_book_metadata_by_id_excludes_chapter_html(motor_reinit_db):
+async def test_get_book_metadata_by_id_excludes_chapter_html(reinit_db):
     book_id = await _seed_book_with_heavy_chapters()
 
     book = await get_book_metadata_by_id(str(book_id))
@@ -284,12 +284,12 @@ async def test_get_book_metadata_by_id_excludes_chapter_html(motor_reinit_db):
     assert book["target_audience"] == "engineers"
 
 
-async def test_get_book_metadata_by_id_returns_none_for_missing_and_malformed_ids(motor_reinit_db):
+async def test_get_book_metadata_by_id_returns_none_for_missing_and_malformed_ids(reinit_db):
     assert await get_book_metadata_by_id(str(ObjectId())) is None
     assert await get_book_metadata_by_id("not-an-object-id") is None
 
 
-async def test_get_books_by_user_returns_newest_first(motor_reinit_db):
+async def test_get_books_by_user_returns_newest_first(reinit_db):
     """The dashboard must show a user's most recent books, not their oldest.
 
     `get_books_by_user` applies .skip()/.limit() with no .sort(), so Mongo returns
@@ -318,7 +318,7 @@ async def test_get_books_by_user_returns_newest_first(motor_reinit_db):
     assert [b["title"] for b in result] == ["Book 4", "Book 3", "Book 2"]
 
 
-async def test_get_books_by_user_pagination_is_stable_across_pages(motor_reinit_db):
+async def test_get_books_by_user_pagination_is_stable_across_pages(reinit_db):
     """Consecutive pages must not repeat or drop rows.
 
     Without an explicit sort the order is not guaranteed stable between queries,

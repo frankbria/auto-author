@@ -98,7 +98,7 @@ def _jpeg() -> BytesIO:
 # --- book deletion -----------------------------------------------------------
 
 
-async def test_delete_book_removes_cover_and_thumbnail(motor_reinit_db, uploads):
+async def test_delete_book_removes_cover_and_thumbnail(reinit_db, uploads):
     book_id = await _book_with_cover(uploads, "owner-1")
 
     assert await delete_book(book_id, "owner-1") is True
@@ -110,7 +110,7 @@ async def test_delete_book_removes_cover_and_thumbnail(motor_reinit_db, uploads)
     "delete", [delete_book, lambda _book_id, owner: delete_all_user_books(owner)]
 )
 async def test_failed_cascade_keeps_the_cover_files(
-    motor_reinit_db, uploads, monkeypatch, delete
+    reinit_db, uploads, monkeypatch, delete
 ):
     """The book survives a failed cascade, so its cover has to survive too."""
     book_id = await _book_with_cover(uploads, "owner-2")
@@ -126,7 +126,7 @@ async def test_failed_cascade_keeps_the_cover_files(
     assert _names(uploads.covers) == _cover_files(book_id)
 
 
-async def test_non_owner_delete_keeps_the_cover_files(motor_reinit_db, uploads):
+async def test_non_owner_delete_keeps_the_cover_files(reinit_db, uploads):
     book_id = await _book_with_cover(uploads, "owner-3")
 
     assert await delete_book(book_id, "someone-else") is False
@@ -135,7 +135,7 @@ async def test_non_owner_delete_keeps_the_cover_files(motor_reinit_db, uploads):
 
 
 async def test_storage_failure_is_logged_and_the_book_is_still_deleted(
-    motor_reinit_db, uploads, monkeypatch, caplog
+    reinit_db, uploads, monkeypatch, caplog
 ):
     book_id = await _book_with_cover(uploads, "owner-4")
     _block_storage(uploads, monkeypatch, "COVER_IMAGES_DIR")
@@ -149,7 +149,7 @@ async def test_storage_failure_is_logged_and_the_book_is_still_deleted(
 
 
 async def test_delete_all_user_books_removes_every_cover_of_that_owner(
-    motor_reinit_db, uploads
+    reinit_db, uploads
 ):
     await _book_with_cover(uploads, "victim")
     await _book_with_cover(uploads, "victim")
@@ -163,7 +163,7 @@ async def test_delete_all_user_books_removes_every_cover_of_that_owner(
 # --- account deletion --------------------------------------------------------
 
 
-async def test_delete_user_removes_the_avatar(motor_reinit_db, uploads):
+async def test_delete_user_removes_the_avatar(reinit_db, uploads):
     await _user_with_avatar(uploads, "gone")
     await _user_with_avatar(uploads, "bystander")
 
@@ -173,7 +173,7 @@ async def test_delete_user_removes_the_avatar(motor_reinit_db, uploads):
 
 
 async def test_avatar_storage_failure_is_logged_and_the_user_is_still_erased(
-    motor_reinit_db, uploads, monkeypatch, caplog
+    reinit_db, uploads, monkeypatch, caplog
 ):
     await _user_with_avatar(uploads, "gone-2")
     _block_storage(uploads, monkeypatch, "PROFILE_PICTURES_DIR")
@@ -227,7 +227,7 @@ async def _cloud_book(owner_id: str, cover: str, thumbnail: str) -> str:
     return str(result.inserted_id)
 
 
-async def test_cloud_book_delete_removes_cover_and_thumbnail(motor_reinit_db, cloud):
+async def test_cloud_book_delete_removes_cover_and_thumbnail(reinit_db, cloud):
     book_id = await _cloud_book("owner-5", "c.jpg", "c_thumb.jpg")
 
     assert await delete_book(book_id, "owner-5") is True
@@ -240,7 +240,7 @@ async def test_cloud_book_delete_removes_cover_and_thumbnail(motor_reinit_db, cl
 
 
 async def test_cloud_thumbnail_is_deleted_even_when_the_cover_delete_raises(
-    motor_reinit_db, cloud, caplog
+    reinit_db, cloud, caplog
 ):
     book_id = await _cloud_book("owner-6", "unreachable.jpg", "t_thumb.jpg")
 
@@ -251,7 +251,7 @@ async def test_cloud_thumbnail_is_deleted_even_when_the_cover_delete_raises(
     assert any("unreachable" in record.getMessage() for record in caplog.records)
 
 
-async def test_cloud_refusing_a_cover_is_logged(motor_reinit_db, cloud, caplog):
+async def test_cloud_refusing_a_cover_is_logged(reinit_db, cloud, caplog):
     """A False from the provider is a file left behind; it must not be silent."""
     book_id = await _cloud_book("owner-7", "foreign.jpg", "foreign_thumb.jpg")
 
@@ -263,7 +263,7 @@ async def test_cloud_refusing_a_cover_is_logged(motor_reinit_db, cloud, caplog):
     assert any("foreign_thumb.jpg" in m for m in messages)
 
 
-async def test_cloud_refusing_an_avatar_is_logged(motor_reinit_db, cloud, caplog):
+async def test_cloud_refusing_an_avatar_is_logged(reinit_db, cloud, caplog):
     users = await get_collection("users")
     await users.insert_one(
         {"auth_id": "gone-3", "avatar_url": "https://cdn.example.com/foreign-a.jpg"}

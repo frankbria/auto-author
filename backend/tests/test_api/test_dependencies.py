@@ -106,7 +106,7 @@ class TestRateLimiting:
     """Rate limiter: per-authenticated-user buckets in a shared Mongo store (#180).
 
     Uses the real limiter (`real_rate_limiter` fixture) and real Mongo
-    (`motor_reinit_db`), since the whole point is the shared persistent store.
+    (`reinit_db`), since the whole point is the shared persistent store.
     """
 
     @pytest.fixture(autouse=True)
@@ -141,7 +141,7 @@ class TestRateLimiting:
             yield
 
     async def test_two_users_do_not_share_a_bucket(
-        self, motor_reinit_db, real_rate_limiter
+        self, reinit_db, real_rate_limiter
     ):
         """AC: user A exhausting the limit must not 429 user B on the same endpoint."""
         limiter = real_rate_limiter(limit=2, window=60)
@@ -159,7 +159,7 @@ class TestRateLimiting:
         assert result["remaining"] == 1
 
     async def test_bucket_shared_across_limiter_instances(
-        self, motor_reinit_db, real_rate_limiter
+        self, reinit_db, real_rate_limiter
     ):
         """Two limiter closures (like two uvicorn workers) count against one bucket."""
         worker1 = real_rate_limiter(limit=3, window=60)
@@ -177,7 +177,7 @@ class TestRateLimiting:
         assert exc_info.value.status_code == 429
 
     async def test_blocks_over_limit_with_headers(
-        self, motor_reinit_db, real_rate_limiter
+        self, reinit_db, real_rate_limiter
     ):
         """Over the limit -> 429 with the standard X-RateLimit-*/Retry-After headers."""
         limiter = real_rate_limiter(limit=3, window=60)
@@ -201,7 +201,7 @@ class TestRateLimiting:
         assert 0 < int(headers["Retry-After"]) <= 60
 
     async def test_logs_warning_before_429(
-        self, motor_reinit_db, real_rate_limiter, caplog
+        self, reinit_db, real_rate_limiter, caplog
     ):
         """A rate-limit 429 emits a warning naming subject/path/limit (#334) —
         an abuse storm must not die silently in PM2 stdout."""
@@ -233,7 +233,7 @@ class TestRateLimiting:
                 assert result["remaining"] == 2
 
     async def test_rate_limiter_per_endpoint(
-        self, motor_reinit_db, real_rate_limiter
+        self, reinit_db, real_rate_limiter
     ):
         """The same user gets independent buckets per endpoint."""
         limiter = real_rate_limiter(limit=2, window=60)
@@ -247,7 +247,7 @@ class TestRateLimiting:
         assert result["remaining"] > 0
 
     async def test_rate_limiter_window_reset(
-        self, motor_reinit_db, real_rate_limiter
+        self, reinit_db, real_rate_limiter
     ):
         """A new window re-allows a user who exhausted the previous one.
 
@@ -282,7 +282,7 @@ class TestRateLimiting:
                 await limiter(request, current_user=USER_A)
 
     async def test_dependency_wiring_resolves_user_via_http(
-        self, motor_reinit_db, real_rate_limiter
+        self, reinit_db, real_rate_limiter
     ):
         """End-to-end DI check: mounted via Depends(), the limiter resolves the
         authenticated user itself and keys buckets per user (a regression that
@@ -317,7 +317,7 @@ class TestRateLimiting:
                 assert (await client.get("/limited")).status_code == 200
 
     async def test_missing_user_id_falls_back_to_client_ip(
-        self, motor_reinit_db, real_rate_limiter
+        self, reinit_db, real_rate_limiter
     ):
         """No resolvable user id -> per-IP buckets (defense in depth)."""
         limiter = real_rate_limiter(limit=1, window=60)

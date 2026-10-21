@@ -29,7 +29,7 @@ async def _make_question(user_id, book_id, chapter_id, order=0):
 
 
 @pytest.mark.asyncio
-async def test_batch_save_new_responses(motor_reinit_db):
+async def test_batch_save_new_responses(reinit_db):
     """Test batch saving new question responses."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -94,7 +94,7 @@ async def test_batch_save_new_responses(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_batch_save_update_existing_responses(motor_reinit_db):
+async def test_batch_save_update_existing_responses(reinit_db):
     """Test batch updating existing question responses."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -146,7 +146,7 @@ async def test_batch_save_update_existing_responses(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_batch_save_partial_failure(motor_reinit_db):
+async def test_batch_save_partial_failure(reinit_db):
     """Test batch save with some invalid responses."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -204,7 +204,7 @@ async def test_batch_save_partial_failure(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_batch_save_empty_list(motor_reinit_db):
+async def test_batch_save_empty_list(reinit_db):
     """Test batch save with empty response list."""
     user_id = "test_user_123"
     responses = []
@@ -221,7 +221,7 @@ async def test_batch_save_empty_list(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_batch_save_word_count_calculation(motor_reinit_db):
+async def test_batch_save_word_count_calculation(reinit_db):
     """Test that word counts are calculated correctly."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -267,7 +267,7 @@ async def test_batch_save_word_count_calculation(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_batch_save_edit_history_tracking(motor_reinit_db):
+async def test_batch_save_edit_history_tracking(reinit_db):
     """Test that edit history is tracked for updates."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -322,7 +322,7 @@ async def test_batch_save_edit_history_tracking(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_batch_save_mixed_new_and_updates(motor_reinit_db):
+async def test_batch_save_mixed_new_and_updates(reinit_db):
     """Test batch with mix of new responses and updates."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -388,7 +388,7 @@ async def test_batch_save_mixed_new_and_updates(motor_reinit_db):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_batch_rejects_question_from_another_chapter(motor_reinit_db):
+async def test_batch_rejects_question_from_another_chapter(reinit_db):
     """A question_id belonging to a different chapter is flagged, not saved."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -419,7 +419,7 @@ async def test_batch_rejects_question_from_another_chapter(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_batch_rejects_other_users_question(motor_reinit_db):
+async def test_batch_rejects_other_users_question(reinit_db):
     """A question owned by another user is flagged, not saved."""
     book_id = "book_123"
     chapter_id = "chapter_123"
@@ -440,7 +440,7 @@ async def test_batch_rejects_other_users_question(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_batch_rejects_nonexistent_and_malformed_ids(motor_reinit_db):
+async def test_batch_rejects_nonexistent_and_malformed_ids(reinit_db):
     """Nonexistent ObjectIds and unparseable ids are both flagged cleanly."""
     user_id = "test_user_123"
     responses = [
@@ -460,7 +460,7 @@ async def test_batch_rejects_nonexistent_and_malformed_ids(motor_reinit_db):
 # ---------------------------------------------------------------------------
 # Repeated question_id within one batch (#242)
 #
-# NB motor_reinit_db drops the DB and creates no indexes, so most of this file
+# NB reinit_db drops the DB and creates no indexes, so most of this file
 # exercises the collection WITHOUT the unique question_user_idx. Production
 # creates it at startup (main.py -> ensure_question_indexes), and the two index
 # states used to fail differently: without it the batch wrote two documents;
@@ -469,7 +469,7 @@ async def test_batch_rejects_nonexistent_and_malformed_ids(motor_reinit_db):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_duplicate_question_id_writes_single_document(motor_reinit_db):
+async def test_duplicate_question_id_writes_single_document(reinit_db):
     """The same question_id twice in one batch writes ONE document, last write wins."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -495,7 +495,7 @@ async def test_duplicate_question_id_writes_single_document(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_duplicate_question_id_last_write_wins_with_unique_index(motor_reinit_db):
+async def test_duplicate_question_id_last_write_wins_with_unique_index(reinit_db):
     """Production shape: with the unique index live, the newer answer must win cleanly.
 
     Before #242 this stored the FIRST answer, returned success=False, and leaked a raw
@@ -506,12 +506,12 @@ async def test_duplicate_question_id_last_write_wins_with_unique_index(motor_rei
     chapter_id = "chapter_123"
 
     # Warm the collection with a real op before creating indexes: the first
-    # createIndexes after motor_reinit_db's drop can otherwise be silently lost.
+    # createIndexes after reinit_db's drop can otherwise be silently lost.
     responses_collection = await get_collection("question_responses")
     await responses_collection.insert_one({"_id": ObjectId(), "warmup": True})
     await responses_collection.delete_many({"warmup": True})
     await ensure_question_indexes()
-    index_names = [i["name"] async for i in responses_collection.list_indexes()]
+    index_names = [i["name"] async for i in await responses_collection.list_indexes()]
     assert "question_user_idx" in index_names, "unique index missing; test would prove nothing"
 
     question = await _make_question(user_id, book_id, chapter_id)
@@ -533,7 +533,7 @@ async def test_duplicate_question_id_last_write_wins_with_unique_index(motor_rei
 
 
 @pytest.mark.asyncio
-async def test_duplicate_question_id_reports_both_items(motor_reinit_db):
+async def test_duplicate_question_id_reports_both_items(reinit_db):
     """Both collapsed items report the one write's outcome, against the same response_id."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -562,7 +562,7 @@ async def test_duplicate_question_id_reports_both_items(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_duplicate_question_id_over_existing_response_updates_once(motor_reinit_db):
+async def test_duplicate_question_id_over_existing_response_updates_once(reinit_db):
     """A repeated id on top of an already-saved response updates it once, last wins."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -592,7 +592,7 @@ async def test_duplicate_question_id_over_existing_response_updates_once(motor_r
 
 
 @pytest.mark.asyncio
-async def test_question_id_repeated_three_times_collapses_to_last_write(motor_reinit_db):
+async def test_question_id_repeated_three_times_collapses_to_last_write(reinit_db):
     """Three occurrences of one id still collapse to a single write of the last answer.
 
     Interleaves a second question so the results are also pinned to come back in
@@ -632,7 +632,7 @@ async def test_question_id_repeated_three_times_collapses_to_last_write(motor_re
 
 
 @pytest.mark.asyncio
-async def test_duplicate_question_id_empty_first_then_valid_saves_valid(motor_reinit_db):
+async def test_duplicate_question_id_empty_first_then_valid_saves_valid(reinit_db):
     """The reverse order of the case below: an invalid first item must not block the valid one."""
     user_id = "test_user_123"
     book_id = "book_123"
@@ -661,7 +661,7 @@ async def test_duplicate_question_id_empty_first_then_valid_saves_valid(motor_re
 
 
 @pytest.mark.asyncio
-async def test_duplicate_question_id_validates_each_item_independently(motor_reinit_db):
+async def test_duplicate_question_id_validates_each_item_independently(reinit_db):
     """Collapsing must not swallow (or misattribute) a per-item validation error.
 
     Mirrors two sequential saves: the valid text lands, the empty follow-up is rejected

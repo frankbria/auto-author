@@ -39,7 +39,7 @@ LOGGER = "app.api.endpoints.webhooks"
 
 
 @pytest_asyncio.fixture
-async def webhook(motor_reinit_db, monkeypatch):
+async def webhook(reinit_db, monkeypatch):
     """The webhook router alone, with Stripe test settings and a fresh database."""
     import app.db.stripe_events as stripe_events_dao
 

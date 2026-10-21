@@ -136,7 +136,7 @@ async def create_test_book_with_chapter(client: AsyncClient) -> tuple[str, str]:
 # ===========================
 
 @pytest.mark.asyncio
-async def test_complete_question_lifecycle(auth_client_factory, motor_reinit_db):
+async def test_complete_question_lifecycle(auth_client_factory, reinit_db):
     """
     Test the complete question lifecycle: Generate → Save Response → Retrieve → Update → Delete
 
@@ -235,7 +235,7 @@ async def test_complete_question_lifecycle(auth_client_factory, motor_reinit_db)
 
 
 @pytest.mark.asyncio
-async def test_generate_questions_for_multiple_chapters(auth_client_factory, motor_reinit_db):
+async def test_generate_questions_for_multiple_chapters(auth_client_factory, reinit_db):
     """
     Test generating questions for multiple chapters in the same book.
 
@@ -286,7 +286,7 @@ async def test_generate_questions_for_multiple_chapters(auth_client_factory, mot
 
 
 @pytest.mark.asyncio
-async def test_question_generation_with_custom_parameters(auth_client_factory, motor_reinit_db):
+async def test_question_generation_with_custom_parameters(auth_client_factory, reinit_db):
     """
     Test question generation with various custom parameters.
 
@@ -329,7 +329,7 @@ async def test_question_generation_with_custom_parameters(auth_client_factory, m
 
 
 @pytest.mark.asyncio
-async def test_question_retrieval_with_filters(auth_client_factory, motor_reinit_db):
+async def test_question_retrieval_with_filters(auth_client_factory, reinit_db):
     """
     Test retrieving questions with various filters.
 
@@ -414,7 +414,7 @@ async def test_question_retrieval_with_filters(auth_client_factory, motor_reinit
 # ===========================
 
 @pytest.mark.asyncio
-async def test_batch_save_multiple_responses_atomically(auth_client_factory, motor_reinit_db):
+async def test_batch_save_multiple_responses_atomically(auth_client_factory, reinit_db):
     """
     Test batch saving multiple question responses atomically.
 
@@ -464,7 +464,7 @@ async def test_batch_save_multiple_responses_atomically(auth_client_factory, mot
 
 
 @pytest.mark.asyncio
-async def test_batch_operations_with_large_datasets(auth_client_factory, motor_reinit_db):
+async def test_batch_operations_with_large_datasets(auth_client_factory, reinit_db):
     """
     Test batch operations with large datasets.
 
@@ -523,7 +523,7 @@ async def test_batch_operations_with_large_datasets(auth_client_factory, motor_r
 # ===========================
 
 @pytest.mark.asyncio
-async def test_invalid_data_handling(auth_client_factory, motor_reinit_db):
+async def test_invalid_data_handling(auth_client_factory, reinit_db):
     """
     Test handling of invalid data in requests.
 
@@ -580,7 +580,7 @@ async def test_invalid_data_handling(auth_client_factory, motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_missing_permissions_unauthorized_access(auth_client_factory, motor_reinit_db):
+async def test_missing_permissions_unauthorized_access(auth_client_factory, reinit_db):
     """
     Test unauthorized access to questions.
 
@@ -628,7 +628,7 @@ async def test_missing_permissions_unauthorized_access(auth_client_factory, moto
 
 
 @pytest.mark.asyncio
-async def test_database_connection_resilience(auth_client_factory, motor_reinit_db):
+async def test_database_connection_resilience(auth_client_factory, reinit_db):
     """
     Test system behavior with database issues.
 
@@ -665,7 +665,7 @@ async def test_database_connection_resilience(auth_client_factory, motor_reinit_
 # ===========================
 
 @pytest.mark.asyncio
-async def test_cascade_delete_book_deletes_questions(auth_client_factory, motor_reinit_db):
+async def test_cascade_delete_book_deletes_questions(auth_client_factory, reinit_db):
     """
     Test cascade deletion: deleting a book deletes its questions.
 
@@ -717,7 +717,7 @@ async def test_cascade_delete_book_deletes_questions(auth_client_factory, motor_
 
 @pytest.mark.asyncio
 async def test_data_integrity_cannot_create_question_for_nonexistent_chapter(
-    auth_client_factory, motor_reinit_db
+    auth_client_factory, reinit_db
 ):
     """
     Test data integrity: cannot create questions for non-existent chapters.
@@ -750,7 +750,7 @@ async def test_data_integrity_cannot_create_question_for_nonexistent_chapter(
 
 @pytest.mark.asyncio
 async def test_user_isolation_cannot_access_other_users_questions(
-    auth_client_factory, motor_reinit_db
+    auth_client_factory, reinit_db
 ):
     """
     Test user isolation: users cannot access other users' questions.
@@ -818,7 +818,7 @@ async def test_user_isolation_cannot_access_other_users_questions(
 # ===========================
 
 @pytest.mark.asyncio
-async def test_question_progress_tracking(auth_client_factory, motor_reinit_db):
+async def test_question_progress_tracking(auth_client_factory, reinit_db):
     """
     Test question progress tracking for chapters.
 
@@ -894,7 +894,7 @@ async def test_question_progress_tracking(auth_client_factory, motor_reinit_db):
 # ===========================
 
 @pytest.mark.asyncio
-async def test_response_edit_history_tracking(auth_client_factory, motor_reinit_db):
+async def test_response_edit_history_tracking(auth_client_factory, reinit_db):
     """
     Test that response edit history is tracked correctly.
 

@@ -41,7 +41,7 @@ async def verify_indexes():
         print("=" * 60)
 
         collection = await get_collection(collection_name)
-        indexes = await collection.list_indexes().to_list(length=None)
+        indexes = await (await collection.list_indexes()).to_list(length=None)
         index_names = [idx['name'] for idx in indexes]
 
         print(f"Found {len(indexes)} indexes:")

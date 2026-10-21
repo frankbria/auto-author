@@ -31,7 +31,7 @@ def _question(book_id, order, text="What motivates the protagonist in this chapt
 
 
 @pytest.fixture
-def service(motor_reinit_db):
+def service(reinit_db):
     svc = QuestionGenerationService(AIService())
 
     async def model_obeys(*, book_id, count, **_):
