@@ -5,8 +5,7 @@
  * This test suite performs automated accessibility scanning using axe-core
  * on all key components in the Auto-Author application.
  *
- * Part of Phase 1: Automated Scanning (4 hours)
- * Document: frontend/claudedocs/accessibility_audit_preparation.md
+ * Guide: docs/development/accessibility-testing.md
  */
 
 import React from 'react';

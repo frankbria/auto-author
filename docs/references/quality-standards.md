@@ -104,12 +104,38 @@ Before moving to the next feature, ALL changes must be:
    - Branch naming convention: `feature/<feature-name>`, `fix/<issue-name>`, `docs/<doc-update>`
    - Create pull requests for all significant changes
 
-4. **Task Tracking (bd)**:
-   - Create or update the bd issue before starting work (`bd ready`, `bd create`)
-   - Move to in-progress when beginning implementation
-   - Close on completion: `bd close <id> --reason "Completed in PR #123"`
-   - Reference issue IDs in commit messages
-   - `CURRENT_SPRINT.md` / `IMPLEMENTATION_PLAN.md` are generated snapshots — edit bd, not the markdown
+4. **Task Tracking (GitHub Issues)**:
+   - Every task is a GitHub issue with a `[PX.Y]` priority prefix in its title
+   - Reference the issue in the PR body (`Closes #123`) so merging closes it
+
+## Pre-commit Hooks
+
+Hooks are defined in `.pre-commit-config.yaml` and run on every commit for the paths each hook declares. They are a fast local check; CI is the gate that cannot be bypassed.
+
+```bash
+uv tool install pre-commit   # once; use --force if the launcher is stale
+pre-commit install           # installs the pre-commit and commit-msg hooks
+```
+
+| Hook | Runs when | What it does |
+|------|-----------|--------------|
+| `check-commit-message` (commit-msg) | every commit | Rejects a message containing a closing keyword followed by an issue number, even a negated one, because GitHub would close the issue |
+| `check-secrets` | every commit | `scripts/check-secrets.sh` scans the staged diff for key, token and password patterns and `.pem` files |
+| `frontend-lint`, `frontend-typecheck`, `frontend-unit-tests`, `frontend-coverage` | files under `frontend/` | ESLint, `tsc`, Jest, and the 85/85/75/85 coverage thresholds |
+| `backend-lint`, `backend-unit-tests`, `backend-coverage` | files under `backend/` | `ruff check`, the pytest suite, and an 85% coverage floor |
+| `frontend-e2e-tests` | manual stage only | Playwright with `BYPASS_AUTH=true` |
+| `pre-commit-hooks` | every commit | Trailing whitespace and end-of-file fixes (not Markdown), YAML and JSON validity, merge-conflict markers, files over 1000 KB, mixed line endings |
+
+The backend hooks need MongoDB running; with it down the pytest hook hangs rather than fails.
+
+```bash
+pre-commit run --from-ref HEAD~1 --to-ref HEAD   # just your commits, before a PR
+pre-commit run backend-lint --all-files          # one hook, whole tree
+pre-commit run --files path/a.py path/b.ts       # specific files
+pre-commit run frontend-e2e-tests --hook-stage manual
+```
+
+If a hook fails, fix the cause and commit again. Do not use `--no-verify`: `main` branch protection requires the same checks in CI. If `check-secrets` flags a value, remove it from the diff and read it from an environment variable instead; real values go in `.env` files that are not committed (only `.env.example` is, and it stays in sync with the variables the code reads).
 
 ## Dependency Batches
 
@@ -447,7 +473,6 @@ Two things that follow:
 
 3. **Implementation Documentation**:
    - Update relevant sections in CLAUDE.md file
-   - Update IMPLEMENTATION_PLAN.md when scope changes
    - Keep architecture diagrams current
    - Update configuration examples when defaults change
    - Document breaking changes prominently
@@ -461,7 +486,6 @@ Two things that follow:
 5. **Decision Records**:
    - Create architecture decision records for significant changes
    - Document technical choices and trade-offs
-   - Update bd issue descriptions with implementation notes
 
 ## Feature Completion Checklist
 
@@ -475,7 +499,7 @@ Before marking ANY feature as complete, verify:
 - [ ] All changes committed with conventional commit messages
 - [ ] All commits pushed to remote repository
 - [ ] E2E test added for user-facing changes (all five coverage requirements above)
-- [ ] bd issue closed with the PR number
+- [ ] PR body references the issue it closes
 - [ ] API documentation updated (if applicable)
 - [ ] Implementation documentation updated
 - [ ] Inline code comments updated or added
