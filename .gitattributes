@@ -1,7 +1,3 @@
-
-# Use bd merge for beads JSONL files
-.beads/beads.jsonl merge=beads
-
 # Every PR appends a line under the same `### <date>` heading in the changelog,
 # so every pair of open PRs conflicts there and nowhere else — eight times in one
 # session (#661). `union` is git's built-in "keep both sides" driver, which is

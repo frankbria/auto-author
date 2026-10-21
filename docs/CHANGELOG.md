@@ -4,6 +4,9 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-20
 
+- **Beads and speckit removed**:
+  - The bd tracker is gone: `.beads/`, its git attributes and ignore lines, the two manual pre-commit export hooks and the three `scripts/*sprint*`/`export-implementation-plan.sh` exporters, the generated `CURRENT_SPRINT.md` and `IMPLEMENTATION_PLAN.md`, `docs/references/beads-workflow.md` and `docs/AUTOMATION_SETUP.md`. GitHub issues with a `[PX.Y]` prefix are the only task tracker; `quality-standards.md` and `CLAUDE.md` say so.
+  - Speckit is gone: `.specify/`, `specs/` and the eight project-local `.claude/commands/speckit.*` commands.
 - **Pillow 13.0.0 and certifi 2026.10.19 (Security Audit red on new advisories)**: the audit gate failed every PR on 8 new pillow advisories (CVE-2026-112395, -112397, -112400, -112404, -112895, -112896, -112897, -112899; fixed in 13.0.0) and PYSEC-2026-4320 in certifi (fixed in 2026.10.19), with no code change. `pillow` is pinned to 13.0.0 in `backend/pyproject.toml`; certifi is transitive and moved in `uv.lock` only. The upload/export/cover test set (533 tests) passes on both; the gate reports no new advisories.
 
 ### 2026-10-14

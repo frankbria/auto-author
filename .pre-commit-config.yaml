@@ -3,30 +3,6 @@
 # Run manually: pre-commit run --all-files
 
 repos:
-  # Auto-sync documentation with bd tracker
-  # NOTE: These hooks are disabled by default to avoid conflicts during commits.
-  # Run manually when needed: pre-commit run export-current-sprint --all-files
-  # Or run the scripts directly: ./scripts/export-current-sprint.sh
-  - repo: local
-    hooks:
-      - id: export-current-sprint
-        name: Export Current Sprint from bd
-        entry: ./scripts/export-current-sprint.sh
-        language: system
-        pass_filenames: false
-        always_run: false
-        stages: [manual]
-        verbose: true
-
-      - id: export-implementation-plan
-        name: Export Implementation Plan from bd
-        entry: ./scripts/export-implementation-plan.sh
-        language: system
-        pass_filenames: false
-        always_run: false
-        stages: [manual]
-        verbose: true
-
   # Commit message - a negated closing keyword still closes the issue
   - repo: local
     hooks:
