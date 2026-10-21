@@ -185,9 +185,10 @@ class TestAIResponseParsingError:
 
     def test_parsing_error_not_retryable(self):
         """Test parsing error marked as not retryable."""
-        error = AIResponseParsingError(retryable=False)
+        error = AIResponseParsingError(retryable=False, correlation_id="parse-123")
 
         assert error.retryable is False
+        assert error.correlation_id == "parse-123"
 
 
 class TestErrorInteroperability:
