@@ -1,64 +1,31 @@
-# AGENTS.md - Auto-Author Development Guide
+# AGENTS.md
 
-## Build/Test Commands
-**Backend (Python/FastAPI)**:
-- Run tests: `cd backend && uv run pytest`
-- With coverage: `uv run pytest --cov=app tests/ --cov-report=term-missing`
-- Single test: `uv run pytest tests/test_file.py::test_function`
-- Dev server: `uv run uvicorn app.main:app --reload`
+Auto Author is an AI-assisted long-form non-fiction writing app: a Next.js frontend (`frontend/`) and a FastAPI backend (`backend/`, managed with `uv`) over MongoDB, in one monorepo. [`CLAUDE.md`](CLAUDE.md) is the canonical project guide for any coding agent, whatever the tool: it covers the quality gates, deployment, environment variables and conventions. Docs are indexed in [`docs/README.md`](docs/README.md).
 
-**Frontend (Next.js)**:
-- Run tests: `cd frontend && npm test`
-- With coverage: `npm run test:coverage`
-- Single test: `npm test -- --testNamePattern="test name"`
-- E2E tests: `npx playwright test` (requires both servers running)
-- Dev server: `npm run dev`
+## Commands
 
-**Lint & Format**:
-- Backend: `uv run ruff check . && uv run ruff format .`
-- Frontend: `npm run lint && npm run typecheck`
+Root `package.json` has only `npm test` (runs `scripts/test-all.sh`). Everything else runs inside `frontend/` or `backend/`.
 
-## Code Style Guidelines
-- **Python**: Use Pydantic models, async/await, type hints, snake_case. Import order: stdlib, third-party, local
-- **TypeScript**: Strict types, JSDoc for complex logic, PascalCase components, camelCase variables
-- **Error handling**: Use try/catch blocks, proper HTTP status codes, detailed error messages, automatic retry for transient errors
-- **File naming**: kebab-case for components, snake_case for Python modules
-- **Testing**: 85% coverage minimum for new code, descriptive test names, arrange-act-assert pattern
-- **UI Components**: Use shadcn/ui, ensure WCAG 2.1 accessibility compliance, implement loading states
-- **Performance**: Track operations with budgets (TOC: 3000ms, Export: 5000ms, Auto-save: 1000ms)
+```bash
+# Frontend
+cd frontend && npm run lint && npm run typecheck && npm test
+npm run test:coverage
 
-## Quality Standards (MANDATORY)
-- **Test Coverage**: 85% minimum for all new code, 100% pass rate required
-- **Git Workflow**: Conventional commits, feature branches, never commit directly to main
-- **Documentation**: Update API docs, code comments, and implementation docs with every change
-- **Performance Budgets**: All operations must meet defined time budgets or log warnings
-- **Accessibility**: All interactive elements must be keyboard accessible (WCAG 2.1)
+# Backend: test tooling lives in the `test` extra to keep prod installs lean
+cd backend && uv sync --extra test         # one-time
+uv run pytest --cov=app tests/ --cov-report=term-missing
 
-## Project Rules & Development Standards
-- **Simplicity**: Clear, maintainable solutions over complexity
-- **Focus**: Stick to defined tasks, avoid scope creep
-- **Quality**: Clean, tested, documented, secure code
-- **Self-documenting code**: Minimize comments unless complex logic requires clarification
-- **DRY principle**: Use symbolic reasoning to identify and eliminate redundancy
-- **File limits**: Keep files under 300 lines (500 for components), refactor when needed
-- **Security**: Server-side validation, no hardcoded credentials, input sanitization from the start
+# E2E
+cd frontend && npx playwright test --ui
+BYPASS_AUTH=true npx playwright test       # Playwright's webServer sets E2E_ALLOW_BYPASS=1
+npx playwright test --config=playwright.real-auth.config.ts   # real auth, no bypass; starts its own servers on 3001/8001
+```
 
-## Feature Completion Checklist
-Before marking ANY feature complete:
-- [ ] All tests pass (100% pass rate)
-- [ ] Code coverage meets 85% minimum
-- [ ] Code formatted and linted
-- [ ] Type checking passes
-- [ ] All changes committed with conventional messages
-- [ ] Changes pushed to remote repository
-- [ ] API documentation updated (if applicable)
-- [ ] Performance impact assessed
-- [ ] Accessibility verified (WCAG 2.1)
-- [ ] Error handling implemented
+Backend lint is `uv run --extra test ruff check app/ tests/`. No formatter is enforced, so do not reformat files you are not changing.
 
-## Key Development Tools
-- **Testing**: pytest (backend), Jest (frontend), Playwright (E2E)
-- **Error Handling**: Unified error handler with exponential backoff retry
-- **Performance**: `usePerformanceTracking` hook with operation budgets
-- **Loading States**: `LoadingStateManager` and `ProgressIndicator` components
-- **Test Helpers**: Condition-based waiting, API-based test data factories
+## Rules
+
+- Keep files under 500 lines.
+- Do not hardcode URLs. Read them from `.env` or `.env.local`.
+- When you change an `.env` variable, change the matching `.env.example` (`frontend/` or `backend/`) too. Never put a secret in `.env.example`; use a placeholder value.
+- Never hardcode secrets.

@@ -18,7 +18,7 @@ def test_no_doc_describes_the_retired_deploy_as_live():
     args = ["git", "grep", "-n", "-F"]
     for phrase in STALE:
         args += ["-e", phrase]
-    args += ["--", ":!docs/CHANGELOG.md", ":!archive", ":!docs/demos", f":!{SELF}"]
+    args += ["--", ":!docs/CHANGELOG.md", ":!docs/demos", f":!{SELF}"]
     found = subprocess.run(args, cwd=REPO, capture_output=True, text=True).stdout
     assert found == "", f"stale deploy docs:\n{found}"
 

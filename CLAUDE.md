@@ -4,9 +4,7 @@ AI-assisted long-form non-fiction writing. Next.js frontend + FastAPI backend, M
 
 - `frontend/` — Next.js app
 - `backend/` — FastAPI app (uv-managed)
-- `docs/` — project docs; `docs/references/` = on-demand deep dives (table below)
-- `claudedocs/` — analysis reports and detailed plans
-- `archive/` — historical planning docs (read-only)
+- `docs/` — all documentation (index: `docs/README.md`); `docs/references/` = on-demand deep dives (table below)
 
 Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append new entries **there**, not here.
 
@@ -18,13 +16,12 @@ Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append n
 
 | When | File |
 |------|------|
-| Creating/checking tasks (bd is the source of truth) | `docs/references/beads-workflow.md` |
-| Creating or reorganizing documentation | `docs/references/documentation-management.md` |
+| Creating or reorganizing documentation | `docs/README.md` (layout and where new docs go) |
 | Using LoadingStateManager, ProgressIndicator, DeleteBookModal | `docs/references/component-documentation.md` |
 | Completing a feature / opening a PR | `docs/references/quality-standards.md` |
 | Perf-sensitive work (TOC 3000ms, Export 5000ms budgets) | `docs/references/performance-monitoring.md` |
 | Writing or fixing tests | `docs/references/testing-infrastructure.md` |
-| Current test status | `docs/POST_DEPLOYMENT_TEST_REPORT.md`, `backend/TEST_COVERAGE_REPORT.md`, `frontend/docs/TEST_FAILURE_ANALYSIS.md` |
+| Current test status | CI on `main` (`gh run list --branch main`); coverage floors are enforced there |
 
 ---
 
@@ -33,9 +30,8 @@ Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append n
 Root `package.json` has only `npm test` (→ `scripts/test-all.sh`). Everything else runs inside `frontend/` or `backend/`.
 
 ```bash
-# Tasks
-bd ready                                   # unblocked work
-bd close <id> --reason "Completed in PR #123"
+# Tasks: GitHub issues, [PX.Y] title prefix, worked lowest first
+gh issue list --state open
 
 # Frontend
 cd frontend && npm run lint && npm run typecheck && npm test
@@ -102,7 +98,6 @@ Files under 500 lines. Never hardcode secrets. Tests before implementation. WCAG
 - `BYPASS_AUTH=true` only takes effect alongside `E2E_ALLOW_BYPASS=1` in **every** environment (frontend middleware #272, backend FastAPI #307). Backend production is hard-blocked regardless. Never use in production.
 - **`ENVIRONMENT` is required by the backend** (`development|test|staging|production`, #777): missing or unknown refuses to start, and compose has no default. Local runs need it in `backend/.env` or the shell; the staging workflows export `staging`.
 - Otherwise standard Next.js / FastAPI vars — see `.env.example`.
-- `CURRENT_SPRINT.md` and `IMPLEMENTATION_PLAN.md` are auto-generated bd snapshots; edit bd, not the markdown.
 
 ---
 

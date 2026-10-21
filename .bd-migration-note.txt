@@ -1,1 +1,0 @@
-# bd database migration fix\nMigrated bd database to resolve legacy database issue causing pre-commit hooks to hang.
