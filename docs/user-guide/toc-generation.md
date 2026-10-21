@@ -35,7 +35,7 @@ If your summary needs improvement, you'll see:
 
 ### Step 2: Clarifying Questions
 
-The AI generates 3-5 targeted questions to better understand your book's content:
+The AI generates up to 5 targeted questions (4 by default) to better understand your book's content:
 
 1. Answer each question in the text boxes provided
 2. Questions typically cover:

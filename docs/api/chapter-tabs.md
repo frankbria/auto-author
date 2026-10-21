@@ -28,9 +28,7 @@ These endpoints support all tab-related operations, including loading chapters, 
 - Updates the status of multiple chapters at once.
 
 ### Chapter Access Logging
-- **POST** `/api/v1/chapter-access`
-- Body: `{ user_id, book_id, chapter_id, access_type, ... }`
-- Logs chapter access for analytics and tab persistence.
+There is no client endpoint for this. The server records chapter access itself through `ChapterAccessService.log_access` when a chapter is read or exported.
 
 ---
 ## Tab State Persistence

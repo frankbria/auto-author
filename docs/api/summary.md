@@ -553,7 +553,7 @@ const validateSummary = async (bookId) => {
 
 - [User Guide: Summary Input and Voice-to-Text](../user-guide/summary-input.md)
 - [Troubleshooting: Summary Input Issues](../user-guide/troubleshooting-summary-input.md)
-- [API Authentication Guide](profile.md)
+- [API Profile and Authentication](profile.md#authentication)
 
 ---
 
