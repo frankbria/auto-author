@@ -176,7 +176,7 @@ All tests must meet:
 
 ## Known Issues
 
-- Backend tests that touch the database request the `motor_reinit_db` fixture (directly or via `auth_client_factory` / `async_client_factory`); without it they can hit a closed Motor client.
+- Backend tests that touch the database request the `reinit_db` fixture (directly or via `auth_client_factory` / `async_client_factory`); without it they can hit a client bound to another test's event loop.
 
 ### Replica set
 

@@ -327,7 +327,7 @@ def test_the_cascade_uses_the_test_runs_own_client(reinit_db):
     assert book_dao._client is base._client
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def replica_set(reinit_db):
     """Skip on a standalone server. A run that says it has a replica set and has not is a failure."""
     if (await base._client.admin.command("hello")).get("setName") is None:

@@ -50,9 +50,9 @@ async def verify_indexes():
             if 'key' in idx:
                 print(f"    Keys: {list(idx['key'].items())}")
             if 'unique' in idx and idx['unique']:
-                print(f"    Unique: True")
+                print("    Unique: True")
             if 'background' in idx and idx['background']:
-                print(f"    Background: True")
+                print("    Background: True")
 
         # Verify expected indexes exist
         print("\nVerification:")

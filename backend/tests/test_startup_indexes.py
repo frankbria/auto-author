@@ -212,7 +212,8 @@ class TestStartingWhileTheDatabaseIsAway:
         await _warm_collections()
         await base._db.users.insert_one({"warm": True, "auth_id": "warm", "email": "warm@example.com"})
         await base._db.question_responses.insert_one({"warm": True})
-        monkeypatch.setattr(base, "_db", AsyncMongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")["nowhere"])
+        nowhere = AsyncMongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")
+        monkeypatch.setattr(base, "_db", nowhere["nowhere"])
         served = FastAPI()
         # The first thing the work does. Asserting only on indexes afterwards cannot tell
         # waiting from going ahead: steps that fail while the database is away fail quietly,
@@ -241,6 +242,7 @@ class TestStartingWhileTheDatabaseIsAway:
         assert "auth_id_unique_idx" in await _index_map(base._db.users)
         assert "owner_book_id_idx" in await _index_map(base._db.books)
         assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)
+        await nowhere.close()
 
     @pytest.mark.asyncio
     async def test_the_work_is_done_again_if_the_database_went_away_while_it_was_being_done(self, reinit_db, away, monkeypatch):
@@ -275,6 +277,7 @@ class TestStartingWhileTheDatabaseIsAway:
         assert len(passes) == 2
         assert "owner_book_id_idx" in await _index_map(base._db.books)
         assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)
+        await gone.client.close()
 
 
 @pytest.mark.asyncio
