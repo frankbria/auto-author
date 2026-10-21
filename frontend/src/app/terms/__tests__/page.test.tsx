@@ -11,9 +11,10 @@ describe('Terms of Service page', () => {
     ).toBeInTheDocument();
   });
 
-  it('carries a visible legal-review notice (template copy, not lawyer-reviewed)', () => {
+  it('no longer carries the pending-legal-review notice (#791: counsel signed off)', () => {
     render(<TermsPage />);
-    expect(screen.getByText(/legal review/i)).toBeInTheDocument();
+    expect(screen.queryByText(/legal review/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
   it('section 6 states auto-renewal and how to cancel (#770)', () => {

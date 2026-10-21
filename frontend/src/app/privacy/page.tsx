@@ -8,10 +8,10 @@ export const metadata = {
   description: 'How Auto Author collects, uses, and protects your data.',
 };
 
-// #335: template Privacy Policy. Copy is a starting point — flag for legal
-// review before public launch. References the account-deletion / cascade-delete
-// path (#179) and the 18-month deactivated record (#954): deleting your account
-// deletes your books at once and keeps the account and billing record.
+// Counsel signed off on this copy (#791). References the account-deletion /
+// cascade-delete path (#179) and the 18-month deactivated record (#954):
+// deleting your account deletes your books at once and keeps the account and
+// billing record.
 const LAST_UPDATED = 'October 14, 2026';
 
 export default function PrivacyPage() {
@@ -35,15 +35,6 @@ export default function PrivacyPage() {
         <p className="mb-6 text-sm text-muted-foreground">
           Last updated: {LAST_UPDATED}
         </p>
-
-        <div
-          role="note"
-          className="mb-8 rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
-        >
-          This policy is provided as a template and has not yet been finalized by
-          counsel. It is pending legal review and may change before general
-          availability.
-        </div>
 
         <div className="space-y-6 text-muted-foreground">
           <section>
