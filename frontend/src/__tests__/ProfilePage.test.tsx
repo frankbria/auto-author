@@ -4,7 +4,6 @@ import '@testing-library/jest-dom';
 import UserProfile from '../app/profile/page';
 import { useSession } from '@/lib/auth-client';
 import useProfileApi from '../hooks/useProfileApi';
-import useOptimizedClerkImage from '../hooks/useOptimizedClerkImage';
 import { toast } from '../lib/toast';
 
 // Mock Next.js hooks
@@ -18,7 +17,6 @@ jest.mock('@/lib/auth-client');
 
 // Mock custom hooks
 jest.mock('../hooks/useProfileApi');
-jest.mock('../hooks/useOptimizedClerkImage');
 
 // Mock lodash.debounce
 jest.mock('lodash.debounce', () => jest.fn((fn) => fn));
@@ -196,10 +194,6 @@ beforeEach(() => {
     isPending: false,
     error: null,
   });
-  // Set up useOptimizedClerkImage mock to always return getOptimizedImageUrl
-  (useOptimizedClerkImage as jest.Mock).mockReturnValue({
-    getOptimizedImageUrl: jest.fn((url) => url),
-  });
   // Set up useProfileApi mock to always return the required functions
   (useProfileApi as jest.Mock).mockReturnValue({
     updateUserProfile: jest.fn().mockResolvedValue({}),
@@ -257,7 +251,7 @@ describe('UserProfile page', () => {
     }),
   };
 
-  it('renders user profile data from Clerk', async () => {
+  it('renders user profile data', async () => {
     render(<UserProfile />);
     // Wait for the form reset to be called (with act)
     await act(async () => {
@@ -386,11 +380,6 @@ describe('UserProfile page', () => {
   });
     // Test profile picture uploading
   it('uploads profile picture correctly', async () => {
-    const mockGetOptimizedImageUrl = jest.fn().mockReturnValue('https://example.com/optimized-avatar.jpg');
-    (useOptimizedClerkImage as jest.Mock).mockReturnValue({
-      getOptimizedImageUrl: mockGetOptimizedImageUrl,
-    });
-
     render(<UserProfile />);
 
     // Verify that we can find buttons for avatar upload functionality

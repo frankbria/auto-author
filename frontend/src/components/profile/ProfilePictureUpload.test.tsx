@@ -1,10 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ProfilePictureUpload } from './ProfilePictureUpload';
-import useOptimizedClerkImage from '@/hooks/useOptimizedClerkImage';
 import { toast } from '@/lib/toast';
 
-jest.mock('@/hooks/useOptimizedClerkImage');
 jest.mock('@/lib/toast', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 jest.mock('next/image', () => ({
   __esModule: true,
@@ -23,15 +21,12 @@ function makeFile(type: string, size: number, name = 'avatar.jpg') {
 describe('ProfilePictureUpload', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useOptimizedClerkImage as jest.Mock).mockReturnValue({
-      getOptimizedImageUrl: (url: string) => url,
-    });
     global.fetch = jest.fn();
   });
 
-  it('renders the current avatar and a change button', () => {
+  it('renders the stored avatar URL unchanged and a change button', () => {
     render(<ProfilePictureUpload currentAvatarUrl="https://x/avatar.jpg" onUploaded={jest.fn()} />);
-    expect(screen.getByTestId('image')).toHaveAttribute('src', expect.stringContaining('avatar.jpg'));
+    expect(screen.getByTestId('image')).toHaveAttribute('src', 'https://x/avatar.jpg');
     expect(screen.getByRole('button', { name: /change photo/i })).toBeInTheDocument();
   });
 
