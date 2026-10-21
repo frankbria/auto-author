@@ -8,7 +8,7 @@
  * - Transient: Temporary errors that may succeed on retry (network, timeouts)
  * - Permanent: Errors requiring user action (validation, permissions)
  * - System: Infrastructure errors requiring technical support
- * - AI_SERVICE: AI service errors with cached content fallback support
+ * - AI_SERVICE: AI service errors
  * - ENTITLEMENT: Plan does not include this feature — needs an upgrade, not a retry (issue #174)
  */
 export enum ErrorType {

@@ -11,7 +11,7 @@ The TOC generation wizard is accessed from your book's dashboard after you've en
 Before generating a TOC, ensure you have:
 
 - Created a book in your dashboard
-- Entered a comprehensive summary (recommended 250+ words)
+- Entered a comprehensive summary (at least 30 words and 150 characters)
 - Saved your summary
 
 ## Wizard Workflow

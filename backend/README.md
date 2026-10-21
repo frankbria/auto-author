@@ -13,26 +13,18 @@ This project is a FastAPI application designed to provide a robust backend for t
 ```
 backend/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── endpoints/
-│   │   │   ├── __init__.py
-│   │   │   └── router.py
-│   │   └── dependencies.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── config.py
-│   │   └── security.py
-│   ├── db/
-│   │   ├── __init__.py
-│   │   └── database.py
+│   ├── api/         # endpoints/, dependencies.py, request_validation.py
+│   ├── core/        # config, better-auth session validation, entitlements
+│   ├── db/          # MongoDB access (motor)
 │   ├── models/
-│   │   └── __init__.py
-│   └── schemas/
-│       └── __init__.py
-└── README.md
+│   ├── schemas/
+│   ├── services/
+│   └── utils/
+├── tests/
+├── pyproject.toml
+├── pytest.ini
+└── uv.lock
 ```
 
 ## Installation
@@ -52,7 +44,8 @@ uv sync --extra test    # `uv sync` alone omits the test tooling
 
 3. Set up environment variables:
    - Copy `.env.example` to `.env`
-   - Fill in required values (MongoDB URI, API keys, etc.)
+   - `ENVIRONMENT` is required (`development|test|staging|production`); the app refuses to start without it
+   - Fill in the other values (MongoDB URI, API keys, etc.)
 
 ## Usage
 
@@ -80,12 +73,11 @@ uv run pytest --cov=app               # Run with coverage
 uv run pytest tests/test_file.py      # Run specific test file
 ```
 
-### Code Formatting
+### Linting
 ```bash
-uv run black .                         # Format all Python files
-uv run ruff check .                    # Run linting
-uv run ruff format .                   # Format with ruff
+uv run --extra test ruff check app/ tests/    # the pinned lint gate (pre-commit and CI)
 ```
+No formatter is enforced.
 
 ### Package Management
 
@@ -94,12 +86,6 @@ This project uses `uv` as the package manager. Always use `uv` commands within t
 - Install new package: `uv pip install package-name`
 - Add a dependency: `uv add package-name` (updates `pyproject.toml` + `uv.lock`)
 - Run any command: `uv run command-name`
-
-### Quick Validation Scripts
-```bash
-uv run python quick_validate.py        # Validate implementation
-uv run python test_toc_transactions.py # Test TOC transactions
-```
 
 ## API Documentation
 

@@ -26,10 +26,10 @@ npm run test:coverage   # Coverage report
 ### Backend Testing
 ```bash
 cd backend
-python -m pytest                    # Run all tests
-python -m pytest --cov             # Coverage report
-python -m pytest -v tests/unit/    # Unit tests only
-python -m pytest tests/integration/ # Integration tests only
+uv sync --extra test                # one-time; test tooling is in the `test` extra
+uv run pytest                       # Run all tests (needs MongoDB on localhost:27017)
+uv run pytest --cov=app             # Coverage report
+uv run pytest tests/integration/    # Integration tests only
 ```
 
 ## Documentation Structure
@@ -41,15 +41,14 @@ python -m pytest tests/integration/ # Integration tests only
 
 ## Test Coverage
 
-### Current Coverage Targets
-- **Unit Tests**: 90% minimum
-- **Integration Tests**: 85% minimum
-- **E2E Critical Paths**: 100%
-- **API Endpoints**: 95% minimum
+### Coverage gates
+CI (`.github/workflows/tests.yml`) and the pre-commit hooks enforce:
+- **Backend**: 85% (`--cov-fail-under=85`)
+- **Frontend**: 85% lines, 85% statements, 75% branches, 85% functions
 
 ### Coverage Reports
 - Frontend: `frontend/coverage/`
-- Backend: `backend/htmlcov/`
+- Backend: `uv run pytest --cov=app --cov-report=html` writes `backend/htmlcov/`
 
 ## Tools and Frameworks
 
@@ -63,8 +62,9 @@ python -m pytest tests/integration/ # Integration tests only
 - **Pytest**: Test runner and framework
 - **Pytest-asyncio**: Async testing support
 - **Pytest-cov**: Coverage reporting
-- **Factory Boy**: Test data generation
+- **HTTPX**: test client for the API
 - **Pytest-mock**: Mocking utilities
+- **Jest-axe** (frontend): automated accessibility checks
 
 ## Test Categories
 
@@ -118,45 +118,29 @@ npm test ChapterTabsTocIntegration
 ### Backend
 ```bash
 # API Tests
-python -m pytest tests/test_api/
+uv run pytest tests/test_api/
 
 # Integration Tests
-python -m pytest tests/integration/
+uv run pytest tests/integration/
 
 # Chapter Questions Tests
-python -m pytest tests/integration/test_chapter_questions_integration.py
+uv run pytest tests/integration/test_chapter_questions_integration.py
 
 # Chapter Tabs Tests
-python -m pytest tests/integration/run_test_chapter_tabs_integration.py
+uv run pytest tests/integration/test_chapter_tabs_integration.py
 ```
 
-## Test Environment Variables
+## Test Environment
 
-Create `.env.test` files for test-specific configuration:
-
-### Frontend (.env.test)
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=test_key
-NODE_ENV=test
-```
-
-### Backend (.env.test)
-```bash
-DATABASE_URL=sqlite:///test.db
-OPENAI_API_KEY=test_key
-ANTHROPIC_API_KEY=test_key
-ENVIRONMENT=test
-```
+There is no `.env.test` file. `backend/tests/conftest.py` sets `ENVIRONMENT=test` and talks to a real MongoDB at `TEST_MONGO_URI` (default `mongodb://localhost:27017/auto-author-test`). The fixtures drop that database before and after each test, so the guard in `backend/tests/db_guard.py` refuses a URI that is not clearly a local test database. Frontend tests need no environment file; `src/jest.setup.ts` configures jsdom.
 
 ## Continuous Integration
 
 Tests are automatically run on:
 - Pull requests
 - Pushes to main branch
-- Scheduled nightly runs
 
-The workflows are in [`.github/workflows/`](../../.github/workflows/); `tests.yml` runs the unit suites.
+The workflows are in [`.github/workflows/`](../../.github/workflows/); `tests.yml` runs the frontend and backend suites with the coverage gates, a Playwright E2E job and the security audit. Staging E2E runs after each staging deploy (`e2e-staging-tests.yml`).
 
 ## Contributing
 

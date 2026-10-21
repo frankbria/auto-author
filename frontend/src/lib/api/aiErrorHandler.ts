@@ -1,6 +1,6 @@
 /**
  * AI Service Error Handler
- * Provides comprehensive error handling for AI service operations with cached content fallback
+ * Provides comprehensive error handling for AI service operations
  */
 
 import { showErrorNotification } from '@/components/errors/ErrorNotification';
@@ -12,8 +12,6 @@ import { ErrorType, ErrorSeverity, requestIdOf } from '@/lib/errors';
 export interface AIErrorResponse {
   message: string;
   status_code: number;
-  cached_content_available?: boolean;
-  cached_content?: unknown;
   estimated_retry_after?: number; // seconds
   /** "day" or "month" when the 429 is an exhausted AI allowance (X-AI-Quota-Period). */
   quota_period?: string;
@@ -21,11 +19,10 @@ export interface AIErrorResponse {
 }
 
 /**
- * AI Service result with cached content support
+ * AI Service result
  */
 export interface AIServiceResult<T> {
   data?: T;
-  fromCache?: boolean;
   error?: string;
   retryAfter?: number;
   canRetry?: boolean;
@@ -61,8 +58,6 @@ function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
         return {
           message: parsed.message || parsed.error || parsed.detail || message,
           status_code: statusCode,
-          cached_content_available: parsed.cached_content_available,
-          cached_content: parsed.cached_content,
           estimated_retry_after: parsed.estimated_retry_after ?? attached.retryAfter,
           quota_period: attached.quotaPeriod,
           // Backend structured errors don't send error_type; derive it from the
@@ -94,8 +89,6 @@ function extractErrorDetails(error: unknown): Partial<AIErrorResponse> {
     return {
       message,
       status_code: statusCode,
-      cached_content_available: Boolean(err.cached_content_available),
-      cached_content: err.cached_content,
       estimated_retry_after: Number(err.estimated_retry_after || 0),
       error_type: (err.error_type as AIErrorResponse['error_type']) || determineErrorType(statusCode, message),
     };
@@ -191,11 +184,11 @@ function isRetryable(errorDetails: Partial<AIErrorResponse>): boolean {
 }
 
 /**
- * Handle AI service errors with cached content fallback
+ * Handle AI service errors
  *
  * @param error - The error object from the AI service
  * @param onRetry - Optional callback for retry action
- * @returns AI service result with cached content if available
+ * @returns AI service result
  */
 export async function handleAIServiceError<T>(
   error: unknown,
@@ -206,7 +199,7 @@ export async function handleAIServiceError<T>(
   const retryable = isRetryable(errorDetails);
 
   // Entitlement denial (issue #174): a paywall, not a transient failure. Show an
-  // upgrade path — never a retry or cached content.
+  // upgrade path — never a retry.
   if (errorDetails.error_type === 'entitlement') {
     showErrorNotification(
       {
@@ -259,39 +252,7 @@ export async function handleAIServiceError<T>(
     return { error: errorDetails.message, canRetry: false };
   }
 
-  // Check if cached content is available
-  if (errorDetails.cached_content_available && errorDetails.cached_content) {
-    // Show warning notification about using cached content
-    showErrorNotification(
-      {
-        type: ErrorType.AI_SERVICE,
-        severity: ErrorSeverity.MEDIUM,
-        message: 'Using previously generated content',
-        details: 'AI service temporarily unavailable. Showing cached content from previous generation.',
-        statusCode: errorDetails.status_code,
-        retryable: retryable,
-        correlationId: requestIdOf(error) ?? `ai-cache-${Date.now()}`,
-        timestamp: new Date(),
-        suggestedActions: retryable && onRetry
-          ? ['The cached content below is from a previous generation', 'Click retry to generate fresh content when available']
-          : ['The cached content below is from a previous generation'],
-      },
-      {
-        onRetry,
-        duration: 10000, // Show for 10 seconds
-      }
-    );
-
-    return {
-      data: errorDetails.cached_content as T,
-      fromCache: true,
-      error: userMessage,
-      retryAfter: errorDetails.estimated_retry_after,
-      canRetry: retryable,
-    };
-  }
-
-  // No cached content available - show error notification
+  // Show error notification
   const suggestedActions: string[] = [];
 
   if (errorDetails.error_type === 'rate_limit') {
@@ -356,11 +317,4 @@ export function createRetryHandler(
 
     void retryFn();
   };
-}
-
-/**
- * Check if a result is from cache
- */
-export function isFromCache<T>(result: AIServiceResult<T>): result is AIServiceResult<T> & { fromCache: true; data: T } {
-  return result.fromCache === true && result.data !== undefined;
 }

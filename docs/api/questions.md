@@ -7,10 +7,7 @@ These endpoints provide comprehensive question generation and management capabil
 All endpoints are prefixed with `/api/v1/books/{book_id}/chapters/{chapter_id}/`
 
 ## Authentication
-All endpoints require authentication via JWT token in the Authorization header:
-```
-Authorization: Bearer <jwt_token>
-```
+All endpoints require a signed-in user. The backend reads the better-auth session cookie; it does not read an `Authorization` header.
 
 ## Endpoints
 
@@ -74,7 +71,7 @@ Retrieve questions for a chapter with optional filtering.
 #### Query Parameters
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| status | string | No | Filter by response status: "draft", "completed" |
+| status | string | No | Filter by response status: "not_answered", "draft", "completed" |
 | category | string | No | Filter by question category |
 | question_type | string | No | Filter by type: "character", "plot", "setting", "theme", "research" |
 | page | integer | No | Page number (default: 1) |
@@ -191,21 +188,28 @@ Provide feedback and rating for a question's relevance and quality.
 #### Request Body
 ```json
 {
+  "question_id": "<question_id>",
+  "user_id": "<any string>",
   "rating": 4,
-  "feedback": "Very helpful question that sparked new ideas for character development."
+  "feedback": "Very helpful question that sparked new ideas."
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| question_id | string | Yes | Required by the schema; the path's `question_id` is the one used |
+| user_id | string | Yes | Required by the schema; the signed-in user is the one used |
 | rating | integer | Yes | Rating from 1-5 stars |
 | feedback | string | No | Optional written feedback |
+
+The editor currently sends only `rating`, so its ratings are refused with `422` (#1117).
 
 #### Response
 ```json
 {
+  "rating": { "id": "...", "question_id": "...", "rating": 4, "feedback": "...", "created_at": "..." },
   "success": true,
-  "message": "Rating saved successfully"
+  "message": "Question rated successfully"
 }
 ```
 
@@ -241,7 +245,7 @@ Replace existing questions with newly generated ones.
 #### Query Parameters
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| preserve_responses | boolean | No | Keep questions that have responses (default: false) |
+| preserve_responses | boolean | No | Keep questions that have responses (default: true) |
 
 #### Request Body
 ```json
@@ -279,34 +283,19 @@ Replace existing questions with newly generated ones.
 
 ## Error Responses
 
-### Common Error Format
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid request parameters",
-    "details": {
-      "field": "count",
-      "issue": "Value must be between 1 and 50"
-    }
-  }
-}
-```
-
-### Error Codes
-| Code | Description |
-|------|-------------|
-| `VALIDATION_ERROR` | Invalid request parameters |
-| `UNAUTHORIZED` | Missing or invalid authentication |
-| `FORBIDDEN` | User lacks permission for this resource |
-| `NOT_FOUND` | Book, chapter, or question not found |
-| `RATE_LIMITED` | Too many requests |
-| `SERVER_ERROR` | Internal server error |
+Errors use FastAPI's shape, `{"detail": ...}`. `detail` is a string, or for AI failures and conflicts an object with a `message`. Common statuses: 400 invalid input, 401 not signed in, 403 not your book, 404 book, chapter or question not found, 422 request body failed validation (for example `count` outside 1 to 50), 429 rate limit exceeded.
 
 ## Rate Limiting
-- 100 requests per minute per user for question generation
-- 500 requests per minute per user for other operations
-- Rate limits are enforced per IP address and user ID
+Limits are per user and per route (`backend/app/api/endpoints/books.py`):
+
+| Route | Limit |
+|-------|-------|
+| `POST .../generate-questions` | 3 per 2 minutes |
+| `POST .../regenerate-questions` | 2 per 3 minutes |
+| `POST .../questions/{question_id}/regenerate` | 2 per 3 minutes |
+| Other question routes | none |
+
+A limited request gets 429 with a `Retry-After` header.
 
 ## Best Practices
 
@@ -333,9 +322,9 @@ Replace existing questions with newly generated ones.
 const response = await fetch(`/api/v1/books/${bookId}/chapters/${chapterId}/generate-questions`, {
   method: 'POST',
   headers: {
-    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'
   },
+  credentials: 'include', // sends the session cookie
   body: JSON.stringify({
     count: 10,
     difficulty: 'medium',
@@ -353,7 +342,7 @@ import requests
 # Save question response
 response = requests.put(
     f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question_id}/response",
-    headers={"Authorization": f"Bearer {token}"},
+    cookies=session_cookies,  # the better-auth session cookie
     json={
         "response_text": "My detailed response...",
         "status": "completed"

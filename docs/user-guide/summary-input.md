@@ -114,7 +114,7 @@ If voice input isn't working:
 
 ### Auto-save Feature
 
-- **Automatic saving**: Your summary is saved automatically 600ms after you stop typing
+- **Automatic saving**: Your summary is saved automatically 1 second after you stop typing
 - **Save indicator**: Look for "Saving..." indicator when auto-save triggers
 - **Local backup**: Work is also saved locally in case of connectivity issues
 - **No action required**: Auto-save works seamlessly in the background
@@ -122,9 +122,8 @@ If voice input isn't working:
 ### Revision History
 
 While editing your summary:
-- **Previous versions** are automatically saved
-- **Major changes** trigger new revision points
-- **Recovery options** available if needed
+- **Previous versions** are saved each time you save a changed summary (the last 20 are kept)
+- **Revision History** on the summary page lists them; click "Revert" to load one into the text area
 
 ## Best Practices
 
@@ -196,7 +195,7 @@ While editing your summary:
 #### Voice Input Not Working
 - **Browser permissions**: Allow microphone access
 - **Hardware issues**: Test microphone with other apps
-- **Browser compatibility**: Use Chrome, Firefox, or Safari
+- **Browser compatibility**: Voice input works in Chrome and Edge over HTTPS; in other browsers, type instead
 - **Network connectivity**: Ensure stable internet connection
 
 #### Auto-save Not Working

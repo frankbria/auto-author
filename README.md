@@ -98,37 +98,20 @@ For detailed documentation about TOC generation:
 
 ### Prerequisites
 
-* Node.js (>=18)
-* Python 3.10+
-* MongoDB (local or Atlas)
-* Docker (optional for local dev containers)
+* Node.js 24+ (`frontend/package.json` engines)
+* Python 3.13+ and [uv](https://docs.astral.sh/uv/) (`backend/pyproject.toml`)
+* MongoDB running on `localhost:27017` (or an Atlas URI)
 
 ### Setup
 
 #### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-org/auto-author.git
+git clone https://github.com/frankbria/auto-author.git
 cd auto-author
 ```
 
-#### 2. Install Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-#### 3. Install Backend
-
-```bash
-cd backend
-pip install
-uvicorn app.main:app --reload
-```
-
-#### 4. Set Environment Variables
+#### 2. Set Environment Variables
 
 Copy the two examples. Unchanged, they give a working local setup against MongoDB on `localhost:27017`:
 
@@ -137,11 +120,34 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 ```
 
+- `ENVIRONMENT` is required by the backend (`development|test|staging|production`); it refuses to start without it. `backend/.env.example` sets it to `development`.
 - The two `DATABASE_NAME` values must stay the same: the backend reads the sessions better-auth writes there.
 - The two `BETTER_AUTH_SECRET` values must stay the same. The example's value is refused in staging and production; generate one there with `python -c 'import secrets; print(secrets.token_urlsafe(64))'`.
 - `NEXT_PUBLIC_API_URL` includes `/api/v1`.
 - Set `OPENAI_API_KEY` in `backend/.env` for the AI features. Without email settings, the sign-up verification link is printed in the frontend's terminal.
 - `BYPASS_AUTH` stays off. Turning it on also needs `E2E_ALLOW_BYPASS=1` (#272, #307), and production refuses it.
+
+#### 3. Run the Backend
+
+```bash
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload
+```
+
+The API is at `http://127.0.0.1:8000`, with interactive docs at `/docs`.
+
+#### 4. Run the Frontend
+
+In a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The app is at `http://localhost:3000`.
 
 ---
 

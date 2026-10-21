@@ -332,9 +332,7 @@ class TestGenerateToc:
         book_id = await _create_book(api)
         await _set_summary(api, book_id)
 
-        err = AIRateLimitError(
-            retry_after=90, cached_content_available=True, correlation_id="rl-1"
-        )
+        err = AIRateLimitError(retry_after=90, correlation_id="rl-1")
         with patch(AI_PATCH_TARGET, new=AsyncMock(side_effect=err)):
             resp = await api.post(
                 f"/api/v1/books/{book_id}/generate-toc",
@@ -344,7 +342,6 @@ class TestGenerateToc:
         detail = resp.json()["detail"]
         assert detail["error_code"] == "AI_RATE_LIMIT"
         assert detail["retry_after"] == 90
-        assert detail["cached_content_available"] is True
         assert detail["correlation_id"] == "rl-1"
 
     @pytest.mark.asyncio

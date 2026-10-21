@@ -115,24 +115,4 @@ describe('the Reference ID', () => {
 
     expect(show).toHaveBeenCalledWith(expect.objectContaining({ correlationId: SERVER_ID }), expect.anything());
   });
-
-  it('is the server id on the notification that earlier content is being shown instead', async () => {
-    const show = ErrorNotification.showErrorNotification as jest.Mock;
-    show.mockClear();
-    const refused = {
-      message: 'AI service unavailable',
-      status_code: 503,
-      error_type: 'service_unavailable',
-      cached_content_available: true,
-      cached_content: { questions: ['Q1'] },
-    };
-    const error = Object.assign(new Error(`Failed to generate: 503 ${JSON.stringify(refused)}`), { requestId: SERVER_ID });
-
-    await handleAIServiceError(error);
-
-    expect(show).toHaveBeenCalledWith(
-      expect.objectContaining({ correlationId: SERVER_ID, message: 'Using previously generated content' }),
-      expect.anything()
-    );
-  });
 });

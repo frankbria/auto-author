@@ -8,15 +8,11 @@ This document outlines the API endpoints available for managing book metadata in
 http://localhost:8000/api/v1
 ```
 
-Replace with the appropriate production URL in deployment environments.
+Replace with the API host of the environment you are calling (staging is `https://api.dev.autoauthor.app`).
 
 ## Authentication
 
-All endpoints require authentication using a Bearer token:
-
-```
-Authorization: Bearer <clerk_jwt_token>
-```
+All endpoints require a signed-in user. The backend reads the better-auth session cookie; it does not read an `Authorization` header.
 
 ## Book Metadata Endpoints
 
@@ -45,7 +41,7 @@ Creates a new book with the specified metadata.
 - `title`: String (1-100 characters)
 
 **Optional Fields:**
-- `subtitle`: String (up to 200 characters)
+- `subtitle`: String (up to 255 characters)
 - `description`: String (up to 5000 characters)
 - `genre`: String (up to 100 characters)
 - `target_audience`: String (up to 100 characters)
@@ -81,11 +77,11 @@ Retrieves all books owned by the authenticated user.
 
 **Endpoint:** `GET /books`
 
-**Rate Limit:** 20 requests per 60 seconds
+**Rate Limit:** 60 requests per 60 seconds
 
 **Query Parameters:**
 - `skip`: Number of records to skip (default: 0)
-- `limit`: Maximum number of records to return (default: 100, max: 100)
+- `limit`: Maximum number of records to return (default: 100, min: 1, max: 100)
 
 **Response:** `200 OK`
 
@@ -168,9 +164,11 @@ Updates the metadata of a specific book.
 }
 ```
 
+`PATCH /books/{book_id}` takes the same body and is limited to 20 requests per 60 seconds. With `PATCH`, a field left out is unchanged and an explicit `null` clears `subtitle`, `description`, `genre` and `target_audience`. `PUT` ignores `null` fields.
+
 **Optional Fields:** (include only the fields you want to update)
 - `title`: String (1-100 characters)
-- `subtitle`: String (up to 200 characters)
+- `subtitle`: String (up to 255 characters)
 - `description`: String (up to 5000 characters)
 - `genre`: String (up to 100 characters)
 - `target_audience`: String (up to 100 characters)
@@ -248,7 +246,7 @@ Returned when authentication is missing or invalid.
 
 ```json
 {
-  "detail": "Authentication required"
+  "detail": "Not authenticated. Please sign in."
 }
 ```
 

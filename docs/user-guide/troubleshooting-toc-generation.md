@@ -7,19 +7,19 @@ This guide provides solutions for common issues encountered during Table of Cont
 ### Summary Not Ready for TOC Generation
 
 #### Symptoms
-- "Your summary needs improvement" message
+- "Summary needs improvement" step in the TOC wizard
 - Low confidence score
-- Multiple improvement suggestions
-- Disabled "Generate TOC" button
+- Improvement suggestions
+- A disabled "Complete Book Summary First" button on the book page (no summary saved yet)
 
 #### Causes
-1. **Summary too short** (under 100 words)
+1. **Summary too short** (the minimum is 30 words and 150 characters)
 2. **Lack of clear themes or structure**
 3. **Missing genre or audience indicators**
 4. **Overly vague or general content**
 
 #### Solutions
-1. **Expand your summary** to at least 250-300 words
+1. **Expand your summary** past the minimum of 30 words and 150 characters (the summary page shows both counts). The maximum is 2,000 characters
 2. **Add specific topics** you plan to cover
 3. **Mention your target audience** and book's purpose
 4. **Clarify the book's genre** and overall approach
@@ -29,7 +29,7 @@ This guide provides solutions for common issues encountered during Table of Cont
 ### AI Service Timeout
 
 #### Symptoms
-- "Error generating TOC: AI service timeout" message
+- An error message instead of the generated TOC
 - Generation process stuck at a specific percentage
 - Error occurs after waiting more than 60 seconds
 
@@ -70,18 +70,18 @@ This guide provides solutions for common issues encountered during Table of Cont
 ### Rate Limit Exceeded
 
 #### Symptoms
-- "Rate limit exceeded: 2 requests per 5 minutes" message
+- A "Rate limit exceeded. Try again in N seconds." message (generation allows 2 requests per 5 minutes)
 - Unable to generate a new TOC after multiple attempts
 
 #### Causes
 1. **Multiple TOC generation attempts** in short succession
-2. **Shared IP address** with rate limits (rare)
+2. **Retrying after a failed generation** counts toward the limit
 
 #### Solutions
 1. **Wait 5 minutes** before trying again
 2. **Plan your TOC approach** before generating
 3. **Use the edit interface** to modify existing TOC rather than regenerating
-4. **If urgent, contact support** for temporary rate limit adjustment
+4. Generating clarifying questions has its own limit of 3 requests per minute
 
 ### Clarifying Questions Not Generated
 
@@ -172,9 +172,9 @@ Common error responses and meanings:
 | Error Message | Meaning | Solution |
 |---------------|---------|----------|
 | 500 - AI service error | Backend AI service failed | Try again later |
-| 429 - Rate limit exceeded | Too many requests | Wait 5 minutes |
-| 400 - Invalid request | Problem with input data | Check summary and responses |
-| 413 - Payload too large | Summary too long | Reduce summary length |
+| 429 - Rate limit exceeded | Too many requests | Wait for the time in the message (up to 5 minutes) |
+| 400 - Invalid request | No summary saved, or no question responses | Save your summary and answer the questions |
+| 400 on saving a summary | Summary over 2,000 characters or under 30 | Change the summary length |
 
 ### Recovering from Failed Generation
 

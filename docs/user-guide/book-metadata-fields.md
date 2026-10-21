@@ -9,7 +9,7 @@ This document outlines all metadata fields available for books in the Auto Autho
 | `title` | Yes | String | Min: 1 char, Max: 100 chars | The main title of your book. This is displayed prominently and is required for all books. |
 | `subtitle` | No | String | Max: 200 chars (frontend), 255 chars (backend) | An optional secondary title that provides additional context or elaborates on the main title. |
 | `description` | No | String | Max: 1000 chars (frontend), 5000 chars (backend) | A detailed summary of your book's content. The frontend enforces a 1000 character limit while the backend allows up to 5000 characters for API compatibility. |
-| `genre` | No | String | Max: 50 chars (frontend), 100 chars (backend) | The literary category or style of your book. Select from predefined options or specify a custom genre. |
+| `genre` | No | String | Max: 50 chars (frontend), 100 chars (backend) | The literary category or style of your book. Chosen from the predefined options below in the form; the API accepts any text up to 100 characters. |
 | `target_audience` | No | String | Max: 100 chars | The intended reader demographic for your book, such as "Young Adult" or "Academic". |
 | `cover_image_url` | n/a | String | Read-only | The stored cover image URL. It is not a form field or a request field (#797): only `POST /books/{book_id}/cover-image` writes it. |
 
@@ -17,13 +17,17 @@ This document outlines all metadata fields available for books in the Auto Autho
 
 The application provides the following predefined genre options:
 
-- Fiction
 - Non-Fiction
-- Fantasy
-- Science Fiction
-- Mystery
-- Romance
+- Business
+- Self-Help
+- Personal Development
+- Health & Wellness
+- How-To / Guide
+- Historical
+- Biography
 - Other
+
+The form stores the option's lowercase value (for example `self-help`), not its label. The list is `GENRE_OPTIONS` in `frontend/src/lib/constants/book-metadata.ts`.
 
 ## Predefined Target Audience Options
 
@@ -61,7 +65,7 @@ The following fields are managed by the system and cannot be directly edited:
 - **Description** is optional but cannot exceed 1000 characters in the frontend (5000 characters in the backend) when provided
 - **Genre** is optional but cannot exceed 50 characters in the frontend (100 characters in the backend) when provided
 - **Target Audience** is optional but cannot exceed 100 characters when provided
-- **Cover Image URL** is optional but must be a valid URL format when provided
+- **Cover Image URL** is read-only. It is set only by uploading a cover image, so it has no validation rule
 
 ## Validation Error Messages
 

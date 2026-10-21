@@ -137,29 +137,10 @@ describe('ErrorNotification component', () => {
     expect(screen.queryByText(/Reference ID:/)).not.toBeInTheDocument();
   });
 
-  it('shows "Cached Content" badge when isFromCache=true with AI_SERVICE error', () => {
-    const error = makeError({ type: ErrorType.AI_SERVICE });
-    render(<ErrorNotification error={error} isFromCache={true} />);
-    expect(screen.getByText('Cached Content')).toBeInTheDocument();
-  });
-
-  it('does not show "Cached Content" badge when isFromCache=false', () => {
-    const error = makeError({ type: ErrorType.AI_SERVICE });
-    render(<ErrorNotification error={error} isFromCache={false} />);
-    expect(screen.queryByText('Cached Content')).not.toBeInTheDocument();
-  });
-
-  it('shows "Generate Fresh" button when AI_SERVICE + isFromCache + retryable + onRetry', () => {
-    const error = makeError({ type: ErrorType.AI_SERVICE, retryable: true });
-    render(<ErrorNotification error={error} isFromCache={true} onRetry={jest.fn()} />);
-    expect(screen.getByText('Generate Fresh')).toBeInTheDocument();
-  });
-
-  it('shows "Retry" button label (not "Generate Fresh") when not from cache', () => {
+  it('shows "Retry" button label', () => {
     const error = makeError({ retryable: true });
     render(<ErrorNotification error={error} onRetry={jest.fn()} />);
     expect(screen.getByText('Retry')).toBeInTheDocument();
-    expect(screen.queryByText('Generate Fresh')).not.toBeInTheDocument();
   });
 
   it('does not show Retry button when retryable=false', () => {
@@ -179,14 +160,6 @@ describe('ErrorNotification component', () => {
     const error = makeError({ retryable: true });
     render(<ErrorNotification error={error} onRetry={onRetry} />);
     fireEvent.click(screen.getByText('Retry'));
-    expect(onRetry).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onRetry when "Generate Fresh" button is clicked', () => {
-    const onRetry = jest.fn();
-    const error = makeError({ type: ErrorType.AI_SERVICE, retryable: true });
-    render(<ErrorNotification error={error} isFromCache={true} onRetry={onRetry} />);
-    fireEvent.click(screen.getByText('Generate Fresh'));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
@@ -229,14 +202,13 @@ describe('ErrorNotification component', () => {
   // not tell the bug from the fix. Asserting the light `-50` surface too is what
   // makes them fail on the old shape.
   it.each([
-    ['SYSTEM', ErrorType.SYSTEM, undefined, 'red'],
-    ['PERMANENT', ErrorType.PERMANENT, undefined, 'orange'],
-    ['TRANSIENT', ErrorType.TRANSIENT, undefined, 'yellow'],
-    ['AI_SERVICE (not cached)', ErrorType.AI_SERVICE, false, 'yellow'],
-    ['AI_SERVICE (cached)', ErrorType.AI_SERVICE, true, 'blue'],
-  ] as const)('paints a themed %s card in %s', (_label, type, isFromCache, hue) => {
+    ['SYSTEM', ErrorType.SYSTEM, 'red'],
+    ['PERMANENT', ErrorType.PERMANENT, 'orange'],
+    ['TRANSIENT', ErrorType.TRANSIENT, 'yellow'],
+    ['AI_SERVICE', ErrorType.AI_SERVICE, 'yellow'],
+  ] as const)('paints a themed %s card in %s', (_label, type, hue) => {
     const { container } = render(
-      <ErrorNotification error={makeError({ type })} isFromCache={isFromCache} />
+      <ErrorNotification error={makeError({ type })} />
     );
 
     const card = container.querySelector(`[class*="bg-${hue}-50"]`);
@@ -412,34 +384,6 @@ describe('showErrorNotification', () => {
     );
   });
 
-  // --- AI_SERVICE + isFromCache ---
-  it('calls toast.warning for AI_SERVICE when isFromCache=true', () => {
-    const error = makeError({ type: ErrorType.AI_SERVICE });
-    showErrorNotification(error, { isFromCache: true });
-    expect(mockToast.warning).toHaveBeenCalledWith(error.message, expect.any(Object));
-  });
-
-  it('includes "Generate Fresh" action for AI_SERVICE + isFromCache + onRetry', () => {
-    const onRetry = jest.fn();
-    const error = makeError({ type: ErrorType.AI_SERVICE });
-    showErrorNotification(error, { isFromCache: true, onRetry });
-    expect(mockToast.warning).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({
-        action: expect.objectContaining({ label: 'Generate Fresh', onClick: onRetry }),
-      })
-    );
-  });
-
-  it('does not include action for AI_SERVICE + isFromCache when no onRetry', () => {
-    const error = makeError({ type: ErrorType.AI_SERVICE });
-    showErrorNotification(error, { isFromCache: true });
-    expect(mockToast.warning).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({ action: undefined })
-    );
-  });
-
   // --- AI_SERVICE + retryAfter ---
   it('calls toast.error with extended duration for AI_SERVICE + retryAfter', () => {
     const error = makeError({ type: ErrorType.AI_SERVICE });
@@ -500,18 +444,11 @@ describe('showErrorNotification', () => {
     expect(opts.duration).toBe(5000);
   });
 
-  it('uses 15000ms default duration for AI_SERVICE (not from cache)', () => {
+  it('uses 15000ms default duration for AI_SERVICE', () => {
     const error = makeError({ type: ErrorType.AI_SERVICE, retryable: false });
     showErrorNotification(error);
     const [, opts] = mockToast.error.mock.calls[0];
     expect(opts.duration).toBe(15000);
-  });
-
-  it('uses 10000ms default duration for AI_SERVICE + isFromCache', () => {
-    const error = makeError({ type: ErrorType.AI_SERVICE });
-    showErrorNotification(error, { isFromCache: true });
-    const [, opts] = mockToast.warning.mock.calls[0];
-    expect(opts.duration).toBe(10000);
   });
 
   it('uses 7000ms default duration for PERMANENT errors', () => {

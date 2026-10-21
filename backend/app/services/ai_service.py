@@ -452,7 +452,7 @@ class AIService:
             List of clarifying questions
 
         Raises:
-            AIServiceError: If generation fails and no cached content available
+            AIServiceError: If generation fails
         """
         correlation_id = str(uuid.uuid4())
 
@@ -489,7 +489,6 @@ class AIService:
             return questions
 
         except AIServiceError as e:
-            e.cached_content_available = False
             logger.error(
                 f"Error generating clarifying questions "
                 f"[correlation_id={correlation_id}]: {str(e)}"
@@ -665,7 +664,7 @@ Make questions specific, actionable, and focused on content structure rather tha
             Dict containing the generated TOC structure
 
         Raises:
-            AIServiceError: If generation fails and no cached content available
+            AIServiceError: If generation fails
         """
         correlation_id = str(uuid.uuid4())
 
@@ -714,7 +713,6 @@ Make questions specific, actionable, and focused on content structure rather tha
             return toc_result
 
         except AIServiceError as e:
-            e.cached_content_available = False
             logger.error(
                 f"Error generating TOC "
                 f"[correlation_id={correlation_id}]: {str(e)}"

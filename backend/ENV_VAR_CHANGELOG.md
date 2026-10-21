@@ -98,12 +98,12 @@ The following Clerk authentication variables have been removed:
 
 - `CLERK_API_KEY` - Clerk API key (no longer needed)
 - `CLERK_PUBLISHABLE_KEY` - Clerk publishable key (no longer needed)
-- `CLERK_JWT_PUBLIC_KEY` - Clerk JWT public key for RS256 validation (replaced by HS256)
+- `CLERK_JWT_PUBLIC_KEY` - Clerk JWT public key for RS256 validation (no longer needed)
 - `CLERK_FRONTEND_API` - Clerk frontend API endpoint (no longer needed)
 - `CLERK_BACKEND_API` - Clerk backend API endpoint (no longer needed)
 - `CLERK_SECRET_KEY` - Clerk secret key (no longer needed)
 - `CLERK_WEBHOOK_SECRET` - Clerk webhook validation secret (no longer needed)
-- `CLERK_JWT_ALGORITHM` - JWT algorithm setting (was "RS256", now fixed to "HS256")
+- `CLERK_JWT_ALGORITHM` - JWT algorithm setting (no longer needed)
 
 **Associated Code Changes**:
 - Removed `clerk_jwt_public_key_pem` property from `Settings` class in `app/core/config.py`
@@ -113,28 +113,19 @@ The following Clerk authentication variables have been removed:
 
 The following better-auth authentication variables have been added:
 
-- `BETTER_AUTH_SECRET` - Shared secret key for JWT signing and verification with HS256
-  - Purpose: Used by both frontend (Node.js) and backend (Python) for HMAC-SHA256 JWT operations
-  - Generation: `openssl rand -base64 32`
+- `BETTER_AUTH_SECRET` - better-auth's secret for signing its session cookies
+  - Purpose: Used by both frontend (Node.js) and backend (Python); the backend checks the session cookie's signature with it
+  - Generation: `python -c 'import secrets; print(secrets.token_urlsafe(64))'`
   - **CRITICAL**: Must be identical between frontend and backend environments
 
 - `BETTER_AUTH_URL` - Base URL of the application
   - Purpose: Used for constructing callback URLs and CORS validation
   - Example: `http://localhost:3000` (development) or `https://autoauthor.app` (production)
 
-- `BETTER_AUTH_ISSUER` - JWT issuer identifier
-  - Purpose: Used in JWT validation to verify token source
-  - Default: `better-auth`
-
-- `JWT_ALGORITHM` - JWT signing algorithm (changed from config field to hardcoded)
-  - Changed from: `CLERK_JWT_ALGORITHM="RS256"` (asymmetric RSA)
-  - Changed to: `JWT_ALGORITHM="HS256"` (symmetric HMAC-SHA256)
-  - Impact: Simplified key management - uses single shared secret instead of public/private key pair
-
 **Associated Code Changes**:
 - Updated `Settings` class in `app/core/config.py` with new better-auth fields
 - Updated `.env.example` with new better-auth variables and instructions
-- Security module will validate JWT using HS256 with `BETTER_AUTH_SECRET`
+- The security module looks the session up in MongoDB by cookie and checks the cookie signature with `BETTER_AUTH_SECRET`
 
 ## Previous OpenAI Migration (2025-XX-XX)
 
@@ -194,25 +185,19 @@ The following better-auth authentication variables have been added:
 
 4. Remove all Clerk environment variables from deployment
 
-## JWT Algorithm Changes
+## Authentication Changes
 
-**Before (Clerk)**:
-- Algorithm: RS256 (RSA, asymmetric)
-- Key Management: Public key distributed, private key kept on Clerk's servers
-- Validation: Verify using Clerk's JWKS endpoint
+**Before (Clerk)**: the backend verified a Clerk JWT (RS256) against Clerk's JWKS endpoint.
 
-**After (Better Auth)**:
-- Algorithm: HS256 (HMAC-SHA256, symmetric)
-- Key Management: Single shared secret between frontend and backend
-- Validation: Direct HMAC verification using `BETTER_AUTH_SECRET`
+**After (Better Auth)**: the backend reads the better-auth session cookie, checks its signature with `BETTER_AUTH_SECRET`, and looks the session up in MongoDB. There is no JWT.
 
-This simplification allows self-hosted authentication without external API dependencies.
+This allows self-hosted authentication without external API dependencies.
 
 ## Impact Summary
 
 | Aspect | Clerk | Better Auth |
 |--------|-------|------------|
-| Key Type | Asymmetric (RS256) | Symmetric (HS256) |
+| Credential | Clerk JWT (RS256) | Session cookie signed with a shared secret |
 | Secrets Required | 7+ variables | 3 variables |
 | Complexity | External JWKS + webhooks | Single shared secret |
 | Self-Hosted | No | Yes |

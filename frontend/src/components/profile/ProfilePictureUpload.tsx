@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import useOptimizedClerkImage from '@/hooks/useOptimizedClerkImage';
 import { toast } from '@/lib/toast';
 import { apiFetch } from '@/lib/api/unauthorized';
 
@@ -36,11 +35,8 @@ interface ProfilePictureUploadProps {
  * (raw fetch so the browser sets the multipart boundary; cookie-authenticated).
  */
 export function ProfilePictureUpload({ currentAvatarUrl, onUploaded }: ProfilePictureUploadProps) {
-  const { getOptimizedImageUrl } = useOptimizedClerkImage();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-
-  const src = currentAvatarUrl ? getOptimizedImageUrl(currentAvatarUrl, 200) : '';
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -83,9 +79,9 @@ export function ProfilePictureUpload({ currentAvatarUrl, onUploaded }: ProfilePi
 
   return (
     <div className="flex items-center gap-4">
-      {src ? (
+      {currentAvatarUrl ? (
         <Image
-          src={src}
+          src={currentAvatarUrl}
           alt="Profile picture"
           width={80}
           height={80}

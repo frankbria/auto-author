@@ -1,20 +1,15 @@
 # Error Handling Architecture
 
-**Status**: ✅ Production Ready
-**Version**: 1.0.0
-**Last Updated**: 2025-10-12
-
 ## Overview
 
 The unified error handling framework provides consistent error classification, automatic retry logic, and user-friendly notifications across the entire application. It replaces ad-hoc try-catch blocks with a systematic approach to error management.
 
 ## Core Principles
 
-1. **Error Classification**: All errors categorized as Transient, Permanent, or System
+1. **Error Classification**: All errors categorized as Transient, Permanent, System, AI service or Entitlement
 2. **Automatic Recovery**: Transient errors retry automatically with exponential backoff
 3. **User-Friendly Messages**: Clear, actionable error messages for all scenarios
 4. **Correlation Tracking**: Unique IDs for error tracking and support
-5. **Graceful Degradation**: System remains functional despite errors
 
 ## Architecture Components
 
@@ -26,6 +21,8 @@ enum ErrorType {
   TRANSIENT = 'transient',  // Temporary, retry possible
   PERMANENT = 'permanent',  // User action required
   SYSTEM = 'system',        // Infrastructure issue
+  AI_SERVICE = 'ai_service',   // AI provider failure or rate limit (429)
+  ENTITLEMENT = 'entitlement', // Plan lacks the feature (402): upgrade, not retry
 }
 ```
 
@@ -77,14 +74,15 @@ Automatically classifies errors based on:
 #### HTTP Status Mapping
 ```typescript
 const HTTP_STATUS_TO_ERROR_TYPE: Record<number, ErrorType> = {
-  // Client errors (4xx) - Permanent
-  400: ErrorType.PERMANENT,  // Bad Request
-  401: ErrorType.PERMANENT,  // Unauthorized
-  403: ErrorType.PERMANENT,  // Forbidden
-  404: ErrorType.PERMANENT,  // Not Found
-  409: ErrorType.PERMANENT,  // Conflict
-  422: ErrorType.PERMANENT,  // Validation Error
-  429: ErrorType.TRANSIENT,  // Rate Limit
+  // Client errors (4xx)
+  400: ErrorType.PERMANENT,    // Bad Request
+  401: ErrorType.PERMANENT,    // Unauthorized
+  402: ErrorType.ENTITLEMENT,  // Payment Required (plan lacks the feature)
+  403: ErrorType.PERMANENT,    // Forbidden
+  404: ErrorType.PERMANENT,    // Not Found
+  409: ErrorType.PERMANENT,    // Conflict
+  422: ErrorType.PERMANENT,    // Validation Error
+  429: ErrorType.AI_SERVICE,   // Rate limit
 
   // Server errors (5xx)
   500: ErrorType.SYSTEM,     // Internal Server Error
@@ -93,6 +91,8 @@ const HTTP_STATUS_TO_ERROR_TYPE: Record<number, ErrorType> = {
   504: ErrorType.TRANSIENT,  // Gateway Timeout
 };
 ```
+
+Only `TRANSIENT` errors are retried by `handleApiCall`. A 429 (`AI_SERVICE`) and a 402 (`ENTITLEMENT`) are not: the 429 shows a retry countdown and the 402 shows an Upgrade button linking to the billing tab (`components/errors/ErrorNotification.tsx`). Any status not in the table classifies as `SYSTEM`.
 
 #### Classification Logic
 ```typescript
@@ -278,7 +278,7 @@ OpenAI calls are retried in exactly one place, `AIService._retry_with_backoff`, 
 | `AIInvalidRequestError` | 400 |
 | Anything else | 500 |
 
-The body is `{ message, error_code, retry_after, retryable, cached_content_available, correlation_id }` under `detail`, plus a `Retry-After` header when a wait is known. The message is the service's own fixed text, never the provider's. Response caching was removed (#214), so there is no cached fallback and `cached_content_available` is always false.
+The body is `{ message, error_code, retry_after, retryable, correlation_id }` under `detail`, plus a `Retry-After` header when a wait is known. The message is the service's own fixed text, never the provider's. There is no cached fallback: response caching was removed (#214) and the `cached_content_available` key with it (#854).
 
 ### Frontend: AI call handling
 
@@ -523,62 +523,11 @@ frontend/src/components/errors/
 - Error notification dismissal
 - Multiple concurrent error scenarios
 
-## Performance Considerations
-
-### Optimization
-- Error classification is synchronous (no async overhead)
-- Retry delays use native setTimeout (no polling)
-- Notifications throttled to prevent spam
-- Correlation IDs generated efficiently
-
-### Memory Management
-- Errors contain only necessary data
-- Original errors stored as weak references
-- Notification cleanup on unmount
-- No persistent error storage
-
 ## Security Considerations
 
-### Information Disclosure
-- Technical error details hidden from users
-- System errors show correlation ID only
-- Stack traces never exposed to UI
-- Sensitive data scrubbed from logs
-
-### Rate Limiting
-- Exponential backoff prevents DoS
-- Max attempts cap prevents infinite retries
-- Delay limits prevent resource exhaustion
-- Manual retry requires user action
-
-## Monitoring and Observability
-
-### Metrics to Track
-- Error rate by type (Transient/Permanent/System)
-- Retry success rate
-- Average retry attempts before success
-- Most common error status codes
-- Correlation ID usage in support tickets
-
-### Logging
-- All errors logged with correlation ID
-- Retry attempts logged with delay
-- Success after retry logged with attempt count
-- User actions (manual retry, dismiss) logged
-
-## Future Enhancements
-
-### Short-term
-1. Backend integration for correlation ID tracking
-2. Error analytics dashboard
-3. Custom error handlers per API endpoint
-4. Retry strategy profiles (aggressive, conservative)
-
-### Long-term
-1. Circuit breaker pattern for failing services
-2. Fallback strategies for degraded service
-3. User preferences for retry behavior
-4. Error prediction and prevention
+- The classifier's user-facing messages are fixed text; technical details sit in `details`.
+- System errors show a reference ID (the server's request id when there is one).
+- `maxAttempts` and `maxDelay` cap automatic retries; a manual retry needs a user action.
 
 ## References
 

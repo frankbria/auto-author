@@ -85,7 +85,7 @@ Files under 500 lines. Never hardcode secrets. Tests before implementation. WCAG
 
 ## Deployment
 
-- Staging: https://dev.autoauthor.app (frontend), https://api.dev.autoauthor.app (backend). SSH as `root`, keys are local.
+- Staging: https://dev.autoauthor.app (frontend), https://api.dev.autoauthor.app (backend). SSH access details are in the operator's local runbook.
 - **Shared box — other apps run here.** Backend is on 8000, frontend on 3002, but check nginx for current truth before assuming a port is free.
 - **Containers since 2026-08-12 (#484)** — `deploy-staging-containers.yml` ships the compose files and pulls a `sha-` image tag; the tag *is* the release id; roll back by deploying an older tag. PM2 is gone (#656, #846).
 - **Application secrets live in `/opt/auto-author/.env` on the box, not in GitHub secrets.** The one workflow that writes it is `sync-staging-env.yml` (manual), and only the `MONGODB_URI` key, from the `staging` environment secret; no other GitHub secret reaches the box. See `docs/STAGING-DEPLOYMENT.md`.
@@ -103,7 +103,7 @@ Files under 500 lines. Never hardcode secrets. Tests before implementation. WCAG
 
 ## API
 
-Auth: better-auth JWT, HS256 shared secret. Session list/revoke via better-auth native APIs (Settings → Security).
+Auth: better-auth session cookie. The backend looks the session up in MongoDB and checks the cookie signature with `BETTER_AUTH_SECRET`; there is no JWT or Bearer token. Session list/revoke via better-auth native APIs (Settings → Security).
 
 Core endpoints: `/api/v1/books`, `/api/v1/chapters`, `/api/v1/toc`, `/api/v1/export`. Full reference in the backend OpenAPI docs.
 

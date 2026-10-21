@@ -190,7 +190,6 @@ def ai_error_http_exception(error: AIServiceError) -> HTTPException:
             "error_code": error.error_code,
             "retry_after": error.retry_after,
             "retryable": error.retryable,
-            "cached_content_available": error.cached_content_available,
             "correlation_id": error.correlation_id,
         },
         headers={"Retry-After": str(error.retry_after)} if error.retry_after else None,
