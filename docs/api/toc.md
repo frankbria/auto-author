@@ -73,7 +73,7 @@ GET /books/{book_id}/toc-readiness
 
 ```json
 {
-  "detail": "Not authorized to access this book"
+  "detail": "Not authorized to check readiness for this book"
 }
 ```
 

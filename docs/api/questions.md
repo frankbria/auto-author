@@ -71,7 +71,7 @@ Retrieve questions for a chapter with optional filtering.
 #### Query Parameters
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| status | string | No | Filter by response status: "draft", "completed" |
+| status | string | No | Filter by response status: "not_answered", "draft", "completed" |
 | category | string | No | Filter by question category |
 | question_type | string | No | Filter by type: "character", "plot", "setting", "theme", "research" |
 | page | integer | No | Page number (default: 1) |
@@ -188,21 +188,28 @@ Provide feedback and rating for a question's relevance and quality.
 #### Request Body
 ```json
 {
+  "question_id": "<question_id>",
+  "user_id": "<any string>",
   "rating": 4,
-  "feedback": "Very helpful question that sparked new ideas for character development."
+  "feedback": "Very helpful question that sparked new ideas."
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| question_id | string | Yes | Required by the schema; the path's `question_id` is the one used |
+| user_id | string | Yes | Required by the schema; the signed-in user is the one used |
 | rating | integer | Yes | Rating from 1-5 stars |
 | feedback | string | No | Optional written feedback |
+
+The editor currently sends only `rating`, so its ratings are refused with `422` (#1117).
 
 #### Response
 ```json
 {
+  "rating": { "id": "...", "question_id": "...", "rating": 4, "feedback": "...", "created_at": "..." },
   "success": true,
-  "message": "Rating saved successfully"
+  "message": "Question rated successfully"
 }
 ```
 
@@ -238,7 +245,7 @@ Replace existing questions with newly generated ones.
 #### Query Parameters
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| preserve_responses | boolean | No | Keep questions that have responses (default: false) |
+| preserve_responses | boolean | No | Keep questions that have responses (default: true) |
 
 #### Request Body
 ```json

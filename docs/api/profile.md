@@ -123,10 +123,12 @@ written only by `POST /users/me/avatar`.
 
 **Status Codes**:
 - `200 OK`: Profile updated successfully
-- `400 Bad Request`: Invalid input data
 - `401 Unauthorized`: No valid session cookie
+- `404 Not Found`: No profile for this account
+- `422 Unprocessable Content`: A field failed validation, or an unknown field was sent
 - `429 Too Many Requests`: Rate limit exceeded
 - `500 Internal Server Error`: Server-side error
+- `504 Gateway Timeout`: The database did not answer in time
 
 **Example Request**:
 ```bash
@@ -264,6 +266,7 @@ record to the tombstone (#954).
 - `403 Forbidden`: Insufficient permissions
 - `404 Not Found`: User not found or already erased
 - `502 Bad Gateway`: The subscription could not be cancelled — nothing was deleted, retry
+- `504 Gateway Timeout`: An unexpected error while deleting ("Error deleting user")
 
 **Example Request**:
 ```bash

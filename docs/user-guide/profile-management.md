@@ -64,7 +64,7 @@ Click **Save Changes** to apply your edits.
 
 1. **View Current Picture**: Your profile image appears at the top of the profile page
 2. **Change Picture**:
-   - Click the edit icon (pencil) on the profile picture
+   - Click **Change photo** next to the profile picture
    - Select a JPEG, PNG, WebP or GIF image of up to 5 MB
    - The image is uploaded and displayed
 
@@ -166,10 +166,12 @@ http://localhost:8000/api/v1
 
 **Status Codes**:
 - `200 OK`: Profile updated successfully
-- `400 Bad Request`: Invalid data format
 - `401 Unauthorized`: No valid session cookie
+- `404 Not Found`: No profile for this account
+- `422 Unprocessable Content`: A field failed validation, or an unknown field was sent
 - `429 Too Many Requests`: Rate limit exceeded
 - `500 Internal Server Error`: Server-side error
+- `504 Gateway Timeout`: The database did not answer in time
 
 ### Delete Account
 
