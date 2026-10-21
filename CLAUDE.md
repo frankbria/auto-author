@@ -32,6 +32,9 @@ Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append n
 Root `package.json` has only `npm test` (→ `scripts/test-all.sh`). Everything else runs inside `frontend/` or `backend/`.
 
 ```bash
+# Tasks: GitHub issues, [PX.Y] title prefix, worked lowest first
+gh issue list --state open
+
 # Frontend
 cd frontend && npm run lint && npm run typecheck && npm test
 npm run test:coverage
