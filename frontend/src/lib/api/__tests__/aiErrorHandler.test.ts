@@ -80,7 +80,28 @@ describe('aiErrorHandler', () => {
       );
     });
 
-    it('should handle service unavailable without cached content', async () => {
+    it('should handle network errors', async () => {
+      const error = new Error('Failed to fetch: network error');
+      const onRetry = jest.fn();
+
+      const result = await handleAIServiceError(error, onRetry);
+
+      expect(result.error).toMatch(/network|connection/i);
+      expect(result.canRetry).toBe(true);
+      expect(result.data).toBeUndefined();
+
+      expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: expect.stringMatching(/network|connection/i),
+          suggestedActions: expect.arrayContaining([
+            expect.stringMatching(/internet.*connection|connection/i),
+          ]),
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should handle service unavailable', async () => {
       const error = new Error('Failed: 503 Service Unavailable');
       const onRetry = jest.fn();
 

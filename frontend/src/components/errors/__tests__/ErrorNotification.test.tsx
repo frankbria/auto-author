@@ -444,7 +444,7 @@ describe('showErrorNotification', () => {
     expect(opts.duration).toBe(5000);
   });
 
-  it('uses 15000ms default duration for AI_SERVICE ', () => {
+  it('uses 15000ms default duration for AI_SERVICE', () => {
     const error = makeError({ type: ErrorType.AI_SERVICE, retryable: false });
     showErrorNotification(error);
     const [, opts] = mockToast.error.mock.calls[0];

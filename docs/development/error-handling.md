@@ -278,7 +278,7 @@ OpenAI calls are retried in exactly one place, `AIService._retry_with_backoff`, 
 | `AIInvalidRequestError` | 400 |
 | Anything else | 500 |
 
-The body is `{ message, error_code, retry_after, retryable, cached_content_available, correlation_id }` under `detail`, plus a `Retry-After` header when a wait is known. The message is the service's own fixed text, never the provider's. Response caching was removed (#214), so there is no cached fallback and `cached_content_available` is always false.
+The body is `{ message, error_code, retry_after, retryable, correlation_id }` under `detail`, plus a `Retry-After` header when a wait is known. The message is the service's own fixed text, never the provider's. There is no cached fallback: response caching was removed (#214) and the `cached_content_available` key with it (#854).
 
 ### Frontend: AI call handling
 

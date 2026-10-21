@@ -4,6 +4,16 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-21
 
+- **Docs truth pass (#854, P2.8)**: every surviving doc was checked against the code. Claims about things that don't exist were deleted, not rewritten. A separate fact-check pass then fixed six more claims.
+  - **Auth**: no HS256, JWT or Bearer anywhere. The backend looks up the better-auth session cookie in MongoDB, and `BETTER_AUTH_SECRET` signs that cookie. Social login, Clerk, remember-me, SMS 2FA, session tiers and made-up contact addresses are gone from the auth, session, profile and API docs.
+  - **User manual**: support is by email only (`support@autoauthor.app`). No phone, live chat, testimonials, collaboration or "coming soon" formats. The privacy wording matches the subprocessor list.
+  - **API docs**: only real routes, real rate limits, and cookie auth.
+  - **README quickstart**: uv, Node 24, Python 3.13, the real clone URL, and the required `ENVIRONMENT`. A fresh clone following it runs both servers and completes a sign-up.
+  - **Dev docs**: black, mypy, `ruff format` and `quick_validate` are gone. The testing docs now describe the MongoDB fixtures and the real 85% gates.
+  - **Deploy docs**: no "SSH as root". Rolling back staging means re-dispatching an earlier `sha-` tag.
+  - **Code**: the Clerk-era `useOptimizedClerkImage` hook is gone, and avatars render their stored URL. The never-used cached-content AI fallback is gone end to end: `cached_content_available`, `isFromCache`, and the "Cached Content" and "Generate Fresh" UI.
+  - **Found on the way**: question ratings never save (#1117).
+
 - **Legal review banners removed (#791, P1.9)**: counsel signed off on the Terms and Privacy copy (recorded on #791, 2026-10-20). The amber "template, pending legal review" notice is gone from `/terms` and `/privacy`, and the page tests now assert it stays gone. The copy itself is unchanged, so `TERMS_VERSION` and the Privacy "Last updated" date are not bumped.
 
 ### 2026-10-20
