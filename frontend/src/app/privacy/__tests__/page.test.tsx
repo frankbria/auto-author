@@ -27,9 +27,10 @@ describe('Privacy Policy page', () => {
     ).toHaveAttribute('href', SUPPORT_MAILTO);
   });
 
-  it('carries a visible legal-review notice', () => {
+  it('no longer carries the pending-legal-review notice (#791: counsel signed off)', () => {
     render(<PrivacyPage />);
-    expect(screen.getByText(/legal review/i)).toBeInTheDocument();
+    expect(screen.queryByText(/legal review/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
   it('provides the #main-content landmark (skip-link target)', () => {

@@ -8,8 +8,7 @@ export const metadata = {
   description: 'The terms governing your use of Auto Author.',
 };
 
-// #335: template Terms of Service. Copy is a starting point — flag for legal
-// review before public launch. Static server component; owns its own
+// Counsel signed off on this copy (#791). Static server component; owns its own
 // <main id="main-content"> so the layout skip-link resolves here.
 const LAST_UPDATED = new Date(`${TERMS_VERSION}T00:00:00Z`).toLocaleDateString(
   'en-US',
@@ -37,15 +36,6 @@ export default function TermsPage() {
         <p className="mb-6 text-sm text-muted-foreground">
           Last updated: {LAST_UPDATED}
         </p>
-
-        <div
-          role="note"
-          className="mb-8 rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
-        >
-          These terms are provided as a template and have not yet been finalized
-          by counsel. They are pending legal review and may change before
-          general availability.
-        </div>
 
         <div className="space-y-6 text-muted-foreground">
           <section>
