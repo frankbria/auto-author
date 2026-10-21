@@ -69,8 +69,6 @@ frontend/
 │   │   └── book.ts           # Book domain types
 │   ├── hooks/                 # Custom React hooks
 │   └── styles/                # Global styles
-├── docs/                      # Frontend documentation
-├── claudedocs/                # Technical analysis reports
 ├── e2e/                       # Playwright E2E tests
 └── public/                    # Static assets
 ```
@@ -335,9 +333,8 @@ NEXT_PUBLIC_SENTRY_DSN=
 - Request/response examples
 
 ### Guides
-- [Accessibility Testing Guide](docs/accessibility_testing_guide.md)
-- [API Client Documentation](docs/api_client_documentation.md)
-- [Component Testing Guide](docs/component_testing_guide.md)
+- [Accessibility Testing Guide](../docs/development/accessibility-testing.md)
+- [Testing guides](../docs/testing/)
 
 ## 🔧 Troubleshooting
 

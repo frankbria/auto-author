@@ -70,12 +70,10 @@ We keep a local user record in MongoDB keyed by the better-auth user id (`auth_i
 - Frontend: `BETTER_AUTH_SECRET` (must match the backend) and `NEXT_PUBLIC_BETTER_AUTH_URL` — see `frontend/.env.example`.
 - `BYPASS_AUTH=true` enables auth bypass for local development and E2E tests only — and only when `E2E_ALLOW_BYPASS=1` is also set (required in every environment since #272; Playwright's webServer config sets it automatically). In production the middleware rejects it at request time unless the flag is set.
 
-> Migration note: this project previously used Clerk. See `CLAUDE.md` (2025-12-17 and 2025-12-24) for migration details.
-
 For detailed documentation:
-- [Authentication User Guide](docs/user-guide-auth.md)
-- [Profile Management Guide](docs/profile-management-guide.md)
-- [API Profile Endpoints](docs/api-profile-endpoints.md)
+- [Authentication User Guide](docs/user-guide/auth.md)
+- [Profile Management Guide](docs/user-guide/profile-management.md)
+- [API Profile Endpoints](docs/api/profile.md)
 
 ---
 
@@ -90,10 +88,9 @@ Auto Author uses AI to generate structured table of contents from book summaries
 - **Hierarchical Organization**: Support for chapters and nested subchapters
 
 For detailed documentation about TOC generation:
-- [TOC Generation Requirements](docs/toc-generation-requirements.md)
-- [TOC Generation User Guide](docs/user-guide-toc-generation.md)
-- [API TOC Endpoints](docs/api-toc-endpoints.md)
-- [Troubleshooting TOC Generation](docs/troubleshooting-toc-generation.md)
+- [TOC Generation User Guide](docs/user-guide/toc-generation.md)
+- [API TOC Endpoints](docs/api/toc.md)
+- [Troubleshooting TOC Generation](docs/user-guide/troubleshooting-toc-generation.md)
 
 ---
 
@@ -171,8 +168,8 @@ provisioned and was removed in #214; there is no cache to configure.)
 # Development (local):
 cd backend && uv run uvicorn app.main:app --reload 2>&1 | grep "AI Service"
 
-# Production (PM2):
-pm2 logs auto-author-backend | grep "AI Service"
+# Containers (local compose or staging):
+docker compose logs backend | grep "AI Service"
 ```
 
 ---
@@ -221,42 +218,20 @@ BYPASS_AUTH=true npx playwright test
 - Complete Playwright test suite with auth bypass support
 - Test helpers for condition-based waiting (no arbitrary timeouts)
 - Comprehensive page objects for all major workflows
-- See [E2E Test Status](frontend/docs/E2E_TEST_STATUS.md) for details
-
-### Comprehensive Test Analysis
-
-For a complete overview of test infrastructure status:
-- [Post-Deployment Test Report](docs/POST_DEPLOYMENT_TEST_REPORT.md) - Overall test status and analysis
+- Test infrastructure and conventions: [docs/references/testing-infrastructure.md](docs/references/testing-infrastructure.md)
 
 ---
 
 ## 📚 Documentation
 
-Auto Author comes with comprehensive documentation to help you understand and use the system effectively:
+The full index is [docs/README.md](docs/README.md). The most-used entries:
 
-### Documentation Indexes
-- [Profile Documentation Index](docs/profile-documentation-index.md) - Complete index of profile-related docs
-
-### Authentication & Profile Management
-- [Authentication User Guide](docs/user-guide-auth.md) - User-facing authentication guide
-- [Profile Management Guide](docs/profile-management-guide.md) - Features and usage of profile management
-- [Frontend Profile Components](docs/frontend-profile-components.md) - Technical docs for profile UI components
-- [Profile Testing Guide](docs/profile-testing-guide.md) - Testing and CI/CD for profile features
-- [Auth Troubleshooting](docs/auth-troubleshooting.md) - Solutions for common authentication issues
-
-### API References
-- [API Authentication Endpoints](docs/api-auth-endpoints.md) - Authentication API documentation
-- [API Profile Endpoints](docs/api-profile-endpoints.md) - Profile management API documentation
-
-### Technical Guides
-- [Session Management](docs/session-management.md) - How user sessions are managed
-- [Login/Logout Flows](docs/login-logout-flows.md) - Detailed authentication flows
-
-### Testing Documentation
-- [Post-Deployment Test Report](docs/POST_DEPLOYMENT_TEST_REPORT.md) - Comprehensive test analysis
-- [Backend Test Coverage Report](backend/TEST_COVERAGE_REPORT.md) - Module-by-module coverage analysis
-- [Frontend Test Failure Analysis](frontend/docs/TEST_FAILURE_ANALYSIS.md) - Categorized test failures with priorities
-- [E2E Test Status](frontend/docs/E2E_TEST_STATUS.md) - Playwright test suite documentation
+- **Users:** [User manual](docs/user-guide/user-manual.md), plus per-feature guides in [docs/user-guide/](docs/user-guide/)
+- **API:** [docs/api/](docs/api/) (books, chapter tabs, profile, questions, summary, TOC); the live reference is the backend's OpenAPI docs
+- **Developers:** [docs/development/](docs/development/) (error handling, export, sessions, setup guides) and [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Deployment:** [DEPLOYMENT.md](DEPLOYMENT.md) (local setup) and [docs/STAGING-DEPLOYMENT.md](docs/STAGING-DEPLOYMENT.md) (staging)
+- **Testing:** [docs/testing/](docs/testing/) and [docs/references/testing-infrastructure.md](docs/references/testing-infrastructure.md)
+- **Change log:** [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
 ---
 
@@ -264,24 +239,14 @@ Auto Author comes with comprehensive documentation to help you understand and us
 
 ```
 auto-author/
-|
-├── frontend/                # Next.js UI
-│   ├── components/
-│   ├── pages/
-│   ├── styles/
-│   └── docs/
-│       ├── TEST_FAILURE_ANALYSIS.md
-│       └── E2E_TEST_STATUS.md
-|
-├── backend/                 # FastAPI backend
-│   ├── app/
-│   ├── tests/
-│   └── TEST_COVERAGE_REPORT.md
-|
-├── docs/                    # Project documentation
-│   ├── POST_DEPLOYMENT_TEST_REPORT.md
-│   └── [other documentation]
-└── README.md
+├── frontend/          # Next.js app
+│   └── src/           # app/ (routes), components/, hooks/, lib/, types/, e2e/, __tests__/
+├── backend/           # FastAPI app (uv-managed)
+│   ├── app/           # api/, core/, db/, models/, schemas/, services/, utils/
+│   └── tests/
+├── docs/              # Documentation (index: docs/README.md)
+├── scripts/           # Repo-level scripts and guard tests
+└── docker-compose*.yml
 ```
 
 ---
