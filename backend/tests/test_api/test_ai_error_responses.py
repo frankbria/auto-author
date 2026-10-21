@@ -182,7 +182,6 @@ class TestGenerateTOCErrors:
             with patch('app.services.ai_service.ai_service.generate_toc_from_summary_and_responses') as mock_generate:
                 mock_generate.side_effect = AIRateLimitError(
                     retry_after=90,
-                    cached_content_available=True,
                     correlation_id="toc-correlation-123"
                 )
 
@@ -192,7 +191,6 @@ class TestGenerateTOCErrors:
                 data = response.json()
                 assert data["detail"]["error_code"] == "AI_RATE_LIMIT"
                 assert data["detail"]["retry_after"] == 90
-                assert data["detail"]["cached_content_available"] is True
 
     @pytest.mark.asyncio
     async def test_toc_network_error_returns_503(self, client, mock_user, mock_book):
@@ -351,7 +349,6 @@ class TestErrorResponseStructure:
                 mock_generate.side_effect = AIRateLimitError(
                     message="Custom rate limit message",
                     retry_after=120,
-                    cached_content_available=False,
                     correlation_id="detailed-correlation-123"
                 )
 
@@ -369,14 +366,13 @@ class TestErrorResponseStructure:
                 assert "message" in detail
                 assert "error_code" in detail
                 assert "retry_after" in detail
-                assert "cached_content_available" in detail
+                assert "cached_content_available" not in detail
                 assert "correlation_id" in detail
 
                 # Check values
                 assert detail["message"] == "Custom rate limit message"
                 assert detail["error_code"] == "AI_RATE_LIMIT"
                 assert detail["retry_after"] == 120
-                assert detail["cached_content_available"] is False
                 assert detail["correlation_id"] == "detailed-correlation-123"
 
     @pytest.mark.asyncio

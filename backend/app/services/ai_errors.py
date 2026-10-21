@@ -20,7 +20,6 @@ class AIServiceError(Exception):
         error_code: Machine-readable error code
         retryable: Whether this error can be retried
         retry_after: Seconds to wait before retrying (None if not applicable)
-        cached_content_available: Whether cached fallback content is available
         original_exception: The original exception that caused this error
         timestamp: When the error occurred
         correlation_id: Optional correlation ID for tracking
@@ -32,7 +31,6 @@ class AIServiceError(Exception):
         error_code: str,
         retryable: bool = False,
         retry_after: Optional[int] = None,
-        cached_content_available: bool = False,
         original_exception: Optional[Exception] = None,
         correlation_id: Optional[str] = None
     ):
@@ -40,7 +38,6 @@ class AIServiceError(Exception):
         self.error_code = error_code
         self.retryable = retryable
         self.retry_after = retry_after
-        self.cached_content_available = cached_content_available
         self.original_exception = original_exception
         self.correlation_id = correlation_id
         self.timestamp = datetime.now().isoformat()
@@ -55,7 +52,6 @@ class AIServiceError(Exception):
                 "error_code": self.error_code,
                 "retryable": self.retryable,
                 "retry_after": self.retry_after,
-                "cached_content_available": self.cached_content_available,
                 "timestamp": self.timestamp,
                 "correlation_id": self.correlation_id
             }
@@ -82,7 +78,6 @@ class AIRateLimitError(AIServiceError):
         self,
         message: str = "AI service rate limit exceeded",
         retry_after: int = 60,
-        cached_content_available: bool = False,
         original_exception: Optional[Exception] = None,
         correlation_id: Optional[str] = None
     ):
@@ -91,7 +86,6 @@ class AIRateLimitError(AIServiceError):
             error_code="AI_RATE_LIMIT",
             retryable=True,
             retry_after=retry_after,
-            cached_content_available=cached_content_available,
             original_exception=original_exception,
             correlation_id=correlation_id
         )
@@ -108,7 +102,6 @@ class AINetworkError(AIServiceError):
         self,
         message: str = "Network error communicating with AI service",
         retry_after: Optional[int] = None,
-        cached_content_available: bool = False,
         original_exception: Optional[Exception] = None,
         correlation_id: Optional[str] = None
     ):
@@ -117,7 +110,6 @@ class AINetworkError(AIServiceError):
             error_code="AI_NETWORK_ERROR",
             retryable=True,
             retry_after=retry_after,
-            cached_content_available=cached_content_available,
             original_exception=original_exception,
             correlation_id=correlation_id
         )
@@ -134,7 +126,6 @@ class AIServiceUnavailableError(AIServiceError):
         self,
         message: str = "AI service temporarily unavailable",
         retry_after: int = 30,
-        cached_content_available: bool = False,
         original_exception: Optional[Exception] = None,
         correlation_id: Optional[str] = None
     ):
@@ -143,7 +134,6 @@ class AIServiceUnavailableError(AIServiceError):
             error_code="AI_SERVICE_UNAVAILABLE",
             retryable=True,
             retry_after=retry_after,
-            cached_content_available=cached_content_available,
             original_exception=original_exception,
             correlation_id=correlation_id
         )
@@ -210,7 +200,6 @@ class AIInvalidRequestError(AIServiceError):
     def __init__(
         self,
         message: str = "Invalid request to AI service",
-        cached_content_available: bool = False,
         original_exception: Optional[Exception] = None,
         correlation_id: Optional[str] = None
     ):
@@ -219,7 +208,6 @@ class AIInvalidRequestError(AIServiceError):
             error_code="AI_INVALID_REQUEST",
             retryable=False,
             retry_after=None,
-            cached_content_available=cached_content_available,
             original_exception=original_exception,
             correlation_id=correlation_id
         )
@@ -237,7 +225,6 @@ class AIResponseParsingError(AIServiceError):
         self,
         message: str = "Failed to parse AI service response",
         retryable: bool = True,
-        cached_content_available: bool = False,
         original_exception: Optional[Exception] = None,
         correlation_id: Optional[str] = None
     ):
@@ -246,7 +233,6 @@ class AIResponseParsingError(AIServiceError):
             error_code="AI_RESPONSE_PARSING_ERROR",
             retryable=retryable,
             retry_after=None,
-            cached_content_available=cached_content_available,
             original_exception=original_exception,
             correlation_id=correlation_id
         )

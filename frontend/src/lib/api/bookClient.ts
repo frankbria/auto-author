@@ -1992,7 +1992,7 @@ export class BookClient {
   // ============= AI Service Methods with Error Handling =============
 
   /**
-   * Analyze summary with AI error handling and cached content support
+   * Analyze summary with AI error handling
    */
   public async analyzeSummaryWithErrorHandling(
     bookId: string,
@@ -2019,7 +2019,7 @@ export class BookClient {
   }
 
   /**
-   * Generate questions with AI error handling and cached content support
+   * Generate questions with AI error handling
    */
   public async generateQuestionsWithErrorHandling(
     bookId: string,
@@ -2034,7 +2034,7 @@ export class BookClient {
   }
 
   /**
-   * Generate TOC with AI error handling and cached content support
+   * Generate TOC with AI error handling
    */
   public async generateTocWithErrorHandling(
     bookId: string,
@@ -2073,7 +2073,7 @@ export class BookClient {
   }
 
   /**
-   * Generate chapter questions with AI error handling and cached content support
+   * Generate chapter questions with AI error handling
    */
   public async generateChapterQuestionsWithErrorHandling(
     bookId: string,
@@ -2181,7 +2181,7 @@ export class BookClient {
   }
 
   /**
-   * Generate chapter draft with AI error handling and cached content support
+   * Generate chapter draft with AI error handling
    */
   public async generateChapterDraftWithErrorHandling(
     bookId: string,

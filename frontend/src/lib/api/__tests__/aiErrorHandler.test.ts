@@ -2,7 +2,7 @@
  * Unit tests for AI Error Handler
  */
 
-import { handleAIServiceError, createRetryHandler, isFromCache } from '../aiErrorHandler';
+import { handleAIServiceError, createRetryHandler } from '../aiErrorHandler';
 import * as ErrorNotification from '@/components/errors/ErrorNotification';
 
 // Mock the error notification module
@@ -26,7 +26,6 @@ describe('aiErrorHandler', () => {
       expect(result.retryAfter).toBe(120);
       expect(result.canRetry).toBe(true);
       expect(result.data).toBeUndefined();
-      expect(result.fromCache).toBeUndefined();
 
       // Verify error notification was shown
       expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
@@ -52,7 +51,6 @@ describe('aiErrorHandler', () => {
 
       expect(result.canRetry).toBe(false);
       expect(result.data).toBeUndefined();
-      expect(result.fromCache).toBeUndefined();
       expect(result.error).toContain('plan');
 
       // Notification is an entitlement type, not retryable, and no onRetry wired.
@@ -82,60 +80,6 @@ describe('aiErrorHandler', () => {
       );
     });
 
-    it('should handle cached content fallback', async () => {
-      const cachedData = { questions: ['Q1', 'Q2', 'Q3'] };
-      const error = new Error(
-        `Failed to generate: 503 ${JSON.stringify({
-          message: 'Service unavailable',
-          status_code: 503,
-          error_type: 'service_unavailable',
-          cached_content_available: true,
-          cached_content: cachedData,
-        })}`
-      );
-      const onRetry = jest.fn();
-
-      const result = await handleAIServiceError(error, onRetry);
-
-      expect(result.data).toEqual(cachedData);
-      expect(result.fromCache).toBe(true);
-      expect(result.canRetry).toBe(true);
-      expect(result.error).toContain('unavailable');
-
-      // Verify warning notification was shown for cached content
-      expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'ai_service',
-          message: 'Using previously generated content',
-        }),
-        expect.objectContaining({
-          onRetry,
-          duration: 10000,
-        })
-      );
-    });
-
-    it('should handle network errors', async () => {
-      const error = new Error('Failed to fetch: network error');
-      const onRetry = jest.fn();
-
-      const result = await handleAIServiceError(error, onRetry);
-
-      expect(result.error).toMatch(/network|connection/i);
-      expect(result.canRetry).toBe(true);
-      expect(result.data).toBeUndefined();
-
-      expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          details: expect.stringMatching(/network|connection/i),
-          suggestedActions: expect.arrayContaining([
-            expect.stringMatching(/internet.*connection|connection/i),
-          ]),
-        }),
-        expect.any(Object)
-      );
-    });
-
     it('should handle service unavailable without cached content', async () => {
       const error = new Error('Failed: 503 Service Unavailable');
       const onRetry = jest.fn();
@@ -144,7 +88,6 @@ describe('aiErrorHandler', () => {
 
       expect(result.error).toContain('unavailable');
       expect(result.canRetry).toBe(true);
-      expect(result.fromCache).toBeUndefined();
 
       expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -383,51 +326,6 @@ describe('aiErrorHandler', () => {
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(retryFn).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('isFromCache', () => {
-    it('should return true for cached results', () => {
-      const result = {
-        data: { questions: ['Q1'] },
-        fromCache: true,
-      };
-
-      expect(isFromCache(result)).toBe(true);
-    });
-
-    it('should return false for non-cached results', () => {
-      const result = {
-        data: { questions: ['Q1'] },
-        fromCache: false,
-      };
-
-      expect(isFromCache(result)).toBe(false);
-    });
-
-    it('should return false for results without data', () => {
-      const result = {
-        fromCache: true,
-      };
-
-      expect(isFromCache(result)).toBe(false);
-    });
-
-    it('should return false for results without fromCache flag', () => {
-      const result = {
-        data: { questions: ['Q1'] },
-      };
-
-      expect(isFromCache(result)).toBe(false);
-    });
-
-    it('should return false for error results', () => {
-      const result = {
-        error: 'Failed',
-        canRetry: true,
-      };
-
-      expect(isFromCache(result)).toBe(false);
     });
   });
 

@@ -3,7 +3,7 @@
 import { toast } from 'sonner';
 import { ClassifiedError, ErrorType } from '@/lib/errors';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { AlertCircleIcon, RefreshIcon, Cancel01Icon, Clock01Icon, Database01Icon } from '@hugeicons/core-free-icons';
+import { AlertCircleIcon, RefreshIcon, Cancel01Icon, Clock01Icon } from '@hugeicons/core-free-icons';
 import { Button } from '@/components/ui/button';
 import { navigateTo } from '@/lib/navigation';
 import { useEffect, useState } from 'react';
@@ -20,8 +20,6 @@ export interface ErrorNotificationProps {
   onDismiss?: () => void;
   /** Custom duration in milliseconds (default: based on error type) */
   duration?: number;
-  /** Whether this is showing cached content */
-  isFromCache?: boolean;
   /** Estimated seconds until retry is available */
   retryAfter?: number;
 }
@@ -74,17 +72,16 @@ export function showErrorNotification(
     onRetry?: () => void;
     onDismiss?: () => void;
     duration?: number;
-    isFromCache?: boolean;
     retryAfter?: number;
   } = {}
 ) {
-  const { onRetry, onDismiss, duration, isFromCache, retryAfter } = options;
+  const { onRetry, onDismiss, duration, retryAfter } = options;
 
   // Determine default duration based on error type
   const defaultDuration =
     duration ||
     (error.type === ErrorType.TRANSIENT ? 5000 :
-     error.type === ErrorType.AI_SERVICE ? (isFromCache ? 10000 : 15000) :
+     error.type === ErrorType.AI_SERVICE ? 15000 :
      error.type === ErrorType.PERMANENT ? 7000 : 10000);
 
   // Entitlement denial (issue #174): show an upgrade CTA, never a retry.
@@ -105,19 +102,7 @@ export function showErrorNotification(
 
   // AI Service error with special handling
   if (error.type === ErrorType.AI_SERVICE) {
-    if (isFromCache) {
-      // Using cached content - show success with warning
-      toast.warning(error.message, {
-        description: error.details || 'AI service temporarily unavailable. Showing cached content.',
-        duration: defaultDuration,
-        icon: <HugeiconsIcon icon={Database01Icon} size={20} />,
-        action: onRetry && {
-          label: 'Generate Fresh',
-          onClick: onRetry,
-        },
-        onDismiss,
-      });
-    } else if (retryAfter && retryAfter > 0) {
+    if (retryAfter && retryAfter > 0) {
       // Rate limited - show countdown
       // Ensure toast stays visible for entire countdown by using max of retryAfter and default duration
       const countdownDuration = Math.max(retryAfter * 1000, defaultDuration);
@@ -204,7 +189,6 @@ export function ErrorNotification({
   error,
   onRetry,
   onDismiss,
-  isFromCache,
   retryAfter,
 }: ErrorNotificationProps) {
   // Severity hue. The card, its left stripe and the icon all derive from it, so
@@ -214,8 +198,6 @@ export function ErrorNotification({
   const hue =
     error.type === ErrorType.SYSTEM
       ? 'red'
-      : error.type === ErrorType.AI_SERVICE && isFromCache
-      ? 'blue'
       : error.type === ErrorType.PERMANENT
       ? 'orange'
       : 'yellow';
@@ -224,14 +206,12 @@ export function ErrorNotification({
   // names, and `bg-${hue}-50` is not one.
   const bgColor = {
     red: 'bg-red-50 dark:bg-red-900/20 border-red-700 dark:border-red-400',
-    blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-700 dark:border-blue-400',
     orange: 'bg-orange-50 dark:bg-orange-900/20 border-orange-700 dark:border-orange-400',
     yellow: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-700 dark:border-yellow-400',
   }[hue];
 
   const iconColor = {
     red: 'text-red-700 dark:text-red-400',
-    blue: 'text-blue-700 dark:text-blue-400',
     orange: 'text-orange-700 dark:text-orange-400',
     yellow: 'text-yellow-700 dark:text-yellow-400',
   }[hue];
@@ -243,21 +223,11 @@ export function ErrorNotification({
       aria-live="assertive"
     >
       <div className="flex items-start gap-3">
-        {error.type === ErrorType.AI_SERVICE && isFromCache ? (
-          <HugeiconsIcon icon={Database01Icon} size={20} className={`shrink-0 mt-0.5 ${iconColor}`} />
-        ) : (
-          <HugeiconsIcon icon={AlertCircleIcon} size={20} className={`shrink-0 mt-0.5 ${iconColor}`} />
-        )}
+        <HugeiconsIcon icon={AlertCircleIcon} size={20} className={`shrink-0 mt-0.5 ${iconColor}`} />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h4 className="font-semibold text-foreground">{error.message}</h4>
-            {isFromCache && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/30">
-                <HugeiconsIcon icon={Database01Icon} size={12} />
-                Cached Content
-              </span>
-            )}
           </div>
 
           {error.details && (
@@ -302,7 +272,7 @@ export function ErrorNotification({
                 onClick={onRetry}
               >
                 <HugeiconsIcon icon={RefreshIcon} size={12} className="mr-1" />
-                {isFromCache ? 'Generate Fresh' : 'Retry'}
+                Retry
               </Button>
             ) : null}
 

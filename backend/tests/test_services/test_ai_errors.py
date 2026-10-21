@@ -32,7 +32,6 @@ class TestAIServiceError:
         assert error.error_code == "TEST_ERROR"
         assert error.retryable is True
         assert error.retry_after == 30
-        assert error.cached_content_available is False
         assert error.original_exception is None
         assert error.correlation_id is None
         assert isinstance(error.timestamp, str)
@@ -45,12 +44,10 @@ class TestAIServiceError:
             error_code="TEST_ERROR",
             retryable=True,
             retry_after=60,
-            cached_content_available=True,
             original_exception=original,
             correlation_id="test-123"
         )
 
-        assert error.cached_content_available is True
         assert error.original_exception is original
         assert error.correlation_id == "test-123"
 
@@ -109,17 +106,6 @@ class TestAIRateLimitError:
         assert error.retry_after == 120
         assert error.retryable is True
 
-    def test_rate_limit_error_with_cached_content(self):
-        """Test rate limit error with cached content available."""
-        error = AIRateLimitError(
-            cached_content_available=True,
-            correlation_id="rate-limit-123"
-        )
-
-        assert error.cached_content_available is True
-        assert error.correlation_id == "rate-limit-123"
-
-
 class TestAINetworkError:
     """Test the AINetworkError class."""
 
@@ -162,17 +148,6 @@ class TestAIServiceUnavailableError:
         assert error.retry_after == 30
         assert "unavailable" in error.message.lower()
 
-    def test_service_unavailable_with_cache(self):
-        """Test service unavailable with cached content."""
-        error = AIServiceUnavailableError(
-            cached_content_available=True,
-            retry_after=60
-        )
-
-        assert error.cached_content_available is True
-        assert error.retry_after == 60
-
-
 class TestAIInvalidRequestError:
     """Test the AIInvalidRequestError class."""
 
@@ -213,15 +188,6 @@ class TestAIResponseParsingError:
         error = AIResponseParsingError(retryable=False)
 
         assert error.retryable is False
-
-    def test_parsing_error_with_cached_content(self):
-        """Test parsing error with cached fallback."""
-        error = AIResponseParsingError(
-            cached_content_available=True,
-            correlation_id="parse-123"
-        )
-
-        assert error.cached_content_available is True
 
 
 class TestErrorInteroperability:
