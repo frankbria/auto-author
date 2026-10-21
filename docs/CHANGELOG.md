@@ -2,6 +2,10 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-21
+
+- **Legal review banners removed (#791, P1.9)**: counsel signed off on the Terms and Privacy copy (recorded on #791, 2026-10-20). The amber "template, pending legal review" notice is gone from `/terms` and `/privacy`, and the page tests now assert it stays gone. The copy itself is unchanged, so `TERMS_VERSION` and the Privacy "Last updated" date are not bumped.
+
 ### 2026-10-20
 
 - **Beads and speckit removed**:
