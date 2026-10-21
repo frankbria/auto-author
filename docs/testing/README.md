@@ -36,12 +36,8 @@ python -m pytest tests/integration/ # Integration tests only
 
 - **[Setup Guide](./setup-guide.md)** - Environment setup and configuration
 - **[Best Practices](./best-practices.md)** - Testing guidelines and standards
-- **[Test Architecture](./test-architecture.md)** - Testing strategy and structure
-- **[Troubleshooting](./troubleshooting.md)** - Common issues and solutions
-- **[Performance Testing](./performance-testing.md)** - Load and performance testing
-- **[Accessibility Testing](./accessibility-testing.md)** - Accessibility compliance testing
-- **[Mobile Testing](./mobile-testing.md)** - Mobile and responsive testing
-- **[CI/CD Integration](./cicd-integration.md)** - Continuous integration setup
+- **[Editing and Auto-save E2E Flow](./e2e-editing-autosave-flow.md)** - The editing and auto-save end-to-end flow
+- **[Accessibility Testing](../development/accessibility-testing.md)** - Accessibility compliance testing
 
 ## Test Coverage
 
@@ -160,7 +156,7 @@ Tests are automatically run on:
 - Pushes to main branch
 - Scheduled nightly runs
 
-See [CI/CD Integration](./cicd-integration.md) for detailed configuration.
+The workflows are in [`.github/workflows/`](../../.github/workflows/); `tests.yml` runs the unit suites.
 
 ## Contributing
 
@@ -173,6 +169,5 @@ When adding new features:
 ## Support
 
 For testing-related questions:
-- Check [Troubleshooting Guide](./troubleshooting.md)
 - Review [Best Practices](./best-practices.md)
 - Consult existing test examples in the codebase

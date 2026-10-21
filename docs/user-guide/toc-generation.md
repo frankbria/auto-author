@@ -20,8 +20,6 @@ Before generating a TOC, ensure you have:
 
 When you click "Generate Table of Contents," the wizard first checks if your summary meets the minimum requirements:
 
-![Readiness Checker](../assets/img/toc-readiness-checker.png)
-
 - **If ready**: The wizard automatically proceeds to Step 2
 - **If not ready**: You'll see feedback on how to improve your summary
 
@@ -38,8 +36,6 @@ If your summary needs improvement, you'll see:
 ### Step 2: Clarifying Questions
 
 The AI generates 3-5 targeted questions to better understand your book's content:
-
-![Clarifying Questions](../assets/img/toc-clarifying-questions.png)
 
 1. Answer each question in the text boxes provided
 2. Questions typically cover:
@@ -60,8 +56,6 @@ The AI generates 3-5 targeted questions to better understand your book's content
 ### Step 3: TOC Generation
 
 The system processes your summary and question responses to create a TOC:
-
-![TOC Generating](../assets/img/toc-generating.png)
 
 During this step, you'll see:
 
@@ -84,8 +78,6 @@ This process typically takes 15-45 seconds.
 
 Once generation is complete, you'll see the proposed TOC structure:
 
-![TOC Review](../assets/img/toc-review.png)
-
 This screen shows:
 
 - Summary stats (total chapters, estimated pages, subchapter status)
@@ -105,8 +97,6 @@ This screen shows:
 ## Step 5: Detailed TOC Editing
 
 After accepting the generated TOC, you'll be taken to the editing interface:
-
-![TOC Editing](../assets/img/toc-edit.png)
 
 In this interface, you can:
 
@@ -142,6 +132,5 @@ When finished editing:
 
 ## Related Documentation
 
-- [TOC Generation Requirements](toc-generation-requirements.md)
-- [API TOC Endpoints](api-toc-endpoints.md)
+- [API TOC Endpoints](../api/toc.md)
 - [Troubleshooting TOC Generation](troubleshooting-toc-generation.md)

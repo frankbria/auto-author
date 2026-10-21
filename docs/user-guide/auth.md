@@ -4,9 +4,8 @@ This guide explains how to register, sign in, and manage your account in Auto Au
 
 ## Related Documentation
 
-- [Profile Management Guide](profile-management-guide.md) - Complete guide to managing your profile
-- [Auth Troubleshooting](auth-troubleshooting.md) - Solutions for common authentication issues
-- [Login/Logout Flows](login-logout-flows.md) - Detailed authentication flows
+- [Profile Management Guide](profile-management.md) - Complete guide to managing your profile
+- [Session Management](../development/session-management.md) - How sign-in, sign-out and sessions work
 
 ## Table of Contents
 
@@ -88,7 +87,7 @@ Access profile settings through the user menu in the top-right corner:
    - Email address (requires verification)
    - Password
 
-For detailed information on profile management features and options, please refer to our comprehensive [Profile Management Guide](profile-management-guide.md).
+For detailed information on profile management features and options, please refer to our comprehensive [Profile Management Guide](profile-management.md).
 
 ### Account Security
 
@@ -164,6 +163,39 @@ If you lose access to your authentication method:
 - After multiple failed attempts, your account may be temporarily locked
 - Wait 30 minutes before trying again
 - Use the "Forgot password" option to reset if needed
+
+**Cannot sign in with the correct password**:
+- Verify your email address first: an unverified account is refused with "Verify your email address to sign in" and sent a new link
+- Use "Forgot password?" to reset the password
+- Clear the site's cookies, or try a private window, to rule out a stale session
+
+**Two-factor code rejected or unavailable**:
+- Authenticator codes depend on your device clock, so make sure it is set automatically
+- On the verification page, choose the backup-code option and enter one of the backup codes you saved when you enabled two-factor authentication
+
+### Signed Out or Redirected to Sign In
+
+Sessions last up to 7 days and are renewed while you use the app. You are sent back to **Sign In** (with a link back to the page you were on) when:
+
+- The session expired, was revoked from another device, or the account was closed. Sign in again.
+- Your browser blocks or clears cookies. Allow cookies for the site, then sign in again.
+
+Signing in again is the fix in every case. Resetting your password ends all of your sessions, so every device must sign in again.
+
+### API Authentication Errors
+
+For developers calling the backend directly, with the session cookie:
+
+| Status | Message | Meaning |
+|--------|---------|---------|
+| 401 | `Not authenticated. Please sign in.` | No valid session cookie was sent |
+| 401 | `Invalid session. Please sign in again.` | The session has no user |
+| 401 | `User not found. Please sign up again.` | The session outlived its user |
+| 401 | `This account is no longer active.` | The account was deactivated or deleted |
+| 403 | `Verify your email address to use this account.` | The email address is not verified |
+| 503 | `The service is temporarily unavailable. Please try again in a moment.` | The session could not be checked; retry after the `Retry-After` seconds. This does not end your session |
+
+If a signed-in browser gets a 401 from the backend, the app signs it out and redirects to **Sign In**. For cookie and session configuration, see [Session Management](../development/session-management.md).
 
 ### Still Need Help?
 

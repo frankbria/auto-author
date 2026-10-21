@@ -321,4 +321,4 @@ The system may suggest regeneration when:
 
 ---
 
-*For technical details about the rating and regeneration systems, see [Developer Guide for Question System](developer-guide-question-system.md) and [API Documentation](api-question-endpoints.md).*
+*For technical details about the rating and regeneration systems, see the [API Documentation](../api/questions.md).*

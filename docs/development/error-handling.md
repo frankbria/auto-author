@@ -220,6 +220,85 @@ Succeeded after 3 attempts
 Duration: 3 seconds
 ```
 
+## Backend Error Responses
+
+Question, book and chapter endpoints in `backend/app/api/endpoints/books.py` raise `HTTPException` with a structured body built by `backend/app/utils/error_handlers.py` (`handle_book_not_found`, `handle_unauthorized_access`, `handle_validation_error`, `handle_question_not_found`, `handle_response_save_error`, `handle_rating_save_error`, `handle_database_error`, `handle_entitlement_denied`, `handle_generic_error`). The schema lives in `backend/app/schemas/errors.py`. The body sits under FastAPI's `detail` key:
+
+```json
+{
+  "detail": {
+    "error": "Book not found",
+    "error_code": "BOOK_NOT_FOUND",
+    "status_code": 404,
+    "details": [
+      { "field": "book_id", "message": "No book exists with ID: invalid-id", "code": "BOOK_NOT_FOUND", "value": "invalid-id" }
+    ],
+    "timestamp": "2025-12-22T10:30:00Z",
+    "request_id": "req_abc123def456"
+  }
+}
+```
+
+`details` and `help_url` are optional. `request_id` is the id of the current request, so a user can quote it to support and it matches the log line.
+
+### Error codes (`ErrorCode`)
+
+| Group | Codes |
+|-------|-------|
+| Resource | `BOOK_NOT_FOUND`, `CHAPTER_NOT_FOUND`, `QUESTION_NOT_FOUND`, `RESPONSE_NOT_FOUND` |
+| Authorization | `UNAUTHORIZED_ACCESS`, `FORBIDDEN_OPERATION` |
+| Validation | `INVALID_REQUEST_DATA`, `VALIDATION_FAILED`, `INVALID_PARAMETER` |
+| Questions | `QUESTION_GENERATION_FAILED`, `QUESTION_LIMIT_EXCEEDED`, `INVALID_DIFFICULTY_LEVEL`, `INVALID_QUESTION_TYPE` |
+| Responses | `RESPONSE_SAVE_FAILED`, `RESPONSE_TOO_SHORT`, `RESPONSE_TOO_LONG` |
+| Ratings | `RATING_SAVE_FAILED`, `INVALID_RATING_VALUE` |
+| Database | `DATABASE_ERROR`, `DATABASE_CONNECTION_FAILED` |
+| Rate limiting | `RATE_LIMIT_EXCEEDED` |
+| Plan | `ENTITLEMENT_REQUIRED` (HTTP 402, #174) |
+| General | `INTERNAL_SERVER_ERROR`, `SERVICE_UNAVAILABLE`, `OPERATION_FAILED` |
+
+Run the handler tests with `cd backend && uv run pytest tests/test_error_handlers.py -v`.
+
+## AI Service Errors and Retry Ownership
+
+### Backend: one retry layer
+
+OpenAI calls are retried in exactly one place, `AIService._retry_with_backoff`, reached only through `_make_openai_request` (#188). Do not wrap a caller in it again: nested wrappers multiplied a persistent failure into `AI_MAX_RETRIES` squared real requests. The OpenAI client is built with `max_retries=0` so the SDK cannot stack its own silent retries underneath.
+
+- `AI_MAX_RETRIES` (default 3, allowed 1 to 10) is the total number of attempts. The delay is `min(1s * 2^attempt, 60s)`.
+- Rate limit, timeout/connection and 5xx errors retry. When attempts run out they surface as `AIRateLimitError`, `AINetworkError` or `AIServiceUnavailableError`.
+- Never retried: billing and quota refusals (`AIProviderQuotaError`), rejected credentials (`AIProviderAuthError`) and bad requests (`AIInvalidRequestError`).
+- Logs carry one `correlation_id` across all attempts of a request.
+
+`ai_error_http_exception` turns a failed AI call into the same response on every AI route:
+
+| Failure | HTTP status |
+|---------|-------------|
+| `AIRateLimitError` | 429 |
+| `AIServiceUnavailableError` (including quota and auth), `AINetworkError` | 503 |
+| `AIInvalidRequestError` | 400 |
+| Anything else | 500 |
+
+The body is `{ message, error_code, retry_after, retryable, cached_content_available, correlation_id }` under `detail`, plus a `Retry-After` header when a wait is known. The message is the service's own fixed text, never the provider's. Response caching was removed (#214), so there is no cached fallback and `cached_content_available` is always false.
+
+### Frontend: AI call handling
+
+`frontend/src/lib/api/aiErrorHandler.ts` (`handleAIServiceError`, `createRetryHandler`) classifies a failed AI call, shows a notification and returns `{ error, retryAfter, canRetry }`. It does not retry by itself; retrying is the user pressing the notification's retry button.
+
+- Rate limits show a countdown ("Retry in 2:30") built from `retry_after`, and the retry button becomes active at zero. A 429 maps to `ErrorType.AI_SERVICE`; a per-plan quota 429 and a 402 are not retryable.
+- Network errors and other retryable failures show a retry button and suggested actions.
+- `BookClient` wraps each AI call: `analyzeSummaryWithErrorHandling`, `generateQuestionsWithErrorHandling`, `generateTocWithErrorHandling`, `generateChapterQuestionsWithErrorHandling` and `generateChapterDraftWithErrorHandling`. Each takes an optional `onRetry` callback as its last argument.
+
+```typescript
+const result = await bookClient.generateQuestionsWithErrorHandling(
+  bookId,
+  () => loadQuestions() // run when the user presses Retry
+);
+if (result.data) setQuestions(result.data.questions);
+// On failure the notification has already been shown.
+```
+
+Unit tests: `cd frontend && npm test -- aiErrorHandler` (`src/lib/api/__tests__/aiErrorHandler.test.ts`, `bookClient.aiErrors.test.ts`).
+
 ## Integration Patterns
 
 ### Basic Usage
@@ -503,6 +582,4 @@ frontend/src/components/errors/
 
 ## References
 
-- [Export Architecture](./EXPORT_ARCHITECTURE.md)
-- [UI Improvements TODO](../UI_IMPROVEMENTS_TODO.md)
-- [Implementation Plan](../IMPLEMENTATION_PLAN.md)
+- [Export Architecture](export.md)

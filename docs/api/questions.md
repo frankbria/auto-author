@@ -365,4 +365,3 @@ result = response.json()
 
 ---
 
-*For frontend integration details, see [Question System Integration Guide](integration-question-system.md).*

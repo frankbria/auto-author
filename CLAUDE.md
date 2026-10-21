@@ -4,9 +4,7 @@ AI-assisted long-form non-fiction writing. Next.js frontend + FastAPI backend, M
 
 - `frontend/` — Next.js app
 - `backend/` — FastAPI app (uv-managed)
-- `docs/` — project docs; `docs/references/` = on-demand deep dives (table below)
-- `claudedocs/` — analysis reports and detailed plans
-- `archive/` — historical planning docs (read-only)
+- `docs/` — all documentation (index: `docs/README.md`); `docs/references/` = on-demand deep dives (table below)
 
 Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append new entries **there**, not here.
 
@@ -18,12 +16,12 @@ Detailed per-issue changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md). Append n
 
 | When | File |
 |------|------|
-| Creating or reorganizing documentation | `docs/references/documentation-management.md` |
+| Creating or reorganizing documentation | `docs/README.md` (layout and where new docs go) |
 | Using LoadingStateManager, ProgressIndicator, DeleteBookModal | `docs/references/component-documentation.md` |
 | Completing a feature / opening a PR | `docs/references/quality-standards.md` |
 | Perf-sensitive work (TOC 3000ms, Export 5000ms budgets) | `docs/references/performance-monitoring.md` |
 | Writing or fixing tests | `docs/references/testing-infrastructure.md` |
-| Current test status | `docs/POST_DEPLOYMENT_TEST_REPORT.md`, `backend/TEST_COVERAGE_REPORT.md`, `frontend/docs/TEST_FAILURE_ANALYSIS.md` |
+| Current test status | CI on `main` (`gh run list --branch main`); coverage floors are enforced there |
 
 ---
 

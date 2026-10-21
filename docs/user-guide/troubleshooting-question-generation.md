@@ -382,4 +382,4 @@ If issues persist after following this guide:
 
 ---
 
-*For additional help with the question system, see [User Guide for Answering Questions](user-guide-question-answering.md) and [API Documentation](api-question-endpoints.md).*
+*For additional help with the question system, see [User Guide for Answering Questions](question-answering.md) and [API Documentation](../api/questions.md).*

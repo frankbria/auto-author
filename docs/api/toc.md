@@ -8,11 +8,7 @@ All API endpoints are prefixed with: `/api/v1`
 
 ## Authentication
 
-All endpoints require authentication via Clerk JWT token in the Authorization header:
-
-```
-Authorization: Bearer <clerk_jwt_token>
-```
+All endpoints require a signed-in user (session cookie). See [Authentication](profile.md#authentication).
 
 ## Endpoints
 
@@ -403,6 +399,13 @@ Returned for a malformed body. `detail` names what is wrong:
 **409 Conflict** — the TOC was modified by another writer since it was read
 (optimistic lock; send `expected_version` inside `toc` to opt in).
 
+## Generation Behavior
+
+- **Readiness gate**: `meets_minimum_requirements` is true when the summary has at least 30 words and 150 characters. The TOC wizard checks this flag alone, so a summary below it never reaches generation. `confidence_score` comes from the AI's analysis of the summary.
+- **Clarifying questions**: the AI is asked for 4 questions by default about organization, audience, key concepts, applications and depth of coverage; at most 5 are returned. If none can be read from the AI reply the request fails rather than returning placeholders.
+- **TOC generation**: the AI receives the summary, the book's title, genre and audience, and the question responses. The prompt asks for 6-12 chapters with 2-4 subchapters each; these are guidance, not enforced limits. Chapters are level 1 and subchapters level 2. The response carries `total_chapters`, `estimated_pages` and `structure_notes`.
+- **Failures**: transient AI errors are retried with exponential backoff. If the AI's reply is not valid TOC JSON, chapter titles are extracted from its text; if nothing usable can be recovered, the request fails with a retryable `AI_INVALID_RESPONSE` error (`The AI returned an unusable table of contents. Please try again.`) rather than returning placeholder chapters.
+
 ## Rate Limiting
 
 TOC generation is rate-limited to prevent abuse:
@@ -424,6 +427,6 @@ TOC generation is rate-limited to prevent abuse:
 
 ## Related Documentation
 
-- [TOC Generation Requirements](toc-generation-requirements.md)
-- [User Guide for TOC Generation](user-guide-toc-generation.md)
-- [Troubleshooting TOC Generation](troubleshooting-toc-generation.md)
+- [User Guide for TOC Generation](../user-guide/toc-generation.md)
+- [Troubleshooting TOC Generation](../user-guide/troubleshooting-toc-generation.md)
+- [Summary API](summary.md)

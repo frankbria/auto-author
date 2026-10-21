@@ -105,11 +105,12 @@ uv run python test_toc_transactions.py # Test TOC transactions
 
 For detailed API documentation, please refer to:
 
-- [API Authentication Endpoints](../docs/api-auth-endpoints.md) - Authentication API documentation
-- [API Profile Endpoints](../docs/api-profile-endpoints.md) - Profile management API documentation
-- [API Book Endpoints](../docs/api-book-endpoints.md) - Book management API documentation
-- [API Chapter Tabs](../docs/api-chapter-tabs.md) - Chapter tabs API documentation
-- [API Question Endpoints](../docs/api-question-endpoints.md) - Question system API documentation
+- [API Profile Endpoints](../docs/api/profile.md) - Authentication and profile management
+- [API Book Endpoints](../docs/api/books.md) - Book management
+- [API Chapter Tabs](../docs/api/chapter-tabs.md) - Chapter tabs
+- [API Question Endpoints](../docs/api/questions.md) - Question system
+- [API Summary Endpoints](../docs/api/summary.md) - Book summary
+- [API TOC Endpoints](../docs/api/toc.md) - Table of contents
 
 These documents provide comprehensive information about available endpoints, request/response formats, and authentication requirements.
 

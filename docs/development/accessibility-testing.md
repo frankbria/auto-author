@@ -2,7 +2,7 @@
 
 **Quick Reference Guide for Auto-Author Frontend Development**
 
-This guide provides practical instructions for developers to test and implement accessible components in the Auto-Author application. For comprehensive audit preparation, see `claudedocs/accessibility_audit_preparation.md`.
+This guide provides practical instructions for developers to test and implement accessible components in the Auto-Author application.
 
 ---
 
@@ -801,12 +801,6 @@ describe('BookCard Accessibility', () => {
 - **ARIA Authoring Practices**: https://www.w3.org/WAI/ARIA/apg/
 - **WebAIM Contrast Checker**: https://webaim.org/resources/contrastchecker/
 - **Radix UI Docs**: https://www.radix-ui.com/primitives/docs/overview/accessibility
-
-### Project-Specific
-
-- **Comprehensive Audit Prep**: `frontend/claudedocs/accessibility_audit_preparation.md`
-- **Current Sprint**: `CURRENT_SPRINT.md`
-- **Implementation Plan**: `IMPLEMENTATION_PLAN.md`
 
 ### Tools
 

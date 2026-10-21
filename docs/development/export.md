@@ -266,44 +266,23 @@ frontend/src/
                 └── page.tsx           # Integration point
 ```
 
-## API Contracts
+## Supported Formats and API
 
-### PDF Export Request
-```typescript
-POST /api/books/{bookId}/export/pdf
-Body: {
-  includeEmptyChapters?: boolean;
-  pageSize?: 'letter' | 'A4';
-}
-Response: Blob (application/pdf)
-```
+All routes are `GET /api/v1/books/{book_id}/export/...`, owner-only (403 otherwise), implemented in `backend/app/api/endpoints/export.py`. Options are query parameters. Each download route is rate limited to 10 requests per hour per format, across all books.
 
-### DOCX Export Request
-```typescript
-POST /api/books/{bookId}/export/docx
-Body: {
-  includeEmptyChapters?: boolean;
-}
-Response: Blob (application/vnd.openxmlformats-officedocument.wordprocessingml.document)
-```
+| Route | Format and use | Query options |
+|-------|----------------|---------------|
+| `/pdf` | PDF: final publishing and printing | `include_empty_chapters`, `page_size` (`letter` or `A4`), `template_id`, `custom_options` |
+| `/docx` | Word: further editing, manuscript submission | `include_empty_chapters`, `template_id`, `custom_options` |
+| `/epub` | EPUB: e-readers and e-book platforms | `include_empty_chapters` |
+| `/markdown` | Markdown: version control, plain-text workflows | `include_empty_chapters`, `multi_file` (one file per chapter, returned as a ZIP) |
+| `/formats` | JSON: each format with its `available` flag, options, `book_stats` and `templates` | none |
+| `/templates` | JSON: the professional templates (`classic_fiction`, `modern_nonfiction`, `academic`) | none |
 
-### Export Formats Query
-```typescript
-GET /api/books/{bookId}/export/formats
-Response: {
-  formats: Array<{
-    format: string;
-    available: boolean;
-    estimated_size: number;
-  }>;
-  book_stats: {
-    total_chapters: number;
-    completed_chapters: number;
-    total_words: number;
-    estimated_pages: number;
-  };
-}
-```
+- `custom_options` is a JSON object string of template overrides; malformed JSON returns 400.
+- The author name and bio on the export come from the owner's profile.
+- Downloads are named after the book title (`Content-Disposition`, RFC 6266 encoded).
+- Status codes: 400 invalid options or unknown template, 503 export library unavailable, 504 export timed out, 500 other failures.
 
 ## Testing Considerations
 
@@ -365,6 +344,4 @@ Response: {
 
 ## References
 
-- [UI Improvements TODO](../UI_IMPROVEMENTS_TODO.md)
-- [Error Handling Architecture](./ERROR_HANDLING_ARCHITECTURE.md)
-- [Implementation Plan](../IMPLEMENTATION_PLAN.md)
+- [Error Handling Architecture](error-handling.md)

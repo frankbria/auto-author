@@ -480,10 +480,8 @@ If you've lost summary content:
 
 ## Related Documentation
 
-- [User Guide: Summary Input and Voice-to-Text](user-guide-summary-input.md)
-- [Summary Input Requirements and Best Practices](summary-input-requirements.md)
-- [API Endpoints: Summary Operations](api-summary-endpoints.md)
-- [Browser Compatibility Guide](browser-compatibility.md)
+- [User Guide: Summary Input and Voice-to-Text](summary-input.md)
+- [API Endpoints: Summary Operations](../api/summary.md)
 
 ---
 

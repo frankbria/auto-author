@@ -1,7 +1,7 @@
 """
 Writing-style transformation templates (issue #58).
 
-Five styles documented in AUTO_AUTHOR_USER_MANUAL.md. Each carries distinct
+Five styles documented in docs/user-guide/user-manual.md. Each carries distinct
 tone / vocabulary / structure guidance so the same source text transforms into
 clearly different output. Every prompt explicitly preserves facts and meaning.
 """

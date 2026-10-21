@@ -108,6 +108,35 @@ Before moving to the next feature, ALL changes must be:
    - Every task is a GitHub issue with a `[PX.Y]` priority prefix in its title
    - Reference the issue in the PR body (`Closes #123`) so merging closes it
 
+## Pre-commit Hooks
+
+Hooks are defined in `.pre-commit-config.yaml` and run on every commit for the paths each hook declares. They are a fast local check; CI is the gate that cannot be bypassed.
+
+```bash
+uv tool install pre-commit   # once; use --force if the launcher is stale
+pre-commit install           # installs the pre-commit and commit-msg hooks
+```
+
+| Hook | Runs when | What it does |
+|------|-----------|--------------|
+| `check-commit-message` (commit-msg) | every commit | Rejects a message containing a closing keyword followed by an issue number, even a negated one, because GitHub would close the issue |
+| `check-secrets` | every commit | `scripts/check-secrets.sh` scans the staged diff for key, token and password patterns and `.pem` files |
+| `frontend-lint`, `frontend-typecheck`, `frontend-unit-tests`, `frontend-coverage` | files under `frontend/` | ESLint, `tsc`, Jest, and the 85/85/75/85 coverage thresholds |
+| `backend-lint`, `backend-unit-tests`, `backend-coverage` | files under `backend/` | `ruff check`, the pytest suite, and an 85% coverage floor |
+| `frontend-e2e-tests` | manual stage only | Playwright with `BYPASS_AUTH=true` |
+| `pre-commit-hooks` | every commit | Trailing whitespace and end-of-file fixes (not Markdown), YAML and JSON validity, merge-conflict markers, files over 1000 KB, mixed line endings |
+
+The backend hooks need MongoDB running; with it down the pytest hook hangs rather than fails.
+
+```bash
+pre-commit run --from-ref HEAD~1 --to-ref HEAD   # just your commits, before a PR
+pre-commit run backend-lint --all-files          # one hook, whole tree
+pre-commit run --files path/a.py path/b.ts       # specific files
+pre-commit run frontend-e2e-tests --hook-stage manual
+```
+
+If a hook fails, fix the cause and commit again. Do not use `--no-verify`: `main` branch protection requires the same checks in CI. If `check-secrets` flags a value, remove it from the diff and read it from an environment variable instead; real values go in `.env` files that are not committed (only `.env.example` is, and it stays in sync with the variables the code reads).
+
 ## Dependency Batches
 
 Since #517, `.github/dependabot.yml` **groups** version updates, so a weekly sweep

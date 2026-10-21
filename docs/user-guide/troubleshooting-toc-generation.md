@@ -141,6 +141,21 @@ This guide provides solutions for common issues encountered during Table of Cont
 4. **Use the edit interface** to restructure as needed
 5. **Consider manually creating** the TOC structure
 
+### TOC Will Not Save or Load
+
+The TOC editor (**Save & Continue**) saves with `PUT /api/v1/books/{book_id}/toc` and loads with `GET /api/v1/books/{book_id}/toc`. The editor shows one of these messages:
+
+| Message or status | Cause | Solution |
+|-------------------|-------|----------|
+| "Failed to load the table of contents. Please try again." | The TOC could not be fetched (network, expired session, or server error) | Reload the page; if you were signed out, sign in again |
+| "Failed to save the table of contents. Please try again." | Any other save failure | Retry. Your edits stay on the page until you leave it, so copy anything important first |
+| "This table of contents changed elsewhere since you opened it." (409) | Another tab or device saved the TOC after you opened it | Reload to get the latest version. Your unsaved edits on this page are discarded |
+| "Two chapters share an id, so this table of contents could not be saved." | An older book has duplicate chapter ids | Reload so the repaired chapters load, then redo your changes |
+| `Chapter N must have a title` (400) | A chapter's title is empty. `N` counts from 0 | Give every chapter a title |
+| "The table of contents is too large to save" (413) | The TOC is over 1,000,000 bytes | Shorten descriptions or remove chapters |
+
+The **Save & Continue** button is disabled while saving and when the TOC has no chapters. A save that succeeds returns you to the book page. If nothing seems to happen, open the browser's Network tab and check the status of the `PUT .../toc` request: a `401` means your session ended (sign in again, see [Authentication](auth.md#signed-out-or-redirected-to-sign-in)) and a `5xx` means the server failed, so wait a moment and retry.
+
 ## Advanced Troubleshooting
 
 ### Debugging TOC Generation Process
@@ -177,7 +192,7 @@ If the TOC never seems to match your expectations:
 1. Accept any generated TOC to get to the edit interface
 2. Completely restructure using the editing tools
 3. Consider breaking down your book into smaller, clearer sections
-4. Reference the [User Guide](user-guide-toc-generation.md) for TOC editing tips
+4. Reference the [User Guide](toc-generation.md) for TOC editing tips
 
 ## When to Contact Support
 
@@ -197,6 +212,5 @@ Provide the following information:
 
 ## Related Documentation
 
-- [TOC Generation Requirements](toc-generation-requirements.md)
-- [User Guide for TOC Generation](user-guide-toc-generation.md)
-- [API TOC Endpoints](api-toc-endpoints.md)
+- [User Guide for TOC Generation](toc-generation.md)
+- [API TOC Endpoints](../api/toc.md)

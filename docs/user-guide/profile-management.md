@@ -7,19 +7,17 @@ This guide provides comprehensive information about the profile management featu
 1. [Profile Management Features](#profile-management-features)
 2. [User Guide for Profile Editing](#user-guide-for-profile-editing)
 3. [API Endpoints for Profile Operations](#api-endpoints-for-profile-operations)
-4. [Troubleshooting Common Profile Issues](#troubleshooting-common-profile-issues)
-5. [Security Considerations](#security-considerations)
+4. [Frontend Components](#frontend-components)
+5. [Troubleshooting Common Profile Issues](#troubleshooting-common-profile-issues)
+6. [Security Considerations](#security-considerations)
 
 ---
 
 ## Related Documentation
 
-- [API Profile Endpoints](api-profile-endpoints.md) - Detailed API documentation for profile operations
-- [Frontend Profile Components](frontend-profile-components.md) - Technical docs for profile UI components
-- [Profile Testing Guide](profile-testing-guide.md) - Testing and CI/CD for profile features
-- [Authentication User Guide](user-guide-auth.md) - General authentication documentation
-- [Clerk Integration Guide](clerk-integration-guide.md) - How Clerk authentication is integrated
-- [Auth Troubleshooting](auth-troubleshooting.md) - Solutions for common authentication issues
+- [API Profile Endpoints](../api/profile.md) - Detailed API documentation for profile operations
+- [Authentication User Guide](auth.md) - Sign-in, sessions and auth troubleshooting
+- [Session Management](../development/session-management.md) - How sessions and cookies work
 
 ---
 
@@ -242,6 +240,27 @@ http://localhost:8000
 - `401 Unauthorized`: Invalid or missing authentication token
 - `403 Forbidden`: Insufficient permissions
 - `404 Not Found`: User not found in Clerk
+
+---
+
+## Frontend Components
+
+For developers. Profile editing is split into a page, an API hook and a form schema.
+
+- **Profile page** (`frontend/src/app/profile/page.tsx`, route `/profile`, sign-in required): loads the profile, edits it with a form, and handles notification preferences and account deletion.
+- **`useProfileApi`** (`frontend/src/hooks/useProfileApi.ts`): cookie-authenticated calls to the profile API, with three methods: `getUserProfile()` (`GET /users/me`), `updateUserProfile(data)` (`PATCH /users/me`) and `deleteUserAccount()` (`DELETE /users/me`).
+- **`ProfilePictureUpload`** (`frontend/src/components/profile/ProfilePictureUpload.tsx`): shows the avatar and uploads a new one with `POST /users/me/avatar`. Uploads do not go through `useProfileApi`.
+
+The form validates with Zod:
+
+| Field | Rule |
+|-------|------|
+| First name, last name | up to 50 characters each |
+| Display name | up to 100 characters |
+| Bio | up to 1000 characters (a counter is shown) |
+| Email notifications, marketing emails | on/off |
+
+Data flow: the page reads the session, calls `getUserProfile()` and fills the form. Saving validates, calls `updateUserProfile()` with the full `preferences` object merged with the edited fields (the backend replaces the whole preferences subdocument), and shows a "Profile updated" toast. Saving is disabled until the profile has loaded, so a failed load cannot overwrite stored preferences. Theme is owned by the Settings page, not the profile form.
 
 ---
 

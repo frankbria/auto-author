@@ -56,6 +56,14 @@ Sessions can be terminated via:
 3. **Security Events**: Force logout on suspicious activity
 4. **Admin Action**: Administrator-forced session termination
 
+## Sign-in and Sign-out Behavior
+
+- **Sign-in** (`/auth/sign-in`): email and password. On success the user goes to the `?redirect=` target, or `/dashboard` when none is given. The redirect is sanitized to a same-site path. An unverified account is refused with `403 EMAIL_NOT_VERIFIED` and sent a fresh verification link.
+- **Protected routes**: `src/middleware.ts` guards `/dashboard` and `/profile`. It only checks that a session cookie exists; the backend validates the session on each API call. With no cookie the user is redirected to `/auth/sign-in?redirect=<path>`.
+- **Sign-out**: "Sign out" in the account menu calls `signOutOrNotify()` (`src/lib/sign-out.ts`) and goes to the home page only once the session is really gone. If the request fails, a "Could not sign out" toast says the user is still signed in.
+- **Backend 401**: `apiFetch()` (`src/lib/api/unauthorized.ts`) signs the browser out and redirects to `/auth/sign-in?redirect=<current page>`. This covers a session that expired, was revoked from another device, or belongs to a closed account.
+- **Multiple devices**: Settings lists active sessions and can revoke one or all others (`ActiveSessionsList`, using better-auth's `listSessions`, `revokeSession` and `revokeOtherSessions`). Resetting a password ends every session of the account.
+
 ## Session Duration Strategies
 
 Auto Author employs different session duration strategies to balance security and convenience:
@@ -278,6 +286,5 @@ Session health metrics collected:
 
 ## Related Documentation
 
-- [Login/Logout Flows](./login-logout-flows.md)
-- [Authentication Troubleshooting](./auth-troubleshooting.md)
-- [API Authentication Documentation](./api-auth-endpoints.md)
+- [Authentication User Guide](../user-guide/auth.md), including troubleshooting
+- [Profile API](../api/profile.md), including authentication

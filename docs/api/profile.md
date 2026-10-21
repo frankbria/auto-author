@@ -4,11 +4,9 @@ This document provides detailed information about the profile-related API endpoi
 
 ## Related Documentation
 
-- [Profile Management Guide](profile-management-guide.md) - Comprehensive guide for profile features
-- [Frontend Profile Components](frontend-profile-components.md) - Technical docs for profile UI components
-- [Profile Testing Guide](profile-testing-guide.md) - Testing and CI/CD for profile features
-- [API Authentication Endpoints](api-auth-endpoints.md) - Authentication API documentation
-- [Clerk Integration Guide](clerk-integration-guide.md) - How Clerk authentication is integrated
+- [Profile Management Guide](../user-guide/profile-management.md) - Comprehensive guide for profile features
+- [Authentication User Guide](../user-guide/auth.md) - Sign-in, sessions and auth error messages
+- [Session Management](../development/session-management.md) - How sessions and cookies are configured
 
 ## Base URL
 
@@ -24,11 +22,9 @@ http://localhost:8000
 
 ## Authentication
 
-All API endpoints in this document require authentication using Clerk JWT tokens. Include the token in the `Authorization` header of your request:
+Every endpoint in this document requires a signed-in user. The API authenticates the better-auth session cookie (`better-auth.session_token`, or `__Secure-better-auth.session_token` over HTTPS) that the sign-in flow sets; there is no separate bearer token. Browser clients send the cookie automatically on same-site requests.
 
-```
-Authorization: Bearer <token>
-```
+An unauthenticated request is answered `401` (for example `Not authenticated. Please sign in.`); an account with an unverified email address gets `403`; and `503` with a `Retry-After` header means the session could not be checked and should be retried. The full list of messages is in the [Authentication User Guide](../user-guide/auth.md#api-authentication-errors). In the browser, the frontend signs the user out and redirects to sign-in on any `401`.
 
 ## Rate Limiting
 
@@ -284,7 +280,6 @@ The profile API incorporates several security features:
 2. **Request Auditing**: All profile-related requests are logged for security monitoring
 3. **Rate Limiting**: Prevents brute force and DoS attacks
 4. **Role-Based Access**: Ensures users can only access appropriate resources
-5. **Clerk Integration**: Leverages Clerk's robust authentication system
 
 ## Error Handling
 

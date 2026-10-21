@@ -46,11 +46,20 @@ The summary input interface includes:
 - **Rich editing**: Supports standard text editing features (cut, copy, paste)
 - **Keyboard shortcuts**: Standard shortcuts work (Ctrl+Z for undo, etc.)
 
-### Minimum Requirements
+### Validation Limits
 
-- **30 words minimum** required to enable TOC generation
-- **Non-empty content** required
-- **Meaningful description** recommended (see examples below)
+The counters under the text area show your words (of the 30 required) and characters (of the 150 required). The Continue button stays disabled, with a message under the text area, until the summary is valid.
+
+| Requirement | Limit | Where it applies |
+|-------------|-------|------------------|
+| Words | At least 30 | Required to generate a TOC |
+| Characters | At least 150 | Required to generate a TOC |
+| Characters | At most 2,000 | Hard limit when saving |
+| Content | Not empty | Required |
+| Language | English | Checked in the text area; Cyrillic, Arabic, CJK, Japanese and Korean text is rejected |
+| Offensive words | Not allowed | Checked in the text area and again when the summary is saved |
+
+Characters are counted as Unicode characters, so an emoji counts once. The server only refuses a save outside 30-2,000 characters; the 30-word and 150-character minimums are what the TOC wizard requires. The last 20 saved versions of the summary are kept as revision history.
 
 ## Voice-to-Text Method
 
@@ -222,10 +231,9 @@ Your summary is the foundation for your entire book structure, so take time to c
 
 ## Related Documentation
 
-- [Summary Input Requirements and Best Practices](summary-input-requirements.md)
-- [API Endpoints: Summary Operations](api-summary-endpoints.md)
+- [API Endpoints: Summary Operations](../api/summary.md)
 - [Troubleshooting: Summary Input Issues](troubleshooting-summary-input.md)
-- [TOC Generation Guide](user-guide-toc-generation.md)
+- [TOC Generation Guide](toc-generation.md)
 
 ---
 

@@ -272,6 +272,12 @@ export const mockApiClient = {
 
 ## Running Tests
 
+### Whole repo
+```bash
+# Backend and frontend unit suites (the repo-wide gate; E2E is excluded)
+npm test
+```
+
 ### Frontend
 ```bash
 cd frontend
@@ -308,6 +314,29 @@ python -m pytest -v
 
 # Fast fail
 python -m pytest -x
+
+# Integration tests only
+uv run pytest tests/integration/ -v
+```
+
+### End-to-end (Playwright)
+```bash
+cd frontend
+npx playwright install            # one-time browser download
+
+npm run test:e2e                  # all specs
+npm run test:e2e:ui               # interactive UI mode
+npm run test:e2e:debug            # step through with the inspector
+```
+
+Run against staging with real auth (`npm run test:e2e:staging`) and the no-bypass local config: see [CLAUDE.md](../../CLAUDE.md) (Commands) and `frontend/tests/e2e/staging/README.md`.
+
+### Staging load smoke
+CI runs this after each staging deploy, with the staging test account in `STAGING_TEST_EMAIL` and `STAGING_TEST_PASSWORD` (see `.github/workflows/e2e-staging-tests.yml`).
+```bash
+cd backend
+uv sync --extra load
+uv run locust -f tests/load/staging_smoke.py StagingSmokeUser --headless --host=https://dev.autoauthor.app
 ```
 
 ## Troubleshooting
@@ -340,5 +369,3 @@ python -m pytest -x
 
 1. Run initial test suite to verify setup
 2. Review [Best Practices](./best-practices.md)
-3. Explore [Test Architecture](./test-architecture.md)
-4. Set up [CI/CD Integration](./cicd-integration.md)

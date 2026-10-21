@@ -416,4 +416,3 @@ WHERE created_at < NOW() - INTERVAL '90 days';
 
 ---
 
-*For implementation details, see [Developer Guide for Extending Question Functionality](developer-guide-question-system.md).*
