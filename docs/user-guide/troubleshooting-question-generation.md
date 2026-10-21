@@ -257,7 +257,7 @@ This guide helps resolve common issues with the AI-powered question generation s
 #### "Rate limit exceeded"
 **Cause:** Too many generation requests in short time
 **Solution:**
-- Wait 5-10 minutes before trying again
+- Wait about 2 minutes before trying again (chapter question generation allows 3 requests per 2 minutes)
 - Reduce generation frequency
 - Consider generating fewer questions at once
 
@@ -304,9 +304,9 @@ This guide helps resolve common issues with the AI-powered question generation s
 fetch('/api/v1/books/123/chapters/456/generate-questions', {
   method: 'POST',
   headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer ' + localStorage.getItem('token')
+    'Content-Type': 'application/json'
   },
+  credentials: 'include', // sends the session cookie
   body: JSON.stringify({
     count: 10,
     difficulty: 'medium'
@@ -376,9 +376,7 @@ If issues persist after following this guide:
    - Timestamp of issue
 
 3. **Contact methods:**
-   - Support ticket system
-   - Email: support@example.com
-   - Emergency: Live chat (for critical issues)
+   - Email: support@autoauthor.app
 
 ---
 

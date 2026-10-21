@@ -23,8 +23,8 @@ This guide provides practical instructions for developers to test and implement 
 
 ```bash
 # Already installed in this project
-@axe-core/react: v4.10.2
-jest-axe: v10.0.0
+@axe-core/react: ^4.13.0
+jest-axe: ^11.0.0
 @types/jest-axe: v3.5.9
 ```
 
@@ -824,13 +824,9 @@ A: All Radix UI primitives are accessible out-of-the-box. They follow ARIA Autho
 **Q: Can I use `aria-label` on a `<div>` to make it a button?**
 A: No. Use semantic HTML (`<button>`) first. ARIA should enhance, not replace, proper HTML.
 
-**Q: What if axe DevTools shows issues in third-party libraries (Clerk, TipTap)?**
+**Q: What if axe DevTools shows issues in third-party libraries (TipTap, Radix)?**
 A: Document these issues separately. Focus on fixing issues in your own components first. Third-party issues may require library updates or custom wrappers.
 
 **Q: How do I handle accessibility for dynamically loaded content?**
 A: Use `aria-live` regions to announce changes. See LoadingStateManager for example patterns.
 
----
-
-**Last Updated**: 2025-10-12
-**Next Review**: After comprehensive accessibility audit

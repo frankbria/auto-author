@@ -23,7 +23,7 @@ This guide provides comprehensive information about the profile management featu
 
 ## Profile Management Features
 
-Auto Author's profile management system integrates with Clerk for authentication while maintaining application-specific user data in our own database. This hybrid approach offers several advantages:
+Your sign-in identity (email, password, two-factor authentication) is handled by better-auth. Your profile (names, bio, picture, preferences) is stored in Auto Author's own database.
 
 ### Core Features
 
@@ -31,7 +31,7 @@ Auto Author's profile management system integrates with Clerk for authentication
 - **Profile Picture Management**: Upload and update profile pictures
 - **User Preferences**: Customize application appearance and notification settings
 - **Account Management**: Options for account deletion
-- **Auto-save Functionality**: Changes are saved automatically as you type
+- **Data export**: Download your data as a JSON file
 
 ### User Preferences Options
 
@@ -42,14 +42,6 @@ Auto Author supports the following user preferences:
 | Theme | UI color scheme (light/dark/system) | Dark |
 | Email Notifications | Receive important updates | Enabled |
 | Marketing Emails | Receive promotional content | Disabled |
-
-### Data Synchronization
-
-Profile changes are synchronized in two places:
-1. **Clerk**: For authentication-related data (name, email, password)
-2. **Auto Author Backend**: For application-specific data (preferences, bio)
-
-This dual-storage approach ensures a seamless user experience while maintaining data integrity across systems.
 
 ---
 
@@ -62,38 +54,29 @@ This dual-storage approach ensures a seamless user experience while maintaining 
 
 ### Editing Basic Information
 
-1. **Name Fields**: Update your first and last name in the corresponding fields
+1. **Name Fields**: Update your first name, last name and display name in the corresponding fields
 2. **Bio**: Share information about yourself in the bio text area
-3. **Email**: Your email is managed through Clerk and can be changed via the "Change" button
+3. **Email**: Your email address is shown but cannot be changed on this page
 
-All text fields feature automatic saving - changes are applied as you type after a short delay.
+Click **Save Changes** to apply your edits.
 
 ### Managing Your Profile Picture
 
 1. **View Current Picture**: Your profile image appears at the top of the profile page
 2. **Change Picture**:
    - Click the edit icon (pencil) on the profile picture
-   - Select an image from your device
-   - The image will be automatically uploaded and displayed
+   - Select a JPEG, PNG, WebP or GIF image of up to 5 MB
+   - The image is uploaded and displayed
 
 ### Setting Preferences
 
-Your preferences are found in the "Preferences" section:
-
-1. **Theme Selection**:
-   - **Light**: Bright theme for daytime use
-   - **Dark**: Dark theme to reduce eye strain (default)
-   - **System**: Follows your device settings
-
-2. **Notification Preferences**:
-   - Toggle "Email Notifications" to receive account updates
-   - Toggle "Marketing Emails" to receive promotional content
+The profile page has two notification toggles: "Email notifications" and "Marketing emails". Theme and the other preferences are on the **Settings** page.
 
 ### Account Management
 
 In the "Account Settings" section, you can:
 
-1. **Change Password**: Click "Change Password" to update your credentials through Clerk
+1. **Change Password**: use **Settings** → **Security** → Change Password
 2. **Download my data**: Click "Download my data" to save a JSON file with your profile, your books and the questions, answers and ratings in them
 3. **Delete Account**:
    - Click "Delete Account"
@@ -106,18 +89,18 @@ In the "Account Settings" section, you can:
 
 ## API Endpoints for Profile Operations
 
-Auto Author provides several API endpoints for profile management. All endpoints require authentication via Clerk JWT tokens.
+Auto Author provides several API endpoints for profile management. All endpoints require a signed-in session: the API reads the better-auth session cookie, not a bearer token.
 
 ### Base URL
 
 ```
-https://api.auto-author.com/v1
+https://api.dev.autoauthor.app/api/v1
 ```
 
 For local development:
 
 ```
-http://localhost:8000
+http://localhost:8000/api/v1
 ```
 
 ### Current User Profile
@@ -132,7 +115,7 @@ http://localhost:8000
 ```json
 {
   "id": "string",
-  "clerk_id": "string",
+  "auth_id": "string",
   "email": "user@example.com",
   "first_name": "string",
   "last_name": "string",
@@ -142,7 +125,6 @@ http://localhost:8000
   "role": "user",
   "created_at": "2025-05-01T12:00:00Z",
   "updated_at": "2025-05-17T12:00:00Z",
-  "books": [],
   "preferences": {
     "theme": "dark",
     "email_notifications": true,
@@ -153,7 +135,7 @@ http://localhost:8000
 
 **Status Codes**:
 - `200 OK`: Profile retrieved successfully
-- `401 Unauthorized`: Invalid or missing authentication token
+- `401 Unauthorized`: No valid session cookie
 - `500 Internal Server Error`: Server-side error
 
 ### Update Profile
@@ -185,7 +167,7 @@ http://localhost:8000
 **Status Codes**:
 - `200 OK`: Profile updated successfully
 - `400 Bad Request`: Invalid data format
-- `401 Unauthorized`: Invalid or missing authentication token
+- `401 Unauthorized`: No valid session cookie
 - `429 Too Many Requests`: Rate limit exceeded
 - `500 Internal Server Error`: Server-side error
 
@@ -193,7 +175,7 @@ http://localhost:8000
 
 **Endpoint**: `DELETE /users/me`
 
-**Description**: Deletes the current user's books and deactivates the account; the account and billing record is kept for 18 months (see `api-profile-endpoints.md`)
+**Description**: Deletes the current user's books and deactivates the account; the account and billing record is kept for 18 months (see [API Profile Endpoints](../api/profile.md))
 
 **Authentication**: Required
 
@@ -208,38 +190,9 @@ http://localhost:8000
 
 **Status Codes**:
 - `200 OK`: Account deactivated
-- `401 Unauthorized`: Invalid or missing authentication token
+- `401 Unauthorized`: No valid session cookie
 - `404 Not Found`: User not found or already deleted
 - `429 Too Many Requests`: Rate limit exceeded
-
-### Clerk User Data
-
-**Endpoint**: `GET /users/clerk/{clerk_id}`
-
-**Description**: Fetches user data directly from Clerk (limited access)
-
-**Authentication**: Required (admin or self only)
-
-**Response Format**:
-```json
-{
-  "id": "string",
-  "first_name": "string",
-  "last_name": "string",
-  "email_addresses": [
-    {
-      "email": "user@example.com",
-      "verified": true
-    }
-  ]
-}
-```
-
-**Status Codes**:
-- `200 OK`: Data retrieved successfully
-- `401 Unauthorized`: Invalid or missing authentication token
-- `403 Forbidden`: Insufficient permissions
-- `404 Not Found`: User not found in Clerk
 
 ---
 
@@ -291,9 +244,9 @@ Data flow: the page reads the session, calls `getUserProfile()` and fills the fo
 
 **Possible Causes and Solutions**:
 
-1. **Auto-save Failure**:
-   - Look for error messages in the UI
-   - Try clicking the "Save Changes" button explicitly
+1. **Save Failure**:
+   - Look for an "Update failed" message in the UI
+   - Click "Save Changes" again
    - Check the browser console for API errors
 
 2. **Validation Errors**:
@@ -311,7 +264,7 @@ Data flow: the page reads the session, calls `getUserProfile()` and fills the fo
 **Possible Causes and Solutions**:
 
 1. **File Format/Size**:
-   - Ensure the image is in a supported format (JPEG, PNG, GIF)
+   - Ensure the image is in a supported format (JPEG, PNG, WebP or GIF)
    - Check that the file size is under 5MB
    - Try resizing or converting the image
 
@@ -319,8 +272,8 @@ Data flow: the page reads the session, calls `getUserProfile()` and fills the fo
    - The browser might be blocking file access
    - Check and enable file permissions for the site
 
-3. **Storage Issues**:
-   - Clerk storage limits may have been reached
+3. **Upload limit**:
+   - Picture uploads are limited to 5 per minute
    - Contact support if you consistently cannot upload images
 
 ### Account Deletion Problems
@@ -349,35 +302,21 @@ Data flow: the page reads the session, calls `getUserProfile()` and fills the fo
 
 Auto Author implements several measures to protect your profile data:
 
-1. **Input Sanitization**: All profile data is sanitized before storage to prevent XSS attacks
-2. **Rate Limiting**: API endpoints have rate limits to prevent brute force attacks
-3. **Input Validation**: Strict validation rules ensure data integrity
-4. **Audit Logging**: All profile changes are logged for security monitoring
-5. **Secure Communication**: All API calls use HTTPS encryption
+1. **Input Sanitization**: text fields in a profile update are sanitized before storage
+2. **Rate Limiting**: the profile endpoints have rate limits (see [API Profile Endpoints](../api/profile.md))
+3. **Input Validation**: the form and the API validate field lengths and types
+4. **Secure Communication**: staging and production serve the app over HTTPS
 
-### Two-System Security Model
+### Identity and Profile Data
 
-Our profile system uses a two-system security model:
-
-1. **Clerk Authentication System**:
-   - Manages critical identity data and credentials
-   - Handles password security and MFA
-   - Provides JWT tokens for API authentication
-
-2. **Application Backend**:
-   - Stores application-specific user data
-   - Manages preferences and content
-   - Links content to authenticated users via Clerk IDs
-
-This separation creates multiple security layers, reducing vulnerability to attacks.
+better-auth stores your email, password hash, sessions and two-factor secret. The application backend stores your profile, preferences and content, and links them to your account by its better-auth id. The backend authenticates each request from your session cookie.
 
 ### Account Recovery Options
 
 If you lose access to your account:
 
-1. **Password Reset**: Use the "Forgot Password" option on the login screen
-2. **Email Recovery**: Verify your identity via email verification
-3. **Support Assistance**: Contact our support team for account recovery help
+1. **Password Reset**: Use the "Forgot password?" link on the sign-in page
+2. **Lost two-factor device**: Use a backup code, or email support@autoauthor.app
 
 ### Best Practices for Users
 
@@ -385,10 +324,9 @@ To maintain the security of your profile:
 
 1. **Use Strong Passwords**: Create unique passwords with a mix of characters
 2. **Enable Two-Factor Authentication**: Add an extra layer of security with 2FA
-3. **Monitor Activity**: Regularly check for unusual activity in your account
-4. **Update Contact Information**: Keep your email and recovery options current
-5. **Log Out on Shared Devices**: Always sign out when using public computers
+3. **Review Sessions**: Check Active Sessions in Settings → Security and sign out devices you do not recognize
+4. **Log Out on Shared Devices**: Always sign out when using public computers
 
 ---
 
-*For additional help, please contact our support team at support@auto-author.com*
+*For additional help, please contact our support team at support@autoauthor.app*

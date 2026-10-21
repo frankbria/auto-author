@@ -144,7 +144,7 @@ class Settings(BaseSettings):
         default="test-secret-for-ci-minimum-32-characters-long-safe-for-testing",
         min_length=32,
         repr=False,
-        description="JWT signing secret - MUST be strong random value, minimum 32 characters"
+        description="better-auth session-cookie signing secret - MUST be strong random value, minimum 32 characters"
     )
     BETTER_AUTH_URL: str = Field("http://localhost:3000", repr=False)  # Base URL of the application
 

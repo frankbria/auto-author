@@ -107,9 +107,7 @@ npm run lint          # `npm run lint -- --fix` to auto-fix
 
 # Backend
 cd backend
-uv run ruff format .
-uv run ruff check .
-uv run mypy app/
+uv run --extra test ruff check app/ tests/   # no formatter or type checker is enforced
 ```
 
 ---
@@ -126,7 +124,7 @@ below are orientation only.
 |----------|----------|-------|
 | `DATABASE_URL` | ✅ | MongoDB connection string (`mongodb://…` or `mongodb+srv://…`) |
 | `DATABASE_NAME` | ✅ | e.g. `auto_author` |
-| `BETTER_AUTH_SECRET` | ✅ | Shared HS256 JWT secret; must match the frontend value exactly. **Production refuses to start without it. Staging does not** — it falls back to the committed CI test secret, so an unconfigured staging boots happily on a publicly-known signing key. Always set it explicitly. Generate: `python -c 'import secrets; print(secrets.token_urlsafe(64))'` |
+| `BETTER_AUTH_SECRET` | ✅ | better-auth's secret for signing its session cookies; the backend checks the cookie signature with it, so it must match the frontend value exactly. **Production refuses to start without it. Staging does not** — it falls back to the committed CI test secret, so an unconfigured staging boots happily on a publicly-known signing key. Always set it explicitly. Generate: `python -c 'import secrets; print(secrets.token_urlsafe(64))'` |
 | `BETTER_AUTH_URL` | ✅ | Base URL of the frontend |
 | `OPENAI_AUTOAUTHOR_API_KEY` | ✅ | OpenAI key |
 | `BACKEND_CORS_ORIGINS` | ✅ | Comma-separated origins, or a JSON array. See the caveat under "CORS" below. |

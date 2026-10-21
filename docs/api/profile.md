@@ -10,15 +10,19 @@ This document provides detailed information about the profile-related API endpoi
 
 ## Base URL
 
+Staging:
+
 ```
-https://api.auto-author.com/v1
+https://api.dev.autoauthor.app/api/v1
 ```
 
 For local development:
 
 ```
-http://localhost:8000
+http://localhost:8000/api/v1
 ```
+
+The profile routes are under `/users`.
 
 ## Authentication
 
@@ -34,12 +38,7 @@ Profile endpoints implement rate limiting to prevent abuse:
 - `/users/me` (DELETE): 3 requests per 5 minutes
 - `/users/me/export` (GET): 10 requests per hour
 
-Responses include rate limit headers:
-```
-X-RateLimit-Limit: <requests_allowed>
-X-RateLimit-Remaining: <requests_remaining>
-X-RateLimit-Reset: <timestamp>
-```
+Only a refused request carries rate limit headers. It is answered `429` with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`.
 
 ---
 
@@ -64,12 +63,14 @@ Retrieves the authenticated user's profile information.
   "first_name": "Jane", 
   "last_name": "Doe",
   "display_name": "Jane Doe",
-  "avatar_url": "https://img.clerk.com/user_avatar.jpg",
+  "avatar_url": "https://example.com/avatars/jane.jpg",
   "bio": "Author and technology enthusiast",
   "role": "user",
   "created_at": "2025-05-01T12:00:00Z",
   "updated_at": "2025-05-17T12:00:00Z",
-  "books": ["6457922acf1d34b789fedcba"],
+  "plan": "free",
+  "stripe_customer_id": null,
+  "stripe_subscription_id": null,
   "preferences": {
     "theme": "dark",
     "email_notifications": true,
@@ -80,13 +81,13 @@ Retrieves the authenticated user's profile information.
 
 **Status Codes**:
 - `200 OK`: Profile retrieved successfully
-- `401 Unauthorized`: Invalid or missing authentication token
+- `401 Unauthorized`: No valid session cookie
 - `500 Internal Server Error`: Server-side error
 
 **Example Request**:
 ```bash
-curl -X GET "http://localhost:8000/api/users/me" \
-  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..."
+curl -X GET "http://localhost:8000/api/v1/users/me" \
+  -b "better-auth.session_token=<session cookie value>"
 ```
 
 ---
@@ -123,14 +124,14 @@ written only by `POST /users/me/avatar`.
 **Status Codes**:
 - `200 OK`: Profile updated successfully
 - `400 Bad Request`: Invalid input data
-- `401 Unauthorized`: Invalid or missing authentication token
+- `401 Unauthorized`: No valid session cookie
 - `429 Too Many Requests`: Rate limit exceeded
 - `500 Internal Server Error`: Server-side error
 
 **Example Request**:
 ```bash
-curl -X PATCH "http://localhost:8000/api/users/me" \
-  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..." \
+curl -X PATCH "http://localhost:8000/api/v1/users/me" \
+  -b "better-auth.session_token=<session cookie value>" \
   -H "Content-Type: application/json" \
   -d '{
     "bio": "Updated professional bio",
@@ -210,7 +211,7 @@ erased). This is how support honours a request for earlier erasure.
 
 **Status Codes**:
 - `200 OK`: Account deactivated
-- `401 Unauthorized`: Invalid or missing authentication token
+- `401 Unauthorized`: No valid session cookie
 - `404 Not Found`: User not found or already deleted
 - `429 Too Many Requests`: Rate limit exceeded
 - `500 Internal Server Error`: Content cascade failed — account left active, retry
@@ -218,8 +219,8 @@ erased). This is how support honours a request for earlier erasure.
 
 **Example Request**:
 ```bash
-curl -X DELETE "http://localhost:8000/api/users/me" \
-  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..."
+curl -X DELETE "http://localhost:8000/api/v1/users/me" \
+  -b "better-auth.session_token=<session cookie value>"
 ```
 
 > ⚠️ **Warning**: This operation is irreversible. All books and related content are permanently deleted, and a deactivated account cannot be reactivated.
@@ -240,8 +241,8 @@ The following endpoints are available only to users with administrator permissio
 
 **Example Request**:
 ```bash
-curl -X GET "http://localhost:8000/api/users/admin/users" \
-  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..."
+curl -X GET "http://localhost:8000/api/v1/users/admin/users" \
+  -b "better-auth.session_token=<session cookie value>"
 ```
 
 #### Deactivate or Erase Any User
@@ -259,15 +260,15 @@ record to the tombstone (#954).
 
 **Status Codes**:
 - `204 No Content`: Account deactivated, or a deactivated account erased
-- `401 Unauthorized`: Invalid or missing authentication token
+- `401 Unauthorized`: No valid session cookie
 - `403 Forbidden`: Insufficient permissions
 - `404 Not Found`: User not found or already erased
 - `502 Bad Gateway`: The subscription could not be cancelled — nothing was deleted, retry
 
 **Example Request**:
 ```bash
-curl -X DELETE "http://localhost:8000/api/users/user_2NxAa1pyy8THf937QUAhKR2tXCI" \
-  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ..."
+curl -X DELETE "http://localhost:8000/api/v1/users/Xf3kq9TzR2bLw8NmPa1cVy7D" \
+  -b "better-auth.session_token=<session cookie value>"
 ```
 
 ---
@@ -276,10 +277,9 @@ curl -X DELETE "http://localhost:8000/api/users/user_2NxAa1pyy8THf937QUAhKR2tXCI
 
 The profile API incorporates several security features:
 
-1. **Input Sanitization**: All incoming data is sanitized to prevent XSS and SQL injection attacks
-2. **Request Auditing**: All profile-related requests are logged for security monitoring
-3. **Rate Limiting**: Prevents brute force and DoS attacks
-4. **Role-Based Access**: Ensures users can only access appropriate resources
+1. **Input Sanitization**: string fields in a profile update are sanitized before they are stored
+2. **Rate Limiting**: each endpoint has the limits listed above
+3. **Role-Based Access**: the admin endpoints require the `admin` role, and `DELETE /users/{auth_id}` allows only an admin or the account's own id
 
 ## Error Handling
 
@@ -300,4 +300,4 @@ Common error scenarios:
 
 ---
 
-*For technical support with the API, please contact api-support@auto-author.com*
+*For help with the API, email support@autoauthor.app*

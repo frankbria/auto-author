@@ -94,7 +94,7 @@ missing key fails the deploy with a named error.
 |-----|-------------|
 | `MONGODB_URI` | Connection string, **no database name in the path**. Compose also hands it to the frontend as `DATABASE_URL` |
 | `DATABASE_NAME` | Database name, e.g. `auto_author_staging` |
-| `BETTER_AUTH_SECRET` | Shared HS256 secret, used by **both** backend and frontend. 64+ random chars |
+| `BETTER_AUTH_SECRET` | better-auth's session-cookie signing secret, used by **both** backend and frontend. 64+ random chars |
 | `OPENAI_API_KEY` | AI provider key (see `docs/STAGING-DEPLOYMENT.md` → AI provider settings) |
 | `ENVIRONMENT` | Exported by the workflows as `staging`; there is no default (#777) |
 

@@ -494,8 +494,8 @@ Before marking ANY feature as complete, verify:
 - [ ] All tests pass (backend and frontend)
 - [ ] Code coverage meets 85% minimum threshold
 - [ ] Coverage report reviewed for meaningful test quality
-- [ ] Code formatted and linted (ruff, ESLint)
-- [ ] Type checking passes (mypy for Python, tsc for TypeScript)
+- [ ] Linted (`ruff check` for Python, ESLint for TypeScript); no formatter is enforced
+- [ ] Type checking passes for the frontend (`npm run typecheck`); the backend has no type checker
 - [ ] All changes committed with conventional commit messages
 - [ ] All commits pushed to remote repository
 - [ ] E2E test added for user-facing changes (all five coverage requirements above)

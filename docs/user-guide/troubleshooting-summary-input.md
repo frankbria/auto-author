@@ -20,7 +20,7 @@ Before diving into specific issues, run through this quick checklist:
 ### ✅ Basic Checks
 - [ ] Are you logged in to your Auto Author account?
 - [ ] Is your internet connection stable?
-- [ ] Are you using a supported browser (Chrome, Firefox, Safari, Edge)?
+- [ ] Are you using a supported browser (Chrome or Edge for voice input)?
 - [ ] Have you refreshed the page recently?
 - [ ] Is the summary page fully loaded?
 
@@ -79,7 +79,7 @@ Before diving into specific issues, run through this quick checklist:
 
 3. **Check revision history**
    - Your content might be saved in a previous revision
-   - Look for revision history options in the interface
+   - The summary page has a "Revision History" section; click "Revert" on a version to load it into the text area
 
 ### Problem: Character Count Not Updating
 
@@ -118,7 +118,7 @@ Before diving into specific issues, run through this quick checklist:
    - Refresh page after changing permissions
 
 2. **Verify browser support**
-   - Voice input requires Chrome, Firefox, Safari, or Edge
+   - Voice input requires Chrome or Edge, over HTTPS. Other browsers show "Dictation is not available in this browser" and you can type instead
    - Internet Explorer and older browsers are not supported
    - Update your browser to the latest version
 
@@ -234,7 +234,7 @@ Before diving into specific issues, run through this quick checklist:
    - Try saving manually if available
 
 2. **Wait for typing to finish**
-   - Auto-save triggers 600ms after stopping typing
+   - Auto-save triggers 1 second after stopping typing
    - Don't navigate away immediately after typing
    - Look for save confirmation before leaving page
 
@@ -318,11 +318,10 @@ Before diving into specific issues, run through this quick checklist:
 
 | Browser | Voice Input | Text Input | Auto-save |
 |---------|-------------|------------|-----------|
-| Chrome 70+ | ✅ | ✅ | ✅ |
-| Firefox 65+ | ✅ | ✅ | ✅ |
-| Safari 14+ | ✅ | ✅ | ✅ |
-| Edge 79+ | ✅ | ✅ | ✅ |
-| Internet Explorer | ❌ | ⚠️ | ❌ |
+| Chrome | ✅ | ✅ | ✅ |
+| Edge | ✅ | ✅ | ✅ |
+| Firefox | ❌ (type instead) | ✅ | ✅ |
+| Safari | ❌ (type instead) | ✅ | ✅ |
 
 ### Browser-Specific Issues
 
@@ -330,13 +329,9 @@ Before diving into specific issues, run through this quick checklist:
 - **Issue**: Voice input may not work in incognito mode
 - **Solution**: Use regular browsing mode or enable microphone in incognito
 
-#### Firefox
-- **Issue**: Auto-save might be slower than other browsers
-- **Solution**: Wait longer for save confirmation
-
-#### Safari
-- **Issue**: Voice commands for punctuation may not work
-- **Solution**: Manually add punctuation after transcription
+#### Firefox and Safari
+- **Issue**: Voice input is not offered
+- **Solution**: Type the summary, or use Chrome or Edge for voice input
 
 #### Mobile Browsers
 - **Voice input**: Generally works well on mobile
@@ -433,7 +428,7 @@ If all else fails:
 If you've lost summary content:
 
 1. **Check revision history**
-   - Look for previous versions in the interface
+   - Use the "Revision History" section on the summary page (the last 20 saved versions are kept)
    - Content might be saved in earlier revision
 
 2. **Browser history**

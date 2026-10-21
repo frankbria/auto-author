@@ -5,23 +5,14 @@ This guide walks you through setting up the complete testing environment for the
 ## Prerequisites
 
 ### System Requirements
-- Node.js 18+ (for frontend)
-- Python 3.9+ (for backend)
+- Node.js 24+ (for frontend)
+- Python 3.13+ and [uv](https://docs.astral.sh/uv/) (for backend)
+- MongoDB on `localhost:27017` (backend tests use a real database)
 - Git
-- VS Code (recommended)
 
 ### Environment Setup
 
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd auto-author
-```
-
-2. **Install root dependencies**
-```bash
-npm install
-```
+Clone the repository (`git clone https://github.com/frankbria/auto-author.git`), then install the frontend and backend dependencies as below. The root `package.json` has only the `npm test` script; there is nothing to install at the root.
 
 ## Frontend Testing Setup
 
@@ -31,189 +22,40 @@ cd frontend
 npm install
 ```
 
-### 2. Configuration Files
+### 2. Configuration
 
-#### Jest Configuration (`jest.config.cjs`)
-```javascript
-const nextJest = require('next/jest')
-
-const createJestConfig = nextJest({
-  dir: './',
-})
-
-const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  testEnvironment: 'jest-environment-jsdom',
-  moduleNameMapping: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-  },
-  collectCoverageFrom: [
-    'src/**/*.{js,jsx,ts,tsx}',
-    '!src/**/*.d.ts',
-    '!src/**/*.stories.{js,jsx,ts,tsx}',
-  ],
-  coverageThreshold: {
-    global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80,
-    },
-  },
-}
-
-module.exports = createJestConfig(customJestConfig)
-```
-
-#### Jest Setup (`jest.setup.js`)
-```javascript
-import '@testing-library/jest-dom'
-
-// Mock Next.js router
-jest.mock('next/router', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    pathname: '/',
-    query: {},
-  }),
-}))
-
-// Mock environment variables
-process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8000'
+Jest is configured in `frontend/jest.config.cjs` (built on `next/jest`, jsdom environment, setup in `frontend/src/jest.setup.ts`). It sets no coverage threshold; the 85/85/75/85 (lines/statements/branches/functions) gate is passed on the command line by CI (`.github/workflows/tests.yml`) and the `frontend-coverage` pre-commit hook:
+```bash
+cd frontend
+npm test -- --coverage --coverageThreshold='{"global":{"lines":85,"statements":85,"branches":75,"functions":85}}'
 ```
 
 ### 3. Test Scripts
-Add these scripts to `package.json`:
-```json
-{
-  "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --watchAll=false",
-    "test:e2e": "jest --testNamePattern='End to End'",
-    "test:integration": "jest --testNamePattern='Integration'",
-    "test:unit": "jest --testPathPattern='unit'",
-    "test:performance": "jest --testNamePattern='Performance'",
-    "test:accessibility": "jest --testNamePattern='Accessibility'"
-  }
-}
-```
-
-### 4. VS Code Configuration
-Create `.vscode/settings.json`:
-```json
-{
-  "jest.jestCommandLine": "npm test --",
-  "jest.autoRun": "watch",
-  "jest.showCoverageOnLoad": true,
-  "testing.automaticallyOpenPeekView": "never"
-}
-```
+`frontend/package.json` defines `test`, `test:watch`, `test:coverage`, `test:e2e`, `test:e2e:ui`, `test:e2e:debug` and the `test:e2e:staging*` scripts.
 
 ## Backend Testing Setup
 
-### 1. Virtual Environment
+### 1. Install Dependencies
 ```bash
 cd backend
-python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# macOS/Linux
-source .venv/bin/activate
+uv sync --extra test    # creates .venv; test tooling (pytest, pytest-asyncio, pytest-cov, ruff, ...) is in the `test` extra
 ```
 
-### 2. Install Dependencies
-```bash
-uv sync --extra test    # test tooling (pytest, pytest-asyncio, pytest-cov, ...) is in the `test` extra
-```
+### 2. Configuration Files
 
-### 3. Configuration Files
+- `backend/pytest.ini`: `testpaths = tests`, `asyncio_mode = auto`, markers `integration` and `unit`.
+- `backend/.coveragerc`: measures `app`, omits tests.
+- The 85% coverage floor is passed on the command line (`--cov=app --cov-fail-under=85`) by CI and the `backend-coverage` pre-commit hook.
 
-#### Pytest Configuration (`pytest.ini`)
-```ini
-[tool:pytest]
-testpaths = tests
-python_files = test_*.py
-python_classes = Test*
-python_functions = test_*
-addopts = 
-    -v
-    --tb=short
-    --cov=app
-    --cov-report=html
-    --cov-report=term-missing
-    --cov-fail-under=85
-asyncio_mode = auto
-env_files = .env.test
-```
+### 3. Test Database
 
-#### Coverage Configuration (`.coveragerc`)
-```ini
-[run]
-source = app
-omit = 
-    */tests/*
-    */venv/*
-    */__pycache__/*
-    */migrations/*
-    app/main.py
+Tests use a real MongoDB, not SQLite or SQLAlchemy. Start MongoDB on `localhost:27017`; `backend/tests/conftest.py` does the rest:
+- It sets `ENVIRONMENT=test`.
+- It connects to `TEST_MONGO_URI` (default `mongodb://localhost:27017/auto-author-test`).
+- The `motor_reinit_db` fixture drops that database before and after the test and points the data-access modules at a fresh Motor client. Tests that touch the database request it, directly or through `auth_client_factory` / `async_client_factory`.
+- `backend/tests/db_guard.py` aborts collection if the URI is not a local test database.
 
-[report]
-exclude_lines =
-    pragma: no cover
-    def __repr__
-    raise AssertionError
-    raise NotImplementedError
-```
-
-### 4. Test Environment
-Create `.env.test`:
-```bash
-DATABASE_URL=sqlite:///test.db
-OPENAI_API_KEY=test_key_openai
-ANTHROPIC_API_KEY=test_key_anthropic
-ENVIRONMENT=test
-LOG_LEVEL=WARNING
-BACKEND_CORS_ORIGINS=["http://localhost:3000"]
-```
-
-### 5. Test Database Setup
-Create `conftest.py` (if not exists):
-```python
-import pytest
-import asyncio
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.database import Base, get_db
-from app.main import app
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-@pytest.fixture(scope="session")
-def test_db():
-    """Create test database."""
-    engine = create_engine("sqlite:///test.db")
-    Base.metadata.create_all(bind=engine)
-    yield engine
-    Base.metadata.drop_all(bind=engine)
-
-@pytest.fixture
-def db_session(test_db):
-    """Create database session for tests."""
-    SessionLocal = sessionmaker(bind=test_db)
-    session = SessionLocal()
-    yield session
-    session.rollback()
-    session.close()
-```
+No `.env.test` file is used.
 
 ## IDE Integration
 
@@ -229,46 +71,9 @@ Install these recommended extensions:
 2. Set test runner to pytest
 3. Enable coverage integration
 
-## Database Setup for Testing
-
-### SQLite (Development/Testing)
-```bash
-# Backend directory
-python -c "from app.database import engine, Base; Base.metadata.create_all(bind=engine)"
-```
-
-### PostgreSQL (Production-like Testing)
-```bash
-# Install PostgreSQL locally or use Docker
-docker run --name test-postgres -e POSTGRES_PASSWORD=testpass -d -p 5433:5432 postgres
-
-# Update .env.test
-DATABASE_URL=postgresql://postgres:testpass@localhost:5433/test_db
-```
-
 ## Mock Services Setup
 
-### AI Service Mocking
-Create `tests/mocks/ai_services.py`:
-```python
-class MockOpenAIClient:
-    def generate_questions(self, content, count=5):
-        return [f"Test question {i}?" for i in range(count)]
-
-class MockAnthropicClient:
-    def generate_content(self, prompt):
-        return "Mock generated content"
-```
-
-### API Client Mocking
-Create `frontend/src/__tests__/mocks/apiClient.ts`:
-```typescript
-export const mockApiClient = {
-  generateQuestions: jest.fn(),
-  saveResponse: jest.fn(),
-  getProgress: jest.fn(),
-}
-```
+Recorded AI provider outputs used by backend tests live in `backend/tests/fixtures/ai_provider_outputs/`. Frontend mocks are in `frontend/src/__mocks__/` and per-test `jest.mock` calls.
 
 ## Running Tests
 
@@ -301,19 +106,19 @@ npm run test:watch
 cd backend
 
 # All tests
-python -m pytest
+uv run pytest
 
 # Specific test files
-python -m pytest tests/test_api/test_partial_patch.py
+uv run pytest tests/test_api/test_partial_patch.py
 
 # With coverage
-python -m pytest --cov
+uv run pytest --cov
 
 # Verbose output
-python -m pytest -v
+uv run pytest -v
 
 # Fast fail
-python -m pytest -x
+uv run pytest -x
 
 # Integration tests only
 uv run pytest tests/integration/ -v
@@ -345,7 +150,7 @@ uv run locust -f tests/load/staging_smoke.py StagingSmokeUser --headless --host=
 
 #### Frontend
 1. **Module resolution issues**
-   - Check `jest.config.cjs` moduleNameMapping
+   - Check `jest.config.cjs` `moduleNameMapper`
    - Verify tsconfig.json paths
 
 2. **Jest environment issues**
@@ -354,16 +159,13 @@ uv run locust -f tests/load/staging_smoke.py StagingSmokeUser --headless --host=
 
 #### Backend
 1. **Database connection issues**
-   - Verify `.env.test` configuration
-   - Check database permissions
+   - Check that MongoDB is running on `localhost:27017` (or that `TEST_MONGO_URI` points at a local test database)
 
 2. **Import path issues**
-   - Ensure PYTHONPATH includes app directory
-   - Check relative imports
+   - Run pytest from `backend/` (`pytest.ini` sets `pythonpath = .`)
 
 ### Performance Issues
 - Use `--maxWorkers=50%` for Jest on limited resources
-- Set `pytest -n auto` for parallel test execution
 
 ## Next Steps
 

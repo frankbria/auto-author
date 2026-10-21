@@ -340,6 +340,12 @@ and is the check that actually exercises the deployed stack.
 Re-run the deploy with an earlier tag. That is the whole procedure:
 
 ```bash
+gh workflow run deploy-staging-containers.yml -f image_tag=sha-<previous>
+```
+
+The workflow's only input is `image_tag`. To do the same by hand on the box:
+
+```bash
 cd /opt/auto-author
 IMAGE_TAG=sha-<previous> ENVIRONMENT=staging docker compose \
   -f docker-compose.yml -f docker-compose.staging.yml up -d

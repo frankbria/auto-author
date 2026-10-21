@@ -19,9 +19,9 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
 ### Step 1: Create Your Account
 
 1. **Sign Up**: Visit the Auto Author website and click "Sign Up"
-2. **Choose Your Method**: Register with email or use social login (Google, GitHub, etc.)
-3. **Verify Your Email**: Complete the verification process
-4. **Set Up Your Profile**: Add your name, bio, and writing preferences
+2. **Enter Your Details**: Name, email, and a password (at least 8 characters with an uppercase letter, a lowercase letter and a number). Sign-up is by email and password only. By signing up you accept the Terms of Service
+3. **Verify Your Email**: Open the verification link we email you. You are signed in once the address is verified
+4. **Set Up Your Profile** (optional): Add your name, bio, and picture on the Profile page
 
 ### Step 2: Create Your First Book
 
@@ -30,20 +30,19 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
    - **Title**: The name of your book
    - **Subtitle** (optional): Additional descriptive text
    - **Description**: A brief summary of what your book is about
-   - **Genre**: Select from Fiction, Non-Fiction, Science Fiction, Fantasy, etc.
-   - **Target Audience**: Choose who your book is for (Children, Young Adult, Adult, etc.)
-   - **Cover Image URL** (optional): Add a link to your book cover image
+   - **Genre**: Select from Non-Fiction, Business, Self-Help, Personal Development, Health & Wellness, How-To / Guide, Historical, Biography or Other
+   - **Target Audience**: Choose who your book is for (Children, Young Adult, Adult, General, Academic or Professional)
 
 3. **Click "Create Book"** to start your writing journey
 
 ### Step 3: Add Your Book Summary
 
 1. **Navigate to your new book** by clicking on it in your dashboard
-2. **Go to the Summary section** 
-3. **Write or speak your book summary**:
+2. **Go to the Summary section**: click "Start with Book Summary" (or "Edit Book Summary" if you already have one)
+3. **Write or speak your book summary** (30 to 2,000 characters; at least 30 words and 150 characters are needed to generate a table of contents):
    - **Text Input**: Type your summary directly
-   - **Voice Input**: Click the microphone icon and speak your summary
-4. **Save your summary** - this will be used to generate your table of contents
+   - **Voice Input**: Click "Voice Input" and speak; click "Stop" when finished
+4. **Click "Continue to TOC Generation"** - your summary is saved and used to generate your table of contents
 
 ## 📖 Complete Feature Guide
 
@@ -63,7 +62,6 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
 - Description (optional but recommended)
 - Genre (optional)
 - Target Audience (optional)
-- Cover Image URL (optional)
 
 **Output**: A new book project appears in your dashboard
 
@@ -71,20 +69,18 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
 **What it does**: Update your book metadata at any time during your writing process.
 
 **How to use it**:
-1. Go to your book dashboard
-2. Click the "Edit" button or the book title
-3. Make your changes in the book details form
-4. Click "Save Changes"
+1. Open your book from the dashboard
+2. Click "Edit Book"
+3. Change the fields in the book details form. Changes are saved automatically a moment after you stop typing
 
 #### Delete a Book
 **What it does**: Permanently remove a book project from your account.
 
 **How to use it**:
-1. Go to your book dashboard
-2. Click the three-dot menu on the book card
-3. Select "Delete Book"
-4. **Type the book title to confirm** (safety feature)
-5. Click "Delete" to permanently remove the book
+1. Go to your dashboard
+2. Click the trash button on the book card
+3. **Type the book title to confirm** (safety feature)
+4. Confirm to permanently remove the book
 
 ⚠️ **Important**: Deleted books cannot be recovered. All chapters and content will be permanently lost.
 
@@ -101,10 +97,10 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
 5. If ready, you'll see clarifying questions to improve the TOC quality
 6. Answer the questions to guide the AI
 7. Review the generated TOC
-8. Click "Accept" to use it or "Regenerate" to try again
+8. Click "Accept & Continue" to use it or "Regenerate" to try again. Accepting replaces your current table of contents, and the review screen warns you if that would remove chapters that already have content
 
 **Inputs Required**:
-- A well-written book summary (minimum 50 words recommended)
+- A book summary of at least 30 words and 150 characters
 - Answers to clarifying questions (if prompted)
 
 **Output**: A complete, structured table of contents with chapters and subchapters
@@ -113,12 +109,12 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
 **What it does**: Refine and customize your AI-generated table of contents.
 
 **How to use it**:
-1. Go to the "Edit TOC" section
-2. Use the drag-and-drop interface to reorder chapters
+1. Click "Edit TOC" on your book page
+2. Drag and drop chapters to reorder them
 3. Click on chapter titles to edit them
-4. Add new chapters manually if needed
+4. Click "Add Chapter" (or "Add Subchapter" on a chapter) to add one manually
 5. Delete chapters you don't want
-6. Click "Save Changes" to update your TOC
+6. Click "Save & Continue" to save your TOC
 
 ### 📝 Chapter Writing & Editing
 
@@ -137,22 +133,22 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
    - **Horizontal Rules**: Add visual separators
 
 **Features**:
-- **Auto-Save**: Your work is automatically saved every 3 seconds
+- **Auto-Save**: Your work is saved automatically. The default interval is 3 seconds; you can change it in Settings (3 to 30 seconds)
 - **Manual Save**: Click "Save" to force an immediate save
 - **Save Status**: See when your work was last saved
-- **Character Count**: Track your progress with live character count
-- **Local Backup**: If network fails, your work is backed up locally
+- **Character Count**: Track your progress with a live character count
+- **Local Backup**: If a save fails, your work is backed up in your browser
 
 #### AI Draft Generation
 **What it does**: Get AI-generated draft content based on your chapter outline.
 
 **How to use it**:
 1. Open a chapter in the editor
-2. Click the "Generate Draft" button
-3. Select your preferred writing style
-4. Choose the length of content you want
-5. Click "Generate"
-6. The AI will create draft content that you can edit
+2. Click the "Generate AI Draft" button
+3. Answer the interview questions about your chapter
+4. Select your preferred writing style and target word count (500 to 5,000 words)
+5. Click "Generate Draft"
+6. The AI will create draft content that you can review and edit
 
 **Writing Styles Available**:
 - Professional
@@ -172,11 +168,14 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
 5. Click "Apply to Chapter" to replace the content
 6. Changed your mind? Click "Revert style" to restore the previous version
 
+#### Enhance Content and Clean Up Dictation
+**What it does**: Improve the clarity of selected text (or the whole chapter) with the "Enhance Content" dialog, or tidy up speech-to-text output with "Clean Up Dictation". Facts and meaning are preserved. Click "Revert enhancement" to undo.
+
 #### Voice Input
-**What it does**: Write your book using your voice instead of typing.
+**What it does**: Write your summary and your answers to the interview questions using your voice instead of typing.
 
 **How to use it**:
-1. Click the microphone icon in the editor
+1. Click the microphone button next to the summary or an answer ("Voice Input" on the summary page)
 2. Grant microphone permissions when prompted
 3. Start speaking - your words will appear as text
 4. Click "Stop" when finished
@@ -200,21 +199,10 @@ Auto Author transforms the daunting task of writing a book into a guided, intera
 4. **Published**: Ready for final export
 
 **How to use it**:
-1. Go to your book's chapter list
-2. Click the status dropdown on any chapter
-3. Select the appropriate status
-4. The system automatically tracks your progress
-
-#### Bulk Status Updates
-**What it does**: Update the status of multiple chapters at once.
-
-**How to use it**:
-1. Go to the chapter management section
-2. Select multiple chapters using checkboxes
-3. Click "Bulk Actions"
-4. Choose "Update Status"
-5. Select the new status
-6. Click "Apply"
+1. Open your book and select a chapter tab
+2. Click the "Chapter options" button (three dots)
+3. Choose Mark as Draft, In Progress, Completed or Published
+4. The book's progress bar on the dashboard reflects your chapter statuses
 
 ### 📤 Export Your Book
 
@@ -247,7 +235,7 @@ Template margins are kept within print-on-demand safe limits (KDP / IngramSpark)
 **What it does**: Generate a professional PDF version of your book ready for printing or digital distribution.
 
 **How to use it**:
-1. Go to your book dashboard
+1. Open your book
 2. Click "Export Book"
 3. Select "PDF" format
 4. Choose your options:
@@ -255,45 +243,47 @@ Template margins are kept within print-on-demand safe limits (KDP / IngramSpark)
    - **Include Empty Chapters**: Yes/No
 5. Click "Export Book"
 6. Wait for the export to complete
-7. Click "Download File" to save your PDF
+7. The file downloads automatically when the export finishes; click "Done" to close the dialog
 
 **Output**: A professionally formatted PDF with:
 - Title page with your book information
 - Table of contents
 - All chapters with proper formatting
-- Page numbers and headers
+- An "About the Author" section from your profile bio, if you have one
 
 #### Export to DOCX (Word)
 **What it does**: Create a Microsoft Word document for easy editing and sharing.
 
 **How to use it**:
-1. Go to your book dashboard
+1. Open your book
 2. Click "Export Book"
 3. Select "DOCX" format
 4. Choose your options:
    - **Include Empty Chapters**: Yes/No
 5. Click "Export Book"
 6. Wait for the export to complete
-7. Click "Download File" to save your Word document
+7. The file downloads automatically when the export finishes; click "Done" to close the dialog
 
 **Output**: A Word document with:
 - Properly formatted text
 - Headings and styles preserved
 - Ready for further editing or submission
 
+#### Export to EPUB
+**What it does**: Create an e-book file for e-readers.
+
+**How to use it**: Click "Export Book", select "EPUB", choose whether to include empty chapters, and click "Export Book".
+
+#### Export to Markdown
+**What it does**: Create plain-text Markdown, useful for version control and other platforms.
+
+**How to use it**: Click "Export Book", select "Markdown", and click "Export Book". Turn on "Separate File Per Chapter" to get a ZIP archive with one .md file per chapter.
+
+Each export format is limited to 10 exports per hour.
+
 ### 🎤 Voice Input & Transcription
 
-#### Voice-to-Text Conversion
-**What it does**: Convert your spoken words into written text for your book.
-
-**How to use it**:
-1. Click the microphone icon in any text input field
-2. Grant browser microphone permissions
-3. Start speaking - your words appear as text
-4. Click "Stop" when finished
-5. Edit the transcribed text as needed
-
-**Supported Languages**: English (primary), with additional languages coming soon
+Voice input is available on the summary page and in the interview question answers. It uses your browser's speech recognition, in English (US), so use a browser that supports it (Chrome or Edge). If yours does not, the page says so and you can type instead.
 
 **Accuracy Tips**:
 - Use a good quality microphone
@@ -301,60 +291,28 @@ Template margins are kept within print-on-demand safe limits (KDP / IngramSpark)
 - Minimize background noise
 - Speak at a moderate pace
 
-### 📊 Progress Tracking & Analytics
+### 📊 Progress Tracking
 
-#### Writing Progress Dashboard
-**What it does**: Track your overall writing progress across all books.
-
-**What you'll see**:
-- Total books created
-- Books in progress
-- Completed books
-- Total word count
-- Daily writing streaks
-
-#### Chapter Progress Tracking
-**What it does**: Monitor the progress of individual chapters.
-
-**What you'll see**:
-- Word count per chapter
-- Character count
-- Status of each chapter
-- Time spent writing
-- Last edited date
+- Each book card on the dashboard shows a progress bar, based on how many chapters are Completed or Published.
+- Hover over a chapter tab to see its status, word count and reading time.
+- The editor shows a live character count.
 
 ### 🔒 User Profile & Settings
 
 #### Edit Your Profile
 **What it does**: Update your personal information and preferences.
 
-**How to use it**:
-1. Click your profile picture in the top right
-2. Select "Profile Settings"
-3. Update your information:
-   - Name
-   - Email
-   - Bio
-   - Profile picture
-4. Click "Save Changes"
-
-#### Account Settings
-**What it does**: Manage your account preferences and security.
-
-**Options available**:
-- **Email Notifications**: Enable/disable email alerts
-- **Writing Preferences**: Set default writing styles
-- **Export Preferences**: Choose default export formats
-- **Security**: Change password, enable 2FA
+**How to use it**: see [Your Profile](#your-profile) below.
 
 #### Authentication Management
-**What it does**: Control how you log in to Auto Author.
+**What it does**: Control how you sign in to Auto Author.
 
 **Features**:
-- **Social Login**: Connect Google, GitHub, etc.
-- **Password Management**: Change or reset password
+- **Password Management**: Change or reset your password
 - **Session Management**: View and revoke active sessions
-- **Multi-Factor Authentication**: Add extra security
+- **Two-Factor Authentication**: Add an authenticator app (TOTP)
+
+See [Security Settings](#security-settings) below.
 
 ### 🛠️ Advanced Features
 
@@ -363,28 +321,26 @@ Template margins are kept within print-on-demand safe limits (KDP / IngramSpark)
 
 **How to use it**:
 1. Open your book
-2. Use the chapter tabs at the top
+2. Use the chapter tabs (see [Chapter Tabs](chapter-tabs.md))
 3. Click between tabs to switch chapters
-4. Drag tabs to reorder chapters
+4. Drag tabs to reorder them
 5. Close tabs when done with a chapter
 
 #### Local Backup & Recovery
-**What it does**: Protects your work with automatic local backups.
+**What it does**: Protects your work if a save fails.
 
 **How it works**:
-- If network fails during auto-save, content is backed up locally
-- You'll see a "Backup Available" notification
+- If auto-save fails, the chapter text is backed up in your browser
+- The editor then shows "A local backup of your content is available. Would you like to restore it?"
 - Click "Restore Backup" to recover your work
 - Click "Dismiss" if you don't need the backup
 
 #### Error Handling & Recovery
-**What it does**: Handles network issues gracefully and helps you recover.
+**What it does**: Tells you when something fails and helps you recover.
 
 **Features**:
-- **Automatic Retry**: Failed operations are retried automatically
 - **Error Notifications**: Clear messages about what went wrong
-- **Recovery Options**: Ways to continue working despite errors
-- **Offline Mode**: Continue writing even without internet
+- **Retry**: Failed AI requests can be retried from the message
 
 ## 🎯 Common Workflows
 
@@ -394,15 +350,13 @@ Template margins are kept within print-on-demand safe limits (KDP / IngramSpark)
 
 **Steps**:
 1. **Create Book**: Set up your new book project
-2. **Write Summary**: Capture your book concept in 100-300 words
+2. **Write Summary**: Capture your book concept in at least 30 words
 3. **Generate TOC**: Let AI create a structured outline
 4. **Refine TOC**: Edit and organize your chapters
 5. **Answer Questions**: Provide details through AI interviews
 6. **Generate Drafts**: Get AI-assisted content for each chapter
 7. **Edit & Polish**: Refine the AI-generated content
 8. **Export**: Create your final manuscript
-
-**Time Estimate**: 1-2 hours for complete outline, 5-10 hours for full draft
 
 ### Workflow 2: Voice-to-Book Process
 
@@ -412,40 +366,10 @@ Template margins are kept within print-on-demand safe limits (KDP / IngramSpark)
 1. **Create Book**: Set up your project
 2. **Voice Summary**: Speak your book concept
 3. **Generate TOC**: Get AI-structured outline
-4. **Voice Chapters**: Speak each chapter content
+4. **Voice Answers**: Speak your answers to each chapter's interview questions, then generate a draft
 5. **Edit Transcripts**: Clean up voice-to-text results
-6. **AI Enhancement**: Use AI to improve your spoken content
+6. **AI Enhancement**: Use "Enhance Content" and "Clean Up Dictation" to improve your text
 7. **Export**: Create your final book
-
-**Time Estimate**: 2-3 hours of speaking, 1-2 hours of editing
-
-### Workflow 3: Professional Editing Workflow
-
-**Perfect for**: Authors with existing content needing refinement
-
-**Steps**:
-1. **Import Content**: Paste existing text into chapters
-2. **AI Analysis**: Get suggestions for improvement
-3. **Style Enhancement**: Apply professional writing styles
-4. **Structure Optimization**: Reorganize for better flow
-5. **Export**: Create polished final version
-
-**Time Estimate**: 30-60 minutes per chapter
-
-### Workflow 4: Collaborative Writing
-
-**Perfect for**: Teams working on books together
-
-**Steps**:
-1. **Create Book**: Set up shared project
-2. **Assign Chapters**: Divide work among team members
-3. **Individual Writing**: Each person works on their chapters
-4. **Review & Feedback**: Comment on each other's work
-5. **Consolidation**: Combine all chapters
-6. **Final Editing**: Polish the complete manuscript
-7. **Export**: Create final version
-
-**Time Estimate**: Varies by team size and complexity
 
 ## ⚙️ Configuration & Settings
 
@@ -516,9 +440,8 @@ Click **Save Settings** to persist changes.
 
 ### Technical Tips
 
-✅ **Use Chrome or Firefox**: For best compatibility with voice input
+✅ **Use a Browser with Speech Recognition**: Voice input depends on your browser (Chrome or Edge); the page tells you if yours does not support it
 ✅ **Enable Microphone Access**: Allow microphone permissions for voice features
-✅ **Clear Cache Regularly**: Helps with performance and updates
 ✅ **Use Stable Internet**: For reliable auto-save and AI features
 ✅ **Check Browser Updates**: Keep your browser up to date
 
@@ -528,115 +451,39 @@ Click **Save Settings** to persist changes.
 **Solution**: Check microphone permissions, try a different browser, ensure no other apps are using the microphone
 
 **Issue**: Auto-save not working
-**Solution**: Check your internet connection, try manual save, refresh the page
-
-**Issue**: AI features slow
-**Solution**: Check your internet speed, try during off-peak hours, reduce browser tabs
+**Solution**: Check your internet connection, try manual save, and use "Restore Backup" if the editor offers it
 
 **Issue**: Export failing
-**Solution**: Try a different format, check for empty chapters, reduce book size if very large
+**Solution**: Try a different format, and wait if you have reached the limit of 10 exports per hour for that format
+
+More: [TOC generation troubleshooting](troubleshooting-toc-generation.md), [summary input troubleshooting](troubleshooting-summary-input.md).
 
 ## 📱 Mobile & Tablet Usage
 
-Auto Author is fully responsive and works on devices from 320px (iPhone SE) to desktop screens.
-
-### Mobile Tips
-
-✅ **Use Landscape Mode**: For better editing experience
-✅ **Voice Input**: Especially useful on mobile devices
-✅ **Tabbed Navigation**: Switch between chapters easily
-✅ **Touch Targets**: All buttons are optimized for finger touch
-
-### Tablet Tips
-
-✅ **Split View**: Use Auto Author alongside research materials
-✅ **External Keyboard**: For faster typing on larger tablets
-✅ **Stylus Support**: Works with Apple Pencil and other styluses
+Auto Author works in a phone or tablet browser. At 768px wide and below, chapter tabs switch to a mobile layout and you can swipe between chapters.
 
 ## 🔒 Privacy & Security
 
-### Data Protection
+### Your Data
 
 🔒 **Your Content is Private**: Only you can access your books and chapters
-🔒 **Secure Storage**: All data encrypted in transit and at rest
-🔒 **No Data Sharing**: Your content is never shared with third parties
-🔒 **Regular Backups**: System backups protect against data loss
+🔒 **Limited Sharing**: Your data is shared only with the service providers listed in the Privacy Policy (the `/privacy` page) (for example OpenAI, which generates AI content from the text you submit to an AI feature), and only as far as each needs it to do its job
 
 ### Account Security
 
-🔒 **Strong Passwords**: Required for all accounts
+🔒 **Password Rules**: At least 8 characters with an uppercase letter, a lowercase letter and a number
 🔒 **Two-Factor Authentication**: Optional but recommended
-🔒 **Session Management**: Control active logins
-🔒 **Activity Logs**: Monitor account access
+🔒 **Session Management**: View and revoke active sessions in Settings → Security
 
-## 🎓 Learning Resources
+## 🎓 Help
 
-### Video Tutorials
-
-- **Getting Started**: 5-minute overview of Auto Author
-- **Book Creation**: Step-by-step book setup guide
-- **AI Features**: How to use AI writing assistance
-- **Export Process**: Creating your final manuscript
-
-### Help Center
-
-- **FAQ**: Answers to common questions
-- **Troubleshooting Guide**: Solutions to common issues
-- **Feature Documentation**: Detailed feature explanations
-- **Best Practices**: Tips for successful book writing
-
-### Community Support
-
-- **User Forum**: Connect with other Auto Author users
-- **Writing Groups**: Join genre-specific writing communities
-- **Feedback Portal**: Suggest new features and improvements
+The in-app Help page (Help in the dashboard navigation) covers getting started and AI draft generation. The troubleshooting guides in this folder cover common problems.
 
 ## 📞 Getting Help
 
-### Support Channels
-
 📧 **Email Support**: support@autoauthor.app
-💬 **Live Chat**: Available during business hours
-📞 **Phone Support**: +1 (555) 123-4567
-🐦 **Twitter**: @AutoAuthorApp
 
-### Support Hours
-
-- **Monday-Friday**: 9:00 AM - 6:00 PM (EST)
-- **Weekends**: Email support only
-- **Emergency**: 24/7 for critical issues
-
-## 🎯 Success Stories
-
-### Real User Results
-
-📚 **"Wrote my first book in 30 days!"** - Sarah, Business Coach
-📚 **"Auto Author helped me organize my 10 years of research"** - Dr. Johnson, Professor
-📚 **"The voice input feature saved me hours of typing"** - Michael, Podcaster
-📚 **"Finally finished the book I've been planning for years"** - Emily, Entrepreneur
-
-### Before & After
-
-**Before Auto Author**:
-- ❌ Struggling to start writing
-- ❌ Disorganized notes and ideas
-- ❌ Overwhelmed by the writing process
-- ❌ Months or years to complete a book
-
-**After Auto Author**:
-- ✅ Clear, structured writing process
-- ✅ AI-assisted content creation
-- ✅ Professional-quality output
-- ✅ Books completed in weeks, not years
-
-## 🚀 Future Features Coming Soon
-
-📅 **Collaborative Editing**: Real-time co-authoring
-📚 **Additional Export Formats**: EPUB, Markdown, HTML
-📊 **Advanced Analytics**: Writing insights and trends
-🤖 **AI Research Assistant**: Content research help
-🎨 **Cover Design Tools**: Built-in cover creation
-📱 **Mobile Apps**: iOS and Android applications
+Email is the only support channel.
 
 ## 📝 Glossary of Terms
 
@@ -644,20 +491,12 @@ Auto Author is fully responsive and works on devices from 320px (iPhone SE) to d
 **Auto-Save**: Automatic saving of your work at regular intervals
 **Chapter Status**: Tracks progress of each chapter (Draft, In Progress, Completed, Published)
 **Clarifying Questions**: AI asks questions to improve content quality
-**Local Backup**: Temporary storage of your work on your device
+**Local Backup**: A copy of unsaved chapter text kept in your browser when a save fails
 **TOC**: Table of Contents - the structure of your book
 **Voice Input**: Speaking instead of typing to create content
 
 ## 🎉 Conclusion
 
-Auto Author is more than just a writing tool - it's your complete book writing companion. From the initial spark of an idea to the final polished manuscript, Auto Author guides you through every step of the writing process with intelligent assistance, powerful features, and a user-friendly interface.
-
-Whether you're writing your first book or your tenth, Auto Author helps you:
-- ✅ **Start faster** with AI-powered outlines
-- ✅ **Write easier** with voice input and AI assistance
-- ✅ **Stay organized** with structured workflows
-- ✅ **Finish stronger** with professional export options
-
-**Your book is waiting to be written. Start today with Auto Author!**
+Auto Author guides you from a book summary to an exported manuscript: an AI-generated outline, interview questions, AI drafts, a rich text editor, and export to PDF, DOCX, EPUB and Markdown.
 
 📚 **Happy Writing!** 📚

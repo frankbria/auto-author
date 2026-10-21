@@ -1,12 +1,8 @@
 # Export Feature Architecture
 
-**Status**: ✅ Production Ready
-**Version**: 1.0.0
-**Last Updated**: 2025-10-12
-
 ## Overview
 
-The export feature allows users to export their books in multiple formats (PDF, DOCX) with customizable options. The system provides a modal-based workflow with real-time progress tracking and comprehensive error handling.
+The export feature allows users to export their books in four formats (PDF, DOCX, EPUB, Markdown) with customizable options. The system provides a modal-based workflow with real-time progress tracking and comprehensive error handling.
 
 ## Architecture Components
 
@@ -15,7 +11,7 @@ The export feature allows users to export their books in multiple formats (PDF, 
 Core TypeScript interfaces for type-safe export operations:
 
 ```typescript
-export type ExportFormat = 'pdf' | 'docx';
+export type ExportFormat = 'pdf' | 'docx' | 'epub' | 'markdown';
 export type PageSize = 'letter' | 'A4';
 
 export interface ExportOptions {
@@ -23,6 +19,9 @@ export interface ExportOptions {
   includeEmptyChapters: boolean;
   pageSize?: PageSize; // PDF only
   chapters?: string[]; // Optional: specific chapters
+  templateId?: string; // PDF and DOCX
+  customization?: TemplateCustomization; // with templateId
+  markdownMultiFile?: boolean; // Markdown only: one file per chapter as a ZIP
 }
 
 export interface ExportProgressInfo {
@@ -42,11 +41,22 @@ Export methods with proper error handling:
 public async exportPDF(bookId: string, options?: {
   includeEmptyChapters?: boolean;
   pageSize?: 'letter' | 'A4';
+  templateId?: string;
+  customization?: TemplateCustomization;
 }): Promise<Blob>
 
 // Export DOCX with options
 public async exportDOCX(bookId: string, options?: {
   includeEmptyChapters?: boolean;
+  templateId?: string;
+  customization?: TemplateCustomization;
+}): Promise<Blob>
+
+// Export EPUB and Markdown (multiFile returns a ZIP)
+public async exportEPUB(bookId: string, options?: { includeEmptyChapters?: boolean }): Promise<Blob>
+public async exportMarkdown(bookId: string, options?: {
+  includeEmptyChapters?: boolean;
+  multiFile?: boolean;
 }): Promise<Blob>
 
 // Get available formats and statistics
@@ -61,8 +71,10 @@ public async getExportFormats(bookId: string): Promise<{
 #### ExportOptionsModal (`frontend/src/components/export/ExportOptionsModal.tsx`)
 
 User-facing modal for export configuration:
-- Format selection (PDF/DOCX) with visual indicators
+- Format selection (PDF, DOCX, EPUB, Markdown)
 - Page size selection (Letter/A4) for PDF exports
+- Template selection for PDF and DOCX; one-file-per-chapter toggle for Markdown
+- Defaults taken from the user's stored export preferences
 - Toggle for including empty chapters
 - Book statistics display (word count, chapters)
 - Validation before export
@@ -132,7 +144,7 @@ User clicks "Export Book" button
 ExportOptionsModal opens
   ↓
 User selects:
-  - Format (PDF or DOCX)
+  - Format (PDF, DOCX, EPUB or Markdown)
   - Page size (if PDF)
   - Include empty chapters toggle
   ↓
@@ -169,7 +181,7 @@ Success Path:
   User clicks "Done"
 
 Failure Path:
-  Error classified (Transient/Permanent/System)
+  Error classified (see error-handling.md)
   ↓
   ExportProgressModal shows error
   ↓
@@ -191,14 +203,11 @@ The export feature integrates with the unified error handling framework:
 ```typescript
 const result = await handleApiCall(
   async () => {
-    if (options.format === 'pdf') {
-      return await bookClient.exportPDF(bookId, options);
-    } else {
-      return await bookClient.exportDOCX(bookId, options);
-    }
+    // BookPage picks exportPDF / exportEPUB / exportMarkdown / exportDOCX by options.format
+    return await bookClient.exportPDF(bookId, options);
   },
   {
-    context: 'Export PDF/DOCX',
+    context: `Export ${options.format.toUpperCase()}`,
     onRetry: (attempt, error) => {
       setExportProgress(0);
       toast.info(`Retrying export (attempt ${attempt})...`);
@@ -238,7 +247,6 @@ const progressInterval = setInterval(() => {
 }, 500);
 ```
 
-**Future Enhancement**: Implement backend polling for real progress updates.
 
 ## File Structure
 
@@ -250,6 +258,8 @@ frontend/src/
 │   └── export/
 │       ├── ExportOptionsModal.tsx     # Options selection UI
 │       ├── ExportProgressModal.tsx    # Progress tracking UI
+│       ├── ExportFormatPicker.tsx     # Format selection
+│       ├── TemplateSelector.tsx       # Template selection
 │       └── exportHelpers.ts           # Utility functions
 ├── lib/
 │   ├── api/
@@ -301,46 +311,10 @@ All routes are `GET /api/v1/books/{book_id}/export/...`, owner-only (403 otherwi
 - Retry scenarios
 - Download verification
 
-## Performance Considerations
-
-### Optimization
-- Modal lazy loading
-- Progress updates throttled to 500ms
-- Blob cleanup after download
-- State reset on modal close
-
-### Scalability
-- Export operations are async
-- No blocking UI during export
-- Memory management for large files
-- Automatic cleanup of object URLs
-
 ## Security Considerations
 
-### Input Validation
-- Book ID validation
-- Option constraints (page size, format)
-- User permissions check
-
-### File Handling
-- Secure blob creation
-- Automatic URL revocation
-- No persistent storage of exports
-
-## Future Enhancements
-
-### Short-term
-1. Backend real-time progress polling
-2. Email notification for long exports
-3. Export queue management
-4. Export history tracking
-
-### Long-term
-1. Additional formats (EPUB, Markdown)
-2. Custom styling options
-3. Batch export multiple books
-4. Export templates
-5. Scheduled exports
+- The backend checks ownership (403 otherwise) and validates `page_size`, template id and `custom_options`.
+- The browser holds the file as a blob; the object URL is revoked after the download. Nothing is stored client-side.
 
 ## References
 
