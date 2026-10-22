@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
 import {
   ChapterBackup,
+  getValidatedItem,
   setValidatedItem,
   validateChapterBackup,
 } from '@/lib/storage/dataValidator';
@@ -54,6 +55,20 @@ export async function saveChapterEdit(
   }
   seen.set(key, { lastModified: result.last_modified, content: edit.content });
   return result;
+}
+
+/**
+ * Flushes an edit the page is leaving (pagehide, #875). The page may be gone
+ * before the keepalive request is sent, notably behind a save in flight, so the
+ * edit is backed up synchronously first; a save that lands clears the backup.
+ */
+export function flushChapterContentOnPageHide(
+  edit: PendingChapterEdit,
+  seen: SeenChapters,
+  inFlightSave: Promise<unknown> | null
+): Promise<void> {
+  backupChapterContent(edit, new Error('Not saved yet: the page was closed'));
+  return flushChapterContent(edit, seen, inFlightSave);
 }
 
 export const chapterDroppedKey = (bookId: string, chapterId: string) =>
@@ -142,4 +157,24 @@ export async function flushChapterContent(
     if (!isChapterConflict(err)) reportSaveFailure('leave-save', err);
     backupChapterContent(edit, err);
   }
+}
+
+// Whether a restorable backup exists for a chapter. Read on every render through
+// useSyncExternalStore, so it is keyed to the chapter on screen and always agrees
+// with storage (#584). Validation parses a whole chapter, so it only runs when the
+// stored string changes; an unchanged string reuses the last answer.
+const backupCache = new Map<string, { raw: string; valid: boolean }>();
+export function readHasBackup(key: string): boolean {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(key);
+  } catch {
+    return false;
+  }
+  if (raw === null) return false;
+  const cached = backupCache.get(key);
+  if (cached?.raw === raw) return cached.valid;
+  const valid = getValidatedItem<ChapterBackup>(key, validateChapterBackup) !== null;
+  backupCache.set(key, { raw, valid });
+  return valid;
 }
