@@ -1,7 +1,7 @@
 import asyncio
 
 from fastapi import APIRouter, Response, status
-from app.api.endpoints import users, webhooks, books, chapters, chapter_questions, export, billing
+from app.api.endpoints import users, webhooks, books, chapters, chapter_questions, chapter_content, export, billing
 from app.core.config import settings, is_production_env
 from app.db.base import get_database
 
@@ -19,6 +19,7 @@ router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 router.include_router(books.router, prefix="/books", tags=["books"])
 router.include_router(chapters.router, prefix="/books", tags=["chapters"])
 router.include_router(chapter_questions.router, prefix="/books", tags=["chapter-questions"])
+router.include_router(chapter_content.router, prefix="/books", tags=["chapter-content"])
 router.include_router(export.router, tags=["export"])
 router.include_router(billing.router, prefix="/billing", tags=["billing"])
 

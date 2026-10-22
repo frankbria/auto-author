@@ -66,7 +66,7 @@ zero helper duplication.
 | PATCH | `/{book_id}/chapters/bulk-status` | update_chapter_status_bulk | 1868 |
 | POST | `/{book_id}/chapters/tab-state` | save_tab_state | 1962 |
 
-### chapter-content / analytics (4) — *next suggested slice*
+### chapter-content / analytics ✅ EXTRACTED → `chapter_content.py` (4; its two helpers `_last_modified_token` and `_chapter_save_rejected` moved too)
 | Method | Path | Handler | Line |
 |---|---|---|---|
 | GET | `/{book_id}/chapters/{chapter_id}/content` | get_chapter_content | 2000 |
