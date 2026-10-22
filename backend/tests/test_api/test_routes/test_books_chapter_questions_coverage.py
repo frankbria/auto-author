@@ -22,6 +22,7 @@ from unittest.mock import patch, AsyncMock
 
 import pytest
 
+from app.db.base import get_collection
 from app.services.ai_errors import AIRateLimitError
 from app.services.question_generation_service import QuestionGenerationService
 
@@ -538,12 +539,32 @@ async def test_rate_question_happy_path(auth_client_factory):
 
     resp = await api.post(
         f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qid}/rating",
-        json={"question_id": qid, "user_id": "ignored", "rating": 4, "feedback": "Helpful"},
+        json={"rating": 4, "feedback": "Helpful"},
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["success"] is True
     assert body["rating"]["rating"] == 4
+
+
+@pytest.mark.asyncio
+async def test_rate_question_stores_the_body_the_editor_sends(auth_client_factory, test_user):
+    """The editor sends only the rating (QuestionDisplay.handleRateQuestion, #1117);
+    the question comes from the path and the user from the session."""
+    api = await auth_client_factory()
+    book_id, chapter_id, qids = await _setup_with_questions(api, count=3)
+    qid = qids[0]
+
+    resp = await api.post(
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qid}/rating",
+        json={"rating": 4},
+    )
+    assert resp.status_code == 200, resp.text
+
+    ratings = await (await get_collection("question_ratings")).find({"user_id": test_user["auth_id"]}).to_list(None)
+    assert [(r["question_id"], r["user_id"], r["rating"]) for r in ratings] == [
+        (qid, test_user["auth_id"], 4)
+    ]
 
 
 @pytest.mark.asyncio
@@ -555,7 +576,7 @@ async def test_rate_question_invalid_rating_422(auth_client_factory):
     # rating below the schema's ge=1 bound.
     resp = await api.post(
         f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qid}/rating",
-        json={"question_id": qid, "user_id": "x", "rating": 0},
+        json={"rating": 0},
     )
     assert resp.status_code == 422
 
@@ -565,7 +586,7 @@ async def test_rate_question_book_not_found_404(auth_client_factory):
     api = await auth_client_factory()
     resp = await api.post(
         f"/api/v1/books/{MISSING_BOOK_ID}/chapters/c1/questions/{MISSING_QUESTION_ID}/rating",
-        json={"question_id": MISSING_QUESTION_ID, "user_id": "x", "rating": 3},
+        json={"rating": 3},
     )
     assert resp.status_code == 404
     assert resp.json()["detail"]["error_code"] == "BOOK_NOT_FOUND"
@@ -581,7 +602,7 @@ async def test_rate_question_wrong_owner_403(auth_client_factory):
     )
     resp = await other.post(
         f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{qids[0]}/rating",
-        json={"question_id": qids[0], "user_id": "x", "rating": 3},
+        json={"rating": 3},
     )
     assert resp.status_code == 403
 
@@ -595,7 +616,7 @@ async def test_rate_question_not_found_422(auth_client_factory):
     # Valid book/owner but nonexistent question -> service ValueError -> 422.
     resp = await api.post(
         f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{MISSING_QUESTION_ID}/rating",
-        json={"question_id": MISSING_QUESTION_ID, "user_id": "x", "rating": 5},
+        json={"rating": 5},
     )
     assert resp.status_code == 422
     assert resp.json()["detail"]["error_code"] == "VALIDATION_FAILED"

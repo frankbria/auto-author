@@ -188,8 +188,6 @@ Provide feedback and rating for a question's relevance and quality.
 #### Request Body
 ```json
 {
-  "question_id": "<question_id>",
-  "user_id": "<any string>",
   "rating": 4,
   "feedback": "Very helpful question that sparked new ideas."
 }
@@ -197,12 +195,10 @@ Provide feedback and rating for a question's relevance and quality.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| question_id | string | Yes | Required by the schema; the path's `question_id` is the one used |
-| user_id | string | Yes | Required by the schema; the signed-in user is the one used |
 | rating | integer | Yes | Rating from 1-5 stars |
 | feedback | string | No | Optional written feedback |
 
-The editor currently sends only `rating`, so its ratings are refused with `422` (#1117).
+The question comes from the path and the user from the session. A body that also carries `question_id` or `user_id` is accepted and those fields are ignored.
 
 #### Response
 ```json

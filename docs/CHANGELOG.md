@@ -4,6 +4,8 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
 
 ### 2026-10-21
 
+- **Question ratings save (#1117, P2.10.1)**: the thumbs up/down on an interview question has never saved anything. The editor sends `{ rating }`, but `QuestionRating` also required `question_id` and `user_id`, so every rating got a 422 and the editor only logged it to the console. The route and the session already supply both (the DAO overwrote them anyway), so the schema drops them, and extra fields are still accepted and ignored. A failed rating now shows a "Rating not saved" toast and clears the highlight. A route test posts the editor's exact body and reads the stored row.
+
 - **Docs truth pass (#854, P2.8)**: every surviving doc was checked against the code. Claims about things that don't exist were deleted, not rewritten. A separate fact-check pass then fixed six more claims.
   - **Auth**: no HS256, JWT or Bearer anywhere. The backend looks up the better-auth session cookie in MongoDB, and `BETTER_AUTH_SECRET` signs that cookie. Social login, Clerk, remember-me, SMS 2FA, session tiers and made-up contact addresses are gone from the auth, session, profile and API docs.
   - **User manual**: support is by email only (`support@autoauthor.app`). No phone, live chat, testimonials, collaboration or "coming soon" formats. The privacy wording matches the subprocessor list.

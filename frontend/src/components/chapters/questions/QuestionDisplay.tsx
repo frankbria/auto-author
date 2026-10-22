@@ -75,6 +75,7 @@ export default function QuestionDisplay({
   // and a frame of staleness.
   // State for rating
   const [rating, setRating] = useState(0);
+  const latestRatingRequest = useRef(0);
   // State for retry attempts
   const [retryCount, setRetryCount] = useState(0);
   // State to track last attempted action for proper retry behavior
@@ -449,20 +450,19 @@ export default function QuestionDisplay({
   };
 
   // Handle rating the question
-  const handleRateQuestion = async (rating: number) => {
-    setRating(rating);
+  const handleRateQuestion = async (newRating: number) => {
+    const previousRating = rating;
+    const request = ++latestRatingRequest.current;
+    setRating(newRating);
 
     try {
-      await bookClient.rateQuestion(
-        bookId,
-        chapterId,
-        question.id,
-        {
-          rating
-        }
-      );
+      await bookClient.rateQuestion(bookId, chapterId, question.id, { rating: newRating });
     } catch (error) {
       console.error('Error rating question:', error);
+      // A newer click owns the rating now; this failure no longer describes it.
+      if (request !== latestRatingRequest.current) return;
+      setRating(previousRating);
+      toast.error({ title: 'Rating not saved', description: 'Please try again.' });
     }
   };
 

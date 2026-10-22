@@ -142,10 +142,11 @@ class QuestionResponse(QuestionResponseBase):
 
 
 class QuestionRating(BaseModel):
-    """Schema for rating a question's relevance/quality"""
+    """Schema for rating a question's relevance/quality.
 
-    question_id: str
-    user_id: str
+    The question comes from the route and the user from the session (#1117).
+    """
+
     rating: int = Field(..., ge=1, le=5)  # 1-5 star rating
     feedback: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
