@@ -19,6 +19,7 @@ import {
   chapterBackupKey,
   chapterDroppedKey,
   flushChapterContent,
+  flushChapterContentOnPageHide,
   isChapterConflict,
   keepDroppedChapterText,
   reportSaveFailure,
@@ -237,13 +238,12 @@ export function useChapterContent({
     editor?.setEditable(!loadFailed, false);
   }, [editor, loadFailed]);
 
-  // React does not unmount on unload; pagehide is the last event a closing page
-  // reliably gets, so an edit inside the debounce goes out with keepalive (#875).
+  // React does not unmount on unload; pagehide is a closing page's last reliable event (#875).
   useEffect(() => {
     const flushOnPageHide = () => {
       const edit = unsavedRef.current;
       unsavedRef.current = null;
-      if (edit) void flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
+      if (edit) void flushChapterContentOnPageHide(edit, seenRef.current, inFlightSaveRef.current);
     };
     window.addEventListener('pagehide', flushOnPageHide);
     return () => window.removeEventListener('pagehide', flushOnPageHide);

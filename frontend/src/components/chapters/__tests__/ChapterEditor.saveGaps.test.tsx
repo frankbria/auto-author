@@ -96,6 +96,28 @@ describe('ChapterEditor save gaps (#875)', () => {
     ]);
   });
 
+  it('backs the edit up at pagehide before any send, while a save is in flight', async () => {
+    mockBookClient.getChapterContent.mockResolvedValue(content('<p>Alpha</p>'));
+    mockBookClient.saveChapterContent.mockReturnValue(new Promise(() => {}));
+    const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
+    await waitFor(() => expect(editorIn(view.container).getHTML()).toBe('<p>Alpha</p>'));
+    act(() => {
+      editorIn(view.container).commands.insertContent(' one');
+    });
+    await flushTimers(3000);
+    expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1);
+    act(() => {
+      editorIn(view.container).commands.insertContent(' two');
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    const backup = JSON.parse(localStorage.getItem('chapter-backup-bk-A') ?? 'null');
+    expect(backup?.content).toBe('<p>Alpha one two</p>');
+  });
+
   it('keeps a Questions-tab draft inserted while the load had failed, and saves it after Retry', async () => {
     mockBookClient.getChapterContent.mockRejectedValue(new Error('offline'));
     sessionStorage.setItem('chapterQuestionsTab_bk_A', 'questions');

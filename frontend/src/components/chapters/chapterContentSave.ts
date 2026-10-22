@@ -57,6 +57,20 @@ export async function saveChapterEdit(
   return result;
 }
 
+/**
+ * Flushes an edit the page is leaving (pagehide, #875). The page may be gone
+ * before the keepalive request is sent, notably behind a save in flight, so the
+ * edit is backed up synchronously first; a save that lands clears the backup.
+ */
+export function flushChapterContentOnPageHide(
+  edit: PendingChapterEdit,
+  seen: SeenChapters,
+  inFlightSave: Promise<unknown> | null
+): Promise<void> {
+  backupChapterContent(edit, new Error('Not saved yet: the page was closed'));
+  return flushChapterContent(edit, seen, inFlightSave);
+}
+
 export const chapterDroppedKey = (bookId: string, chapterId: string) =>
   `chapter-dropped-${bookId}-${chapterId}`;
 
