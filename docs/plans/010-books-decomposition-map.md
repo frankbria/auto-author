@@ -77,6 +77,7 @@ zero helper duplication.
 ### chapter-questions ✅ EXTRACTED → `chapter_questions.py` (7 + the batch route; 9 handlers)
 
 The `questions/responses/batch` row below (listed under "others") moved with this cluster, last in the new router.
+
 | Method | Path | Handler | Line |
 |---|---|---|---|
 | POST | `/{book_id}/chapters/{chapter_id}/generate-questions` | generate_chapter_questions | 2338 |
