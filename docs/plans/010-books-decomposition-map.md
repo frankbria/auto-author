@@ -74,7 +74,9 @@ zero helper duplication.
 | GET | `/{book_id}/chapters/{chapter_id}/analytics` | get_chapter_analytics | 2186 |
 | POST | `/{book_id}/chapters/batch-content` | batch_get_chapter_content | 2236 |
 
-### chapter-questions (7)
+### chapter-questions ✅ EXTRACTED → `chapter_questions.py` (7 + the batch route; 9 handlers)
+
+The `questions/responses/batch` row below (listed under "others") moved with this cluster, last in the new router.
 | Method | Path | Handler | Line |
 |---|---|---|---|
 | POST | `/{book_id}/chapters/{chapter_id}/generate-questions` | generate_chapter_questions | 2338 |

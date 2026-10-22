@@ -957,3 +957,34 @@ async def test_response_edit_history_tracking(auth_client_factory, reinit_db):
     assert "metadata" in final_data
     # Note: API may or may not return edit_history in response
     # This depends on schema definition
+
+
+@pytest.mark.asyncio
+async def test_save_response_audit_is_update_follows_the_upsert(auth_client_factory, monkeypatch):
+    """The first save of an answer audits is_update False, a re-save True (#857)."""
+    from app.api.endpoints import chapter_questions
+
+    audited = []
+
+    async def _record(*args, **kwargs):
+        audited.append(kwargs)
+
+    client = await auth_client_factory()
+    monkeypatch.setattr(chapter_questions, "audit_after_commit", _record)
+
+    book_id, chapter_id = await create_test_book_with_chapter(client)
+    gen = await client.post(
+        f"/api/v1/books/{book_id}/chapters/{chapter_id}/generate-questions",
+        json={"count": 3, "difficulty": "medium", "focus": ["plot"]},
+    )
+    assert gen.status_code == 200
+    question_id = gen.json()["questions"][0]["id"]
+
+    url = f"/api/v1/books/{book_id}/chapters/{chapter_id}/questions/{question_id}/response"
+    for text in ("A first answer.", "A second answer."):
+        resp = await client.put(url, json={"response_text": text, "status": "draft"})
+        assert resp.status_code == 200
+        assert "is_update" not in resp.json()["response"]
+
+    saves = [c["metadata"]["is_update"] for c in audited if c["action"] == "save_question_response"]
+    assert saves == [False, True]

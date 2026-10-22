@@ -11,6 +11,7 @@ import pytest
 
 from app.api.dependencies import audit_after_commit
 from app.api.endpoints import books as books_endpoint
+from app.api.endpoints import chapter_questions as chapter_questions_endpoint
 from app.api.endpoints import users as users_endpoint
 from tests.conftest import _sync_logs
 
@@ -24,6 +25,7 @@ async def test_audit_rows_have_no_title_and_no_read_rows(
     api = await auth_client_factory()
     monkeypatch.setattr(users_endpoint, "audit_after_commit", audit_after_commit)
     monkeypatch.setattr(books_endpoint, "audit_after_commit", audit_after_commit)
+    monkeypatch.setattr(chapter_questions_endpoint, "audit_after_commit", audit_after_commit)
 
     payload = {"title": TITLE, "genre": test_book.get("genre", "Non-Fiction")}
     resp = await api.post("/api/v1/books/", json=payload)
