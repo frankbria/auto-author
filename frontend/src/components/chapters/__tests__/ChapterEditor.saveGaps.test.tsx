@@ -15,6 +15,8 @@ jest.unmock('@tiptap/extension-placeholder');
 jest.unmock('@tiptap/extension-character-count');
 
 jest.mock('@/lib/api/bookClient');
+// Each render's draft handler, so a test can resolve a generation started earlier.
+const mockDraftHandlers: Array<(draft: string) => void> = [];
 jest.mock('../questions/QuestionContainer', () => ({
   __esModule: true,
   default: ({
@@ -24,6 +26,7 @@ jest.mock('../questions/QuestionContainer', () => ({
     onDraftGenerated: (draft: string) => void;
     onSwitchToEditor: () => void;
   }) => (
+    mockDraftHandlers.push(onDraftGenerated),
     <button
       onClick={() => {
         onDraftGenerated('<p>Draft</p>');
@@ -127,6 +130,27 @@ describe('ChapterEditor save gaps (#875)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use This Draft' }));
     mockBookClient.getChapterContent.mockResolvedValue(content('<p>Server</p>'));
     await act(async () => fireEvent.click(retry));
+    await waitFor(() => expect(editorIn(view.container).getHTML()).toBe('<p>Server</p><p>Draft</p>'));
+    await flushTimers(5000);
+
+    expect(mockBookClient.saveChapterContent.mock.calls.map(([, , html]) => html)).toEqual([
+      '<p>Server</p><p>Draft</p>',
+    ]);
+  });
+
+  it('inserts a draft started while the load had failed that arrives after Retry succeeded', async () => {
+    mockBookClient.getChapterContent.mockRejectedValue(new Error('offline'));
+    sessionStorage.setItem('chapterQuestionsTab_bk_A', 'questions');
+    const view = render(<ChapterEditor bookId="bk" chapterId="A" />);
+    const retry = await screen.findByRole('button', { name: 'Retry' });
+    const startedWhileFailed = mockDraftHandlers[mockDraftHandlers.length - 1];
+
+    mockBookClient.getChapterContent.mockResolvedValue(content('<p>Server</p>'));
+    await act(async () => fireEvent.click(retry));
+    act(() => {
+      startedWhileFailed('<p>Draft</p>');
+    });
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Chapter Editor' }));
     await waitFor(() => expect(editorIn(view.container).getHTML()).toBe('<p>Server</p><p>Draft</p>'));
     await flushTimers(5000);
 

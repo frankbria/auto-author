@@ -464,14 +464,14 @@ export function useChapterContent({
 
   const handleDraftGenerated = (draft: string) => {
     if (!editor) return;
-    if (loadFailed) {
+    // The editor, not this render's loadFailed: a draft started before Retry can arrive after it.
+    if (!editor.isEditable) {
       const earlier = draftWhileFailedRef.current?.key === backupKey ? draftWhileFailedRef.current.html : '';
       draftWhileFailedRef.current = { key: backupKey, html: earlier + draft };
       return;
     }
     // Insert the draft at the current cursor position
     editor.chain().focus().insertContent(draft).run();
-    // Trigger auto-save
     setAutoSavePending(true);
   };
 
