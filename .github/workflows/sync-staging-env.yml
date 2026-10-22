@@ -80,7 +80,8 @@ jobs:
           chmod 600 ~/.ssh/staging_key
           # The host key comes from a secret, and every ssh/scp below runs with
           # StrictHostKeyChecking=yes, so a box answering with another key is
-          # refused before authentication (#859).
+          # refused before authentication (#859). HostKeyAlias looks the key up
+          # under one fixed name, whatever STAGING_TS_HOST or HOST holds.
           if [ -z "$STAGING_KNOWN_HOSTS" ]; then
             echo "::error::STAGING_KNOWN_HOSTS is empty; refusing to SSH without a pinned host key"
             exit 1
@@ -133,7 +134,7 @@ jobs:
           # -i plus stdin, not `docker exec -e`, so the candidate credential stays
           # out of argv on this shared box.
           printf '%s\n' "${MONGODB_URI}" | ssh -i ~/.ssh/staging_key \
-            -o StrictHostKeyChecking=yes -o ConnectTimeout=30 \
+            -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             'set -euo pipefail; docker exec -i auto-author-backend-1 python -c "import sys, pymongo; uri = sys.stdin.readline().strip(); pymongo.MongoClient(uri, serverSelectionTimeoutMS=8000).admin.command(\"ping\"); print(\"PRE-FLIGHT PING OK\")"'
 
@@ -146,7 +147,7 @@ jobs:
           # list. GitHub masks it in logs; this covers `ps` on a SHARED box, which
           # masking does not.
           printf '%s\n' "${MONGODB_URI}" | ssh -i ~/.ssh/staging_key \
-            -o StrictHostKeyChecking=yes -o ConnectTimeout=30 \
+            -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} '
               set -euo pipefail
               IFS= read -r VALUE
@@ -176,7 +177,7 @@ jobs:
       - name: Recreate containers
         if: ${{ inputs.recreate }}
         run: |
-          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o ConnectTimeout=30 \
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              cd /opt/auto-author
@@ -208,7 +209,7 @@ jobs:
           # inside the running backend, then confirm the app's own readiness probe
           # agrees. /health returns only an exception type, so the ping is what
           # gives a diagnosable message.
-          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o ConnectTimeout=30 \
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} bash -s <<'REMOTE'
           set -euo pipefail
           echo '--- direct MongoDB ping from the backend container ---'

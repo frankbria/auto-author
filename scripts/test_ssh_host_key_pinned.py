@@ -17,6 +17,9 @@ def test_no_workflow_trusts_an_unknown_host_key():
         text = wf.read_text()
         assert not re.search(r"StrictHostKeyChecking=(accept-new|no)\b", text), wf.name
         assert "StrictHostKeyChecking=yes" in text, wf.name
+        # Every connection looks the key up under the one alias the secret is keyed by.
+        for line in re.findall(r"^(?!\s*#).*-o StrictHostKeyChecking=yes.*$", text, re.M):
+            assert "HostKeyAlias=auto-author-staging" in line, f"{wf.name}: {line.strip()}"
 
 
 def test_every_sshing_workflow_writes_the_pinned_known_hosts():

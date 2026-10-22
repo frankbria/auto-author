@@ -53,7 +53,7 @@ under `Settings` → `Environments` → `staging` for environment-scoped ones.
 | Secret | Description | Example |
 |--------|-------------|---------|
 | `SSH_KEY` | Private SSH key for server access | `-----BEGIN OPENSSH PRIVATE KEY-----…` |
-| `STAGING_KNOWN_HOSTS` | The box's SSH host keys in `known_hosts` form, listing every name `STAGING_TS_HOST`/`HOST` may hold. Deploy and env-sync SSH with `StrictHostKeyChecking=yes`, so a box answering with any other key is refused before authentication (#859). If the box is rebuilt or its keys rotate, re-scan over Tailscale (`ssh-keyscan <tailscale-ip>`), compare the fingerprints with a trusted session, and update this secret | `<ip>,<tailscale-name> ssh-ed25519 AAAA…` |
+| `STAGING_KNOWN_HOSTS` | The box's SSH host keys in `known_hosts` form, keyed by the alias `auto-author-staging` (every ssh/scp passes `-o HostKeyAlias=auto-author-staging`, so it does not matter which name `STAGING_TS_HOST`/`HOST` holds). Deploy and env-sync SSH with `StrictHostKeyChecking=yes`, so a box answering with any other key is refused before authentication (#859). If the box is rebuilt or its keys rotate, re-scan over Tailscale (`ssh-keyscan <tailscale-ip>`), compare the fingerprints with a trusted session, replace the host field with `auto-author-staging`, and update this secret | `auto-author-staging ssh-ed25519 AAAA…` |
 | `USER` | SSH username | — |
 | `STAGING_TS_HOST` | Tailscale hostname for the box; preferred over `HOST` | `staging-vps` |
 | `HOST` | Fallback when `STAGING_TS_HOST` is unset | `<staging-host>` |
