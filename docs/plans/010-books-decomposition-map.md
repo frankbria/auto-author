@@ -28,7 +28,7 @@ zero helper duplication.
 | PUT | `/{book_id}` | update_book_details | 259 |
 | PATCH | `/{book_id}` | patch_book_details | 352 |
 | DELETE | `/{book_id}` | delete_book_endpoint | 440 |
-| POST | `/{book_id}/cover-image` | upload_book_cover_image | 508 |
+| POST | `/{book_id}/cover-image` | upload_book_cover_image (✅ moved → `book_cover.py`, #1133) | 508 |
 
 ### summaries (4) ✅ EXTRACTED → `book_summary.py` (the offensive-word list moved with it)
 | Method | Path | Handler | Line |
@@ -107,6 +107,7 @@ The `questions/responses/batch` row below moved earlier, with chapter-questions 
 4. **chapter-drafts/style/enhance** ✅ done (#1123) — `ai_service` + style/enhancement services.
 5. **summaries** ✅ done (#1124); **toc** ✅ done (#1125); **pre-toc questions** ✅ done (#1126, `book_questions.py`).
    `books.py` now holds only book-crud + cover upload; fold `book_cover_upload.py` in then.
+6. **cover upload** ✅ done (#1133) → `book_cover.py`. `books.py` holds only book CRUD (427 lines, under the 500-line rule).
 
 ## Route-ordering caveat (must hold for every future slice)
 Literal chapter sub-paths (`/chapters/metadata`, `/chapters/tab-state`,

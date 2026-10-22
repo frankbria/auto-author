@@ -16,7 +16,7 @@ import pytest
 
 from app.api import dependencies
 from app.db import audit_log
-from app.api.endpoints import books as books_endpoint, chapter_ai as chapter_ai_endpoint, chapter_questions as chapter_questions_endpoint, users as users_endpoint
+from app.api.endpoints import books as books_endpoint, book_cover as book_cover_endpoint, chapter_ai as chapter_ai_endpoint, chapter_questions as chapter_questions_endpoint, users as users_endpoint
 from app.services.chapter_access_service import chapter_access_service
 from tests.test_api.test_routes.test_books_chapters_crud_coverage import create_book
 
@@ -41,7 +41,7 @@ def audit_log_down(monkeypatch):
     """Call after creating the client: the factory stubs the audit out, and these
     tests need the real one running into a failing write."""
     def arm():
-        for module in (books_endpoint, chapter_ai_endpoint, chapter_questions_endpoint, users_endpoint):
+        for module in (books_endpoint, book_cover_endpoint, chapter_ai_endpoint, chapter_questions_endpoint, users_endpoint):
             monkeypatch.setattr(module, "audit_after_commit", dependencies.audit_after_commit)
         # The collection itself, so the routes' rows and the DB layer's own fail alike.
         monkeypatch.setattr(audit_log, "audit_logs_collection", _Refuses())
