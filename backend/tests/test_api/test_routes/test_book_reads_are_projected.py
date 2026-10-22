@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock
 import pytest
 from bson import ObjectId
 
-from app.api.endpoints import books as books_endpoint
+from app.api.endpoints import chapter_ai as chapter_ai_endpoint
 from app.db import base
 
 pytestmark = pytest.mark.asyncio
@@ -111,7 +111,7 @@ async def test_generating_a_draft_reads_no_bodies(auth_client_factory, monkeypat
     api = await auth_client_factory()
     book_id = await _a_large_book(api)
     drafted = {"success": True, "draft": "A draft.", "metadata": {"word_count": 2, "estimated_reading_time": 1}, "suggestions": []}
-    monkeypatch.setattr(books_endpoint.ai_service, "generate_chapter_draft", AsyncMock(return_value=drafted))
+    monkeypatch.setattr(chapter_ai_endpoint.ai_service, "generate_chapter_draft", AsyncMock(return_value=drafted))
 
     async with _reads_of_the_book() as reads:
         answer = await api.post(

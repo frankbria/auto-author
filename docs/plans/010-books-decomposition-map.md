@@ -38,7 +38,7 @@ zero helper duplication.
 | PATCH | `/{book_id}/summary` | patch_book_summary | 666 |
 | POST | `/{book_id}/analyze-summary` | analyze_book_summary | 720 |
 
-### pre-toc / book-level questions (3)
+### pre-toc / book-level questions (3) ✅ EXTRACTED → `book_questions.py`
 | Method | Path | Handler | Line |
 |---|---|---|---|
 | POST | `/{book_id}/generate-questions` | generate_clarifying_questions | 841 |
@@ -105,8 +105,8 @@ The `questions/responses/batch` row below moved earlier, with chapter-questions 
 2. **chapter-content/analytics** — shares only `chapter_access_service` (imported, not duplicated).
 3. **chapter-questions** — `question_generation_service` + question schemas cluster together.
 4. **chapter-drafts/style/enhance** ✅ done (#1123) — `ai_service` + style/enhancement services.
-5. **summaries** ✅ done (#1124); **toc** ✅ done (#1125); **pre-toc questions** — book-level AI; can fold into books or a `book_ai.py`.
-   Leaves `books.py` = book-crud + cover only; fold `book_cover_upload.py` in then.
+5. **summaries** ✅ done (#1124); **toc** ✅ done (#1125); **pre-toc questions** ✅ done (#1126, `book_questions.py`).
+   `books.py` now holds only book-crud + cover upload; fold `book_cover_upload.py` in then.
 
 ## Route-ordering caveat (must hold for every future slice)
 Literal chapter sub-paths (`/chapters/metadata`, `/chapters/tab-state`,
