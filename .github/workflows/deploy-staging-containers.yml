@@ -98,14 +98,25 @@ jobs:
           tags: tag:ci,tag:staging-server
 
       - name: Setup SSH
+        env:
+          STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
           chmod 600 ~/.ssh/staging_key
           # No `nc` preflight or ssh-keyscan: those open connections that close
           # before authenticating, which the box's fail2ban (aggressive,
-          # maxretry=4) counts as attacks and bans the runner for (#162). The
-          # steps below authenticate on first contact via accept-new.
+          # maxretry=4) counts as attacks and bans the runner for (#162).
+          # The host key comes from a secret, and every ssh/scp below runs with
+          # StrictHostKeyChecking=yes, so a box answering with another key is
+          # refused before authentication (#859). HostKeyAlias looks the key up
+          # under one fixed name, whatever STAGING_TS_HOST or HOST holds.
+          if [ -z "$STAGING_KNOWN_HOSTS" ]; then
+            echo "::error::STAGING_KNOWN_HOSTS is empty; refusing to SSH without a pinned host key"
+            exit 1
+          fi
+          printf '%s\n' "$STAGING_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Ship compose files
         run: |
@@ -114,7 +125,7 @@ jobs:
           # box intermittently gets the follow-up dropped (#162 again).
           for attempt in 1 2 3; do
             if scp -i ~/.ssh/staging_key \
-                 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+                 -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
                  docker-compose.yml docker-compose.staging.yml \
                  ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }}:/opt/auto-author/; then
               exit 0
@@ -127,7 +138,7 @@ jobs:
 
       - name: Pull and start
         run: |
-          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              cd /opt/auto-author
@@ -144,7 +155,7 @@ jobs:
 
       - name: Health check
         run: |
-          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              for i in \$(seq 1 30); do
@@ -168,7 +179,7 @@ jobs:
       # variable NAMES only — never values — since this log is public.
       - name: Frontend carries no backend secret
         run: |
-          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              names=\$(docker exec auto-author-frontend-1 env | cut -d= -f1)
@@ -187,7 +198,7 @@ jobs:
       - name: Prune old images
         if: success()
         run: |
-          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "docker image prune -f --filter 'until=336h'"
 
