@@ -18,7 +18,7 @@ from bson import ObjectId
 from PIL import Image
 
 import app.services.file_upload_service as fus
-from app.api.endpoints import books as books_endpoint
+from app.api.endpoints import book_cover as book_cover_endpoint
 from app.db.base import get_collection
 
 pytestmark = pytest.mark.asyncio
@@ -255,7 +255,7 @@ async def test_a_failed_update_keeps_the_old_cover_and_removes_the_new_files(
     async def _boom(*args, **kwargs):
         raise RuntimeError("simulated mongo failure")
 
-    monkeypatch.setattr(books_endpoint, "update_book", _boom)
+    monkeypatch.setattr(book_cover_endpoint, "update_book", _boom)
 
     response = await _upload(client, book_id)
 
@@ -274,7 +274,7 @@ async def test_an_update_that_matches_no_book_removes_the_new_files(
     async def _gone(*args, **kwargs):
         return None
 
-    monkeypatch.setattr(books_endpoint, "update_book", _gone)
+    monkeypatch.setattr(book_cover_endpoint, "update_book", _gone)
 
     response = await _upload(client, book_id)
 

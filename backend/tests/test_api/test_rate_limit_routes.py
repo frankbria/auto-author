@@ -283,7 +283,7 @@ class TestRateLimitDrivesReal429:
         cannot see the declared numbers. #797 names them: 5 per 60 seconds."""
         import inspect
 
-        from app.api.endpoints.books import upload_book_cover_image
+        from app.api.endpoints.book_cover import upload_book_cover_image
 
         assert "get_rate_limiter(limit=5, window=60)" in inspect.getsource(
             upload_book_cover_image
