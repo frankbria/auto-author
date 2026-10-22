@@ -1770,5 +1770,6 @@ To stop two checkout tabs from both being paid, I recorded the user's newest Che
 Removing the backend seed script broke `subprocessors.test.ts`, a frontend test that sweeps `backend/app` for `os.getenv` reads and pins `SEED_USER_PASSWORD` as its sentinel. The commit hook runs only the hooks whose paths changed, so a backend-only commit never ran it; CI's Frontend Tests found it after the PR was open. Earlier, the backend hook also caught two tests the targeted runs had missed (a PUT twin of a PATCH test, and a coverage-config test that pointed at a `pass` line in a deleted class).
 **Rule:** before committing a deletion, `git grep` the deleted file's name and every name it defines across the whole repo, tests and other stacks included, and run whatever turns up; a targeted test run is not the inventory.
 
-## 2026-10-22 — A wait loop that exits is not a finished build
-A `for i in $(seq ...)` wait for "Build Images" ran out of iterations with the build still `in_progress`, and I dispatched the staging deploy on that. Read the run's actual `status`/`conclusion` (or use `gh run watch <id> --exit-status`) before acting on a wait, never the loop's exit.
+### A wait loop that exits is not a finished build (2026-10-22)
+A `for i in $(seq ...)` wait for "Build Images" ran out of iterations with the build still `in_progress`, and I dispatched the staging deploy on that.
+**Rule:** read the run's actual `status`/`conclusion` (or use `gh run watch <id> --exit-status`) before acting on a wait, never the loop's exit.
