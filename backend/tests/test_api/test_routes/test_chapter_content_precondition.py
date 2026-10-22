@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import pytest
 from bson import ObjectId
 
-from app.api.endpoints import books as books_endpoint
+from app.api.endpoints import chapter_content as chapter_content_endpoint
 from app.db import base
 
 API = "/api/v1/books"
@@ -124,14 +124,14 @@ def _commit_first(monkeypatch, competing_write):
     """Run a real competing write in the window between the handler's read and
     its own write. The gather test above usually lands there too, but only
     when the event loop happens to interleave; this pins the window open."""
-    real = books_endpoint.apply_chapter_content_update
+    real = chapter_content_endpoint.apply_chapter_content_update
 
     async def write_after_competitor(**kwargs):
         await competing_write(real, kwargs)
         return await real(**kwargs)
 
     monkeypatch.setattr(
-        books_endpoint, "apply_chapter_content_update", write_after_competitor
+        chapter_content_endpoint, "apply_chapter_content_update", write_after_competitor
     )
 
 
