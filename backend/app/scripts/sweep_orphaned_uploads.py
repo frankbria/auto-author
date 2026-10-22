@@ -115,7 +115,13 @@ async def _referenced_keys(db):
     return keys
 
 
-async def sweep_orphaned_uploads(db, storage, *, grace, apply=False, now=None) -> dict:
+class SweepRefused(Exception):
+    """--apply against a database that references no upload at all."""
+
+
+async def sweep_orphaned_uploads(
+    db, storage, *, grace, apply=False, now=None, allow_no_references=False
+) -> dict:
     """Find (and with ``apply``, delete) unreferenced objects under ``PREFIXES``.
 
     ``storage`` is a cloud provider or :class:`LocalUploads`. Returns the keys in
@@ -124,6 +130,12 @@ async def sweep_orphaned_uploads(db, storage, *, grace, apply=False, now=None) -
     cutoff = (now or datetime.now(timezone.utc)) - grace
     objects = [obj for prefix in PREFIXES for obj in await storage.list_objects(prefix)]
     referenced = await _referenced_keys(db)  # after the listing: see the docstring
+    # A wrong or empty --database makes every file look orphaned.
+    if apply and not referenced and objects and not allow_no_references:
+        raise SweepRefused(
+            f"no book or user in {db.name!r} references any upload, but storage holds "
+            f"{len(objects)}; refusing to delete them all (pass --allow-no-references if intended)"
+        )
     stats = {"referenced": [], "young": [], "orphans": [], "deleted": [], "failed": [], "dry_run": not apply}
 
     for obj in objects:
@@ -163,6 +175,10 @@ async def _main(argv=None) -> int:
     parser.add_argument("--database", help="database name (default: $DATABASE_NAME)")
     parser.add_argument("--apply", action="store_true", help="delete the orphans; without it nothing is deleted")
     parser.add_argument(
+        "--allow-no-references", action="store_true",
+        help="let --apply run when the database references no upload at all",
+    )
+    parser.add_argument(
         "--grace-minutes", type=int, default=60,
         help="skip objects written this recently (default: 60)",
     )
@@ -183,7 +199,8 @@ async def _main(argv=None) -> int:
     client = AsyncMongoClient(uri, **_client_kwargs(uri))
     try:
         stats = await sweep_orphaned_uploads(
-            client[database], storage, grace=timedelta(minutes=args.grace_minutes), apply=args.apply
+            client[database], storage, grace=timedelta(minutes=args.grace_minutes), apply=args.apply,
+            allow_no_references=args.allow_no_references,
         )
     except Exception as exc:  # noqa: BLE001 - operator-facing CLI
         logger.error("Sweep failed: %s", exc)

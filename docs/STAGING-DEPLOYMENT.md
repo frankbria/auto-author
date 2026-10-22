@@ -426,10 +426,13 @@ docker compose exec backend python -m app.scripts.sweep_orphaned_uploads --apply
 - **Grace window**: objects written in the last 60 minutes are skipped
   (`--grace-minutes N` changes it), because an upload is stored before the record
   naming it is saved.
+- **Empty-database guard**: `--apply` refuses (exit `2`) when no book or user
+  references any upload while storage holds some, since a wrong `--database` makes
+  every file look orphaned. Pass `--allow-no-references` only if that is really so.
 - `exec` into the running backend, not a throwaway container: it needs the same
   storage settings, and with local storage the same files.
 - Exit codes: `0` done, `1` at least one delete failed (logged), `2` connection
-  or configuration error.
+  or configuration error, or the empty-database guard.
 
 ---
 

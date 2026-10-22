@@ -267,3 +267,18 @@ async def test_cloudinary_sweep_matches_the_stored_url_to_the_public_id(reinit_d
     assert stats["referenced"] == [live["public_id"]]
     assert stats["deleted"] == [orphan["public_id"]]
     cld.cloudinary_uploader.destroy.assert_called_once_with(orphan["public_id"])
+
+
+async def test_apply_refuses_when_no_record_references_anything(reinit_db, uploads, monkeypatch):
+    """A wrong or empty --database makes every file look orphaned; --apply must not
+    delete them all unless told the empty database is intended."""
+    _file(uploads.covers, f"{BOOK}_{HEX}.jpg")
+    _file(uploads.avatars, f"alice_{HEX}.png")
+    monkeypatch.setattr(sweep_module, "get_cloud_storage_service", lambda: None)
+    args = ["--mongodb-uri", TEST_MONGO_URI, "--database", base.get_database().name, "--apply"]
+
+    assert await _main(args) == 2
+    assert len(_names(uploads.covers)) == 1 and len(_names(uploads.avatars)) == 1
+
+    assert await _main([*args, "--allow-no-references"]) == 0
+    assert _names(uploads.covers) == [] and _names(uploads.avatars) == []
