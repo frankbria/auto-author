@@ -39,7 +39,7 @@ under `Settings` → `Environments` → `staging` for environment-scoped ones.
 
 | Workflow | Reads |
 |---|---|
-| `deploy-staging-containers.yml` | `TS_CLIENT_ID`, `TS_AUTH_SECRET`, `SSH_KEY`, `USER`, `STAGING_TS_HOST` (falls back to `HOST`) |
+| `deploy-staging-containers.yml` | `TS_CLIENT_ID`, `TS_AUTH_SECRET`, `SSH_KEY`, `STAGING_KNOWN_HOSTS`, `USER`, `STAGING_TS_HOST` (falls back to `HOST`) |
 | `sync-staging-env.yml` | the same server-access secrets, plus `MONGODB_URI` (staging environment) |
 | `build-images.yml` | `GITHUB_TOKEN` (automatic); staging environment **variables** `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL`, `NEXT_PUBLIC_SENTRY_DSN` |
 | `e2e-staging-tests.yml` | `TEST_USER_EMAIL`, `TEST_USER_PASSWORD` (staging environment) |
@@ -53,6 +53,7 @@ under `Settings` → `Environments` → `staging` for environment-scoped ones.
 | Secret | Description | Example |
 |--------|-------------|---------|
 | `SSH_KEY` | Private SSH key for server access | `-----BEGIN OPENSSH PRIVATE KEY-----…` |
+| `STAGING_KNOWN_HOSTS` | The box's SSH host keys in `known_hosts` form, listing every name `STAGING_TS_HOST`/`HOST` may hold. Deploy and env-sync SSH with `StrictHostKeyChecking=yes`, so a box answering with any other key is refused before authentication (#859). If the box is rebuilt or its keys rotate, re-scan over Tailscale (`ssh-keyscan <tailscale-ip>`), compare the fingerprints with a trusted session, and update this secret | `<ip>,<tailscale-name> ssh-ed25519 AAAA…` |
 | `USER` | SSH username | — |
 | `STAGING_TS_HOST` | Tailscale hostname for the box; preferred over `HOST` | `staging-vps` |
 | `HOST` | Fallback when `STAGING_TS_HOST` is unset | `<staging-host>` |
@@ -164,7 +165,7 @@ degraded — which is worse than a loud failure. Set them.
 
 ### Deployment fails with "connection refused" or an SSH timeout
 
-- Verify `SSH_KEY`, `USER`, `STAGING_TS_HOST`, and the Tailscale OAuth client.
+- Verify `SSH_KEY`, `STAGING_KNOWN_HOSTS`, `USER`, `STAGING_TS_HOST`, and the Tailscale OAuth client. `Host key verification failed` means the box's key no longer matches `STAGING_KNOWN_HOSTS`.
 - The staging host runs fail2ban in aggressive mode and bans bursty connections.
 
 ### Backend health check fails
