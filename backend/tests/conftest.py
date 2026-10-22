@@ -27,14 +27,8 @@ for _storage_field in (
 # import and reads these, so reset them before any app module imports it.
 from app.core.config import Settings, settings as _settings
 
-AI_SETTINGS = (
-    "AI_BASE_URL",
-    "AI_API_KEY",
-    "AI_MODEL_DEFAULT",
-    "AI_MODEL_LONG_OUTPUT",
-    "AI_MAX_OUTPUT_TOKENS_DEFAULT",
-    "AI_MAX_OUTPUT_TOKENS_LONG",
-)
+# Every AI_* field, so a setting added later is reset without editing this list.
+AI_SETTINGS = tuple(name for name in Settings.model_fields if name.startswith("AI_"))
 for _name in AI_SETTINGS:
     setattr(_settings, _name, Settings.model_fields[_name].default)
 
