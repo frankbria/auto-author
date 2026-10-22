@@ -135,6 +135,9 @@ class Settings(BaseSettings):
     AI_MODEL_LONG_OUTPUT: str = "gpt-4o"
     AI_MAX_OUTPUT_TOKENS_DEFAULT: int = Field(default=4000, ge=1)
     AI_MAX_OUTPUT_TOKENS_LONG: int = Field(default=8000, ge=1)
+    # Reasoning models spend part of max_tokens on hidden reasoning. This is
+    # added to every flow's budget before the caps above clamp it (#925).
+    AI_REASONING_HEADROOM_TOKENS: int = Field(default=0, ge=0)
 
     # Better Auth Settings
     # CRITICAL: BETTER_AUTH_SECRET must be set in .env file

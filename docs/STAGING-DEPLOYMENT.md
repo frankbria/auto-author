@@ -171,6 +171,7 @@ change.
 | `AI_MODEL_LONG_OUTPUT` | `gpt-4o` | Chapter drafts and TOC generation (needs ≥ 6000 output tokens for TOC) |
 | `AI_MAX_OUTPUT_TOKENS_DEFAULT` | `4000` | Cap on every default-class request's `max_tokens` |
 | `AI_MAX_OUTPUT_TOKENS_LONG` | `8000` | Cap on drafts and TOC. Lowering it below 6000 truncates large TOCs, which then fail cleanly as `AI_RESPONSE_TRUNCATED` |
+| `AI_REASONING_HEADROOM_TOKENS` | `0` | Added to every flow's `max_tokens` before the caps clamp it, for reasoning models (below). Must be ≥ 0 |
 
 Things that differ by provider:
 
@@ -180,13 +181,18 @@ Things that differ by provider:
   billing some other way surfaces as `AI_UNEXPECTED_ERROR`; check the backend
   log for its message. A retired or unknown model name is the same.
 - **Reasoning models** (Nemotron, Qwen3, GLM thinking modes) spend part of
-  `max_tokens` on hidden reasoning. Each flow's budget is fixed in code
-  (analysis 1000, clarifying questions 800, chapter questions 2000, TOC 6000),
-  and the `AI_MAX_OUTPUT_TOKENS_*` caps only ever lower it. Measured live,
+  `max_tokens` on hidden reasoning. Each flow's own budget is fixed in code
+  (analysis 1000, clarifying questions 800, chapter questions 2000, rewrites
+  4000 or more, TOC 6000, a draft 1.6 tokens a word). Measured live,
   `nemotron-3-nano:30b` spent all 1000 analysis tokens thinking and returned
-  empty content in 4 of 4 runs, while its TOC (6000) worked. Every flow reports
-  an exhausted budget as `AI_RESPONSE_TRUNCATED` rather than parsing the
-  empty answer. **Use a non-reasoning model for `AI_MODEL_DEFAULT`.**
+  empty content, which every flow reports as `AI_RESPONSE_TRUNCATED` rather
+  than parsing the empty answer. To run one, set `AI_REASONING_HEADROOM_TOKENS`
+  (3000 made Nemotron's analysis return a verdict in 3 of 3 runs, #925) and
+  raise `AI_MAX_OUTPUT_TOKENS_DEFAULT` / `_LONG` to at least the largest
+  budget plus the headroom (5000 and 9000 for 3000), within the model's
+  output limit: the caps still clamp the sum. A truncated transform, enhance
+  or transcription cleanup answers 413 "too long", which on a reasoning model
+  usually means the headroom is too small, not that the chapter is.
 - **Output format.** The parsers are pinned against real `nemotron-3-nano:30b`
   output (`backend/tests/fixtures/ai_provider_outputs/`). Capture another
   model's fixtures the same way before relying on it in production.

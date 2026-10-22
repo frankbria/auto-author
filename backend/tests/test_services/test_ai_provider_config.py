@@ -9,8 +9,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
-from app.core.config import settings
+from app.core.config import Settings, settings
 from app.services.ai_errors import AIServiceError
 from app.services.ai_service import AIService
 from tests.test_services.openai_autospec import autospec_openai_client
@@ -193,3 +194,59 @@ class TestAlternateProviderOnTheWire:
             with pytest.raises(AIServiceError) as exc:
                 await call
             assert exc.value.error_code == "AI_RESPONSE_TRUNCATED"
+
+
+async def _budgets(svc):
+    """The max_tokens each flow sends, in a fixed order (#925)."""
+    calls = (
+        ("READINESS: Ready", lambda: svc.analyze_summary_for_toc(SUMMARY)),
+        ("1. Who reads it?", lambda: svc.generate_clarifying_questions(SUMMARY)),
+        ("1. Why?", lambda: svc.generate_chapter_questions("Write questions.", 5)),
+        ("Enhanced.", lambda: svc.enhance_text("Some text.", "clarity")),
+        ("Formal.", lambda: svc.transform_text_style("Some text.", "academic")),
+        ("Clean.", lambda: svc.enhance_transcription("um some text")),
+        (_toc(3, 2), lambda: svc.generate_toc_from_summary_and_responses(SUMMARY, RESPONSES)),
+        ("Draft.", lambda: svc.generate_chapter_draft("Ch", "Desc", RESPONSES, target_length=1000)),
+    )
+    sent = []
+    for content, call in calls:
+        svc.client = autospec_openai_client(content=content)
+        try:
+            await call()
+        except AIServiceError:
+            pass  # only the request matters here, not the parse
+        assert svc.client.chat.completions.create.called, content
+        sent.append(_sent(svc)[1])
+    return sent
+
+
+# analysis, clarifying, chapter questions, enhance, transform, transcription, TOC, draft
+TODAYS_BUDGETS = [1000, 800, 2000, 4000, 4000, 4000, 6000, 1600]
+
+
+class TestReasoningHeadroom:
+    """AI_REASONING_HEADROOM_TOKENS raises every flow's budget, under the caps (#925)."""
+
+    @pytest.mark.asyncio
+    async def test_unset_sends_todays_budgets(self, unset_ai_settings):
+        assert await _budgets(AIService()) == TODAYS_BUDGETS
+
+    @pytest.mark.asyncio
+    async def test_headroom_is_added_to_every_flow(self, unset_ai_settings, monkeypatch):
+        monkeypatch.setattr(settings, "AI_REASONING_HEADROOM_TOKENS", 300)
+        monkeypatch.setattr(settings, "AI_MAX_OUTPUT_TOKENS_DEFAULT", 100_000)
+        monkeypatch.setattr(settings, "AI_MAX_OUTPUT_TOKENS_LONG", 100_000)
+        assert await _budgets(AIService()) == [b + 300 for b in TODAYS_BUDGETS]
+
+    @pytest.mark.asyncio
+    async def test_headroom_stays_under_each_class_cap(self, unset_ai_settings, monkeypatch):
+        monkeypatch.setattr(settings, "AI_REASONING_HEADROOM_TOKENS", 3000)
+        # analysis 4000, questions 3800 and 5000 -> 4000 (default cap 4000);
+        # rewrites 7000, TOC 9000 -> 8000, draft 4600 (long cap 8000).
+        assert await _budgets(AIService()) == [4000, 3800, 4000, 7000, 7000, 7000, 8000, 4600]
+
+    def test_negative_headroom_is_rejected(self, monkeypatch):
+        monkeypatch.setenv("AI_REASONING_HEADROOM_TOKENS", "-1")
+        with pytest.raises(ValidationError) as exc:
+            Settings()
+        assert "AI_REASONING_HEADROOM_TOKENS" in str(exc.value)

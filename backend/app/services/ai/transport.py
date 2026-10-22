@@ -304,7 +304,8 @@ class TransportMixin:
                 model=model,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=min(max_tokens, cap),
+                # Headroom for hidden reasoning, still under the class cap (#925).
+                max_tokens=min(max_tokens + settings.AI_REASONING_HEADROOM_TOKENS, cap),
             )
 
         async def _async_wrapper():
