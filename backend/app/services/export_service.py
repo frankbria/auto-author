@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Export builds are CPU-bound (reportlab / python-docx) and run in worker
 # threads. `asyncio.to_thread` would put them on the event loop's DEFAULT
-# executor — the very pool ai_service.py uses to offload blocking OpenAI calls
+# executor — the very pool app/services/ai/transport.py uses to offload blocking OpenAI calls
 # (#175) — so a burst of oversized exports could occupy every worker and queue
 # AI generation behind builds whose clients already gave up at the 504. Giving
 # exports their own bounded pool keeps that blast radius inside exports (#345).

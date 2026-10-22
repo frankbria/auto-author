@@ -249,7 +249,7 @@ class TestSingleRetryLayer:
         create_mock = MagicMock(side_effect=self._rate_limit_error())
         with patch.object(
             ai_service.client.chat.completions, 'create', create_mock
-        ), patch('app.services.ai_service.asyncio', new=asyncio_without_retry_waits()):
+        ), patch('app.services.ai.transport.asyncio', new=asyncio_without_retry_waits()):
             with pytest.raises(AIRateLimitError):
                 await ai_service.generate_clarifying_questions(
                     summary="Test summary", num_questions=3
@@ -265,7 +265,7 @@ class TestSingleRetryLayer:
         create_mock = MagicMock(side_effect=self._rate_limit_error())
         with patch.object(
             ai_service.client.chat.completions, 'create', create_mock
-        ), patch('app.services.ai_service.asyncio', new=asyncio_without_retry_waits()):
+        ), patch('app.services.ai.transport.asyncio', new=asyncio_without_retry_waits()):
             with pytest.raises(AIRateLimitError):
                 await ai_service.generate_toc_from_summary_and_responses(
                     summary="Test summary",
@@ -284,7 +284,7 @@ class TestSingleRetryLayer:
         with caplog.at_level(_logging.INFO, logger="app.services.ai_service"):
             with patch.object(
                 ai_service.client.chat.completions, 'create', create_mock
-            ), patch('app.services.ai_service.asyncio', new=asyncio_without_retry_waits()):
+            ), patch('app.services.ai.transport.asyncio', new=asyncio_without_retry_waits()):
                 with pytest.raises(AIRateLimitError):
                     await ai_service.generate_clarifying_questions(
                         summary="Test summary", num_questions=3
@@ -304,7 +304,7 @@ class TestSingleRetryLayer:
         with caplog.at_level(_logging.INFO, logger="app.services.ai_service"):
             with patch.object(
                 ai_service.client.chat.completions, 'create', create_mock
-            ), patch('app.services.ai_service.asyncio', new=asyncio_without_retry_waits()):
+            ), patch('app.services.ai.transport.asyncio', new=asyncio_without_retry_waits()):
                 with pytest.raises(AIRateLimitError):
                     await ai_service.generate_clarifying_questions(
                         summary="Test summary", num_questions=3
