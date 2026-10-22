@@ -2,6 +2,10 @@
 
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
+### 2026-10-22
+
+- **Question endpoints extracted from books.py (#857, P2.11)**: the nine chapter-question handlers (generate, list, save/get response, rate, regenerate one, progress, regenerate all, and the batch save) moved verbatim from `books.py` (3039 to 2117 lines) into `chapter_questions.py`, mounted under the same `/books` prefix, so URLs, schemas and status codes are unchanged. Tests that patched `books.audit_after_commit` now patch the new module too; a characterization test pins the nine routes to the new router. One small fix rode along: the `save_question_response` audit row computed `is_update` as `"id" in result`, which was always true. The DAO now reports whether the upsert inserted, and the first save audits `False`, a re-save `True` (the flag is popped before the response, so the payload is unchanged).
+
 ### 2026-10-21
 
 - **Question ratings save (#1117, P2.10.1)**: the thumbs up/down on an interview question has never saved anything. The editor sends `{ rating }`, but `QuestionRating` also required `question_id` and `user_id`, so every rating got a 422 and the editor only logged it to the console. The route and the session already supply both (the DAO overwrote them anyway), so the schema drops them, and extra fields are still accepted and ignored. A failed rating now shows a "Rating not saved" toast and clears the highlight. A route test posts the editor's exact body and reads the stored row.

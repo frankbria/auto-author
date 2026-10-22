@@ -354,13 +354,14 @@ async def save_question_response(
         "last_edited_at": now,
     })
 
-    doc, _ = await _upsert_one(
+    doc, is_update = await _upsert_one(
         responses_collection,
         {"question_id": question_id, "user_id": user_id},
         response_dict,
         push=_edit_history_push(word_count),
     )
     doc["id"] = str(doc.pop("_id"))
+    doc["is_update"] = is_update  # the endpoint pops it for the audit row
     return doc
 
 

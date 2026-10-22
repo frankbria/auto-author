@@ -380,7 +380,7 @@ class SystemE2ETest:
 def mock_ai_service(monkeypatch):
     """Mock the AI service to return predictable responses"""
     from app.services.ai_service import AIService, ai_service
-    from app.api.endpoints import books as books_endpoint
+    from app.api.endpoints import chapter_questions as chapter_questions_endpoint
     from tests.test_services.openai_autospec import autospec_openai_client
 
     # Whatever is not stood in for below reaches this provider, never a real one: drafting a
@@ -595,7 +595,7 @@ The key to habit change isn't massive transformation but small, consistent adjus
         }
 
     # Mock the endpoint
-    monkeypatch.setattr(books_endpoint, "generate_chapter_questions", mock_generate_chapter_questions_endpoint)
+    monkeypatch.setattr(chapter_questions_endpoint, "generate_chapter_questions", mock_generate_chapter_questions_endpoint)
 
 
 # Pytest test cases
