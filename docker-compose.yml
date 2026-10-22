@@ -14,10 +14,19 @@
 # upstream config changes. The box is shared with other apps — check the ports
 # are still free before the first deploy.
 
+# Rotated container logs (#858): the box is shared, and Docker's default
+# json-file driver keeps every line forever. 3 x 10 MB per service.
+x-logging: &rotated-logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/frankbria/auto-author-backend:staging}
     restart: unless-stopped
+    logging: *rotated-logs
     # Bound to loopback: nginx proxies from the same host, so there is no reason
     # to publish these on the shared box's public interface.
     ports:
@@ -61,6 +70,7 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/frankbria/auto-author-frontend:staging}
     restart: unless-stopped
+    logging: *rotated-logs
     ports:
       - "127.0.0.1:3002:3002"
     # No `env_file:` here, unlike the backend (#781). The shared .env holds the
