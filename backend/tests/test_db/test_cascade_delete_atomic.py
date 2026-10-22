@@ -22,8 +22,9 @@ books there are (#786).
 import os
 from collections import Counter
 
-import motor.motor_asyncio
+from pymongo import AsyncMongoClient
 import pytest
+import pytest_asyncio
 from bson.objectid import ObjectId
 from pymongo import monitoring
 
@@ -115,12 +116,12 @@ class _CommandLog(monitoring.CommandListener):
         pass
 
 
-@pytest.fixture
-def command_log(motor_reinit_db, monkeypatch):
+@pytest_asyncio.fixture
+async def command_log(reinit_db, monkeypatch):
     """Rebind the DAOs to a client that logs its commands. Listeners can only be
     attached when a client is built."""
     log = _CommandLog()
-    client = motor.motor_asyncio.AsyncIOMotorClient(
+    client = AsyncMongoClient(
         TEST_MONGO_URI, event_listeners=[log]
     )
     db = client.get_default_database()
@@ -132,11 +133,11 @@ def command_log(motor_reinit_db, monkeypatch):
         audit_log_dao, "audit_logs_collection", db.get_collection("audit_logs")
     )
     yield log
-    client.close()
+    await client.close()
 
 
 @pytest.mark.asyncio
-async def test_delete_book_removes_all_related_data(motor_reinit_db):
+async def test_delete_book_removes_all_related_data(reinit_db):
     """Happy path: book and every child collection are emptied, user updated."""
     owner = "owner-1"
     book_id = await _seed_book_with_children(owner)
@@ -161,7 +162,7 @@ async def test_delete_book_removes_all_related_data(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_book_not_owned_removes_nothing(motor_reinit_db):
+async def test_delete_book_not_owned_removes_nothing(reinit_db):
     """A non-owner gets False and nothing is deleted."""
     owner = "owner-2"
     book_id = await _seed_book_with_children(owner)
@@ -175,7 +176,7 @@ async def test_delete_book_not_owned_removes_nothing(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_all_user_books_only_touches_owner(motor_reinit_db):
+async def test_delete_all_user_books_only_touches_owner(reinit_db):
     """delete_all_user_books cascades every owned book (returning the count)
     and leaves other users' data alone (issue #179)."""
     await _seed_book_with_children("victim")
@@ -195,7 +196,7 @@ async def test_delete_all_user_books_only_touches_owner(motor_reinit_db):
 
 @pytest.mark.asyncio
 async def test_delete_all_user_books_failure_leaves_every_book(
-    motor_reinit_db, monkeypatch
+    reinit_db, monkeypatch
 ):
     """A failed child delete propagates, so the account-deletion caller aborts
     before touching the user record, and every book document survives it
@@ -270,7 +271,7 @@ async def test_delete_all_user_books_chunks_question_ids(command_log, monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_delete_all_user_books_writes_one_audit_row(motor_reinit_db):
+async def test_delete_all_user_books_writes_one_audit_row(reinit_db):
     """One summary row for the account, carrying counts and no book titles."""
     await _seed_account("victim", 2)
 
@@ -296,7 +297,7 @@ async def test_delete_all_user_books_writes_one_audit_row(motor_reinit_db):
 
 @pytest.mark.asyncio
 async def test_delete_book_failure_is_contained_and_logged(
-    motor_reinit_db, monkeypatch, caplog
+    reinit_db, monkeypatch, caplog
 ):
     """A mid-cascade failure (non-transactional path) leaves the book document
     intact (children-first ordering) and logs the error; the exception
@@ -318,7 +319,7 @@ async def test_delete_book_failure_is_contained_and_logged(
     ), "expected an error log for the failed cascade"
 
 
-def test_the_cascade_uses_the_test_runs_own_client(motor_reinit_db):
+def test_the_cascade_uses_the_test_runs_own_client(reinit_db):
     """``book.py`` binds ``_client`` when it is imported. Left at that, it is a
     client from another event loop: the replica-set probe raises on it, the
     error is swallowed, and the cascade quietly takes the path without a
@@ -326,8 +327,8 @@ def test_the_cascade_uses_the_test_runs_own_client(motor_reinit_db):
     assert book_dao._client is base._client
 
 
-@pytest.fixture
-async def replica_set(motor_reinit_db):
+@pytest_asyncio.fixture
+async def replica_set(reinit_db):
     """Skip on a standalone server. A run that says it has a replica set and has not is a failure."""
     if (await base._client.admin.command("hello")).get("setName") is None:
         if os.environ.get("REQUIRE_REPLICA_SET"):

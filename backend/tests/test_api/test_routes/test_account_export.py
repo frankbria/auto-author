@@ -57,7 +57,7 @@ async def _export(token: str):
 
 
 @pytest.mark.asyncio
-async def test_export_returns_the_callers_profile_books_and_answers(motor_reinit_db):
+async def test_export_returns_the_callers_profile_books_and_answers(reinit_db):
     seeded = await _seed_better_auth_user("exporter@example.com", name="Ex Porter")
     await _seed_content(seeded["user_id"], "MINE")
 
@@ -85,7 +85,7 @@ async def test_export_returns_the_callers_profile_books_and_answers(motor_reinit
 
 
 @pytest.mark.asyncio
-async def test_export_never_contains_another_users_data(motor_reinit_db):
+async def test_export_never_contains_another_users_data(reinit_db):
     """No IDOR: the endpoint takes no id, and each export holds only its caller's rows."""
     alice = await _seed_better_auth_user("alice@example.com", name="Alice A")
     bob = await _seed_better_auth_user("bob@example.com", name="Bob B")
@@ -103,7 +103,7 @@ async def test_export_never_contains_another_users_data(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_export_holds_no_credential_and_no_internal_field(motor_reinit_db):
+async def test_export_holds_no_credential_and_no_internal_field(reinit_db):
     seeded = await _seed_better_auth_user("careful@example.com")
     async with _client(seeded["tokens"][0]) as c:
         assert (await c.get("/api/v1/users/me")).status_code == 200
@@ -125,7 +125,7 @@ async def test_export_holds_no_credential_and_no_internal_field(motor_reinit_db)
 
 
 @pytest.mark.asyncio
-async def test_export_requires_a_session(motor_reinit_db):
+async def test_export_requires_a_session(reinit_db):
     async with _client("no-such-token") as c:
         response = await c.get("/api/v1/users/me/export")
     assert response.status_code == 401

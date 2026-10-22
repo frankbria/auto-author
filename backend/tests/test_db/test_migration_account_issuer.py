@@ -7,7 +7,7 @@ password change — all filter on `issuer == "local:credential"`, so every accou
 row written by 1.6 (which has no such field) stops matching and the server answers
 401 while logging `User not found` about a user it has already loaded.
 
-These tests run against a real local MongoDB via `motor_reinit_db`. The account
+These tests run against a real local MongoDB via `reinit_db`. The account
 documents are hand-built in the exact shapes better-auth's MongoDB adapter writes:
 `_id`/`userId` as ObjectId (the adapter coerces every id-referencing field), and
 `accountId` as a plain string.
@@ -23,9 +23,11 @@ from app.scripts.migration_account_issuer import (
     LOCAL_CREDENTIAL_ISSUER,
     AccountIssuerBackfillError,
     _client_kwargs,
+    _main,
     _resolve_connection,
     backfill_account_issuer,
 )
+from tests.conftest import TEST_MONGO_URI
 
 #: better-auth ships `createLocalAccountIssuer` here; the frontend owns the
 #: dependency, so this path only exists once its node_modules are installed.
@@ -76,7 +78,7 @@ async def _seed(users=(), accounts=()):
 class TestBackfill:
     pytestmark = pytest.mark.asyncio
 
-    async def test_backfills_a_16_shaped_credential_account(self, motor_reinit_db):
+    async def test_backfills_a_16_shaped_credential_account(self, reinit_db):
         user = _user_doc()
         account = _legacy_account(user)
         db = await _seed([user], [account])
@@ -91,7 +93,7 @@ class TestBackfill:
         assert stats["issuer_backfilled"] == 1
         assert stats["account_id_repaired"] == 0
 
-    async def test_leaves_a_17_shaped_account_untouched(self, motor_reinit_db):
+    async def test_leaves_a_17_shaped_account_untouched(self, reinit_db):
         user = _user_doc()
         account = _migrated_account(user)
         db = await _seed([user], [account])
@@ -101,7 +103,7 @@ class TestBackfill:
         assert stats["issuer_backfilled"] == 0
         assert stats["already_migrated"] == 1
 
-    async def test_is_idempotent(self, motor_reinit_db):
+    async def test_is_idempotent(self, reinit_db):
         user = _user_doc()
         db = await _seed([user], [_legacy_account(user)])
 
@@ -112,7 +114,7 @@ class TestBackfill:
         assert second["issuer_backfilled"] == 0
         assert second["already_migrated"] == 1
 
-    async def test_dry_run_writes_nothing(self, motor_reinit_db):
+    async def test_dry_run_writes_nothing(self, reinit_db):
         user = _user_doc()
         account = _legacy_account(user)
         db = await _seed([user], [account])
@@ -127,7 +129,7 @@ class TestBackfill:
         assert stats["dry_run"] is True
 
     async def test_repairs_an_account_id_that_does_not_match_the_user(
-        self, motor_reinit_db
+        self, reinit_db
     ):
         # The 1.7 guide keys a credential account on the linked user's stable id,
         # and sign-in.mjs asserts `account.accountId === user.id` outright. A row
@@ -148,7 +150,7 @@ class TestRefusals:
     pytestmark = pytest.mark.asyncio
 
     async def test_aborts_on_an_unmigrated_non_credential_provider(
-        self, motor_reinit_db
+        self, reinit_db
     ):
         # This deployment configures only emailAndPassword + twoFactor, so an
         # OAuth/SSO row means someone added a provider. Its trusted issuer is a
@@ -164,7 +166,7 @@ class TestRefusals:
             await backfill_account_issuer(db, dry_run=True)
 
     async def test_a_migrated_non_credential_provider_is_not_an_abort(
-        self, motor_reinit_db
+        self, reinit_db
     ):
         # Only rows still *needing* an issuer are undecidable. One that already
         # carries a trusted issuer has been handled and must not block the run.
@@ -186,7 +188,7 @@ class TestRefusals:
         assert stats["already_migrated"] == 1
 
     async def test_aborts_on_an_identity_collision_before_writing(
-        self, motor_reinit_db
+        self, reinit_db
     ):
         # 1.7 puts a unique index on (issuer, accountId). Two credential rows for
         # one user would both resolve to the same key, so writing first and
@@ -202,7 +204,7 @@ class TestRefusals:
         assert all("issuer" not in doc for doc in stored)
 
     async def test_matches_a_user_whose_id_was_stored_as_a_string(
-        self, motor_reinit_db
+        self, reinit_db
     ):
         # better-auth's Mongo adapter coerces id-referencing fields to ObjectId,
         # so `userId` is normally an ObjectId. A row that holds the hex string
@@ -220,7 +222,7 @@ class TestRefusals:
         assert stored["accountId"] == str(user["_id"])
         assert stats["orphans"] == []
 
-    async def test_reports_and_skips_an_account_with_no_user(self, motor_reinit_db):
+    async def test_reports_and_skips_an_account_with_no_user(self, reinit_db):
         # A credential row whose user is gone can never sign in, with or without
         # an issuer. Backfilling it would mint an identity for a user that does
         # not exist; aborting on it would block the whole migration for dead data.
@@ -237,13 +239,20 @@ class TestRefusals:
         stored = await db["account"].find_one({"_id": orphan["_id"]})
         assert "issuer" not in stored
 
-    async def test_an_empty_account_collection_is_a_no_op(self, motor_reinit_db):
+    async def test_an_empty_account_collection_is_a_no_op(self, reinit_db):
         db = base.get_database()
 
         stats = await backfill_account_issuer(db, dry_run=False)
 
         assert stats["scanned"] == 0
         assert stats["issuer_backfilled"] == 0
+
+    async def test_the_command_line_runs_a_dry_run_and_exits_clean(self, reinit_db):
+        db = base.get_database()
+        await db["account"].insert_one({"providerId": "credential", "userId": ObjectId()})
+
+        assert await _main(["--mongodb-uri", TEST_MONGO_URI, "--database", db.name]) == 0
+        assert "issuer" not in await db["account"].find_one({})
 
 
 class TestIssuerLiteral:

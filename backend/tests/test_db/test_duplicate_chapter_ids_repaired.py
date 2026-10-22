@@ -41,7 +41,7 @@ async def _chapters(book_id: ObjectId) -> list:
 
 
 @pytest.mark.asyncio
-async def test_later_occurrences_get_fresh_ids_and_the_first_keeps_its_own(motor_reinit_db):
+async def test_later_occurrences_get_fresh_ids_and_the_first_keeps_its_own(reinit_db):
     book_id = await _book([
         _chapter("dup", "First", "first draft", subchapters=[_chapter("dup", "Nested", "nested draft")]),
         _chapter("dup", "Second", "second draft"),
@@ -60,7 +60,7 @@ async def test_later_occurrences_get_fresh_ids_and_the_first_keeps_its_own(motor
 
 
 @pytest.mark.asyncio
-async def test_the_repair_is_idempotent_and_leaves_clean_books_alone(motor_reinit_db):
+async def test_the_repair_is_idempotent_and_leaves_clean_books_alone(reinit_db):
     repaired = await _book([_chapter("dup", "A", "a"), _chapter("dup", "B", "b")])
     clean = await _book([_chapter("x", "A", "a"), _chapter("y", "B", "b")])
     no_toc = ObjectId()
@@ -76,7 +76,7 @@ async def test_the_repair_is_idempotent_and_leaves_clean_books_alone(motor_reini
 
 
 @pytest.mark.asyncio
-async def test_after_the_repair_one_save_changes_one_chapter(motor_reinit_db):
+async def test_after_the_repair_one_save_changes_one_chapter(reinit_db):
     book_id = await _book([_chapter("dup", "First", "first draft"), _chapter("dup", "Second", "second draft")])
 
     await repair_duplicate_chapter_ids()
@@ -87,7 +87,7 @@ async def test_after_the_repair_one_save_changes_one_chapter(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_a_malformed_toc_does_not_stop_the_repair_of_other_books(motor_reinit_db):
+async def test_a_malformed_toc_does_not_stop_the_repair_of_other_books(reinit_db):
     """Found in review: an AI TOC is stored as it came, nulls and all."""
     await _book([None, _chapter("dup", "A", "a"), _chapter("dup", "B", "b")])
     await tx.books_collection.insert_one({"_id": ObjectId(), "owner_id": OWNER, "table_of_contents": {"chapters": {"0": "x"}}})

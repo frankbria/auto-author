@@ -97,7 +97,7 @@ async def test_concurrent_first_response_saves_over_http_all_succeed(
 
 
 @pytest.mark.asyncio
-async def test_concurrent_first_ratings_produce_one_document(motor_reinit_db):
+async def test_concurrent_first_ratings_produce_one_document(reinit_db):
     await _unique_indexes_in_place()
     user_id, question_id = "user-1", "q-1"
 
@@ -116,7 +116,7 @@ async def test_concurrent_first_ratings_produce_one_document(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_concurrent_first_batch_saves_produce_one_document(motor_reinit_db):
+async def test_concurrent_first_batch_saves_produce_one_document(reinit_db):
     user_id, book_id, chapter_id = "user-1", "book-1", "ch-1"
     question = await _make_question(user_id, book_id, chapter_id)
     await _unique_indexes_in_place()
@@ -137,7 +137,7 @@ async def test_concurrent_first_batch_saves_produce_one_document(motor_reinit_db
 
 
 @pytest.mark.asyncio
-async def test_upsert_retries_the_duplicate_key_the_server_does_not(motor_reinit_db):
+async def test_upsert_retries_the_duplicate_key_the_server_does_not(reinit_db):
     """The client-side retry is real, not decoration.
 
     MongoDB >= 4.2 retries a duplicate-key upsert itself when the filter is pure
@@ -162,7 +162,7 @@ async def test_upsert_retries_the_duplicate_key_the_server_does_not(motor_reinit
 
 
 @pytest.mark.asyncio
-async def test_edit_history_is_capped_at_the_newest_entries(motor_reinit_db):
+async def test_edit_history_is_capped_at_the_newest_entries(reinit_db):
     """100 saves leave the newest EDIT_HISTORY_LIMIT entries, no more."""
     assert EDIT_HISTORY_LIMIT == 50
     user_id, question_id = "user-1", "q-1"
@@ -183,7 +183,7 @@ async def test_edit_history_is_capped_at_the_newest_entries(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_batch_save_shares_the_edit_history_cap(motor_reinit_db):
+async def test_batch_save_shares_the_edit_history_cap(reinit_db):
     user_id, book_id, chapter_id = "user-1", "book-1", "ch-1"
     question = await _make_question(user_id, book_id, chapter_id)
 
@@ -198,7 +198,7 @@ async def test_batch_save_shares_the_edit_history_cap(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_rerating_keeps_the_original_created_at(motor_reinit_db):
+async def test_rerating_keeps_the_original_created_at(reinit_db):
     user_id, question_id = "user-1", "q-1"
     first = await save_question_rating(
         question_id, QuestionRating(rating=2), user_id

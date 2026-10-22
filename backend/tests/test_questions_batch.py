@@ -12,7 +12,7 @@ from app.schemas.book import (
 
 
 @pytest.mark.asyncio
-async def test_create_questions_batch_success(motor_reinit_db):
+async def test_create_questions_batch_success(reinit_db):
     """Test that batch creation successfully inserts all questions atomically."""
     # Arrange
     book_id = "test_book_123"
@@ -90,7 +90,7 @@ async def test_create_questions_batch_empty_list():
 
 
 @pytest.mark.asyncio
-async def test_create_questions_batch_preserves_order(motor_reinit_db):
+async def test_create_questions_batch_preserves_order(reinit_db):
     """Test that batch creation preserves question order."""
     # Arrange
     book_id = "test_book_order"
@@ -126,7 +126,7 @@ async def test_create_questions_batch_preserves_order(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_create_questions_batch_same_timestamps(motor_reinit_db):
+async def test_create_questions_batch_same_timestamps(reinit_db):
     """Test that all questions in a batch get the same timestamp."""
     # Arrange
     book_id = "test_book_timestamps"
@@ -161,7 +161,7 @@ async def test_create_questions_batch_same_timestamps(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_create_questions_batch_atomicity(motor_reinit_db):
+async def test_create_questions_batch_atomicity(reinit_db):
     """
     Test that batch creation is atomic - if one fails, none are saved.
 

@@ -282,7 +282,7 @@ class TestRateLimitsAreKeyedOnTheRouteNotTheResource:
         assert update.status_code == 200, update.text
 
     async def test_a_request_with_no_matched_route_falls_back_to_its_path(
-        self, motor_reinit_db, monkeypatch
+        self, reinit_db, monkeypatch
     ):
         monkeypatch.setattr(deps.settings, "BYPASS_AUTH", False)
         limiter = real_get_rate_limiter(limit=5, window=60)

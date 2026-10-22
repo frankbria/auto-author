@@ -1,6 +1,6 @@
 # backend/app/db/base.py
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from bson.objectid import ObjectId
 from app.core.config import settings
 import certifi
@@ -12,7 +12,7 @@ is_atlas = settings.mongo_connection_string.startswith("mongodb+srv://")
 # MongoDB Atlas (mongodb+srv://) requires TLS with certificate validation
 # Local MongoDB (mongodb://localhost) does not use TLS
 if is_atlas:
-    _client = AsyncIOMotorClient(
+    _client = AsyncMongoClient(
         settings.mongo_connection_string,  # Prefers MONGODB_URI over DATABASE_URL
         tlsCAFile=certifi.where(),  # Use certifi's CA bundle for SSL certificate verification
         tls=True,  # Explicitly enable TLS for Atlas connections
@@ -23,7 +23,7 @@ if is_atlas:
     )
 else:
     # Local MongoDB - no TLS configuration needed
-    _client = AsyncIOMotorClient(
+    _client = AsyncMongoClient(
         settings.mongo_connection_string,
         serverSelectionTimeoutMS=30000,  # 30-second timeout for server selection
         connectTimeoutMS=20000,  # 20-second timeout for initial connection

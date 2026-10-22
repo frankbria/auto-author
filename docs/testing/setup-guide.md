@@ -52,7 +52,7 @@ uv sync --extra test    # creates .venv; test tooling (pytest, pytest-asyncio, p
 Tests use a real MongoDB, not SQLite or SQLAlchemy. Start MongoDB on `localhost:27017`; `backend/tests/conftest.py` does the rest:
 - It sets `ENVIRONMENT=test`.
 - It connects to `TEST_MONGO_URI` (default `mongodb://localhost:27017/auto-author-test`).
-- The `motor_reinit_db` fixture drops that database before and after the test and points the data-access modules at a fresh Motor client. Tests that touch the database request it, directly or through `auth_client_factory` / `async_client_factory`.
+- The async `reinit_db` fixture drops that database before and after the test and points the data-access modules at a fresh `AsyncMongoClient`, closed on the test's own event loop. Tests that touch the database request it, directly or through `auth_client_factory` / `async_client_factory`.
 - `backend/tests/db_guard.py` aborts collection if the URI is not a local test database.
 
 No `.env.test` file is used.

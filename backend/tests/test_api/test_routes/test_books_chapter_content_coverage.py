@@ -55,7 +55,7 @@ async def _seed_toc(api, book_id, chapters):
 
     Written directly through the (test-rewired) async books collection. The
     ``PUT .../toc`` endpoint can't be used here because
-    ``toc_transactions.py`` captured a now-closed Motor client at import time.
+    ``toc_transactions.py`` captured a now-closed client at import time.
     """
     result = await base.books_collection.update_one(
         {"_id": ObjectId(book_id)},

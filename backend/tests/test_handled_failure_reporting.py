@@ -183,7 +183,7 @@ class TestStartUpAndTheDailyPurge:
             await served.state.database_prepared  # beside the server since #1012
             await asyncio.sleep(0.05)  # the purge runs as a task of its own
 
-    async def test_indexes_that_could_not_be_created(self, motor_reinit_db, reports):
+    async def test_indexes_that_could_not_be_created(self, reinit_db, reports):
         from app.db.indexing_strategy import ChapterTabIndexManager
 
         failed = AsyncMock(return_value={"success": False, "message": f"index on {SENTINEL} failed"})
@@ -193,13 +193,13 @@ class TestStartUpAndTheDailyPurge:
         assert _kinds(reports) == ["startup-indexes"]
         assert SENTINEL not in _said(reports)
 
-    async def test_accounts_that_could_not_be_marked_verified(self, motor_reinit_db, reports):
+    async def test_accounts_that_could_not_be_marked_verified(self, reinit_db, reports):
         with patch.object(user_dao, "grandfather_unverified_accounts", AsyncMock(side_effect=RuntimeError("database is away"))):
             await self._start()
 
         assert _kinds(reports) == ["startup-verify-accounts"]
 
-    async def test_a_purge_of_expired_accounts_that_failed(self, motor_reinit_db, reports):
+    async def test_a_purge_of_expired_accounts_that_failed(self, reinit_db, reports):
         with patch.object(user_dao, "purge_expired_users", AsyncMock(side_effect=RuntimeError("database is away"))):
             await self._start()
 
@@ -269,7 +269,7 @@ class TestADeletedUsersFilesStillInStorage:
         assert _kinds(reports) == ["delete-files"]
         assert SENTINEL not in _said(reports)
 
-    async def test_or_when_an_account_is_closed(self, motor_reinit_db, reports):
+    async def test_or_when_an_account_is_closed(self, reinit_db, reports):
         await user_dao.create_user(
             {"auth_id": "auth-closing", "email": "closing@example.com", "avatar_url": f"/uploads/{SENTINEL}.png"}
         )

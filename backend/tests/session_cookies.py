@@ -33,7 +33,7 @@ def session_collection(found=None, error=None) -> AsyncMock:
     joined read, which answers ``found`` or raises ``error``."""
     answer = AsyncMock(side_effect=error) if error else AsyncMock(return_value=[found] if found else [])
     collection = AsyncMock()
-    collection.aggregate = Mock(return_value=Mock(to_list=answer))
+    collection.aggregate = AsyncMock(return_value=Mock(to_list=answer))
     return collection
 
 

@@ -43,7 +43,7 @@ def _client_with(cookie_value: str | None) -> AsyncClient:
 
 
 @pytest.fixture(autouse=True)
-def nothing_stands_in_for_the_sign_in_check(motor_reinit_db):
+def nothing_stands_in_for_the_sign_in_check(reinit_db):
     """These tests are worth nothing with an override in place: refuse to run with one."""
     assert get_current_user_from_session not in app.dependency_overrides
     yield

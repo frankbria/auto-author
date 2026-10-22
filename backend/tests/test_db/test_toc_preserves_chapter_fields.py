@@ -54,7 +54,7 @@ def _edit_toc_item(cid, title, order, subchapters=None, level=1):
 
 
 @pytest_asyncio.fixture
-async def book_with_drafts(motor_reinit_db):
+async def book_with_drafts(reinit_db):
     toc = {
         "version": 3,
         "chapters": [
@@ -149,7 +149,7 @@ async def test_stored_value_wins_and_new_items_keep_their_own(book_with_drafts):
 
 
 @pytest.mark.asyncio
-async def test_idless_items_never_match_each_other(motor_reinit_db):
+async def test_idless_items_never_match_each_other(reinit_db):
     """A legacy stored chapter with no id must not lend its draft to a new item."""
     legacy = _stored("x", "Legacy", 1)
     del legacy["id"]
@@ -169,7 +169,7 @@ async def test_idless_items_never_match_each_other(motor_reinit_db):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("bad", [None, ["a string"]])
-async def test_malformed_stored_subchapters_do_not_block_an_edit(motor_reinit_db, bad):
+async def test_malformed_stored_subchapters_do_not_block_an_edit(reinit_db, bad):
     """generate-toc stores AI JSON verbatim and validates only chapter titles,
     so a stored chapter can hold `subchapters: null` or strings. An edit must
     still succeed and replace it, as it did before #749 added the stored walk."""

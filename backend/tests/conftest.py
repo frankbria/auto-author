@@ -25,7 +25,7 @@ for _storage_field in (
 
 import app.api.dependencies as deps
 from fastapi import HTTPException, Request
-import motor.motor_asyncio
+from pymongo import AsyncMongoClient
 import app.db.user as users_dao
 import app.db.book as books_dao
 import app.db.audit_log as audit_log_dao
@@ -231,33 +231,21 @@ def arm_real_ai_quota():
     for key in armed_keys:
         app.dependency_overrides.pop(key, None)
 
-@pytest_asyncio.fixture(scope="function")
-def event_loop():
+@pytest_asyncio.fixture(autouse=False)  # Not autouse - tests must explicitly request this fixture
+async def reinit_db():
     """
-    Create a new event loop for each test function.
-    This ensures Motor async clients have a proper event loop context.
-    """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(autouse=False)  # Not autouse - tests must explicitly request this fixture
-def motor_reinit_db():
-    """
-    Every test gets its own Motor client bound to a fresh database.
+    Every test gets its own client bound to a fresh database.
     Drops the test DB before & after so you start with a clean slate.
 
-    Note: This is a SYNC fixture (not async) because autouse=True fixtures
-    need to work with both sync and async tests. Using async autouse fixtures
-    with sync tests causes pytest-asyncio to hang.
+    Async so that teardown closes the client on the event loop the test used:
+    an AsyncMongoClient is bound to its first loop and cannot be closed from
+    another one.
     """
     # Drop database before test using sync client
     _sync_client.drop_database(_TEST_DB_NAME)
 
-    # Create async Motor client for test use
-    base._client = motor.motor_asyncio.AsyncIOMotorClient(TEST_MONGO_URI)
+    # Create the async client for test use
+    base._client = AsyncMongoClient(TEST_MONGO_URI)
     base._db = base._client.get_default_database()
 
     # Set up collections
@@ -283,7 +271,7 @@ def motor_reinit_db():
 
     # Drop database after test using sync client
     _sync_client.drop_database(_TEST_DB_NAME)
-    base._client.close()
+    await base._client.close()
 
 
 @pytest.fixture(scope="function")
@@ -365,7 +353,7 @@ def _signed_in_as(user_map: dict):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def auth_client_factory(motor_reinit_db, monkeypatch, test_user):
+async def auth_client_factory(reinit_db, monkeypatch, test_user):
     """
     Returns an async function `make_client(overrides: dict = None)`
     that gives you an AsyncClient whose get_current_user_from_session
@@ -471,7 +459,7 @@ def test_book(test_user):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
+async def async_client_factory(reinit_db, monkeypatch, test_user):
     """
     Returns an async function make_client(overrides: dict = None, auth: bool = True)
     that yields an AsyncClient whose get_current_user_from_session always returns test_user
@@ -547,6 +535,6 @@ async def async_client_factory(motor_reinit_db, monkeypatch, test_user):
     app.dependency_overrides.clear()
 
 
-# REMOVED: clean_db fixture was redundant and conflicting with motor_reinit_db
-# The motor_reinit_db fixture (line 67) already handles database cleanup before/after each test
+# REMOVED: clean_db fixture was redundant and conflicting with reinit_db
+# The reinit_db fixture (line 67) already handles database cleanup before/after each test
 # Having both autouse fixtures caused race conditions and test hangs

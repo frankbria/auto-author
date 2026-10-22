@@ -8,8 +8,9 @@ which autospec can't traverse (accessing ``.chat.completions`` raises
 every call — an unknown or missing kwarg raises ``TypeError`` instead of
 sailing through a bare ``Mock``.
 """
+import asyncio
 from types import SimpleNamespace
-from unittest.mock import create_autospec
+from unittest.mock import AsyncMock, create_autospec
 
 from openai import OpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
@@ -54,3 +55,13 @@ def autospec_openai_client(
     return SimpleNamespace(
         chat=SimpleNamespace(completions=SimpleNamespace(create=mock_create))
     )
+
+
+def asyncio_without_retry_waits() -> SimpleNamespace:
+    """``asyncio`` as ``ai_service`` sees it, with its backoff sleeps skipped.
+
+    Patch ``app.services.ai_service.asyncio`` with this rather than
+    ``...ai_service.asyncio.sleep``: that path sets ``sleep`` on the shared
+    ``asyncio`` module, and the database driver's own waits then spin forever.
+    """
+    return SimpleNamespace(**{**vars(asyncio), "sleep": AsyncMock()})

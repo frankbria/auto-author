@@ -5,7 +5,7 @@ Reproduces the check-then-insert race that produced duplicate user records for a
 single auth_id and verifies the fix: a unique index on users.auth_id/email plus
 a create_user that catches DuplicateKeyError and re-fetches the winner.
 
-Uses a real local MongoDB via motor_reinit_db (which does NOT build app indexes),
+Uses a real local MongoDB via reinit_db (which does NOT build app indexes),
 so each test calls ensure_user_indexes() itself.
 """
 
@@ -32,8 +32,8 @@ def _user(**overrides):
 
 
 class TestEnsureUserIndexes:
-    async def test_creates_unique_indexes(self, motor_reinit_db):
-        # motor_reinit_db drops the DB immediately before this test; a real
+    async def test_creates_unique_indexes(self, reinit_db):
+        # reinit_db drops the DB immediately before this test; a real
         # round-trip drains that async drop so the first createIndexes below
         # can't be lost to it (a drop-then-index test artifact, not a prod path).
         await base.users_collection.insert_one({"warmup": True})
@@ -53,14 +53,14 @@ class TestEnsureUserIndexes:
         assert auth_idx is not None and auth_idx.get("unique") is True
         assert email_idx is not None and email_idx.get("unique") is True
 
-    async def test_idempotent(self, motor_reinit_db):
+    async def test_idempotent(self, reinit_db):
         # Safe to run twice (mirrors startup re-runs / hot reload).
         await ensure_user_indexes()
         await ensure_user_indexes()
 
 
 class TestConcurrentCreateProducesOneRecord:
-    async def test_concurrent_first_loads_produce_one_record(self, motor_reinit_db):
+    async def test_concurrent_first_loads_produce_one_record(self, reinit_db):
         await ensure_user_indexes()
 
         # Simulate an SPA's parallel first-load requests all inserting the same
@@ -78,7 +78,7 @@ class TestConcurrentCreateProducesOneRecord:
         assert len(winners) == 1
         assert len(rejected) == 7  # every duplicate insert hit the unique index
 
-    async def test_duplicate_insert_raises(self, motor_reinit_db):
+    async def test_duplicate_insert_raises(self, reinit_db):
         # create_user is a pure insert primitive: a duplicate (auth_id or email)
         # raises DuplicateKeyError for the caller to handle, rather than silently
         # inserting a second doc.

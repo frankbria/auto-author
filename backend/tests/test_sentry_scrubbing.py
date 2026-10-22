@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 import sentry_sdk
 from fastapi.testclient import TestClient
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
@@ -49,7 +49,7 @@ def _scratch(collection: str):
     """A collection in the test database, on a client made after the SDK started,
     as the app's is: the SDK watches only the clients created after it."""
     uri = os.environ.get("TEST_MONGO_URI", "mongodb://localhost:27017/auto-author-test")
-    return AsyncIOMotorClient(uri).get_default_database()[collection]
+    return AsyncMongoClient(uri).get_default_database()[collection]
 
 
 async def _fail(payload: dict):

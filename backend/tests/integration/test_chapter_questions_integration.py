@@ -2,7 +2,7 @@
 Integration tests for the chapter questions feature (issue #45).
 
 Exercises real data flow through ``QuestionGenerationService`` against a real
-local MongoDB (via the ``motor_reinit_db`` fixture from conftest): question
+local MongoDB (via the ``reinit_db`` fixture from conftest): question
 generation, response saving, response retrieval, and progress tracking.
 
 The only mocked dependency is the AI service call — everything else (question
@@ -47,7 +47,7 @@ def service(mock_ai_service):
 
 
 @pytest.fixture
-async def seeded_book(motor_reinit_db):
+async def seeded_book(reinit_db):
     """Insert a book with one TOC chapter into the test DB; return (book_id, chapter_id)."""
     book_doc = {
         "_id": ObjectId(),

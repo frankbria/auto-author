@@ -9,7 +9,7 @@ from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Tuple
-from motor.motor_asyncio import AsyncIOMotorClientSession
+from pymongo.asynchronous.client_session import AsyncClientSession
 from .audit_log import audit_after_write
 from app.models.book import BookDB
 
@@ -367,7 +367,7 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
     # Detect replica-set support; multi-document transactions require one.
     use_transaction = True
     try:
-        async with await _client.start_session():
+        async with _client.start_session():
             info = await _client.admin.command("isMaster")
             use_transaction = info.get("setName") is not None
     except Exception:
@@ -375,8 +375,8 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
 
     try:
         if use_transaction:
-            async with await _client.start_session() as session:
-                async with session.start_transaction():
+            async with _client.start_session() as session:
+                async with await session.start_transaction():
                     deleted, counts = await _delete_books_internal(
                         [book_id], user_auth_id, session
                     )
@@ -464,7 +464,7 @@ async def _delete_cover_files(book: Dict) -> None:
 async def _delete_books_internal(
     book_ids: List[str],
     user_auth_id: str,
-    session: Optional[AsyncIOMotorClientSession],
+    session: Optional[AsyncClientSession],
 ) -> Tuple[int, Dict[str, int]]:
     """Run the cascade deletes for ``book_ids``, optionally inside a transaction
     ``session``. Children go first and the book documents + user association

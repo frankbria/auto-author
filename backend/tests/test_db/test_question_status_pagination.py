@@ -100,7 +100,7 @@ async def _collect_pages(status: str, limit: int) -> tuple[list, list]:
 
 
 async def test_completed_filter_across_multiple_pages_is_complete_and_disjoint(
-    motor_reinit_db,
+    reinit_db,
 ):
     """4 completed questions at limit=2 => exactly 2 full pages covering all 4.
 
@@ -124,7 +124,7 @@ async def test_completed_filter_across_multiple_pages_is_complete_and_disjoint(
     assert totals == [4, 4]
 
 
-async def test_completed_filter_page_shape_and_ordering(motor_reinit_db):
+async def test_completed_filter_page_shape_and_ordering(reinit_db):
     ids = await _seed_chapter()
 
     page1 = await get_questions_for_chapter(
@@ -146,7 +146,7 @@ async def test_completed_filter_page_shape_and_ordering(motor_reinit_db):
     assert [q.id for q in page1.questions] == [ids[1], ids[3]]
 
 
-async def test_not_answered_filter_never_yields_an_empty_page(motor_reinit_db):
+async def test_not_answered_filter_never_yields_an_empty_page(reinit_db):
     """Questions 2 and 6 are unanswered. At limit=1 the old code's first page
     paged raw order 1 (completed), filtered it away, and returned an EMPTY page
     while claiming 7 pages of results."""
@@ -160,7 +160,7 @@ async def test_not_answered_filter_never_yields_an_empty_page(motor_reinit_db):
     assert totals == [2, 2]
 
 
-async def test_draft_filter_returns_only_the_draft_question(motor_reinit_db):
+async def test_draft_filter_returns_only_the_draft_question(reinit_db):
     ids = await _seed_chapter()
 
     result = await get_questions_for_chapter(
@@ -173,7 +173,7 @@ async def test_draft_filter_returns_only_the_draft_question(motor_reinit_db):
     assert result.has_more is False
 
 
-async def test_status_filter_is_scoped_to_the_requesting_user(motor_reinit_db):
+async def test_status_filter_is_scoped_to_the_requesting_user(reinit_db):
     """Another user's response on the same question must not make it match."""
     ids = await _seed_chapter()
     responses = await get_collection("question_responses")
@@ -201,7 +201,7 @@ async def test_status_filter_is_scoped_to_the_requesting_user(motor_reinit_db):
 
 
 async def test_unfiltered_total_is_the_collection_count_not_the_page_length(
-    motor_reinit_db,
+    reinit_db,
 ):
     """``total`` must describe the result set, not the slice. The old code
     returned ``len(page)``, so a 7-question chapter at limit=3 reported
@@ -216,7 +216,7 @@ async def test_unfiltered_total_is_the_collection_count_not_the_page_length(
     assert result.has_more is True
 
 
-async def test_unfiltered_paging_still_covers_every_question(motor_reinit_db):
+async def test_unfiltered_paging_still_covers_every_question(reinit_db):
     ids = await _seed_chapter()
 
     seen, _ = await _collect_pages(status=None, limit=3)
@@ -225,7 +225,7 @@ async def test_unfiltered_paging_still_covers_every_question(motor_reinit_db):
     assert len(seen) == len(set(seen))
 
 
-async def test_category_filter_composes_with_status(motor_reinit_db):
+async def test_category_filter_composes_with_status(reinit_db):
     """The status id-set must narrow the SAME query the other filters build on,
     not replace it."""
     ids = await _seed_chapter()
@@ -242,7 +242,7 @@ async def test_category_filter_composes_with_status(motor_reinit_db):
     assert result.total == 1
 
 
-async def test_unknown_status_value_is_ignored_as_before(motor_reinit_db):
+async def test_unknown_status_value_is_ignored_as_before(reinit_db):
     """Characterization pin, not a fix: the endpoint does not validate ``status``,
     and an unrecognised value has always fallen through to an unfiltered result.
     Tightening that to a 422 is a separate breaking change (out of scope for

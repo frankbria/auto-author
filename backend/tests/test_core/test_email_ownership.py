@@ -46,7 +46,7 @@ async def _seed_better_auth(email: str) -> tuple[str, str]:
 
 async def _indexed_users():
     # Warm the freshly dropped collection before building indexes, or the first
-    # createIndexes can be silently lost (motor reinit/drop race).
+    # createIndexes can be silently lost (reinit/drop race).
     await base.users_collection.insert_one({"auth_id": "warmup"})
     await base.users_collection.delete_one({"auth_id": "warmup"})
     await ensure_user_indexes()
@@ -57,7 +57,7 @@ def _request(token: str) -> Request:
     return Request({"type": "http", "headers": [(b"cookie", cookie)]})
 
 
-async def test_stale_email_holder_no_longer_blocks_first_login(motor_reinit_db):
+async def test_stale_email_holder_no_longer_blocks_first_login(reinit_db):
     """The lockout: a backend doc already holds the victim's email (set through
     the old PATCH /users/me). The victim's first login must still succeed."""
     await _indexed_users()
@@ -81,7 +81,7 @@ async def test_stale_email_holder_no_longer_blocks_first_login(motor_reinit_db):
     assert attacker is not None and "email" not in attacker
 
 
-async def test_concurrent_first_loads_share_one_record(motor_reinit_db):
+async def test_concurrent_first_loads_share_one_record(reinit_db):
     """The auth_id race (#178) still resolves to the one winning record."""
     await _indexed_users()
     racer_id, token = await _seed_better_auth("racer@example.com")
@@ -94,7 +94,7 @@ async def test_concurrent_first_loads_share_one_record(motor_reinit_db):
     assert await base.users_collection.count_documents({"auth_id": racer_id}) == 1
 
 
-async def test_existing_record_mirrors_better_auth_email(motor_reinit_db):
+async def test_existing_record_mirrors_better_auth_email(reinit_db):
     """A doc whose email diverged from better-auth is brought back in line on
     the owner's next request, which also frees the address it was squatting."""
     await _indexed_users()
@@ -115,7 +115,7 @@ async def test_existing_record_mirrors_better_auth_email(motor_reinit_db):
     ) == 1
 
 
-async def test_mirror_releases_email_held_by_another_record(motor_reinit_db):
+async def test_mirror_releases_email_held_by_another_record(reinit_db):
     """Mirroring onto an address a stale doc holds must not 500 on the index."""
     await _indexed_users()
     owner_id, token = await _seed_better_auth("new@example.com")

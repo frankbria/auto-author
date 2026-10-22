@@ -3,7 +3,7 @@
 Real HMAC signatures (stdlib hmac, the exact scheme Stripe uses:
 ``t=<ts>,v1=HMAC-SHA256(f"{t}.{payload}")``) so ``stripe.Webhook.construct_event``
 genuinely verifies — the signature seam is NOT mocked. User persistence and
-replay tracking run against real local Mongo via ``motor_reinit_db``.
+replay tracking run against real local Mongo via ``reinit_db``.
 
 Bare-router pattern (mount only webhooks.router): the webhook is deliberately
 unauthenticated — the signature is the auth.
@@ -79,13 +79,13 @@ def subscription_event(
 
 
 @pytest_asyncio.fixture
-async def webhook_client(motor_reinit_db, monkeypatch):
+async def webhook_client(reinit_db, monkeypatch):
     """Bare app with only the webhook router, Stripe test config, fresh Mongo."""
     import app.db.stripe_events as stripe_events_dao
 
     monkeypatch.setattr(settings, "STRIPE_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
     monkeypatch.setattr(settings, "STRIPE_PRICE_ID_PRO", TEST_PRO_PRICE_ID)
-    # motor_reinit_db dropped the DB; force the lazy TTL-index ensure to re-run
+    # reinit_db dropped the DB; force the lazy TTL-index ensure to re-run
     # against the fresh collection.
     monkeypatch.setattr(stripe_events_dao, "_ttl_index_ensured", False)
     app = FastAPI()
@@ -405,7 +405,7 @@ class TestReplayIdempotency:
         assert replay.status_code == 200
         assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "free"
 
-    async def test_full_app_middleware_preserves_raw_body(self, motor_reinit_db, monkeypatch):
+    async def test_full_app_middleware_preserves_raw_body(self, reinit_db, monkeypatch):
         """Regression guard: the REAL app's middleware chain (request validation +
         session middleware) must not consume/alter the body before the endpoint —
         raw-body HMAC verification breaks silently otherwise."""
@@ -449,7 +449,7 @@ class TestReplayIdempotency:
         assert retry.status_code == 200
         assert (await get_user_by_auth_id("auth-stripe-1"))["plan"] == "pro"
 
-    async def test_mark_event_processed_dao(self, motor_reinit_db):
+    async def test_mark_event_processed_dao(self, reinit_db):
         from app.db.stripe_events import is_event_processed, mark_event_processed
 
         assert await is_event_processed("evt_dao_1") is False

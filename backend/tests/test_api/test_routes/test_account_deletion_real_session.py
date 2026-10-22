@@ -83,7 +83,7 @@ async def _better_auth_docs(user_oid: ObjectId) -> dict:
 
 @pytest.mark.asyncio
 async def test_deleted_account_is_locked_out_and_its_better_auth_docs_are_gone(
-    motor_reinit_db,
+    reinit_db,
 ):
     victim = await _seed_better_auth_user("gone@example.com", sessions=2)
     bystander = await _seed_better_auth_user("stays@example.com")
@@ -131,7 +131,7 @@ async def test_deleted_account_is_locked_out_and_its_better_auth_docs_are_gone(
 
 
 @pytest.mark.asyncio
-async def test_inactive_app_user_is_rejected_even_with_a_live_session(motor_reinit_db):
+async def test_inactive_app_user_is_rejected_even_with_a_live_session(reinit_db):
     seeded = await _seed_better_auth_user("inactive@example.com")
     async with _client(seeded["tokens"][0]) as c:
         assert (await c.get("/api/v1/users/me")).status_code == 200
@@ -142,7 +142,7 @@ async def test_inactive_app_user_is_rejected_even_with_a_live_session(motor_rein
 
 
 @pytest.mark.asyncio
-async def test_session_whose_better_auth_user_was_deleted_is_rejected(motor_reinit_db):
+async def test_session_whose_better_auth_user_was_deleted_is_rejected(reinit_db):
     seeded = await _seed_better_auth_user("orphan@example.com")
     async with _client(seeded["tokens"][0]) as c:
         assert (await c.get("/api/v1/users/me")).status_code == 200
@@ -152,13 +152,13 @@ async def test_session_whose_better_auth_user_was_deleted_is_rejected(motor_rein
 
 
 @pytest.mark.asyncio
-async def test_same_email_can_sign_up_again_after_deletion(motor_reinit_db):
+async def test_same_email_can_sign_up_again_after_deletion(reinit_db):
     first = await _seed_better_auth_user("again@example.com")
     async with _client(first["tokens"][0]) as c:
         assert (await c.get("/api/v1/users/me")).status_code == 200
         # The production unique index on users.email is what makes a retained
         # soft-deleted record collide with the new sign-up. Build it after the
-        # collection exists (see motor_reinit_db's drop/index race).
+        # collection exists (see reinit_db's drop/index race).
         await ensure_user_indexes()
         indexes = await (await get_collection("users")).index_information()
         assert "email_unique_idx" in indexes
@@ -186,7 +186,7 @@ async def test_same_email_can_sign_up_again_after_deletion(motor_reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_admin_user_list_still_serialises_a_deleted_account(motor_reinit_db):
+async def test_admin_user_list_still_serialises_a_deleted_account(reinit_db):
     """The deleted record keeps no email, so the admin listing must not 500 on it."""
     gone = await _seed_better_auth_user("listed@example.com")
     async with _client(gone["tokens"][0]) as c:
@@ -207,7 +207,7 @@ async def test_admin_user_list_still_serialises_a_deleted_account(motor_reinit_d
 
 @pytest.mark.asyncio
 async def test_admin_delete_revokes_a_user_who_never_reached_the_backend(
-    motor_reinit_db,
+    reinit_db,
 ):
     """A better-auth user with no app record (signed up, never called the API)
     still gets every session and credential revoked; the 404 only reports the
@@ -231,7 +231,7 @@ async def test_admin_delete_revokes_a_user_who_never_reached_the_backend(
 
 
 @pytest.mark.asyncio
-async def test_delete_by_auth_id_revokes_better_auth_docs_too(motor_reinit_db):
+async def test_delete_by_auth_id_revokes_better_auth_docs_too(reinit_db):
     seeded = await _seed_better_auth_user("byid@example.com")
     async with _client(seeded["tokens"][0]) as c:
         assert (await c.get("/api/v1/users/me")).status_code == 200
@@ -249,7 +249,7 @@ async def test_delete_by_auth_id_revokes_better_auth_docs_too(motor_reinit_db):
 
 @pytest.mark.asyncio
 async def test_deactivation_keeps_the_account_record_until_an_admin_erases_it(
-    motor_reinit_db,
+    reinit_db,
 ):
     """#954: DELETE /users/me keeps the name, email and billing identity on the
     users record and nowhere else. An admin's DELETE then erases that record to
@@ -334,7 +334,7 @@ async def test_deactivation_keeps_the_account_record_until_an_admin_erases_it(
 )
 @pytest.mark.asyncio
 async def test_closed_account_is_rejected_even_if_the_better_auth_user_survives(
-    motor_reinit_db, extra
+    reinit_db, extra
 ):
     """If erasing the better-auth identity fails after the record is replaced,
     the surviving session must not authenticate — and must not mirror the email

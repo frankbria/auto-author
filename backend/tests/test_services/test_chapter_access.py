@@ -87,7 +87,7 @@ async def test_get_chapter_analytics(access_service):
     ])
 
     mock_collection = MagicMock()
-    mock_collection.aggregate = MagicMock(return_value=mock_cursor)
+    mock_collection.aggregate = AsyncMock(return_value=mock_cursor)
     access_service._get_collection = AsyncMock(return_value=mock_collection)
 
     # Get analytics
@@ -140,7 +140,7 @@ async def test_get_user_recent_chapters(access_service):
     ])
 
     mock_collection = MagicMock()
-    mock_collection.aggregate = MagicMock(return_value=mock_cursor)
+    mock_collection.aggregate = AsyncMock(return_value=mock_cursor)
     access_service._get_collection = AsyncMock(return_value=mock_collection)
 
     # Get recent chapters

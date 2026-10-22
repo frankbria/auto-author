@@ -16,7 +16,7 @@ backend/
 │   ├── main.py
 │   ├── api/         # endpoints/, dependencies.py, request_validation.py
 │   ├── core/        # config, better-auth session validation, entitlements
-│   ├── db/          # MongoDB access (motor)
+│   ├── db/          # MongoDB access (PyMongo Async)
 │   ├── models/
 │   ├── schemas/
 │   ├── services/

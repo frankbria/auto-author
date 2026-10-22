@@ -15,6 +15,11 @@ Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep 
   - **Deploy docs**: no "SSH as root". Rolling back staging means re-dispatching an earlier `sha-` tag.
   - **Code**: the Clerk-era `useOptimizedClerkImage` hook is gone, and avatars render their stored URL. The never-used cached-content AI fallback is gone end to end: `cached_content_available`, `isFromCache`, and the "Cached Content" and "Generate Fresh" UI.
   - **Found on the way**: question ratings never save (#1117).
+- **Motor replaced by PyMongo Async (#856, P2.10)**: Motor is deprecated (critical fixes end 2027-05-14). The backend now uses `pymongo.AsyncMongoClient`, and motor is gone from `pyproject.toml` and `uv.lock`.
+  - Where the APIs differ: `aggregate()`, `list_indexes()` and `start_transaction()` are awaited, `start_session()` is not, and `close()` is awaited.
+  - An `AsyncMongoClient` is bound to the event loop it first runs on. The test fixture `motor_reinit_db` is now the async `reinit_db`, so it closes its client on the test's own loop. The unused custom `event_loop` fixture is gone.
+  - Five tests replaced `asyncio.sleep` for the whole process to skip AI retry waits. The driver waits with `asyncio.sleep`, so those tests spun forever. They now patch `ai_service`'s own view of `asyncio` with `asyncio_without_retry_waits()`.
+  - `delete_book`'s transaction path was checked against a single-node replica set: the full suite passes there as well as on standalone Mongo.
 
 - **Legal review banners removed (#791, P1.9)**: counsel signed off on the Terms and Privacy copy (recorded on #791, 2026-10-20). The amber "template, pending legal review" notice is gone from `/terms` and `/privacy`, and the page tests now assert it stays gone. The copy itself is unchanged, so `TERMS_VERSION` and the Privacy "Last updated" date are not bumped.
 
