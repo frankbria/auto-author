@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
 import {
   ChapterBackup,
+  getValidatedItem,
   setValidatedItem,
   validateChapterBackup,
 } from '@/lib/storage/dataValidator';
@@ -142,4 +143,24 @@ export async function flushChapterContent(
     if (!isChapterConflict(err)) reportSaveFailure('leave-save', err);
     backupChapterContent(edit, err);
   }
+}
+
+// Whether a restorable backup exists for a chapter. Read on every render through
+// useSyncExternalStore, so it is keyed to the chapter on screen and always agrees
+// with storage (#584). Validation parses a whole chapter, so it only runs when the
+// stored string changes; an unchanged string reuses the last answer.
+const backupCache = new Map<string, { raw: string; valid: boolean }>();
+export function readHasBackup(key: string): boolean {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(key);
+  } catch {
+    return false;
+  }
+  if (raw === null) return false;
+  const cached = backupCache.get(key);
+  if (cached?.raw === raw) return cached.valid;
+  const valid = getValidatedItem<ChapterBackup>(key, validateChapterBackup) !== null;
+  backupCache.set(key, { raw, valid });
+  return valid;
 }

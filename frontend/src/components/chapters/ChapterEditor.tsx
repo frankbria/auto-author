@@ -82,6 +82,7 @@ export function ChapterEditor({
     keepSavedText,
     handleRecoverBackup,
     handleDismissBackup,
+    handleDraftGenerated,
     lastAutoSavedContent,
     setAutoSavePending,
     setHasUnsavedChanges,
@@ -138,15 +139,6 @@ export function ChapterEditor({
     editor,
     selector: ({ editor: current }) => current?.storage.characterCount.characters() ?? 0,
   });
-
-  const handleDraftGenerated = (draft: string) => {
-    if (editor) {
-      // Insert the draft at the current cursor position
-      editor.chain().focus().insertContent(draft).run();
-      // Trigger auto-save
-      setAutoSavePending(true);
-    }
-  };
 
   // Apply a style transform: snapshot the current content, then replace it (#58).
   const handleApplyStyleTransform = (transformed: string) => {

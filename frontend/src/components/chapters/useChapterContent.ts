@@ -26,30 +26,11 @@ import {
   PendingChapterEdit,
   saveChapterEdit,
   SeenChapters,
+  readHasBackup,
 } from './chapterContentSave';
 
 // Storage raises no event for writes in the same tab: the writers here re-render.
 export const subscribeToNothing = () => () => {};
-
-// Whether a restorable backup exists for a chapter. Read on every render through
-// useSyncExternalStore, so it is keyed to the chapter on screen and always agrees
-// with storage (#584). Validation parses a whole chapter, so it only runs when the
-// stored string changes; an unchanged string reuses the last answer.
-const backupCache = new Map<string, { raw: string; valid: boolean }>();
-function readHasBackup(key: string): boolean {
-  let raw: string | null;
-  try {
-    raw = localStorage.getItem(key);
-  } catch {
-    return false;
-  }
-  if (raw === null) return false;
-  const cached = backupCache.get(key);
-  if (cached?.raw === raw) return cached.valid;
-  const valid = getValidatedItem<ChapterBackup>(key, validateChapterBackup) !== null;
-  backupCache.set(key, { raw, valid });
-  return valid;
-}
 
 interface ChapterContentOptions {
   bookId: string;
@@ -86,6 +67,9 @@ export function useChapterContent({
   // not hold its text, so any save would overwrite it (#757). Retry bumps the attempt.
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [loaded, setLoaded] = useState<{ key: string; content: string; lastModified?: string | null } | null>(null);
+  // A Questions-tab draft used while the load had failed waits for Retry's text (#875).
+  const draftWhileFailedRef = useRef<{ key: string; html: string } | null>(null);
   // The latest edit the server does not have yet, flushed if the editor goes away.
   const unsavedRef = useRef<PendingChapterEdit | null>(null);
   // The save request in flight, which a flush waits for so it cannot land last.
@@ -174,7 +158,6 @@ export function useChapterContent({
     immediatelyRender: false,
   });
 
-
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -189,7 +172,9 @@ export function useChapterContent({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges, autoSavePending]);
 
-  // Load chapter content if no initial content provided
+  // Load chapter content if no initial content provided. The load waits on the
+  // chapter, not the editor: the editor is null on the first render, and waiting
+  // on it fetched every chapter twice and dropped the first answer (#758).
   useEffect(() => {
     // A response for a chapter that is no longer this effect's chapter must not
     // land: it would become the content the next save writes under the new id (#756).
@@ -197,33 +182,25 @@ export function useChapterContent({
     const loadChapterContent = async () => {
       setIsLoading(true);
       setError(null);
+      setLoaded(null);
       // A conflict belongs to the chapter it was raised on.
       setConflict(null);
       try {
         const contentData = await bookClient.getChapterContent(bookId, chapterId);
         if (ignore) return;
-        if (editor) {
-          // Loading is not an edit: no update event, so nothing is marked unsaved (#831).
-          editor.commands.setContent(contentData.content || '', { emitUpdate: false });
-          seenRef.current.set(chapterBackupKey(bookId, chapterId), {
-            lastModified: contentData.last_modified,
-            content: contentData.content || '',
-          });
-          // Loading is not an edit.
-          unsavedRef.current = null;
-          setLastAutoSavedContent(contentData.content || '');
-          setLoadFailed(false);
-          editor.setEditable(true, false);
-        }
+        setLoaded({
+          key: chapterBackupKey(bookId, chapterId),
+          content: contentData.content || '',
+          lastModified: contentData.last_modified,
+        });
+        setLoadFailed(false);
       } catch (err) {
+        // The superseding load owns the spinner.
         if (ignore) return;
         console.error('Failed to load chapter content:', err);
         setError('Failed to load chapter content');
         setLoadFailed(true);
-        editor?.setEditable(false, false);
-      } finally {
-        // The superseding load owns the spinner.
-        if (!ignore) setIsLoading(false);
+        setIsLoading(false);
       }
     };
     if (!initialContent && bookId && chapterId) {
@@ -232,7 +209,45 @@ export function useChapterContent({
     return () => {
       ignore = true;
     };
-  }, [bookId, chapterId, initialContent, editor, loadAttempt]);
+  }, [bookId, chapterId, initialContent, loadAttempt]);
+
+  // The loaded text goes into the editor once both exist, and only then does the
+  // spinner give way to it.
+  useEffect(() => {
+    if (!editor || loaded?.key !== backupKey) return;
+    // Loading is not an edit: no update event, so nothing is marked unsaved (#831).
+    editor.commands.setContent(loaded.content, { emitUpdate: false });
+    seenRef.current.set(loaded.key, { lastModified: loaded.lastModified, content: loaded.content });
+    unsavedRef.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the imperative editor, as below
+    setLastAutoSavedContent(loaded.content);
+    setIsLoading(false);
+    const draft = draftWhileFailedRef.current;
+    draftWhileFailedRef.current = null;
+    if (draft?.key !== loaded.key) return;
+    // Appended, not inserted at the cursor: setContent left none the writer chose.
+    editor.commands.insertContentAt(editor.state.doc.content.size, draft.html);
+    unsavedRef.current = { bookId, chapterId, content: editor.getHTML() };
+    setAutoSavePending(true);
+    setHasUnsavedChanges(true);
+  }, [backupKey, bookId, chapterId, editor, loaded]);
+
+  // A chapter that failed to load is read-only (#757).
+  useEffect(() => {
+    editor?.setEditable(!loadFailed, false);
+  }, [editor, loadFailed]);
+
+  // React does not unmount on unload; pagehide is the last event a closing page
+  // reliably gets, so an edit inside the debounce goes out with keepalive (#875).
+  useEffect(() => {
+    const flushOnPageHide = () => {
+      const edit = unsavedRef.current;
+      unsavedRef.current = null;
+      if (edit) void flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
+    };
+    window.addEventListener('pagehide', flushOnPageHide);
+    return () => window.removeEventListener('pagehide', flushOnPageHide);
+  }, []);
 
   // Leaving a chapter, by unmount (TabContent keys the editor per chapter) or a
   // caller swapping chapterId, must not drop an edit still inside the autosave
@@ -447,6 +462,19 @@ export function useChapterContent({
     noteBackupWrite();
   };
 
+  const handleDraftGenerated = (draft: string) => {
+    if (!editor) return;
+    if (loadFailed) {
+      const earlier = draftWhileFailedRef.current?.key === backupKey ? draftWhileFailedRef.current.html : '';
+      draftWhileFailedRef.current = { key: backupKey, html: earlier + draft };
+      return;
+    }
+    // Insert the draft at the current cursor position
+    editor.chain().focus().insertContent(draft).run();
+    // Trigger auto-save
+    setAutoSavePending(true);
+  };
+
   return {
     editor,
     isLoading,
@@ -463,6 +491,7 @@ export function useChapterContent({
     keepSavedText: () => setOlderBackup(null),
     handleRecoverBackup,
     handleDismissBackup,
+    handleDraftGenerated,
     lastAutoSavedContent,
     setAutoSavePending,
     setHasUnsavedChanges,
