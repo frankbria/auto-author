@@ -36,8 +36,8 @@ async def test_enhance_success_each_type(auth_client_factory, etype, label):
             "generated_at": "2026-06-28 10:00:00",
         },
     }
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
-        with patch("app.api.endpoints.books.ai_service.enhance_text",
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
+        with patch("app.api.endpoints.chapter_ai.ai_service.enhance_text",
                    AsyncMock(return_value=mock_result)):
             response = await client.post(
                 URL, json={"content": "The cat sat there.", "enhancement_type": etype}
@@ -52,7 +52,7 @@ async def test_enhance_success_each_type(auth_client_factory, etype, label):
 @pytest.mark.asyncio
 async def test_enhance_requires_content(auth_client_factory):
     client = await auth_client_factory()
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
         response = await client.post(URL, json={"content": "  ", "enhancement_type": "grammar"})
     assert response.status_code == 400
     assert "required" in response.json()["detail"].lower()
@@ -61,7 +61,7 @@ async def test_enhance_requires_content(auth_client_factory):
 @pytest.mark.asyncio
 async def test_enhance_rejects_invalid_type(auth_client_factory):
     client = await auth_client_factory()
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
         response = await client.post(URL, json={"content": "Hello there.", "enhancement_type": "seo"})
     assert response.status_code == 400
     assert "unsupported" in response.json()["detail"].lower()
@@ -70,7 +70,7 @@ async def test_enhance_rejects_invalid_type(auth_client_factory):
 @pytest.mark.asyncio
 async def test_enhance_book_not_found_returns_404(auth_client_factory):
     client = await auth_client_factory()
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=None)):
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=None)):
         response = await client.post(
             URL, json={"content": "Some text.", "enhancement_type": "clarity"}
         )
@@ -82,8 +82,8 @@ async def test_enhance_chapter_not_found_returns_404(auth_client_factory):
     """An owned book but a missing chapter id 404s before calling the AI."""
     client = await auth_client_factory()
     bad_url = "/api/v1/books/test_book_id/chapters/nope/enhance-text"
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
-        with patch("app.api.endpoints.books.ai_service.enhance_text",
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
+        with patch("app.api.endpoints.chapter_ai.ai_service.enhance_text",
                    AsyncMock()) as enhance:
             response = await client.post(
                 bad_url, json={"content": "Some text.", "enhancement_type": "clarity"}
@@ -96,8 +96,8 @@ async def test_enhance_chapter_not_found_returns_404(auth_client_factory):
 async def test_enhance_ai_failure_returns_503(auth_client_factory):
     client = await auth_client_factory()
     mock_result = {"success": False, "error": "AI service unavailable", "enhanced": "", "metadata": {}}
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
-        with patch("app.api.endpoints.books.ai_service.enhance_text",
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
+        with patch("app.api.endpoints.chapter_ai.ai_service.enhance_text",
                    AsyncMock(return_value=mock_result)):
             response = await client.post(
                 URL, json={"content": "Some text.", "enhancement_type": "tone"}
@@ -110,7 +110,7 @@ async def test_enhance_ai_failure_returns_503(auth_client_factory):
 async def test_enhance_rejects_other_users_book(auth_client_factory):
     client = await auth_client_factory()
     other_book = {**MOCK_BOOK, "owner_id": "someone-else"}
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=other_book)):
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=other_book)):
         response = await client.post(
             URL, json={"content": "Some text.", "enhancement_type": "vocabulary"}
         )

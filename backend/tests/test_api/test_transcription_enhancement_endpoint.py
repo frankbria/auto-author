@@ -27,8 +27,8 @@ async def test_cleanup_success(auth_client_factory):
             "generated_at": "2026-06-29 10:00:00",
         },
     }
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
-        with patch("app.api.endpoints.books.ai_service.enhance_transcription",
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
+        with patch("app.api.endpoints.chapter_ai.ai_service.enhance_transcription",
                    AsyncMock(return_value=mock_result)):
             response = await client.post(
                 URL, json={"content": "um so the cat you know sat on the mat"}
@@ -43,8 +43,8 @@ async def test_cleanup_success(auth_client_factory):
 @pytest.mark.asyncio
 async def test_cleanup_requires_content(auth_client_factory):
     client = await auth_client_factory()
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
-        with patch("app.api.endpoints.books.ai_service.enhance_transcription",
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
+        with patch("app.api.endpoints.chapter_ai.ai_service.enhance_transcription",
                    AsyncMock()) as enhance:
             response = await client.post(URL, json={"content": "   "})
     assert response.status_code == 400
@@ -55,7 +55,7 @@ async def test_cleanup_requires_content(auth_client_factory):
 @pytest.mark.asyncio
 async def test_cleanup_book_not_found_returns_404(auth_client_factory):
     client = await auth_client_factory()
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=None)):
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=None)):
         response = await client.post(URL, json={"content": "um hello there"})
     assert response.status_code == 404
 
@@ -65,8 +65,8 @@ async def test_cleanup_chapter_not_found_returns_404(auth_client_factory):
     """An owned book but a missing chapter id 404s before calling the AI."""
     client = await auth_client_factory()
     bad_url = "/api/v1/books/test_book_id/chapters/nope/enhance-transcription"
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
-        with patch("app.api.endpoints.books.ai_service.enhance_transcription",
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
+        with patch("app.api.endpoints.chapter_ai.ai_service.enhance_transcription",
                    AsyncMock()) as enhance:
             response = await client.post(bad_url, json={"content": "um hello there"})
     assert response.status_code == 404
@@ -77,8 +77,8 @@ async def test_cleanup_chapter_not_found_returns_404(auth_client_factory):
 async def test_cleanup_ai_failure_returns_503(auth_client_factory):
     client = await auth_client_factory()
     mock_result = {"success": False, "error": "AI service unavailable", "enhanced": "", "metadata": {}}
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
-        with patch("app.api.endpoints.books.ai_service.enhance_transcription",
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=MOCK_BOOK)):
+        with patch("app.api.endpoints.chapter_ai.ai_service.enhance_transcription",
                    AsyncMock(return_value=mock_result)):
             response = await client.post(URL, json={"content": "um hello there"})
     assert response.status_code == 503
@@ -89,6 +89,6 @@ async def test_cleanup_ai_failure_returns_503(auth_client_factory):
 async def test_cleanup_rejects_other_users_book(auth_client_factory):
     client = await auth_client_factory()
     other_book = {**MOCK_BOOK, "owner_id": "someone-else"}
-    with patch("app.api.endpoints.books.get_book_metadata_by_id", AsyncMock(return_value=other_book)):
+    with patch("app.api.endpoints.chapter_ai.get_book_metadata_by_id", AsyncMock(return_value=other_book)):
         response = await client.post(URL, json={"content": "um hello there"})
     assert response.status_code == 403

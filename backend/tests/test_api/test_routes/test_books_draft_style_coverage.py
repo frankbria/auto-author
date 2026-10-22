@@ -77,7 +77,7 @@ async def test_generate_draft_happy_path(auth_client_factory):
     chapter_id = await _seed_toc_chapter(book_id)
 
     with patch(
-        "app.api.endpoints.books.ai_service.generate_chapter_draft",
+        "app.api.endpoints.chapter_ai.ai_service.generate_chapter_draft",
         new=AsyncMock(return_value=_DRAFT_OK),
     ):
         r = await api.post(
@@ -107,7 +107,7 @@ async def test_generate_draft_coerces_invalid_target_length(auth_client_factory)
     chapter_id = await _seed_toc_chapter(book_id)
 
     with patch(
-        "app.api.endpoints.books.ai_service.generate_chapter_draft",
+        "app.api.endpoints.chapter_ai.ai_service.generate_chapter_draft",
         new=AsyncMock(return_value=_DRAFT_OK),
     ) as mock_gen:
         r = await api.post(
@@ -196,7 +196,7 @@ async def test_generate_draft_ai_returns_failure_503(auth_client_factory):
     chapter_id = await _seed_toc_chapter(book_id)
 
     with patch(
-        "app.api.endpoints.books.ai_service.generate_chapter_draft",
+        "app.api.endpoints.chapter_ai.ai_service.generate_chapter_draft",
         new=AsyncMock(return_value={"success": False, "error": "model down"}),
     ):
         r = await api.post(
@@ -214,7 +214,7 @@ async def test_generate_draft_ai_raises_500(auth_client_factory):
     chapter_id = await _seed_toc_chapter(book_id)
 
     with patch(
-        "app.api.endpoints.books.ai_service.generate_chapter_draft",
+        "app.api.endpoints.chapter_ai.ai_service.generate_chapter_draft",
         new=AsyncMock(side_effect=RuntimeError("boom")),
     ):
         r = await api.post(
@@ -254,7 +254,7 @@ async def test_transform_style_happy_path_each_style(auth_client_factory, style)
     chapter_id = await _seed_toc_chapter(book_id)
 
     with patch(
-        "app.api.endpoints.books.ai_service.transform_text_style",
+        "app.api.endpoints.chapter_ai.ai_service.transform_text_style",
         new=AsyncMock(return_value=_transform_ok(style)),
     ):
         r = await api.post(
@@ -335,7 +335,7 @@ async def test_transform_style_ai_failure_503(auth_client_factory):
     chapter_id = await _seed_toc_chapter(book_id)
 
     with patch(
-        "app.api.endpoints.books.ai_service.transform_text_style",
+        "app.api.endpoints.chapter_ai.ai_service.transform_text_style",
         new=AsyncMock(return_value={"success": False, "error": "AI unavailable"}),
     ):
         r = await api.post(

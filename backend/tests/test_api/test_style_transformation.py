@@ -27,8 +27,8 @@ async def test_transform_style_success(auth_client_factory):
             "generated_at": "2026-06-25 10:00:00",
         },
     }
-    with patch("app.api.endpoints.books.get_book_owner_id", AsyncMock(return_value=MOCK_BOOK["owner_id"])):
-        with patch("app.api.endpoints.books.ai_service.transform_text_style",
+    with patch("app.api.endpoints.chapter_ai.get_book_owner_id", AsyncMock(return_value=MOCK_BOOK["owner_id"])):
+        with patch("app.api.endpoints.chapter_ai.ai_service.transform_text_style",
                    AsyncMock(return_value=mock_result)):
             response = await client.post(
                 URL, json={"content": "The cat sat there.", "target_style": "professional"}
@@ -43,7 +43,7 @@ async def test_transform_style_success(auth_client_factory):
 @pytest.mark.asyncio
 async def test_transform_style_requires_content(auth_client_factory):
     client = await auth_client_factory()
-    with patch("app.api.endpoints.books.get_book_owner_id", AsyncMock(return_value=MOCK_BOOK["owner_id"])):
+    with patch("app.api.endpoints.chapter_ai.get_book_owner_id", AsyncMock(return_value=MOCK_BOOK["owner_id"])):
         response = await client.post(URL, json={"content": "  ", "target_style": "professional"})
     assert response.status_code == 400
     assert "required" in response.json()["detail"].lower()
@@ -52,7 +52,7 @@ async def test_transform_style_requires_content(auth_client_factory):
 @pytest.mark.asyncio
 async def test_transform_style_rejects_invalid_style(auth_client_factory):
     client = await auth_client_factory()
-    with patch("app.api.endpoints.books.get_book_owner_id", AsyncMock(return_value=MOCK_BOOK["owner_id"])):
+    with patch("app.api.endpoints.chapter_ai.get_book_owner_id", AsyncMock(return_value=MOCK_BOOK["owner_id"])):
         response = await client.post(URL, json={"content": "Hello there.", "target_style": "spicy"})
     assert response.status_code == 400
     assert "unsupported" in response.json()["detail"].lower()
@@ -62,8 +62,8 @@ async def test_transform_style_rejects_invalid_style(auth_client_factory):
 async def test_transform_style_ai_failure_returns_503(auth_client_factory):
     client = await auth_client_factory()
     mock_result = {"success": False, "error": "AI service unavailable", "transformed": "", "metadata": {}}
-    with patch("app.api.endpoints.books.get_book_owner_id", AsyncMock(return_value=MOCK_BOOK["owner_id"])):
-        with patch("app.api.endpoints.books.ai_service.transform_text_style",
+    with patch("app.api.endpoints.chapter_ai.get_book_owner_id", AsyncMock(return_value=MOCK_BOOK["owner_id"])):
+        with patch("app.api.endpoints.chapter_ai.ai_service.transform_text_style",
                    AsyncMock(return_value=mock_result)):
             response = await client.post(
                 URL, json={"content": "Some text.", "target_style": "academic"}
@@ -75,7 +75,7 @@ async def test_transform_style_ai_failure_returns_503(auth_client_factory):
 @pytest.mark.asyncio
 async def test_transform_style_rejects_other_users_book(auth_client_factory):
     client = await auth_client_factory()
-    with patch("app.api.endpoints.books.get_book_owner_id", AsyncMock(return_value="someone-else")):
+    with patch("app.api.endpoints.chapter_ai.get_book_owner_id", AsyncMock(return_value="someone-else")):
         response = await client.post(
             URL, json={"content": "Some text.", "target_style": "creative"}
         )
