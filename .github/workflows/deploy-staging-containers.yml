@@ -138,7 +138,9 @@ jobs:
              # --pull always so a re-run of the same tag still fetches a rebuilt
              # image; compose would otherwise reuse a stale local layer.
              docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
-             docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans"
+             docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans
+             # Log rotation as the running containers have it (#858).
+             docker inspect --format '{{.Name}} {{json .HostConfig.LogConfig}}' \$(docker compose -f docker-compose.yml -f docker-compose.staging.yml ps -q)"
 
       - name: Health check
         run: |
