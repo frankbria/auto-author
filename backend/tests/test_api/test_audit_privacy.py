@@ -11,6 +11,7 @@ import pytest
 
 from app.api.dependencies import audit_after_commit
 from app.api.endpoints import books as books_endpoint
+from app.api.endpoints import book_cover as book_cover_endpoint
 from app.api.endpoints import chapter_questions as chapter_questions_endpoint
 from app.api.endpoints import chapter_ai as chapter_ai_endpoint
 from app.api.endpoints import users as users_endpoint
@@ -26,6 +27,7 @@ async def test_audit_rows_have_no_title_and_no_read_rows(
     api = await auth_client_factory()
     monkeypatch.setattr(users_endpoint, "audit_after_commit", audit_after_commit)
     monkeypatch.setattr(books_endpoint, "audit_after_commit", audit_after_commit)
+    monkeypatch.setattr(book_cover_endpoint, "audit_after_commit", audit_after_commit)
     monkeypatch.setattr(chapter_questions_endpoint, "audit_after_commit", audit_after_commit)
     monkeypatch.setattr(chapter_ai_endpoint, "audit_after_commit", audit_after_commit)
 
