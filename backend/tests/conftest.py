@@ -22,6 +22,23 @@ for _storage_field in (
 ):
     os.environ[_storage_field] = ""
 
+# AI tests assert the documented model defaults, whatever a developer's
+# backend/.env sets (#926). The module-level ai_service singleton is built at
+# import and reads these, so reset them before any app module imports it.
+from app.core.config import Settings, settings as _settings
+
+# Every AI_* field, so a setting added later is reset without editing this list.
+AI_SETTINGS = tuple(name for name in Settings.model_fields if name.startswith("AI_"))
+for _name in AI_SETTINGS:
+    setattr(_settings, _name, Settings.model_fields[_name].default)
+
+
+@pytest.fixture(autouse=True)
+def unset_ai_settings(monkeypatch):
+    """Every AI_* setting at its declared default, whatever the local .env says."""
+    for name in AI_SETTINGS:
+        monkeypatch.setattr(_settings, name, Settings.model_fields[name].default)
+
 
 import app.api.dependencies as deps
 from fastapi import HTTPException, Request

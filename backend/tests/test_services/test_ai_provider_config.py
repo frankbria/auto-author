@@ -17,24 +17,8 @@ from app.services.ai_service import AIService
 from tests.test_services.openai_autospec import autospec_openai_client
 from tests.test_services.test_toc_token_budget import _toc
 
-AI_SETTINGS = (
-    "AI_BASE_URL",
-    "AI_API_KEY",
-    "AI_MODEL_DEFAULT",
-    "AI_MODEL_LONG_OUTPUT",
-    "AI_MAX_OUTPUT_TOKENS_DEFAULT",
-    "AI_MAX_OUTPUT_TOKENS_LONG",
-    "AI_REASONING_HEADROOM_TOKENS",
-)
 SUMMARY = "A practical guide for first-time engineering managers. " * 5
 RESPONSES = [{"question": "Who reads it?", "answer": "New managers."}]
-
-
-@pytest.fixture
-def unset_ai_settings(monkeypatch):
-    """Every AI_* setting at its declared default, whatever the local .env says."""
-    for name in AI_SETTINGS:
-        monkeypatch.setattr(settings, name, Settings.model_fields[name].default)
 
 
 @pytest.fixture
