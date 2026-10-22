@@ -163,9 +163,10 @@ async def get_books_by_user(
 
 
 async def update_book(
-    book_id: str, book_data: Dict, user_auth_id: str
+    book_id: str, book_data: Dict, user_auth_id: str, return_document: bool = True
 ) -> Optional[Dict]:
-    """Update an existing book"""
+    """Update an existing book. ``return_document`` is pymongo's: pass
+    ``ReturnDocument.BEFORE`` for the document the update replaced."""
     # Add updated_at timestamp
     book_data["updated_at"] = datetime.now(timezone.utc)
 
@@ -173,7 +174,7 @@ async def update_book(
     updated_book = await books_collection.find_one_and_update(
         {"_id": ObjectId(book_id), "owner_id": user_auth_id},  # Only owner can update
         {"$set": book_data},
-        return_document=True,
+        return_document=return_document,
     )
 
     # Create audit log entry if book was found and updated
@@ -377,11 +378,11 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
         if use_transaction:
             async with _client.start_session() as session:
                 async with await session.start_transaction():
-                    deleted, counts = await _delete_books_internal(
+                    deleted, counts, gone = await _delete_books_internal(
                         [book_id], user_auth_id, session
                     )
         else:
-            deleted, counts = await _delete_books_internal([book_id], user_auth_id, None)
+            deleted, counts, gone = await _delete_books_internal([book_id], user_auth_id, None)
     except Exception:
         # Transactional path rolls back; non-transactional path is contained by
         # children-first ordering (the book document is deleted last).
@@ -392,7 +393,9 @@ async def delete_book(book_id: str, user_auth_id: str) -> bool:
     if not deleted:
         return False
 
-    await _delete_cover_files(book)
+    # The delete's own pre-image: a cover replaced since the read above is the
+    # one the book had when it went (#938).
+    await _delete_cover_files(gone)
 
     await audit_after_write(
         action="book_delete",
@@ -422,7 +425,7 @@ async def delete_all_user_books(user_auth_id: str) -> int:
     if not books:
         return 0
 
-    deleted, counts = await _delete_books_internal(
+    deleted, counts, _ = await _delete_books_internal(
         [str(book["_id"]) for book in books], user_auth_id, None
     )
 
@@ -465,12 +468,13 @@ async def _delete_books_internal(
     book_ids: List[str],
     user_auth_id: str,
     session: Optional[AsyncClientSession],
-) -> Tuple[int, Dict[str, int]]:
+) -> Tuple[int, Dict[str, int], Optional[Dict]]:
     """Run the cascade deletes for ``book_ids``, optionally inside a transaction
     ``session``. Children go first and the book documents + user association
     last, so a non-transactional partial failure leaves the books discoverable.
     Returns the number of book documents deleted (0 if they vanished after the
-    ownership check) and the per-collection child delete counts.
+    ownership check), the per-collection child delete counts, and for a single
+    book the document as the delete removed it (its pre-image), else None.
     """
     chapter_access_logs = await get_collection("chapter_access_logs")
     questions_collection = await get_collection("questions")
@@ -503,18 +507,23 @@ async def _delete_books_internal(
     )
 
     # Parents last: book documents, then the user's book_ids association.
-    books_result = await books_collection.delete_many(
-        {"_id": {"$in": [ObjectId(b) for b in book_ids]}, "owner_id": user_auth_id},
-        session=session,
-    )
-    if books_result.deleted_count:
+    book_filter = {"_id": {"$in": [ObjectId(b) for b in book_ids]}, "owner_id": user_auth_id}
+    gone = None
+    if len(book_ids) == 1:
+        gone = await books_collection.find_one_and_delete(
+            book_filter, projection=_DELETE_PROJECTION, session=session
+        )
+        deleted = int(gone is not None)
+    else:
+        deleted = (await books_collection.delete_many(book_filter, session=session)).deleted_count
+    if deleted:
         await users_collection.update_one(
             {"auth_id": user_auth_id}, {"$pull": {"book_ids": in_books}}, session=session
         )
 
-    return books_result.deleted_count, {
+    return deleted, {
         "chapter_access_logs": access_logs_result.deleted_count,
         "questions": questions_result.deleted_count,
         "question_responses": responses_deleted,
         "question_ratings": ratings_deleted,
-    }
+    }, gone

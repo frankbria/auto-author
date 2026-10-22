@@ -341,3 +341,74 @@ async def test_admin_delete_route_removes_the_target_users_files(
     assert response.status_code == 204, response.text
     assert _names(uploads.avatars) == [_avatar_file("admin-1")]
     assert _names(uploads.covers) == []
+
+
+# --- races that used to orphan a cover (#938) --------------------------------
+
+
+async def test_delete_book_removes_a_cover_replaced_after_its_ownership_check(
+    reinit_db, uploads, monkeypatch
+):
+    """A cover upload landing between delete_book's read and its delete swaps
+    the pair; the delete must remove the pair the book had when it went."""
+    book_id = await _book_with_cover(uploads, "owner-8")
+    new_cover, new_thumb = f"{book_id}_{'1' * 32}.jpg", f"{book_id}_{'1' * 32}_thumb.jpg"
+    real = book_dao._delete_books_internal
+
+    async def _upload_lands_first(*args):
+        (uploads.covers / new_cover).write_bytes(b"new")
+        (uploads.covers / new_thumb).write_bytes(b"new")
+        for name in _cover_files(book_id):  # the upload removes the old pair itself
+            (uploads.covers / name).unlink()
+        books = await get_collection("books")
+        await books.update_one(
+            {"_id": ObjectId(book_id)},
+            {"$set": {
+                "cover_image_url": f"/uploads/cover_images/{new_cover}",
+                "cover_thumbnail_url": f"/uploads/cover_images/{new_thumb}",
+            }},
+        )
+        return await real(*args)
+
+    monkeypatch.setattr(book_dao, "_delete_books_internal", _upload_lands_first)
+
+    assert await delete_book(book_id, "owner-8") is True
+
+    assert _names(uploads.covers) == []
+
+
+async def test_overlapping_cover_uploads_leave_no_orphan(
+    auth_client_factory, test_user, uploads, monkeypatch
+):
+    """Both requests read the book before either writes; whichever write lands
+    second must remove the pair the first one wrote."""
+    import asyncio
+
+    client = await auth_client_factory()
+    books = await get_collection("books")
+    book_id = str(
+        (await books.insert_one({"title": "T", "owner_id": test_user["auth_id"]})).inserted_id
+    )
+    both_saved = asyncio.Barrier(2)
+    real = fus.FileUploadService.process_and_save_cover_image
+
+    async def _save_then_wait(self, *args, **kwargs):
+        urls = await real(self, *args, **kwargs)
+        await asyncio.wait_for(both_saved.wait(), timeout=10)
+        return urls
+
+    monkeypatch.setattr(fus.FileUploadService, "process_and_save_cover_image", _save_then_wait)
+
+    responses = await asyncio.gather(*(
+        client.post(
+            f"/api/v1/books/{book_id}/cover-image",
+            files={"file": ("cover.jpg", _jpeg(), "image/jpeg")},
+        )
+        for _ in range(2)
+    ))
+
+    assert [r.status_code for r in responses] == [200, 200], [r.text for r in responses]
+    book = await books.find_one({"_id": ObjectId(book_id)})
+    assert _names(uploads.covers) == sorted(
+        url.rsplit("/", 1)[1] for url in (book["cover_image_url"], book["cover_thumbnail_url"])
+    )
