@@ -115,7 +115,8 @@ class TestCloudinaryStorageService:
 
         with patch.dict('sys.modules', {
             'cloudinary': mock_cloudinary_module,
-            'cloudinary.uploader': mock_uploader
+            'cloudinary.uploader': mock_uploader,
+            'cloudinary.api': mock_cloudinary_module.api,
         }):
             yield mock_cloudinary_module.config, mock_uploader
 

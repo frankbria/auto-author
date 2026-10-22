@@ -404,6 +404,33 @@ accumulate), confirm Atlas backups.
 window.
 **As needed** — re-check the Atlas IP allowlist after any VPS network change.
 
+### Orphaned upload sweep (#938)
+
+Cover and avatar files are deleted best-effort after the database write, so a
+failed storage call, a crash in between, or a raced upload can leave a file no
+record names. `app.scripts.sweep_orphaned_uploads` lists every object under
+`cover_images/` and `profile_pictures/` in the configured storage (S3,
+Cloudinary or local `uploads/`) that no `books.cover_image_url` /
+`cover_thumbnail_url` or `users.avatar_url` points at. Nothing outside those two
+prefixes is listed or deleted.
+
+```bash
+cd /opt/auto-author   # IMAGE_TAG and ENVIRONMENT exported as in the recreate snippet above
+docker compose exec backend python -m app.scripts.sweep_orphaned_uploads           # dry run
+docker compose exec backend python -m app.scripts.sweep_orphaned_uploads --apply   # delete
+```
+
+- **Dry run is the default**: it logs each candidate (`Orphan: <key>`) and a
+  count line, and deletes nothing. `--apply` deletes them and logs each one
+  (`Deleted: <key>`, or `Storage did not delete <key>`).
+- **Grace window**: objects written in the last 60 minutes are skipped
+  (`--grace-minutes N` changes it), because an upload is stored before the record
+  naming it is saved.
+- `exec` into the running backend, not a throwaway container: it needs the same
+  storage settings, and with local storage the same files.
+- Exit codes: `0` done, `1` at least one delete failed (logged), `2` connection
+  or configuration error.
+
 ---
 
 **Related**: `.github/DEPLOYMENT.md` (which workflow reads which secret),

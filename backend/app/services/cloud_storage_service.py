@@ -6,8 +6,9 @@ Provides a unified interface for cloud storage operations.
 import asyncio
 import re
 import uuid
+from datetime import datetime
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import List, NamedTuple, Optional, Protocol
 
 from app.core.config import settings
 from urllib.parse import urlparse
@@ -25,6 +26,15 @@ def _is_owned_key(key: str, key_prefix: str) -> bool:
     return bool(key_prefix) and key.startswith(key_prefix) and ".." not in key.split("/")
 
 
+class StoredObject(NamedTuple):
+    """One object found by ``list_objects``: its key, a URL ``delete_image``
+    accepts for it, and when it was last written (timezone-aware)."""
+
+    key: str
+    url: str
+    modified: datetime
+
+
 class CloudStorageInterface(Protocol):
     """Protocol defining the interface for cloud storage providers."""
 
@@ -40,6 +50,10 @@ class CloudStorageInterface(Protocol):
 
     async def delete_image(self, url: str, key_prefix: str) -> bool:
         """Delete an image by URL, only if its key is under ``key_prefix``."""
+        ...
+
+    async def list_objects(self, prefix: str) -> List[StoredObject]:
+        """Every object whose key starts with ``prefix``, all pages."""
         ...
 
 
@@ -120,12 +134,32 @@ class S3StorageService:
             logger.error(f"S3 delete failed: {str(e)}")
             return False
 
+    async def list_objects(self, prefix: str) -> List[StoredObject]:
+        """Every key under ``prefix``; the paginator follows the 1000-key pages."""
+
+        def _list():
+            pages = self.s3_client.get_paginator("list_objects_v2").paginate(
+                Bucket=self.bucket_name, Prefix=prefix
+            )
+            return [
+                StoredObject(
+                    item["Key"],
+                    f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{item['Key']}",
+                    item["LastModified"],
+                )
+                for page in pages
+                for item in page.get("Contents", [])
+            ]
+
+        return await asyncio.to_thread(_list)
+
 
 class CloudinaryStorageService:
     """Cloudinary storage service implementation."""
 
     def __init__(self, cloud_name: str, api_key: str, api_secret: str):
         import cloudinary
+        import cloudinary.api
         import cloudinary.uploader
 
         cloudinary.config(
@@ -135,6 +169,7 @@ class CloudinaryStorageService:
             secure=True
         )
         self.cloudinary_uploader = cloudinary.uploader
+        self.cloudinary_api = cloudinary.api
 
     async def upload_image(
         self,
@@ -201,6 +236,31 @@ class CloudinaryStorageService:
         except Exception as e:
             logger.error(f"Cloudinary delete failed: {str(e)}")
             return False
+
+    async def list_objects(self, prefix: str) -> List[StoredObject]:
+        """Every uploaded image whose public_id starts with ``prefix`` (Admin
+        API, 500 per page). The key is the public_id, which has no extension."""
+
+        def _list():
+            objects, cursor = [], None
+            while True:
+                options = {"type": "upload", "prefix": prefix, "max_results": 500}
+                if cursor:
+                    options["next_cursor"] = cursor
+                page = self.cloudinary_api.resources(**options)
+                objects += [
+                    StoredObject(
+                        r["public_id"],
+                        r["secure_url"],
+                        datetime.fromisoformat(r["created_at"].replace("Z", "+00:00")),
+                    )
+                    for r in page.get("resources", [])
+                ]
+                cursor = page.get("next_cursor")
+                if not cursor:
+                    return objects
+
+        return await asyncio.to_thread(_list)
 
 
 class CloudStorageFactory:

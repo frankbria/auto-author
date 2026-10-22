@@ -11,6 +11,8 @@ from fastapi import (
 from typing import Dict
 from datetime import datetime, timezone
 
+from pymongo import ReturnDocument
+
 from app.core.security import get_current_user_from_session
 from app.db.database import get_book_fields, update_book
 from app.api.dependencies import audit_after_commit, get_rate_limiter
@@ -34,7 +36,7 @@ async def upload_book_cover_image(
     """
     try:
         # Validate book ownership
-        book = await get_book_fields(book_id, "owner_id", "cover_image_url", "cover_thumbnail_url")
+        book = await get_book_fields(book_id, "owner_id")
         if not book or book.get("owner_id") != current_user.get("auth_id"):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -53,22 +55,25 @@ async def upload_book_cover_image(
 
         # Persist first; only remove the previous cover once the new URLs are
         # safely stored (#797). If persistence fails, clean up the just-saved
-        # files so the book never points at a deleted image.
+        # files so the book never points at a deleted image. The previous cover
+        # is the write's own pre-image, not the read above: an overlapping
+        # upload may have replaced it since (#938).
         update_data = {
             "cover_image_url": image_url,
             "cover_thumbnail_url": thumbnail_url,
             "updated_at": datetime.now(timezone.utc),
         }
         try:
-            updated_book = await update_book(
-                book_id, update_data, current_user.get("auth_id")
+            replaced = await update_book(
+                book_id, update_data, current_user.get("auth_id"),
+                return_document=ReturnDocument.BEFORE,
             )
         except Exception:
             await file_upload_service.delete_cover_image(
                 book_id, image_url, thumbnail_url
             )
             raise
-        if not updated_book:
+        if not replaced:
             await file_upload_service.delete_cover_image(
                 book_id, image_url, thumbnail_url
             )
@@ -77,8 +82,8 @@ async def upload_book_cover_image(
                 detail="Book not found"
             )
 
-        old_cover_url = book.get("cover_image_url")
-        old_thumbnail_url = book.get("cover_thumbnail_url")
+        old_cover_url = replaced.get("cover_image_url")
+        old_thumbnail_url = replaced.get("cover_thumbnail_url")
         if old_cover_url or old_thumbnail_url:
             await file_upload_service.delete_cover_image(
                 book_id, old_cover_url, old_thumbnail_url
