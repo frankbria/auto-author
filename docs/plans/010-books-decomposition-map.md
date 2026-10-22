@@ -88,7 +88,10 @@ The `questions/responses/batch` row below (listed under "others") moved with thi
 | GET | `/{book_id}/chapters/{chapter_id}/question-progress` | get_chapter_question_progress | 2826 |
 | POST | `/{book_id}/chapters/{chapter_id}/regenerate-questions` | regenerate_chapter_questions | 2902 |
 
-### chapter-drafts / style / enhance (5)
+### chapter-drafts / style / enhance ✅ EXTRACTED → `chapter_ai.py` (4 handlers; its helper `_rewrite_failure` moved too)
+
+The `questions/responses/batch` row below moved earlier, with chapter-questions (#857).
+
 | Method | Path | Handler | Line |
 |---|---|---|---|
 | POST | `/{book_id}/chapters/{chapter_id}/generate-draft` | generate_chapter_draft | 3011 |
@@ -101,7 +104,7 @@ The `questions/responses/batch` row below (listed under "others") moved with thi
 1. **chapters** ✅ done — self-contained, `chapter_status_service` only.
 2. **chapter-content/analytics** — shares only `chapter_access_service` (imported, not duplicated).
 3. **chapter-questions** — `question_generation_service` + question schemas cluster together.
-4. **chapter-drafts/style/enhance** — `ai_service` + style/enhancement services.
+4. **chapter-drafts/style/enhance** ✅ done (#1123) — `ai_service` + style/enhancement services.
 5. **summaries**, **toc**, **pre-toc questions** — book-level AI; can fold into books or a `book_ai.py`.
    Leaves `books.py` = book-crud + cover only; fold `book_cover_upload.py` in then.
 

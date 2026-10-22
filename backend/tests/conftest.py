@@ -130,6 +130,7 @@ from app.core.security import get_current_user_from_session
 from app.api.endpoints import users as users_endpoint
 from app.api.endpoints import books as books_endpoint
 from app.api.endpoints import chapter_questions as chapter_questions_endpoint
+from app.api.endpoints import chapter_ai as chapter_ai_endpoint
 from bson import ObjectId
 from unittest.mock import patch as _mock_patch
 
@@ -394,6 +395,7 @@ async def auth_client_factory(reinit_db, monkeypatch, test_user):
         monkeypatch.setattr(users_endpoint, "audit_after_commit", _noop_audit_request)
         monkeypatch.setattr(books_endpoint, "audit_after_commit", _noop_audit_request)
         monkeypatch.setattr(chapter_questions_endpoint, "audit_after_commit", _noop_audit_request)
+        monkeypatch.setattr(chapter_ai_endpoint, "audit_after_commit", _noop_audit_request)
 
         cookies = {}
         if auth:
@@ -494,6 +496,7 @@ async def async_client_factory(reinit_db, monkeypatch, test_user):
         monkeypatch.setattr(users_endpoint, "audit_after_commit", _noop_audit)
         monkeypatch.setattr(books_endpoint, "audit_after_commit", _noop_audit)
         monkeypatch.setattr(chapter_questions_endpoint, "audit_after_commit", _noop_audit)
+        monkeypatch.setattr(chapter_ai_endpoint, "audit_after_commit", _noop_audit)
 
         cookies = {}
         if auth:
