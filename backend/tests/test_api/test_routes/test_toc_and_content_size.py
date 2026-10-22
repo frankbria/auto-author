@@ -10,7 +10,7 @@ import pytest
 from bson import ObjectId
 from pymongo.errors import OperationFailure
 
-from app.api.endpoints import books as books_endpoint
+from app.api.endpoints import book_toc as book_toc_endpoint
 from app.db import base
 from app.schemas.book import MAX_CHAPTER_CONTENT_BYTES, MAX_TOC_BODY_BYTES
 from tests.test_api.test_routes.test_books_toc_coverage import (  # noqa: F401  (the fixture is autouse)
@@ -234,10 +234,10 @@ class TestATableOfContentsBodyHasALargestSize:
 
 class TestOnlyTheSizeRefusalIsCalledAFullBook:
     async def test_another_database_error_is_left_as_it_is(self):
-        assert books_endpoint._book_is_full(OperationFailure("duplicate key", 11000)) is None
-        assert books_endpoint._book_is_full(OperationFailure("no code")) is None
-        assert books_endpoint._book_is_full(RuntimeError("something else")) is None
+        assert book_toc_endpoint._book_is_full(OperationFailure("duplicate key", 11000)) is None
+        assert book_toc_endpoint._book_is_full(OperationFailure("no code")) is None
+        assert book_toc_endpoint._book_is_full(RuntimeError("something else")) is None
 
     async def test_both_ways_the_database_says_it(self):
         for code in (10334, 17419):
-            assert books_endpoint._book_is_full(OperationFailure("too large", code)).status_code == 413
+            assert book_toc_endpoint._book_is_full(OperationFailure("too large", code)).status_code == 413

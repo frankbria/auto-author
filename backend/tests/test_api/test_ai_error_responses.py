@@ -178,7 +178,7 @@ class TestGenerateTOCErrors:
     @pytest.mark.asyncio
     async def test_toc_rate_limit_error_returns_429(self, client, mock_user, mock_book):
         """Test that TOC generation rate limit errors return 429."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.book_toc.get_book_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_toc_from_summary_and_responses') as mock_generate:
                 mock_generate.side_effect = AIRateLimitError(
                     retry_after=90,
@@ -195,7 +195,7 @@ class TestGenerateTOCErrors:
     @pytest.mark.asyncio
     async def test_toc_network_error_returns_503(self, client, mock_user, mock_book):
         """Test that TOC generation network errors return 503."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.book_toc.get_book_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_toc_from_summary_and_responses') as mock_generate:
                 mock_generate.side_effect = AINetworkError(
                     correlation_id="toc-correlation-456"
@@ -211,7 +211,7 @@ class TestGenerateTOCErrors:
     async def test_toc_invalid_response_returns_500_retryable(self, client, mock_user, mock_book):
         """An unusable/poorly-formatted AI TOC surfaces as a retryable error (issue #48),
         not a silently-saved placeholder TOC."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.book_toc.get_book_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_toc_from_summary_and_responses') as mock_generate:
                 mock_generate.side_effect = AIServiceError(
                     message="The AI returned an unusable table of contents. Please try again.",
@@ -230,7 +230,7 @@ class TestGenerateTOCErrors:
     @pytest.mark.asyncio
     async def test_toc_service_unavailable_returns_503(self, client, mock_user, mock_book):
         """Test that TOC generation service unavailable errors return 503."""
-        with patch('app.api.endpoints.books.get_book_by_id', return_value=mock_book):
+        with patch('app.api.endpoints.book_toc.get_book_by_id', return_value=mock_book):
             with patch('app.services.ai_service.ai_service.generate_toc_from_summary_and_responses') as mock_generate:
                 mock_generate.side_effect = AIServiceUnavailableError(
                     retry_after=45,

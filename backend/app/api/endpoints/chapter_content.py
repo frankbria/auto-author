@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pymongo.errors import OperationFailure
 
-from app.api.endpoints.books import _book_is_full
+from app.api.endpoints.book_toc import _book_is_full
 from app.core.reporting import report_failure
 from app.core.security import get_current_user_from_session
 from app.db.book import NO_PRECONDITION

@@ -45,7 +45,7 @@ zero helper duplication.
 | GET | `/{book_id}/question-responses` | get_question_responses | 970 |
 | PUT | `/{book_id}/question-responses` | save_question_responses | 1005 |
 
-### toc (4)
+### toc (4) ✅ EXTRACTED → `book_toc.py` (`_without_bodies` and `_book_is_full` moved with it)
 | Method | Path | Handler | Line |
 |---|---|---|---|
 | GET | `/{book_id}/toc-readiness` | check_toc_generation_readiness | 1074 |
@@ -105,7 +105,7 @@ The `questions/responses/batch` row below moved earlier, with chapter-questions 
 2. **chapter-content/analytics** — shares only `chapter_access_service` (imported, not duplicated).
 3. **chapter-questions** — `question_generation_service` + question schemas cluster together.
 4. **chapter-drafts/style/enhance** ✅ done (#1123) — `ai_service` + style/enhancement services.
-5. **summaries** ✅ done (#1124); **toc**, **pre-toc questions** — book-level AI; can fold into books or a `book_ai.py`.
+5. **summaries** ✅ done (#1124); **toc** ✅ done (#1125); **pre-toc questions** — book-level AI; can fold into books or a `book_ai.py`.
    Leaves `books.py` = book-crud + cover only; fold `book_cover_upload.py` in then.
 
 ## Route-ordering caveat (must hold for every future slice)
