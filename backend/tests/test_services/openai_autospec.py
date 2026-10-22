@@ -58,10 +58,10 @@ def autospec_openai_client(
 
 
 def asyncio_without_retry_waits() -> SimpleNamespace:
-    """``asyncio`` as ``ai_service`` sees it, with its backoff sleeps skipped.
+    """``asyncio`` as the AI transport sees it, with its backoff sleeps skipped.
 
-    Patch ``app.services.ai_service.asyncio`` with this rather than
-    ``...ai_service.asyncio.sleep``: that path sets ``sleep`` on the shared
+    Patch ``app.services.ai.transport.asyncio`` with this rather than
+    ``...transport.asyncio.sleep``: that path sets ``sleep`` on the shared
     ``asyncio`` module, and the database driver's own waits then spin forever.
     """
     return SimpleNamespace(**{**vars(asyncio), "sleep": AsyncMock()})

@@ -66,7 +66,7 @@ def provider_fails(monkeypatch):
         client = autospec_openai_client()
         client.chat.completions.create.side_effect = error
         monkeypatch.setattr(ai_service, "client", client)
-        monkeypatch.setattr("app.services.ai_service.asyncio", asyncio_without_retry_waits())
+        monkeypatch.setattr("app.services.ai.transport.asyncio", asyncio_without_retry_waits())
         return client.chat.completions.create
 
     return install
