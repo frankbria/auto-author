@@ -30,7 +30,7 @@ zero helper duplication.
 | DELETE | `/{book_id}` | delete_book_endpoint | 440 |
 | POST | `/{book_id}/cover-image` | upload_book_cover_image | 508 |
 
-### summaries (4)
+### summaries (4) ✅ EXTRACTED → `book_summary.py` (the offensive-word list moved with it)
 | Method | Path | Handler | Line |
 |---|---|---|---|
 | GET | `/{book_id}/summary` | get_book_summary | 585 |
@@ -105,7 +105,7 @@ The `questions/responses/batch` row below moved earlier, with chapter-questions 
 2. **chapter-content/analytics** — shares only `chapter_access_service` (imported, not duplicated).
 3. **chapter-questions** — `question_generation_service` + question schemas cluster together.
 4. **chapter-drafts/style/enhance** ✅ done (#1123) — `ai_service` + style/enhancement services.
-5. **summaries**, **toc**, **pre-toc questions** — book-level AI; can fold into books or a `book_ai.py`.
+5. **summaries** ✅ done (#1124); **toc**, **pre-toc questions** — book-level AI; can fold into books or a `book_ai.py`.
    Leaves `books.py` = book-crud + cover only; fold `book_cover_upload.py` in then.
 
 ## Route-ordering caveat (must hold for every future slice)
