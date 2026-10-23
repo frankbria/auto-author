@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFi
 from typing import List, Dict
 from datetime import datetime, timezone
 
+from pymongo import ReturnDocument
+
 from app.api.endpoints.billing import cancel_subscription_for_deletion
 from app.core.security import get_current_user_from_session, SessionRoleChecker
 from app.schemas.user import UserUpdate, UserResponse
@@ -224,22 +226,25 @@ async def upload_profile_picture(
 
         # Persist first; only remove the previous avatar once the new URL is
         # safely stored. If persistence fails, clean up the just-saved file so
-        # we don't leak an orphan or point the record at a deleted image.
+        # we don't leak an orphan or point the record at a deleted image. The
+        # previous avatar is the write's own pre-image, not the session's: an
+        # overlapping upload may have replaced it since (#1143).
         try:
-            updated_user = await update_user(
+            replaced = await update_user(
                 auth_id=current_user["auth_id"],
                 user_data={
                     "avatar_url": avatar_url,
                     "updated_at": datetime.now(timezone.utc),
                 },
                 actor_id=current_user["auth_id"],
+                return_document=ReturnDocument.BEFORE,
             )
         except Exception:
             await upload_service.delete_profile_picture(
                 current_user["auth_id"], avatar_url
             )
             raise
-        if not updated_user:
+        if not replaced:
             await upload_service.delete_profile_picture(
                 current_user["auth_id"], avatar_url
             )
@@ -247,7 +252,7 @@ async def upload_profile_picture(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
 
-        old_avatar = current_user.get("avatar_url")
+        old_avatar = replaced.get("avatar_url")
         if old_avatar and old_avatar != avatar_url:
             await upload_service.delete_profile_picture(
                 current_user["auth_id"], old_avatar
