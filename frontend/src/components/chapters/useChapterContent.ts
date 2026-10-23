@@ -96,9 +96,17 @@ export function useChapterContent({
   const backupKey = chapterBackupKey(bookId, chapterId);
   const droppedKey = chapterDroppedKey(bookId, chapterId);
   // The backup Restore offers: a failed save's first, then text dropped on Reload (#760).
+  // Chapters whose backup this session wrote from the text now in the editor (a
+  // failed save): offering it back would restore what is already on screen (#1195).
+  const ownBackups = useRef(new Set<string>());
   const restoreKey = useSyncExternalStore(
     subscribeToNothing,
-    () => (readHasBackup(backupKey) ? backupKey : readHasBackup(droppedKey) ? droppedKey : null),
+    () =>
+      readHasBackup(backupKey) && !ownBackups.current.has(backupKey)
+        ? backupKey
+        : readHasBackup(droppedKey)
+          ? droppedKey
+          : null,
     () => null
   );
   const hasBackup = restoreKey !== null;
@@ -115,6 +123,11 @@ export function useChapterContent({
     return 0;
   });
   const noteBackupWrite = () => setBackupWrites((n) => n + 1);
+  const backUp = (edit: { bookId: string; chapterId: string; content: string }, err: unknown) => {
+    const stored = backupChapterContent(edit, err);
+    if (stored) ownBackups.current.add(chapterBackupKey(edit.bookId, edit.chapterId));
+    return stored;
+  };
   // A backup older than the saved chapter, which the writer has asked to restore.
   // It is a question about one backup: shown only while that backup is the one
   // on offer, so it cannot be answered for another chapter's (#831).
@@ -149,7 +162,7 @@ export function useChapterContent({
       // While saves are failing, each edit refreshes the backup: the next try may be
       // up to 30s away, and a crash before it would lose what was typed since (#855).
       if (autoSaveFailuresRef.current > 0 && unsavedRef.current) {
-        backupChapterContent(unsavedRef.current, new Error('Not saved yet: autosave is retrying'));
+        backUp(unsavedRef.current, new Error('Not saved yet: autosave is retrying'));
       }
       if (html !== lastAutoSavedContent) {
         setAutoSavePending(true);
@@ -232,6 +245,7 @@ export function useChapterContent({
     editor.commands.setContent(loaded.content, { emitUpdate: false });
     seenRef.current.set(loaded.key, { lastModified: loaded.lastModified, content: loaded.content });
     unsavedRef.current = null;
+    ownBackups.current.delete(backupKey);
     // A backup of the text the server already holds (a pagehide save whose response
     // never arrived) is not older text worth a restore prompt.
     const backup = getValidatedItem<ChapterBackup>(backupKey, validateChapterBackup);
@@ -315,7 +329,7 @@ export function useChapterContent({
   // The local text stays in the editor and in a backup; nothing else saves
   // until the writer picks a version, and neither choice is ever made for them.
   const handleConflict = (content: string, err: ChapterSaveConflict) => {
-    const backedUp = backupChapterContent({ bookId, chapterId, content }, err);
+    const backedUp = backUp({ bookId, chapterId, content }, err);
     noteBackupWrite();
     // A save that comes back after the editor moved to another chapter is
     // backed up under its own chapter; the choice belongs to that chapter.
@@ -331,7 +345,7 @@ export function useChapterContent({
   // Like a conflict, an answer rather than an outage: no backoff, the server's
   // words on screen, the text kept in a backup.
   const handleTooLarge = (content: string, err: Error) => {
-    const backedUp = backupChapterContent({ bookId, chapterId, content }, err);
+    const backedUp = backUp({ bookId, chapterId, content }, err);
     noteBackupWrite();
     if (shownChapterRef.current !== chapterBackupKey(bookId, chapterId)) return;
     setRefusedContent(content);
@@ -410,7 +424,7 @@ export function useChapterContent({
         }
         reportSaveFailure('auto-save', err);
         autoSaveFailuresRef.current += 1;
-        if (backupChapterContent({ bookId, chapterId, content }, err)) {
+        if (backUp({ bookId, chapterId, content }, err)) {
           noteBackupWrite();
           setError('Failed to auto-save. Content backed up locally.');
         } else {
@@ -458,12 +472,12 @@ export function useChapterContent({
         handleTooLarge(content, err as Error);
         return;
       }
-      setError('Failed to save chapter content');
       reportSaveFailure('manual-save', err);
 
       // Backup to localStorage on manual save failure too
-      backupChapterContent({ bookId, chapterId, content }, err);
+      const backedUp = backUp({ bookId, chapterId, content }, err);
       noteBackupWrite();
+      setError(backedUp ? 'Failed to save chapter content. Content backed up locally.' : 'Failed to save chapter content');
     } finally {
       setIsSaving(false);
     }
