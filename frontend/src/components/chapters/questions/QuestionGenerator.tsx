@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { AlertCircleIcon, BookOpen01Icon, HelpCircleIcon, BrainIcon, SparklesIcon } from '@hugeicons/core-free-icons';
+import { AlertCircleIcon } from '@hugeicons/core-free-icons';
 import { QuestionDifficulty, QuestionType } from '@/types/chapter-questions';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
+import { FOCUS_OPTIONS } from '@/lib/questionFocus';
 
 interface QuestionGeneratorProps {
   bookId: string;
@@ -59,34 +59,6 @@ export default function QuestionGenerator({
 
     await onGenerate(questionCount, difficulty, focus);
   };
-
-  // Question type options with descriptions
-  const questionTypeOptions = [
-    {
-      type: QuestionType.CHARACTER,
-      label: 'Character',
-      description: 'Questions about characters, their motivations, development, and relationships',
-      icon: <HugeiconsIcon icon={BookOpen01Icon} size={16} />
-    },
-    {
-      type: QuestionType.PLOT,
-      label: 'Plot',
-      description: 'Questions about story structure, events, conflicts, and resolutions',
-      icon: <HugeiconsIcon icon={SparklesIcon} size={16} />
-    },
-    {
-      type: QuestionType.SETTING,
-      label: 'Setting',
-      description: 'Questions about world-building, locations, time periods, and atmosphere',
-      icon: <HugeiconsIcon icon={HelpCircleIcon} size={16} />
-    },
-    {
-      type: QuestionType.THEME,
-      label: 'Theme',
-      description: 'Questions about central ideas, messages, symbolism, and deeper meaning',
-      icon: <HugeiconsIcon icon={BrainIcon} size={16} />
-    }
-  ];
 
   return (
     <Card className="w-full">
@@ -168,32 +140,24 @@ export default function QuestionGenerator({
             <div className="space-y-2">
               <Label>Question Focus (optional)</Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                {questionTypeOptions.map((option) => (
-                  <TooltipProvider key={option.type}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-start space-x-2">
-                          <Checkbox
-                            id={`focus-${option.type}`}
-                            checked={focusTypes.includes(option.type)}
-                            onCheckedChange={() => toggleQuestionType(option.type)}
-                            className="mt-0.5"
-                          />
-                          <div className="grid gap-1.5 leading-none">
-                            <Label htmlFor={`focus-${option.type}`} className="font-medium flex items-center">
-                              {option.icon} <span className="ml-1">{option.label}</span>
-                            </Label>
-                            <p className="text-xs text-muted-foreground">
-                              {option.description.substring(0, 40)}...
-                            </p>
-                          </div>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs">{option.description}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                {FOCUS_OPTIONS.map((option) => (
+                  <div key={option.type} className="flex items-start space-x-2">
+                    <Checkbox
+                      id={`focus-${option.type}`}
+                      aria-describedby={`focus-${option.type}-desc`}
+                      checked={focusTypes.includes(option.type)}
+                      onCheckedChange={() => toggleQuestionType(option.type)}
+                      className="mt-0.5"
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <Label htmlFor={`focus-${option.type}`} className="font-medium">
+                        {option.label}
+                      </Label>
+                      <p id={`focus-${option.type}-desc`} className="text-xs text-muted-foreground">
+                        {option.description}
+                      </p>
+                    </div>
+                  </div>
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-2">

@@ -22,7 +22,7 @@ describe('RegenerateQuestionsDialog', () => {
 
   it('includes selected focus areas and preserve toggle state', () => {
     render(<RegenerateQuestionsDialog {...baseProps} />);
-    fireEvent.click(screen.getByLabelText('Theme'));
+    fireEvent.click(screen.getByLabelText('Message'));
     fireEvent.click(screen.getByRole('switch'));
     fireEvent.click(screen.getByRole('button', { name: /^regenerate$/i }));
     expect(baseProps.onConfirm).toHaveBeenCalledWith(

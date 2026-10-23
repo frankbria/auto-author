@@ -194,7 +194,7 @@ describe('QuestionGenerator - handleGenerate', () => {
     fireEvent.click(screen.getByText(/Show Advanced Options/i));
 
     // Check the CHARACTER checkbox
-    const characterCheckbox = screen.getByRole('checkbox', { name: /Character/i });
+    const characterCheckbox = screen.getByRole('checkbox', { name: /People/i });
     fireEvent.click(characterCheckbox);
 
     // Generate
@@ -239,7 +239,7 @@ describe('QuestionGenerator - toggleQuestionType', () => {
     // Reveal advanced options
     fireEvent.click(screen.getByText(/Show Advanced Options/i));
 
-    const plotCheckbox = screen.getByRole('checkbox', { name: /Plot/i });
+    const plotCheckbox = screen.getByRole('checkbox', { name: /Structure/i });
     fireEvent.click(plotCheckbox);
 
     fireEvent.click(
@@ -257,7 +257,7 @@ describe('QuestionGenerator - toggleQuestionType', () => {
 
     fireEvent.click(screen.getByText(/Show Advanced Options/i));
 
-    const plotCheckbox = screen.getByRole('checkbox', { name: /Plot/i });
+    const plotCheckbox = screen.getByRole('checkbox', { name: /Structure/i });
 
     // Check then uncheck
     fireEvent.click(plotCheckbox); // adds PLOT
@@ -279,8 +279,8 @@ describe('QuestionGenerator - toggleQuestionType', () => {
 
     fireEvent.click(screen.getByText(/Show Advanced Options/i));
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /Character/i }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /Theme/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /People/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Message/i }));
 
     fireEvent.click(
       screen.getByRole('button', { name: /Generate Interview Questions/i })
