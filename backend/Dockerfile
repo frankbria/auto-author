@@ -12,7 +12,7 @@
 # docker entry moves the digest, as a pull request the image scan runs on. It
 # reads a literal FROM line only; with the tag in a build argument it found no
 # dependency here at all.
-FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f AS base
+FROM python:3.13-slim@sha256:57b29a7c050c4e679e4bea572e14b3965cf4b5839de2da49d55e49ffc4024f39 AS base
 
 # uv, by version and digest (#819). `:latest` was whatever was newest on the day
 # of the build. A stage of its own, so that it is named in a FROM line like the
