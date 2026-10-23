@@ -258,7 +258,6 @@ frontend/src/
 │   └── export/
 │       ├── ExportOptionsModal.tsx     # Options selection UI
 │       ├── ExportProgressModal.tsx    # Progress tracking UI
-│       ├── ExportFormatPicker.tsx     # Format selection
 │       ├── TemplateSelector.tsx       # Template selection
 │       └── exportHelpers.ts           # Utility functions
 ├── lib/

@@ -2140,66 +2140,26 @@ export class BookClient {
     completedCount: number;
     inProgressCount: number;
   }> {
-    // Fetch all questions using pagination
-    const allQuestions: Question[] = [];
-    const PAGE_SIZE = 50;
-    let currentPage = 1;
-    let totalPages = 1;
-
-    // Iteratively fetch all pages of questions
-    do {
-      const questionsResponse = await this.getChapterQuestions(bookId, chapterId, {
-        page: currentPage,
-        limit: PAGE_SIZE
-      });
-
-      allQuestions.push(...questionsResponse.questions);
-      totalPages = questionsResponse.pages;
-      currentPage++;
-    } while (currentPage <= totalPages);
-
-    // Fetch responses for each question that has one
-    const qaResponses: Array<{ question: string; answer: string; questionId: string; status: string }> = [];
-    let completedCount = 0;
-    let inProgressCount = 0;
-
-    for (const question of allQuestions) {
-      try {
-        const responseData = await this.getQuestionResponse(bookId, chapterId, question.id);
-
-        if (responseData.has_response && responseData.response) {
-          const status = responseData.response.status;
-
-          if (status === 'completed') {
-            completedCount++;
-            qaResponses.push({
-              question: question.question_text,
-              answer: responseData.response.response_text,
-              questionId: question.id,
-              status: status
-            });
-          } else if (status === 'draft') {
-            inProgressCount++;
-            // Include draft responses too, but mark them
-            qaResponses.push({
-              question: question.question_text,
-              answer: responseData.response.response_text,
-              questionId: question.id,
-              status: status
-            });
-          }
-        }
-      } catch (error) {
-        console.error(`Error fetching response for question ${question.id}:`, error);
-        // Continue fetching other responses even if one fails
-      }
+    const response = await apiFetch(
+      `${this.baseUrl}/books/${bookId}/chapters/${chapterId}/question-answers`,
+      { headers: await this.getHeaders(), credentials: 'include' }
+    );
+    if (!response.ok) {
+      throw await failure(response, 'Failed to get chapter answers');
     }
-
+    const data = await response.json();
     return {
-      responses: qaResponses,
-      totalQuestions: allQuestions.length,
-      completedCount,
-      inProgressCount
+      responses: data.responses.map(
+        (r: { question_id: string; question: string; answer: string; status: string }) => ({
+          question: r.question,
+          answer: r.answer,
+          questionId: r.question_id,
+          status: r.status,
+        })
+      ),
+      totalQuestions: data.total_questions,
+      completedCount: data.completed_count,
+      inProgressCount: data.in_progress_count,
     };
   }
 

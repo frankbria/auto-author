@@ -113,20 +113,27 @@ describe('the toolbar draft generator', () => {
     expect(screen.getByRole('dialog')).not.toHaveTextContent(/network error/i);
   });
 
-  it('does not write over what the writer has typed while the answers were loading', async () => {
+  it('says it is reading the answers, instead of showing sample questions, until they arrive', async () => {
     let arrive!: (value: Saved) => void;
     mockedClient.getChapterQAResponses.mockReturnValue(new Promise<Saved>((resolve) => { arrive = resolve; }));
     await opened();
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Answer to question 1' }), { target: { value: 'Typed before they arrived' } });
-    // Let the answers arrive and be acted on: a turn of the event loop, inside act,
-    // or the assertion below runs before anything could have been written over.
+    expect(screen.getByText('Reading your answers…')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /^Question \d+$/ })).not.toBeInTheDocument();
+
     await act(async () => {
       arrive(saved(['Who keeps the light?', 'An old man named Tam.']));
-      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    expect(answers()[0]).toBe('Typed before they arrived');
+    expect(screen.queryByText('Reading your answers…')).not.toBeInTheDocument();
+    expect(questions()).toEqual(['Who keeps the light?']);
+  });
+
+  it('drops the reading message and shows the sample questions when the read fails', async () => {
+    mockedClient.getChapterQAResponses.mockRejectedValue(new Error('Network error'));
+    await opened();
+
+    await waitFor(() => expect(screen.queryByText('Reading your answers…')).not.toBeInTheDocument());
     expect(questions()).toHaveLength(5);
   });
 

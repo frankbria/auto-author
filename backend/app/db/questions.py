@@ -365,6 +365,41 @@ async def save_question_response(
     return doc
 
 
+async def get_chapter_answers(book_id: str, chapter_id: str, user_id: str) -> Dict[str, Any]:
+    """A chapter's answered questions in order, read with two queries (#1050)."""
+    questions_collection = await get_collection("questions")
+    responses_collection = await get_collection("question_responses")
+
+    questions = await questions_collection.find({
+        "book_id": book_id, "chapter_id": chapter_id, "user_id": user_id,
+    }).sort("order", 1).to_list(length=None)
+    by_qid = {
+        r["question_id"]: r
+        async for r in responses_collection.find({
+            "question_id": {"$in": [str(q["_id"]) for q in questions]},
+            "user_id": user_id,
+        })
+    }
+
+    answers = []
+    for q in questions:
+        r = by_qid.get(str(q["_id"]))
+        status = r.get("status", "draft") if r else None
+        if status in ("completed", "draft"):
+            answers.append({
+                "question_id": str(q["_id"]),
+                "question": q["question_text"],
+                "answer": r.get("response_text", ""),
+                "status": status,
+            })
+    return {
+        "responses": answers,
+        "total_questions": len(questions),
+        "completed_count": sum(a["status"] == "completed" for a in answers),
+        "in_progress_count": sum(a["status"] == "draft" for a in answers),
+    }
+
+
 async def get_question_response(question_id: str, user_id: str) -> Optional[Dict[str, Any]]:
     """Get a question response."""
     responses_collection = await get_collection("question_responses")

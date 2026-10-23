@@ -1179,159 +1179,56 @@ describe('BookClient.getChapterQAResponses', () => {
   const bookId = 'book123';
   const chapterId = 'ch1';
 
-  /** Helper: mock a getChapterQuestions response */
-  function mockQuestionsPage(questions: unknown[], pages: number) {
+  const answer = (n: number, status = 'completed') => ({
+    question_id: `q${n}`, question: `Question ${n}?`, answer: `Answer ${n}`, status,
+  });
+
+  it('reads a chapter of 20 questions in one request (#1050)', async () => {
+    const responses = Array.from({ length: 20 }, (_, i) => answer(i + 1));
     (global.fetch as jest.Mock).mockResolvedValueOnce(
-      okJson({ questions, pages, total: questions.length * pages })
+      okJson({ responses, total_questions: 20, completed_count: 20, in_progress_count: 0 })
     );
-  }
-
-  /** Helper: mock a getQuestionResponse response */
-  function mockQResponse(hasResponse: boolean, status?: string, responseText?: string) {
-    const body = hasResponse
-      ? {
-          has_response: true,
-          response: {
-            id: 'r1',
-            question_id: 'q1',
-            response_text: responseText ?? 'Some answer',
-            status: status ?? 'completed',
-          },
-          success: true,
-        }
-      : { has_response: false, response: null, success: true };
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce(okJson(body));
-  }
-
-  it('returns aggregated responses for a single-page result with completed responses', async () => {
-    const questions = [
-      { id: 'q1', question_text: 'What is your goal?' },
-      { id: 'q2', question_text: 'Who is your audience?' },
-    ];
-
-    mockQuestionsPage(questions, 1);
-    mockQResponse(true, 'completed', 'My goal is X');
-    mockQResponse(true, 'completed', 'Developers');
 
     const result = await bookClient.getChapterQAResponses(bookId, chapterId);
 
-    expect(result.totalQuestions).toBe(2);
-    expect(result.completedCount).toBe(2);
-    expect(result.inProgressCount).toBe(0);
-    expect(result.responses).toHaveLength(2);
-    expect(result.responses[0]).toMatchObject({
-      question: 'What is your goal?',
-      answer: 'My goal is X',
-      status: 'completed',
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain(
+      `/books/${bookId}/chapters/${chapterId}/question-answers`
+    );
+    expect(result.responses).toHaveLength(20);
+    expect(result.responses[0]).toEqual({
+      question: 'Question 1?', answer: 'Answer 1', questionId: 'q1', status: 'completed',
     });
   });
 
-  it('includes draft responses in inProgressCount', async () => {
-    const questions = [
-      { id: 'q1', question_text: 'Q completed' },
-      { id: 'q2', question_text: 'Q in progress' },
-    ];
-
-    mockQuestionsPage(questions, 1);
-    mockQResponse(true, 'completed', 'Done answer');
-    mockQResponse(true, 'draft', 'Work in progress');
-
-    const result = await bookClient.getChapterQAResponses(bookId, chapterId);
-
-    expect(result.completedCount).toBe(1);
-    expect(result.inProgressCount).toBe(1);
-    expect(result.responses).toHaveLength(2);
-    expect(result.responses[1]).toMatchObject({ status: 'draft', answer: 'Work in progress' });
-  });
-
-  it('skips questions with no response (has_response = false)', async () => {
-    const questions = [{ id: 'q1', question_text: 'Unanswered Q' }];
-
-    mockQuestionsPage(questions, 1);
-    mockQResponse(false);
-
-    const result = await bookClient.getChapterQAResponses(bookId, chapterId);
-
-    expect(result.totalQuestions).toBe(1);
-    expect(result.responses).toHaveLength(0);
-    expect(result.completedCount).toBe(0);
-    expect(result.inProgressCount).toBe(0);
-  });
-
-  it('handles pagination across multiple pages', async () => {
-    // getChapterQAResponses fetches ALL pages first, THEN fetches individual responses.
-    // Mock order must match: page-1-questions, page-2-questions, q1-response, q2-response.
-
-    // Page 1 questions (pages=2 signals there is a second page)
+  it('maps the counts, drafts included', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(
-      okJson({ questions: [{ id: 'q1', question_text: 'Page 1 Q' }], pages: 2, total: 2 })
+      okJson({
+        responses: [answer(1), answer(2, 'draft')],
+        total_questions: 3, completed_count: 1, in_progress_count: 1,
+      })
     );
-    // Page 2 questions
+
+    const result = await bookClient.getChapterQAResponses(bookId, chapterId);
+
+    expect(result).toMatchObject({ totalQuestions: 3, completedCount: 1, inProgressCount: 1 });
+    expect(result.responses[1]).toMatchObject({ status: 'draft', answer: 'Answer 2' });
+  });
+
+  it('returns empty for a chapter with no questions', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(
-      okJson({ questions: [{ id: 'q2', question_text: 'Page 2 Q' }], pages: 2, total: 2 })
+      okJson({ responses: [], total_questions: 0, completed_count: 0, in_progress_count: 0 })
     );
-    // Response for q1 (fetched after all pages are loaded)
-    mockQResponse(true, 'completed', 'Page 1 answer');
-    // Response for q2
-    mockQResponse(true, 'completed', 'Page 2 answer');
 
     const result = await bookClient.getChapterQAResponses(bookId, chapterId);
 
-    expect(result.totalQuestions).toBe(2);
-    expect(result.completedCount).toBe(2);
-    expect(result.responses).toHaveLength(2);
+    expect(result).toEqual({ responses: [], totalQuestions: 0, completedCount: 0, inProgressCount: 0 });
   });
 
-  it('continues gracefully when getQuestionResponse throws for one question', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  it('rejects when the request fails', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(403, 'Forbidden'));
 
-    const questions = [
-      { id: 'q1', question_text: 'Q that errors' },
-      { id: 'q2', question_text: 'Q that succeeds' },
-    ];
-
-    mockQuestionsPage(questions, 1);
-
-    // q1 fetch throws a network error
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
-    // q2 fetch succeeds
-    mockQResponse(true, 'completed', 'Good answer');
-
-    const result = await bookClient.getChapterQAResponses(bookId, chapterId);
-
-    // Should only have q2's response
-    expect(result.totalQuestions).toBe(2);
-    expect(result.responses).toHaveLength(1);
-    expect(result.responses[0].questionId).toBe('q2');
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Error fetching response for question q1'),
-      expect.any(Error)
-    );
-
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('returns empty when there are no questions', async () => {
-    mockQuestionsPage([], 1);
-
-    const result = await bookClient.getChapterQAResponses(bookId, chapterId);
-
-    expect(result.totalQuestions).toBe(0);
-    expect(result.responses).toHaveLength(0);
-    expect(result.completedCount).toBe(0);
-    expect(result.inProgressCount).toBe(0);
-  });
-
-  it('passes correct pagination params to getChapterQuestions', async () => {
-    mockQuestionsPage([], 1);
-
-    await bookClient.getChapterQAResponses(bookId, chapterId);
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('page=1&limit=50'),
-      expect.any(Object)
-    );
+    await expect(bookClient.getChapterQAResponses(bookId, chapterId)).rejects.toThrow();
   });
 });
 
