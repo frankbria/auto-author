@@ -1,4 +1,5 @@
-"""Account data export (#790): GET /users/me/export.
+"""Account data export (#790): POST /users/me/export/token, then
+GET /users/me/export?token=... (#966).
 
 Real better-auth session documents, no patched resolver, so the owner scoping
 is the one production uses.
@@ -53,7 +54,11 @@ async def _seed_content(owner_id: str, marker: str) -> None:
 
 async def _export(token: str):
     async with _client(token) as c:
-        return await c.get("/api/v1/users/me/export")
+        issued = await c.post("/api/v1/users/me/export/token")
+        assert issued.status_code == 200, issued.text
+        return await c.get(
+            "/api/v1/users/me/export", params={"token": issued.json()["token"]}
+        )
 
 
 @pytest.mark.asyncio
@@ -127,5 +132,6 @@ async def test_export_holds_no_credential_and_no_internal_field(reinit_db):
 @pytest.mark.asyncio
 async def test_export_requires_a_session(reinit_db):
     async with _client("no-such-token") as c:
-        response = await c.get("/api/v1/users/me/export")
+        assert (await c.post("/api/v1/users/me/export/token")).status_code == 401
+        response = await c.get("/api/v1/users/me/export", params={"token": "x"})
     assert response.status_code == 401

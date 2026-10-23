@@ -20,6 +20,8 @@ export const API = 'http://localhost:8001/api/v1';
 // each email there, which is how the spec gets the verification link.
 export const FRONTEND_LOG = path.resolve(__dirname, 'test-results/real-auth-frontend.log');
 const BACKEND_LOG = path.resolve(__dirname, 'test-results/real-auth-backend.log');
+// Lines the frontend's MongoDB driver turns into failures (#972); see src/e2e/real-auth/mongo-faults.cjs.
+export const MONGO_FAULTS = path.resolve(__dirname, 'test-results/real-auth-mongo-faults');
 
 export const MONGO = process.env.E2E_MONGODB_URI || 'mongodb://localhost:27017';
 export const DATABASE = 'auto_author_e2e_real_auth';
@@ -85,6 +87,8 @@ export default defineConfig({
         NEXT_PUBLIC_ENVIRONMENT: 'test',
         // Unset on purpose: with no provider, development prints emails.
         EMAIL_SERVICE_PROVIDER: '',
+        NODE_OPTIONS: `--require ${path.resolve(__dirname, 'src/e2e/real-auth/mongo-faults.cjs')}`,
+        E2E_MONGO_FAULTS: MONGO_FAULTS,
       },
     },
   ],

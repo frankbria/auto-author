@@ -214,7 +214,10 @@ def test_ebooklib_is_gone_from_the_code_the_manifest_and_the_lock():
     backend = Path(export_service_module.__file__).resolve().parents[2]
 
     assert not hasattr(export_service_module, "epub")
-    assert "ebooklib" not in Path(export_service_module.__file__).read_text().lower()
+    # The builders live in app/services/export/ since #988.
+    sources = [Path(export_service_module.__file__), *(backend / "app/services/export").glob("*.py")]
+    assert len(sources) > 1
+    assert not any("ebooklib" in f.read_text().lower() for f in sources)
     assert "ebooklib" not in (backend / "pyproject.toml").read_text().lower()
     assert "ebooklib" not in (backend / "uv.lock").read_text().lower()
 

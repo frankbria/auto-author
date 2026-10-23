@@ -31,8 +31,20 @@ There is one kind of session. It lasts 7 days (`expiresIn`) and is renewed at mo
 - **Signature check**: the backend accepts a cookie only if its signature matches `BETTER_AUTH_SECRET`, so the token alone does not authenticate.
 - **Cookie attributes**: httpOnly, `secure`, `sameSite: lax` (see Cookie Settings below).
 - **No cookie cache**: `auth.ts` has no `cookieCache`, so a revoked session stops working at once instead of lingering for minutes (#793).
-- **Password reset**: ends every session of the account (`revokeSessionsOnPasswordReset`).
+- **Password reset**: ends every session of the account (`revokeSessionsOnPasswordReset`) and forgets every device trusted to skip the second factor (#972).
+- **Two-factor changes**: enabling 2FA (the `verify-totp` call that completes setup), disabling it and regenerating backup codes end every other session of the account in the same request; disabling also forgets every trusted device (#972, `src/lib/auth-second-factor.ts`). The `verify-totp` or backup-code call that finishes a sign-in ends nothing.
 - **Secret rotation**: the backend knows one secret only. Changing `BETTER_AUTH_SECRET` signs every user out.
+
+## Two-factor response flags (API contract)
+
+`POST /api/auth/two-factor/verify-totp` (when it enables 2FA), `POST /api/auth/two-factor/disable` and `POST /api/auth/two-factor/generate-backup-codes` answer 200 once the change itself is made, even when a follow-up step failed. The follow-up is retried once and the failure is logged and sent to Sentry; the answer then carries better-auth's usual body plus:
+
+| Field | Endpoints | Meaning when `false` |
+|---|---|---|
+| `otherSessionsEnded` | all three | The account's other sessions are still signed in. |
+| `trustedDevicesForgotten` | `disable` | Devices trusted earlier may skip the code if 2FA is turned back on. |
+
+Each field is present only when it is `false`; absent means the step succeeded. Every caller must check them: a 200 alone does not mean the other devices are signed out. The settings page (`TwoFactorSetup.tsx`) shows a warning toast for each. The change is not answered with an error instead, because it has already happened, and an error would lose freshly regenerated backup codes.
 
 ## Configuration Options
 

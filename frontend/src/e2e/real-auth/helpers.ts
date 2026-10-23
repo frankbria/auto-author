@@ -12,14 +12,18 @@ export const SAME_ORIGIN = { Origin: WEB };
  * The link in the email the development server printed when `email` signed up.
  * Each address is used once, so the first email to it is the sign-up one; a
  * refused sign-in on the page mails another (#969); an API sign-in mails none.
+ * `pattern` picks a later email's link instead, such as a password reset's.
  */
-export async function verificationLink(email: string): Promise<string> {
+export async function verificationLink(
+  email: string,
+  pattern = /URL: (\S+verify-email\S+)/
+): Promise<string> {
   let link: string | undefined;
   await expect
     .poll(() => {
       const log = readFileSync(FRONTEND_LOG, 'utf8');
       const start = log.indexOf(`To: ${email}`);
-      link = start < 0 ? undefined : /URL: (\S+verify-email\S+)/.exec(log.slice(start))?.[1];
+      link = start < 0 ? undefined : pattern.exec(log.slice(start))?.[1];
       return link;
     })
     .toBeTruthy();
