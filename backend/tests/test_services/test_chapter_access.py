@@ -77,31 +77,6 @@ async def test_get_user_tab_state(access_service):
 
 
 @pytest.mark.asyncio
-async def test_get_chapter_analytics(access_service):
-    """Test getting chapter analytics"""
-    # Mock the collection
-    mock_cursor = MagicMock()
-    mock_cursor.to_list = AsyncMock(return_value=[
-        {"_id": {"chapter_id": "ch1", "access_type": "view"}, "count": 10, "last_access": datetime.now()},
-        {"_id": {"chapter_id": "ch2", "access_type": "edit"}, "count": 5, "last_access": datetime.now()}
-    ])
-
-    mock_collection = MagicMock()
-    mock_collection.aggregate = AsyncMock(return_value=mock_cursor)
-    access_service._get_collection = AsyncMock(return_value=mock_collection)
-
-    # Get analytics
-    analytics = await access_service.get_chapter_analytics(
-        book_id="book456",
-        days=30
-    )
-
-    assert isinstance(analytics, list)
-    assert len(analytics) == 2
-    assert analytics[0]["count"] == 10
-
-
-@pytest.mark.asyncio
 async def test_save_tab_state(access_service):
     """Test saving tab state"""
     # Mock the collection

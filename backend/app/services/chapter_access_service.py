@@ -1,7 +1,6 @@
 """Chapter access logging service for analytics and tab persistence"""
 
 import logging
-from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 
 from app.core.reporting import report_failure
@@ -80,24 +79,6 @@ class ChapterAccessService:
 
         result = await cursor.to_list(length=1)
         return result[0] if result else None
-
-    async def get_chapter_analytics(self, book_id: str, days: int = 30) -> List[Dict]:
-        """Get chapter access analytics for the past N days"""
-
-        since_date = datetime.now(timezone.utc) - timedelta(days=days)
-        collection = await self._get_collection()
-        pipeline = [
-            {"$match": {"book_id": book_id, "timestamp": {"$gte": since_date}}},
-            {
-                "$group": {
-                    "_id": {"chapter_id": "$chapter_id", "access_type": "$access_type"},
-                    "count": {"$sum": 1},
-                    "last_access": {"$max": "$timestamp"},
-                }
-            },
-        ]
-
-        return await (await collection.aggregate(pipeline)).to_list(None)
 
     async def get_user_recent_chapters(
         self, user_id: str, book_id: str, limit: int = 10
