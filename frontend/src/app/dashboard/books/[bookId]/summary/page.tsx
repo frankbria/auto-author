@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import bookClient from '@/lib/api/bookClient';
 import {
@@ -69,6 +69,28 @@ export default function BookSummaryPage() {
   const shownBookRef = useRef(bookId);
   useEffect(() => {
     shownBookRef.current = bookId;
+  }, [bookId]);
+  const saveInFlight = useRef(false);
+  const persist = useCallback((text: string) => {
+    saveInFlight.current = true;
+    bookClient.saveBookSummary(bookId, text)
+      .then((data) => {
+        // A save of another book says nothing about the one on screen.
+        if (shownBookRef.current !== bookId) return;
+        lastSaved.current = data.summary;
+        if (!draftOnOffer.current) removeStored(unsavedKey(bookId));
+        setSaveFailure(null);
+      })
+      .catch(() => {
+        // The text exists only here now. It is kept under its own key, which the
+        // next load does not write over, and the writer is told (#832). Kept for
+        // its own book whichever book is on screen; told only if it is this one.
+        const kept = writeStored(unsavedKey(bookId), text);
+        if (shownBookRef.current === bookId) setSaveFailure({ kept });
+      })
+      .finally(() => {
+        saveInFlight.current = false;
+      });
   }, [bookId]);
   const [summaryHistory, setSummaryHistory] = useState<unknown[]>([]);
   // Derived during render, not mirrored into state via an effect (#584,
@@ -152,27 +174,24 @@ export default function BookSummaryPage() {
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     if (summary !== lastSaved.current) {
       saveTimeout.current = setTimeout(() => {
-        bookClient.saveBookSummary(bookId, summary)
-          .then((data) => {
-            // A save of another book says nothing about the one on screen.
-            if (shownBookRef.current !== bookId) return;
-            lastSaved.current = data.summary;
-            if (!draftOnOffer.current) removeStored(unsavedKey(bookId));
-            setSaveFailure(null);
-          })
-          .catch(() => {
-            // The text exists only here now. It is kept under its own key, which the
-            // next load does not write over, and the writer is told (#832). Kept for
-            // its own book whichever book is on screen; told only if it is this one.
-            const kept = writeStored(unsavedKey(bookId), summary);
-            if (shownBookRef.current === bookId) setSaveFailure({ kept });
-          });
+        persist(summary);
       }, 1000);
     }
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
-  }, [summary, bookId, summaryLoaded]);
+  }, [summary, bookId, summaryLoaded, persist]);
+
+  // A failed save is tried again by Try again and by the browser coming back
+  // online, not only by a change to the text (#1047). Never over a save in flight.
+  const retrySave = () => {
+    if (!saveInFlight.current) persist(summary);
+  };
+  useEffect(() => {
+    if (!saveFailure) return;
+    window.addEventListener('online', retrySave);
+    return () => window.removeEventListener('online', retrySave);
+  });
 
   // Derived, not stored: with no book there is nothing to load, so nothing to
   // wait for, and the effect never has to say so.
@@ -313,6 +332,7 @@ export default function BookSummaryPage() {
       <SummarySaveNotices
         saveFailure={saveFailure}
         unsavedDraft={unsavedDraft}
+        onRetry={retrySave}
         onRestore={() => {
           if (unsavedDraft === null) return;
           // Restored, it is the working copy, and saving it is what clears the stored one.

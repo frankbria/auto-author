@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 export function SummarySaveNotices({
   saveFailure,
   unsavedDraft,
+  onRetry,
   onRestore,
   onDiscard,
 }: {
@@ -14,6 +15,7 @@ export function SummarySaveNotices({
   saveFailure: { kept: boolean } | null;
   /** Text from an earlier visit whose save failed. */
   unsavedDraft: string | null;
+  onRetry: () => void;
   onRestore: () => void;
   onDiscard: () => void;
 }) {
@@ -24,11 +26,16 @@ export function SummarySaveNotices({
       {saveFailure && (
         <div
           role="alert"
-          className="p-4 mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400"
+          className="p-4 mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
         >
-          {saveFailure.kept
-            ? 'Your summary could not be saved. It is kept on this device, and saving is tried again when you change it.'
-            : 'Your summary could not be saved, and it could not be kept on this device either. Copy it somewhere safe before leaving this page.'}
+          <span>
+            {saveFailure.kept
+              ? 'Your summary could not be saved. It is kept on this device, and saving is tried again when you change it or your connection comes back.'
+              : 'Your summary could not be saved, and it could not be kept on this device either. Copy it somewhere safe before leaving this page.'}
+          </span>
+          <Button size="sm" variant="outline" onClick={onRetry}>
+            Try again
+          </Button>
         </div>
       )}
       {unsavedDraft !== null && (
