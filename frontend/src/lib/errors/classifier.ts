@@ -119,7 +119,7 @@ export function classifyError(
   return {
     type: ErrorType.SYSTEM,
     severity: ErrorSeverity.CRITICAL,
-    message: 'Something went wrong. Our team has been notified.',
+    message: 'Something went wrong.',
     details: errorMessage,
     retryable: false,
     correlationId,
@@ -236,7 +236,7 @@ function getUserFriendlyMessage(error: unknown, errorType: ErrorType): string {
     case 429:
       return 'Too many requests. Please wait a moment and try again.';
     case 500:
-      return 'A server error occurred. Our team has been notified.';
+      return 'A server error occurred.';
     case 502:
     case 503:
       return 'The service is temporarily unavailable. Please try again shortly.';
