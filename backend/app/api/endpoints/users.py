@@ -373,7 +373,9 @@ async def delete_user_account(
 
     Regular users can only deactivate their own account
     Admin users can deactivate any user account, and erase a deactivated one
-    before its purge date when its owner asks support to (#954)
+    before its purge date when its owner asks support to (#954). If a deactivated
+    account still has better-auth rows (a removal that failed part way), the first
+    call only finishes removing them and keeps the record; the next one erases (#956).
     """
     # Check permissions - users can only delete their own account unless they're admins
     if current_user["auth_id"] != auth_id and current_user["role"] != "admin":
