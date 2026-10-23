@@ -239,3 +239,35 @@ describe('leaving a chapter with an edit that cannot be saved', () => {
     expect(localStorage.getItem('chapter-backup-book-1-chapter-1')).toContain('MANUSCRIPT-SENTINEL');
   });
 });
+
+describe('a chapter that fails to load (#1006)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    saveSucceeded();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  const loadWith = async (failure: Error) => {
+    mockBookClient.getChapterContent.mockRejectedValue(failure);
+    render(<ChapterEditor {...props} initialContent="" />);
+    await screen.findByText(/Failed to load chapter content/);
+  };
+
+  it('is reported once, with its tags and no chapter text', async () => {
+    const failure = Object.assign(new Error('Failed to get chapter content'), { statusCode: 500 });
+
+    await loadWith(failure);
+
+    expect(captured).toHaveBeenCalledTimes(1);
+    expect(captured).toHaveBeenCalledWith(failure, { tags: { feature: 'autosave', operation: 'load' } });
+  });
+
+  it('is not reported when the chapter does not exist, which is an answer', async () => {
+    await loadWith(Object.assign(new Error('Chapter not found'), { statusCode: 404 }));
+
+    expect(captured).not.toHaveBeenCalled();
+  });
+});

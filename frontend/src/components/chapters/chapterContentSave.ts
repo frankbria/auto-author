@@ -101,7 +101,7 @@ const lastReported = new Map<string, number>();
  * sent, never the chapter's text: a failed save's error is about the response.
  */
 export function reportSaveFailure(
-  operation: 'auto-save' | 'manual-save' | 'leave-save' | 'backup' | 'restore',
+  operation: 'auto-save' | 'manual-save' | 'leave-save' | 'backup' | 'restore' | 'load',
   error: unknown
 ): void {
   const last = lastReported.get(operation);

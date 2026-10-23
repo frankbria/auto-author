@@ -200,6 +200,8 @@ export function useChapterContent({
         // The superseding load owns the spinner.
         if (ignore) return;
         console.error('Failed to load chapter content:', err);
+        // A missing chapter is an answer; anything else is a writer who cannot open their work (#1006).
+        if ((err as { statusCode?: unknown } | null)?.statusCode !== 404) reportSaveFailure('load', err);
         setError('Failed to load chapter content');
         setLoadFailed(true);
         setIsLoading(false);
