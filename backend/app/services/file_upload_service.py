@@ -496,7 +496,3 @@ class FileUploadService:
             "total_size_mb": round(total_size / (1024 * 1024), 2),
             "upload_directory": str(UPLOAD_DIR.absolute())
         }
-
-
-# Create a singleton instance
-file_upload_service = FileUploadService()
