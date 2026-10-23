@@ -3,6 +3,7 @@
 Per-issue implementation log, moved here from `CLAUDE.md` on 2026-07-24 to keep that file small. Newest entries first (some dates appear out of order — entries were appended as work landed).
 
 ### 2026-10-22
+- **Orphaned `ExportFormatPicker` removed (#1054)**: the export page it served was deleted in #855, so nothing rendered it and its focus-after-Retry and unavailable-format concerns have no home. The Export Book dialog has neither (formats are fixed radios, none can be unavailable; a failed stats load is a toast with no Retry), so nothing else changed.
 - **Characters XML forbids no longer break DOCX or EPUB export (#1199)**: U+FFFE/U+FFFF, C0 controls other than tab/LF/CR and lone surrogates in chapter text, link hrefs, titles or the author made DOCX raise `All strings must be XML compatible` (500); `ExportService.export_book` now strips them once from the whole book (`strip_non_xml` in `export/outline.py`) before any builder runs.
 
 - **Upload offload tests no longer flake (#1202)**: `_count_ticks_while` counted heartbeat ticks over a fixed 0.15 s sleep, so a loop stall as long as the sleep let a correctly offloaded call finish before the first tick and read `0 > 0` (reproduced: 0.2 s stall gives 0 ticks, 0.05 s gives 20). The helper is now `_Heartbeat`: the stand-in blocking call waits for the heartbeat to tick, so an offloaded call passes with no timing assumption and a call run on the loop thread times out and fails (all 7 offload tests fail with `to_thread` replaced by a direct call).
