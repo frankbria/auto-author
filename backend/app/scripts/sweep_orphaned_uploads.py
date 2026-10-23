@@ -28,8 +28,9 @@ Rules:
 Storage is whatever the backend is configured for (``settings.storage_provider``:
 S3, Cloudinary, or the local ``uploads/`` directory under the working directory).
 
-Run it from a throwaway container off the deployed image, exactly like the
-account-issuer backfill (``docs/STAGING-DEPLOYMENT.md``)::
+Run it inside the running backend container (``docker compose exec backend``), which
+has the same storage settings and files; runbook in ``docs/STAGING-DEPLOYMENT.md``
+→ Maintenance::
 
     python -m app.scripts.sweep_orphaned_uploads             # dry run, deletes nothing
     python -m app.scripts.sweep_orphaned_uploads --apply     # deletes the candidates
@@ -49,10 +50,10 @@ from datetime import datetime, timedelta, timezone
 from pymongo import AsyncMongoClient
 
 import app.services.file_upload_service as fus
-from app.scripts.migration_account_issuer import (
-    AccountIssuerBackfillError,
-    _client_kwargs,
-    _resolve_connection,
+from app.scripts._connection import (
+    ConnectionConfigError,
+    client_kwargs,
+    resolve_connection,
 )
 from app.services.cloud_storage_service import (
     StoredObject,
@@ -187,16 +188,16 @@ async def _main(argv=None) -> int:
         parser.error("--grace-minutes cannot be negative")
 
     try:
-        uri, database = _resolve_connection(args.mongodb_uri, args.database, os.environ)
+        uri, database = resolve_connection(args.mongodb_uri, args.database, os.environ)
         storage = get_cloud_storage_service() or LocalUploads()
-    except AccountIssuerBackfillError as exc:
+    except ConnectionConfigError as exc:
         logger.error("%s", exc)
         return 2
     except Exception as exc:  # noqa: BLE001 - operator-facing CLI
         logger.error("Storage is not configured: %s", exc)
         return 2
 
-    client = AsyncMongoClient(uri, **_client_kwargs(uri))
+    client = AsyncMongoClient(uri, **client_kwargs(uri))
     try:
         stats = await sweep_orphaned_uploads(
             client[database], storage, grace=timedelta(minutes=args.grace_minutes), apply=args.apply,
