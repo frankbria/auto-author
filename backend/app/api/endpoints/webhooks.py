@@ -25,6 +25,9 @@ from app.db.user import (
 
 logger = logging.getLogger(__name__)
 
+# Stripe events are a few KiB; 1 MiB is generous and bounds what an anonymous caller can make us buffer.
+MAX_WEBHOOK_BODY_BYTES = 1024 * 1024
+
 
 def _report(kind: str, message: str, *args, anyone_can_cause_it: bool = False) -> None:
     """Log a webhook failure as an error and send it to Sentry (#812).
@@ -62,10 +65,23 @@ async def stripe_webhook(request: Request):
         )
         return JSONResponse(status_code=503, content={"detail": "Stripe webhook is not configured"})
 
-    raw_body = await request.body()
+    # Anyone can post here: refuse on the headers before reading a byte (#1005).
     sig_header = request.headers.get("stripe-signature")
     if not sig_header:
         raise HTTPException(status_code=400, detail="Missing Stripe-Signature header")
+    too_large = HTTPException(status_code=413, detail="Webhook payload too large")
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_WEBHOOK_BODY_BYTES:
+        raise too_large
+    # The declared length can lie and chunked bodies declare none, so the
+    # stream is counted and cut off at the limit rather than buffered whole.
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > MAX_WEBHOOK_BODY_BYTES:
+            raise too_large
+        chunks.append(chunk)
+    raw_body = b"".join(chunks)
 
     try:
         stripe.Webhook.construct_event(

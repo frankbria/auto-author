@@ -54,17 +54,19 @@ async def _get_books_from(peer: str):
     return response, seen["client"][0]
 
 
-# The gateway of a Docker network: the first address of whichever range Docker gave it.
-@pytest.mark.parametrize("gateway", ["172.17.0.1", "172.22.0.1", "172.31.0.1", "192.168.0.1"])
-async def test_the_redirect_to_the_trailing_slash_stays_on_https(gateway):
-    response, _ = await _get_books_from(gateway)
+# The compose network is pinned (#1011), so nginx reaches the backend as its gateway.
+GATEWAY = "172.20.0.1"
+
+
+async def test_the_redirect_to_the_trailing_slash_stays_on_https():
+    response, _ = await _get_books_from(GATEWAY)
 
     assert response.status_code == 307
     assert response.headers["location"] == "https://api.example.test/api/v1/books/"
 
 
 async def test_the_client_is_the_address_nginx_added_not_one_the_caller_sent():
-    _, client = await _get_books_from("172.22.0.1")
+    _, client = await _get_books_from(GATEWAY)
 
     assert client == "198.51.100.9"
 
@@ -76,15 +78,25 @@ async def test_a_peer_that_is_not_the_proxy_is_not_believed():
     assert client == "203.0.113.50"
 
 
+# Another container, or another Docker network's gateway, is not the proxy: whatever
+# forwarded headers it carries are its own to write (#1011).
+@pytest.mark.parametrize("peer", ["172.20.0.3", "172.19.0.5", "172.17.0.1"])
+async def test_another_docker_address_is_not_believed(peer):
+    response, client = await _get_books_from(peer)
+
+    assert response.headers["location"].startswith("http://")
+    assert client == peer
+
+
 async def test_every_answer_tells_the_browser_to_keep_using_https():
-    response, _ = await _get_books_from("172.22.0.1")
+    response, _ = await _get_books_from(GATEWAY)
 
     assert response.headers["strict-transport-security"] == "max-age=31536000"
 
 
 @pytest.mark.parametrize(
     "peer, recorded",
-    [("172.22.0.1", "198.51.100.9"), ("203.0.113.50", "203.0.113.50")],
+    [(GATEWAY, "198.51.100.9"), ("203.0.113.50", "203.0.113.50")],
     ids=["through the proxy", "straight from an untrusted peer"],
 )
 async def test_the_audit_row_records_the_client_the_proxy_named(

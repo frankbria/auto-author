@@ -142,7 +142,7 @@ jobs:
       # never executed here (#839). A service container takes no command, so
       # the replica set is started by hand, on its own port. REQUIRE_REPLICA_SET
       # turns the skip those tests take on a standalone server into a failure.
-      - name: Cascade delete on a single-node replica set
+      - name: Cascade delete and startup repair on a single-node replica set
         working-directory: backend
         env:
           REQUIRE_REPLICA_SET: '1'
@@ -155,7 +155,7 @@ jobs:
           shell 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27018"}]}).ok'
           for _ in $(seq 1 30); do [ "$(shell 'db.hello().isWritablePrimary')" = true ] && break; sleep 1; done
           [ "$(shell 'db.hello().isWritablePrimary')" = true ] || { echo "::error::the replica set has no primary"; exit 1; }
-          uv run pytest tests/test_db/test_cascade_delete_atomic.py --no-cov -v
+          uv run pytest tests/test_db/test_cascade_delete_atomic.py tests/test_startup_indexes.py --no-cov -v
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1

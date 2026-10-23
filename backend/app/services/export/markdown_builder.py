@@ -48,6 +48,13 @@ def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
             convert_b = convert_strong = inline_marks.inline(inline_marks.BOLD)
             convert_em = convert_i = inline_marks.inline(inline_marks.ITALIC)
 
+        def convert_p(self, el, text, parent_tags):
+            # A paragraph that begins `# ` is escaped for the builders too, so
+            # that `_extract_text_formatting` can tell it from a heading (#1026).
+            if not for_a_markdown_reader:
+                text = re.sub(r"^(\s*)(#{1,6} )", r"\1\\\2", text)
+            return super().convert_p(el, text, parent_tags)
+
         def convert_hN(self, n, el, text, parent_tags):
             # markdownify stops at the sixth level itself.
             return super().convert_hN(n + below_the_chapter_heading, el, text, parent_tags)
@@ -124,8 +131,13 @@ class MarkdownMixin:
             if not para.strip():
                 continue
 
-            # Detect headings
-            if para.startswith('# '):
+            # A paragraph that began `# ` arrives as `\# `: not a heading (#1026).
+            if re.match(r'\\#{1,6} ', para):
+                formatted_content.append({
+                    'text': para[1:].strip(),
+                    'style': 'normal'
+                })
+            elif para.startswith('# '):
                 formatted_content.append({
                     'text': para[2:].strip(),
                     'style': 'heading1'

@@ -314,7 +314,7 @@ export default function QuestionDisplay({
       } else if (errorType === ErrorType.AUTH) {
         errorMessage = 'Authentication error. Please sign in again.';
       } else if (errorType === ErrorType.SERVER) {
-        errorMessage = 'Server error. Our team has been notified. Please try again.';
+        errorMessage = 'Server error. Please try again.';
       } else if (errorType === ErrorType.VALIDATION) {
         errorMessage = 'Invalid response format. Please check your input.';
       }
@@ -440,7 +440,7 @@ export default function QuestionDisplay({
       } else if (errorType === ErrorType.AUTH) {
         errorMessage = 'Authentication error. Please sign in again.';
       } else if (errorType === ErrorType.SERVER) {
-        errorMessage = 'Server error. Our team has been notified. Please try again.';
+        errorMessage = 'Server error. Please try again.';
       }
 
       setSaveError(errorMessage);

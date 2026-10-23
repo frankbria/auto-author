@@ -83,6 +83,39 @@ async def ensure_user_indexes() -> None:
     except Exception:
         logger.error("Failed to create index on session.token", exc_info=True)
 
+    await _ensure_better_auth_indexes()
+
+
+async def _ensure_better_auth_indexes() -> None:
+    """The filters better-auth's own lookups use (#1034), as a profiled sign-up,
+    sign-in, password reset and session list issued them. Its adapter makes no
+    index, so each was a collection scan. Default names, like session.token.
+    """
+    for name, field in (
+        ("account", "userId"),  # sign-in, password reset
+        ("session", "userId"),  # session list, revoke, account deletion
+        ("verification", "identifier"),  # email/reset links, trust-device sweep (prefix regex)
+    ):
+        try:
+            await (await get_collection(name)).create_index(field)
+        except Exception:
+            logger.error("Failed to create index on %s.%s", name, field, exc_info=True)
+
+    try:
+        user = await get_collection("user")
+        cursor = await user.aggregate(
+            [{"$group": {"_id": "$email", "n": {"$sum": 1}}}, {"$match": {"n": {"$gt": 1}}}, {"$limit": 1}]
+        )
+        duplicated = await cursor.to_list(1)
+        if duplicated:
+            # A unique build would fail on them; an operator has to merge the accounts.
+            logger.error("user.email has duplicate values; indexing it without unique")
+            await user.create_index("email", name="email_idx")
+        else:
+            await user.create_index("email", name="email_unique_idx", unique=True)
+    except Exception:
+        logger.error("Failed to create index on user.email", exc_info=True)
+
 
 # User-related database operations
 async def get_user_by_auth_id(auth_id: str) -> Optional[Dict]:
@@ -141,9 +174,10 @@ async def release_email(email: str, auth_id: str) -> int:
 
 async def update_user(
     auth_id: str, user_data: Dict, actor_id: str = None,
-    extra_filter: Optional[Dict] = None,
+    extra_filter: Optional[Dict] = None, return_document=True,
 ) -> Optional[Dict]:
-    """Update an existing user.
+    """Update an existing user. ``return_document`` is pymongo's: pass
+    ``ReturnDocument.BEFORE`` for the document the update replaced.
 
     ``extra_filter`` is merged into the query so a caller can make the write
     conditional on server-side state — the condition is then evaluated by Mongo
@@ -172,7 +206,7 @@ async def update_user(
 
     # Update the user
     updated_user = await users_collection.find_one_and_update(
-        query, {"$set": user_data}, return_document=True
+        query, {"$set": user_data}, return_document=return_document
     )
 
     # Log the change if user was found and updated

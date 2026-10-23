@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from pymongo.errors import PyMongoError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from contextlib import asynccontextmanager
 from app.api.endpoints.router import router as api_router
 from app.core.config import settings, is_deployed_env, is_production_env
@@ -16,6 +17,7 @@ from pathlib import Path
 from app.api.request_validation import RequestValidationMiddleware
 from app.core.better_auth_session import SESSION_LOOKUP_TIMEOUT_SECONDS, SessionStoreUnavailable
 from app.core.reporting import report_failure
+from app.services.ai.transport import ai_failure_reported
 from app.core.request_context import configure_logging
 
 configure_logging()
@@ -50,9 +52,21 @@ def _scrub_free_text(event, hint):
             # which for a schema rule holds the value that failed (#996).
             failure["value"] = failure["value"].split(" dup key:")[0].split(", full error:")[0]
     failed = (hint or {}).get("exc_info", (None, None))[1]
-    if isinstance(failed, (ValidationError, ResponseValidationError)) and event.get("exception", {}).get("values"):
-        # Its text quotes the value that did not fit: a stored document (#995).
-        event["exception"]["values"][-1]["value"] = _invalid_fields(failed)
+    # Its text quotes the value that did not fit: a stored document (#995). A
+    # route may catch it and raise something else from it, so the whole chain (#1162).
+    rejections, seen = {}, set()
+    while failed is not None and id(failed) not in seen:
+        seen.add(id(failed))
+        if isinstance(failed, (ValidationError, ResponseValidationError)):
+            rejections.setdefault(type(failed).__name__, failed)
+        failed = failed.__cause__ or (None if failed.__suppress_context__ else failed.__context__)
+    for failure in event.get("exception", {}).get("values", []):
+        if failure.get("type") in rejections:
+            failure["value"] = _invalid_fields(rejections[failure["type"]])
+    failed = (hint or {}).get("exc_info", (None, None))[1]
+    if isinstance(failed, StarletteHTTPException) and ai_failure_reported.get():
+        # The AI transport reported the failure this 5xx answers (#994).
+        return None
     return event
 
 
@@ -74,6 +88,7 @@ def _init_sentry() -> None:
         return
     import sentry_sdk
     from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.openai import OpenAIIntegration
     from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
 
     sentry_sdk.init(
@@ -95,9 +110,15 @@ def _init_sentry() -> None:
         # app log at ERROR, some quoting what the user wrote. An unhandled
         # exception is still reported (see above), and so is a 5xx that a route
         # raises as an HTTPException: the SDK's Starlette integration reports
-        # those itself. A failure answered below 500, or logged and carried on
-        # from, has to call capture_exception or capture_message to be seen.
+        # those itself, except one answering an AI failure, which the AI
+        # transport has already reported (#994). A failure answered below 500,
+        # or logged and carried on from, has to call capture_exception or
+        # capture_message to be seen.
         integrations=[LoggingIntegration(level=None, event_level=None)],
+        # The SDK turns this on by itself. It exists to record prompts and
+        # completions, and it reported every failed attempt on its own. A
+        # failed model call is reported once, by the AI transport (#994).
+        disabled_integrations=[OpenAIIntegration()],
     )
     logger.info("Sentry error tracking initialized")
 
@@ -427,7 +448,8 @@ async def session_store_unavailable_handler(request: Request, exc: SessionStoreU
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    # The type, not the text: an exception's text can quote user data (#1162).
+    logger.error(f"Unhandled exception: {type(exc).__name__}", exc_info=True)
     return _server_error(request, exc)
 
 

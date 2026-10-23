@@ -125,7 +125,7 @@ export default function QuestionContainer({
     } else if (errType === ErrorType.AUTH) {
       errorMessage = 'Authentication error. Please sign in again.';
     } else if (errType === ErrorType.SERVER) {
-      errorMessage = 'Server error. Our team has been notified.';
+      errorMessage = 'Server error.';
     }
 
     setError(errorMessage);

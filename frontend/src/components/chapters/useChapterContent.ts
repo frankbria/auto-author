@@ -21,6 +21,7 @@ import {
   flushChapterContent,
   flushChapterContentOnPageHide,
   isChapterConflict,
+  isChapterTooLarge,
   keepDroppedChapterText,
   reportSaveFailure,
   saveSucceeded,
@@ -80,6 +81,9 @@ export function useChapterContent({
   // A save the server rejected because the chapter changed elsewhere. Saving
   // stops until the writer reloads the server copy or overwrites it.
   const [conflict, setConflict] = useState<ChapterSaveConflict | null>(null);
+  // The text the server refused as too large (#1038): resending it cannot work,
+  // so autosave waits for it to change.
+  const [refusedContent, setRefusedContent] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [autoSavePending, setAutoSavePending] = useState(false);
@@ -87,6 +91,7 @@ export function useChapterContent({
   // up to 30s, so an outage is not a request every few seconds (#855). Any save
   // that works resets it, and so does a change of chapter.
   const autoSaveFailuresRef = useRef(0);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
   const backupKey = chapterBackupKey(bookId, chapterId);
   const droppedKey = chapterDroppedKey(bookId, chapterId);
@@ -138,6 +143,7 @@ export function useChapterContent({
         onContentChange(html);
       }
       if (loadFailed) return;
+      setRefusedContent((refused) => (refused === html ? refused : null));
       // Tagged with its chapter now, so a flush can never send it to the next one.
       unsavedRef.current = html !== lastAutoSavedContent ? { bookId, chapterId, content: html } : null;
       // While saves are failing, each edit refreshes the backup: the next try may be
@@ -199,6 +205,8 @@ export function useChapterContent({
         // The superseding load owns the spinner.
         if (ignore) return;
         console.error('Failed to load chapter content:', err);
+        // A missing chapter is an answer; anything else is a writer who cannot open their work (#1006).
+        if ((err as { statusCode?: unknown } | null)?.statusCode !== 404) reportSaveFailure('load', err);
         setError('Failed to load chapter content');
         setLoadFailed(true);
         setIsLoading(false);
@@ -206,6 +214,10 @@ export function useChapterContent({
     };
     if (!initialContent && bookId && chapterId) {
       loadChapterContent();
+    } else if (initialContent) {
+      // The text arrived while a load was in flight: that load is ignored now.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- ends the load this effect's cleanup just ignored
+      setIsLoading(false);
     }
     return () => {
       ignore = true;
@@ -220,7 +232,14 @@ export function useChapterContent({
     editor.commands.setContent(loaded.content, { emitUpdate: false });
     seenRef.current.set(loaded.key, { lastModified: loaded.lastModified, content: loaded.content });
     unsavedRef.current = null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the imperative editor, as below
+    // A backup of the text the server already holds (a pagehide save whose response
+    // never arrived) is not older text worth a restore prompt.
+    const backup = getValidatedItem<ChapterBackup>(backupKey, validateChapterBackup);
+    if (backup?.content === loaded.content) {
+      localStorage.removeItem(backupKey);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- re-reads storage, as below
+      noteBackupWrite();
+    }
     setLastAutoSavedContent(loaded.content);
     setIsLoading(false);
     const draft = draftWhileFailedRef.current;
@@ -243,6 +262,9 @@ export function useChapterContent({
     const flushOnPageHide = () => {
       const edit = unsavedRef.current;
       unsavedRef.current = null;
+      // A bfcache restore must not fire the pre-hide timer: its token is stale.
+      clearTimeout(autoSaveTimerRef.current);
+      setAutoSavePending(false); // so the first edit after a restore re-arms it
       if (edit) void flushChapterContentOnPageHide(edit, seenRef.current, inFlightSaveRef.current);
     };
     window.addEventListener('pagehide', flushOnPageHide);
@@ -306,6 +328,16 @@ export function useChapterContent({
     );
   };
 
+  // Like a conflict, an answer rather than an outage: no backoff, the server's
+  // words on screen, the text kept in a backup.
+  const handleTooLarge = (content: string, err: Error) => {
+    const backedUp = backupChapterContent({ bookId, chapterId, content }, err);
+    noteBackupWrite();
+    if (shownChapterRef.current !== chapterBackupKey(bookId, chapterId)) return;
+    setRefusedContent(content);
+    setError(backedUp ? `${err.message} Your text is still here and backed up on this device.` : err.message);
+  };
+
   const resolveConflict = (keep: 'mine' | 'theirs') => {
     if (!conflict || !editor) return;
     // The dropped text, including edits made since the conflict, stays
@@ -338,10 +370,10 @@ export function useChapterContent({
 
   // Auto-save functionality with localStorage backup
   useEffect(() => {
-    if (!autoSavePending || !editor || isSaving || loadFailed || conflict) return;
+    if (!autoSavePending || !editor || isSaving || loadFailed || conflict || refusedContent !== null) return;
 
     const delay = Math.max(autoSaveDelayMs, Math.min(autoSaveDelayMs * 2 ** autoSaveFailuresRef.current, 30_000));
-    const timer = setTimeout(async () => {
+    const timer = autoSaveTimerRef.current = setTimeout(async () => {
       const content = editor.getHTML();
       if (content === lastAutoSavedContent) {
         // Nothing to save, but the pending flag must drop: typing only re-arms
@@ -372,6 +404,10 @@ export function useChapterContent({
           handleConflict(content, err);
           return;
         }
+        if (isChapterTooLarge(err)) {
+          handleTooLarge(content, err as Error);
+          return;
+        }
         reportSaveFailure('auto-save', err);
         autoSaveFailuresRef.current += 1;
         if (backupChapterContent({ bookId, chapterId, content }, err)) {
@@ -386,7 +422,7 @@ export function useChapterContent({
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [autoSavePending, autoSaveDelayMs, bookId, chapterId, conflict, editor, isSaving, lastAutoSavedContent, loadFailed]);
+  }, [autoSavePending, autoSaveDelayMs, bookId, chapterId, conflict, editor, isSaving, lastAutoSavedContent, loadFailed, refusedContent]);
 
   const handleSave = async (isAutoSave: boolean = false) => {
     if (isSaving || !editor || loadFailed) return;
@@ -416,6 +452,10 @@ export function useChapterContent({
       console.error('Failed to save chapter:', err);
       if (isChapterConflict(err)) {
         handleConflict(content, err);
+        return;
+      }
+      if (isChapterTooLarge(err)) {
+        handleTooLarge(content, err as Error);
         return;
       }
       setError('Failed to save chapter content');

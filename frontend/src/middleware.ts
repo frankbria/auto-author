@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { buildCsp } from '@/lib/csp';
+import { isDeployedEnv } from '@/lib/deployed-env';
 
 // Middleware for route protection using better-auth session cookies
 // This will:
@@ -74,11 +75,11 @@ export async function middleware(request: NextRequest) {
     return withCsp(request);
   }
 
-  // Check for better-auth session cookie
-  // In production (HTTPS), better-auth sets '__Secure-better-auth.session_token'
-  // In development (HTTP), it sets 'better-auth.session_token'
+  // Routing hint only: the backend (better_auth_session.py) is the authority that
+  // verifies the cookie signature. Accept the same names it does (#975): when deployed
+  // only the __Secure- name, because the bare one can be planted by a sibling subdomain.
   const sessionToken = request.cookies.get('__Secure-better-auth.session_token')
-    || request.cookies.get('better-auth.session_token');
+    || (isDeployedEnv() ? undefined : request.cookies.get('better-auth.session_token'));
 
   // Redirect to sign-in if accessing protected route without session
   if (!sessionToken) {

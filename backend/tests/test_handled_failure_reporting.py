@@ -27,7 +27,7 @@ from app import main
 from app.core import better_auth_session, reporting
 from app.core.config import settings
 from app.core.reporting import report_failure
-from app.db import book as book_dao
+from app.db import book_delete as book_delete_dao
 from app.db import user as user_dao
 from app.services import file_upload_service
 from app.services.chapter_access_service import chapter_access_service
@@ -139,9 +139,9 @@ class TestAnAccessRecordThatCouldNotBeWritten:
         await _seed_toc(book_id, toc)
         chapter_id = toc["chapters"][0]["id"]
 
-        with patch.object(chapter_access_service, "log_access", AsyncMock(side_effect=RuntimeError("database is away"))):
-            first = await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}/content")
-            await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}/content")
+        with patch.object(chapter_access_service, "_insert", AsyncMock(side_effect=RuntimeError("database is away"))):
+            first = await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
+            await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
 
         assert first.status_code == 200
         assert _kinds(reports) == ["access-log"]
@@ -264,7 +264,7 @@ class TestADeletedUsersFilesStillInStorage:
     async def test_storage_that_cannot_even_be_set_up_when_a_book_is_deleted(self, reports):
         """The one way the callers' own handlers are reached: the service cannot be constructed."""
         with patch.object(FileUploadService, "__init__", MagicMock(side_effect=RuntimeError("no upload storage"))):
-            await book_dao._delete_cover_files({"_id": ObjectId(), "cover_image_url": f"/uploads/{SENTINEL}.png"})
+            await book_delete_dao._delete_cover_files({"_id": ObjectId(), "cover_image_url": f"/uploads/{SENTINEL}.png"})
 
         assert _kinds(reports) == ["delete-files"]
         assert SENTINEL not in _said(reports)

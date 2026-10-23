@@ -13,6 +13,7 @@ from bson import ObjectId
 from PIL import Image
 
 import app.db.book as book_dao
+import app.db.book_delete as book_delete_dao
 import app.services.file_upload_service as fus
 from app.db.base import get_collection
 from app.db.book import delete_all_user_books, delete_book
@@ -118,7 +119,7 @@ async def test_failed_cascade_keeps_the_cover_files(
     async def _boom(*args):
         raise RuntimeError("simulated mongo failure")
 
-    monkeypatch.setattr(book_dao, "_delete_books_internal", _boom)
+    monkeypatch.setattr(book_delete_dao, "_delete_books_internal", _boom)
 
     with pytest.raises(RuntimeError):
         await delete(book_id, "owner-2")
@@ -140,7 +141,7 @@ async def test_storage_failure_is_logged_and_the_book_is_still_deleted(
     book_id = await _book_with_cover(uploads, "owner-4")
     _block_storage(uploads, monkeypatch, "COVER_IMAGES_DIR")
 
-    with caplog.at_level(logging.ERROR, logger="app.db.book"):
+    with caplog.at_level(logging.ERROR, logger="app.db.book_delete"):
         assert await delete_book(book_id, "owner-4") is True
 
     books = await get_collection("books")
@@ -399,7 +400,7 @@ async def test_delete_book_removes_a_cover_replaced_after_its_ownership_check(
     the pair; the delete must remove the pair the book had when it went."""
     book_id = await _book_with_cover(uploads, "owner-8")
     new_cover, new_thumb = f"{book_id}_{'1' * 32}.jpg", f"{book_id}_{'1' * 32}_thumb.jpg"
-    real = book_dao._delete_books_internal
+    real = book_delete_dao._delete_books_internal
 
     async def _upload_lands_first(*args):
         (uploads.covers / new_cover).write_bytes(b"new")
@@ -416,7 +417,7 @@ async def test_delete_book_removes_a_cover_replaced_after_its_ownership_check(
         )
         return await real(*args)
 
-    monkeypatch.setattr(book_dao, "_delete_books_internal", _upload_lands_first)
+    monkeypatch.setattr(book_delete_dao, "_delete_books_internal", _upload_lands_first)
 
     assert await delete_book(book_id, "owner-8") is True
 
@@ -458,3 +459,41 @@ async def test_overlapping_cover_uploads_leave_no_orphan(
     assert _names(uploads.covers) == sorted(
         url.rsplit("/", 1)[1] for url in (book["cover_image_url"], book["cover_thumbnail_url"])
     )
+
+
+async def test_overlapping_avatar_uploads_leave_no_orphan(
+    auth_client_factory, test_user, uploads, monkeypatch
+):
+    """Both requests start from a session that still shows the old avatar; the
+    file each write replaced must go, not the session's copy twice (#1143)."""
+    import asyncio
+
+    auth_id = test_user["auth_id"]
+    old = _avatar_file(auth_id)
+    (uploads.avatars / old).write_bytes(b"old")
+    old_url = f"/uploads/profile_pictures/{old}"
+    users = await get_collection("users")
+    client = await auth_client_factory(overrides={"avatar_url": old_url})
+    both_saved = asyncio.Barrier(2)
+    real = fus.FileUploadService.process_and_save_profile_picture
+
+    async def _save_then_wait(self, *args, **kwargs):
+        url = await real(self, *args, **kwargs)
+        await asyncio.wait_for(both_saved.wait(), timeout=10)
+        return url
+
+    monkeypatch.setattr(
+        fus.FileUploadService, "process_and_save_profile_picture", _save_then_wait
+    )
+
+    responses = await asyncio.gather(*(
+        client.post(
+            "/api/v1/users/me/avatar",
+            files={"file": ("a.jpg", _jpeg(), "image/jpeg")},
+        )
+        for _ in range(2)
+    ))
+
+    assert [r.status_code for r in responses] == [200, 200], [r.text for r in responses]
+    user = await users.find_one({"auth_id": auth_id})
+    assert _names(uploads.avatars) == [user["avatar_url"].rsplit("/", 1)[1]]
