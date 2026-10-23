@@ -98,9 +98,14 @@ async def _upload(client, book_id: str):
 
 
 @pytest.mark.parametrize("method", ["put", "patch"])
-async def test_book_update_ignores_cover_image_url(auth_client_factory, method):
+async def test_book_update_ignores_cover_image_url(auth_client_factory, uploads, method):
     client = await auth_client_factory()
-    book_id = await _book(ME, cover_image_url="/uploads/cover_images/server.jpg")
+    book_id = await _book(ME)
+    server_url = f"/uploads/cover_images/{book_id}_{uuid.uuid4().hex}.jpg"
+    books = await get_collection("books")
+    await books.update_one(
+        {"_id": ObjectId(book_id)}, {"$set": {"cover_image_url": server_url}}
+    )
 
     response = await getattr(client, method)(
         f"/api/v1/books/{book_id}",
@@ -110,9 +115,9 @@ async def test_book_update_ignores_cover_image_url(auth_client_factory, method):
     assert response.status_code == 200, response.text
     stored = await _stored(book_id)
     assert stored["title"] == "Renamed"
-    assert stored["cover_image_url"] == "/uploads/cover_images/server.jpg"
+    assert stored["cover_image_url"] == server_url
     # The response still reports the server's value.
-    assert response.json()["cover_image_url"] == "/uploads/cover_images/server.jpg"
+    assert response.json()["cover_image_url"] == server_url
 
 
 async def test_an_empty_cover_image_url_does_not_clear_the_stored_one(

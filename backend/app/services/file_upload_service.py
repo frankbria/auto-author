@@ -77,6 +77,18 @@ def _resolve_local_cover_path(image_url: str, book_id: str) -> Optional[Path]:
     )
 
 
+def is_own_cover_url(url: Optional[str], book_id: str) -> bool:
+    """Whether ``url`` names one of ``book_id``'s cover files in the active
+    storage: #797's rule, so a typed-in legacy value is not rendered (#941)."""
+    if not url:
+        return False
+    # Not get_cloud_storage_service() alone: in local mode it warns on every call.
+    cloud = get_cloud_storage_service() if settings.storage_provider != "local" else None
+    if cloud:
+        return cloud.owned_key(url, f"cover_images/{book_id}/") is not None
+    return _resolve_local_cover_path(url, book_id) is not None
+
+
 def _resolve_local_profile_path(image_url: str, user_id: str) -> Optional[Path]:
     """Resolve a /uploads/profile_pictures/<name> URL to that user's file."""
     return _resolve_local_path(
@@ -358,6 +370,33 @@ class FileUploadService:
                 # raises, so a file left behind is reported from here (#996).
                 logger.error(f"Error deleting image file {url}: {e}")
                 report_failure("delete-files", e)
+
+    async def delete_cover_images(self, files: list[tuple[str, str]]) -> None:
+        """Delete many ``(book_id, url)`` cover files in batched storage calls
+        (#941), each refused unless it is that book's own (#797). Never raises."""
+        try:
+            if self.cloud_storage:
+                failed = await self.cloud_storage.delete_images(
+                    [(url, f"cover_images/{book_id}/") for book_id, url in files]
+                )
+            else:
+                failed = []
+                for book_id, url in files:
+                    path = _resolve_local_cover_path(url, book_id)
+                    if path is None:
+                        failed.append(url)
+                    elif path.exists():
+                        path.unlink()
+        except Exception as e:
+            logger.error(f"Error deleting {len(files)} cover image files: {e}")
+            report_failure("delete-files", e)
+            return
+        if failed:
+            logger.warning(
+                "Storage did not delete %d cover image file(s): %s",
+                len(failed), ", ".join(failed[:20]),
+            )
+            report_failure("delete-files", message="Storage did not delete cover images")
 
     async def process_and_save_profile_picture(
         self,

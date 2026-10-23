@@ -218,6 +218,7 @@ async def test_s3_sweep_deletes_only_the_unreferenced_key(reinit_db):
 
 def _cloudinary():
     service = CloudinaryStorageService.__new__(CloudinaryStorageService)
+    service.cloud_name = "demo"
     service.cloudinary_uploader = Mock()
     service.cloudinary_uploader.destroy.return_value = {"result": "ok"}
     service.cloudinary_api = Mock()

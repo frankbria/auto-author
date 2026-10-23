@@ -444,6 +444,9 @@ export interface BookResponse extends BookBase {
   /** Cover image URL. Written by the cover upload only; not a request field (#797). */
   cover_image_url?: string;
 
+  /** Cover thumbnail URL, written with the cover (#941). */
+  cover_thumbnail_url?: string;
+
   /** Table of contents items (chapters and sections) */
   toc_items: TocItem[];
 
