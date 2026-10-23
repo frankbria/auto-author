@@ -19,19 +19,19 @@ FRONTEND_TYPES = Path(__file__).resolve().parents[4] / "frontend" / "src" / "typ
 def _frontend_enum_values(filename: str):
     src = (FRONTEND_TYPES / filename).read_text()
     body = re.search(r"enum ChapterStatus\s*\{(.*?)\}", src, re.S)
-    if body is None:  # chapter-tabs.ts re-exports the single enum from book.ts
+    if body is None:  # chapter-tabs.ts re-exports the single enum from book-enums.ts
         return None
     return re.findall(r"=\s*'([^']+)'", body.group(1))
 
 
 def test_frontend_has_one_chapter_status_enum_definition():
     assert _frontend_enum_values("chapter-tabs.ts") is None
-    assert _frontend_enum_values("book.ts"), "could not parse ChapterStatus in book.ts"
+    assert _frontend_enum_values("book-enums.ts"), "could not parse ChapterStatus in book-enums.ts"
 
 
 @pytest.mark.asyncio
 async def test_bulk_status_accepts_every_frontend_status_value(auth_client_factory):
-    values = _frontend_enum_values("book.ts")
+    values = _frontend_enum_values("book-enums.ts")
     assert "in-progress" in values  # parser sanity: not vacuously empty
 
     api = await auth_client_factory()

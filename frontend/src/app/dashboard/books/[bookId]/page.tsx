@@ -12,6 +12,9 @@ import { toast } from '@/lib/toast';
 import Image from 'next/image';
 import { BookMetadataForm } from '@/components/BookMetadataForm';
 import { BookCoverUpload } from '@/components/books/BookCoverUpload';
+import { BookWizardSteps } from '@/components/books/BookWizardSteps';
+import { BookStatsPanel } from '@/components/books/BookStatsPanel';
+import { NoChaptersPlaceholder } from '@/components/books/NoChaptersPlaceholder';
 import { uploadUrl } from '@/lib/api/imageUpload';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChapterTabs } from '@/components/chapters/ChapterTabs';
@@ -388,77 +391,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
               Last edited {formatDate(book.updated_at ?? book.created_at ?? '')}
             </div>
           </div>
-        </div>        {/* Wizard/Stepper Actions */}
-        <div className="mt-8 mb-8">
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            {/* Step 1: Book Summary */}
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col items-center">
-                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">1</div>
-                <div className="h-8 w-1 bg-indigo-300/30 md:h-1 md:w-8 md:mx-2 md:my-0 my-2"></div>
-              </div>
-              <div>
-                <div className="font-semibold text-foreground">Book Summary</div>
-                <div className="text-xs text-muted-foreground">Describe your book&apos;s main idea and structure</div>
-                <Link href={`/dashboard/books/${bookId}/summary`}>
-                  <button className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
-                    {book?.summary && book.summary.length >= 30 ? 'Edit Book Summary' : 'Start with Book Summary'}
-                  </button>
-                </Link>
-              </div>
-            </div>
-            {/* Step 2: TOC Generation */}
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full ${(book?.summary && book.summary.length >= 30) ? 'bg-indigo-600 text-white' : 'bg-muted text-muted-foreground border border-border'} flex items-center justify-center font-bold`}>2</div>
-                <div className="h-8 w-1 bg-indigo-300/30 md:h-1 md:w-8 md:mx-2 md:my-0 my-2"></div>
-              </div>
-              <div>
-                <div className="font-semibold text-foreground">Generate TOC</div>
-                <div className="text-xs text-muted-foreground">AI generates a Table of Contents from your summary</div>
-                {book?.summary && book.summary.length >= 30 ? (
-                  book.chapters && book.chapters.length > 0 ? (
-                    <Link href={`/dashboard/books/${bookId}/edit-toc`}>
-                      <button className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
-                        Edit TOC
-                      </button>
-                    </Link>
-                  ) : (
-                    <Link href={`./generate-toc`}>
-                      <button className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
-                        Generate TOC
-                      </button>
-                    </Link>
-                  )
-                ) : (
-                  <button className="mt-2 px-4 py-2 bg-muted text-muted-foreground font-medium rounded-md cursor-not-allowed" disabled>
-                    Complete Book Summary First
-                  </button>
-                )}
-              </div>
-            </div>
-            {/* Step 3: Write Content */}
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full ${(book?.summary && book.summary.length >= 30 && book.chapters && book.chapters.length > 0) ? 'bg-indigo-600 text-white' : 'bg-muted text-muted-foreground border border-border'} flex items-center justify-center font-bold`}>3</div>
-              </div>
-              <div>
-                <div className="font-semibold text-foreground">Write Content</div>
-                <div className="text-xs text-muted-foreground">Write and edit your chapter content</div>
-                {(book?.summary && book.summary.length >= 30 && book.chapters && book.chapters.length > 0) ? (
-                  <div className="mt-2 text-sm text-green-700 dark:text-green-400">
-                    ✓ Ready to write! Use the tabs below to start writing your chapters.
-                  </div>
-                ) : (
-                  <button className="mt-2 px-4 py-2 bg-muted text-muted-foreground font-medium rounded-md cursor-not-allowed" disabled>
-                    {book?.summary && book.summary.length >= 30 ? 'Generate TOC First' : 'Complete Book Summary First'}
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex-1"></div>
-          </div>
         </div>
+        <BookWizardSteps bookId={bookId} summary={book.summary} chapterCount={book.chapters.length} />
         {/* End Wizard/Stepper Actions */}
         {!editMode ? (
           <>
@@ -528,80 +462,10 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
             />
           ) : (
             /* No chapters placeholder */
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <div className="mb-4">
-                <svg className="h-16 w-16 text-muted-foreground mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                <h3 className="text-xl font-medium text-foreground mb-2">No chapters yet</h3>
-                <p className="text-muted-foreground text-sm max-w-md">
-                  Complete your book summary and generate a Table of Contents to start writing chapters.
-                </p>
-              </div>
-              {book?.summary && book.summary.length >= 30 ? (
-                <Link href={`./generate-toc`}>
-                  <button className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
-                    Generate Table of Contents
-                  </button>
-                </Link>
-              ) : (
-                <Link href={`./summary`}>
-                  <button className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md">
-                    Complete Book Summary
-                  </button>
-                </Link>
-              )}
-            </div>
+            <NoChaptersPlaceholder hasSummary={!!book.summary && book.summary.length >= 30} />
           )}
         </div>
-        <div className="bg-card border border-border p-5 rounded-lg">
-          <h2 className="text-xl font-semibold text-foreground mb-4">Book Stats</h2>
-          <div className="space-y-3">
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Overall Progress</div>
-              <div className="flex items-center gap-2">
-                <div
-                  className="flex-1 bg-muted rounded-full h-2"
-                  role="progressbar"
-                  aria-label="Overall progress"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={book.progress}
-                >
-                  <div
-                    className="bg-indigo-600 h-2 rounded-full"
-                    style={{ width: `${book.progress}%` }}
-                  ></div>
-                </div>
-                <span className="text-foreground">{book.progress}%</span>
-              </div>
-            </div>
-            <div className="pt-2">
-              <div className="text-sm text-muted-foreground mb-1">Chapters</div>
-              <div className="text-foreground font-medium">{book.chapters.length}</div>
-            </div>
-            <div className="pt-2">
-              <div className="text-sm text-muted-foreground mb-1">Total Word Count</div>
-              <div className="text-foreground font-medium">
-                {book.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0).toLocaleString()}
-              </div>
-            </div>
-            <div className="pt-2">
-              <div className="text-sm text-muted-foreground mb-1">Completed Chapters</div>
-              <div className="text-foreground font-medium">
-                {book.chapters.filter(ch => ch.completed).length} of {book.chapters.length}
-              </div>
-            </div>
-          </div>
-          <div className="mt-6 pt-4 border-t border-border">
-            <button
-              onClick={handleExportClick}
-              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-all"
-            >
-              Export Book
-            </button>
-          </div>
-        </div>
+        <BookStatsPanel progress={book.progress} chapters={book.chapters} onExport={handleExportClick} />
       </div>
 
       {/* Export Modals */}
