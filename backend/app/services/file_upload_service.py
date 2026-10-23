@@ -359,6 +359,33 @@ class FileUploadService:
                 logger.error(f"Error deleting image file {url}: {e}")
                 report_failure("delete-files", e)
 
+    async def delete_cover_images(self, files: list[tuple[str, str]]) -> None:
+        """Delete many ``(book_id, url)`` cover files in batched storage calls
+        (#941), each refused unless it is that book's own (#797). Never raises."""
+        try:
+            if self.cloud_storage:
+                failed = await self.cloud_storage.delete_images(
+                    [(url, f"cover_images/{book_id}/") for book_id, url in files]
+                )
+            else:
+                failed = []
+                for book_id, url in files:
+                    path = _resolve_local_cover_path(url, book_id)
+                    if path is None:
+                        failed.append(url)
+                    elif path.exists():
+                        path.unlink()
+        except Exception as e:
+            logger.error(f"Error deleting {len(files)} cover image files: {e}")
+            report_failure("delete-files", e)
+            return
+        if failed:
+            logger.warning(
+                "Storage did not delete %d cover image file(s): %s",
+                len(failed), ", ".join(failed[:20]),
+            )
+            report_failure("delete-files", message="Storage did not delete cover images")
+
     async def process_and_save_profile_picture(
         self,
         file: UploadFile,

@@ -48,6 +48,15 @@ class CloudStorageInterface(Protocol):
         """Upload an image and return its URL."""
         ...
 
+    def owned_key(self, url: str, key_prefix: str) -> Optional[str]:
+        """The storage key ``url`` names, if this provider wrote it under ``key_prefix``."""
+        ...
+
+    async def delete_images(self, items: list[tuple[str, str]]) -> list[str]:
+        """Delete many ``(url, key_prefix)`` images in batched calls. Returns the
+        URLs not deleted, refused ones included."""
+        ...
+
     async def delete_image(self, url: str, key_prefix: str) -> bool:
         """Delete an image by URL, only if its key is under ``key_prefix``."""
         ...
@@ -109,15 +118,49 @@ class S3StorageService:
             logger.error(f"S3 upload failed: {str(e)}")
             raise Exception(f"Failed to upload to S3: {str(e)}")
 
+    def owned_key(self, url: str, key_prefix: str) -> Optional[str]:
+        """The key of this bucket's ``url`` if it sits under ``key_prefix``."""
+        # Format: https://bucket.s3.region.amazonaws.com/folder/file.jpg
+        try:
+            parsed = urlparse(url)
+        except ValueError:  # urlparse rejects some malformed stored values
+            return None
+        if parsed.hostname != f"{self.bucket_name}.s3.{self.region}.amazonaws.com":
+            return None
+        key = parsed.path.lstrip("/")
+        return key if _is_owned_key(key, key_prefix) else None
+
+    async def delete_images(self, items: list[tuple[str, str]]) -> list[str]:
+        """Delete in DeleteObjects calls of up to 1,000 keys, the API's cap."""
+        urls = {}
+        failed = []
+        for url, key_prefix in items:
+            key = self.owned_key(url, key_prefix)
+            if key is None:
+                failed.append(url)
+            else:
+                urls[key] = url
+        keys = list(urls)
+        for start in range(0, len(keys), 1000):
+            chunk = keys[start:start + 1000]
+            try:
+                response = await asyncio.to_thread(
+                    self.s3_client.delete_objects,
+                    Bucket=self.bucket_name,
+                    Delete={"Objects": [{"Key": key} for key in chunk], "Quiet": True},
+                )
+            except self.ClientError as e:
+                logger.error(f"S3 batch delete failed: {str(e)}")
+                failed += [urls[key] for key in chunk]
+                continue
+            failed += [urls[error["Key"]] for error in response.get("Errors", [])]
+        return failed
+
     async def delete_image(self, url: str, key_prefix: str) -> bool:
         """Delete an image from S3 by URL, only if its key is under ``key_prefix``."""
         try:
-            # Format: https://bucket.s3.region.amazonaws.com/folder/file.jpg
-            parsed = urlparse(url)
-            if parsed.hostname != f"{self.bucket_name}.s3.{self.region}.amazonaws.com":
-                return False
-            key = parsed.path.lstrip("/")
-            if not _is_owned_key(key, key_prefix):
+            key = self.owned_key(url, key_prefix)
+            if key is None:
                 logger.warning("Refusing to delete S3 key outside %s", key_prefix)
                 return False
 
@@ -207,19 +250,53 @@ class CloudinaryStorageService:
             logger.error(f"Cloudinary upload failed: {str(e)}")
             raise Exception(f"Failed to upload to Cloudinary: {str(e)}")
 
+    def owned_key(self, url: str, key_prefix: str) -> Optional[str]:
+        """The public_id of a Cloudinary ``url`` if it sits under ``key_prefix``."""
+        # Format: https://res.cloudinary.com/<cloud>/image/upload/v123/<public_id>.<ext>
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return None
+        if parsed.hostname != "res.cloudinary.com" or "/image/upload/" not in parsed.path:
+            return None
+        parts = parsed.path.split("/image/upload/", 1)[1].split("/")
+        if re.fullmatch(r"v\d+", parts[0]):
+            parts = parts[1:]
+        public_id = "/".join(parts).rsplit(".", 1)[0]  # Remove extension
+        return public_id if _is_owned_key(public_id, key_prefix) else None
+
+    async def delete_images(self, items: list[tuple[str, str]]) -> list[str]:
+        """Delete in Admin API delete_resources calls of up to 100 public_ids,
+        the API's cap. Anything not answered "deleted" is reported."""
+        urls = {}
+        failed = []
+        for url, key_prefix in items:
+            public_id = self.owned_key(url, key_prefix)
+            if public_id is None:
+                failed.append(url)
+            else:
+                urls[public_id] = url
+        ids = list(urls)
+        for start in range(0, len(ids), 100):
+            chunk = ids[start:start + 100]
+            try:
+                result = await asyncio.to_thread(
+                    self.cloudinary_api.delete_resources,
+                    chunk, resource_type="image", type="upload",
+                )
+                deleted = result.get("deleted", {})
+            except Exception as e:
+                logger.error(f"Cloudinary batch delete failed: {str(e)}")
+                deleted = {}
+            failed += [urls[i] for i in chunk if deleted.get(i) != "deleted"]
+        return failed
+
     async def delete_image(self, url: str, key_prefix: str) -> bool:
         """Delete an image from Cloudinary by URL, only if its public_id is
         under ``key_prefix``."""
         try:
-            # Format: https://res.cloudinary.com/<cloud>/image/upload/v123/<public_id>.<ext>
-            parsed = urlparse(url)
-            if parsed.hostname != "res.cloudinary.com" or "/image/upload/" not in parsed.path:
-                return False
-            parts = parsed.path.split("/image/upload/", 1)[1].split("/")
-            if re.fullmatch(r"v\d+", parts[0]):
-                parts = parts[1:]
-            public_id = "/".join(parts).rsplit(".", 1)[0]  # Remove extension
-            if not _is_owned_key(public_id, key_prefix):
+            public_id = self.owned_key(url, key_prefix)
+            if public_id is None:
                 logger.warning("Refusing to destroy Cloudinary id outside %s", key_prefix)
                 return False
 
