@@ -26,8 +26,13 @@ interface AfterHookContext {
 }
 
 function reportFailure(operation: string, error: unknown) {
-  console.error(`Auth ${operation} failed:`, error);
-  Sentry.captureException(error, { tags: { feature: "auth", operation } });
+  // Reporting must not throw either: the callers promise never to.
+  try {
+    console.error(`Auth ${operation} failed:`, error);
+    Sentry.captureException(error, { tags: { feature: "auth", operation } });
+  } catch {
+    // Nothing left to report to.
+  }
 }
 
 /** Runs `step`, once more if it throws; true when either attempt succeeded. */
@@ -50,10 +55,10 @@ async function withOneRetry(operation: string, step: () => Promise<unknown>) {
  * rotates only the session that made the change. Disabling 2FA also forgets
  * every trusted device, where better-auth forgets only the caller's.
  *
- * If the sessions cannot be ended, the change's own answer is kept with
- * `otherSessionsEnded: false` rather than replaced by an error: the change has
- * already happened, and for regenerated backup codes an error would lose the
- * only copy of the new codes.
+ * If a step fails, the change's own answer is kept and flagged rather than
+ * replaced by an error: the change has already happened, and for regenerated
+ * backup codes an error would lose the only copy of the new codes. The flags
+ * are `otherSessionsEnded: false` and, on disable, `trustedDevicesForgotten: false`.
  */
 export async function endOtherSessionsOnSecondFactorChange(ctx: AfterHookContext, database: Db) {
   if (!SECOND_FACTOR_CHANGES.has(ctx.path ?? "") || isAPIError(ctx.context.returned)) return;
@@ -64,7 +69,10 @@ export async function endOtherSessionsOnSecondFactorChange(ctx: AfterHookContext
   // user merely re-checking a code changes nothing.
   if (ctx.path === "/two-factor/verify-totp" && !ctx.context.newSession) return;
 
-  if (ctx.path === "/two-factor/disable") await forgetTrustedDevices(database, caller.user.id);
+  const flags: Record<string, false> = {};
+  if (ctx.path === "/two-factor/disable" && !(await forgetTrustedDevices(database, caller.user.id))) {
+    flags.trustedDevicesForgotten = false;
+  }
 
   // enable and disable replaced the caller's session with this new one.
   const keep = (ctx.context.newSession ?? caller).session.token;
@@ -75,9 +83,8 @@ export async function endOtherSessionsOnSecondFactorChange(ctx: AfterHookContext
       sessions.map((s) => s.token).filter((token) => token !== keep)
     );
   });
-  if (!ended) {
-    return ctx.json({ ...(ctx.context.returned as object), otherSessionsEnded: false });
-  }
+  if (!ended) flags.otherSessionsEnded = false;
+  if (Object.keys(flags).length) return ctx.json({ ...(ctx.context.returned as object), ...flags });
 }
 
 /**
@@ -85,11 +92,12 @@ export async function endOtherSessionsOnSecondFactorChange(ctx: AfterHookContext
  * on a password reset and on disabling 2FA. The two-factor plugin keeps each
  * as a `trust-device-*` verification row whose value is the user id.
  *
- * Never throws: on a reset, better-auth ends the account's sessions only after
- * this returns, and that must happen even when this cleanup fails.
+ * Never throws, and resolves false when the rows could not be deleted: on a
+ * reset, better-auth ends the account's sessions only after this returns, and
+ * that must happen even when this cleanup fails.
  */
 export async function forgetTrustedDevices(database: Db, userId: string) {
-  await withOneRetry("forget-trusted-devices", () =>
+  return withOneRetry("forget-trusted-devices", () =>
     database.collection("verification").deleteMany({ value: userId, identifier: /^trust-device-/ })
   );
 }

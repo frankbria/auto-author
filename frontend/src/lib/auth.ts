@@ -57,7 +57,9 @@ function createAuthInstance(database: Db) {
       revokeSessionsOnPasswordReset: true,
       // ...and forgets the devices trusted to skip the second factor (#972).
       // better-auth ends the sessions right after this returns; it never throws.
-      onPasswordReset: ({ user }) => forgetTrustedDevices(database, user.id),
+      onPasswordReset: async ({ user }) => {
+        await forgetTrustedDevices(database, user.id);
+      },
       // Password reset configuration
       sendResetPassword: async ({ user, url }) => {
         // Send password reset email

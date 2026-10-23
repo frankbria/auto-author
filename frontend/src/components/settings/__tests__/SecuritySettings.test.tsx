@@ -448,6 +448,35 @@ describe('TwoFactorSetup', () => {
     }
   );
 
+  it('warns when 2FA was disabled but trusted devices could not be forgotten (#972)', async () => {
+    mockTwoFactorDisable.mockResolvedValue({
+      data: { status: true, trustedDevicesForgotten: false },
+      error: null,
+    });
+    mockUseSession.mockReturnValue({
+      data: {
+        user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: true },
+        session: { token: 'tok' },
+      },
+    });
+    render(<TwoFactorSetup />);
+    fireEvent.click(screen.getByRole('button', { name: /disable 2fa/i }));
+    fireEvent.change(screen.getByLabelText('Confirm your password'), {
+      target: { value: 'my-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Disable 2FA' }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Trusted devices were not forgotten', variant: 'destructive' })
+      )
+    );
+    // The sessions did end, and the page says so.
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Other devices were signed out.' })
+    );
+  });
+
   it('shows a destructive toast when the disable password is wrong', async () => {
     mockTwoFactorDisable.mockResolvedValue({ data: null, error: { message: 'Invalid password' } });
     mockUseSession.mockReturnValue({

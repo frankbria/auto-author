@@ -29,6 +29,16 @@ const endedOtherSessions = (data: unknown) => {
   return false;
 };
 
+/** Disabling also forgets every trusted device; `trustedDevicesForgotten: false` says it could not. */
+const warnIfTrustedDevicesRemain = (data: unknown) => {
+  if ((data as { trustedDevicesForgotten?: boolean } | null)?.trustedDevicesForgotten !== false) return;
+  toast({
+    title: 'Trusted devices were not forgotten',
+    description: 'Devices you trusted may skip the code if you turn 2FA back on.',
+    variant: 'destructive',
+  });
+};
+
 /**
  * TOTP two-factor authentication setup backed by better-auth's twoFactor
  * plugin. Enabling requires the account password, then a scanned QR code /
@@ -139,6 +149,7 @@ export default function TwoFactorSetup() {
           title: 'Two-factor authentication disabled',
           description: endedOtherSessions(data) ? 'Other devices were signed out.' : undefined,
         });
+        warnIfTrustedDevicesRemain(data);
       }
     } finally {
       setIsSubmitting(false);
