@@ -6,24 +6,24 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     # Core FastAPI dependencies
-    "fastapi==0.142.2",
+    "fastapi==0.143.0",
     "uvicorn==0.54.0",
     "python-multipart==0.0.32",
     # Database
-    "pymongo==4.18.2",
+    "pymongo==4.18.3",
     # Configuration and environment
     "python-dotenv==1.2.4",
-    "pydantic[email]==2.13.5",
+    "pydantic[email]==2.14.0",
     "pydantic-settings==2.15.0",
     # AI and external APIs
-    "openai==3.26.0",
+    "openai==3.27.0",
     "requests==2.34.2",
     # Authentication is better-auth (TypeScript) end to end: the backend only
     # validates session cookies, so it needs no JWT or password-hashing library.
     # python-jose (zero importers, dragged in ecdsa/rsa/pyasn1) and passlib
     # (helpers had no production callers) were removed in #342.
     # AWS SDK for transcription and S3
-    "boto3==1.43.108",
+    "boto3==1.43.110",
     # Image processing and storage
     "cloudinary==1.46.3",
     "pillow==13.0.0",
