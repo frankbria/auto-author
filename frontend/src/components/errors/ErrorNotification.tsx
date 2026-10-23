@@ -61,6 +61,18 @@ function RetryCountdown({ initialSeconds, onRetry }: { initialSeconds: number; o
 }
 
 /**
+ * One element per line: a toast description collapses newlines, so a joined
+ * string renders as a run-on sentence.
+ */
+function descriptionLines(lines: string[]) {
+  return (
+    <div className="space-y-1">
+      {lines.map((line) => <p key={line}>{line}</p>)}
+    </div>
+  );
+}
+
+/**
  * Show an error notification using the toast system
  *
  * @param error - Classified error to display
@@ -142,10 +154,8 @@ export function showErrorNotification(
   } else if (error.type === ErrorType.PERMANENT) {
     // Permanent error with field guidance
     const description = error.fieldErrors
-      ? Object.entries(error.fieldErrors)
-          .map(([field, msg]) => `${field}: ${msg}`)
-          .join('\n')
-      : error.details || error.suggestedActions?.join('\n');
+      ? descriptionLines(Object.entries(error.fieldErrors).map(([field, msg]) => `${field}: ${msg}`))
+      : error.details || (error.suggestedActions && descriptionLines(error.suggestedActions));
 
     toast.error(error.message, {
       description,
@@ -155,13 +165,10 @@ export function showErrorNotification(
   } else {
     // System error with correlation ID
     toast.error(error.message, {
-      // The toast description collapses newlines, so each line is its own element.
-      description: (
-        <div className="space-y-1">
-          <p>Reference ID: {error.correlationId}</p>
-          {error.suggestedActions?.map((action) => <p key={action}>{action}</p>)}
-        </div>
-      ),
+      description: descriptionLines([
+        `Reference ID: ${error.correlationId}`,
+        ...(error.suggestedActions ?? []),
+      ]),
       duration: defaultDuration,
       onDismiss,
     });

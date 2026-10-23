@@ -347,12 +347,9 @@ describe('showErrorNotification', () => {
       fieldErrors: { title: 'Required', email: 'Invalid' },
     });
     showErrorNotification(error);
-    expect(mockToast.error).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({
-        description: expect.stringContaining('title: Required'),
-      })
-    );
+    const [, opts] = mockToast.error.mock.calls[0];
+    render(<div>{opts.description}</div>);
+    expect(screen.getByText('title: Required')).not.toBe(screen.getByText('email: Invalid'));
   });
 
   it('calls toast.error with details for PERMANENT error without fieldErrors', () => {
@@ -367,18 +364,15 @@ describe('showErrorNotification', () => {
     );
   });
 
-  it('calls toast.error with suggestedActions joined for PERMANENT without fieldErrors or details', () => {
+  it('calls toast.error with suggestedActions on separate lines for PERMANENT without fieldErrors or details', () => {
     const error = makeError({
       type: ErrorType.PERMANENT,
       suggestedActions: ['Check your input', 'Try a different value'],
     });
     showErrorNotification(error);
-    expect(mockToast.error).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({
-        description: 'Check your input\nTry a different value',
-      })
-    );
+    const [, opts] = mockToast.error.mock.calls[0];
+    render(<div>{opts.description}</div>);
+    expect(screen.getByText('Check your input')).not.toBe(screen.getByText('Try a different value'));
   });
 
   // --- AI_SERVICE + retryAfter ---
