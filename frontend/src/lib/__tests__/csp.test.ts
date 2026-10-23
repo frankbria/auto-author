@@ -62,6 +62,12 @@ describe('buildCsp — production', () => {
     expect(directive(ciCsp, 'connect-src')).toContain('http://localhost:8000');
   });
 
+  it('img-src carries the API origin, so an http API (local, CI) can serve uploads (#941)', () => {
+    expect(directive(csp, 'img-src')).toContain('https://api.dev.autoauthor.app');
+    const ciCsp = buildCsp(NONCE, { isDev: false, apiUrl: 'http://localhost:8000/api/v1' });
+    expect(directive(ciCsp, 'img-src')).toContain('http://localhost:8000');
+  });
+
   it('falls back to connect-src self only when the API URL is unparseable', () => {
     const broken = buildCsp(NONCE, { isDev: false, apiUrl: 'not a url' });
     expect(directive(broken, 'connect-src')).toBe("connect-src 'self'");

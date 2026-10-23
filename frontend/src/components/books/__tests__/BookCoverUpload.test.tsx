@@ -94,4 +94,30 @@ describe('BookCoverUpload (#941)', () => {
     expect((toast.error as jest.Mock).mock.calls.at(-1)![0].description).toBe(message);
     expect(onUploaded).not.toHaveBeenCalled();
   });
+
+  it('clears the input after a rejected file, so picking it again fires change', () => {
+    const setValue = jest.spyOn(HTMLInputElement.prototype, 'value', 'set');
+    render(<BookCoverUpload bookId="b1" coverUrl={undefined} onUploaded={jest.fn()} />);
+    choose(makeFile('text/plain', 100, 'a.txt'));
+    expect(setValue).toHaveBeenCalledWith('');
+    setValue.mockRestore();
+  });
+
+  it('keeps the button focusable while uploading, and ignores clicks on it', async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    render(<BookCoverUpload bookId="b1" coverUrl={undefined} onUploaded={jest.fn()} />);
+    const button = screen.getByRole('button', { name: /upload cover/i });
+    button.focus();
+    choose(makeFile('image/png', 1000, 'c.png'));
+
+    const busy = await screen.findByRole('button', { name: /uploading/i });
+    expect(busy).toBe(button);
+    expect(busy).not.toBeDisabled();
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    expect(busy).toHaveFocus();
+
+    const pick = jest.spyOn(screen.getByLabelText(/upload book cover/i) as HTMLInputElement, 'click');
+    fireEvent.click(busy);
+    expect(pick).not.toHaveBeenCalled();
+  });
 });

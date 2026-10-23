@@ -12,6 +12,10 @@ describe('uploadUrl (#941)', () => {
     expect(uploadUrl(url)).toBe(url);
   });
 
+  it('leaves a protocol-relative URL alone instead of treating it as local', () => {
+    expect(uploadUrl('//evil.test/x.jpg')).toBe('//evil.test/x.jpg');
+  });
+
   it('gives nothing for no URL', () => {
     expect(uploadUrl(null)).toBeUndefined();
     expect(uploadUrl(undefined)).toBeUndefined();

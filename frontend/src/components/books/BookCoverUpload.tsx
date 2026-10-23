@@ -35,6 +35,7 @@ export function BookCoverUpload({ bookId, coverUrl, onUploaded }: BookCoverUploa
     const problem = imageFileProblem(file);
     if (problem) {
       toast.error(problem);
+      e.target.value = ''; // so re-picking the same file fires change again
       return;
     }
 
@@ -80,8 +81,10 @@ export function BookCoverUpload({ bookId, coverUrl, onUploaded }: BookCoverUploa
         <Button
           type="button"
           variant="outline"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
+          // Not `disabled`: that would drop keyboard focus to the page body mid-upload.
+          onClick={() => !uploading && inputRef.current?.click()}
+          disabled={false}
+          aria-disabled={uploading || undefined}
           busy={uploading}
           aria-describedby={hintId}
         >

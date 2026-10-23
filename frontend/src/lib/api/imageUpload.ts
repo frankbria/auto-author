@@ -12,7 +12,8 @@ const MAX_SIZE = 5 * 1024 * 1024; // 5MB — matches backend
  */
 export function uploadUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
-  return url.startsWith('/') ? new URL(url, API_BASE_URL).href : url;
+  // `//host/x` is protocol-relative, another origin, not a local path.
+  return url.startsWith('/') && !url.startsWith('//') ? new URL(url, API_BASE_URL).href : url;
 }
 
 /** Why `file` cannot be uploaded as an image, or null when it can. */
