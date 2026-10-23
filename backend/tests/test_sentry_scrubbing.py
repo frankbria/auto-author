@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 import sentry_sdk
+from bson import ObjectId
 from fastapi.testclient import TestClient
 from pymongo import AsyncMongoClient
 from openai import AsyncOpenAI
@@ -20,7 +21,9 @@ from pydantic import BaseModel
 
 from app import main
 from app.core.config import settings
+from app.db.base import get_collection
 from app.main import app
+from tests.session_cookies import mint_session, real_session_client
 
 REPO = Path(__file__).resolve().parents[2]
 PROBE = "/__sentry_probe"
@@ -82,6 +85,13 @@ async def _work_then_fail():
     except Exception:
         pass
     raise RuntimeError("after the work")
+
+
+async def _signed_in(email: str):
+    """A verified better-auth user with a real session: nothing overridden."""
+    oid = ObjectId()
+    await (await get_collection("user")).insert_one({"_id": oid, "email": email, "emailVerified": True})
+    return real_session_client(await mint_session(oid)), oid
 
 
 async def _reject():
@@ -193,12 +203,55 @@ class TestARefusedRequestIsNotAnError:
         assert REJECTED not in caplog.text
         assert events == []
 
-    def test_a_model_rejected_inside_a_handler_is_the_same(self, api, events, caplog):
+
+class TestAModelTheServerBuiltIsAServerFault:
+    """A model that fails validation inside a handler was not built from the
+    request: FastAPI refuses a bad request before the handler runs. It is a
+    stored document or the server's own data, so a 500 that is reported (#995)."""
+
+    def test_a_model_rejected_inside_a_handler_is_a_reported_500(self, api, events, caplog):
         with caplog.at_level(logging.INFO):
             response = api.get(PROBE + "/rejected")
 
+        assert response.status_code == 500
+        assert response.json()["detail"] == "An unexpected error occurred"
+        errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1 and "words" in errors[0], "one ERROR line, naming the field"
+        assert REJECTED not in caplog.text and REJECTED not in response.text
+        assert len(events) == 1
+        assert events[0]["exception"]["values"][-1]["type"] == "ValidationError"
+        assert REJECTED not in json.dumps(events, default=str)
+
+    @pytest.mark.asyncio
+    async def test_a_stored_book_that_no_longer_fits_its_response_model(self, reinit_db, events, caplog):
+        """A real route, real MongoDB, a real session: the title was saved before
+        the 100-character limit, and the book can no longer be read back."""
+        ada, _ = await _signed_in("ada@example.com")
+        async with ada:
+            created = await ada.post("/api/v1/books/", json={"title": "Small Changes"})
+            book_id = created.json()["id"]
+            await (await get_collection("books")).update_one(
+                {"_id": ObjectId(book_id)}, {"$set": {"title": STORED + " " + "x" * 120}}
+            )
+            with caplog.at_level(logging.INFO):
+                response = await ada.get(f"/api/v1/books/{book_id}")
+
+        assert response.status_code == 500
+        assert set(response.json()) == {"detail", "request_id"}
+        assert response.json()["detail"] == "An unexpected error occurred"
+        errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1 and "title" in errors[0], "one ERROR line, naming the field"
+        assert "STORED-SENTINEL" not in caplog.text
+        assert len(events) == 1
+        assert "STORED-SENTINEL" not in json.dumps(events, default=str)
+
+    @pytest.mark.asyncio
+    async def test_a_refused_request_body_is_still_a_422_and_not_reported(self, reinit_db, events, caplog):
+        ada, _ = await _signed_in("ada@example.com")
+        async with ada:
+            with caplog.at_level(logging.INFO):
+                response = await ada.post("/api/v1/books/", json={"title": REJECTED + "x" * 120})
+
         assert response.status_code == 422
-        assert "words" in caplog.text, "the log still says which field"
         assert [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR] == []
-        assert REJECTED not in caplog.text
         assert events == []
