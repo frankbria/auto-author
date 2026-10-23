@@ -15,7 +15,8 @@ from app.api.endpoints.book_toc import _book_is_full
 from app.core.security import get_current_user_from_session
 from app.db.book import NO_PRECONDITION
 from app.db.database import (
-    get_book_fields, get_book_metadata_by_id, apply_chapter_content_update,
+    get_book_fields, get_book_metadata_by_id, get_book_owner_and_chapter,
+    apply_chapter_content_update,
 )
 from app.schemas.book import ChapterContentUpdate, MAX_CHAPTER_CONTENT_BYTES
 from app.services.chapter_status_service import chapter_status_service
@@ -40,18 +41,7 @@ async def _chapter_save_rejected(book_id: str, chapter_id: str) -> HTTPException
     """Why a content save didn't land: 404 if the chapter is gone, else 409
     carrying what the editor needs to offer reload-or-overwrite (#760) without
     another GET. Overwrite = resend with ``current_last_modified``."""
-    book = await get_book_fields(book_id, "table_of_contents") or {}
-    chapters = (book.get("table_of_contents") or {}).get("chapters", [])
-    # One level of subchapters: the depth apply_chapter_content_update writes.
-    chapter = next(
-        (
-            c
-            for top in chapters
-            for c in [top, *(top.get("subchapters") or [])]
-            if c.get("id") == chapter_id
-        ),
-        None,
-    )
+    chapter = ((await get_book_owner_and_chapter(book_id, chapter_id)) or {}).get("chapter")
     if chapter is None:
         return HTTPException(status_code=404, detail="Chapter not found")
     return HTTPException(
@@ -77,29 +67,14 @@ async def get_chapter_content(
     Get chapter content with enhanced metadata for tab interface.
     """
     # Get the book and verify ownership
-    book = await get_book_fields(book_id, "owner_id", "table_of_contents")
+    book = await get_book_owner_and_chapter(book_id, chapter_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.get("owner_id") != current_user.get("auth_id"):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this book's content"
         )
-
-    # Find the chapter in TOC
-    current_toc = book.get("table_of_contents", {})
-    chapters = current_toc.get("chapters", [])
-
-    def find_chapter(chapter_list):
-        for chapter in chapter_list:
-            if chapter.get("id") == chapter_id:
-                return chapter
-            if chapter.get("subchapters"):
-                found = find_chapter(chapter["subchapters"])
-                if found:
-                    return found
-        return None
-
-    chapter = find_chapter(chapters)
+    chapter = book.get("chapter")
     if not chapter:
         raise HTTPException(
             status_code=404, detail="Chapter not found"
