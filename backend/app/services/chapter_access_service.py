@@ -115,6 +115,7 @@ class ChapterAccessService:
         active_chapter_id: str,
         open_tab_ids: List[str],
         tab_order: List[str],
+        closed_tab_ids: Optional[List[str]] = None,
         session_id: Optional[str] = None,
     ) -> str:
         """Save tab state for persistence across sessions"""
@@ -123,6 +124,7 @@ class ChapterAccessService:
             "active_chapter_id": active_chapter_id,
             "open_tab_ids": open_tab_ids,
             "tab_order": tab_order,
+            "closed_tab_ids": closed_tab_ids or [],
         }
 
         # Not log_access: here the row IS the saved state, so a failure must fail the save.

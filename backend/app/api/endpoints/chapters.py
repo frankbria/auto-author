@@ -236,6 +236,7 @@ async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_u
                 "active_chapter_id": metadata.get("active_chapter_id"),
                 "open_tab_ids": metadata.get("open_tab_ids", []),
                 "tab_order": metadata.get("tab_order", []),
+                "closed_tab_ids": metadata.get("closed_tab_ids", []),
                 "last_updated": tab_state.get("timestamp"),
             },
             "success": True,
@@ -525,6 +526,7 @@ async def save_tab_state(
             active_chapter_id=tab_state.active_chapter_id,
             open_tab_ids=tab_state.open_tab_ids,
             tab_order=tab_state.tab_order,
+            closed_tab_ids=tab_state.closed_tab_ids,
         )
 
         return {

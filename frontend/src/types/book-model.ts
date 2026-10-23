@@ -171,6 +171,7 @@ export interface TabStateRequest {
   active_chapter_id: string;
   open_tab_ids: string[]; // Max 20 tabs
   tab_order: string[];
+  closed_tab_ids?: string[];
 }
 
 /**
@@ -181,6 +182,7 @@ export interface TabStateResponse {
   active_chapter_id: string;
   open_tab_ids: string[];
   tab_order: string[];
+  closed_tab_ids?: string[];
   last_updated: string;
 }
 
