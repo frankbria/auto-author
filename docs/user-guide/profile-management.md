@@ -77,7 +77,7 @@ The profile page has two notification toggles: "Email notifications" and "Market
 In the "Account Settings" section, you can:
 
 1. **Change Password**: use **Settings** → **Security** → Change Password
-2. **Download my data**: Click "Download my data" to save a JSON file with your profile, your books and the questions, answers and ratings in them
+2. **Download my data**: Click "Download my data" to save a JSON file with your profile, your books and the questions, answers and ratings in them. You can do this 10 times an hour; past that, a message on the page says how long to wait
 3. **Delete Account**:
    - Click "Delete Account"
    - Confirm by typing your email address in the prompt

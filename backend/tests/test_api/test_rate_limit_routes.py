@@ -305,7 +305,7 @@ EXPECTED_RATE_LIMITED_ROUTES = {
     ("GET", "/api/v1/users/me"),
     ("PATCH", "/api/v1/users/me"),
     ("DELETE", "/api/v1/users/me"),
-    ("GET", "/api/v1/users/me/export"),
+    ("POST", "/api/v1/users/me/export/token"),
     ("POST", "/api/v1/users/me/avatar"),
     # export.py (mounted under /api/v1/books)
     ("GET", "/api/v1/books/{book_id}/export/pdf"),

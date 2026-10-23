@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { useSession } from '@/lib/auth-client';
 import { signOutOrNotify } from '@/lib/sign-out';
 import { clearLocalWriting } from '@/lib/storage/localWriting';
-import useProfileApi, { ACCOUNT_EXPORT_URL, type UserPreferences } from '@/hooks/useProfileApi';
+import useProfileApi, { downloadAccountData, type UserPreferences } from '@/hooks/useProfileApi';
 import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
 import { FormField } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,7 @@ export default function UserProfile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.image ?? null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   // Session email is the confirmation phrase; the hydrated profile email is
   // the fallback for sessions without one (e.g. route-mocked E2E).
@@ -357,9 +358,17 @@ export default function UserProfile() {
             >
               Delete Account
             </Button>
-            {/* shortcut: a plain link, so an error shows as the API's JSON page; fetch it if that needs a toast */}
-            <Button asChild variant="outline">
-              <a href={ACCOUNT_EXPORT_URL}>Download my data</a>
+            <Button
+              type="button"
+              variant="outline"
+              busy={exporting}
+              onClick={async () => {
+                setExporting(true);
+                await downloadAccountData();
+                setExporting(false);
+              }}
+            >
+              Download my data
             </Button>
             <Button type="submit" disabled={loadState !== 'loaded'} busy={loadState === 'loading'}>
               {loadState === 'loading' ? 'Loading…' : 'Save Changes'}

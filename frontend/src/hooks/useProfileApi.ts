@@ -1,11 +1,48 @@
 import { useCallback } from 'react';
 
 import { useAuthFetch } from '@/hooks/useAuthFetch';
+import { apiFetch, browser } from '@/lib/api/unauthorized';
+import { toast } from '@/lib/toast';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-/** The account data download (#790): the backend answers with a JSON attachment. */
-export const ACCOUNT_EXPORT_URL = `${API_BASE_URL}/users/me/export`;
+/** Why the download did not start, as the toast says it. */
+function exportRefusal(response: Response | null): { title: string; description: string } {
+  if (response?.status === 429) {
+    const minutes = Math.max(1, Math.ceil(Number(response.headers.get('Retry-After')) / 60) || 1);
+    return {
+      title: 'Download limit reached',
+      description: `You can download your data again in ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+    };
+  }
+  if (response?.status === 401) {
+    return { title: 'Your session has expired', description: 'Sign in again to download your data.' };
+  }
+  return { title: "Couldn't start the download", description: 'Please try again.' };
+}
+
+/**
+ * The account data download (#790). A single-use token is requested first
+ * (#966), so a refusal is shown here and the user stays on the page; with the
+ * token, the browser fetches the attachment and streams it to disk.
+ */
+export async function downloadAccountData(): Promise<void> {
+  let response: Response | null = null;
+  try {
+    response = await apiFetch(`${API_BASE_URL}/users/me/export/token`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (response.ok) {
+      const { token } = await response.json();
+      browser.go(`${API_BASE_URL}/users/me/export?token=${encodeURIComponent(token)}`);
+      return;
+    }
+  } catch {
+    // No network: fall through to the generic message.
+  }
+  toast({ ...exportRefusal(response), variant: 'destructive' });
+}
 
 export type UserPreferences = {
   theme: 'light' | 'dark' | 'system';

@@ -36,7 +36,7 @@ Profile endpoints implement rate limiting to prevent abuse:
 - `/users/me` (GET): 20 requests per minute
 - `/users/me` (PATCH): 5 requests per minute
 - `/users/me` (DELETE): 3 requests per 5 minutes
-- `/users/me/export` (GET): 10 requests per hour
+- `/users/me/export/token` (POST): 10 requests per hour
 
 Only a refused request carries rate limit headers. It is answered `429` with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`.
 
@@ -147,9 +147,21 @@ curl -X PATCH "http://localhost:8000/api/v1/users/me" \
 
 ### Export Account Data
 
-`GET /users/me/export` returns the authenticated user's data as one JSON
-document, sent as an attachment (`auto-author-data.json`) (#790). It takes no
-id: every query is scoped to the session's own account.
+The download takes two requests (#966), so a refusal reaches the page as JSON
+it can show instead of replacing it:
+
+1. `POST /users/me/export/token` returns `{"token": "..."}`: a single-use token
+   for the session's own account, valid for 60 seconds. This is the rate-limited
+   request (10 per hour); a refusal is the usual `429` with `Retry-After`.
+2. `GET /users/me/export?token=...` with the same session cookie returns the
+   account's data as one JSON document, sent as an attachment
+   (`auto-author-data.json`) (#790). Redeeming the token uses it up. An
+   unknown, used or expired token is answered `410`, another account's token
+   `403`, both with a JSON `detail`; a missing token is `422` and no session
+   `401`. Each export writes one `account_export` audit row, before any data is
+   sent.
+
+It takes no id: every query is scoped to the session's own account.
 
 | Key | Holds |
 |---|---|
@@ -163,7 +175,11 @@ Ids are strings and dates are ISO 8601 in UTC. The response is sent with
 would name other accounts. Not included: the audit log, chapter
 access log and usage counters, uploaded image files (their URLs are), and
 anything better-auth or the payment processor holds (password hash, sessions,
-two-factor secrets, payment records). The response is built in memory.
+two-factor secrets, payment records). The document is streamed, one stored
+document at a time from cursors read ten at a time, so the server holds about
+ten books however large the library is. The response has no `Content-Length`;
+a database failure part way through ends it early, and the browser reports the
+download as failed.
 
 ---
 
