@@ -246,6 +246,7 @@ class BookResponse(BookBase):
     updated_at: datetime
     owner_id: str
     cover_image_url: Optional[str] = None
+    cover_thumbnail_url: Optional[str] = None
     toc_items: List[TocItemSchema] = []
     published: bool = False
     collaborators: List[Dict[str, Any]] = []
@@ -254,6 +255,19 @@ class BookResponse(BookBase):
         from_attributes=True,
         populate_by_name=True
     )
+
+    @model_validator(mode="after")
+    def _only_server_written_covers(self):
+        """A cover URL the server did not write (typed in before #797) is not
+        returned, so it is never rendered (#941)."""
+        # Lazy: importing the service module builds the upload service.
+        from app.services.file_upload_service import is_own_cover_url
+
+        if not is_own_cover_url(self.cover_image_url, self.id):
+            self.cover_image_url = None
+        if not is_own_cover_url(self.cover_thumbnail_url, self.id):
+            self.cover_thumbnail_url = None
+        return self
 
 
 class BookDetailResponse(BookResponse):

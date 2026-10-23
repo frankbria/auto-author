@@ -77,6 +77,18 @@ def _resolve_local_cover_path(image_url: str, book_id: str) -> Optional[Path]:
     )
 
 
+def is_own_cover_url(url: Optional[str], book_id: str) -> bool:
+    """Whether ``url`` names one of ``book_id``'s cover files in the active
+    storage: #797's rule, so a typed-in legacy value is not rendered (#941)."""
+    if not url:
+        return False
+    # Not get_cloud_storage_service() alone: in local mode it warns on every call.
+    cloud = get_cloud_storage_service() if settings.storage_provider != "local" else None
+    if cloud:
+        return cloud.owned_key(url, f"cover_images/{book_id}/") is not None
+    return _resolve_local_cover_path(url, book_id) is not None
+
+
 def _resolve_local_profile_path(image_url: str, user_id: str) -> Optional[Path]:
     """Resolve a /uploads/profile_pictures/<name> URL to that user's file."""
     return _resolve_local_path(

@@ -255,9 +255,10 @@ class TestBookCoverUpload:
 
             assert response.status_code == 200
 
-            # Verify book was updated
-            book_response = await client.get(f"/api/v1/books/{book_id}")
-            book_data = book_response.json()
+            # Verify the stored record. The stub's cdn.example.com URLs are not
+            # this storage's, so book responses leave them out (#941).
+            books = await get_collection("books")
+            stored = await books.find_one({"_id": ObjectId(book_id)})
 
-            assert book_data["cover_image_url"] == "https://cdn.example.com/cover.jpg"
-            # Note: cover_thumbnail_url might not be returned in the book response
+            assert stored["cover_image_url"] == "https://cdn.example.com/cover.jpg"
+            assert stored["cover_thumbnail_url"] == "https://cdn.example.com/cover_thumb.jpg"
