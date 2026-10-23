@@ -12,9 +12,9 @@ import { toast } from '@/lib/toast';
 // authFetch — the legacy ProfilePage.test.tsx mocks those wholesale and cannot
 // express disabled/enabled semantics.
 
-const mockPush = jest.fn();
+const mockGo = jest.fn();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: jest.fn() }),
   usePathname: () => '/profile',
 }));
 
@@ -65,7 +65,8 @@ const openDeleteDialog = async () => {
 describe('ProfilePage account deletion type-to-confirm (#216)', () => {
   beforeEach(() => {
     mockAuthFetch.mockReset();
-    mockPush.mockClear();
+    mockGo.mockClear();
+    jest.spyOn(browser, 'go').mockImplementation(mockGo);
     mockAuthFetch.mockResolvedValue(profile());
     // Re-seed the session explicitly: a per-test mockReturnValue override
     // (the fallback test below) must not leak into other tests via ordering.
@@ -113,7 +114,7 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
 
     await waitFor(() => expect(deleteCall()).toBeDefined());
     expect(deleteCall()![0]).toBe('/users/me');
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(mockGo).toHaveBeenCalledWith('/'));
   });
 
   // Chapter backups and summary drafts outlived the account in the browser, so
@@ -135,7 +136,7 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     fireEvent.change(input, { target: { value: SESSION_EMAIL } });
     fireEvent.click(confirmButton);
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(mockGo).toHaveBeenCalledWith('/'));
     expect(Object.keys(localStorage)).toEqual(['theme']);
     expect(Object.keys(sessionStorage)).toEqual([]);
   });
@@ -160,14 +161,14 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     fireEvent.change(input, { target: { value: SESSION_EMAIL } });
     fireEvent.click(confirmButton);
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(mockGo).toHaveBeenCalledWith('/'));
     expect(signOut).toHaveBeenCalledTimes(1);
     const deleteOrder = mockAuthFetch.mock.invocationCallOrder[
       mockAuthFetch.mock.calls.findIndex(([, opts]) => opts?.method === 'DELETE')
     ];
     expect(deleteOrder).toBeLessThan(signOut.mock.invocationCallOrder[0]);
     expect(signOut.mock.invocationCallOrder[0]).toBeLessThan(
-      mockPush.mock.invocationCallOrder[0]
+      mockGo.mock.invocationCallOrder[0]
     );
   });
 
@@ -180,7 +181,7 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     fireEvent.change(input, { target: { value: SESSION_EMAIL } });
     fireEvent.click(confirmButton);
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(mockGo).toHaveBeenCalledWith('/'));
     expect(toast.error).not.toHaveBeenCalled();
   });
 
@@ -292,7 +293,7 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     await waitFor(() => expect(deleteCalls()).toHaveLength(1));
     // finally-block contract: dialog closed, no redirect.
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockGo).not.toHaveBeenCalled();
 
     // Reopening starts clean.
     fireEvent.click(screen.getByRole('button', { name: /^delete account$/i }));
