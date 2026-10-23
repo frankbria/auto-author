@@ -1,6 +1,5 @@
 """
-Chapter content endpoints: read, save (with the #759 precondition), analytics
-and batch read.
+Chapter content endpoints: read, save (with the #759 precondition) and batch read.
 
 Extracted verbatim from ``books.py`` (issue #1122). Behavior-preserving move:
 routes are mounted under the same ``/books`` prefix in ``router.py``.
@@ -13,15 +12,12 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pymongo.errors import OperationFailure
 
 from app.api.endpoints.book_toc import _book_is_full
-from app.core.reporting import report_failure
 from app.core.security import get_current_user_from_session
 from app.db.book import NO_PRECONDITION
 from app.db.database import (
-    get_book_fields, get_book_metadata_by_id, get_book_owner_id,
-    apply_chapter_content_update,
+    get_book_fields, get_book_metadata_by_id, apply_chapter_content_update,
 )
 from app.schemas.book import ChapterContentUpdate, MAX_CHAPTER_CONTENT_BYTES
-from app.services.chapter_access_service import chapter_access_service
 from app.services.chapter_status_service import chapter_status_service
 
 logger = logging.getLogger(__name__)
@@ -107,22 +103,7 @@ async def get_chapter_content(
     if not chapter:
         raise HTTPException(
             status_code=404, detail="Chapter not found"
-        )  # Log chapter access
-    try:
-        await chapter_access_service.log_access(
-            user_id=current_user.get("auth_id"),
-            book_id=book_id,
-            chapter_id=chapter_id,
-            access_type="read_content",
-            metadata={
-                "chapter_title": chapter.get("title", ""),
-                "include_metadata": include_metadata,
-                "access_timestamp": datetime.now(timezone.utc).isoformat(),
-            },
         )
-    except Exception as error:
-        logger.error("Failed to log chapter content access", exc_info=True)
-        report_failure("access-log", error)
     # Prepare response
     response = {
         "book_id": book_id,
@@ -268,56 +249,6 @@ async def update_chapter_content(
     }
 
 
-@router.get("/{book_id}/chapters/{chapter_id}/analytics", response_model=dict)
-async def get_chapter_analytics(
-    book_id: str,
-    chapter_id: str,
-    current_user: Dict = Depends(get_current_user_from_session),
-    days: int = Query(
-        30, description="Number of days to include in analytics", ge=1, le=365
-    ),
-):
-    """
-    Get analytics data for a specific chapter.
-    """
-    # Get the book and verify ownership
-    owner_id = await get_book_owner_id(book_id)
-    if owner_id is None:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if owner_id != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book's analytics"
-        )
-
-    try:
-        # Get chapter analytics
-        # The service aggregates analytics for the whole book; this route is
-        # chapter-specific, so keep only entries for the requested chapter.
-        book_analytics = await chapter_access_service.get_chapter_analytics(
-            book_id=book_id,
-            days=days,
-        )
-        analytics = [
-            entry
-            for entry in book_analytics
-            if entry.get("_id", {}).get("chapter_id") == chapter_id
-        ]
-
-        return {
-            "book_id": book_id,
-            "chapter_id": chapter_id,
-            "analytics_period_days": days,
-            "analytics": analytics,
-            "success": True,
-        }
-
-    except Exception:
-        logger.error("Failed to retrieve chapter analytics", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail="Failed to retrieve chapter analytics"
-        )
-
-
 @router.post("/{book_id}/chapters/batch-content", response_model=dict)
 async def batch_get_chapter_content(
     book_id: str,
@@ -391,24 +322,6 @@ async def batch_get_chapter_content(
                 }
 
             chapter_data[chapter_id] = chapter_info
-
-    # Log batch access
-    try:
-        await chapter_access_service.log_access(
-            user_id=current_user.get("auth_id"),
-            book_id=book_id,
-            chapter_id="batch_request",
-            access_type="batch_read_content",
-            metadata={
-                "requested_chapters": chapter_ids,
-                "found_chapters": len(found_chapters),
-                "include_metadata": include_metadata,
-                "access_timestamp": datetime.now(timezone.utc).isoformat(),
-            },
-        )
-    except Exception as error:
-        logger.error("Failed to log batch chapter access", exc_info=True)
-        report_failure("access-log", error)
 
     return {
         "book_id": book_id,

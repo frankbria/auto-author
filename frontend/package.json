@@ -6,6 +6,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "predev": "node scripts/third-party-notices.mjs",
     "dev": "next dev",
     "prebuild": "node scripts/third-party-notices.mjs",
     "build": "next build",
@@ -47,7 +48,7 @@
     "@radix-ui/react-tabs": "^1.2.1",
     "@radix-ui/react-toast": "^1.3.1",
     "@radix-ui/react-tooltip": "^1.4.1",
-    "@sentry/nextjs": "^10.76.2",
+    "@sentry/nextjs": "^11.8.0",
     "@tailwindcss/typography": "^0.5.20",
     "@tiptap/extension-character-count": "^3.32.0",
     "@tiptap/extension-placeholder": "^3.32.0",
