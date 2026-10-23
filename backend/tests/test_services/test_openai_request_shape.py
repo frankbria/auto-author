@@ -69,7 +69,7 @@ class TestRequestShapeThroughService:
             "temperature",
             "max_tokens",
         }
-        assert create.call_args.kwargs["model"] == "gpt-4"
+        assert create.call_args.kwargs["model"] == "gpt-4o"
 
     @pytest.mark.asyncio
     async def test_generate_clarifying_questions_through_real_sdk_shape(self):
