@@ -16,6 +16,7 @@ from app.services.export.errors import (
     ExportValidationError,
 )
 from app.services.export.markdown_builder import MarkdownMixin
+from app.services.export.outline import strip_non_xml
 from app.services.export.outline import OutlineMixin
 from app.services.export.pdf_builder import PdfMixin
 from app.services.export_templates import resolve_template
@@ -209,6 +210,7 @@ class ExportService(PdfMixin, DocxMixin, EpubMixin, MarkdownMixin, OutlineMixin)
         or KeyError (unknown template).
         """
         self.validate_book_for_export(book_data, include_empty_chapters)
+        book_data = strip_non_xml(book_data)
 
         flattened_chapters = self._select_chapters(book_data, include_empty_chapters)
 
