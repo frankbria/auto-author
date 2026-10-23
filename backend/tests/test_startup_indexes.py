@@ -309,8 +309,10 @@ async def test_lifespan_finishes_a_deletion_that_died_half_way(reinit_db):
 
     async with app.router.lifespan_context(app):
         # The sweep runs in the daily housekeeping task, beside the server.
+        # The identity goes account first, user last: wait for the last row, or
+        # leaving the lifespan cancels the sweep between the two (#1180).
         for _ in range(100):
-            if await base._db.get_collection("account").count_documents({"userId": oid}) == 0:
+            if await base._db.get_collection("user").count_documents({"_id": oid}) == 0:
                 break
             await asyncio.sleep(0.05)
 
