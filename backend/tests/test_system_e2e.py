@@ -178,7 +178,7 @@ class SystemE2ETest:
         """Step 5: Get chapters from the book (created with TOC)"""
         self.log_step("Getting chapters from book...")
 
-        response = await self.client.get(f"/api/v1/books/{self.book_id}/chapters?flat=true")
+        response = await self.client.get(f"/api/v1/books/{self.book_id}/chapters/metadata")
         response.raise_for_status()
 
         data = response.json()
@@ -306,9 +306,9 @@ class SystemE2ETest:
         book = book_response.json()
 
         # Verify chapters
-        chapters_response = await self.client.get(f"/api/v1/books/{self.book_id}/chapters")
+        chapters_response = await self.client.get(f"/api/v1/books/{self.book_id}/chapters/metadata")
         chapters_response.raise_for_status()
-        chapters = chapters_response.json()
+        chapters = chapters_response.json()["chapters"]
 
         # Verify content - use the dedicated content endpoint
         content_response = await self.client.get(f"/api/v1/books/{self.book_id}/chapters/{self.chapter_id}/content")
