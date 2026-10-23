@@ -179,7 +179,7 @@ class TestCloudinaryStorageService:
             'result': 'ok'
         }
 
-        url = "https://res.cloudinary.com/test/image/upload/v123/folder/subfolder/image.jpg"
+        url = "https://res.cloudinary.com/test-cloud/image/upload/v123/folder/subfolder/image.jpg"
         result = await cloudinary_service.delete_image(url, "folder/")
 
         assert result is True

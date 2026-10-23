@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Card, CardContent, CardFooter, CardTitle } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Delete02Icon } from '@hugeicons/core-free-icons';
 import { DeleteBookModal } from '@/components/books';
+import { uploadUrl } from '@/lib/api/imageUpload';
 
 export type BookProject = {
   id: string;
@@ -16,6 +18,7 @@ export type BookProject = {
   genre?: string;
   target_audience?: string;
   cover_image_url?: string;
+  cover_thumbnail_url?: string;
   created_at?: string;
   updated_at?: string;
   published?: boolean;
@@ -86,6 +89,16 @@ export default function BookCard({ book, onClick, onDelete }: BookCardProps) {
         onClick={handleClick}
       >
       <div className="p-5">
+        {book.cover_thumbnail_url && (
+          <Image
+            src={uploadUrl(book.cover_thumbnail_url)!}
+            alt={`Cover of ${book.title}`}
+            width={80}
+            height={120}
+            unoptimized
+            className="mb-3 h-[120px] w-20 rounded border border-border object-cover"
+          />
+        )}
         <CardTitle className="text-xl font-semibold text-card-foreground mb-2 truncate" title={book.title}>
           {book.title}
         </CardTitle>

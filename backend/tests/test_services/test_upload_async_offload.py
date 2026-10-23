@@ -175,6 +175,8 @@ class TestCloudStorageOffload:
         from app.services.cloud_storage_service import CloudinaryStorageService
 
         service = CloudinaryStorageService.__new__(CloudinaryStorageService)
+
+        service.cloud_name = "demo"
         uploader = Mock()
 
         def slow_upload(*a, **kw):
@@ -196,6 +198,8 @@ class TestCloudStorageOffload:
         from app.services.cloud_storage_service import CloudinaryStorageService
 
         service = CloudinaryStorageService.__new__(CloudinaryStorageService)
+
+        service.cloud_name = "demo"
         uploader = Mock()
 
         def slow_destroy(*a, **kw):

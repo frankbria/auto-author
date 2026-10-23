@@ -36,11 +36,18 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
         book_obj.id = result.inserted_id
 
         # Associate the book with the user
-        await users_collection.update_one(
+        attached = await users_collection.update_one(
             # Never onto a tombstone (deleted account, #784).
             {"auth_id": user_auth_id, "deleted_at": {"$exists": False}},
             {"$push": {"book_ids": str(book_obj.id)}},
         )
+        # An insert that lands after delete_user's second cascade (#945) finds
+        # the tombstone here: the book has no children or cover yet.
+        if not attached.matched_count and await users_collection.count_documents(
+            {"auth_id": user_auth_id, "deleted_at": {"$exists": True}}, limit=1
+        ):
+            await books_collection.delete_one({"_id": result.inserted_id})
+            raise ValueError("The account was deleted")
 
         # Create audit log entry
         await audit_after_write(
@@ -417,7 +424,8 @@ async def delete_all_user_books(user_auth_id: str) -> int:
 
     Never a transaction, even on a replica set: one spanning a whole account
     outlives the 60s transaction limit on exactly the accounts this is for.
-    ponytail: the id list is a snapshot — a book created mid-cascade survives.
+    The id list is a snapshot; delete_user runs this again after the tombstone
+    to catch a book created mid-cascade (#945).
     """
     books = await books_collection.find(
         {"owner_id": user_auth_id}, _DELETE_PROJECTION
@@ -429,10 +437,21 @@ async def delete_all_user_books(user_auth_id: str) -> int:
         [str(book["_id"]) for book in books], user_auth_id, None
     )
 
-    # shortcut: one storage call per cover, in sequence; batch them if accounts
-    # with thousands of covers appear (cover upload has no UI yet, #941).
-    for book in books:
-        await _delete_cover_files(book)
+    # Covers in batched storage calls (#941), once the documents are gone (#785).
+    files = [
+        (str(book["_id"]), url)
+        for book in books
+        for url in (book.get("cover_image_url"), book.get("cover_thumbnail_url"))
+        if url
+    ]
+    if files:
+        try:
+            from app.services.file_upload_service import FileUploadService
+
+            await FileUploadService().delete_cover_images(files)
+        except Exception as error:  # the service could not be set up at all
+            logger.error("Failed to delete cover files for %s", user_auth_id, exc_info=True)
+            report_failure("delete-files", error)
 
     # One row for the account, without the titles a per-book row would keep.
     await audit_after_write(

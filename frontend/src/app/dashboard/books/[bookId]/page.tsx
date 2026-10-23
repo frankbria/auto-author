@@ -11,6 +11,8 @@ import * as React from 'react';
 import { toast } from '@/lib/toast';
 import Image from 'next/image';
 import { BookMetadataForm } from '@/components/BookMetadataForm';
+import { BookCoverUpload } from '@/components/books/BookCoverUpload';
+import { uploadUrl } from '@/lib/api/imageUpload';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChapterTabs } from '@/components/chapters/ChapterTabs';
 import { ChapterBreadcrumb } from '@/components/navigation/ChapterBreadcrumb';
@@ -35,7 +37,6 @@ type BookDetails = Omit<BookProject, 'chapters'> & {
   subtitle?: string;
   genre?: string;
   target_audience?: string;
-  cover_image_url?: string;
   created_at?: string;
   updated_at?: string;
   published?: boolean;
@@ -114,7 +115,6 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           subtitle: bookData.subtitle,
           genre: bookData.genre,
           target_audience: bookData.target_audience,
-          cover_image_url: bookData.cover_image_url,
           created_at: bookData.created_at,
           updated_at: bookData.updated_at,
           published: bookData.published,
@@ -464,7 +464,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           <>
             {book.cover_image_url && (
               <div className="mt-4">
-                <Image src={book.cover_image_url} alt="Book cover" width={256} height={384} className="max-w-xs rounded shadow-sm border border-border" />
+                <Image src={uploadUrl(book.cover_image_url)!} alt="Book cover" width={256} height={384} unoptimized className="max-w-xs rounded shadow-sm border border-border" />
               </div>
             )}
             <div className="mt-2">
@@ -482,6 +482,11 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
           </>
         ) : (
           <>
+            <BookCoverUpload
+              bookId={book.id}
+              coverUrl={book.cover_image_url}
+              onUploaded={(urls) => setBook({ ...book, ...urls })}
+            />
             <BookMetadataForm
               book={{
                 title: book.title || '',

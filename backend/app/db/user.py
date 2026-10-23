@@ -291,6 +291,13 @@ async def delete_user(auth_id: str, actor_id: str = None) -> bool:
     )
     success = previous is not None
 
+    # A book created after the caller's cascade read its id list is not in it
+    # (#945); past the tombstone create_book removes its own, so a second pass
+    # here catches the rest. Empty, it costs one find.
+    from app.db.book import delete_all_user_books
+
+    await delete_all_user_books(auth_id)
+
     # The returned pre-image is the last place the avatar URL exists (#785).
     avatar_url = (previous or {}).get("avatar_url")
     if avatar_url:

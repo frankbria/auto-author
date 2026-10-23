@@ -47,7 +47,9 @@ export function buildCsp(nonce: string, { isDev, apiUrl, sentryDsn }: CspOptions
     // 'unsafe-inline', which styled-components/Tailwind inline styles need.
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
-    "img-src 'self' data: https: blob:",
+    // The API origin too: it serves local-storage uploads (covers, avatars), and
+    // over http (local dev, CI) `https:` alone would block them (#941).
+    `img-src 'self' data: https: blob:${apiOrigin ? ` ${apiOrigin}` : ''}`,
     "media-src 'self'",
     `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''}${sentryOrigin ? ` ${sentryOrigin}` : ''}${isDev ? ' ws://localhost:*' : ''}`,
     "worker-src 'self' blob:",

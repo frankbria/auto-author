@@ -131,12 +131,13 @@ class TestDeleteUser:
         self, reinit_db
     ):
         """A create_book that authenticated before the delete lands after it:
-        its book_ids $push must not grow the tombstone."""
+        its book_ids $push must not grow the tombstone, and it fails (#945)."""
         from app.db.book import create_book
 
         await _make_user(auth_id="auth-race")
         await delete_user("auth-race")
-        await create_book({"title": "Late"}, "auth-race")
+        with pytest.raises(ValueError):
+            await create_book({"title": "Late"}, "auth-race")
         assert set(await get_user_by_auth_id("auth-race")) == DEACTIVATED_KEYS
 
     async def test_delete_defaults_actor_to_self(self, reinit_db):
