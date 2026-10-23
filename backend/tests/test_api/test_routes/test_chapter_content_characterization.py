@@ -17,7 +17,6 @@ _BASE = "/api/v1/books/{book_id}/chapters/{chapter_id}"
 MOVED_CONTENT_ROUTES = {
     ("GET", f"{_BASE}/content"),                                   # get_chapter_content
     ("PATCH", f"{_BASE}/content"),                                 # update_chapter_content
-    ("GET", f"{_BASE}/analytics"),                                 # get_chapter_analytics
     ("POST", "/api/v1/books/{book_id}/chapters/batch-content"),    # batch_get_chapter_content
 }
 

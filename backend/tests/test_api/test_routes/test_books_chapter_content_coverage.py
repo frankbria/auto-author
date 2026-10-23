@@ -1,5 +1,5 @@
 """
-Integration coverage tests for the chapter content / tab-state / analytics /
+Integration coverage tests for the chapter content / tab-state /
 batch-content endpoint group in ``app/api/endpoints/books.py``.
 
 Covered endpoints:
@@ -7,7 +7,6 @@ Covered endpoints:
 - GET    /{book_id}/chapters/tab-state        (get_tab_state -- see note below)
 - GET    /{book_id}/chapters/{chapter_id}/content   (get_chapter_content)
 - PATCH  /{book_id}/chapters/{chapter_id}/content   (update_chapter_content)
-- GET    /{book_id}/chapters/{chapter_id}/analytics (get_chapter_analytics)
 - POST   /{book_id}/chapters/batch-content    (batch_get_chapter_content)
 
 These run against a real MongoDB test database (session auth is mocked by the
@@ -19,11 +18,6 @@ Notes on *real* (sometimes surprising) behavior that these tests pin down:
   ``GET /{book_id}/chapters/{chapter_id}`` route, so a GET for tab-state is
   actually handled by ``get_chapter`` with ``chapter_id == "tab-state"`` and
   returns 404 "Chapter not found". The tests assert this real routing behavior.
-
-* ``GET .../analytics`` happy path returns **500**: the endpoint calls
-  ``chapter_access_service.get_chapter_analytics(user_id=..., book_id=...,
-  chapter_id=..., days=...)`` but the service only accepts ``(book_id, days)``,
-  raising ``TypeError`` which the endpoint converts to a 500.
 
 * ``POST .../batch-content`` with ``include_metadata=True`` and at least one
   *found* chapter returns **500**: the endpoint does
@@ -364,9 +358,6 @@ async def test_saving_content_writes_no_access_log_row(auth_client_factory):
 
     assert await logs.count_documents({}) == before
     assert await logs.count_documents({"access_type": "update_content"}) == 0
-    # The right collection is being counted: reading the chapter does add a row.
-    assert (await api.get(f"{API}/{book_id}/chapters/ch1/content")).status_code == 200
-    assert await logs.count_documents({}) == before + 1
     # And the saves were real ones.
     assert (await api.get(f"{API}/{book_id}/chapters/ch1/content")).json()["content"] == "draft number 2"
 
@@ -488,90 +479,34 @@ async def test_update_chapter_content_wrong_owner(auth_client_factory):
 
 
 # --------------------------------------------------------------------------- #
-# get_chapter_analytics  (GET /{book_id}/chapters/{chapter_id}/analytics)
+# Reads write no access-log row (#1036); the analytics route that read them is gone
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_get_chapter_analytics_happy_path(auth_client_factory):
+async def test_reading_chapter_content_writes_no_access_log_row(auth_client_factory):
     api = await auth_client_factory()
     book_id = await _create_book(api)
-    await _seed_toc(api, book_id, [_chapter("ch1", content="text")])
+    await _seed_toc(api, book_id, [_chapter("ch1", content="alpha")])
 
-    r = await api.get(f"{API}/{book_id}/chapters/ch1/analytics", params={"days": 14})
+    r = await api.get(f"{API}/{book_id}/chapters/ch1/content")
     assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["success"] is True
-    assert body["book_id"] == book_id
-    assert body["chapter_id"] == "ch1"
-    assert body["analytics_period_days"] == 14
-    assert isinstance(body["analytics"], list)
-    # Every returned entry belongs to the requested chapter.
-    assert all(
-        e.get("_id", {}).get("chapter_id") == "ch1" for e in body["analytics"]
+    r = await api.post(
+        f"{API}/{book_id}/chapters/batch-content",
+        json={"chapter_ids": ["ch1"], "include_metadata": False},
     )
+    assert r.status_code == 200, r.text
+
+    rows = await base._db.get_collection("chapter_access_logs").find(
+        {"book_id": book_id, "access_type": {"$in": ["read_content", "batch_read_content"]}}
+    ).to_list(None)
+    assert rows == []
 
 
 @pytest.mark.asyncio
-async def test_get_chapter_analytics_filters_to_requested_chapter(auth_client_factory):
-    """The service aggregates the whole book; the route must return only ch1."""
+async def test_chapter_analytics_route_is_gone(auth_client_factory):
     api = await auth_client_factory()
     book_id = await _create_book(api)
-    await _seed_toc(
-        api,
-        book_id,
-        [_chapter("ch1", content="text one"), _chapter("ch2", content="text two")],
-    )
-
-    # Generate read_content access logs for BOTH chapters.
-    await api.get(f"{API}/{book_id}/chapters/ch1/content")
-    await api.get(f"{API}/{book_id}/chapters/ch2/content")
-
-    r = await api.get(f"{API}/{book_id}/chapters/ch1/analytics", params={"days": 7})
-    assert r.status_code == 200, r.text
-    entries = r.json()["analytics"]
-    assert entries  # ch1 was accessed, so there is at least one entry
-    # ch2's logs must NOT leak into ch1's analytics.
-    assert all(e["_id"]["chapter_id"] == "ch1" for e in entries)
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_analytics_book_not_found(auth_client_factory):
-    api = await auth_client_factory()
-    r = await api.get(f"{API}/{MISSING_BOOK_ID}/chapters/ch1/analytics")
+    r = await api.get(f"{API}/{book_id}/chapters/ch1/analytics")
     assert r.status_code == 404
-    assert r.json()["detail"] == "Book not found"
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_analytics_wrong_owner(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await _create_book(api)
-
-    other = await auth_client_factory(
-        overrides={"auth_id": "other-user-999", "email": "o@e.com"}
-    )
-    r = await other.get(f"{API}/{book_id}/chapters/ch1/analytics")
-    assert r.status_code == 403
-    assert "Not authorized" in r.json()["detail"]
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_analytics_days_too_low(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await _create_book(api)
-    r = await api.get(
-        f"{API}/{book_id}/chapters/ch1/analytics", params={"days": 0}
-    )
-    assert r.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_analytics_days_too_high(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await _create_book(api)
-    r = await api.get(
-        f"{API}/{book_id}/chapters/ch1/analytics", params={"days": 400}
-    )
-    assert r.status_code == 422
 
 
 # --------------------------------------------------------------------------- #

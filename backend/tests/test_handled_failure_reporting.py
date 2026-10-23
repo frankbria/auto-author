@@ -139,9 +139,9 @@ class TestAnAccessRecordThatCouldNotBeWritten:
         await _seed_toc(book_id, toc)
         chapter_id = toc["chapters"][0]["id"]
 
-        with patch.object(chapter_access_service, "log_access", AsyncMock(side_effect=RuntimeError("database is away"))):
-            first = await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}/content")
-            await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}/content")
+        with patch.object(chapter_access_service, "_insert", AsyncMock(side_effect=RuntimeError("database is away"))):
+            first = await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
+            await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
 
         assert first.status_code == 200
         assert _kinds(reports) == ["access-log"]
