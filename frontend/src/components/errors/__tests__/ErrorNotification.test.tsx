@@ -299,12 +299,9 @@ describe('showErrorNotification', () => {
   it('falls to else branch for TRANSIENT + retryable but no onRetry (uses correlationId description)', () => {
     const error = makeError({ type: ErrorType.TRANSIENT, retryable: true });
     showErrorNotification(error); // no onRetry
-    expect(mockToast.error).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({
-        description: expect.stringContaining(error.correlationId),
-      })
-    );
+    const [, opts] = mockToast.error.mock.calls[0];
+    render(<div>{opts.description}</div>);
+    expect(screen.getByText(`Reference ID: ${error.correlationId}`)).toBeInTheDocument();
   });
 
   it('falls to else branch for TRANSIENT + not retryable', () => {
@@ -350,12 +347,9 @@ describe('showErrorNotification', () => {
       fieldErrors: { title: 'Required', email: 'Invalid' },
     });
     showErrorNotification(error);
-    expect(mockToast.error).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({
-        description: expect.stringContaining('title: Required'),
-      })
-    );
+    const [, opts] = mockToast.error.mock.calls[0];
+    render(<div>{opts.description}</div>);
+    expect(screen.getByText('title: Required')).not.toBe(screen.getByText('email: Invalid'));
   });
 
   it('calls toast.error with details for PERMANENT error without fieldErrors', () => {
@@ -370,18 +364,15 @@ describe('showErrorNotification', () => {
     );
   });
 
-  it('calls toast.error with suggestedActions joined for PERMANENT without fieldErrors or details', () => {
+  it('calls toast.error with suggestedActions on separate lines for PERMANENT without fieldErrors or details', () => {
     const error = makeError({
       type: ErrorType.PERMANENT,
       suggestedActions: ['Check your input', 'Try a different value'],
     });
     showErrorNotification(error);
-    expect(mockToast.error).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({
-        description: 'Check your input\nTry a different value',
-      })
-    );
+    const [, opts] = mockToast.error.mock.calls[0];
+    render(<div>{opts.description}</div>);
+    expect(screen.getByText('Check your input')).not.toBe(screen.getByText('Try a different value'));
   });
 
   // --- AI_SERVICE + retryAfter ---
@@ -420,12 +411,24 @@ describe('showErrorNotification', () => {
   it('calls toast.error with correlationId for SYSTEM errors', () => {
     const error = makeError({ type: ErrorType.SYSTEM, correlationId: 'sys-ref-999' });
     showErrorNotification(error);
-    expect(mockToast.error).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({
-        description: expect.stringContaining('sys-ref-999'),
-      })
-    );
+    const [, opts] = mockToast.error.mock.calls[0];
+    render(<div>{opts.description}</div>);
+    expect(screen.getByText('Reference ID: sys-ref-999')).toBeInTheDocument();
+  });
+
+  it('puts the Reference ID and each suggested action on their own line (#1001)', () => {
+    const error = makeError({
+      type: ErrorType.SYSTEM,
+      correlationId: 'sys-ref-999',
+      suggestedActions: ['Try refreshing the page', 'Contact support'],
+    });
+    showErrorNotification(error);
+    const [, opts] = mockToast.error.mock.calls[0];
+    expect(typeof opts.description).not.toBe('string');
+    render(<div>{opts.description}</div>);
+    const lines = ['Reference ID: sys-ref-999', 'Try refreshing the page', 'Contact support'];
+    const blocks = lines.map((l) => screen.getByText(l));
+    expect(new Set(blocks).size).toBe(3);
   });
 
   // --- Duration override ---
