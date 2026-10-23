@@ -255,6 +255,8 @@ record to the tombstone (#954).
 
 **Endpoint**: `DELETE /users/{auth_id}`
 
+If a deactivated account still has better-auth rows (a removal that failed part way), the first call only removes those rows and keeps the retained record; a second call then erases it (#956). The daily purge loop finishes such removals on its own as well.
+
 **Authentication**: Required (admin, or the user's own id)
 
 **Path Parameters**:
