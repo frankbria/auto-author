@@ -157,7 +157,7 @@ class TestTheReportCarriesNothingTheUserWrote:
     @pytest.mark.parametrize("sentinel", [STORED, PROMPT], ids=["database write", "model prompt"])
     def test_nor_does_what_the_request_stored_or_sent_to_the_model(self, api, events, sentinel):
         """Real MongoDB and the real model client: both record what they did
-        as breadcrumbs, and the model client reports its own failure."""
+        as breadcrumbs."""
         assert api.post(PROBE + "/work").status_code == 500
 
         crumbs = [c.get("category") for e in events for c in e["breadcrumbs"]["values"]]
