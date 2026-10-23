@@ -1822,6 +1822,11 @@ describe('BookClient core CRUD – success paths', () => {
     );
   });
 
+  it('getChapterContent carries the status, so a missing chapter is not reported (#1006)', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(404, 'Not found'));
+    await expect(bookClient.getChapterContent(BOOK_ID, CHAPTER_ID)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
   // getChaptersMetadata – success and error
   it('getChaptersMetadata GETs and returns the metadata', async () => {
     const data = { book_id: BOOK_ID, chapters: [], total_chapters: 0, completion_stats: { draft: 0, in_progress: 0, completed: 0, published: 0 } };

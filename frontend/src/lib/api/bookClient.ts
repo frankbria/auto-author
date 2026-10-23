@@ -1140,7 +1140,8 @@ export class BookClient {
       credentials: 'include',
     });
     if (!response.ok) {
-      throw await failure(response, 'Failed to get chapter content');
+      // The status lets the editor tell a missing chapter (an answer) from a failure (#1006).
+      throw Object.assign(await failure(response, 'Failed to get chapter content'), { statusCode: response.status });
     }
     return response.json();
   }
