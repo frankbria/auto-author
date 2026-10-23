@@ -26,6 +26,9 @@ class _Unreachable:
     async def find_one(self, *args, **kwargs):
         raise ServerSelectionTimeoutError("no primary available")
 
+    async def aggregate(self, *args, **kwargs):
+        raise ServerSelectionTimeoutError("no primary available")
+
 
 @pytest.mark.parametrize("path", [
     "",
