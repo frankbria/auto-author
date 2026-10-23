@@ -52,3 +52,9 @@ async def refund_usage(user_id: str, period_key: str) -> None:
     was charged for never reached the model."""
     coll = await _usage_collection()
     await coll.update_one({"_id": f"{user_id}:{period_key}"}, {"$inc": {"count": -1}})
+
+
+async def delete_usage(user_id: str) -> None:
+    """Remove every counter of ``user_id``, at account deletion (#957)."""
+    coll = await _usage_collection()
+    await coll.delete_many({"user_id": user_id})

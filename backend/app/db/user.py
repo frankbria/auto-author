@@ -1,6 +1,7 @@
 # backend/app/db/user.py
 
 import logging
+import re
 
 from .base import users_collection, get_collection
 from bson.objectid import ObjectId
@@ -8,6 +9,7 @@ from pymongo import ReturnDocument
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 from .audit_log import audit_after_write
+from .usage import delete_usage
 from app.core.reporting import report_failure
 
 logger = logging.getLogger(__name__)
@@ -223,8 +225,8 @@ async def grandfather_unverified_accounts() -> int:
 
 async def delete_better_auth_identity(auth_id: str) -> int:
     """Remove the better-auth user and everything that authenticates as it:
-    sessions (every device), credential/OAuth accounts (the old password) and
-    the twoFactor secret (#763).
+    sessions (every device), credential/OAuth accounts (the old password), the
+    twoFactor secret (#763) and verification rows (#957).
 
     better-auth's MongoDB adapter stores ``_id`` and ``userId`` as ObjectIds;
     the string form is matched too so a legacy string-keyed row can't survive.
@@ -237,6 +239,20 @@ async def delete_better_auth_identity(auth_id: str) -> int:
     for name in ("session", "account", "twoFactor"):
         collection = await get_collection(name)
         removed += (await collection.delete_many({"userId": {"$in": ids}})).deleted_count
+    # Verification rows (#957), in the shapes better-auth 1.7 writes: the user
+    # id is the value of trust-device, pending 2FA sign-in, password-reset and
+    # delete-account rows; a pending sign-in's attempts and OTP are keyed by
+    # that row's identifier, a signed-in OTP by "<user id>!<session id>".
+    verification = await get_collection("verification")
+    pending = [
+        row["identifier"]
+        async for row in verification.find({"value": {"$in": ids}}, {"identifier": 1})
+    ]
+    removed += (await verification.delete_many({"$or": [
+        {"value": {"$in": ids}},
+        {"identifier": {"$in": [f"2fa-{kind}-{p}" for p in pending for kind in ("attempts", "otp")]}},
+        {"identifier": {"$regex": f"^2fa-otp-{re.escape(auth_id)}!"}},
+    ]})).deleted_count
     better_auth_users = await get_collection("user")
     result = await better_auth_users.delete_many({"$or": [{"_id": {"$in": ids}}, {"id": auth_id}]})
     return removed + result.deleted_count
@@ -298,6 +314,7 @@ async def delete_user(auth_id: str, actor_id: str = None) -> bool:
     # Unconditional: a better-auth user who never reached the backend has no
     # app record, but their sessions and credentials must still go.
     removed = await delete_better_auth_identity(auth_id)
+    await delete_usage(auth_id)  # usage counters are the account's too (#957)
     if not success and removed:
         # An earlier deactivation whose identity removal failed (#956):
         # finishing it is this deletion, so an admin's repair is not taken as
