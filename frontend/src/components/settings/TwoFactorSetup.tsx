@@ -119,31 +119,15 @@ export default function TwoFactorSetup() {
         }
         setLocalEnabledOverride(false);
         setStep('idle');
-        toast({ title: 'Two-factor authentication disabled' });
-        await signOutOtherDevices();
+        // The server ended the account's other sessions in the same request (#972).
+        toast({
+          title: 'Two-factor authentication disabled',
+          description: 'Other devices were signed out.',
+        });
       }
     } finally {
       setIsSubmitting(false);
       setPassword('');
-    }
-  };
-
-  // A second-factor change ends every other session (#793): one an attacker
-  // already holds would otherwise outlive the change meant to lock them out.
-  // better-auth rotates only the session that made the change.
-  const signOutOtherDevices = async () => {
-    // The client resolves with { error } when refused and throws when the
-    // request never arrives; either way the other sessions are still alive.
-    const failed = await authClient.revokeOtherSessions().then(
-      ({ error }) => Boolean(error),
-      () => true
-    );
-    if (failed) {
-      toast({
-        title: 'Other devices are still signed in',
-        description: 'Use "Sign out other devices" under Active Sessions to end them.',
-        variant: 'destructive',
-      });
     }
   };
 
@@ -167,11 +151,11 @@ export default function TwoFactorSetup() {
       setStep('idle');
       setTotpUri(null);
       setBackupCodes([]);
+      // The server ended the account's other sessions in the same request (#972).
       toast({
         title: 'Two-factor authentication enabled',
-        description: 'Store your backup codes somewhere safe.',
+        description: 'Other devices were signed out. Store your backup codes somewhere safe.',
       });
-      await signOutOtherDevices();
     } finally {
       setIsSubmitting(false);
     }
@@ -329,8 +313,8 @@ export default function TwoFactorSetup() {
         {step === 'codes' && (
           <div className="space-y-4">
             <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
-              Your old backup codes no longer work. Save these new codes now — they won&apos;t
-              be shown again.
+              Your old backup codes no longer work and other devices were signed out. Save
+              these new codes now — they won&apos;t be shown again.
             </p>
             <div className="space-y-2">
               <div className="flex items-center justify-between">

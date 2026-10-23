@@ -10,6 +10,7 @@ import { getDefaultCookieAttributes } from "./auth-cookies";
 import { rejectWeakPassword } from "./auth-password-policy";
 import { getIpAddressConfig } from "./auth-ip";
 import { stampTermsAcceptance, termsAcceptanceFields } from "./auth-terms";
+import { endOtherSessionsOnSecondFactorChange, forgetTrustedDevices } from "./auth-second-factor";
 
 const mongoUrl = process.env.DATABASE_URL || "mongodb://localhost:27017/auto_author";
 const dbName = process.env.DATABASE_NAME || "auto_author";
@@ -41,7 +42,11 @@ function createAuthInstance(database: Db) {
     user: { additionalFields: termsAcceptanceFields },
     databaseHooks: { user: { create: { before: stampTermsAcceptance } } },
     // The password rule the pages show is enforced here too (#794).
-    hooks: { before: createAuthMiddleware(rejectWeakPassword) },
+    hooks: {
+      before: createAuthMiddleware(rejectWeakPassword),
+      // A 2FA change ends the account's other sessions in the same request (#972).
+      after: createAuthMiddleware(endOtherSessionsOnSecondFactorChange),
+    },
     emailAndPassword: {
       enabled: true,
       // No session until the address is verified (#792): sign-up returns none
@@ -50,6 +55,8 @@ function createAuthInstance(database: Db) {
       // A reset ends every session of the account (#793). better-auth's default
       // leaves them alive, so a session an attacker held would survive the reset.
       revokeSessionsOnPasswordReset: true,
+      // ...and forgets the devices trusted to skip the second factor (#972).
+      onPasswordReset: ({ user }) => forgetTrustedDevices(database, user.id),
       // Password reset configuration
       sendResetPassword: async ({ user, url }) => {
         // Send password reset email
