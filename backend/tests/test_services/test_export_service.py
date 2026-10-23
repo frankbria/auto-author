@@ -890,5 +890,6 @@ class TestHtmlBecomesMarkdownWithoutHtml2text:
     def test_a_link_keeps_its_address(self):
         html = '<p>See <a href="https://example.com/a_b?x=1&amp;y=2">the page</a>.</p>'
 
-        assert self._builders_get(html) == [("normal", "See [the page](https://example.com/a_b?x=1&y=2).")]
+        on, sep, off = "\ue00c", "\ue00d", "\ue00e"  # the builders get a link mark, not Markdown (#1190)
+        assert self._builders_get(html) == [("normal", f"See {on}https://example.com/a_b?x=1&y=2{sep}the page{off}.")]
         assert self._exported(html) == "See [the page](https://example.com/a_b?x=1&y=2)."

@@ -19,6 +19,12 @@ except ImportError:
     MARKDOWNIFY_AVAILABLE = False
 
 
+# Where text can stand on its own line: the chapter itself and a <div>; and what
+# ends the line before it.
+_BARE_BLOCKS = {"[document]", "div", "article", "section"}
+_BLOCKS = {"p", "div", "article", "section", "ul", "ol", "pre", "blockquote", "table", "hr", "h1", "h2", "h3", "h4", "h5", "h6"}
+
+
 def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
     """Chapter HTML as Markdown, with markdownify (MIT). It replaced a
     GPL-3.0-or-later converter on every export path (#823).
@@ -47,6 +53,22 @@ def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
             # Marks the builders turn into formatting, not `**` printed (#1030).
             convert_b = convert_strong = inline_marks.inline(inline_marks.BOLD)
             convert_em = convert_i = inline_marks.inline(inline_marks.ITALIC)
+            convert_s = convert_del = convert_strike = inline_marks.inline(inline_marks.STRIKE)
+            convert_sup = inline_marks.inline(inline_marks.SUP)
+            convert_sub = inline_marks.inline(inline_marks.SUB)
+            convert_code = inline_marks.code
+            convert_a = inline_marks.link
+
+        def process_text(self, el, parent_tags=None):
+            # Marks go from the text as parsed: &#xe00c; in the source is a mark
+            # only once decoded. Text that opens a bare block or the chapter is
+            # a paragraph the author typed: `# ` must not read as a heading (#1190).
+            text = inline_marks.without_marks(super().process_text(el, parent_tags))
+            prev = el.previous_sibling
+            if (not for_a_markdown_reader and el.parent is not None
+                    and el.parent.name in _BARE_BLOCKS and (prev is None or prev.name in _BLOCKS)):
+                text = re.sub(r"^(\s*)(#{1,6} )", r"\1\\\2", text)
+            return text
 
         def convert_p(self, el, text, parent_tags):
             # A paragraph that begins `# ` is escaped for the builders too, so

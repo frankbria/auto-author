@@ -39,8 +39,13 @@ def _pdf_text(value) -> str:
 
 
 def _pdf_inline(value) -> str:
-    """Chapter text for Paragraph(): escaped, with its bold and italic (#1030)."""
-    return inline_marks.as_tags(_pdf_text(value), ("<b>", "</b>"), ("<i>", "</i>"))
+    """Chapter text for Paragraph(): escaped, with its inline formatting (#1030, #1190)."""
+    return inline_marks.as_tags(
+        _pdf_text(value), ("<b>", "</b>"), ("<i>", "</i>"),
+        code=('<font face="Courier">', "</font>"), strike=("<strike>", "</strike>"),
+        sup=("<super>", "</super>"), sub=("<sub>", "</sub>"),
+        link=('<a href="{}" color="#0563C1">', "</a>"),
+    )
 
 
 class PdfMixin:
