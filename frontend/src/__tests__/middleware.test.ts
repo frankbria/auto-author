@@ -268,3 +268,56 @@ describe('CSP header (#190)', () => {
     expect(await nonceOf()).not.toBe(await nonceOf());
   });
 });
+
+// #975: the backend (better_auth_session._accepted_cookie_names) accepts only the
+// __Secure- cookie when deployed; the middleware must not wave through the bare name.
+describe('session cookie name when deployed (#975)', () => {
+  const env = process.env as Record<string, string | undefined>;
+  const keys = ['BYPASS_AUTH', 'E2E_ALLOW_BYPASS', 'NODE_ENV', 'ENVIRONMENT', 'NEXT_PUBLIC_ENVIRONMENT'];
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    keys.forEach((k) => (saved[k] = env[k]));
+    env.BYPASS_AUTH = 'false';
+    delete env.E2E_ALLOW_BYPASS;
+    delete env.ENVIRONMENT;
+    delete env.NEXT_PUBLIC_ENVIRONMENT;
+  });
+
+  afterEach(() => {
+    keys.forEach((k) => {
+      if (saved[k] === undefined) delete env[k];
+      else env[k] = saved[k];
+    });
+  });
+
+  it.each(['/dashboard', '/profile'])(
+    'redirects %s with only the unprefixed cookie when ENVIRONMENT=staging',
+    async (path) => {
+      env.NODE_ENV = 'test';
+      env.ENVIRONMENT = 'staging';
+      const res = await middleware(requestFor(path, 'better-auth.session_token'));
+      expect(res.status).toBe(307);
+      expect(new URL(res.headers.get('location')!).pathname).toBe('/auth/sign-in');
+    }
+  );
+
+  it('redirects the unprefixed cookie when NODE_ENV=production', async () => {
+    env.NODE_ENV = 'production';
+    const res = await middleware(requestFor('/dashboard', 'better-auth.session_token'));
+    expect(res.status).toBe(307);
+  });
+
+  it('passes the __Secure- cookie when deployed', async () => {
+    env.NODE_ENV = 'production';
+    env.ENVIRONMENT = 'staging';
+    const res = await middleware(requestFor('/dashboard', '__Secure-better-auth.session_token'));
+    expect(res.status).toBe(200);
+  });
+
+  it('still accepts the unprefixed cookie in local dev', async () => {
+    env.NODE_ENV = 'development';
+    const res = await middleware(requestFor('/dashboard', 'better-auth.session_token'));
+    expect(res.status).toBe(200);
+  });
+});
