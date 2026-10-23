@@ -1246,6 +1246,7 @@ export class BookClient {
     active_chapter_id: string | null;
     open_tab_ids: string[];
     tab_order: string[];
+    closed_tab_ids?: string[];
   }): Promise<void> {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -1271,6 +1272,7 @@ export class BookClient {
     active_chapter_id: string | null;
     open_tab_ids: string[];
     tab_order: string[];
+    closed_tab_ids?: string[];
     session_id?: string;
   } | null> {
     const params = sessionId ? `?session_id=${sessionId}` : '';

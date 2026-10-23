@@ -8,6 +8,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { ArrowUp01Icon, ArrowDown01Icon } from '@hugeicons/core-free-icons';
 import { ChapterTab } from './ChapterTab';
 import { TabOverflowMenu } from './TabOverflowMenu';
+import { AllChaptersMenu } from './AllChaptersMenu';
 import { ChapterTabMetadata } from '@/types/chapter-tabs';
 
 interface TabBarProps {
@@ -187,6 +188,13 @@ export function TabBar({
           </Droppable>
         </DragDropContext>
       </ScrollArea>
+
+      <AllChaptersMenu
+        chapters={chapters}
+        tabOrder={tabOrder}
+        activeChapterId={activeChapterId}
+        onSelect={onTabSelect}
+      />
 
       {orientation === 'horizontal' && (
         <TabOverflowMenu
