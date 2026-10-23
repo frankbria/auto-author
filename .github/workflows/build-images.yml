@@ -43,6 +43,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    # Job-level, and only the job that pushes: the attestation step needs an OIDC
+    # token and write access to the attestation store (#1015). A job-level block
+    # replaces the workflow-level one, so the existing grants are restated.
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
     # NEXT_PUBLIC_* is inlined into the client bundle at build time, so a frontend
     # image is only valid for one environment (#779). Each frontend variant runs
     # in its GitHub environment, which is what scopes `vars.*` to that
@@ -219,6 +228,30 @@ jobs:
           while read -r tag; do
             docker push "$tag"
           done <<< "$TAGS"
+
+      # The registry digest of the image that was just pushed: after `docker push`
+      # the local image carries it in RepoDigests, so this names the exact image
+      # that was smoke-tested, not a rebuild (#1015).
+      - name: Resolve the pushed digest
+        id: digest
+        if: github.event_name != 'pull_request'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          TAG=$(echo "$TAGS" | head -n1)
+          IMAGE=${TAG%:*}
+          DIGEST=$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$TAG" | grep -F "$IMAGE@" | head -n1 | cut -d@ -f2)
+          case "$DIGEST" in sha256:*) ;; *) echo "::error::no registry digest for $TAG after push"; exit 1 ;; esac
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.digest.outputs.image }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
 
       - name: Report published tags
         if: github.event_name != 'pull_request'
