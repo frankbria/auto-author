@@ -501,7 +501,7 @@ SUGGESTIONS: Add more concrete examples. Define target audience clearly. Include
         assert ai_service is not None
         assert isinstance(ai_service, AIService)
         assert hasattr(ai_service, "client")
-        assert ai_service.model == "gpt-4"
+        assert ai_service.model == "gpt-4o"
 
     # Retry Mechanism Tests
 
