@@ -78,6 +78,9 @@ export function DraftGenerator({
       setWritingStyle(preferred);
     }
   }, [userPreferences]);
+  // The chapter whose saved answers have been read for this opening of the dialog.
+  const [readFor, setReadFor] = useState<string | null>(null);
+  const isReadingAnswers = isOpen && readFor !== chapterKey;
   // On opening, start from what the writer has already answered in this
   // chapter's interview (#834). It opened with five sample questions and empty
   // answers whatever had been answered, to be typed again. Answers still in
@@ -98,9 +101,13 @@ export function DraftGenerator({
       .catch(() => {
         // Whatever is shown stays, the sample questions or the answers read the
         // last time: the dialog works without a fresh read.
+      })
+      .finally(() => {
+        if (!ignore) setReadFor(key);
       });
     return () => {
       ignore = true;
+      setReadFor(null);
     };
   }, [isOpen, bookId, chapterId]);
   const [generatedDraft, setGeneratedDraft] = useState<string | null>(null);
@@ -306,7 +313,9 @@ export function DraftGenerator({
                   </Button>
                 </div>
 
-                {questionResponses.map((qr, index) => (
+                {isReadingAnswers ? (
+                  <p role="status" className="text-sm text-muted-foreground">Reading your answers…</p>
+                ) : questionResponses.map((qr, index) => (
                   <div key={index} className="space-y-2 p-4 border rounded-lg">
                     <div className="flex justify-between items-start">
                       <div className="flex-1 space-y-2">

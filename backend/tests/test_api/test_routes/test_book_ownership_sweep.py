@@ -90,6 +90,7 @@ REQUESTS: dict[tuple[str, str], dict] = {
     ("POST", CHAPTER + "/regenerate-questions"): {"json": {"count": 3}},
     ("GET", CHAPTER + "/questions"): {},
     ("GET", CHAPTER + "/question-progress"): {},
+    ("GET", CHAPTER + "/question-answers"): {},
     ("POST", CHAPTER + "/questions/responses/batch"): {
         "json": [{"question_id": "{question_id}", "response_text": "Mine now.", "status": "draft"}]
     },
