@@ -77,3 +77,70 @@ async def test_a_password_left_without_its_user_is_found_too(reinit_db):
 
     assert await erase_stranded_identities() == 1
     assert await _better_auth_docs(victim["oid"]) == NONE_LEFT
+
+
+# #956: a deactivation (#954) keeps a retained record, and finishing its
+# identity removal must not cost that record.
+
+
+async def _deactivate_with_identity_removal_failing_once(monkeypatch, victim: dict) -> None:
+    """Deactivate ``victim`` while the database drops the connection once, part
+    way through the identity removal: the sessions go, the rest stays."""
+    from pymongo.errors import AutoReconnect
+
+    real_get_collection = users_dao.get_collection
+    failed = []
+
+    async def drops_once(name):
+        if name == "account" and not failed:
+            failed.append(name)
+            raise AutoReconnect("connection reset by peer")
+        return await real_get_collection(name)
+
+    monkeypatch.setattr(users_dao, "get_collection", drops_once)
+    with pytest.raises(AutoReconnect):
+        await delete_user(victim["user_id"])
+    assert failed and await _better_auth_docs(victim["oid"]) == {**ALL_THERE, "session": 0}
+
+
+async def _retained(auth_id: str) -> dict:
+    from app.db.base import get_collection
+
+    doc = await (await get_collection("users")).find_one({"auth_id": auth_id})
+    return {key: doc.get(key) for key in ("purge_at", "retained")}
+
+
+async def test_the_sweep_finishes_a_failed_removal_and_keeps_the_retained_record(reinit_db, monkeypatch):
+    victim = await _account("sweep-keeps@example.com")
+    await _deactivate_with_identity_removal_failing_once(monkeypatch, victim)
+    kept = await _retained(victim["user_id"])
+    assert kept["retained"]["email"] == "sweep-keeps@example.com"
+
+    assert await erase_stranded_identities() == 1
+
+    assert await _better_auth_docs(victim["oid"]) == NONE_LEFT
+    assert await _retained(victim["user_id"]) == kept
+
+
+async def test_an_admin_finishes_a_failed_removal_without_erasing_the_retained_record(reinit_db, monkeypatch):
+    from app.db.base import get_collection
+    from tests.session_cookies import real_session_client
+
+    victim = await _account("admin-repair@example.com")
+    await _deactivate_with_identity_removal_failing_once(monkeypatch, victim)
+    kept = await _retained(victim["user_id"])
+
+    admin = await _seed_better_auth_user("repairer@example.com")
+    async with real_session_client(admin["tokens"][0]) as c:
+        assert (await c.get("/api/v1/users/me")).status_code == 200
+        await (await get_collection("users")).update_one(
+            {"auth_id": admin["user_id"]}, {"$set": {"role": "admin"}}
+        )
+        assert (await c.delete(f"/api/v1/users/{victim['user_id']}")).status_code == 204
+
+        assert await _better_auth_docs(victim["oid"]) == NONE_LEFT
+        assert await _retained(victim["user_id"]) == kept
+
+        # With the identity gone, the next admin DELETE is the erasure #954 offers.
+        assert (await c.delete(f"/api/v1/users/{victim['user_id']}")).status_code == 204
+    assert await _retained(victim["user_id"]) == {"purge_at": None, "retained": None}
