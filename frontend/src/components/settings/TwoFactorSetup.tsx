@@ -15,6 +15,21 @@ type SetupStep = 'idle' | 'password' | 'verify' | 'codes';
 type FlowMode = 'enable' | 'disable' | 'regenerate';
 
 /**
+ * The server ends the account's other sessions in the same request as a 2FA
+ * change (#972). When it could not, the change still happened and its answer
+ * carries `otherSessionsEnded: false`; this warns and returns false then.
+ */
+const endedOtherSessions = (data: unknown) => {
+  if ((data as { otherSessionsEnded?: boolean } | null)?.otherSessionsEnded !== false) return true;
+  toast({
+    title: 'Other devices are still signed in',
+    description: 'Use "Sign out other devices" under Active Sessions to end them.',
+    variant: 'destructive',
+  });
+  return false;
+};
+
+/**
  * TOTP two-factor authentication setup backed by better-auth's twoFactor
  * plugin. Enabling requires the account password, then a scanned QR code /
  * entered secret is confirmed with a 6-digit code before 2FA becomes active.
@@ -107,8 +122,9 @@ export default function TwoFactorSetup() {
         setBackupCodes(data.backupCodes ?? []);
         setCodesAcknowledged(false);
         setStep('codes');
+        endedOtherSessions(data);
       } else {
-        const { error } = await authClient.twoFactor.disable({ password });
+        const { data, error } = await authClient.twoFactor.disable({ password });
         if (error) {
           toast({
             title: 'Could not disable 2FA',
@@ -119,10 +135,9 @@ export default function TwoFactorSetup() {
         }
         setLocalEnabledOverride(false);
         setStep('idle');
-        // The server ended the account's other sessions in the same request (#972).
         toast({
           title: 'Two-factor authentication disabled',
-          description: 'Other devices were signed out.',
+          description: endedOtherSessions(data) ? 'Other devices were signed out.' : undefined,
         });
       }
     } finally {
@@ -138,7 +153,7 @@ export default function TwoFactorSetup() {
     if (!codesAcknowledged) return;
     setIsSubmitting(true);
     try {
-      const { error } = await authClient.twoFactor.verifyTotp({ code: verifyCode });
+      const { data, error } = await authClient.twoFactor.verifyTotp({ code: verifyCode });
       if (error) {
         toast({
           title: 'Invalid code',
@@ -151,10 +166,10 @@ export default function TwoFactorSetup() {
       setStep('idle');
       setTotpUri(null);
       setBackupCodes([]);
-      // The server ended the account's other sessions in the same request (#972).
+      const signedOut = endedOtherSessions(data) ? 'Other devices were signed out. ' : '';
       toast({
         title: 'Two-factor authentication enabled',
-        description: 'Other devices were signed out. Store your backup codes somewhere safe.',
+        description: `${signedOut}Store your backup codes somewhere safe.`,
       });
     } finally {
       setIsSubmitting(false);
@@ -313,8 +328,8 @@ export default function TwoFactorSetup() {
         {step === 'codes' && (
           <div className="space-y-4">
             <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
-              Your old backup codes no longer work and other devices were signed out. Save
-              these new codes now — they won&apos;t be shown again.
+              Your old backup codes no longer work. Save these new codes now — they won&apos;t
+              be shown again.
             </p>
             <div className="space-y-2">
               <div className="flex items-center justify-between">

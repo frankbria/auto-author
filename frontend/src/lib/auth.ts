@@ -45,7 +45,7 @@ function createAuthInstance(database: Db) {
     hooks: {
       before: createAuthMiddleware(rejectWeakPassword),
       // A 2FA change ends the account's other sessions in the same request (#972).
-      after: createAuthMiddleware(endOtherSessionsOnSecondFactorChange),
+      after: createAuthMiddleware((ctx) => endOtherSessionsOnSecondFactorChange(ctx, database)),
     },
     emailAndPassword: {
       enabled: true,
@@ -56,6 +56,7 @@ function createAuthInstance(database: Db) {
       // leaves them alive, so a session an attacker held would survive the reset.
       revokeSessionsOnPasswordReset: true,
       // ...and forgets the devices trusted to skip the second factor (#972).
+      // better-auth ends the sessions right after this returns; it never throws.
       onPasswordReset: ({ user }) => forgetTrustedDevices(database, user.id),
       // Password reset configuration
       sendResetPassword: async ({ user, url }) => {

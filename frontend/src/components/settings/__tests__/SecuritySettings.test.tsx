@@ -398,6 +398,56 @@ describe('TwoFactorSetup', () => {
     expect(mockRevokeOtherSessions).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['enable', false],
+    ['disable', true],
+    ['regenerate', true],
+  ] as const)(
+    'warns when %s changed 2FA but the server could not sign out other devices (#972)',
+    async (flow, startEnabled) => {
+      const answer = { data: { status: true, otherSessionsEnded: false }, error: null };
+      mockVerifyTotp.mockResolvedValue(answer);
+      mockTwoFactorDisable.mockResolvedValue(answer);
+      mockGenerateBackupCodes.mockResolvedValue({
+        data: { backupCodes: ['FFFF-6666'], otherSessionsEnded: false },
+        error: null,
+      });
+      mockUseSession.mockReturnValue({
+        data: {
+          user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: startEnabled },
+          session: { token: 'tok' },
+        },
+      });
+      render(<TwoFactorSetup />);
+      const start = { enable: /enable 2fa/i, disable: /disable 2fa/i, regenerate: /regenerate/i };
+      fireEvent.click(screen.getByRole('button', { name: start[flow] }));
+      fireEvent.change(screen.getByLabelText('Confirm your password'), {
+        target: { value: 'my-password' },
+      });
+      fireEvent.submit(screen.getByLabelText('Confirm your password').closest('form')!);
+      if (flow === 'enable') {
+        await waitFor(() => expect(screen.getByTestId('two-factor-qr')).toBeInTheDocument());
+        fireEvent.change(screen.getByLabelText('Verification Code'), {
+          target: { value: '123456' },
+        });
+        fireEvent.click(screen.getByLabelText(/i.ve saved my backup codes/i));
+        fireEvent.click(screen.getByRole('button', { name: /verify & enable/i }));
+      }
+
+      await waitFor(() =>
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: 'Other devices are still signed in',
+            variant: 'destructive',
+          })
+        )
+      );
+      // No toast claims the other devices were signed out.
+      expect(JSON.stringify(mockToast.mock.calls)).not.toMatch(/were signed out/);
+      if (flow === 'regenerate') expect(screen.getByText('FFFF-6666')).toBeInTheDocument();
+    }
+  );
+
   it('shows a destructive toast when the disable password is wrong', async () => {
     mockTwoFactorDisable.mockResolvedValue({ data: null, error: { message: 'Invalid password' } });
     mockUseSession.mockReturnValue({
