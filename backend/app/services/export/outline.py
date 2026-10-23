@@ -1,5 +1,6 @@
 """The chapter outline every builder shares: selection, numbering, headings,
 contents entries and the running-head tokens (#988)."""
+import re
 from typing import Dict, List
 
 
@@ -99,3 +100,19 @@ class OutlineMixin:
         return self._flatten_chapters(
             toc.get('chapters', []), include_empty=include_empty_chapters
         )
+
+
+# What XML 1.0 allows nowhere (C0 controls but tab/LF/CR, lone surrogates, U+FFFE/U+FFFF): python-docx
+# raises on it and the EPUB stops being well-formed.
+_NOT_XML = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
+
+
+def strip_non_xml(value):
+    """A copy of the book (any nesting of dicts, lists and strings) without code points XML 1.0 forbids."""
+    if isinstance(value, str):
+        return _NOT_XML.sub("", value)
+    if isinstance(value, dict):
+        return {k: strip_non_xml(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [strip_non_xml(v) for v in value]
+    return value
