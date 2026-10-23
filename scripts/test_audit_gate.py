@@ -572,6 +572,7 @@ def test_every_entry_in_the_real_baseline_says_why():
     baseline = json.loads((REPO / "security-baseline.json").read_text())
     entries = {**baseline.get("pypi", {}), **baseline.get("npm", {})}
 
-    assert entries, "the baseline is empty; this guard is vacuous"
+    # An empty baseline is the goal (reached 2026-10-23), so prove instead that this read the real file
+    assert {"pypi", "npm"} <= baseline.keys(), "this guard is not reading the real baseline"
     for advisory, reason in entries.items():
         assert isinstance(reason, str) and len(reason) > 40, f"{advisory}: {reason!r}"
