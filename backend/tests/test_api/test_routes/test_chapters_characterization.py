@@ -18,16 +18,14 @@ from app.api.endpoints import chapters
 from app.main import app
 
 
-# The 9 handlers moved out of books.py into chapters.py, by (method, path)
+# The 7 handlers moved out of books.py into chapters.py, by (method, path)
 # relative to the /books mount prefix.
 MOVED_CHAPTER_ROUTES = {
     ("POST", "/api/v1/books/{book_id}/chapters"),                 # create_chapter
-    ("GET", "/api/v1/books/{book_id}/chapters"),                  # list_chapters
     ("GET", "/api/v1/books/{book_id}/chapters/metadata"),         # get_chapters_metadata
     ("GET", "/api/v1/books/{book_id}/chapters/tab-state"),        # get_tab_state
     ("POST", "/api/v1/books/{book_id}/chapters/tab-state"),       # save_tab_state
     ("PATCH", "/api/v1/books/{book_id}/chapters/bulk-status"),    # update_chapter_status_bulk
-    ("GET", "/api/v1/books/{book_id}/chapters/{chapter_id}"),     # get_chapter
     ("PUT", "/api/v1/books/{book_id}/chapters/{chapter_id}"),     # update_chapter
     ("DELETE", "/api/v1/books/{book_id}/chapters/{chapter_id}"),  # delete_chapter
 }
@@ -56,7 +54,7 @@ def test_moved_chapter_routes_still_served_by_app():
 
 
 def test_moved_routes_now_live_on_chapters_router():
-    """The 9 moved handlers are owned by chapters.router, not books.router."""
+    """The 7 moved handlers are owned by chapters.router, not books.router."""
     owned = set()
     for route in chapters.router.routes:
         for method in getattr(route, "methods", ()) or ():
