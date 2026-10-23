@@ -11,7 +11,7 @@ export const SAME_ORIGIN = { Origin: WEB };
 /**
  * The link in the email the development server printed when `email` signed up.
  * Each address is used once, so the first email to it is the sign-up one; a
- * refused sign-in mails another, whose link lands on the home page instead.
+ * refused sign-in on the page mails another (#969); an API sign-in mails none.
  */
 export async function verificationLink(email: string): Promise<string> {
   let link: string | undefined;

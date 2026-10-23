@@ -78,8 +78,11 @@ function createAuthInstance(database: Db) {
     },
     emailVerification: {
       sendOnSignUp: true,
-      // A refused sign-in mails a fresh link, which is how a user gets another one.
-      sendOnSignIn: true,
+      // Off (#969): the sign-in page mails the fresh link on EMAIL_NOT_VERIFIED,
+      // aimed at the user's destination. Passing that callbackURL to sign-in
+      // instead made better-auth's client reload the page on every success.
+      // A direct API sign-in therefore mails nothing.
+      sendOnSignIn: false,
       autoSignInAfterVerification: true,
       expiresIn: 60 * 60, // the email says one hour
       // Awaited, so a failed send rejects here. better-auth catches that and

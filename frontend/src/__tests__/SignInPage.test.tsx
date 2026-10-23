@@ -14,6 +14,8 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockSignInEmail = authClient.signIn.email as unknown as jest.Mock;
+const mockSendVerificationEmail =
+  authClient.sendVerificationEmail as unknown as jest.Mock;
 
 function setup(redirectParam: string | null) {
   (useSearchParams as jest.Mock).mockReturnValue(
@@ -70,23 +72,17 @@ describe("SignInPage redirect handling", () => {
     expect(push).toHaveBeenCalledWith("/dashboard");
   });
 
-  // #969: a refused (unverified) sign-in mails a link to this callbackURL.
-  it("sends the fresh verification link toward the sanitized destination", async () => {
-    setup("/dashboard/books/1");
+  // #969 demo: a callbackURL on sign-in makes better-auth answer redirect:true,
+  // and its client redirectPlugin then reloads the whole page. The mocked client
+  // runs no plugins, so what is pinned is the cause: no callbackURL is sent.
+  it("signs in with a client-side transition, sending no callbackURL", async () => {
+    const { push } = setup("/dashboard/books/1");
     await signIn();
     expect(mockSignInEmail).toHaveBeenCalledWith({
       email: "test@example.com",
       password: "pw1234",
-      callbackURL: "/auth/verify-email?next=%2Fdashboard%2Fbooks%2F1",
     });
-  });
-
-  it("never points the verification link off-site", async () => {
-    setup("https://evil.com");
-    await signIn();
-    expect(mockSignInEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ callbackURL: "/auth/verify-email?next=%2Fdashboard" })
-    );
+    expect(push).toHaveBeenCalledWith("/dashboard/books/1");
   });
 
   it("does not navigate at all when sign-in fails", async () => {
@@ -117,6 +113,64 @@ describe("SignInPage error and 2FA handling (#198)", () => {
       await screen.findByText(/verify your email address.*sent you a new link/i)
     ).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  // #969: the server no longer mails on a refused sign-in (sendOnSignIn: false);
+  // the page sends the one link, aimed at the sanitized destination.
+  it("sends exactly one verification link toward the destination when refused as unverified", async () => {
+    mockSignInEmail.mockResolvedValue({
+      data: null,
+      error: { code: "EMAIL_NOT_VERIFIED", message: "Email not verified", status: 403 },
+    });
+    setup("/dashboard/books/1");
+    await signIn();
+    await screen.findByText(/verify your email address/i);
+    expect(mockSendVerificationEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendVerificationEmail).toHaveBeenCalledWith({
+      email: "test@example.com",
+      callbackURL: "/auth/verify-email?next=%2Fdashboard%2Fbooks%2F1",
+    });
+  });
+
+  it("never points that link off-site", async () => {
+    mockSignInEmail.mockResolvedValue({
+      data: null,
+      error: { code: "EMAIL_NOT_VERIFIED", message: "Email not verified", status: 403 },
+    });
+    setup("https://evil.com");
+    await signIn();
+    await screen.findByText(/verify your email address/i);
+    expect(mockSendVerificationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ callbackURL: "/auth/verify-email?next=%2Fdashboard" })
+    );
+  });
+
+  it("says so when the new link could not be sent", async () => {
+    mockSignInEmail.mockResolvedValue({
+      data: null,
+      error: { code: "EMAIL_NOT_VERIFIED", message: "Email not verified", status: 403 },
+    });
+    mockSendVerificationEmail.mockResolvedValueOnce({
+      data: null,
+      error: { status: 429, message: "Too many requests" },
+    });
+    setup(null);
+    await signIn();
+    expect(
+      await screen.findByText(/could not send a new link/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/sent you a new link/i)).not.toBeInTheDocument();
+  });
+
+  it("sends no verification link for any other refusal", async () => {
+    mockSignInEmail.mockResolvedValue({
+      data: null,
+      error: { message: "Invalid credentials" },
+    });
+    setup(null);
+    await signIn();
+    await screen.findByText("Email or password is incorrect");
+    expect(mockSendVerificationEmail).not.toHaveBeenCalled();
   });
 
   it("renders the mapped user-friendly message when credentials are rejected", async () => {
