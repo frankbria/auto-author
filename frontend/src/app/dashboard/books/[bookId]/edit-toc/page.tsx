@@ -448,6 +448,10 @@ export default function EditTOCPage({ params }: { params: Promise<{ bookId: stri
       if ((err as { statusCode?: number }).statusCode === 409) {
         setConflict(true);
         setError('This table of contents changed elsewhere since you opened it. Reload to see the latest version; your unsaved edits here will be discarded.');
+      } else if ((err as { statusCode?: number }).statusCode === 413 && (err as Error).message) {
+        // The server says what the limit is (#1038).
+        setConflict(false);
+        setError((err as Error).message);
       } else if ((err as { statusCode?: number }).statusCode === 400 && /must be unique/.test((err as Error).message ?? '')) {
         // A book stored before #754 can hold two chapters with one id; start-up repairs them (#885).
         setConflict(false);

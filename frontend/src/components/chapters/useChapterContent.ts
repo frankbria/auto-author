@@ -21,6 +21,7 @@ import {
   flushChapterContent,
   flushChapterContentOnPageHide,
   isChapterConflict,
+  isChapterTooLarge,
   keepDroppedChapterText,
   reportSaveFailure,
   saveSucceeded,
@@ -80,6 +81,9 @@ export function useChapterContent({
   // A save the server rejected because the chapter changed elsewhere. Saving
   // stops until the writer reloads the server copy or overwrites it.
   const [conflict, setConflict] = useState<ChapterSaveConflict | null>(null);
+  // The text the server refused as too large (#1038): resending it cannot work,
+  // so autosave waits for it to change.
+  const [refusedContent, setRefusedContent] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [autoSavePending, setAutoSavePending] = useState(false);
@@ -139,6 +143,7 @@ export function useChapterContent({
         onContentChange(html);
       }
       if (loadFailed) return;
+      setRefusedContent((refused) => (refused === html ? refused : null));
       // Tagged with its chapter now, so a flush can never send it to the next one.
       unsavedRef.current = html !== lastAutoSavedContent ? { bookId, chapterId, content: html } : null;
       // While saves are failing, each edit refreshes the backup: the next try may be
@@ -323,6 +328,16 @@ export function useChapterContent({
     );
   };
 
+  // Like a conflict, an answer rather than an outage: no backoff, the server's
+  // words on screen, the text kept in a backup.
+  const handleTooLarge = (content: string, err: Error) => {
+    const backedUp = backupChapterContent({ bookId, chapterId, content }, err);
+    noteBackupWrite();
+    if (shownChapterRef.current !== chapterBackupKey(bookId, chapterId)) return;
+    setRefusedContent(content);
+    setError(backedUp ? `${err.message} Your text is still here and backed up on this device.` : err.message);
+  };
+
   const resolveConflict = (keep: 'mine' | 'theirs') => {
     if (!conflict || !editor) return;
     // The dropped text, including edits made since the conflict, stays
@@ -355,7 +370,7 @@ export function useChapterContent({
 
   // Auto-save functionality with localStorage backup
   useEffect(() => {
-    if (!autoSavePending || !editor || isSaving || loadFailed || conflict) return;
+    if (!autoSavePending || !editor || isSaving || loadFailed || conflict || refusedContent !== null) return;
 
     const delay = Math.max(autoSaveDelayMs, Math.min(autoSaveDelayMs * 2 ** autoSaveFailuresRef.current, 30_000));
     const timer = autoSaveTimerRef.current = setTimeout(async () => {
@@ -389,6 +404,10 @@ export function useChapterContent({
           handleConflict(content, err);
           return;
         }
+        if (isChapterTooLarge(err)) {
+          handleTooLarge(content, err as Error);
+          return;
+        }
         reportSaveFailure('auto-save', err);
         autoSaveFailuresRef.current += 1;
         if (backupChapterContent({ bookId, chapterId, content }, err)) {
@@ -403,7 +422,7 @@ export function useChapterContent({
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [autoSavePending, autoSaveDelayMs, bookId, chapterId, conflict, editor, isSaving, lastAutoSavedContent, loadFailed]);
+  }, [autoSavePending, autoSaveDelayMs, bookId, chapterId, conflict, editor, isSaving, lastAutoSavedContent, loadFailed, refusedContent]);
 
   const handleSave = async (isAutoSave: boolean = false) => {
     if (isSaving || !editor || loadFailed) return;
@@ -433,6 +452,10 @@ export function useChapterContent({
       console.error('Failed to save chapter:', err);
       if (isChapterConflict(err)) {
         handleConflict(content, err);
+        return;
+      }
+      if (isChapterTooLarge(err)) {
+        handleTooLarge(content, err as Error);
         return;
       }
       setError('Failed to save chapter content');
