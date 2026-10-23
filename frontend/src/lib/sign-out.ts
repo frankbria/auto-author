@@ -23,14 +23,22 @@ export const endSignOut = () => {
  * with `{ error }` when refused and throws when the request never arrives;
  * either way the session is still alive, so the caller must not carry on as
  * if it had worked. Returns whether the sign-out happened.
+ *
+ * `leavePage`: hold the redirect guards until the page is replaced, for a
+ * caller that follows a success with a full-page load rather than router.push.
  */
-export async function signOutOrNotify({ quiet = false } = {}): Promise<boolean> {
+export async function signOutOrNotify({
+  quiet = false,
+  leavePage = false,
+} = {}): Promise<boolean> {
   underwayUntil = Infinity;
   const failed = await authClient.signOut().then(
     ({ error }) => Boolean(error),
     () => true
   );
-  underwayUntil = failed ? 0 : Date.now() + CALLER_NAVIGATES_WITHIN_MS;
+  // leavePage: the caller replaces the document, which resets this module, so
+  // no timer can expire before a slow navigation lands (#1177).
+  underwayUntil = failed ? 0 : leavePage ? Infinity : Date.now() + CALLER_NAVIGATES_WITHIN_MS;
   if (failed && !quiet) {
     toast({
       title: "Could not sign out",
