@@ -82,7 +82,6 @@ REQUESTS: dict[tuple[str, str], dict] = {
     ("DELETE", CHAPTER): {},
     ("GET", CHAPTER + "/content"): {},
     ("PATCH", CHAPTER + "/content"): {"json": {"content": "<p>Mine now.</p>"}},
-    ("GET", CHAPTER + "/analytics"): {},
     ("POST", CHAPTER + "/enhance-text"): {"json": {"content": "<p>A sentence to improve, and another after it.</p>", "enhancement_type": "grammar"}},
     ("POST", CHAPTER + "/enhance-transcription"): {"json": {"content": "um so a sentence to tidy up, you know"}},
     ("POST", CHAPTER + "/generate-draft"): {
