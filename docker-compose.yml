@@ -50,13 +50,18 @@ services:
       # forgotten value must stop the deploy, not quietly start as staging.
       ENVIRONMENT: ${ENVIRONMENT:?ENVIRONMENT is required (development|test|staging|production)}
       SENTRY_DSN: ${SENTRY_DSN:-}
-      # Whose X-Forwarded-Proto and X-Forwarded-For uvicorn believes (#814). Its
-      # default is loopback, but nginx on the host reaches this container as the
-      # Docker network's gateway, so the API thought it was served over http and
-      # redirected there. These are the ranges Docker gives its networks. Not
-      # "*": that takes the first X-Forwarded-For address, which the caller
-      # writes; with a list uvicorn takes the last one that is not a proxy.
-      FORWARDED_ALLOW_IPS: "172.16.0.0/12,192.168.0.0/16"
+      # Whose X-Forwarded-Proto and X-Forwarded-For uvicorn believes (#814, #1011).
+      # Its default is loopback, but nginx on the host reaches this container as
+      # the Docker network's gateway, so the API thought it was served over http.
+      # Only that gateway is trusted, not a range: the other containers and
+      # networks on the box must not be able to write the client's address. That
+      # needs the network's subnet fixed (see `networks:` below); it is pinned
+      # because a clash fails `compose up` loudly, where a drifting gateway would
+      # silently turn the redirects back to http. 172.20.0.0/16 was checked free
+      # on the staging box. Not "*": that takes the first X-Forwarded-For
+      # address, which the caller writes; with a list uvicorn takes the last
+      # one that is not a proxy.
+      FORWARDED_ALLOW_IPS: "172.20.0.1"
     healthcheck:
       # Liveness only (#807): is the process serving. /health, which checks
       # MongoDB and the configuration, stays the deploy gate; using it here
@@ -104,3 +109,12 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+# Pinned so FORWARDED_ALLOW_IPS can name the gateway (#1011). 172.20.0.0/16 is
+# unused by the other networks on the staging box; a clash fails `compose up`.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
