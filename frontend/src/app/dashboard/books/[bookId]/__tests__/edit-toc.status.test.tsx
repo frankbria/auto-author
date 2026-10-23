@@ -239,3 +239,18 @@ describe('Edit TOC page: optimistic lock (#750)', () => {
     expect(screen.queryByRole('button', { name: /reload/i })).not.toBeInTheDocument();
   });
 });
+
+describe('Edit TOC page: a table of contents too large to save (#1038)', () => {
+  it('shows the server message instead of the generic failure', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    (useSession as jest.Mock).mockReturnValue({ data: { user: { id: 'u1' } } });
+    mockBookClient.getToc.mockResolvedValue(tocWith([chapter('c1', 'One', 1, 'draft')], 4));
+    const detail = 'The table of contents is too large to save: the limit is 262,144 bytes.';
+    mockBookClient.updateToc.mockRejectedValue(Object.assign(new Error(detail), { statusCode: 413 }));
+    renderPage();
+    await screen.findByDisplayValue('One');
+    fireEvent.click(screen.getByRole('button', { name: /save & continue/i }));
+    expect(await screen.findByText(detail)).toBeInTheDocument();
+    expect(screen.queryByText(/failed to save the table of contents/i)).not.toBeInTheDocument();
+  });
+});

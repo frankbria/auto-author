@@ -51,6 +51,9 @@ export type ChapterSaveConflict = Error & {
   currentContent: string;
 };
 
+/** A content save the server refuses as too large (#1038); the message is its own words. */
+export type ChapterSaveTooLarge = Error & { statusCode: 413 };
+
 /** The backend's 409 detail (#759), or null if the body is not one. */
 function chapterConflictDetail(
   body: string
@@ -63,6 +66,16 @@ function chapterConflictDetail(
     return typeof detail?.current_content === 'string' && (typeof token === 'string' || token === null)
       ? detail
       : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The backend's 413 detail (#1038), or null if the body is not a string one. */
+function chapterTooLargeDetail(body: string): string | null {
+  try {
+    const detail = JSON.parse(body)?.detail;
+    return typeof detail === 'string' && detail ? detail : null;
   } catch {
     return null;
   }
@@ -1100,6 +1113,13 @@ export class BookClient {
             currentLastModified: conflict.current_last_modified,
             currentContent: conflict.current_content,
           }) satisfies ChapterSaveConflict,
+          response
+        );
+      }
+      const tooLarge = response.status === 413 ? chapterTooLargeDetail(error) : null;
+      if (tooLarge) {
+        throw withRequestId(
+          Object.assign(new Error(tooLarge), { statusCode: 413 as const }) satisfies ChapterSaveTooLarge,
           response
         );
       }
