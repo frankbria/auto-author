@@ -187,6 +187,52 @@ async def test_avatar_storage_failure_is_logged_and_the_user_is_still_erased(
     assert any("gone-2" in record.getMessage() for record in caplog.records)
 
 
+async def test_book_created_after_the_cascade_read_is_gone_after_deletion(
+    reinit_db, uploads
+):
+    """A POST /books in flight during deletion can land after the cascade's id
+    read (#945). The endpoints run the cascade, then delete_user; a book created
+    between them must not outlive the account, nor its cover and children."""
+    await _user_with_avatar(uploads, "racer")
+    await delete_all_user_books("racer")  # the endpoint's pass, before the tombstone
+
+    late_id = str((await book_dao.create_book({"title": "Late"}, "racer"))["_id"])
+    cover, thumb = _cover_files(late_id)
+    (uploads.covers / cover).write_bytes(b"cover")
+    (uploads.covers / thumb).write_bytes(b"thumb")
+    books = await get_collection("books")
+    await books.update_one(
+        {"_id": ObjectId(late_id)},
+        {
+            "$set": {
+                "cover_image_url": f"/uploads/cover_images/{cover}",
+                "cover_thumbnail_url": f"/uploads/cover_images/{thumb}",
+            }
+        },
+    )
+    questions = await get_collection("questions")
+    await questions.insert_one({"book_id": late_id, "user_id": "racer", "text": "Q?"})
+
+    assert await delete_user("racer") is True
+
+    assert await books.count_documents({"owner_id": "racer"}) == 0
+    assert await questions.count_documents({"book_id": late_id}) == 0
+    assert _names(uploads.covers) == []
+
+
+async def test_book_created_after_deletion_returns_is_not_kept(reinit_db, uploads):
+    """The insert of a request still in flight can land after delete_user's
+    second pass too (#945); create_book then finds the tombstone itself."""
+    await _user_with_avatar(uploads, "racer-2")
+    assert await delete_user("racer-2") is True
+
+    with pytest.raises(ValueError):
+        await book_dao.create_book({"title": "Later"}, "racer-2")
+
+    books = await get_collection("books")
+    assert await books.count_documents({"owner_id": "racer-2"}) == 0
+
+
 # --- cloud storage -----------------------------------------------------------
 
 

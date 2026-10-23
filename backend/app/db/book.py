@@ -36,11 +36,18 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
         book_obj.id = result.inserted_id
 
         # Associate the book with the user
-        await users_collection.update_one(
+        attached = await users_collection.update_one(
             # Never onto a tombstone (deleted account, #784).
             {"auth_id": user_auth_id, "deleted_at": {"$exists": False}},
             {"$push": {"book_ids": str(book_obj.id)}},
         )
+        # An insert that lands after delete_user's second cascade (#945) finds
+        # the tombstone here: the book has no children or cover yet.
+        if not attached.matched_count and await users_collection.count_documents(
+            {"auth_id": user_auth_id, "deleted_at": {"$exists": True}}, limit=1
+        ):
+            await books_collection.delete_one({"_id": result.inserted_id})
+            raise ValueError("The account was deleted")
 
         # Create audit log entry
         await audit_after_write(
@@ -417,7 +424,8 @@ async def delete_all_user_books(user_auth_id: str) -> int:
 
     Never a transaction, even on a replica set: one spanning a whole account
     outlives the 60s transaction limit on exactly the accounts this is for.
-    ponytail: the id list is a snapshot — a book created mid-cascade survives.
+    The id list is a snapshot; delete_user runs this again after the tombstone
+    to catch a book created mid-cascade (#945).
     """
     books = await books_collection.find(
         {"owner_id": user_auth_id}, _DELETE_PROJECTION
