@@ -158,8 +158,8 @@ password, rotation runbook): `docs/DATABASE_CONNECTION_STANDARD.md`.
 
 ### AI provider settings (#917)
 
-All optional. With none set, the backend calls api.openai.com with `gpt-4` and
-`gpt-4o`, the same as before #917. They reach the backend through `env_file:`,
+All optional. With none set, the backend calls api.openai.com with `gpt-4o`
+for both model classes (the default class used `gpt-4` until OpenAI retired it, #1205). They reach the backend through `env_file:`,
 so adding a line to the box `.env` and recreating the containers is the whole
 change.
 
@@ -167,7 +167,7 @@ change.
 |---|---|---|
 | `AI_BASE_URL` | empty (api.openai.com) | Any OpenAI-compatible endpoint, such as z.ai, OpenRouter, vLLM or Ollama (`…/v1`). This is the only routing switch: the SDK's own `OPENAI_BASE_URL` is ignored |
 | `AI_API_KEY` | empty | That provider's key, which takes precedence over `OPENAI_API_KEY`. **Required whenever `AI_BASE_URL` is set**, because the OpenAI key is never sent to another endpoint and `/health` reports `AI_API_KEY` as missing. A keyless local server (Ollama) still needs a non-empty value, any string will do. Compose still requires `OPENAI_API_KEY`, so leave the existing value |
-| `AI_MODEL_DEFAULT` | `gpt-4` | Summary analysis, clarifying and chapter questions, enhance, transform, transcription cleanup |
+| `AI_MODEL_DEFAULT` | `gpt-4o` | Summary analysis, clarifying and chapter questions, enhance, transform, transcription cleanup |
 | `AI_MODEL_LONG_OUTPUT` | `gpt-4o` | Chapter drafts and TOC generation (needs ≥ 6000 output tokens for TOC) |
 | `AI_MAX_OUTPUT_TOKENS_DEFAULT` | `4000` | Cap on every default-class request's `max_tokens` |
 | `AI_MAX_OUTPUT_TOKENS_LONG` | `8000` | Cap on drafts and TOC. Lowering it below 6000 truncates large TOCs, which then fail cleanly as `AI_RESPONSE_TRUNCATED` |

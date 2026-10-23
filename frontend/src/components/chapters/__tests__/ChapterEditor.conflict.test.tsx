@@ -251,8 +251,7 @@ describe('ChapterEditor save conflict (#760)', () => {
     await flushTimers(3000);
     expect(backup()).toBe('<p>Theirs edit</p>');
 
-    // Both versions stay on offer: dismissing the failed save's backup leaves the dropped text.
-    await act(async () => view.getByRole('button', { name: 'Dismiss' }).click());
+    // The failed save's backup is the text on screen (#1195), so the dropped text is what is offered.
     await act(async () => view.getByRole('button', { name: 'Restore Backup' }).click());
     expect(view.html()).toBe('<p>Alpha mine more</p>');
   });
