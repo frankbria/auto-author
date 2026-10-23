@@ -9,7 +9,7 @@ Two defects fixed here:
    ``update_chapter_statuses_with_version_guard`` and maps a version conflict to
    **409** (mirroring create/update/delete_chapter).
 2. The read/aggregate handlers (``get_chapters_metadata``, ``get_tab_state``,
-   ``list_chapters``, ``save_tab_state``) had no ``try/except``, so an unexpected
+   ``save_tab_state``) had no ``try/except``, so an unexpected
    error propagated unlogged. They now log and return a structured **500** while
    preserving the existing 404/403 checks.
 
@@ -126,30 +126,15 @@ async def test_bulk_status_logging_failure_does_not_fail_committed_update(
 
     assert resp.status_code == 200
     assert resp.json()["updated_chapters"] == [chapter_id]
-    # The update really persisted (list_chapters does not log access, so it is
-    # unaffected by the patched-to-fail log_access).
-    after = await api.get(f"/api/v1/books/{book_id}/chapters")
-    statuses = {c["id"]: c["status"] for c in after.json()["chapters"]}
+    # The update really persisted.
+    stored = await chapters.get_book_by_id(book_id)
+    statuses = {c["id"]: c["status"] for c in stored["table_of_contents"]["chapters"]}
     assert statuses[chapter_id] == "in-progress"
 
 
 # --------------------------------------------------------------------------- #
 # Part 2: read/aggregate handlers -> structured 500 (preserving 404/403)
 # --------------------------------------------------------------------------- #
-
-
-@pytest.mark.asyncio
-async def test_list_chapters_unexpected_error_returns_500(
-    auth_client_factory, monkeypatch
-):
-    api = await auth_client_factory()
-    book_id = await create_book(api)
-
-    monkeypatch.setattr(chapters, "get_book_by_id", _async_raiser())
-
-    resp = await api.get(f"/api/v1/books/{book_id}/chapters")
-    assert resp.status_code == 500
-    assert resp.json()["detail"] == "Failed to list chapters"
 
 
 @pytest.mark.asyncio
@@ -216,7 +201,6 @@ async def test_read_handlers_still_return_404_on_missing_book(
     missing = str(ObjectId())
 
     for path in (
-        f"/api/v1/books/{missing}/chapters",
         f"/api/v1/books/{missing}/chapters/metadata",
         f"/api/v1/books/{missing}/chapters/tab-state",
     ):

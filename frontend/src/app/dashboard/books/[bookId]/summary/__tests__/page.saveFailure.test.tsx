@@ -110,6 +110,75 @@ describe('a summary save that fails', () => {
   });
 });
 
+describe('retrying a save that failed without changing the text (#1047)', () => {
+  async function failedOnce() {
+    serverHas('The saved summary');
+    await opened();
+    mockedClient.saveBookSummary.mockRejectedValueOnce(new Error('Network error'));
+    await typeAndWaitForTheSave('A summary the server never received');
+    expect(await screen.findByText(/could not be saved/i)).toBeInTheDocument();
+    mockedClient.saveBookSummary.mockClear();
+  }
+
+  it('saves the current text when Try again is clicked', async () => {
+    await failedOnce();
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await act(async () => {});
+
+    expect(mockedClient.saveBookSummary).toHaveBeenCalledTimes(1);
+    expect(mockedClient.saveBookSummary).toHaveBeenCalledWith('book-1', 'A summary the server never received');
+    await waitFor(() => expect(screen.queryByText(/could not be saved/i)).not.toBeInTheDocument());
+    expect(localStorage.getItem(UNSAVED)).toBeNull();
+  });
+
+  it('saves again when the browser comes back online', async () => {
+    await failedOnce();
+
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    expect(mockedClient.saveBookSummary).toHaveBeenCalledTimes(1);
+    expect(mockedClient.saveBookSummary).toHaveBeenCalledWith('book-1', 'A summary the server never received');
+    await waitFor(() => expect(screen.queryByText(/could not be saved/i)).not.toBeInTheDocument());
+  });
+
+  it('does not retry on online when nothing failed', async () => {
+    serverHas('The saved summary');
+    await opened();
+
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    expect(mockedClient.saveBookSummary).not.toHaveBeenCalled();
+  });
+
+  it('does not start a second save while one is in flight', async () => {
+    await failedOnce();
+    let finish!: (value: unknown) => void;
+    mockedClient.saveBookSummary.mockReturnValue(new Promise((resolve) => (finish = resolve)) as never);
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+
+    expect(mockedClient.saveBookSummary).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish({ summary: 'A summary the server never received', success: true });
+    });
+  });
+
+  it('says saving is also tried again when the connection comes back', async () => {
+    await failedOnce();
+
+    expect(screen.getByText(/could not be saved/i)).toHaveTextContent(/or your connection comes back/i);
+  });
+});
+
 describe('coming back after a save failed', () => {
   it('shows the saved summary, keeps the unsaved one, and offers the choice', async () => {
     localStorage.setItem(UNSAVED, 'What I wrote last time, which was not saved');
