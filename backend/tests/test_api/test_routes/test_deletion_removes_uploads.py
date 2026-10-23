@@ -13,6 +13,7 @@ from bson import ObjectId
 from PIL import Image
 
 import app.db.book as book_dao
+import app.db.book_delete as book_delete_dao
 import app.services.file_upload_service as fus
 from app.db.base import get_collection
 from app.db.book import delete_all_user_books, delete_book
@@ -118,7 +119,7 @@ async def test_failed_cascade_keeps_the_cover_files(
     async def _boom(*args):
         raise RuntimeError("simulated mongo failure")
 
-    monkeypatch.setattr(book_dao, "_delete_books_internal", _boom)
+    monkeypatch.setattr(book_delete_dao, "_delete_books_internal", _boom)
 
     with pytest.raises(RuntimeError):
         await delete(book_id, "owner-2")
@@ -140,7 +141,7 @@ async def test_storage_failure_is_logged_and_the_book_is_still_deleted(
     book_id = await _book_with_cover(uploads, "owner-4")
     _block_storage(uploads, monkeypatch, "COVER_IMAGES_DIR")
 
-    with caplog.at_level(logging.ERROR, logger="app.db.book"):
+    with caplog.at_level(logging.ERROR, logger="app.db.book_delete"):
         assert await delete_book(book_id, "owner-4") is True
 
     books = await get_collection("books")
@@ -399,7 +400,7 @@ async def test_delete_book_removes_a_cover_replaced_after_its_ownership_check(
     the pair; the delete must remove the pair the book had when it went."""
     book_id = await _book_with_cover(uploads, "owner-8")
     new_cover, new_thumb = f"{book_id}_{'1' * 32}.jpg", f"{book_id}_{'1' * 32}_thumb.jpg"
-    real = book_dao._delete_books_internal
+    real = book_delete_dao._delete_books_internal
 
     async def _upload_lands_first(*args):
         (uploads.covers / new_cover).write_bytes(b"new")
@@ -416,7 +417,7 @@ async def test_delete_book_removes_a_cover_replaced_after_its_ownership_check(
         )
         return await real(*args)
 
-    monkeypatch.setattr(book_dao, "_delete_books_internal", _upload_lands_first)
+    monkeypatch.setattr(book_delete_dao, "_delete_books_internal", _upload_lands_first)
 
     assert await delete_book(book_id, "owner-8") is True
 
