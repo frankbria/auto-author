@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSession } from '@/lib/auth-client';
 import { signOutOrNotify } from '@/lib/sign-out';
+import { browser } from '@/lib/api/unauthorized';
 import { clearLocalWriting } from '@/lib/storage/localWriting';
 import useProfileApi, { downloadAccountData, type UserPreferences } from '@/hooks/useProfileApi';
 import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
@@ -43,7 +43,6 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function UserProfile() {
-  const router = useRouter();
   const { data: session } = useSession();
   const user = session?.user;
   const { getUserProfile, updateUserProfile, deleteUserAccount } = useProfileApi();
@@ -191,10 +190,13 @@ export default function UserProfile() {
       // The server already revoked every session (#763); this clears the
       // cookies and the client session cache. The account is gone either way,
       // so a sign-out failure must not surface as "Delete failed".
-      if (!(await signOutOrNotify({ quiet: true }))) {
+      if (!(await signOutOrNotify({ quiet: true, leavePage: true }))) {
         console.error('Sign out after delete failed');
       }
-      router?.push?.('/');
+      // A full load, not router.push: a slow client navigation (a cold dev
+      // compile of `/`) outlasts any guard timer, and ProtectedRoute then sends
+      // the still-mounted /profile to sign-in (#1177).
+      browser.go('/');
     } catch (err) {
       toast.error({
         title: 'Delete failed',
