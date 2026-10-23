@@ -7,6 +7,8 @@ like markup (`[not a link]`, `__init__`) must still print as typed, and the
 Markdown export keeps its syntax.
 """
 
+import re
+import zipfile
 from io import BytesIO
 
 import pytest
@@ -143,3 +145,49 @@ class TestHashAtTheStartOfABlockIsText:
         font_of = {text: font for font, text in runs}
         for text in EXPECTED + ["* # in a list"]:
             assert font_of[text] == font_of["plain body"], runs
+
+
+FORGED_TEXT = "<p>&#xe00c;javascript:alert(1)&#xe00d;click me&#xe00e; and &#xe000;x &#xe001;</p>"
+FORGED_HREF = '<p><a href="https://a/&#xe00e;&#xe00c;javascript:alert(1)&#xe00d;">t</a></p>'
+BREAK_IN_LINK = '<p><a href="https://x.com">a<br>b</a></p>'
+MARKS = re.compile("[-]")
+
+
+def _all_text(data: bytes) -> str:
+    """Every document part of an EPUB/DOCX, decoded."""
+    with zipfile.ZipFile(BytesIO(data)) as zf:
+        return "".join(zf.read(n).decode("utf8", "replace") for n in zf.namelist())
+
+
+@pytest.mark.parametrize("content", [FORGED_TEXT, FORGED_HREF])
+class TestMarksWrittenAsCharacterReferencesMakeNothing:
+    async def test_pdf(self, content):
+        pdf = await _export(content, "pdf")
+        assert b"javascript" not in pdf
+        assert not MARKS.search("".join(t for _, t in await _pdf_runs(content)))
+
+    async def test_epub(self, content):
+        everything = _all_text(await _export(content, "epub"))
+        assert 'href="javascript' not in everything and "href=\"https://a/" not in everything
+        assert not MARKS.search(everything)
+
+    async def test_docx(self, content):
+        data = await _export(content, "docx")
+        assert "javascript:" not in _all_text_rels(data)
+        assert not MARKS.search(_all_text(data))
+
+
+def _all_text_rels(data: bytes) -> str:
+    with zipfile.ZipFile(BytesIO(data)) as zf:
+        return "".join(zf.read(n).decode() for n in zf.namelist() if n.endswith(".rels"))
+
+
+@pytest.mark.parametrize("fmt", ["pdf", "epub", "docx"])
+async def test_a_line_break_inside_a_link_leaves_plain_text(fmt):
+    data = await _export(BREAK_IN_LINK, fmt)
+    if fmt == "pdf":
+        assert not MARKS.search("".join(t for _, t in await _pdf_runs(BREAK_IN_LINK)))
+        assert b"x.com" not in data
+    else:
+        assert not MARKS.search(_all_text(data))
+        assert "x.com" not in _all_text(data)

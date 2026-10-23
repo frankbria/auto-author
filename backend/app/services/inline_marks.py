@@ -73,7 +73,9 @@ def link(self, el, text, parent_tags):
     href = (el.get("href") or "").strip()
     if not text:
         return ""
-    if urlparse(href).scheme.lower() not in _LINK_SCHEMES or re.search(r"[\s\x00-\x1f]", href):
+    # A link ends at a line break, so one with a <br> in it is its text alone.
+    if (urlparse(href).scheme.lower() not in _LINK_SCHEMES or re.search(r"[\s\x00-\x1f]", href)
+            or _ANY.search(href) or "\n" in text):
         return f"{prefix}{text}{suffix}"
     return f"{prefix}{LINK_ON}{href}{LINK_SEP}{text}{LINK_OFF}{suffix}"
 

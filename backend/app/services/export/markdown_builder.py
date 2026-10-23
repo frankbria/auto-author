@@ -60,9 +60,10 @@ def _html_to_markdown(content: str, *, for_a_markdown_reader: bool) -> str:
             convert_a = inline_marks.link
 
         def process_text(self, el, parent_tags=None):
-            # Text that opens a bare block or the chapter is a paragraph the
-            # author typed: `# ` there must not read as a heading (#1190).
-            text = super().process_text(el, parent_tags)
+            # Marks go from the text as parsed: &#xe00c; in the source is a mark
+            # only once decoded. Text that opens a bare block or the chapter is
+            # a paragraph the author typed: `# ` must not read as a heading (#1190).
+            text = inline_marks.without_marks(super().process_text(el, parent_tags))
             prev = el.previous_sibling
             if (not for_a_markdown_reader and el.parent is not None
                     and el.parent.name in _BARE_BLOCKS and (prev is None or prev.name in _BLOCKS)):
