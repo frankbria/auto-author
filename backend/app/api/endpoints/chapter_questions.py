@@ -624,6 +624,52 @@ async def regenerate_single_question(
         )
 
 
+@router.get("/{book_id}/chapters/{chapter_id}/question-answers", response_model=Dict[str, Any])
+async def get_chapter_answers(
+    book_id: str,
+    chapter_id: str,
+    current_user: Dict = Depends(get_current_user_from_session),
+):
+    """
+    Get every answered question of a chapter, with its answer, in one request.
+
+    Replaces listing the questions and then fetching each answer separately (#1050).
+
+    Error Codes:
+        - BOOK_NOT_FOUND (404): Book does not exist
+        - FORBIDDEN_OPERATION (403): User is not the book owner
+        - OPERATION_FAILED (500): Error retrieving answers
+    """
+    request_id = generate_request_id()
+
+    owner_id = await get_book_owner_id(book_id)
+    if owner_id is None:
+        raise handle_book_not_found(book_id, request_id)
+
+    if owner_id != current_user.get("auth_id"):
+        raise handle_unauthorized_access(
+            resource_type="book",
+            resource_id=book_id,
+            user_id=current_user.get("auth_id"),
+            required_permission="owner",
+            request_id=request_id
+        )
+
+    try:
+        return await get_question_generation_service().get_chapter_answers(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            user_id=current_user.get("auth_id")
+        )
+    except Exception as e:
+        raise handle_generic_error(
+            error=e,
+            operation="retrieving chapter answers",
+            context={"book_id": book_id, "chapter_id": chapter_id},
+            request_id=request_id
+        )
+
+
 @router.get(
     "/{book_id}/chapters/{chapter_id}/question-progress",
     response_model=QuestionProgressResponse

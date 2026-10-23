@@ -27,6 +27,7 @@ from app.db.database import (
     get_questions_for_chapter as db_get_questions_for_chapter,
     save_question_response as db_save_question_response,
     get_question_response as db_get_question_response,
+    get_chapter_answers as db_get_chapter_answers,
     save_question_rating as db_save_question_rating,
     get_ratings_for_chapter as db_get_ratings_for_chapter,
     get_chapter_question_progress as db_get_chapter_question_progress,
@@ -268,6 +269,15 @@ class QuestionGenerationService:
     ) -> Optional[Dict[str, Any]]:
         """Get a question response."""
         return await db_get_question_response(question_id, user_id)
+
+    async def get_chapter_answers(
+        self,
+        book_id: str,
+        chapter_id: str,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """Get a chapter's questions with their answers."""
+        return await db_get_chapter_answers(book_id, chapter_id, user_id)
 
     async def save_question_rating(
         self,
