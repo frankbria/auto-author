@@ -108,6 +108,11 @@ export const createAuthClient = jest.fn(() => ({
   // Password reset methods
   requestPasswordReset: mockRequestPasswordReset,
   resetPassword: mockResetPassword,
+  // Email verification resend (#969)
+  sendVerificationEmail: jest.fn().mockResolvedValue({
+    data: { status: true },
+    error: null,
+  }),
   // Account security methods (#64)
   changePassword: jest.fn().mockResolvedValue({ data: {}, error: null }),
   listSessions: jest.fn().mockResolvedValue({ data: [], error: null }),

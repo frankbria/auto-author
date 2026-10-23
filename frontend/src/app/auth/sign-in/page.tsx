@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { sanitizeRedirectPath } from "@/lib/security";
+import { verificationCallbackURL } from "@/lib/verify-email";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,10 +106,25 @@ function SignInForm() {
       const { data, error: signInError } = await authClient.signIn.email({
         email,
         password,
+        // No callbackURL (#969): with one, better-auth answers redirect:true
+        // and its client reloads the whole page instead of router.push below.
       });
 
       if (signInError) {
         setError(getErrorMessage(signInError));
+        // The server mails nothing on this refusal (sendOnSignIn: false), so
+        // the one fresh link is sent here, aimed at where the user was going.
+        if (signInError.code === "EMAIL_NOT_VERIFIED") {
+          const { error: sendError } = await authClient.sendVerificationEmail({
+            email,
+            callbackURL: verificationCallbackURL(redirect),
+          });
+          if (sendError) {
+            setError(
+              "Verify your email address to sign in. We could not send a new link right now; please try again in a minute."
+            );
+          }
+        }
         return;
       }
 

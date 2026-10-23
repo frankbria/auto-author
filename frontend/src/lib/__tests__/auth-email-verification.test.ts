@@ -40,12 +40,15 @@ describe('Email verification is required (issue #792)', () => {
     expect(emailAndPassword.requireEmailVerification).toBe(true);
   });
 
-  it('sends the link at sign-up and again at a refused sign-in, valid for one hour', async () => {
+  // A refused sign-in no longer mails from the server (#969): the sign-in page
+  // sends the link itself, so it can aim it at the user's destination without a
+  // sign-in callbackURL (which made every successful sign-in a full reload).
+  it('sends the link at sign-up only, valid for one hour', async () => {
     const { emailVerification } = await options();
 
     expect(emailVerification).toMatchObject({
       sendOnSignUp: true,
-      sendOnSignIn: true,
+      sendOnSignIn: false,
       autoSignInAfterVerification: true,
       expiresIn: 60 * 60,
     });
