@@ -49,8 +49,9 @@ async def test_audit_rows_have_no_title_and_no_read_rows(
 
 
 def test_no_audit_call_site_records_a_title():
-    """Chapter and book titles reach audit rows through call-site dict literals;
-    most of those endpoints need an AI call to exercise, so scan the source."""
+    """Chapter and book titles, and uploaded files' client-side names (#949), reach
+    audit rows through call-site dict literals; most of those endpoints need an AI
+    call to exercise, so scan the source."""
     calls, offenders = 0, []
     for path in (Path(__file__).resolve().parents[2] / "app").rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text())):
@@ -65,7 +66,8 @@ def test_no_audit_call_site_records_a_title():
                     offenders += [
                         f"{path.name}:{k.lineno} {k.value}"
                         for k in ast.walk(kw.value)
-                        if isinstance(k, ast.Constant) and "title" in str(k.value).lower()
+                        if isinstance(k, ast.Constant)
+                        and any(word in str(k.value).lower() for word in ("title", "filename"))
                     ]
     assert calls >= 20, "scan found too few audit calls to mean anything"
     assert offenders == []
