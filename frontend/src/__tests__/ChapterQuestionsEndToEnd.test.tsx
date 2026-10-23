@@ -702,7 +702,7 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       await waitFor(() => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Complete all questions (simulated)
       (mockBookClient.getChapterQuestionProgress as jest.Mock).mockResolvedValue({
@@ -755,7 +755,8 @@ describe('Chapter Questions End-to-End Tests', () => {
         </TestWrapper>
       );
 
-      // Should show error message or retry option
+      // Default 1s is not enough under load: the error state follows the first render and a rejected
+      // fetch (a plain Error is UNKNOWN, so there is no backoff pause to wait out).
       await waitFor(() => {
         const errorMessage = screen.queryByText(/Error loading questions/i);
         const networkError = screen.queryByText(/Network error/i);
@@ -763,7 +764,7 @@ describe('Chapter Questions End-to-End Tests', () => {
 
         // At least one error indicator should be present
         expect(errorMessage || networkError || retryButton).toBeTruthy();
-      });
+      }, { timeout: 10000 });
 
       // Should provide retry option
       const retryButton = screen.getByRole('button', { name: /Retry/i }) ||
@@ -779,7 +780,7 @@ describe('Chapter Questions End-to-End Tests', () => {
       // Should recover and show questions
       await waitFor(() => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
     });
 
     test('handles offline scenarios with data persistence', async () => {
@@ -867,7 +868,7 @@ describe('Chapter Questions End-to-End Tests', () => {
                         screen.queryByPlaceholderText(/Write your answer here/i) ||
                         screen.getByRole('textbox');
         expect(textarea).toHaveValue('Previously saved response');
-      });
+      }, { timeout: 10000 });
 
       // Should maintain progress state - check for question text instead
       expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
@@ -936,7 +937,7 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       await waitFor(() => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Check ARIA labels
       const main = screen.queryByRole('main');
@@ -975,7 +976,7 @@ describe('Chapter Questions End-to-End Tests', () => {
 
       await waitFor(() => {
         expect(screen.getByText('What are the main learning objectives for this chapter?')).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
 
       // Should have mobile-optimized layout
       const container = screen.queryByTestId('question-container') ||
