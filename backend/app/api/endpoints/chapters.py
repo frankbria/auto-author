@@ -247,53 +247,6 @@ async def get_tab_state(book_id: str, current_user: Dict = Depends(get_current_u
         raise HTTPException(status_code=500, detail="Failed to retrieve tab state")
 
 
-@router.get("/{book_id}/chapters/{chapter_id}", response_model=dict)
-async def get_chapter(
-    book_id: str,
-    chapter_id: str,
-    current_user: Dict = Depends(get_current_user_from_session),
-):
-    """
-    Get a specific chapter by ID from the book's TOC.
-    """
-    # Get the book and verify ownership
-    book = await get_book_by_id(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    if book.get("owner_id") != current_user.get("auth_id"):
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this book's chapters"
-        )  # Get TOC and find the chapter
-    current_toc = book.get("table_of_contents", {})
-    chapters = current_toc.get("chapters", [])
-
-    def find_chapter(chapter_list):
-        for chapter in chapter_list:
-            if chapter.get("id") == chapter_id:
-                return chapter
-            # Recursively search subchapters
-            if chapter.get("subchapters"):
-                found = find_chapter(chapter["subchapters"])
-                if found:
-                    return found
-        return None
-
-    chapter = find_chapter(chapters)
-    if not chapter:
-        raise HTTPException(status_code=404, detail="Chapter not found")
-
-    # Log chapter access
-    await chapter_access_service.log_access(
-        user_id=current_user.get("auth_id"),
-        book_id=book_id,
-        chapter_id=chapter_id,
-        access_type="view",
-        metadata={"chapter_title": chapter.get("title")},
-    )
-
-    return {"book_id": book_id, "chapter": chapter, "success": True}
-
-
 @router.put("/{book_id}/chapters/{chapter_id}", response_model=dict)
 async def update_chapter(
     book_id: str,
@@ -421,75 +374,6 @@ async def delete_chapter(
         logger.error("Failed to delete chapter", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to delete chapter")
 
-
-
-@router.get("/{book_id}/chapters", response_model=dict)
-async def list_chapters(
-    book_id: str,
-    current_user: Dict = Depends(get_current_user_from_session),
-    flat: bool = Query(
-        False, description="Return flat list instead of hierarchical structure"
-    ),
-):
-    """
-    List all chapters in the book's TOC.
-    Can return either hierarchical structure (default) or flat list.
-    """
-    try:
-        # Get the book and verify ownership
-        book = await get_book_by_id(book_id)
-        if not book:
-            raise HTTPException(status_code=404, detail="Book not found")
-        if book.get("owner_id") != current_user.get("auth_id"):
-            raise HTTPException(
-                status_code=403, detail="Not authorized to access this book's chapters"
-            )
-
-        # Get TOC
-        current_toc = book.get("table_of_contents", {})
-        chapters = current_toc.get("chapters", [])
-
-        if flat:
-            # Return flat list of all chapters and subchapters
-            def flatten_chapters(chapter_list, result=None):
-                if result is None:
-                    result = []
-                for chapter in chapter_list:
-                    result.append(
-                        {
-                            "id": chapter.get("id"),
-                            "title": chapter.get("title"),
-                            "description": chapter.get("description", ""),
-                            "level": chapter.get("level", 1),
-                            "order": chapter.get("order", 0),
-                        }
-                    )
-                    if chapter.get("subchapters"):
-                        flatten_chapters(chapter["subchapters"], result)
-                return result
-
-            flat_chapters = flatten_chapters(chapters)
-            return {
-                "book_id": book_id,
-                "chapters": flat_chapters,
-                "total_chapters": len(flat_chapters),
-                "structure": "flat",
-                "success": True,
-            }
-        else:
-            # Return hierarchical structure
-            return {
-                "book_id": book_id,
-                "chapters": chapters,
-                "total_chapters": current_toc.get("total_chapters", len(chapters)),
-                "structure": "hierarchical",
-                "success": True,
-            }
-    except HTTPException:
-        raise
-    except Exception:
-        logger.error("Failed to list chapters", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to list chapters")
 
 
 # Enhanced Chapter Metadata and Tab Management Endpoints

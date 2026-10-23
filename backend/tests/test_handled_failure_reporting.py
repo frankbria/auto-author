@@ -140,8 +140,9 @@ class TestAnAccessRecordThatCouldNotBeWritten:
         chapter_id = toc["chapters"][0]["id"]
 
         with patch.object(chapter_access_service, "_insert", AsyncMock(side_effect=RuntimeError("database is away"))):
-            first = await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
-            await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
+            # An edit still writes an access record; the GET that did is gone (#1039).
+            first = await api.put(f"/api/v1/books/{book_id}/chapters/{chapter_id}", json={"status": "in-progress"})
+            await api.put(f"/api/v1/books/{book_id}/chapters/{chapter_id}", json={"status": "in-progress"})
 
         assert first.status_code == 200
         assert _kinds(reports) == ["access-log"]

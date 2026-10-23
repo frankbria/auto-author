@@ -33,7 +33,6 @@ class _Unreachable:
     "/toc",
     "/chapters/metadata",
     "/chapters/tab-state",
-    "/chapters/ch1",
     "/chapters/ch1/content",
     "/export/pdf",
 ])

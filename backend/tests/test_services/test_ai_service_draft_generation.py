@@ -28,6 +28,9 @@ class TestAIServiceDraftGeneration:
         with patch('app.services.ai_service.OpenAI', return_value=mock_openai_client):
             service = AIService()
             service.client = mock_openai_client
+            # Both model classes default to gpt-4o (#1205); a distinct default
+            # keeps the draft-only model scoping (#232) observable.
+            service.model = "default-class-model"
             return service
 
     @pytest.mark.asyncio
@@ -243,7 +246,7 @@ class TestAIServiceDraftGeneration:
         """Draft model scoping must not leak into other AI flows (#232)."""
         await ai_service.analyze_summary_for_toc("A" * 200)
         call_args = ai_service.client.chat.completions.create.call_args
-        assert call_args[1]["model"] == "gpt-4"
+        assert call_args[1]["model"] == "default-class-model"
 
     @pytest.mark.asyncio
     async def test_max_tokens_has_headroom_floor_for_small_targets(self, ai_service):
