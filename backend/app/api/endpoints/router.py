@@ -1,7 +1,7 @@
 import asyncio
 
 from fastapi import APIRouter, Response, status
-from app.api.endpoints import users, webhooks, books, book_cover, chapters, chapter_questions, chapter_content, chapter_ai, book_summary, book_toc, book_questions, export, billing
+from app.api.endpoints import users, account_export, webhooks, books, book_cover, chapters, chapter_questions, chapter_content, chapter_ai, book_summary, book_toc, book_questions, export, billing
 from app.core.config import settings, is_production_env
 from app.db.base import get_database
 
@@ -15,6 +15,7 @@ router = APIRouter()
 
 # Include sub-routers
 router.include_router(users.router, prefix="/users", tags=["users"])
+router.include_router(account_export.router, prefix="/users", tags=["users"])
 router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 router.include_router(books.router, prefix="/books", tags=["books"])
 router.include_router(book_cover.router, prefix="/books", tags=["book-cover"])

@@ -2,6 +2,8 @@ import { render, screen, fireEvent, waitFor, act, within } from '@testing-librar
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
 import UserProfile from '@/app/profile/page';
 import { authClient, useSession } from '@/lib/auth-client';
+import { browser } from '@/lib/api/unauthorized';
+import { toast } from '@/lib/toast';
 
 // Type-to-confirm tests for account deletion (issue #216): the Delete-account
 // button must stay disabled until the user types the account email, matching
@@ -316,14 +318,50 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
   });
 });
 
-describe('ProfilePage data export (#790)', () => {
-  it('links to the account export endpoint', async () => {
+describe('ProfilePage data export (#790, #966)', () => {
+  const realFetch = global.fetch;
+  let go: jest.SpyInstance;
+
+  beforeEach(() => {
+    mockAuthFetch.mockReset();
     mockAuthFetch.mockResolvedValue(profile());
+    (toast as unknown as jest.Mock).mockClear();
+    go = jest.spyOn(browser, 'go').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    go.mockRestore();
+    global.fetch = realFetch;
+  });
+
+  const answer = (status: number, body: unknown, headers: Record<string, string> = {}) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: status < 300,
+      status,
+      headers: new Headers(headers),
+      json: async () => body,
+    });
+  };
+
+  const clickDownload = async () => {
     render(<UserProfile />);
-    const link = await screen.findByRole('link', { name: /download my data/i });
-    expect(link).toHaveAttribute(
-      'href',
-      expect.stringMatching(/\/api\/v1\/users\/me\/export$/)
+    fireEvent.click(await screen.findByRole('button', { name: /download my data/i }));
+  };
+
+  it('a granted token sends the browser to the file', async () => {
+    answer(200, { token: 'abc' });
+    await clickDownload();
+    await waitFor(() =>
+      expect(go).toHaveBeenCalledWith(expect.stringMatching(/\/api\/v1\/users\/me\/export\?token=abc$/))
     );
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('a refused request shows a toast and the page stays put', async () => {
+    answer(429, { detail: 'Rate limit exceeded.' }, { 'Retry-After': '60' });
+    await clickDownload();
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    expect(go).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /download my data/i })).toBeEnabled();
   });
 });
