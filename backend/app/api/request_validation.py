@@ -65,11 +65,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             # Process the request
             response = await call_next(request)
         except Exception as e:
-            # Log exceptions
+            # The handler below logs the failure at ERROR, once (#1162); this
+            # line only closes the request, and its text can hold user data.
             process_time = (time.time() - start_time) * 1000
-            logger.error(
+            logger.info(
                 f"Request failed: {request.method} {request.url.path} "
-                f"[ID: {request_id}] - Error: {str(e)}, "
+                f"[ID: {request_id}] - Error: {type(e).__name__}, "
                 f"Took: {process_time:.2f}ms"
             )
             # Answered here instead of re-raised (#810). A response made
