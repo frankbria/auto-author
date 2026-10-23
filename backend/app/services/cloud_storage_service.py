@@ -26,6 +26,19 @@ def _is_owned_key(key: str, key_prefix: str) -> bool:
     return bool(key_prefix) and key.startswith(key_prefix) and ".." not in key.split("/")
 
 
+def _parse_https(url: str):
+    """``url`` parsed, or None unless it is https with no backslash. urlparse
+    and browsers disagree on ``\\`` (``https://evil.test\\@bucket...`` is the
+    bucket to Python, evil.test to a browser), so refuse it outright."""
+    if "\\" in url:
+        return None
+    try:
+        parsed = urlparse(url)
+    except ValueError:  # urlparse rejects some malformed stored values
+        return None
+    return parsed if parsed.scheme == "https" else None
+
+
 class StoredObject(NamedTuple):
     """One object found by ``list_objects``: its key, a URL ``delete_image``
     accepts for it, and when it was last written (timezone-aware)."""
@@ -121,11 +134,8 @@ class S3StorageService:
     def owned_key(self, url: str, key_prefix: str) -> Optional[str]:
         """The key of this bucket's ``url`` if it sits under ``key_prefix``."""
         # Format: https://bucket.s3.region.amazonaws.com/folder/file.jpg
-        try:
-            parsed = urlparse(url)
-        except ValueError:  # urlparse rejects some malformed stored values
-            return None
-        if parsed.hostname != f"{self.bucket_name}.s3.{self.region}.amazonaws.com":
+        parsed = _parse_https(url)
+        if parsed is None or parsed.hostname != f"{self.bucket_name}.s3.{self.region}.amazonaws.com":
             return None
         key = parsed.path.lstrip("/")
         return key if _is_owned_key(key, key_prefix) else None
@@ -211,6 +221,7 @@ class CloudinaryStorageService:
             api_secret=api_secret,
             secure=True
         )
+        self.cloud_name = cloud_name
         self.cloudinary_uploader = cloudinary.uploader
         self.cloudinary_api = cloudinary.api
 
@@ -253,13 +264,11 @@ class CloudinaryStorageService:
     def owned_key(self, url: str, key_prefix: str) -> Optional[str]:
         """The public_id of a Cloudinary ``url`` if it sits under ``key_prefix``."""
         # Format: https://res.cloudinary.com/<cloud>/image/upload/v123/<public_id>.<ext>
-        try:
-            parsed = urlparse(url)
-        except ValueError:
+        parsed = _parse_https(url)
+        prefix = f"/{self.cloud_name}/image/upload/"
+        if parsed is None or parsed.hostname != "res.cloudinary.com" or not parsed.path.startswith(prefix):
             return None
-        if parsed.hostname != "res.cloudinary.com" or "/image/upload/" not in parsed.path:
-            return None
-        parts = parsed.path.split("/image/upload/", 1)[1].split("/")
+        parts = parsed.path[len(prefix):].split("/")
         if re.fullmatch(r"v\d+", parts[0]):
             parts = parts[1:]
         public_id = "/".join(parts).rsplit(".", 1)[0]  # Remove extension
@@ -267,7 +276,7 @@ class CloudinaryStorageService:
 
     async def delete_images(self, items: list[tuple[str, str]]) -> list[str]:
         """Delete in Admin API delete_resources calls of up to 100 public_ids,
-        the API's cap. Anything not answered "deleted" is reported."""
+        the API's cap. Anything not answered "deleted" or "not_found" is reported."""
         urls = {}
         failed = []
         for url, key_prefix in items:
@@ -288,7 +297,8 @@ class CloudinaryStorageService:
             except Exception as e:
                 logger.error(f"Cloudinary batch delete failed: {str(e)}")
                 deleted = {}
-            failed += [urls[i] for i in chunk if deleted.get(i) != "deleted"]
+            # not_found: a retry or an earlier sweep already removed it.
+            failed += [urls[i] for i in chunk if deleted.get(i) not in ("deleted", "not_found")]
         return failed
 
     async def delete_image(self, url: str, key_prefix: str) -> bool:

@@ -41,6 +41,7 @@ def s3():
 @pytest.fixture
 def cloudinary():
     service = CloudinaryStorageService.__new__(CloudinaryStorageService)
+    service.cloud_name = "demo"
     service.cloudinary_uploader = Mock()
     service.cloudinary_uploader.destroy.return_value = {"result": "ok"}
     return service
@@ -82,6 +83,10 @@ async def test_s3_deletes_a_key_under_the_owners_prefix(s3):
         # the bucket host as userinfo: the real host is evil.test
         f"https://bkt.s3.us-east-1.amazonaws.com@evil.test/cover_images/{BOOK_A}/x.png",
         f"https://bkt.s3.us-east-1.amazonaws.com\\@evil.test/cover_images/{BOOK_A}/x.png",
+        # a backslash: urlparse reads the bucket as host, a browser loads evil.test
+        f"https://evil.test\\@bkt.s3.us-east-1.amazonaws.com/cover_images/{BOOK_A}/x.png",
+        # the bucket over plain http
+        f"http://bkt.s3.us-east-1.amazonaws.com/cover_images/{BOOK_A}/x.png",
         # urlparse raises on this one; a stored value must never raise out of a delete
         "http://[bad",
         "not a url",
@@ -139,6 +144,12 @@ async def test_cloudinary_destroys_a_public_id_under_the_owners_prefix(cloudinar
         f"https://res.cloudinary.com.evil.test/demo/image/upload/v1/profile_pictures/user-a/{HEX}.png",
         f"https://evil.test/cloudinary.com/image/upload/v1/profile_pictures/user-a/{HEX}.png",
         f"https://res.cloudinary.com@evil.test/demo/image/upload/v1/profile_pictures/user-a/{HEX}.png",
+        # a backslash: urlparse reads Cloudinary as host, a browser loads evil.test
+        f"https://evil.test\\@res.cloudinary.com/demo/image/upload/v1/profile_pictures/user-a/{HEX}.png",
+        # plain http
+        f"http://res.cloudinary.com/demo/image/upload/v1/profile_pictures/user-a/{HEX}.png",
+        # another Cloudinary account's asset
+        f"https://res.cloudinary.com/other/image/upload/v1/profile_pictures/user-a/{HEX}.png",
         "http://[bad",
         "",
     ],

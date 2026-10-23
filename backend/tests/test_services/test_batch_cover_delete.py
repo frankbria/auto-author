@@ -44,6 +44,7 @@ def s3():
 @pytest.fixture
 def cloudinary():
     service = CloudinaryStorageService.__new__(CloudinaryStorageService)
+    service.cloud_name = "demo"
     service.cloudinary_uploader = Mock()
     service.cloudinary_api = Mock()
     service.cloudinary_api.delete_resources.side_effect = lambda ids, **_: {
@@ -112,20 +113,27 @@ async def test_cloudinary_deletes_in_chunks_of_100_public_ids(cloudinary):
 
 async def test_cloudinary_batch_reports_what_it_did_not_delete(cloudinary):
     mine = f"{CLD}/cover_images/aa/{HEX}.png"
-    gone = f"{CLD}/cover_images/aa/{HEX}_thumb.png"
+    unanswered = f"{CLD}/cover_images/aa/{HEX}_thumb.png"
     foreign = f"{CLD}/cover_images/bb/{HEX}.png"
     cloudinary.cloudinary_api.delete_resources.side_effect = lambda ids, **_: {
-        "deleted": {
-            f"cover_images/aa/{HEX}": "deleted",
-            f"cover_images/aa/{HEX}_thumb": "not_found",
-        }
+        "deleted": {f"cover_images/aa/{HEX}": "deleted"}
     }
 
     failed = await cloudinary.delete_images(
-        [(mine, "cover_images/aa/"), (gone, "cover_images/aa/"), (foreign, "cover_images/aa/")]
+        [(mine, "cover_images/aa/"), (unanswered, "cover_images/aa/"), (foreign, "cover_images/aa/")]
     )
 
-    assert sorted(failed) == sorted([gone, foreign])
+    assert sorted(failed) == sorted([unanswered, foreign])
+
+
+async def test_cloudinary_batch_treats_not_found_as_already_gone(cloudinary):
+    """A retry or an already-swept file answers not_found: the goal is met."""
+    gone = f"{CLD}/cover_images/aa/{HEX}_thumb.png"
+    cloudinary.cloudinary_api.delete_resources.side_effect = lambda ids, **_: {
+        "deleted": {f"cover_images/aa/{HEX}_thumb": "not_found"}
+    }
+
+    assert await cloudinary.delete_images([(gone, "cover_images/aa/")]) == []
 
 
 # --- the service and the account cascade -------------------------------------
