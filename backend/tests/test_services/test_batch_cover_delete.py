@@ -166,6 +166,24 @@ async def test_local_batch_removes_only_each_books_own_files(local):
     assert sorted(p.name for p in local.iterdir()) == [f"{b}_{HEX}.png"]
 
 
+async def test_local_batch_failure_does_not_skip_later_files(local, caplog):
+    a, b = _book_ids(2)
+    # unlink() on a directory raises a real OSError
+    (local / f"{a}_{HEX}.png").mkdir()
+    (local / f"{b}_{HEX}.png").write_bytes(b"x")
+
+    await fus.FileUploadService().delete_cover_images(
+        [
+            (a, f"/uploads/cover_images/{a}_{HEX}.png"),
+            (b, f"/uploads/cover_images/{b}_{HEX}.png"),
+            (b, f"/uploads/cover_images/{b}_{HEX}_thumb.png"),  # already gone
+        ]
+    )
+
+    assert [p.name for p in local.iterdir()] == [f"{a}_{HEX}.png"]
+    assert "did not delete 1 cover image file(s)" in caplog.text
+
+
 class _BatchCloud:
     """Records batch calls; the provider parsing is covered above."""
 

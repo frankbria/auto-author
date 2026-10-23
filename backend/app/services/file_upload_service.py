@@ -385,8 +385,12 @@ class FileUploadService:
                     path = _resolve_local_cover_path(url, book_id)
                     if path is None:
                         failed.append(url)
-                    elif path.exists():
-                        path.unlink()
+                        continue
+                    # One try per file, as in delete_cover_image: a failure must not skip the rest
+                    try:
+                        path.unlink(missing_ok=True)
+                    except OSError:
+                        failed.append(url)
         except Exception as e:
             logger.error(f"Error deleting {len(files)} cover image files: {e}")
             report_failure("delete-files", e)
@@ -492,7 +496,3 @@ class FileUploadService:
             "total_size_mb": round(total_size / (1024 * 1024), 2),
             "upload_directory": str(UPLOAD_DIR.absolute())
         }
-
-
-# Create a singleton instance
-file_upload_service = FileUploadService()
