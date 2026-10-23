@@ -2,7 +2,7 @@
 // (15.3+). Inert unless NEXT_PUBLIC_SENTRY_DSN is set; when set, Sentry installs
 // global handlers so client errors reach the service instead of the console.
 import * as Sentry from '@sentry/nextjs';
-import { beforeBreadcrumb, beforeSend } from '@/lib/sentry-scrub';
+import { beforeBreadcrumb, beforeSend, dataCollection } from '@/lib/sentry-scrub';
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 if (dsn) {
@@ -10,6 +10,7 @@ if (dsn) {
     dsn,
     environment: process.env.NEXT_PUBLIC_ENVIRONMENT ?? process.env.NODE_ENV,
     tracesSampleRate: 0,
+    dataCollection,
     beforeSend,
     beforeBreadcrumb,
   });
