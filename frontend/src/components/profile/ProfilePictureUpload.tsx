@@ -4,26 +4,7 @@ import Image from 'next/image';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/lib/toast';
-import { apiFetch } from '@/lib/api/unauthorized';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB — matches backend
-
-/**
- * FastAPI's `detail` is polymorphic: a string for HTTPException, but an array
- * of {loc, msg, type} for 422 validation errors. Interpolating the array gives
- * "[object Object]" (#215), so pull out the msg fields.
- */
-function extractDetail(detail: unknown): string | null {
-  if (typeof detail === 'string') return detail || null;
-  if (Array.isArray(detail)) {
-    const msgs = detail.map((d) => (d && typeof d === 'object' && 'msg' in d ? String((d as { msg: unknown }).msg) : null)).filter(Boolean);
-    return msgs.length ? msgs.join('; ') : null;
-  }
-  if (detail && typeof detail === 'object' && 'msg' in detail) return String((detail as { msg: unknown }).msg);
-  return null;
-}
+import { IMAGE_ACCEPT, imageFileProblem, uploadImage, uploadUrl } from '@/lib/api/imageUpload';
 
 interface ProfilePictureUploadProps {
   currentAvatarUrl: string | null;
@@ -37,33 +18,20 @@ interface ProfilePictureUploadProps {
 export function ProfilePictureUpload({ currentAvatarUrl, onUploaded }: ProfilePictureUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const avatarSrc = uploadUrl(currentAvatarUrl);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast.error({ title: 'Invalid file', description: 'Use JPEG, PNG, WebP, or GIF.' });
-      return;
-    }
-    if (file.size > MAX_SIZE) {
-      toast.error({ title: 'File too large', description: 'Maximum size is 5MB.' });
+    const problem = imageFileProblem(file);
+    if (problem) {
+      toast.error(problem);
       return;
     }
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await apiFetch(`${API_BASE_URL}/users/me/avatar`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(extractDetail(body?.detail) || 'Upload failed');
-      }
-      const data = await res.json();
+      const data = await uploadImage<{ avatar_url: string }>('/users/me/avatar', file);
       onUploaded(data.avatar_url);
       toast.success({ title: 'Profile picture updated' });
     } catch (err) {
@@ -79,9 +47,9 @@ export function ProfilePictureUpload({ currentAvatarUrl, onUploaded }: ProfilePi
 
   return (
     <div className="flex items-center gap-4">
-      {currentAvatarUrl ? (
+      {avatarSrc ? (
         <Image
-          src={currentAvatarUrl}
+          src={avatarSrc}
           alt="Profile picture"
           width={80}
           height={80}
@@ -94,7 +62,7 @@ export function ProfilePictureUpload({ currentAvatarUrl, onUploaded }: ProfilePi
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept={IMAGE_ACCEPT}
         className="hidden"
         onChange={handleFile}
         data-testid="avatar-input"

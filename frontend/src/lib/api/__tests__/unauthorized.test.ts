@@ -112,7 +112,7 @@ describe('apiFetch', () => {
 describe('every backend caller uses apiFetch', () => {
   // A caller that kept a bare fetch() would leave a revoked session looping
   // on 401s for that part of the app.
-  it.each(['src/hooks/useAuthFetch.ts', 'src/lib/api/bookClient.ts', 'src/components/profile/ProfilePictureUpload.tsx'])(
+  it.each(['src/hooks/useAuthFetch.ts', 'src/lib/api/bookClient.ts', 'src/lib/api/imageUpload.ts'])(
     '%s has no bare fetch call',
     (file) => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
