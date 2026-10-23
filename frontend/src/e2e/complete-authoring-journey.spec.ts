@@ -225,6 +225,24 @@ async function mockAiEndpoints(page: Page) {
     }
   );
 
+  // A chapter's questions with their answers in one read (#1050), from what was saved above.
+  await page.route('**/books/*/chapters/*/question-answers', (route) => {
+    const answered = CHAPTER_QUESTIONS.filter((q) => savedResponses.has(q.id));
+    return route.fulfill(
+      json({
+        responses: answered.map((q) => ({
+          question_id: q.id,
+          question: q.question_text,
+          answer: savedResponses.get(q.id)!.response_text,
+          status: savedResponses.get(q.id)!.status,
+        })),
+        total_questions: CHAPTER_QUESTIONS.length,
+        completed_count: answered.filter((q) => savedResponses.get(q.id)!.status === 'completed').length,
+        in_progress_count: answered.filter((q) => savedResponses.get(q.id)!.status !== 'completed').length,
+      })
+    );
+  });
+
   // Progress summary.
   await page.route('**/books/*/chapters/*/question-progress', (route) =>
     route.fulfill(json(progressBody()))

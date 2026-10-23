@@ -147,3 +147,26 @@ it('a protected page reached a while after signing out still redirects (found in
   );
   now.mockRestore();
 });
+
+it('leavePage keeps the guards off however long the navigation takes (#1177)', async () => {
+  // Deleting the account replaces the document; on a cold dev server that load
+  // outlasted the 5 s hold, and the still-mounted page was sent to sign-in.
+  const now = jest.spyOn(Date, 'now');
+  now.mockReturnValue(1_000_000);
+  const ui = () => (
+    <ProtectedRoute>
+      <SignOutButton />
+    </ProtectedRoute>
+  );
+  const { rerender } = render(ui());
+  expect(await signOutOrNotify({ leavePage: true })).toBe(true);
+
+  // The guard re-evaluates (a re-render of the still-mounted page) long after.
+  now.mockReturnValue(1_000_000 + 60_000);
+  (usePathname as jest.Mock).mockReturnValue('/profile');
+  rerender(ui());
+  await new Promise((r) => setTimeout(r, 0));
+
+  expect(router.push).not.toHaveBeenCalled();
+  now.mockRestore();
+});
