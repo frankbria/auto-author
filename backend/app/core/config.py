@@ -131,7 +131,7 @@ class Settings(BaseSettings):
     # can see a deploy-time value.
     AI_BASE_URL: str = Field("", repr=False)
     AI_API_KEY: str = Field("", repr=False)
-    AI_MODEL_DEFAULT: str = "gpt-4"
+    AI_MODEL_DEFAULT: str = "gpt-4o"  # gpt-4 is retired: OpenAI answers 404 model_not_found (#1205)
     AI_MODEL_LONG_OUTPUT: str = "gpt-4o"
     AI_MAX_OUTPUT_TOKENS_DEFAULT: int = Field(default=4000, ge=1)
     AI_MAX_OUTPUT_TOKENS_LONG: int = Field(default=8000, ge=1)

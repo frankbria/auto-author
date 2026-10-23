@@ -94,7 +94,7 @@ class TestDefaultsMatchTodaysRequests:
         svc = AIService()
         svc.client = autospec_openai_client(content="READINESS: Ready")
         await svc.analyze_summary_for_toc(SUMMARY)
-        assert _sent(svc) == ("gpt-4", 1000)
+        assert _sent(svc) == ("gpt-4o", 1000)
 
     @pytest.mark.asyncio
     async def test_long_output_flow_params(self, unset_ai_settings):
