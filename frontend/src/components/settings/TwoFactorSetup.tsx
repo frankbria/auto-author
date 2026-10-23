@@ -15,6 +15,31 @@ type SetupStep = 'idle' | 'password' | 'verify' | 'codes';
 type FlowMode = 'enable' | 'disable' | 'regenerate';
 
 /**
+ * The server ends the account's other sessions in the same request as a 2FA
+ * change (#972). When it could not, the change still happened and its answer
+ * carries `otherSessionsEnded: false`; this warns and returns false then.
+ */
+const endedOtherSessions = (data: unknown) => {
+  if ((data as { otherSessionsEnded?: boolean } | null)?.otherSessionsEnded !== false) return true;
+  toast({
+    title: 'Other devices are still signed in',
+    description: 'Use "Sign out other devices" under Active Sessions to end them.',
+    variant: 'destructive',
+  });
+  return false;
+};
+
+/** Disabling also forgets every trusted device; `trustedDevicesForgotten: false` says it could not. */
+const warnIfTrustedDevicesRemain = (data: unknown) => {
+  if ((data as { trustedDevicesForgotten?: boolean } | null)?.trustedDevicesForgotten !== false) return;
+  toast({
+    title: 'Trusted devices were not forgotten',
+    description: 'Devices you trusted may skip the code if you turn 2FA back on.',
+    variant: 'destructive',
+  });
+};
+
+/**
  * TOTP two-factor authentication setup backed by better-auth's twoFactor
  * plugin. Enabling requires the account password, then a scanned QR code /
  * entered secret is confirmed with a 6-digit code before 2FA becomes active.
@@ -107,8 +132,9 @@ export default function TwoFactorSetup() {
         setBackupCodes(data.backupCodes ?? []);
         setCodesAcknowledged(false);
         setStep('codes');
+        endedOtherSessions(data);
       } else {
-        const { error } = await authClient.twoFactor.disable({ password });
+        const { data, error } = await authClient.twoFactor.disable({ password });
         if (error) {
           toast({
             title: 'Could not disable 2FA',
@@ -119,31 +145,15 @@ export default function TwoFactorSetup() {
         }
         setLocalEnabledOverride(false);
         setStep('idle');
-        toast({ title: 'Two-factor authentication disabled' });
-        await signOutOtherDevices();
+        toast({
+          title: 'Two-factor authentication disabled',
+          description: endedOtherSessions(data) ? 'Other devices were signed out.' : undefined,
+        });
+        warnIfTrustedDevicesRemain(data);
       }
     } finally {
       setIsSubmitting(false);
       setPassword('');
-    }
-  };
-
-  // A second-factor change ends every other session (#793): one an attacker
-  // already holds would otherwise outlive the change meant to lock them out.
-  // better-auth rotates only the session that made the change.
-  const signOutOtherDevices = async () => {
-    // The client resolves with { error } when refused and throws when the
-    // request never arrives; either way the other sessions are still alive.
-    const failed = await authClient.revokeOtherSessions().then(
-      ({ error }) => Boolean(error),
-      () => true
-    );
-    if (failed) {
-      toast({
-        title: 'Other devices are still signed in',
-        description: 'Use "Sign out other devices" under Active Sessions to end them.',
-        variant: 'destructive',
-      });
     }
   };
 
@@ -154,7 +164,7 @@ export default function TwoFactorSetup() {
     if (!codesAcknowledged) return;
     setIsSubmitting(true);
     try {
-      const { error } = await authClient.twoFactor.verifyTotp({ code: verifyCode });
+      const { data, error } = await authClient.twoFactor.verifyTotp({ code: verifyCode });
       if (error) {
         toast({
           title: 'Invalid code',
@@ -167,11 +177,11 @@ export default function TwoFactorSetup() {
       setStep('idle');
       setTotpUri(null);
       setBackupCodes([]);
+      const signedOut = endedOtherSessions(data) ? 'Other devices were signed out. ' : '';
       toast({
         title: 'Two-factor authentication enabled',
-        description: 'Store your backup codes somewhere safe.',
+        description: `${signedOut}Store your backup codes somewhere safe.`,
       });
-      await signOutOtherDevices();
     } finally {
       setIsSubmitting(false);
     }

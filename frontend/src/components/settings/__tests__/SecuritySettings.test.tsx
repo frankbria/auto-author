@@ -151,11 +151,17 @@ describe('TwoFactorSetup', () => {
       expect(mockVerifyTotp).toHaveBeenCalledWith({ code: '123456' })
     );
     await waitFor(() => expect(screen.getByText('Enabled')).toBeInTheDocument());
-    // #793: a session someone else already holds must not outlive the change.
-    expect(mockRevokeOtherSessions).toHaveBeenCalledTimes(1);
+    // #972: the server ends the other sessions in the verify request itself.
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Two-factor authentication enabled',
+        description: expect.stringMatching(/other devices were signed out/i),
+      })
+    );
+    expect(mockRevokeOtherSessions).not.toHaveBeenCalled();
   });
 
-  it('leaves other sessions alone when the verification code is wrong (#793)', async () => {
+  it('shows a destructive toast when the verification code is wrong', async () => {
     mockVerifyTotp.mockResolvedValue({ data: null, error: { message: 'Invalid code' } });
     render(<TwoFactorSetup />);
     fireEvent.click(screen.getByRole('button', { name: /enable 2fa/i }));
@@ -175,7 +181,7 @@ describe('TwoFactorSetup', () => {
         expect.objectContaining({ title: 'Invalid code', variant: 'destructive' })
       )
     );
-    expect(mockRevokeOtherSessions).not.toHaveBeenCalled();
+    expect(screen.queryByText('Enabled')).not.toBeInTheDocument();
   });
 
   it('refuses to start setup when the server returns a non-TOTP method', async () => {
@@ -382,15 +388,71 @@ describe('TwoFactorSetup', () => {
     );
     // Status flips locally even though the session flag is stale until refetch
     await waitFor(() => expect(screen.getByText('Disabled')).toBeInTheDocument());
-    // #793: disabling needs only the password, so it ends other sessions too.
-    expect(mockRevokeOtherSessions).toHaveBeenCalledTimes(1);
+    // #972: the server ends the other sessions in the disable request itself.
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Two-factor authentication disabled',
+        description: 'Other devices were signed out.',
+      })
+    );
+    expect(mockRevokeOtherSessions).not.toHaveBeenCalled();
   });
 
   it.each([
-    ['the server refuses', () => Promise.resolve({ data: null, error: { message: 'boom' } })],
-    ['the request never arrives', () => Promise.reject(new Error('Failed to fetch'))],
-  ])('says so when 2FA changed but %s and other devices stay signed in (#793)', async (_case, answer) => {
-    mockRevokeOtherSessions.mockImplementation(answer);
+    ['enable', false],
+    ['disable', true],
+    ['regenerate', true],
+  ] as const)(
+    'warns when %s changed 2FA but the server could not sign out other devices (#972)',
+    async (flow, startEnabled) => {
+      const answer = { data: { status: true, otherSessionsEnded: false }, error: null };
+      mockVerifyTotp.mockResolvedValue(answer);
+      mockTwoFactorDisable.mockResolvedValue(answer);
+      mockGenerateBackupCodes.mockResolvedValue({
+        data: { backupCodes: ['FFFF-6666'], otherSessionsEnded: false },
+        error: null,
+      });
+      mockUseSession.mockReturnValue({
+        data: {
+          user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: startEnabled },
+          session: { token: 'tok' },
+        },
+      });
+      render(<TwoFactorSetup />);
+      const start = { enable: /enable 2fa/i, disable: /disable 2fa/i, regenerate: /regenerate/i };
+      fireEvent.click(screen.getByRole('button', { name: start[flow] }));
+      fireEvent.change(screen.getByLabelText('Confirm your password'), {
+        target: { value: 'my-password' },
+      });
+      fireEvent.submit(screen.getByLabelText('Confirm your password').closest('form')!);
+      if (flow === 'enable') {
+        await waitFor(() => expect(screen.getByTestId('two-factor-qr')).toBeInTheDocument());
+        fireEvent.change(screen.getByLabelText('Verification Code'), {
+          target: { value: '123456' },
+        });
+        fireEvent.click(screen.getByLabelText(/i.ve saved my backup codes/i));
+        fireEvent.click(screen.getByRole('button', { name: /verify & enable/i }));
+      }
+
+      await waitFor(() =>
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: 'Other devices are still signed in',
+            variant: 'destructive',
+          })
+        )
+      );
+      // No toast claims the other devices were signed out.
+      expect(JSON.stringify(mockToast.mock.calls)).not.toMatch(/were signed out/);
+      if (flow === 'regenerate') expect(screen.getByText('FFFF-6666')).toBeInTheDocument();
+    }
+  );
+
+  it('warns when 2FA was disabled but trusted devices could not be forgotten (#972)', async () => {
+    mockTwoFactorDisable.mockResolvedValue({
+      data: { status: true, trustedDevicesForgotten: false },
+      error: null,
+    });
     mockUseSession.mockReturnValue({
       data: {
         user: { id: 'u1', email: 'a@b.com', twoFactorEnabled: true },
@@ -406,17 +468,16 @@ describe('TwoFactorSetup', () => {
 
     await waitFor(() =>
       expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'Other devices are still signed in',
-          variant: 'destructive',
-        })
+        expect.objectContaining({ title: 'Trusted devices were not forgotten', variant: 'destructive' })
       )
     );
-    // The 2FA change itself happened and is shown.
-    expect(screen.getByText('Disabled')).toBeInTheDocument();
+    // The sessions did end, and the page says so.
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Other devices were signed out.' })
+    );
   });
 
-  it('leaves other sessions alone when the disable password is wrong (#793)', async () => {
+  it('shows a destructive toast when the disable password is wrong', async () => {
     mockTwoFactorDisable.mockResolvedValue({ data: null, error: { message: 'Invalid password' } });
     mockUseSession.mockReturnValue({
       data: {
@@ -436,7 +497,6 @@ describe('TwoFactorSetup', () => {
         expect.objectContaining({ title: 'Could not disable 2FA', variant: 'destructive' })
       )
     );
-    expect(mockRevokeOtherSessions).not.toHaveBeenCalled();
   });
 });
 
