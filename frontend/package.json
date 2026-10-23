@@ -6,6 +6,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "predev": "node scripts/third-party-notices.mjs",
     "dev": "next dev",
     "prebuild": "node scripts/third-party-notices.mjs",
     "build": "next build",
