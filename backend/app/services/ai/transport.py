@@ -8,6 +8,7 @@ from contextvars import ContextVar
 import uuid
 from typing import Dict, List, Optional
 from app.core.config import settings
+from app.core.reporting import report_failure
 from app.schemas.ai_input import MAX_PROMPT_CHARS
 from app.services.ai_errors import (
     AIServiceError,
@@ -108,6 +109,10 @@ def shortened_rewrite_error(source: str, rewrite: str, min_percent: int) -> Opti
 # it to tell a request refused beforehand, which costs nothing, from one the
 # provider may have billed (#798). A ContextVar, so each request has its own.
 model_call_attempted: ContextVar[bool] = ContextVar("model_call_attempted", default=False)
+
+# True once this request's AI failure has gone to report_failure, so the 5xx
+# the route answers with is not a second report of it (#994).
+ai_failure_reported: ContextVar[bool] = ContextVar("ai_failure_reported", default=False)
 
 
 class TransportMixin:
@@ -325,7 +330,14 @@ class TransportMixin:
             )
 
         model_call_attempted.set(True)
-        return await self._retry_with_backoff(_async_wrapper, correlation_id=correlation_id)
+        try:
+            return await self._retry_with_backoff(_async_wrapper, correlation_id=correlation_id)
+        except AIServiceError as error:
+            # Once, after the retries. Some flows answer this with fallback
+            # content, so the route's response cannot be the report (#994).
+            ai_failure_reported.set(True)
+            report_failure(f"ai-{error.error_code}", error)
+            raise
 
     def _untruncated_text(self, response, correlation_id: Optional[str] = None) -> str:
         """The completion's text, refusing one that hit max_tokens.

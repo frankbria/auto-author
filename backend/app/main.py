@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from pymongo.errors import PyMongoError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from contextlib import asynccontextmanager
 from app.api.endpoints.router import router as api_router
 from app.core.config import settings, is_deployed_env, is_production_env
@@ -16,6 +17,7 @@ from pathlib import Path
 from app.api.request_validation import RequestValidationMiddleware
 from app.core.better_auth_session import SESSION_LOOKUP_TIMEOUT_SECONDS, SessionStoreUnavailable
 from app.core.reporting import report_failure
+from app.services.ai.transport import ai_failure_reported
 from app.core.request_context import configure_logging
 
 configure_logging()
@@ -53,6 +55,9 @@ def _scrub_free_text(event, hint):
     if isinstance(failed, (ValidationError, ResponseValidationError)) and event.get("exception", {}).get("values"):
         # Its text quotes the value that did not fit: a stored document (#995).
         event["exception"]["values"][-1]["value"] = _invalid_fields(failed)
+    if isinstance(failed, StarletteHTTPException) and ai_failure_reported.get():
+        # The AI transport reported the failure this 5xx answers (#994).
+        return None
     return event
 
 
@@ -74,6 +79,7 @@ def _init_sentry() -> None:
         return
     import sentry_sdk
     from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.openai import OpenAIIntegration
     from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
 
     sentry_sdk.init(
@@ -95,9 +101,15 @@ def _init_sentry() -> None:
         # app log at ERROR, some quoting what the user wrote. An unhandled
         # exception is still reported (see above), and so is a 5xx that a route
         # raises as an HTTPException: the SDK's Starlette integration reports
-        # those itself. A failure answered below 500, or logged and carried on
-        # from, has to call capture_exception or capture_message to be seen.
+        # those itself, except one answering an AI failure, which the AI
+        # transport has already reported (#994). A failure answered below 500,
+        # or logged and carried on from, has to call capture_exception or
+        # capture_message to be seen.
         integrations=[LoggingIntegration(level=None, event_level=None)],
+        # The SDK turns this on by itself. It exists to record prompts and
+        # completions, and it reported every failed attempt on its own. A
+        # failed model call is reported once, by the AI transport (#994).
+        disabled_integrations=[OpenAIIntegration()],
     )
     logger.info("Sentry error tracking initialized")
 
