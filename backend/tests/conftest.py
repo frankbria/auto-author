@@ -45,6 +45,7 @@ from fastapi import HTTPException, Request
 from pymongo import AsyncMongoClient
 import app.db.user as users_dao
 import app.db.book as books_dao
+import app.db.book_delete as book_delete_dao
 import app.db.audit_log as audit_log_dao
 import app.db.toc_transactions as toc_transactions
 from app.db import base
@@ -274,9 +275,11 @@ async def reinit_db():
     base.audit_logs_collection = base._db.get_collection("audit_logs")
 
     books_dao.books_collection = base.books_collection
+    book_delete_dao.books_collection = base.books_collection
+    book_delete_dao.users_collection = base.users_collection
     books_dao.users_collection = base.users_collection
     # delete_book opens its transaction on this client; left as imported it belongs to another event loop (#839).
-    books_dao._client = base._client
+    book_delete_dao._client = base._client
     users_dao.users_collection = base.users_collection
     audit_log_dao.audit_logs_collection = base.audit_logs_collection
 

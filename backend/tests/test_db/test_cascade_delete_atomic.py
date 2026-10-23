@@ -30,6 +30,7 @@ from pymongo import monitoring
 
 import app.db.audit_log as audit_log_dao
 import app.db.book as book_dao
+import app.db.book_delete as book_delete_dao
 from app.db import base
 from app.db.book import delete_book, delete_all_user_books
 from app.db.base import get_collection
@@ -85,7 +86,7 @@ class _FailingDeleteMany:
 
 
 def _fail_response_deletes(monkeypatch):
-    real_get_collection = book_dao.get_collection
+    real_get_collection = book_delete_dao.get_collection
 
     async def fake_get_collection(name):
         coll = await real_get_collection(name)
@@ -93,7 +94,7 @@ def _fail_response_deletes(monkeypatch):
             return _FailingDeleteMany(coll)
         return coll
 
-    monkeypatch.setattr(book_dao, "get_collection", fake_get_collection)
+    monkeypatch.setattr(book_delete_dao, "get_collection", fake_get_collection)
 
 
 class _CommandLog(monitoring.CommandListener):
@@ -126,7 +127,9 @@ async def command_log(reinit_db, monkeypatch):
     )
     db = client.get_default_database()
     monkeypatch.setattr(base, "_db", db)
-    monkeypatch.setattr(book_dao, "_client", client)
+    monkeypatch.setattr(book_delete_dao, "_client", client)
+    monkeypatch.setattr(book_delete_dao, "books_collection", db.get_collection("books"))
+    monkeypatch.setattr(book_delete_dao, "users_collection", db.get_collection("users"))
     monkeypatch.setattr(book_dao, "books_collection", db.get_collection("books"))
     monkeypatch.setattr(book_dao, "users_collection", db.get_collection("users"))
     monkeypatch.setattr(
@@ -258,7 +261,7 @@ async def test_delete_all_user_books_commands_do_not_grow_with_books(
 async def test_delete_all_user_books_chunks_question_ids(command_log, monkeypatch):
     """Responses and ratings are keyed by question id alone, and one ``$in`` is
     capped at 16MB, so the ids go in chunks."""
-    monkeypatch.setattr(book_dao, "_QUESTION_ID_CHUNK", 2)
+    monkeypatch.setattr(book_delete_dao, "_QUESTION_ID_CHUNK", 2)
     await _seed_account("victim", 5)
     command_log.commands.clear()
 
@@ -324,7 +327,7 @@ def test_the_cascade_uses_the_test_runs_own_client(reinit_db):
     client from another event loop: the replica-set probe raises on it, the
     error is swallowed, and the cascade quietly takes the path without a
     transaction, on a replica set too (#839)."""
-    assert book_dao._client is base._client
+    assert book_delete_dao._client is base._client
 
 
 @pytest_asyncio.fixture
@@ -340,13 +343,13 @@ async def replica_set(reinit_db):
 def cascade_sessions(monkeypatch):
     """What ``delete_book`` hands the cascade as its session, and whether a transaction was open then."""
     seen = []
-    real = book_dao._delete_books_internal
+    real = book_delete_dao._delete_books_internal
 
     async def watched(book_ids, user_auth_id, session):
         seen.append((session, session is not None and session.in_transaction))
         return await real(book_ids, user_auth_id, session)
 
-    monkeypatch.setattr(book_dao, "_delete_books_internal", watched)
+    monkeypatch.setattr(book_delete_dao, "_delete_books_internal", watched)
     return seen
 
 
