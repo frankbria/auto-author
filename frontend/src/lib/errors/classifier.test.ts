@@ -196,6 +196,11 @@ describe('classifyError – generic errors', () => {
     expect(result.retryable).toBe(false);
   });
 
+  it('makes no claim that anyone was notified (#1001)', () => {
+    const result = classifyError(new Error('Some random failure'));
+    expect(result.message).not.toMatch(/notified/i);
+  });
+
   it('includes the error message in "details"', () => {
     const result = classifyError(new Error('Oops'));
     expect(result.details).toBe('Oops');

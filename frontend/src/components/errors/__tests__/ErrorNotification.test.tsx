@@ -299,12 +299,9 @@ describe('showErrorNotification', () => {
   it('falls to else branch for TRANSIENT + retryable but no onRetry (uses correlationId description)', () => {
     const error = makeError({ type: ErrorType.TRANSIENT, retryable: true });
     showErrorNotification(error); // no onRetry
-    expect(mockToast.error).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({
-        description: expect.stringContaining(error.correlationId),
-      })
-    );
+    const [, opts] = mockToast.error.mock.calls[0];
+    render(<div>{opts.description}</div>);
+    expect(screen.getByText(`Reference ID: ${error.correlationId}`)).toBeInTheDocument();
   });
 
   it('falls to else branch for TRANSIENT + not retryable', () => {
@@ -420,12 +417,24 @@ describe('showErrorNotification', () => {
   it('calls toast.error with correlationId for SYSTEM errors', () => {
     const error = makeError({ type: ErrorType.SYSTEM, correlationId: 'sys-ref-999' });
     showErrorNotification(error);
-    expect(mockToast.error).toHaveBeenCalledWith(
-      error.message,
-      expect.objectContaining({
-        description: expect.stringContaining('sys-ref-999'),
-      })
-    );
+    const [, opts] = mockToast.error.mock.calls[0];
+    render(<div>{opts.description}</div>);
+    expect(screen.getByText('Reference ID: sys-ref-999')).toBeInTheDocument();
+  });
+
+  it('puts the Reference ID and each suggested action on their own line (#1001)', () => {
+    const error = makeError({
+      type: ErrorType.SYSTEM,
+      correlationId: 'sys-ref-999',
+      suggestedActions: ['Try refreshing the page', 'Contact support'],
+    });
+    showErrorNotification(error);
+    const [, opts] = mockToast.error.mock.calls[0];
+    expect(typeof opts.description).not.toBe('string');
+    render(<div>{opts.description}</div>);
+    const lines = ['Reference ID: sys-ref-999', 'Try refreshing the page', 'Contact support'];
+    const blocks = lines.map((l) => screen.getByText(l));
+    expect(new Set(blocks).size).toBe(3);
   });
 
   // --- Duration override ---

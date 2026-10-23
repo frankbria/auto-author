@@ -119,7 +119,7 @@ export function classifyError(
   return {
     type: ErrorType.SYSTEM,
     severity: ErrorSeverity.CRITICAL,
-    message: 'Something went wrong. Our team has been notified.',
+    message: 'Something went wrong.',
     details: errorMessage,
     retryable: false,
     correlationId,

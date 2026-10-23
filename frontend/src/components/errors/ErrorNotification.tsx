@@ -155,7 +155,13 @@ export function showErrorNotification(
   } else {
     // System error with correlation ID
     toast.error(error.message, {
-      description: `Reference ID: ${error.correlationId}\n${error.suggestedActions?.join('\n') || ''}`,
+      // The toast description collapses newlines, so each line is its own element.
+      description: (
+        <div className="space-y-1">
+          <p>Reference ID: {error.correlationId}</p>
+          {error.suggestedActions?.map((action) => <p key={action}>{action}</p>)}
+        </div>
+      ),
       duration: defaultDuration,
       onDismiss,
     });
