@@ -67,6 +67,9 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
 CONTENT_EXCLUDING_PROJECTION = {
     "table_of_contents.chapters.content": 0,
     "table_of_contents.chapters.subchapters.content": 0,
+    # The other two unbounded fields (#1041). No route that walks the chapter list reads them.
+    "summary_history": 0,
+    "question_responses": 0,
 }
 
 
@@ -113,6 +116,38 @@ async def get_book_fields(book_id: str, *fields: str) -> Optional[Dict]:
         return await books_collection.find_one(
             {"_id": ObjectId(book_id)}, {field: 1 for field in fields}
         )
+    except (InvalidId, TypeError):  # a malformed id names no book; a DB error is not that (#849)
+        return None
+
+
+async def get_book_owner_and_chapter(book_id: str, chapter_id: str) -> Optional[Dict]:
+    """The book's ``_id`` and ``owner_id`` plus ``chapter``: the one chapter named, or ``None`` (#1041).
+
+    The chapter is picked inside the database, so only its own body comes back.
+    Bodies are written at two levels (a chapter, or a subchapter of one: see
+    :func:`apply_chapter_content_update`), so two levels are searched. The found
+    chapter's own subchapters are cut to their ids: the caller counts them and
+    never reads their bodies. ``None`` for a missing book and for a malformed id.
+    """
+    top = "$table_of_contents.chapters"
+    sub = {"$reduce": {"input": {"$ifNull": [top, []]}, "initialValue": [],
+                       "in": {"$concatArrays": ["$$value", {"$cond": [{"$isArray": "$$this.subchapters"}, "$$this.subchapters", []]}]}}}
+    both = {"$concatArrays": [{"$cond": [{"$isArray": top}, top, []]}, sub]}
+    found = {"$filter": {"input": both, "as": "c", "cond": {"$eq": ["$$c.id", chapter_id]}}}
+    try:
+        cursor = await books_collection.aggregate([
+            {"$match": {"_id": ObjectId(book_id)}},
+            {"$project": {"owner_id": 1, "chapter": {"$first": found}}},
+            {"$set": {"chapter.subchapters": {"$cond": [
+                {"$isArray": "$chapter.subchapters"},
+                {"$map": {"input": "$chapter.subchapters", "as": "s", "in": {"id": "$$s.id"}}},
+                "$$REMOVE",
+            ]}}},
+        ])
+        book = next(iter(await cursor.to_list(1)), None)
+        if book and not book.get("chapter"):
+            book["chapter"] = None  # the $set above leaves {} where no chapter matched
+        return book
     except (InvalidId, TypeError):  # a malformed id names no book; a DB error is not that (#849)
         return None
 

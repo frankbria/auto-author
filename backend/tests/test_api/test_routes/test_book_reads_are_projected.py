@@ -61,7 +61,11 @@ async def _reads_of_the_book():
         yield reads
     finally:
         await base._db.command("profile", 0)
-        reads.extend(await base._db["system.profile"].find({"ns": f"{base._db.name}.books", "op": "query"}).to_list(None))
+        # A find is recorded as a query; an aggregation (#1041) as a command.
+        ns = f"{base._db.name}.books"
+        reads.extend(await base._db["system.profile"].find(
+            {"ns": ns, "$or": [{"op": "query"}, {"op": "command", "command.aggregate": "books"}]}
+        ).to_list(None))
 
 
 def _bytes(reads) -> int:
@@ -70,26 +74,28 @@ def _bytes(reads) -> int:
 
 # (what it is, method, path under the book, JSON body, the status it answers, the most its reads may bring back)
 NO_BODIES = 350 * KB  # everything but the 700 KB of chapter bodies
+NO_BODIES_OR_BULK = 10 * KB  # and without the 300 KB of summary history and interview answers (#1041)
+ONE_BODY = 110 * KB  # the 100 KB body asked for, and the owner
 ROUTES = [
-    ("the book", "GET", "", None, 200, NO_BODIES),
+    ("the book", "GET", "", None, 200, NO_BODIES_OR_BULK),
     ("the summary", "GET", "/summary", None, 200, 230 * KB),
     ("saving the summary", "PUT", "/summary", {"summary": "A new summary of the book, long enough to be one. " * 4}, 200, 5 * KB),
     ("patching the summary", "PATCH", "/summary", {"summary": "A patched summary of the book, long enough to be one. " * 4}, 200, 230 * KB),
     ("the interview answers", "GET", "/question-responses", None, 200, 130 * KB),
     ("readiness for a table of contents", "GET", "/toc-readiness", None, 200, 5 * KB),
-    ("the table of contents", "GET", "/toc", None, 200, NO_BODIES),
-    ("the chapters' metadata", "GET", "/chapters/metadata", None, 200, NO_BODIES),
-    ("enhancing text, refused for having none", "POST", "/chapters/c2/enhance-text", {"content": "   "}, 400, NO_BODIES),
+    ("the table of contents", "GET", "/toc", None, 200, NO_BODIES_OR_BULK),
+    ("the chapters' metadata", "GET", "/chapters/metadata", None, 200, NO_BODIES_OR_BULK),
+    ("enhancing text, refused for having none", "POST", "/chapters/c2/enhance-text", {"content": "   "}, 400, NO_BODIES_OR_BULK),
     ("saving the interview answers", "PUT", "/question-responses",
      {"responses": [{"question": "Who is it for?", "answer": "Readers who like the sea."}]}, 200, 5 * KB),
-    ("cleaning up a transcription, refused for having none", "POST", "/chapters/c2/enhance-transcription", {"content": "   "}, 400, NO_BODIES),
+    ("cleaning up a transcription, refused for having none", "POST", "/chapters/c2/enhance-transcription", {"content": "   "}, 400, NO_BODIES_OR_BULK),
     ("deleting the book", "DELETE", "", None, 204, 5 * KB),
-    # A chapter's body is in the table of contents, so that is read whole; the 300 KB beside it is not.
-    ("one chapter's content", "GET", "/chapters/c1a/content", None, 200, 750 * KB),
+    # Only the chapter asked for: a subchapter's body, not its parent's, its siblings' or the 300 KB beside them (#1041).
+    ("one chapter's content", "GET", "/chapters/c1a/content", None, 200, ONE_BODY),
     ("several chapters' content", "POST", "/chapters/batch-content", {"chapter_ids": ["c1", "c2"]}, 200, 750 * KB),
-    # Two reads: the book without its bodies, then the table of contents for the body to show beside the refusal.
+    # Two reads: the book without its bodies, then the one chapter for the body to show beside the refusal.
     ("a save refused as out of date", "PATCH", "/chapters/c2/content",
-     {"content": "<p>new</p>", "expected_last_modified": "2000-01-01T00:00:00+00:00"}, 409, 1_060 * KB),
+     {"content": "<p>new</p>", "expected_last_modified": "2000-01-01T00:00:00+00:00"}, 409, NO_BODIES_OR_BULK + ONE_BODY),
 ]
 
 
@@ -120,7 +126,7 @@ async def test_generating_a_draft_reads_no_bodies(auth_client_factory, monkeypat
         )
 
     assert answer.status_code == 200, answer.text[:300]
-    assert reads and _bytes(reads) <= NO_BODIES, f"{_bytes(reads):,} bytes read from books"
+    assert reads and _bytes(reads) <= NO_BODIES_OR_BULK, f"{_bytes(reads):,} bytes read from books"
 
 
 async def test_uploading_a_cover_reads_the_owner_and_the_cover_it_replaces(auth_client_factory, monkeypatch, tmp_path):
