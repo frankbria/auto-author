@@ -14,6 +14,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ResendVerificationButton } from "@/components/auth/ResendVerificationButton";
+import { verificationCallbackURL } from "@/lib/verify-email";
 import {
   PasswordRequirements,
   isPasswordValid,
@@ -31,17 +33,8 @@ function getErrorMessage(error: { message?: string; code?: string } | null): str
   const message = error.message?.toLowerCase() || "";
   const code = error.code?.toLowerCase() || "";
 
-  // Check for specific error patterns
-  if (
-    message.includes("exists") ||
-    message.includes("already") ||
-    message.includes("duplicate") ||
-    code.includes("user_exists") ||
-    code.includes("email_exists")
-  ) {
-    return "An account with this email already exists";
-  }
-
+  // No "account already exists" case: with requireEmailVerification, better-auth
+  // answers a duplicate sign-up with the same generic success as a new one (#969).
   if (
     message.includes("invalid email") ||
     message.includes("email format") ||
@@ -136,8 +129,8 @@ export default function SignUpPage() {
         email,
         password,
         name,
-        // Where the emailed link lands once the address is verified.
-        callbackURL: "/dashboard",
+        // Where the emailed link lands: it reads ?error=, then goes on (#969).
+        callbackURL: verificationCallbackURL("/dashboard"),
       });
 
       if (signUpError) {
@@ -174,14 +167,14 @@ export default function SignUpPage() {
               finish creating your account. The link expires in one hour.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              No email? Check your spam folder, or{" "}
-              <Link href="/auth/sign-in" className="text-primary hover:underline">
-                sign in
-              </Link>{" "}
-              with your email and password and we will send a new link.
+              No email? Check your spam folder, or send a new link.
             </p>
+            <ResendVerificationButton
+              email={sentTo}
+              callbackURL={verificationCallbackURL("/dashboard")}
+            />
           </CardContent>
         </Card>
       </Shell>

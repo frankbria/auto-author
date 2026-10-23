@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,8 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockSignUpEmail = authClient.signUp.email as unknown as jest.Mock;
+const mockSendVerificationEmail =
+  authClient.sendVerificationEmail as unknown as jest.Mock;
 
 // Meets all requirements (≥8 chars, upper, lower, digit); built by
 // concatenation so the pre-commit secrets pattern can't false-positive.
@@ -53,34 +55,18 @@ describe("SignUpPage (#198)", () => {
       email: "test@example.com",
       password: VALID_PW,
       name: "Test User",
-      // Where the emailed link lands once the address is verified.
-      callbackURL: "/dashboard",
+      // The emailed link lands on the page that reads ?error= (#969).
+      callbackURL: "/auth/verify-email?next=%2Fdashboard",
     });
     expect(
       await screen.findByRole("heading", { name: /check your email/i })
     ).toBeInTheDocument();
     expect(screen.getByText(/test@example\.com/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute(
-      "href",
-      "/auth/sign-in"
-    );
-    expect(push).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: /sign up/i })).not.toBeInTheDocument();
-  });
-
-  it("renders the mapped message and does not navigate when the account already exists", async () => {
-    mockSignUpEmail.mockResolvedValue({
-      data: null,
-      error: { message: "User already exists" },
-    });
-    const { push } = setup();
-    const user = await fillForm();
-    await user.click(submitButton());
-
     expect(
-      await screen.findByText("An account with this email already exists")
+      screen.getByRole("button", { name: /resend verification email/i })
     ).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /sign up/i })).not.toBeInTheDocument();
   });
 
   it("shows a generic message (never the raw backend text) for an unmatched error (#215)", async () => {
@@ -137,5 +123,86 @@ describe("SignUpPage (#198)", () => {
       notice.compareDocumentPosition(submitButton()) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+  });
+});
+
+describe("Check your email: resend (#969)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSignUpEmail.mockResolvedValue({ data: { user: {} }, error: null });
+    mockSendVerificationEmail.mockResolvedValue({ data: { status: true }, error: null });
+  });
+
+  afterEach(() => jest.useRealTimers());
+
+  async function reachCheckEmail() {
+    setup();
+    const user = await fillForm();
+    await user.click(submitButton());
+    await screen.findByRole("heading", { name: /check your email/i });
+    return screen.getByRole("button", { name: /resend verification email/i });
+  }
+
+  it("sends another link to the address it knows, without the password", async () => {
+    const resend = await reachCheckEmail();
+    await userEvent.setup().click(resend);
+
+    expect(mockSendVerificationEmail).toHaveBeenCalledWith({
+      email: "test@example.com",
+      callbackURL: "/auth/verify-email?next=%2Fdashboard",
+    });
+    expect(
+      await screen.findByText(/sent a new link to test@example\.com/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/sent a new link/i);
+  });
+
+  it("holds off for 60 seconds with a countdown, then allows another send", async () => {
+    const resend = await reachCheckEmail();
+    jest.useFakeTimers();
+
+    fireEvent.click(resend);
+    await act(async () => {});
+    expect(resend).toHaveAttribute("aria-disabled", "true");
+    expect(resend).toHaveTextContent("(60s)");
+
+    fireEvent.click(resend);
+    expect(mockSendVerificationEmail).toHaveBeenCalledTimes(1);
+
+    act(() => jest.advanceTimersByTime(59_000));
+    expect(resend).toHaveTextContent("(1s)");
+
+    act(() => jest.advanceTimersByTime(1_000));
+    expect(resend).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(resend);
+    await act(async () => {});
+    expect(mockSendVerificationEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it("says so in the status region when better-auth refuses the send", async () => {
+    mockSendVerificationEmail.mockResolvedValue({
+      data: null,
+      error: { status: 429, message: "Too many requests. Please try again later." },
+    });
+    const resend = await reachCheckEmail();
+    await userEvent.setup().click(resend);
+
+    expect(await screen.findByText(/too many requests/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/wait a minute/i);
+  });
+
+  it("reports a failed send without claiming success", async () => {
+    mockSendVerificationEmail.mockResolvedValue({
+      data: null,
+      error: { status: 500, message: "boom" },
+    });
+    const resend = await reachCheckEmail();
+    await userEvent.setup().click(resend);
+
+    expect(
+      await screen.findByText(/could not send a new link/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/sent a new link/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/boom/)).not.toBeInTheDocument();
   });
 });

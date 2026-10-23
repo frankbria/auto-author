@@ -70,6 +70,25 @@ describe("SignInPage redirect handling", () => {
     expect(push).toHaveBeenCalledWith("/dashboard");
   });
 
+  // #969: a refused (unverified) sign-in mails a link to this callbackURL.
+  it("sends the fresh verification link toward the sanitized destination", async () => {
+    setup("/dashboard/books/1");
+    await signIn();
+    expect(mockSignInEmail).toHaveBeenCalledWith({
+      email: "test@example.com",
+      password: "pw1234",
+      callbackURL: "/auth/verify-email?next=%2Fdashboard%2Fbooks%2F1",
+    });
+  });
+
+  it("never points the verification link off-site", async () => {
+    setup("https://evil.com");
+    await signIn();
+    expect(mockSignInEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ callbackURL: "/auth/verify-email?next=%2Fdashboard" })
+    );
+  });
+
   it("does not navigate at all when sign-in fails", async () => {
     mockSignInEmail.mockResolvedValue({
       data: null,

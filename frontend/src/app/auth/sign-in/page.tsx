@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { sanitizeRedirectPath } from "@/lib/security";
+import { verificationCallbackURL } from "@/lib/verify-email";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,6 +106,10 @@ function SignInForm() {
       const { data, error: signInError } = await authClient.signIn.email({
         email,
         password,
+        // An unverified account is refused and mailed a fresh link to this
+        // URL (#969). better-auth also navigates here after a plain success;
+        // the page forwards to the same destination router.push uses below.
+        callbackURL: verificationCallbackURL(redirect),
       });
 
       if (signInError) {
