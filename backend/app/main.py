@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from fastapi.exceptions import RequestValidationError
+from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from pymongo.errors import PyMongoError
@@ -49,7 +49,16 @@ def _scrub_free_text(event, hint):
             # The driver also ends a write error with the server's whole answer,
             # which for a schema rule holds the value that failed (#996).
             failure["value"] = failure["value"].split(" dup key:")[0].split(", full error:")[0]
+    failed = (hint or {}).get("exc_info", (None, None))[1]
+    if isinstance(failed, (ValidationError, ResponseValidationError)) and event.get("exception", {}).get("values"):
+        # Its text quotes the value that did not fit: a stored document (#995).
+        event["exception"]["values"][-1]["value"] = _invalid_fields(failed)
     return event
+
+
+def _invalid_fields(exc) -> str:
+    """Which fields failed and how, never the values (#808)."""
+    return "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['type']}" for e in exc.errors())
 
 
 def _init_sentry() -> None:
@@ -391,20 +400,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-# Pydantic validation error handler
+# A request that fails validation is a RequestValidationError, answered above.
+# One that reaches here is a model the server built, from a stored document or
+# its own data, that does not fit: our fault, so a reported 500 (#995). Logged
+# without the traceback, whose last line quotes the value.
 @app.exception_handler(ValidationError)
-async def pydantic_validation_exception_handler(request: Request, exc: ValidationError):
-    # Which model and which fields, never the values: str(exc) and its traceback
-    # quote the rejected input (#808).
-    fields = "; ".join(
-        f"{'.'.join(map(str, error['loc']))}: {error['type']}"
-        for error in exc.errors(include_input=False, include_context=False, include_url=False)
-    )
-    logger.warning("Pydantic validation error for %s: %s", exc.title, fields)
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-        content={"detail": "Validation error"},
-    )
+@app.exception_handler(ResponseValidationError)
+async def model_validation_exception_handler(request: Request, exc: Exception):
+    logger.error("A model built for %s failed validation: %s", request.url.path, _invalid_fields(exc))
+    return _server_error(request, exc)
 
 
 # A session that could not be checked (#1007). Answered 503 with when to come
@@ -424,6 +428,10 @@ async def session_store_unavailable_handler(request: Request, exc: SessionStoreU
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return _server_error(request, exc)
+
+
+def _server_error(request: Request, exc: Exception) -> JSONResponse:
     # Route to Sentry (#334). No-op when Sentry isn't initialized (no DSN).
     if settings.SENTRY_DSN:
         import sentry_sdk
