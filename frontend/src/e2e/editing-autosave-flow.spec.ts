@@ -55,6 +55,14 @@ async function getBackup(page: Page, bookId: string, chapterId: string): Promise
   return page.evaluate((key) => localStorage.getItem(key), backupKey(bookId, chapterId));
 }
 
+// Same context, so the same localStorage; the save failure is routed on the first page only.
+async function openInSecondTab(page: Page): Promise<Page> {
+  const tab = await page.context().newPage();
+  await tab.goto(page.url());
+  await openFirstChapter(tab);
+  return tab;
+}
+
 test.describe('Editing & Auto-save Flow', () => {
   let bookId: string;
   let chapterId: string;
@@ -137,17 +145,16 @@ test.describe('Editing & Auto-save Flow', () => {
       page.getByText('Failed to auto-save. Content backed up locally.')
     ).toBeVisible({ timeout: SAVE_TIMEOUT });
 
-    // Network is "restored" for the reload; the backup is still in localStorage.
-    await page.unroute(CONTENT_GLOB);
-    await page.reload();
-    await openFirstChapter(page);
+    // A second tab, not a reload: a reload's pagehide save lands the text on the
+    // server, and a backup the server already holds is no longer offered (#1139).
+    const tab = await openInSecondTab(page);
 
     await expect(
-      page.getByText(/a local backup of your content is available/i)
+      tab.getByText(/a local backup of your content is available/i)
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Restore Backup' }).click();
+    await tab.getByRole('button', { name: 'Restore Backup' }).click();
 
-    await expect(page.locator('.tiptap')).toContainText(
+    await expect(tab.locator('.tiptap')).toContainText(
       'Recovered prose that only exists in the local backup.'
     );
   });
@@ -159,19 +166,17 @@ test.describe('Editing & Auto-save Flow', () => {
       page.getByText('Failed to auto-save. Content backed up locally.')
     ).toBeVisible({ timeout: SAVE_TIMEOUT });
 
-    await page.unroute(CONTENT_GLOB);
-    await page.reload();
-    await openFirstChapter(page);
+    const tab = await openInSecondTab(page);
 
     await expect(
-      page.getByText(/a local backup of your content is available/i)
+      tab.getByText(/a local backup of your content is available/i)
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Dismiss' }).click();
+    await tab.getByRole('button', { name: 'Dismiss' }).click();
 
     await expect(
-      page.getByText(/a local backup of your content is available/i)
+      tab.getByText(/a local backup of your content is available/i)
     ).toBeHidden();
-    expect(await getBackup(page, bookId, chapterId)).toBeNull();
+    expect(await getBackup(tab, bookId, chapterId)).toBeNull();
   });
 
   test('auto-save recovers on its own once the network returns', async ({ page }) => {
