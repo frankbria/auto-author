@@ -4,10 +4,8 @@ endpoints in ``app/api/endpoints/books.py``.
 
 Endpoints exercised (all under ``/api/v1/books/{book_id}/...``):
     POST   /{book_id}/chapters                       create_chapter
-    GET    /{book_id}/chapters/{chapter_id}          get_chapter
     PUT    /{book_id}/chapters/{chapter_id}          update_chapter
     DELETE /{book_id}/chapters/{chapter_id}          delete_chapter
-    GET    /{book_id}/chapters                        list_chapters
     GET    /{book_id}/chapters/metadata              get_chapters_metadata
     PATCH  /{book_id}/chapters/bulk-status           update_chapter_status_bulk
 
@@ -30,6 +28,8 @@ Behavioral notes captured from the (now-fixed) implementation:
 
 import pytest
 from bson import ObjectId
+
+from app.db.database import get_book_by_id
 
 
 # --------------------------------------------------------------------------- #
@@ -68,6 +68,19 @@ async def add_chapter(api, book_id, *, title="Chapter", level=1, order=1,
     return resp.json()["chapter_id"]
 
 
+async def stored_chapter(book_id, chapter_id):
+    """The chapter as stored (None if absent), searching subchapters. Read from
+    the database: no route returns a whole chapter any more (#1039)."""
+    book = await get_book_by_id(book_id)
+    todo = list(book["table_of_contents"]["chapters"])
+    while todo:
+        ch = todo.pop()
+        if ch["id"] == chapter_id:
+            return ch
+        todo.extend(ch.get("subchapters") or [])
+    return None
+
+
 async def make_other_user(auth_client_factory):
     return await auth_client_factory(
         overrides={"auth_id": "other-user-999", "email": "o@e.com"}
@@ -99,9 +112,7 @@ async def test_create_chapter_happy_path(auth_client_factory):
     assert body["chapter"]["status"] == "draft"
 
     # The created chapter is retrievable.
-    got = await api.get(f"/api/v1/books/{book_id}/chapters/{body['chapter_id']}")
-    assert got.status_code == 200
-    assert got.json()["chapter"]["title"] == "Ch1"
+    assert (await stored_chapter(book_id, body["chapter_id"]))["title"] == "Ch1"
 
 
 @pytest.mark.asyncio
@@ -120,9 +131,7 @@ async def test_create_subchapter_happy_path(auth_client_factory):
     assert resp.status_code == 201
     sub_id = resp.json()["chapter_id"]
     # Retrievable through the recursive lookup.
-    got = await api.get(f"/api/v1/books/{book_id}/chapters/{sub_id}")
-    assert got.status_code == 200
-    assert got.json()["chapter"]["title"] == "Sub"
+    assert (await stored_chapter(book_id, sub_id))["title"] == "Sub"
 
 
 @pytest.mark.asyncio
@@ -182,91 +191,6 @@ async def test_create_chapter_missing_required_fields_returns_422(auth_client_fa
     )
 
     assert resp.status_code == 422
-
-
-# --------------------------------------------------------------------------- #
-# get_chapter  (GET /{book_id}/chapters/{chapter_id})
-# --------------------------------------------------------------------------- #
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_happy_path(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await create_book(api)
-    chapter_id = await add_chapter(api, book_id, title="Intro")
-
-    resp = await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
-
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["success"] is True
-    assert body["book_id"] == book_id
-    assert body["chapter"]["id"] == chapter_id
-    assert body["chapter"]["title"] == "Intro"
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_finds_nested_subchapter(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await create_book(api)
-    parent_id = await add_chapter(api, book_id, title="Parent")
-    sub_id = await add_chapter(api, book_id, title="Nested", level=2, order=1,
-                               parent_id=parent_id)
-
-    resp = await api.get(f"/api/v1/books/{book_id}/chapters/{sub_id}")
-
-    assert resp.status_code == 200
-    assert resp.json()["chapter"]["id"] == sub_id
-    assert resp.json()["chapter"]["title"] == "Nested"
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_book_not_found(auth_client_factory):
-    api = await auth_client_factory()
-    missing_book = str(ObjectId())
-
-    resp = await api.get(f"/api/v1/books/{missing_book}/chapters/c1")
-
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "Book not found"
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_invalid_objectid_book_not_found(auth_client_factory):
-    """A non-ObjectId book id -> get_book_by_id returns None -> 404."""
-    api = await auth_client_factory()
-
-    resp = await api.get("/api/v1/books/not-an-objectid/chapters/c1")
-
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "Book not found"
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_chapter_not_found(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await create_book(api)
-    await add_chapter(api, book_id)
-
-    resp = await api.get(f"/api/v1/books/{book_id}/chapters/does-not-exist")
-
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "Chapter not found"
-
-
-@pytest.mark.asyncio
-async def test_get_chapter_wrong_owner_forbidden(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await create_book(api)
-    chapter_id = await add_chapter(api, book_id)
-
-    other = await make_other_user(auth_client_factory)
-    resp = await other.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
-
-    assert resp.status_code == 403
-    assert "Not authorized" in resp.json()["detail"]
-
-
 # --------------------------------------------------------------------------- #
 # update_chapter  (PUT /{book_id}/chapters/{chapter_id})
 # --------------------------------------------------------------------------- #
@@ -289,10 +213,10 @@ async def test_update_chapter_happy_path(auth_client_factory):
     assert body["message"] == "Chapter updated successfully"
 
     # The change is actually persisted.
-    got = await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
-    assert got.json()["chapter"]["title"] == "New Title"
-    assert got.json()["chapter"]["description"] == "new"
-    assert got.json()["chapter"]["order"] == 5
+    got = await stored_chapter(book_id, chapter_id)
+    assert got["title"] == "New Title"
+    assert got["description"] == "new"
+    assert got["order"] == 5
 
 
 @pytest.mark.asyncio
@@ -308,8 +232,7 @@ async def test_update_chapter_metadata_field(auth_client_factory):
     )
 
     assert resp.status_code == 200
-    got = await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
-    assert got.json()["chapter"]["metadata"] == {"key": "value"}
+    assert (await stored_chapter(book_id, chapter_id))["metadata"] == {"key": "value"}
 
 
 @pytest.mark.asyncio
@@ -379,10 +302,9 @@ async def test_delete_chapter_happy_path(auth_client_factory):
     assert body["message"] == "Chapter deleted successfully"
 
     # Confirm the chapter is really gone and the other remains.
-    after = await api.get(f"/api/v1/books/{book_id}/chapters/{drop_id}")
-    assert after.status_code == 404
-    remaining = await api.get(f"/api/v1/books/{book_id}/chapters")
-    assert [c["id"] for c in remaining.json()["chapters"]] == [keep_id]
+    assert await stored_chapter(book_id, drop_id) is None
+    assert await stored_chapter(book_id, keep_id) is not None
+    assert len((await get_book_by_id(book_id))["table_of_contents"]["chapters"]) == 1
 
 
 @pytest.mark.asyncio
@@ -434,85 +356,7 @@ async def test_delete_subchapter_happy_path(auth_client_factory):
 
     assert resp.status_code == 200
     assert resp.json()["chapter_id"] == sub_id
-    assert (await api.get(f"/api/v1/books/{book_id}/chapters/{sub_id}")).status_code == 404
-
-
-# --------------------------------------------------------------------------- #
-# list_chapters  (GET /{book_id}/chapters)
-# --------------------------------------------------------------------------- #
-
-
-@pytest.mark.asyncio
-async def test_list_chapters_hierarchical_default(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await create_book(api)
-    c1 = await add_chapter(api, book_id, title="C1", order=1)
-    c2 = await add_chapter(api, book_id, title="C2", order=2)
-
-    resp = await api.get(f"/api/v1/books/{book_id}/chapters")
-
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["structure"] == "hierarchical"
-    assert body["total_chapters"] == 2
-    assert [c["id"] for c in body["chapters"]] == [c1, c2]
-    assert body["success"] is True
-
-
-@pytest.mark.asyncio
-async def test_list_chapters_flat_includes_subchapters(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await create_book(api)
-    c1 = await add_chapter(api, book_id, title="C1", order=1)
-    sub = await add_chapter(api, book_id, title="Sub", level=2, order=1, parent_id=c1)
-    c2 = await add_chapter(api, book_id, title="C2", order=2)
-
-    resp = await api.get(f"/api/v1/books/{book_id}/chapters?flat=true")
-
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["structure"] == "flat"
-    # 2 top-level + 1 nested subchapter flattened.
-    assert body["total_chapters"] == 3
-    assert {c["id"] for c in body["chapters"]} == {c1, sub, c2}
-
-
-@pytest.mark.asyncio
-async def test_list_chapters_empty_toc(auth_client_factory):
-    """A book with no chapters returns an empty hierarchical list."""
-    api = await auth_client_factory()
-    book_id = await create_book(api)
-
-    resp = await api.get(f"/api/v1/books/{book_id}/chapters")
-
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["chapters"] == []
-    assert body["total_chapters"] == 0
-
-
-@pytest.mark.asyncio
-async def test_list_chapters_book_not_found(auth_client_factory):
-    api = await auth_client_factory()
-    missing_book = str(ObjectId())
-
-    resp = await api.get(f"/api/v1/books/{missing_book}/chapters")
-
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "Book not found"
-
-
-@pytest.mark.asyncio
-async def test_list_chapters_wrong_owner_forbidden(auth_client_factory):
-    api = await auth_client_factory()
-    book_id = await create_book(api)
-    await add_chapter(api, book_id)
-
-    other = await make_other_user(auth_client_factory)
-    resp = await other.get(f"/api/v1/books/{book_id}/chapters")
-
-    assert resp.status_code == 403
-    assert "Not authorized" in resp.json()["detail"]
+    assert await stored_chapter(book_id, sub_id) is None
 
 
 # --------------------------------------------------------------------------- #
@@ -592,8 +436,7 @@ async def test_bulk_status_single_chapter_happy(auth_client_factory):
     assert "1 chapters" in body["message"]
 
     # Persisted.
-    after = await api.get(f"/api/v1/books/{book_id}/chapters/{chapter_id}")
-    assert after.json()["chapter"]["status"] == "in-progress"
+    assert (await stored_chapter(book_id, chapter_id))["status"] == "in-progress"
 
 
 @pytest.mark.asyncio
@@ -824,8 +667,7 @@ async def test_delete_chapter_version_conflict_returns_409(
 
     # The chapter was NOT deleted — the losing write was rejected wholesale.
     monkeypatch.undo()
-    remaining = await api.get(f"/api/v1/books/{book_id}/chapters")
-    assert [c["id"] for c in remaining.json()["chapters"]] == [chapter_id]
+    assert await stored_chapter(book_id, chapter_id) is not None
 
 
 def _mutate_book_before_write(monkeypatch, book_id, mutation):
