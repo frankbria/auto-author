@@ -31,7 +31,10 @@ class EpubMixin:
             heading_tag = {"heading1": "h2", "heading2": "h3", "heading3": "h4"}
             for para in self._extract_text_formatting(content):
                 text = inline_marks.as_tags(
-                    html.escape(para["text"]), ("<strong>", "</strong>"), ("<em>", "</em>")
+                    html.escape(para["text"]), ("<strong>", "</strong>"), ("<em>", "</em>"),
+                    code=("<code>", "</code>"), strike=("<s>", "</s>"),
+                    sup=("<sup>", "</sup>"), sub=("<sub>", "</sub>"),
+                    link=('<a href="{}">', "</a>"),
                 )
                 tag = heading_tag.get(para["style"], "p")
                 parts.append(f"<{tag}>{text}</{tag}>")
