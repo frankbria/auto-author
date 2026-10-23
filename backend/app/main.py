@@ -52,9 +52,18 @@ def _scrub_free_text(event, hint):
             # which for a schema rule holds the value that failed (#996).
             failure["value"] = failure["value"].split(" dup key:")[0].split(", full error:")[0]
     failed = (hint or {}).get("exc_info", (None, None))[1]
-    if isinstance(failed, (ValidationError, ResponseValidationError)) and event.get("exception", {}).get("values"):
-        # Its text quotes the value that did not fit: a stored document (#995).
-        event["exception"]["values"][-1]["value"] = _invalid_fields(failed)
+    # Its text quotes the value that did not fit: a stored document (#995). A
+    # route may catch it and raise something else from it, so the whole chain (#1162).
+    rejections, seen = {}, set()
+    while failed is not None and id(failed) not in seen:
+        seen.add(id(failed))
+        if isinstance(failed, (ValidationError, ResponseValidationError)):
+            rejections.setdefault(type(failed).__name__, failed)
+        failed = failed.__cause__ or (None if failed.__suppress_context__ else failed.__context__)
+    for failure in event.get("exception", {}).get("values", []):
+        if failure.get("type") in rejections:
+            failure["value"] = _invalid_fields(rejections[failure["type"]])
+    failed = (hint or {}).get("exc_info", (None, None))[1]
     if isinstance(failed, StarletteHTTPException) and ai_failure_reported.get():
         # The AI transport reported the failure this 5xx answers (#994).
         return None
@@ -439,7 +448,8 @@ async def session_store_unavailable_handler(request: Request, exc: SessionStoreU
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    # The type, not the text: an exception's text can quote user data (#1162).
+    logger.error(f"Unhandled exception: {type(exc).__name__}", exc_info=True)
     return _server_error(request, exc)
 
 

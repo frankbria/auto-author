@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 import sentry_sdk
 from bson import ObjectId
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pymongo import AsyncMongoClient
 from openai import AsyncOpenAI
@@ -98,6 +99,17 @@ async def _reject():
     _Chapter.model_validate({"words": REJECTED})
 
 
+async def _unhandled():
+    raise RuntimeError(REJECTED)
+
+
+async def _reject_and_reraise():
+    try:
+        _Chapter.model_validate({"words": REJECTED})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred") from e
+
+
 @pytest.fixture
 def events(monkeypatch):
     """The SDK as the app starts it, sending to a list. Inert again afterwards."""
@@ -115,8 +127,10 @@ def api():
     app.add_api_route(PROBE, _fail, methods=["POST"])
     app.add_api_route(PROBE + "/rejected", _reject, methods=["GET"])
     app.add_api_route(PROBE + "/work", _work_then_fail, methods=["POST"])
+    app.add_api_route(PROBE + "/chained", _reject_and_reraise, methods=["GET"])
+    app.add_api_route(PROBE + "/unhandled", _unhandled, methods=["GET"])
     yield TestClient(app, raise_server_exceptions=False)
-    del app.router.routes[-3:]
+    del app.router.routes[-5:]
 
 
 def _fail_a_request(api: TestClient):
@@ -221,6 +235,25 @@ class TestAModelTheServerBuiltIsAServerFault:
         assert len(events) == 1
         assert events[0]["exception"]["values"][-1]["type"] == "ValidationError"
         assert REJECTED not in json.dumps(events, default=str)
+
+    def test_a_model_failure_re_raised_as_an_http_500_sends_no_value(self, api, events, caplog):
+        with caplog.at_level(logging.INFO):
+            response = api.get(PROBE + "/chained")
+
+        assert response.status_code == 500
+        assert len(events) == 1
+        assert len(events[0]["exception"]["values"]) > 1, "the chain is what carries the value"
+        assert REJECTED not in json.dumps(events, default=str)
+        assert REJECTED not in caplog.text
+
+    def test_an_unhandled_500_is_logged_once_at_error_without_its_text(self, api, caplog):
+        with caplog.at_level(logging.INFO):
+            api.get(PROBE + "/unhandled")
+
+        errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1, [r.getMessage() for r in errors]
+        assert "RuntimeError" in errors[0].getMessage() and REJECTED not in errors[0].getMessage()
+        assert errors[0].exc_info, "the traceback stays on the one line"
 
     @pytest.mark.asyncio
     async def test_a_stored_book_that_no_longer_fits_its_response_model(self, reinit_db, events, caplog):
