@@ -202,6 +202,9 @@ describe('ChapterEditor localStorage backup', () => {
       // Backup should be cleared from localStorage
       expect(localStorage.getItem(backupKey)).toBeNull();
 
+      // The restored text is what the editor shows
+      expect(screen.getByRole('textbox')).toHaveValue('<p>Backed up content from previous session</p>');
+
       // Auto-save should be triggered with restored content
       await act(async () => {
         jest.advanceTimersByTime(3000);
