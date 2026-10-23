@@ -98,7 +98,6 @@ async def upload_book_cover_image(
                 resource_type="book",
                 target_id=book_id,
                 metadata={
-                    "filename": file.filename,
                     "content_type": file.content_type,
                     "image_url": image_url,
                 }

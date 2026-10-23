@@ -323,7 +323,7 @@ async def upload_profile_picture(
                 action="avatar_upload",
                 resource_type="user",
                 target_id=current_user["auth_id"],
-                metadata={"filename": file.filename, "avatar_url": avatar_url},
+                metadata={"avatar_url": avatar_url},
             )
 
         return {"message": "Profile picture updated", "avatar_url": avatar_url}
