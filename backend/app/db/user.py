@@ -221,22 +221,25 @@ async def grandfather_unverified_accounts() -> int:
     return result.modified_count
 
 
-async def delete_better_auth_identity(auth_id: str) -> None:
+async def delete_better_auth_identity(auth_id: str) -> int:
     """Remove the better-auth user and everything that authenticates as it:
     sessions (every device), credential/OAuth accounts (the old password) and
     the twoFactor secret (#763).
 
     better-auth's MongoDB adapter stores ``_id`` and ``userId`` as ObjectIds;
     the string form is matched too so a legacy string-keyed row can't survive.
+    Returns how many documents it removed.
     """
     ids: List = [auth_id]
     if ObjectId.is_valid(auth_id):
         ids.append(ObjectId(auth_id))
+    removed = 0
     for name in ("session", "account", "twoFactor"):
         collection = await get_collection(name)
-        await collection.delete_many({"userId": {"$in": ids}})
+        removed += (await collection.delete_many({"userId": {"$in": ids}})).deleted_count
     better_auth_users = await get_collection("user")
-    await better_auth_users.delete_many({"$or": [{"_id": {"$in": ids}}, {"id": auth_id}]})
+    result = await better_auth_users.delete_many({"$or": [{"_id": {"$in": ids}}, {"id": auth_id}]})
+    return removed + result.deleted_count
 
 
 async def delete_user(auth_id: str, actor_id: str = None) -> bool:
@@ -287,7 +290,16 @@ async def delete_user(auth_id: str, actor_id: str = None) -> bool:
 
     # Unconditional: a better-auth user who never reached the backend has no
     # app record, but their sessions and credentials must still go.
-    await delete_better_auth_identity(auth_id)
+    removed = await delete_better_auth_identity(auth_id)
+    if not success and removed:
+        # An earlier deactivation whose identity removal failed (#956):
+        # finishing it is this deletion, so an admin's repair is not taken as
+        # a request to erase the retained record.
+        success = bool(
+            await users_collection.count_documents(
+                {"auth_id": auth_id, "purge_at": {"$exists": True}}, limit=1
+            )
+        )
 
     # Log the deletion
     if success:
