@@ -21,6 +21,7 @@ export interface ChapterTabsState {
   active_chapter_id: string | null;
   open_tab_ids: string[];
   tab_order: string[];
+  closed_tab_ids: string[];
   is_loading: boolean;
   error: string | null;
   last_active_chapter?: string;

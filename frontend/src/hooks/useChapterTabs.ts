@@ -11,6 +11,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
     active_chapter_id: initialActiveChapter || null,
     open_tab_ids: [],
     tab_order: [],
+    closed_tab_ids: [],
     is_loading: true,
     error: null,
   });  // Load initial chapter metadata and tab state
@@ -121,6 +122,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
               active_chapter_id: tabState?.active_chapter_id || lastActiveChapter,
               open_tab_ids: tabState?.open_tab_ids,
               tab_order: tabState?.tab_order,
+              closed_tab_ids: tabState?.closed_tab_ids,
             },
             initialActiveChapter,
           ),
@@ -142,7 +144,12 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
 
   const setActiveChapter = useCallback((chapterId: string) => {
     setState(prevState => {
-      const newState = { ...prevState, active_chapter_id: chapterId };
+      // Opening a chapter reopens it if it was closed (#1043).
+      const newState = {
+        ...prevState,
+        active_chapter_id: chapterId,
+        closed_tab_ids: prevState.closed_tab_ids.filter(id => id !== chapterId),
+      };
 
       // Add to open tabs if not already open
       if (!newState.open_tab_ids.includes(chapterId)) {
@@ -185,6 +192,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
         ...prevState,
         open_tab_ids: newOpenTabs,
         tab_order: newTabOrder,
+        closed_tab_ids: [...prevState.closed_tab_ids.filter(id => id !== chapterId), chapterId],
         active_chapter_id: newActiveChapter,
       };
     });
@@ -230,6 +238,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
         active_chapter_id: state.active_chapter_id,
         open_tab_ids: state.open_tab_ids,
         tab_order: state.tab_order,
+        closed_tab_ids: state.closed_tab_ids,
         last_updated: new Date().toISOString()
       };
       localStorage.setItem(`tabState_${bookId}`, JSON.stringify(tabState));
@@ -239,12 +248,13 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
         active_chapter_id: state.active_chapter_id,
         open_tab_ids: state.open_tab_ids,
         tab_order: state.tab_order,
+        closed_tab_ids: state.closed_tab_ids,
       });
     } catch (error) {
       console.error('Failed to save tab state:', error);
       // Don't show this error to the user as it's not critical
     }
-  }, [bookId, state.active_chapter_id, state.open_tab_ids, state.tab_order]);
+  }, [bookId, state.active_chapter_id, state.open_tab_ids, state.tab_order, state.closed_tab_ids]);
 
   // Auto-save tab state when it changes
   useEffect(() => {
@@ -252,7 +262,7 @@ export function useChapterTabs(bookId: string, initialActiveChapter?: string) {
       const timeoutId = setTimeout(saveTabState, 1000); // Debounce saves
       return () => clearTimeout(timeoutId);
     }
-  }, [saveTabState, state.is_loading, state.open_tab_ids, state.active_chapter_id, state.tab_order]);
+  }, [saveTabState, state.is_loading, state.open_tab_ids, state.active_chapter_id, state.tab_order, state.closed_tab_ids]);
   const openTab = useCallback((chapterId: string) => {
     setActiveChapter(chapterId);
   }, [setActiveChapter]);

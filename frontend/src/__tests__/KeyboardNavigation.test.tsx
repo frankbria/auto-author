@@ -33,6 +33,7 @@ describe('Keyboard Navigation', () => {
         active_chapter_id: 'ch-1',
         open_tab_ids: tabOrder,
         tab_order: tabOrder,
+        closed_tab_ids: [],
         is_loading: false,
         error: null
       },
@@ -71,6 +72,7 @@ describe('Keyboard Navigation', () => {
         active_chapter_id: 'ch-1',
         open_tab_ids: tabOrder,
         tab_order: tabOrder,
+        closed_tab_ids: [],
         is_loading: false,
         error: null
       },
@@ -108,6 +110,7 @@ describe('Keyboard Navigation', () => {
         active_chapter_id: 'ch-1',
         open_tab_ids: tabOrder,
         tab_order: tabOrder,
+        closed_tab_ids: [],
         is_loading: false,
         error: null
       },

@@ -61,6 +61,7 @@ describe('reconcileTabState', () => {
       active_chapter_id: 'c1',
       open_tab_ids: ['c1', 'c2'],
       tab_order: ['c1', 'c2', 'c3'],
+      closed_tab_ids: [],
     });
   });
 
@@ -69,6 +70,7 @@ describe('reconcileTabState', () => {
       active_chapter_id: 'c2',
       open_tab_ids: ['c2'],
       tab_order: ['c2', 'c3'],
+      closed_tab_ids: [],
     });
   });
 
@@ -83,6 +85,7 @@ describe('reconcileTabState', () => {
       active_chapter_id: 'c3',
       open_tab_ids: ['c1', 'c3'],
       tab_order: ['c1', 'c2', 'c3'],
+      closed_tab_ids: [],
     });
   });
 
@@ -95,6 +98,7 @@ describe('reconcileTabState', () => {
       active_chapter_id: 'c1',
       open_tab_ids: ['c1'],
       tab_order: ['c1', 'c2'],
+      closed_tab_ids: [],
     });
   });
 
@@ -103,6 +107,7 @@ describe('reconcileTabState', () => {
       active_chapter_id: 'c1',
       open_tab_ids: ['c1'],
       tab_order: ['c2', 'c1'],
+      closed_tab_ids: [],
     });
   });
 
@@ -111,6 +116,7 @@ describe('reconcileTabState', () => {
       active_chapter_id: null,
       open_tab_ids: [],
       tab_order: [],
+      closed_tab_ids: [],
     });
   });
 });

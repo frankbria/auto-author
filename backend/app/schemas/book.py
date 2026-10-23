@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Annotated, Optional, List, Dict, Any
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from enum import Enum
 
@@ -325,6 +325,10 @@ class TabStateRequest(BaseModel):
     active_chapter_id: str
     open_tab_ids: List[str] = Field(max_length=20)  # Limit open tabs
     tab_order: List[str]
+    # Chapters the writer closed: hidden until reopened (#1043). Absent in old states.
+    closed_tab_ids: List[Annotated[str, Field(max_length=64)]] = Field(
+        default_factory=list, max_length=500
+    )
 
     @field_validator("tab_order")
     @classmethod
@@ -352,6 +356,9 @@ class TabStateRequest(BaseModel):
         if len(self.open_tab_ids) != len(open_tabs_set):
             raise ValueError("open_tab_ids contains duplicate entries")
 
+        if len(self.closed_tab_ids) != len(set(self.closed_tab_ids)):
+            raise ValueError("closed_tab_ids contains duplicate entries")
+
         return self
 
 
@@ -361,6 +368,7 @@ class TabStateResponse(BaseModel):
     active_chapter_id: str
     open_tab_ids: List[str]
     tab_order: List[str]
+    closed_tab_ids: List[str] = []
     last_updated: datetime
 
 
