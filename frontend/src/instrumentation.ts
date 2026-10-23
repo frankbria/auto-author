@@ -4,7 +4,7 @@
 // Next.js runs register() once per server/edge runtime; onRequestError routes
 // server-side (incl. React Server Component) errors to Sentry.
 import * as Sentry from '@sentry/nextjs';
-import { beforeBreadcrumb, beforeSend } from '@/lib/sentry-scrub';
+import { beforeBreadcrumb, beforeSend, dataCollection } from '@/lib/sentry-scrub';
 
 export async function register() {
   // Refuse to boot a deployed server on a secret published in the repo (#780).
@@ -20,6 +20,7 @@ export async function register() {
       environment: process.env.NEXT_PUBLIC_ENVIRONMENT ?? process.env.NODE_ENV,
       // Errors only by default (no tracing spend); enable later via config.
       tracesSampleRate: 0,
+      dataCollection,
       beforeSend,
       beforeBreadcrumb,
     });
