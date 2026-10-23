@@ -87,6 +87,7 @@ export function useChapterContent({
   // up to 30s, so an outage is not a request every few seconds (#855). Any save
   // that works resets it, and so does a change of chapter.
   const autoSaveFailuresRef = useRef(0);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [lastAutoSavedContent, setLastAutoSavedContent] = useState(initialContent);
   const backupKey = chapterBackupKey(bookId, chapterId);
   const droppedKey = chapterDroppedKey(bookId, chapterId);
@@ -206,6 +207,10 @@ export function useChapterContent({
     };
     if (!initialContent && bookId && chapterId) {
       loadChapterContent();
+    } else if (initialContent) {
+      // The text arrived while a load was in flight: that load is ignored now.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- ends the load this effect's cleanup just ignored
+      setIsLoading(false);
     }
     return () => {
       ignore = true;
@@ -220,7 +225,14 @@ export function useChapterContent({
     editor.commands.setContent(loaded.content, { emitUpdate: false });
     seenRef.current.set(loaded.key, { lastModified: loaded.lastModified, content: loaded.content });
     unsavedRef.current = null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the imperative editor, as below
+    // A backup of the text the server already holds (a pagehide save whose response
+    // never arrived) is not older text worth a restore prompt.
+    const backup = getValidatedItem<ChapterBackup>(backupKey, validateChapterBackup);
+    if (backup?.content === loaded.content) {
+      localStorage.removeItem(backupKey);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- re-reads storage, as below
+      noteBackupWrite();
+    }
     setLastAutoSavedContent(loaded.content);
     setIsLoading(false);
     const draft = draftWhileFailedRef.current;
@@ -243,6 +255,9 @@ export function useChapterContent({
     const flushOnPageHide = () => {
       const edit = unsavedRef.current;
       unsavedRef.current = null;
+      // A bfcache restore must not fire the pre-hide timer: its token is stale.
+      clearTimeout(autoSaveTimerRef.current);
+      setAutoSavePending(false); // so the first edit after a restore re-arms it
       if (edit) void flushChapterContentOnPageHide(edit, seenRef.current, inFlightSaveRef.current);
     };
     window.addEventListener('pagehide', flushOnPageHide);
@@ -341,7 +356,7 @@ export function useChapterContent({
     if (!autoSavePending || !editor || isSaving || loadFailed || conflict) return;
 
     const delay = Math.max(autoSaveDelayMs, Math.min(autoSaveDelayMs * 2 ** autoSaveFailuresRef.current, 30_000));
-    const timer = setTimeout(async () => {
+    const timer = autoSaveTimerRef.current = setTimeout(async () => {
       const content = editor.getHTML();
       if (content === lastAutoSavedContent) {
         // Nothing to save, but the pending flag must drop: typing only re-arms
