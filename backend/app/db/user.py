@@ -141,9 +141,10 @@ async def release_email(email: str, auth_id: str) -> int:
 
 async def update_user(
     auth_id: str, user_data: Dict, actor_id: str = None,
-    extra_filter: Optional[Dict] = None,
+    extra_filter: Optional[Dict] = None, return_document=True,
 ) -> Optional[Dict]:
-    """Update an existing user.
+    """Update an existing user. ``return_document`` is pymongo's: pass
+    ``ReturnDocument.BEFORE`` for the document the update replaced.
 
     ``extra_filter`` is merged into the query so a caller can make the write
     conditional on server-side state — the condition is then evaluated by Mongo
@@ -172,7 +173,7 @@ async def update_user(
 
     # Update the user
     updated_user = await users_collection.find_one_and_update(
-        query, {"$set": user_data}, return_document=True
+        query, {"$set": user_data}, return_document=return_document
     )
 
     # Log the change if user was found and updated

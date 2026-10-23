@@ -459,3 +459,41 @@ async def test_overlapping_cover_uploads_leave_no_orphan(
     assert _names(uploads.covers) == sorted(
         url.rsplit("/", 1)[1] for url in (book["cover_image_url"], book["cover_thumbnail_url"])
     )
+
+
+async def test_overlapping_avatar_uploads_leave_no_orphan(
+    auth_client_factory, test_user, uploads, monkeypatch
+):
+    """Both requests start from a session that still shows the old avatar; the
+    file each write replaced must go, not the session's copy twice (#1143)."""
+    import asyncio
+
+    auth_id = test_user["auth_id"]
+    old = _avatar_file(auth_id)
+    (uploads.avatars / old).write_bytes(b"old")
+    old_url = f"/uploads/profile_pictures/{old}"
+    users = await get_collection("users")
+    client = await auth_client_factory(overrides={"avatar_url": old_url})
+    both_saved = asyncio.Barrier(2)
+    real = fus.FileUploadService.process_and_save_profile_picture
+
+    async def _save_then_wait(self, *args, **kwargs):
+        url = await real(self, *args, **kwargs)
+        await asyncio.wait_for(both_saved.wait(), timeout=10)
+        return url
+
+    monkeypatch.setattr(
+        fus.FileUploadService, "process_and_save_profile_picture", _save_then_wait
+    )
+
+    responses = await asyncio.gather(*(
+        client.post(
+            "/api/v1/users/me/avatar",
+            files={"file": ("a.jpg", _jpeg(), "image/jpeg")},
+        )
+        for _ in range(2)
+    ))
+
+    assert [r.status_code for r in responses] == [200, 200], [r.text for r in responses]
+    user = await users.find_one({"auth_id": auth_id})
+    assert _names(uploads.avatars) == [user["avatar_url"].rsplit("/", 1)[1]]
