@@ -16,14 +16,7 @@ import { Label } from '@/components/ui/label';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { RefreshIcon } from '@hugeicons/core-free-icons';
 import { QuestionType, QuestionDifficulty } from '@/types/chapter-questions';
-
-const FOCUS_OPTIONS: { value: QuestionType; label: string }[] = [
-  { value: QuestionType.CHARACTER, label: 'Character' },
-  { value: QuestionType.PLOT, label: 'Plot' },
-  { value: QuestionType.SETTING, label: 'Setting' },
-  { value: QuestionType.THEME, label: 'Theme' },
-  { value: QuestionType.RESEARCH, label: 'Research' },
-];
+import { FOCUS_OPTIONS } from '@/lib/questionFocus';
 
 interface RegenerateQuestionsDialogProps {
   isOpen: boolean;
@@ -74,17 +67,23 @@ export default function RegenerateQuestionsDialog({
             <p className="text-sm font-medium mb-2">Focus areas (optional)</p>
             <div className="grid grid-cols-2 gap-2">
               {FOCUS_OPTIONS.map((opt) => (
-                <label
-                  key={opt.value}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
-                >
+                <div key={opt.type} className="flex items-start gap-2 text-sm">
                   <Checkbox
-                    checked={focus.includes(opt.value)}
-                    onCheckedChange={() => toggleFocus(opt.value)}
-                    aria-label={opt.label}
+                    id={`regen-focus-${opt.type}`}
+                    aria-describedby={`regen-focus-${opt.type}-desc`}
+                    checked={focus.includes(opt.type)}
+                    onCheckedChange={() => toggleFocus(opt.type)}
+                    className="mt-0.5"
                   />
-                  {opt.label}
-                </label>
+                  <div className="grid gap-1 leading-none">
+                    <Label htmlFor={`regen-focus-${opt.type}`} className="font-medium">
+                      {opt.label}
+                    </Label>
+                    <p id={`regen-focus-${opt.type}-desc`} className="text-xs text-muted-foreground">
+                      {opt.description}
+                    </p>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
