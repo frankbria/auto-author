@@ -6,7 +6,23 @@
  * password-reset link is `?token=…`), the server's request body and cookies,
  * and the response body that the API client puts in its error messages.
  */
-import type { Breadcrumb, ErrorEvent } from '@sentry/nextjs';
+import type { Breadcrumb, ErrorEvent, init } from '@sentry/nextjs';
+
+const PERSONAL_KEYS = { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] };
+
+// v11 collects the client IP, cookies, every header and bodies when this is
+// unset (#1111). This is the migration guide's "keep the v10 default" block.
+export const dataCollection: Parameters<typeof init>[0]['dataCollection'] = {
+  userInfo: false,
+  cookies: false,
+  httpHeaders: { request: PERSONAL_KEYS, response: PERSONAL_KEYS },
+  httpBodies: [],
+  urlQueryParams: PERSONAL_KEYS,
+  genAI: { inputs: false, outputs: false },
+  databaseQueryData: false,
+  queues: false,
+  graphQL: { document: false, variables: false },
+};
 
 const withoutQuery = (address: string) => address.split(/[?#]/)[0];
 

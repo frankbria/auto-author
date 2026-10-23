@@ -1791,6 +1791,24 @@ describe('BookClient core CRUD – success paths', () => {
     expect(err.statusCode).toBeUndefined();
   });
 
+  // #1038: a too-large save is final until the text changes; the editor needs the server's words.
+  it('saveChapterContent turns a 413 into an error carrying the server detail verbatim', async () => {
+    const detail = 'This chapter is too long to save: the limit is 500,000 bytes. Split it into two chapters.';
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(413, JSON.stringify({ detail })));
+
+    const err = await bookClient.saveChapterContent(BOOK_ID, CHAPTER_ID, 'x').catch((e) => e);
+
+    expect(err).toMatchObject({ statusCode: 413, message: detail });
+  });
+
+  it('saveChapterContent reports a 413 without a string detail as a plain failure', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(errorResponse(413, 'Too Large'));
+
+    const err = await bookClient.saveChapterContent(BOOK_ID, CHAPTER_ID, 'x').catch((e) => e);
+
+    expect(err.statusCode).toBeUndefined();
+  });
+
   // getChapterContent – success and error
   it('getChapterContent GETs and returns the chapter content', async () => {
     const data = { content: '<p>Hello</p>', chapter_id: CHAPTER_ID, book_id: BOOK_ID };
