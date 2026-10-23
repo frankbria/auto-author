@@ -67,6 +67,15 @@ describe('middleware route protection', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('location')).toBeNull();
   });
+
+  // #969: an emailed link lands here with ?error=; a sign-in redirect would drop it.
+  it('lets a signed-out visitor reach the verify-email page with its query', async () => {
+    const res = await middleware(
+      requestFor('/auth/verify-email?next=%2Fdashboard&error=TOKEN_EXPIRED')
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('location')).toBeNull();
+  });
 });
 
 describe('production bypass guard (#192)', () => {
