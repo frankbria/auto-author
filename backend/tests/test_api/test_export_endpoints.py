@@ -529,8 +529,7 @@ class TestExportAvailability:
             ]
         })
 
-        import app.services.export_service as es
-        monkeypatch.setattr(es, "PDF_AVAILABLE", False)
+        monkeypatch.setattr("app.services.export.pdf_builder.PDF_AVAILABLE", False)
 
         resp = await client.get(f"/api/v1/books/{book_id}/export/pdf")
         assert resp.status_code == 503

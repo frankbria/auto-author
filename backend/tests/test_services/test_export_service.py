@@ -457,27 +457,27 @@ class TestExportAvailabilityGuards:
     @pytest.mark.asyncio
     async def test_generate_pdf_raises_when_reportlab_unavailable(self, monkeypatch):
         import app.services.export_service as es
-        monkeypatch.setattr(es, "PDF_AVAILABLE", False)
+        monkeypatch.setattr("app.services.export.pdf_builder.PDF_AVAILABLE", False)
         with pytest.raises(es.ExportUnavailableError, match="reportlab"):
             await es.export_service.generate_pdf({"title": "x"}, [])
 
     @pytest.mark.asyncio
     async def test_generate_docx_raises_when_docx_unavailable(self, monkeypatch):
         import app.services.export_service as es
-        monkeypatch.setattr(es, "DOCX_AVAILABLE", False)
+        monkeypatch.setattr("app.services.export.docx_builder.DOCX_AVAILABLE", False)
         with pytest.raises(es.ExportUnavailableError, match="python-docx"):
             await es.export_service.generate_docx({"title": "x"}, [])
 
     @pytest.mark.asyncio
     async def test_generate_markdown_raises_when_markdownify_unavailable(self, monkeypatch):
         import app.services.export_service as es
-        monkeypatch.setattr(es, "MARKDOWNIFY_AVAILABLE", False)
+        monkeypatch.setattr("app.services.export.markdown_builder.MARKDOWNIFY_AVAILABLE", False)
         with pytest.raises(es.ExportUnavailableError, match="markdownify"):
             await es.export_service.generate_markdown({"title": "x"}, [])
 
     def test_clean_html_falls_back_without_markdownify(self, monkeypatch):
         import app.services.export_service as es
-        monkeypatch.setattr(es, "MARKDOWNIFY_AVAILABLE", False)
+        monkeypatch.setattr("app.services.export.markdown_builder.MARKDOWNIFY_AVAILABLE", False)
         svc = es.ExportService()
         out = svc._clean_html_content("<p>Hello <strong>world</strong></p>")
         assert "Hello" in out and "world" in out
@@ -787,7 +787,10 @@ class TestHtmlBecomesMarkdownWithoutHtml2text:
 
         backend = Path(es.__file__).resolve().parents[2]
         assert not hasattr(es, "html2text")
-        assert "html2text" not in Path(es.__file__).read_text()
+        # The builders live in app/services/export/ since #988.
+        sources = [Path(es.__file__), *(backend / "app/services/export").glob("*.py")]
+        assert len(sources) > 1
+        assert not any("html2text" in f.read_text() for f in sources)
         assert "html2text" not in (backend / "pyproject.toml").read_text()
         assert "html2text" not in (backend / "uv.lock").read_text()
 

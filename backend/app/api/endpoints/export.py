@@ -14,10 +14,10 @@ from app.services.export_service import (
     ExportUnavailableError,
     ExportValidationError,
     ExportTimeoutError,
-    PDF_AVAILABLE,
-    DOCX_AVAILABLE,
-    MARKDOWNIFY_AVAILABLE,
 )
+from app.services.export.docx_builder import DOCX_AVAILABLE
+from app.services.export.markdown_builder import MARKDOWNIFY_AVAILABLE
+from app.services.export.pdf_builder import PDF_AVAILABLE
 from app.services.export_templates import list_templates
 from app.services.chapter_access_service import chapter_access_service
 from app.core.config import settings
