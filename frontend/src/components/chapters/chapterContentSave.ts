@@ -27,6 +27,9 @@ export type SeenChapters = Map<string, { lastModified?: string | null; content: 
 export const isChapterConflict = (err: unknown): err is ChapterSaveConflict =>
   (err as { statusCode?: unknown } | null)?.statusCode === 409;
 
+export const isChapterTooLarge = (err: unknown) =>
+  (err as { statusCode?: unknown } | null)?.statusCode === 413;
+
 /**
  * Saves an edit on the token last seen for its chapter, and records the token
  * the save returns before resolving, so a save queued behind this one sends it.
