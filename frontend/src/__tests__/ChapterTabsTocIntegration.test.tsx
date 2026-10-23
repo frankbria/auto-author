@@ -68,6 +68,7 @@ describe('ChapterTabs TOC Integration', () => {
         active_chapter_id: 'ch1',
         open_tab_ids: ['ch1', 'ch2'],
         tab_order: ['ch1', 'ch2'],
+        closed_tab_ids: [],
         is_loading: false,        error: null,
       },
       actions: {
@@ -100,6 +101,7 @@ describe('ChapterTabs TOC Integration', () => {
         active_chapter_id: null,
         open_tab_ids: [],
         tab_order: [],
+        closed_tab_ids: [],
         is_loading: true,
         error: null,
       },      actions: {
@@ -129,6 +131,7 @@ describe('ChapterTabs TOC Integration', () => {
         active_chapter_id: null,
         open_tab_ids: [],
         tab_order: [],
+        closed_tab_ids: [],
         is_loading: false,
         error: 'Failed to load TOC data',
       },      actions: {
