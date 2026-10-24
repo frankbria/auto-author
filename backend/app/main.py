@@ -325,11 +325,9 @@ async def lifespan(app: FastAPI):
 
     # Shutdown tasks
     # Drop any export builds still queued on the dedicated pool (#345).
-    # wait=False so shutdown isn't held hostage by an in-flight build — a
-    # running thread cannot be cancelled, only waited on.
-    from app.services.export_service import export_executor
+    from app.services.export_service import shutdown_export_executor
 
-    export_executor.shutdown(wait=False, cancel_futures=True)
+    shutdown_export_executor()
     logger.info("Application shutdown")
 
 

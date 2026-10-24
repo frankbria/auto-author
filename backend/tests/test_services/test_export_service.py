@@ -893,3 +893,19 @@ class TestHtmlBecomesMarkdownWithoutHtml2text:
         on, sep, off = "\ue00c", "\ue00d", "\ue00e"  # the builders get a link mark, not Markdown (#1190)
         assert self._builders_get(html) == [("normal", f"See {on}https://example.com/a_b?x=1&y=2{sep}the page{off}.")]
         assert self._exported(html) == "See [the page](https://example.com/a_b?x=1&y=2)."
+
+
+def test_shutting_the_pool_down_leaves_a_working_one_behind():
+    """#1071: app shutdown must not leave exports unable to schedule."""
+    import app.services.export_service as es
+
+    original = es.export_executor
+    try:
+        es.shutdown_export_executor()
+        assert es.export_executor is not original
+        assert es.export_executor.submit(int, "7").result() == 7
+        with pytest.raises(RuntimeError):
+            original.submit(int, "7")
+    finally:
+        es.export_executor.shutdown()
+        es.export_executor = original
