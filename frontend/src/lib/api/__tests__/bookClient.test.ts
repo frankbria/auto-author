@@ -633,7 +633,7 @@ describe('BookClient.regenerateSingleQuestion', () => {
 
   it('attaches the status code and a clean detail message on failure', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(
-      errorResponse(429, 'ignored', { detail: { error: 'REGENERATION_LIMIT_REACHED', message: 'cap reached' } })
+      errorResponse(429, 'ignored', { detail: { error_code: 'REGENERATION_LIMIT_REACHED', message: 'cap reached' } })
     );
 
     const err = await bookClient

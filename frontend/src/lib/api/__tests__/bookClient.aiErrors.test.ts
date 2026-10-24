@@ -26,6 +26,7 @@ const METHODS: Array<[string, () => Promise<unknown>]> = [
   ['enhanceVoiceTranscription', () => bookClient.enhanceVoiceTranscription('b1', 'c1', { content: 'x' })],
   ['generateChapterQuestions', () => bookClient.generateChapterQuestions('b1', 'c1', { count: 3 })],
   ['regenerateChapterQuestions', () => bookClient.regenerateChapterQuestions('b1', 'c1', {})],
+  ['regenerateSingleQuestion', () => bookClient.regenerateSingleQuestion('b1', 'c1', 'q1')],
 ];
 
 const QUOTA =
@@ -115,5 +116,18 @@ describe.each(METHODS)('%s', (_name, call) => {
     expect(error.statusCode).toBe(502);
     expect(error.message).toMatch(/^Failed to .+\. Please try again\.$/);
     expect(error.message).not.toMatch(/[<{]|502|Bad Gateway/);
+  });
+});
+
+describe('regenerateSingleQuestion: the per-question cap (#1093)', () => {
+  it('carries the cap as errorCode, so it is told apart from a rate limit', async () => {
+    const error = await thrownBy(() => bookClient.regenerateSingleQuestion('b1', 'c1', 'q1'), {
+      status: 429,
+      body: { detail: { error_code: 'REGENERATION_LIMIT_REACHED', message: 'cap reached', request_id: 'r1' } },
+    });
+
+    expect(error.statusCode).toBe(429);
+    expect(error.errorCode).toBe('REGENERATION_LIMIT_REACHED');
+    expect(error.message).toBe('cap reached');
   });
 });

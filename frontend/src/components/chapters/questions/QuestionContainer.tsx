@@ -255,15 +255,17 @@ export default function QuestionContainer({
       });
     } catch (error) {
       console.error('Failed to regenerate question:', error);
-      // Surface the per-question regeneration cap distinctly from generic failures.
-      const isLimit = (error as { statusCode?: number })?.statusCode === 429;
-      toast({
-        title: isLimit ? 'Regeneration limit reached' : 'Error',
-        description: isLimit
-          ? 'This question has been regenerated the maximum number of times.'
-          : 'Failed to regenerate question. Please try again.',
-        variant: 'destructive',
-      });
+      // The per-question cap is its own message; every other refusal (plan,
+      // allowance, rate limit, outage) goes through the shared handler (#1093).
+      if ((error as { errorCode?: string })?.errorCode === 'REGENERATION_LIMIT_REACHED') {
+        toast({
+          title: 'Regeneration limit reached',
+          description: 'This question has been regenerated the maximum number of times.',
+          variant: 'destructive',
+        });
+      } else {
+        await handleAIServiceError(error, () => handleRegenerateQuestion(questionId));
+      }
     } finally {
       setIsGenerating(false);
     }

@@ -230,7 +230,7 @@ async def test_regenerate_single_question_at_limit_returns_429(auth_client_facto
         json={},
     )
     assert resp.status_code == 429
-    assert resp.json()["detail"]["error"] == "REGENERATION_LIMIT_REACHED"
+    assert resp.json()["detail"]["error_code"] == "REGENERATION_LIMIT_REACHED"
 
 
 @pytest.mark.asyncio
