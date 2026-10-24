@@ -17,6 +17,8 @@ import { BookStatsPanel } from '@/components/books/BookStatsPanel';
 import { NoChaptersPlaceholder } from '@/components/books/NoChaptersPlaceholder';
 import { uploadUrl } from '@/lib/api/imageUpload';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { ChapterTabMetadata } from '@/types/chapter-tabs';
+import { liveStats } from '@/components/books/liveStats';
 import { ChapterTabs } from '@/components/chapters/ChapterTabs';
 import { ChapterBreadcrumb } from '@/components/navigation/ChapterBreadcrumb';
 import { ExportOptionsModal } from '@/components/export/ExportOptionsModal';
@@ -59,6 +61,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
 
   const [book, setBook] = useState<BookDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The tabs' own chapter list; Book Stats follow it once it reports (#1092).
+  const [liveChapters, setLiveChapters] = useState<ChapterTabMetadata[] | null>(null);
   const [editMode, setEditMode] = useState(false);
 
   // Unwrap params using React.use (Next.js 15+)
@@ -355,6 +359,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       </div>
     );
   }
+
+  const { chapters: statsChapters, progress: statsProgress } = liveStats(liveChapters, book);
   return (
     <div className="container mx-auto flex-1 p-6">
       {/* Breadcrumb Navigation */}
@@ -459,13 +465,14 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
               bookId={book.id}
               className="h-full"
               initialActiveChapter={initialChapter || undefined}
+              onChaptersChange={setLiveChapters}
             />
           ) : (
             /* No chapters placeholder */
             <NoChaptersPlaceholder hasSummary={!!book.summary && book.summary.length >= 30} />
           )}
         </div>
-        <BookStatsPanel progress={book.progress} chapters={book.chapters} onExport={handleExportClick} />
+        <BookStatsPanel progress={statsProgress} chapters={statsChapters} onExport={handleExportClick} />
       </div>
 
       {/* Export Modals */}
