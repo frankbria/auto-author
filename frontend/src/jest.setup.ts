@@ -271,9 +271,19 @@ jest.mock('@tiptap/react', () => {
   const createMockEditor = (config: any) => {
     let content = config?.content || '';
     const updateHandler = config?.onUpdate;
+    // EditorContent reads the text through this, so the textbox follows every change (#1045).
+    const listeners = new Set<() => void>();
+    const changeContent = (next: string) => {
+      content = next;
+      listeners.forEach((l) => l());
+    };
 
     const mockEditor = {
       // Core properties
+      subscribeToContent: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
       isDestroyed: false,
       isFocused: false,
       isEditable: true,
@@ -322,7 +332,7 @@ jest.mock('@tiptap/react', () => {
           setHorizontalRule: jest.fn(() => ({ run: jest.fn(() => true) })),
           insertContent: jest.fn((newContent: string) => ({
             run: jest.fn(() => {
-              content += newContent;
+              changeContent(content + newContent);
               if (updateHandler) {
                 updateHandler({ editor: mockEditor });
               }
@@ -331,7 +341,7 @@ jest.mock('@tiptap/react', () => {
           })),
           setContent: jest.fn((newContent: string, options?: { emitUpdate?: boolean }) => ({
             run: jest.fn(() => {
-              content = newContent;
+              changeContent(newContent);
               // As the real command: an update is emitted unless asked not to (#831).
               if (updateHandler && options?.emitUpdate !== false) {
                 updateHandler({ editor: mockEditor });
@@ -348,14 +358,14 @@ jest.mock('@tiptap/react', () => {
       // Direct command access
       commands: {
         setContent: jest.fn((newContent: string, options?: { emitUpdate?: boolean }) => {
-          content = newContent;
+          changeContent(newContent);
           if (updateHandler && options?.emitUpdate !== false) {
             updateHandler({ editor: mockEditor });
           }
           return true;
         }),
         insertContent: jest.fn((newContent: string) => {
-          content += newContent;
+          changeContent(content + newContent);
           if (updateHandler) {
             updateHandler({ editor: mockEditor });
           }
@@ -364,7 +374,7 @@ jest.mock('@tiptap/react', () => {
         focus: jest.fn(() => true),
         blur: jest.fn(() => true),
         clearContent: jest.fn(() => {
-          content = '';
+          changeContent('');
           if (updateHandler) {
             updateHandler({ editor: mockEditor });
           }
@@ -444,22 +454,16 @@ jest.mock('@tiptap/react', () => {
   // Mock EditorContent component - render a simple textarea with role="textbox"
   // CRITICAL: This component must trigger onUpdate when user types
   const EditorContent = React.forwardRef(({ editor, className, ...props }: any, ref: any) => {
-    const [value, setValue] = React.useState(editor?.getHTML() || '');
-
-    React.useEffect(() => {
-      if (editor) {
-        setValue(editor.getHTML());
-      }
-    }, [editor]);
+    // The textbox shows the editor's own content, whoever changed it.
+    const value: string = React.useSyncExternalStore(
+      (listener: () => void) => editor?.subscribeToContent?.(listener) ?? (() => {}),
+      () => editor?.getHTML() ?? '',
+      () => '',
+    );
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const newValue = e.target.value;
-      setValue(newValue);
-
-      // CRITICAL FIX: Call setContent which triggers onUpdate callback
-      if (editor?.commands?.setContent) {
-        editor.commands.setContent(newValue);
-      }
+      // Setting the content emits onUpdate, as typing does.
+      editor?.commands?.setContent?.(e.target.value);
     };
 
     return React.createElement('div', {
