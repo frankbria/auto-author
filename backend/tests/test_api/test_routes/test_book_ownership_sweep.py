@@ -9,14 +9,35 @@ fails ``test_every_book_route_is_in_the_sweep`` until it is given a request here
 
 Both users sign in with real session cookies (#838): nothing stands in for the
 sign-in check, so the user a route sees is the one production would give it.
+
+A book id outside the path (#1060). Walking ``app.routes`` and every route's
+query, header, cookie and body parameters, down through the fields of each body
+model, finds no route that takes a book id anywhere but its path, so there is no
+second kind of request to sweep. ``test_no_route_takes_a_book_id_outside_its_path``
+holds that: a route that starts taking one fails it until it has a non-owner test.
+The walk cannot see into a body typed as a bare ``dict``; the handlers that take
+one were read instead, and none reads a book id from it:
+
+- ``PUT``/``PATCH /books/{book_id}/summary`` read ``summary``; ``PUT .../toc``
+  reads ``toc``; ``POST .../generate-questions`` reads ``num_questions``.
+- ``POST .../questions/responses/batch`` reads a ``question_id`` per item, and
+  saves only ids of questions the caller owns in the book and chapter in the path.
+- ``POST /webhooks/stripe`` reads a signed Stripe event, which names no book.
+
+The routes that reach books without being told a book id, and why they need no
+non-owner test here: ``GET /books/`` and ``GET /users/me/export`` select by the
+caller's own ``auth_id``; ``DELETE /users/me`` deletes the caller's books, and
+``DELETE /users/{auth_id}`` is an admin's, both by ``owner_id``.
 """
 
 import io
+import typing
 from datetime import datetime, timezone
 
 import pytest
 from bson import ObjectId
 from PIL import Image
+from pydantic import BaseModel
 
 from app.core.security import get_current_user_from_session
 from app.db.base import get_collection
@@ -24,7 +45,7 @@ from app.db.questions import create_question
 from app.main import app
 from app.schemas.book import QuestionCreate, QuestionDifficulty, QuestionMetadata, QuestionType
 from app.services.ai_service import ai_service
-from tests.route_introspection import route_dependency_calls
+from tests.route_introspection import route_dependency_calls, walk_effective_routes
 from tests.session_cookies import mint_session, real_session_client
 from tests.test_services.openai_autospec import autospec_openai_client
 
@@ -40,68 +61,110 @@ def _a_cover() -> bytes:
     return picture.getvalue()
 
 
-# One request for every route under a book: (method, path after the book) -> what to send.
+# The requests for every route under a book: (method, path after the book) -> what to send.
 # Each is a request that is in order apart from who sends it, so that a refusal is for whose
-# book it is and not for what was asked.
-REQUESTS: dict[tuple[str, str], dict] = {
-    ("GET", ""): {},
-    ("PUT", ""): {"json": {"title": "Mine Now"}},
-    ("PATCH", ""): {"json": {"title": "Mine Now"}},
-    ("DELETE", ""): {},
-    ("POST", "/analyze-summary"): {"json": {}},
-    ("GET", "/summary"): {},
-    ("PUT", "/summary"): {"json": {"summary": "A summary of somebody else's book, long enough to be one."}},
-    # With no summary in it, this route answers with the one the book has. Its write is tied to the
-    # owner in the database as well; this reading path has only the route's own check, so it is the one swept.
-    ("PATCH", "/summary"): {"json": {}},
-    ("POST", "/generate-questions"): {"json": {}},
-    ("GET", "/question-responses"): {},
-    ("PUT", "/question-responses"): {"json": {"responses": [{"question": "Who is it for?", "answer": "Managers."}]}},
-    ("GET", "/toc-readiness"): {},
-    ("POST", "/generate-toc"): {"json": {}},
-    ("GET", "/toc"): {},
-    ("PUT", "/toc"): {"json": {"toc": {"chapters": [], "total_chapters": 0, "estimated_pages": 0, "structure_notes": ""}}},
-    ("POST", "/cover-image"): {"files": {"file": ("cover.png", _a_cover(), "image/png")}},
-    ("GET", "/export/formats"): {},
-    ("GET", "/export/templates"): {},
-    ("GET", "/export/pdf"): {},
-    ("GET", "/export/docx"): {},
-    ("GET", "/export/epub"): {},
-    ("GET", "/export/markdown"): {},
-    ("POST", "/chapters"): {"json": {"title": "A chapter of my own", "order": 2}},
-    ("GET", "/chapters/metadata"): {},
-    ("GET", "/chapters/tab-state"): {},
-    ("POST", "/chapters/tab-state"): {
+# book it is and not for what was asked. A route whose handler takes a different path on what it
+# is sent has one request per path (#1060), named by "branch"; a check that sits on one branch only
+# is then caught on the other. The branches read from the handlers, and why the rest have one request:
+#   PATCH /summary       a summary writes it, none reads the stored one back      -> both swept
+#   POST /generate-toc   answers in the body, or the ones saved on the book        -> both swept
+#   POST /chapters       a chapter, or a subchapter under a parent in the TOC      -> both swept
+#   POST .../regenerate-questions  preserve_responses keeps or deletes answered   -> both swept
+#   PATCH .../content    with expected_last_modified, a conditional save           -> both swept
+#   GET .../content, POST /chapters/batch-content  include_metadata               -> both swept
+#   GET /chapters/metadata  include_content_stats                                 -> both swept
+#   GET /export/markdown  one file, or a zip with multi_file                      -> both swept
+# Every other option (export template_id/custom_options, question list filters, page/limit,
+# auto_update_metadata, num_questions) only shapes the answer after the one ownership check, and
+# nothing in those handlers runs on a different code path before or around it.
+REQUESTS: dict[tuple[str, str], list[dict]] = {
+    ("GET", ""): [{}],
+    ("PUT", ""): [{"json": {"title": "Mine Now"}}],
+    ("PATCH", ""): [{"json": {"title": "Mine Now"}}],
+    ("DELETE", ""): [{}],
+    ("POST", "/analyze-summary"): [{"json": {}}],
+    ("GET", "/summary"): [{}],
+    ("PUT", "/summary"): [{"json": {"summary": "A summary of somebody else's book, long enough to be one."}}],
+    # The write is tied to the owner in the database as well; the read has only the route's own check.
+    ("PATCH", "/summary"): [
+        {"branch": "read", "json": {}},
+        {"branch": "write", "json": {"summary": "A summary of somebody else's book, long enough to be one."}},
+    ],
+    ("POST", "/generate-questions"): [{"json": {}}],
+    ("GET", "/question-responses"): [{}],
+    ("PUT", "/question-responses"): [{"json": {"responses": [{"question": "Who is it for?", "answer": "Managers."}]}}],
+    ("GET", "/toc-readiness"): [{}],
+    ("POST", "/generate-toc"): [
+        {"branch": "saved answers", "json": {}},
+        {"branch": "sent answers", "json": {"question_responses": [{"question": "Who is it for?", "answer": "Managers."}]}},
+    ],
+    ("GET", "/toc"): [{}],
+    ("PUT", "/toc"): [{"json": {"toc": {"chapters": [], "total_chapters": 0, "estimated_pages": 0, "structure_notes": ""}}}],
+    ("POST", "/cover-image"): [{"files": {"file": ("cover.png", _a_cover(), "image/png")}}],
+    ("GET", "/export/formats"): [{}],
+    ("GET", "/export/templates"): [{}],
+    ("GET", "/export/pdf"): [{}],
+    ("GET", "/export/docx"): [{}],
+    ("GET", "/export/epub"): [{}],
+    ("GET", "/export/markdown"): [{"branch": "one file"}, {"branch": "zip", "params": {"multi_file": "true"}}],
+    ("POST", "/chapters"): [
+        {"branch": "chapter", "json": {"title": "A chapter of my own", "order": 2}},
+        {"branch": "subchapter", "json": {"title": "A part of my own", "order": 1, "level": 2, "parent_id": CHAPTER_ID}},
+    ],
+    ("GET", "/chapters/metadata"): [{"branch": "titles"}, {"branch": "stats", "params": {"include_content_stats": "true"}}],
+    ("GET", "/chapters/tab-state"): [{}],
+    ("POST", "/chapters/tab-state"): [{
         "json": {"active_chapter_id": CHAPTER_ID, "open_tab_ids": [CHAPTER_ID], "tab_order": [CHAPTER_ID]}
-    },
-    ("POST", "/chapters/batch-content"): {"json": {"chapter_ids": [CHAPTER_ID]}},
-    ("PATCH", "/chapters/bulk-status"): {"json": {"chapter_ids": [CHAPTER_ID], "status": "completed"}},
-    ("PUT", CHAPTER): {"json": {"title": "Mine Now"}},
-    ("DELETE", CHAPTER): {},
-    ("GET", CHAPTER + "/content"): {},
-    ("PATCH", CHAPTER + "/content"): {"json": {"content": "<p>Mine now.</p>"}},
-    ("POST", CHAPTER + "/enhance-text"): {"json": {"content": "<p>A sentence to improve, and another after it.</p>", "enhancement_type": "grammar"}},
-    ("POST", CHAPTER + "/enhance-transcription"): {"json": {"content": "um so a sentence to tidy up, you know"}},
-    ("POST", CHAPTER + "/generate-draft"): {
+    }],
+    ("POST", "/chapters/batch-content"): [
+        {"branch": "metadata", "json": {"chapter_ids": [CHAPTER_ID]}},
+        {"branch": "content only", "json": {"chapter_ids": [CHAPTER_ID], "include_metadata": False}},
+    ],
+    ("PATCH", "/chapters/bulk-status"): [{"json": {"chapter_ids": [CHAPTER_ID], "status": "completed"}}],
+    ("PUT", CHAPTER): [{"json": {"title": "Mine Now"}}],
+    ("DELETE", CHAPTER): [{}],
+    ("GET", CHAPTER + "/content"): [{"branch": "metadata"}, {"branch": "content only", "params": {"include_metadata": "false"}}],
+    ("PATCH", CHAPTER + "/content"): [
+        {"branch": "save", "json": {"content": "<p>Mine now.</p>"}},
+        # The chapter has never been saved, so null is its token, and the owner's save goes through.
+        {"branch": "conditional save", "json": {"content": "<p>Mine now.</p>", "expected_last_modified": None}},
+    ],
+    ("POST", CHAPTER + "/enhance-text"): [{"json": {"content": "<p>A sentence to improve, and another after it.</p>", "enhancement_type": "grammar"}}],
+    ("POST", CHAPTER + "/enhance-transcription"): [{"json": {"content": "um so a sentence to tidy up, you know"}}],
+    ("POST", CHAPTER + "/generate-draft"): [{
         "json": {"question_responses": [{"question": "Who is it for?", "answer": "Managers."}]}
-    },
-    ("POST", CHAPTER + "/transform-style"): {"json": {"content": "<p>A sentence to restyle, and another after it.</p>", "target_style": "professional"}},
-    ("POST", CHAPTER + "/generate-questions"): {"json": {"count": 3}},
-    ("POST", CHAPTER + "/regenerate-questions"): {"json": {"count": 3}},
-    ("GET", CHAPTER + "/questions"): {},
-    ("GET", CHAPTER + "/question-progress"): {},
-    ("GET", CHAPTER + "/question-answers"): {},
-    ("POST", CHAPTER + "/questions/responses/batch"): {
+    }],
+    ("POST", CHAPTER + "/transform-style"): [{"json": {"content": "<p>A sentence to restyle, and another after it.</p>", "target_style": "professional"}}],
+    ("POST", CHAPTER + "/generate-questions"): [{"json": {"count": 3}}],
+    ("POST", CHAPTER + "/regenerate-questions"): [
+        {"branch": "keep answered", "json": {"count": 3}},
+        {"branch": "replace all", "json": {"count": 3}, "params": {"preserve_responses": "false"}},
+    ],
+    ("GET", CHAPTER + "/questions"): [{}],
+    ("GET", CHAPTER + "/question-progress"): [{}],
+    ("GET", CHAPTER + "/question-answers"): [{}],
+    ("POST", CHAPTER + "/questions/responses/batch"): [{
         "json": [{"question_id": "{question_id}", "response_text": "Mine now.", "status": "draft"}]
-    },
-    ("GET", QUESTION + "/response"): {},
-    ("PUT", QUESTION + "/response"): {"json": {"response_text": "Mine now.", "status": "draft"}},
-    ("POST", QUESTION + "/rating"): {"json": {"question_id": "{question_id}", "user_id": "someone", "rating": 1}},
-    ("POST", QUESTION + "/regenerate"): {"json": {}},
+    }],
+    ("GET", QUESTION + "/response"): [{}],
+    ("PUT", QUESTION + "/response"): [{"json": {"response_text": "Mine now.", "status": "draft"}}],
+    ("POST", QUESTION + "/rating"): [{"json": {"question_id": "{question_id}", "user_id": "someone", "rating": 1}}],
+    ("POST", QUESTION + "/regenerate"): [{"json": {}}],
 }
 
 # The collections a book's content lives in. A refused request leaves every one of them as it was.
 CONTENT = ("books", "questions", "question_responses", "question_ratings")
+
+
+# One test case per request: (method, path, the request).
+SWEEP = [
+    pytest.param(
+        method, path, {key: part for key, part in request.items() if key != "branch"},
+        id=" ".join(filter(None, [method, path or "/", request.get("branch")])),
+    )
+    for (method, path), requests in sorted(REQUESTS.items())
+    for request in requests
+]
 
 
 def _live_book_routes() -> set[tuple[str, str]]:
@@ -118,11 +181,54 @@ def test_every_book_route_is_in_the_sweep():
     assert live, "found no route with a book id in its path: the route table is not being read"
     assert sorted(live - set(REQUESTS)) == [], "a route under a book has no request in REQUESTS, so nothing checks who may use it"
     assert sorted(set(REQUESTS) - live) == [], "REQUESTS names a route the application no longer has"
+    assert all(REQUESTS.values()), "a route in REQUESTS has no request in its list"
+    for route, requests in REQUESTS.items():
+        branches = [request.get("branch") for request in requests]
+        assert len(requests) == 1 or (None not in branches and len(set(branches)) == len(branches)), (
+            f"{route}: a route with more than one request names each by a different branch"
+        )
 
 
 def test_every_route_with_a_book_id_is_under_the_books_prefix():
     # The sweep builds its paths from the prefix. A book id anywhere else would be swept wrongly.
     assert [path for _, path in route_dependency_calls() if "{book_id}" in path and not path.startswith(BOOK_ROUTE)] == []
+
+
+def _names_in(annotation, seen: set) -> list[str]:
+    """Every field name in a body's type, through nested models, lists and optionals."""
+    names = [name for part in typing.get_args(annotation) for name in _names_in(part, seen)]
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel) and annotation not in seen:
+        seen.add(annotation)
+        for name, field in annotation.model_fields.items():
+            names += [name, *_names_in(field.annotation, seen)]
+    return names
+
+
+def _inputs_outside_the_path(dependant) -> list[str]:
+    """The names a route reads from its query string, headers, cookies and body, its dependencies' too."""
+    names = [p.name for p in (*dependant.query_params, *dependant.header_params, *dependant.cookie_params)]
+    for body in dependant.body_params:
+        # A lone body is the whole request body and its parameter name is not on the wire; else it is a key.
+        named = len(dependant.body_params) > 1 or getattr(body.field_info, "embed", False)
+        names += ([body.name] if named else []) + _names_in(body.field_info.annotation, set())
+    return names + [name for sub in dependant.dependencies for name in _inputs_outside_the_path(sub)]
+
+
+def test_no_route_takes_a_book_id_outside_its_path():
+    inputs = {
+        (method, ctx.path_format): _inputs_outside_the_path(ctx.dependant)
+        for route in app.routes
+        for ctx in walk_effective_routes(route)
+        if ctx.dependant
+        for method in ctx.methods - {"HEAD"}
+    }
+
+    seen = {name for names in inputs.values() for name in names}
+    assert {"chapter_ids", "target_audience", "include_empty_chapters"} <= seen, "the walk is not reading bodies or query strings"
+    assert {route: [n for n in names if "book" in n.lower()] for route, names in inputs.items() if any("book" in n.lower() for n in names)} == {}, (
+        "a route takes a book id outside its path: give it a test that another user's book id is refused, "
+        "and add it to the list in this module's docstring"
+    )
 
 
 async def _signed_in(email: str):
@@ -201,8 +307,8 @@ def the_model(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("method,path", sorted(REQUESTS), ids=lambda part: part or "/")
-async def test_someone_who_does_not_own_the_book_is_refused(reinit_db, the_model, method, path):
+@pytest.mark.parametrize("method,path,request_", SWEEP)
+async def test_someone_who_does_not_own_the_book_is_refused(reinit_db, the_model, method, path, request_):
     assert get_current_user_from_session not in app.dependency_overrides
     ada = await _signed_in("ada@example.com")
     grace = await _signed_in("grace@example.com")
@@ -210,7 +316,7 @@ async def test_someone_who_does_not_own_the_book_is_refused(reinit_db, the_model
         ids = await _adas_book(ada)
         before = await _content()
 
-        answer = await grace.request(method, (BOOK_ROUTE + path).format(**ids), **_filled(REQUESTS[(method, path)], ids))
+        answer = await grace.request(method, (BOOK_ROUTE + path).format(**ids), **_filled(request_, ids))
 
         assert answer.status_code in (403, 404), f"{answer.status_code}: {answer.text[:300]}"
         assert await _content() == before, "a refused request changed the book"
@@ -221,8 +327,8 @@ async def test_someone_who_does_not_own_the_book_is_refused(reinit_db, the_model
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("method,path", sorted(REQUESTS), ids=lambda part: part or "/")
-async def test_the_owner_is_not_refused_the_same_request(reinit_db, the_model, method, path):
+@pytest.mark.parametrize("method,path,request_", SWEEP)
+async def test_the_owner_is_not_refused_the_same_request(reinit_db, the_model, method, path, request_):
     """The other half. A request that the owner is refused too proves nothing about the stranger:
     she may have been turned away for a missing chapter or an empty answer, by a route that never
     looked at whose book it was."""
@@ -230,7 +336,7 @@ async def test_the_owner_is_not_refused_the_same_request(reinit_db, the_model, m
     try:
         ids = await _adas_book(ada)
 
-        answer = await ada.request(method, (BOOK_ROUTE + path).format(**ids), **_filled(REQUESTS[(method, path)], ids))
+        answer = await ada.request(method, (BOOK_ROUTE + path).format(**ids), **_filled(request_, ids))
 
         # Through means answered, or passed on to the model: what the stand-in model says back is
         # not usable by every route, and that is not a refusal. A refusal is one whenever it comes.
