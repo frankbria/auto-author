@@ -44,21 +44,8 @@ async function opened() {
   return view;
 }
 
-/** The editor's test double does not redraw restored text, so it is read from the save that follows. */
-async function expectTheBackupToBeWhatIsSaved() {
-  await act(async () => {
-    jest.advanceTimersByTime(3000);
-    await Promise.resolve();
-  });
-  await waitFor(() =>
-    expect(mockBookClient.saveChapterContent).toHaveBeenCalledWith(
-      'book-1',
-      'chapter-1',
-      '<p>The backup</p>',
-      expect.anything(),
-      expect.anything(),
-    ),
-  );
+function expectTheBackupToBeShown() {
+  expect(screen.getByRole('textbox')).toHaveValue('<p>The backup</p>');
 }
 
 /** Whether the browser would ask before leaving the page. */
@@ -147,7 +134,7 @@ describe('restoring a backup', () => {
 
     await user.click(screen.getByRole('button', { name: /restore the older backup/i }));
 
-    await expectTheBackupToBeWhatIsSaved();
+    expectTheBackupToBeShown();
     expect(localStorage.getItem(BACKUP_KEY)).toBeNull();
     expect(screen.queryByText(/older than the saved chapter/i)).not.toBeInTheDocument();
   });
@@ -210,7 +197,7 @@ describe('restoring a backup', () => {
 
     await user.click(screen.getByRole('button', { name: /restore backup/i }));
 
-    await expectTheBackupToBeWhatIsSaved();
+    expectTheBackupToBeShown();
     expect(screen.queryByText(/older than the saved chapter/i)).not.toBeInTheDocument();
   });
 
@@ -222,7 +209,7 @@ describe('restoring a backup', () => {
 
     await user.click(screen.getByRole('button', { name: /restore backup/i }));
 
-    await expectTheBackupToBeWhatIsSaved();
+    expectTheBackupToBeShown();
   });
 });
 
