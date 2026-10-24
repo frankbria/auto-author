@@ -95,7 +95,7 @@ jobs:
     # API_TIMEOUT_MS below the step timeout, so a hung request like those four
     # surfaces as an error instead of a silent kill. Same permissions and
     # secret as 77dfa9c; the new inputs are optional.
-    uses: frankbria/glm-review/.github/workflows/review.yml@694b8104c462f47ace9112dfd46ee4c5954c75d6 # main @ 2026-10-24
+    uses: frankbria/glm-review/.github/workflows/review.yml@694b8104c462f47ace9112dfd46ee4c5954c75d6 # 2026-10-24 (main; no tags upstream)
     with:
       base_url: https://api.kimi.com/coding/
       model: k3[1m]
