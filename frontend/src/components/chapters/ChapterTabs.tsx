@@ -13,6 +13,7 @@ import { TabBar } from './TabBar';
 import { TabContent } from './TabContent';
 import TabContextMenu from './TabContextMenu';
 import { MobileChapterTabs } from './MobileChapterTabs';
+import type { ChapterTabMetadata } from '@/types/chapter-tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChapterTabsProps {
@@ -20,9 +21,11 @@ interface ChapterTabsProps {
   initialActiveChapter?: string;
   className?: string;
   orientation?: 'horizontal' | 'vertical';
+  /** Called with the tabs' chapter list whenever it changes (#1092). */
+  onChaptersChange?: (chapters: ChapterTabMetadata[]) => void;
 }
 
-export function ChapterTabs({ bookId, initialActiveChapter, className, orientation = 'vertical' }: ChapterTabsProps) {
+export function ChapterTabs({ bookId, initialActiveChapter, className, orientation = 'vertical', onChaptersChange }: ChapterTabsProps) {
   // Check if we're on a mobile device - must be called at the top level
   const isMobile = useMediaQuery('(max-width: 768px)');
 
@@ -39,6 +42,11 @@ export function ChapterTabs({ bookId, initialActiveChapter, className, orientati
     loading,
     error
   } = useChapterTabs(bookId, initialActiveChapter);
+
+  // The page's Book Stats read the same list; skip the initial empty state.
+  useEffect(() => {
+    if (!loading) onChaptersChange?.(state.chapters);
+  }, [state.chapters, loading, onChaptersChange]);
 
   // Delete chapter handler
   const handleDeleteChapter = useCallback(async (chapterId: string) => {

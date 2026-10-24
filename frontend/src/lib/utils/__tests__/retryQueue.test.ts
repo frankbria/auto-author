@@ -237,3 +237,77 @@ describe('RetryQueue', () => {
     });
   });
 });
+
+describe('RetryQueue timer retry (#1067)', () => {
+  const authError = Object.assign(new Error('nope'), { response: { status: 401 } });
+  let q: RetryQueue;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    q = new RetryQueue();
+  });
+  afterEach(() => {
+    q.clear();
+    jest.useRealTimers();
+  });
+
+  it('drains a group whose head failed once, with no online event, in order', async () => {
+    const order: string[] = [];
+    let fail = true;
+    const head = jest.fn(async () => {
+      if (fail) {
+        fail = false;
+        throw authError;
+      }
+      order.push('a');
+    });
+    q.add('a', head, { group: 'g' });
+    q.add('b', async () => void order.push('b'), { group: 'g' });
+    await q.processQueue();
+    expect(q.size()).toBe(2);
+    expect(order).toEqual([]);
+
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(order).toEqual(['a', 'b']);
+    expect(q.size()).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('backs off exponentially up to a cap', async () => {
+    const op = jest.fn().mockRejectedValue(authError);
+    q.add('a', op, { maxRetries: 100 });
+    await q.processQueue();
+    const calls = () => op.mock.calls.length;
+    expect(calls()).toBe(1);
+    await jest.advanceTimersByTimeAsync(999);
+    expect(calls()).toBe(1);
+    await jest.advanceTimersByTimeAsync(1); // 1s
+    expect(calls()).toBe(2);
+    await jest.advanceTimersByTimeAsync(2000);
+    expect(calls()).toBe(3);
+    await jest.advanceTimersByTimeAsync(4000);
+    expect(calls()).toBe(4);
+    await jest.advanceTimersByTimeAsync(8000 + 16000);
+    expect(calls()).toBe(6);
+    await jest.advanceTimersByTimeAsync(30000); // capped
+    expect(calls()).toBe(7);
+    await jest.advanceTimersByTimeAsync(30000);
+    expect(calls()).toBe(8);
+  });
+
+  it('sets no timer while offline', async () => {
+    const spy = jest.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    q.add('a', jest.fn().mockRejectedValue(authError));
+    await q.processQueue();
+    expect(jest.getTimerCount()).toBe(0);
+    spy.mockRestore();
+  });
+
+  it('clear() cancels the timer', async () => {
+    q.add('a', jest.fn().mockRejectedValue(authError));
+    await q.processQueue();
+    expect(jest.getTimerCount()).toBe(1);
+    q.clear();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});

@@ -6,7 +6,7 @@
  * performance, and optimization scenarios.
  */
 
-import React from 'react';
+import React, { Profiler } from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
@@ -33,31 +33,14 @@ jest.mock('@/lib/api/bookClient', () => ({
   }
 }));
 
-// Performance monitoring utilities
-const performanceMonitor = {
-  startTime: 0,
-  endTime: 0,
-  memoryBefore: 0,
-  memoryAfter: 0,
-
-  start() {
-    this.startTime = performance.now();
-    if (performance.memory) {
-      this.memoryBefore = performance.memory.usedJSHeapSize;
-    }
-  },
-
-  end() {
-    this.endTime = performance.now();
-    if (performance.memory) {
-      this.memoryAfter = performance.memory.usedJSHeapSize;
-    }
-    return {
-      duration: this.endTime - this.startTime,
-      memoryUsed: this.memoryAfter - this.memoryBefore
-    };
-  }
-};
+// Wall-clock budgets flake on busy CI (#1078). These tests instead count what the
+// component controls: React commits (a render loop shows up as extra commits) and
+// API calls (a refetch per navigation shows up as extra calls).
+let commits = 0;
+const onRender = () => { commits += 1; };
+const Counted: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Profiler id="perf" onRender={onRender}>{children}</Profiler>
+);
 
 // Generate large datasets for performance testing
 const generateLargeQuestionSet = (count: number) => {
@@ -97,6 +80,7 @@ const generateLargeResponseSet = (count: number) => {
 describe('Chapter Questions Performance Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    commits = 0;
   });
 
   afterEach(() => {
@@ -105,9 +89,7 @@ describe('Chapter Questions Performance Tests', () => {
 
   // No QueryClientProvider — see #347: the dependency had zero runtime usage and
   // nothing under test calls a react-query hook.
-  const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <>{children}</>
-  );
+  const TestWrapper = Counted;
 
   describe('Large Question Set Performance', () => {
     test('renders 100 questions within acceptable time limits', async () => {
@@ -121,8 +103,6 @@ describe('Chapter Questions Performance Tests', () => {
         answered_questions: 50,
         completion_percentage: 50
       });
-
-      performanceMonitor.start();
 
       await act(async () => {
         render(
@@ -140,11 +120,10 @@ describe('Chapter Questions Performance Tests', () => {
         expect(screen.getByText(/Performance test question 1/)).toBeInTheDocument();
       });
 
-      const performance = performanceMonitor.end();
-
-      // Should render within 2 seconds
-      expect(performance.duration).toBeLessThan(2000);
-      console.log(`Rendered 100 questions in ${performance.duration}ms`);
+      // One question fetch and one progress fetch, however many questions arrive
+      expect(bookClient.getChapterQuestions).toHaveBeenCalledTimes(1);
+      expect(bookClient.getChapterQuestionProgress).toHaveBeenCalledTimes(1);
+      expect(commits).toBeLessThanOrEqual(3);
     });
 
     test('handles 500 questions with virtualization', async () => {
@@ -153,8 +132,6 @@ describe('Chapter Questions Performance Tests', () => {
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
         questions: veryLargeQuestionSet
       });
-
-      performanceMonitor.start();
 
       await act(async () => {
         render(
@@ -172,11 +149,8 @@ describe('Chapter Questions Performance Tests', () => {
         expect(screen.getByTestId('question-container')).toBeInTheDocument();
       });
 
-      const performance = performanceMonitor.end();
-
-      // Should handle large sets efficiently
-      expect(performance.duration).toBeLessThan(3000);
-      console.log(`Handled 500 questions in ${performance.duration}ms`);
+      expect(bookClient.getChapterQuestions).toHaveBeenCalledTimes(1);
+      expect(commits).toBeLessThanOrEqual(3);
     });
 
     test('memory usage remains stable with large question sets', async () => {
@@ -222,8 +196,6 @@ describe('Chapter Questions Performance Tests', () => {
 
   describe('API Performance Tests', () => {
     test('question generation API calls complete within time limits', async () => {
-      const startTime = performance.now();
-
       const mockQuestions = generateLargeQuestionSet(10);
 
       (bookClient.generateChapterQuestions as jest.Mock).mockImplementation(
@@ -242,18 +214,14 @@ describe('Chapter Questions Performance Tests', () => {
         })
       );
 
-      let generateCalled = false;
+      const onGenerate = jest.fn(async () => mockQuestions);
 
       render(
         <TestWrapper>
           <QuestionGenerator
             bookId="test-book"
             chapterId="test-chapter"
-            onGenerate={async () => {
-              generateCalled = true;
-              // Return the mocked questions
-              return mockQuestions;
-            }}
+            onGenerate={onGenerate}
           />
         </TestWrapper>
       );
@@ -268,19 +236,15 @@ describe('Chapter Questions Performance Tests', () => {
 
         // If click succeeds, check callback was called
         await waitFor(() => {
-          expect(generateCalled).toBe(true);
+          expect(onGenerate).toHaveBeenCalled();
         }, { timeout: 1000 });
       } catch (error) {
         // If button interaction fails, at least component rendered
         console.log('Button interaction failed in performance test');
       }
 
-      const endTime = performance.now();
-      const totalTime = endTime - startTime;
-
-      // Should complete within 5 seconds including UI updates
-      expect(totalTime).toBeLessThan(5000);
-      console.log(`Question generation completed in ${totalTime}ms`);
+      // One click, one generation request
+      expect(onGenerate).toHaveBeenCalledTimes(1);
     });
 
     test('handles concurrent API calls efficiently', async () => {
@@ -292,8 +256,6 @@ describe('Chapter Questions Performance Tests', () => {
           setTimeout(() => resolve({ success: true }), 50);
         })
       );
-
-      performanceMonitor.start();
 
       // Make multiple concurrent API calls
       for (let i = 0; i < concurrentCalls; i++) {
@@ -307,10 +269,6 @@ describe('Chapter Questions Performance Tests', () => {
 
       await Promise.all(callPromises);
 
-      const performance = performanceMonitor.end();
-
-      // All calls should complete reasonably quickly
-      expect(performance.duration).toBeLessThan(1000);
       expect(bookClient.saveQuestionResponse).toHaveBeenCalledTimes(concurrentCalls);
     });
 
@@ -320,8 +278,6 @@ describe('Chapter Questions Performance Tests', () => {
           setTimeout(() => reject(new Error('API Error')), 100);
         })
       );
-
-      performanceMonitor.start();
 
       render(
         <TestWrapper>
@@ -341,10 +297,9 @@ describe('Chapter Questions Performance Tests', () => {
         expect(emptyState || errorState).toBeInTheDocument();
       });
 
-      const performance = performanceMonitor.end();
-
-      // Error handling should be fast
-      expect(performance.duration).toBeLessThan(1000);
+      // A failed load is not retried in a loop
+      expect(bookClient.getChapterQuestions).toHaveBeenCalledTimes(1);
+      expect(commits).toBeLessThanOrEqual(4);
     });
   });
 
@@ -375,10 +330,11 @@ describe('Chapter Questions Performance Tests', () => {
       });
 
       // Test rapid navigation
-      const times: number[] = [];
+      const loadCalls = (bookClient.getChapterQuestions as jest.Mock).mock.calls.length;
+      const perNav: number[] = [];
 
       for (let i = 0; i < 10; i++) {
-        const startTime = performance.now();
+        const before = commits;
 
         const nextButton = screen.getByText('Next');
         fireEvent.click(nextButton);
@@ -387,14 +343,12 @@ describe('Chapter Questions Performance Tests', () => {
           expect(screen.getByText(new RegExp(`Performance test question ${i + 2}`))).toBeInTheDocument();
         });
 
-        const endTime = performance.now();
-        times.push(endTime - startTime);
+        perNav.push(commits - before);
       }
 
-      // Average navigation time should be under 100ms
-      const averageTime = times.reduce((sum, time) => sum + time, 0) / times.length;
-      expect(averageTime).toBeLessThan(100);
-      console.log(`Average navigation time: ${averageTime}ms`);
+      // One commit per click; navigating is local: it never refetches the question list
+      expect(bookClient.getChapterQuestions).toHaveBeenCalledTimes(loadCalls);
+      expect(Math.max(...perNav)).toBeLessThanOrEqual(1);
     });
 
   });
@@ -552,8 +506,6 @@ describe('Chapter Questions Performance Tests', () => {
         return;
       }
 
-      performanceMonitor.start();
-
       // Rapid typing should be debounced
       await userEvent.type(searchInput, 'performance test');
 
@@ -561,10 +513,8 @@ describe('Chapter Questions Performance Tests', () => {
         expect(screen.getByText(/Performance test question/)).toBeInTheDocument();
       });
 
-      const performance = performanceMonitor.end();
-
-      // Search should be responsive
-      expect(performance.duration).toBeLessThan(1000);
+      // Typing must not refetch the list
+      expect(bookClient.getChapterQuestions).toHaveBeenCalledTimes(1);
     });
 
     test('virtual scrolling handles large lists efficiently', async () => {
@@ -573,8 +523,6 @@ describe('Chapter Questions Performance Tests', () => {
       (bookClient.getChapterQuestions as jest.Mock).mockResolvedValue({
         questions: hugeQuestionSet
       });
-
-      performanceMonitor.start();
 
       const { container } = render(
         <TestWrapper>
@@ -587,14 +535,11 @@ describe('Chapter Questions Performance Tests', () => {
       );
 
       await waitFor(() => {
-        // Wait for content to load - check for any text content
-        expect(container.firstChild).toBeInTheDocument();
+        expect(screen.getByText(/Performance test question 1/)).toBeInTheDocument();
       });
 
-      const performance = performanceMonitor.end();
-
-      // Virtual scrolling should handle large lists efficiently
-      expect(performance.duration).toBeLessThan(3000);
+      expect(bookClient.getChapterQuestions).toHaveBeenCalledTimes(1);
+      expect(commits).toBeLessThanOrEqual(3);
 
       // Only visible items should be rendered in DOM
       // Since we're using virtualization, check that not all questions are rendered
