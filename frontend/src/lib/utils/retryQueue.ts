@@ -4,7 +4,7 @@
  * Manages offline operations with automatic retry when connection is restored
  */
 
-import { ErrorHandler } from '@/lib/errors/errorHandler';
+import { ErrorHandler, calculateBackoff } from '@/lib/errors/errorHandler';
 
 export interface QueuedOperation<T> {
   id: string;
@@ -25,6 +25,8 @@ export class RetryQueue {
   private queue: Map<string, QueuedOperation<any>>;
   private processing: boolean;
   private errorHandler: ErrorHandler;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private failedRounds = 0;
 
   constructor() {
     this.queue = new Map();
@@ -69,7 +71,9 @@ export class RetryQueue {
    * Remove an operation from the queue
    */
   remove(id: string): boolean {
-    return this.queue.delete(id);
+    const removed = this.queue.delete(id);
+    this.schedule();
+    return removed;
   }
 
   /**
@@ -77,6 +81,7 @@ export class RetryQueue {
    */
   clear(): void {
     this.queue.clear();
+    this.schedule();
   }
 
   /**
@@ -137,6 +142,25 @@ export class RetryQueue {
     if (Array.from(this.queue.keys()).some(id => !drained.has(id))) {
       await this.processQueue();
     }
+    this.schedule();
+  }
+
+  /**
+   * Op left queued with retries remaining: retry on a backoff timer while
+   * online, since `online` may never fire (#1067). Offline waits for `online`.
+   */
+  private schedule(): void {
+    clearTimeout(this.timer);
+    this.timer = undefined;
+    if (this.queue.size === 0) {
+      this.failedRounds = 0;
+      return;
+    }
+    if (this.processing || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      void this.processQueue();
+    }, calculateBackoff(this.failedRounds++));
   }
 
   /**

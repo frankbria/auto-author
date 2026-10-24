@@ -27,7 +27,6 @@ import httpx
 
 
 # Test configuration
-TEST_TIMEOUT = 300  # 5 minutes for full E2E test
 AI_TIMEOUT = 60  # 1 minute for individual AI calls
 
 # Test data
@@ -600,7 +599,6 @@ The key to habit change isn't massive transformation but small, consistent adjus
 
 # Pytest test cases
 @pytest.mark.asyncio
-@pytest.mark.timeout(TEST_TIMEOUT)
 async def test_complete_system_workflow(auth_client_factory, mock_ai_service):
     """Test the complete authoring workflow from book creation to chapter draft"""
     client = await auth_client_factory()

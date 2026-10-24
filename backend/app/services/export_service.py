@@ -29,6 +29,7 @@ __all__ = [
     "ExportValidationError",
     "export_executor",
     "export_service",
+    "shutdown_export_executor",
 ]
 
 logger = logging.getLogger(__name__)
@@ -49,10 +50,32 @@ logger = logging.getLogger(__name__)
 # stays unaffected either way, which is the point.
 EXPORT_THREAD_NAME_PREFIX = "export_worker"
 
-export_executor = ThreadPoolExecutor(
-    max_workers=settings.EXPORT_MAX_WORKERS,
-    thread_name_prefix=EXPORT_THREAD_NAME_PREFIX,
-)
+
+
+def _new_export_executor() -> ThreadPoolExecutor:
+    return ThreadPoolExecutor(
+        max_workers=settings.EXPORT_MAX_WORKERS,
+        thread_name_prefix=EXPORT_THREAD_NAME_PREFIX,
+    )
+
+
+export_executor = _new_export_executor()
+
+
+def shutdown_export_executor() -> None:
+    """Drop queued builds and retire the pool, leaving a fresh one behind (#1071).
+
+    A pool cannot be restarted, so a lifespan that ran in-process (a test
+    client) would otherwise leave every later export failing with "cannot
+    schedule new futures after shutdown". Threads start lazily, so the
+    replacement costs nothing until the next export; in production this runs
+    once, at process exit.
+    """
+    global export_executor
+    # wait=False so shutdown isn't held hostage by an in-flight build — a
+    # running thread cannot be cancelled, only waited on.
+    old, export_executor = export_executor, _new_export_executor()
+    old.shutdown(wait=False, cancel_futures=True)
 
 
 async def _run_export_build(func, *args):
