@@ -114,6 +114,23 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      # #1223: twice a post-deploy run spent ~15 min on 30 s `page.goto` timeouts
+      # while the staging box's nginx logged no request from the runner, and a
+      # plain rerun passed. Probe the public URL first so that state fails in
+      # ~2 min with the curl error (DNS, connect, TLS or timeout) in the log.
+      # The resolved address is deliberately not printed (public repo).
+      - name: Wait for the staging sign-in page
+        run: |
+          for i in $(seq 1 12); do
+            if out=$(curl -sS -o /dev/null --max-time 10 -w '%{http_code} in %{time_total}s' https://dev.autoauthor.app/auth/sign-in 2>&1) \
+              && [ "${out%% *}" = 200 ]; then
+              echo "sign-in page ready on attempt $i: $out"; exit 0
+            fi
+            echo "attempt $i/12: $out"; sleep 10
+          done
+          echo "::error::https://dev.autoauthor.app/auth/sign-in did not return 200 from this runner in 12 tries"
+          exit 1
+
       - name: Run E2E tests against staging
         working-directory: frontend
         env:
