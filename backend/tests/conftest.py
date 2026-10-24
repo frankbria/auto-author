@@ -40,6 +40,25 @@ def unset_ai_settings(monkeypatch):
         monkeypatch.setattr(_settings, name, Settings.model_fields[name].default)
 
 
+_AI_SERVICE_ATTRS = ("client", "model", "long_output_model", "max_retries")
+
+
+@pytest.fixture(autouse=True)
+def ai_service_unchanged():
+    """Fail a test that leaves the shared ai_service changed for later tests (#1061).
+
+    Compares identity, so a swapped client fails even when its fields look alike.
+    """
+    from app.services.ai_service import ai_service
+
+    before = {name: getattr(ai_service, name) for name in _AI_SERVICE_ATTRS}
+    yield
+    changed = [n for n in _AI_SERVICE_ATTRS if getattr(ai_service, n) is not before[n]]
+    for name in changed:  # restore first so one leak is one failure, not a cascade
+        setattr(ai_service, name, before[name])
+    assert not changed, f"test leaked ai_service.{', ai_service.'.join(changed)}; use patch.object/monkeypatch"
+
+
 import app.api.dependencies as deps
 from fastapi import HTTPException, Request
 from pymongo import AsyncMongoClient
