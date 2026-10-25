@@ -17,7 +17,7 @@
 # docker entry moves the digest, as a pull request the image scan runs on. It
 # reads a literal FROM line only; with the tag in a build argument it found no
 # dependency here at all.
-FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS base
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS base
 
 # ---- deps: install with the lockfile only, so this layer caches on lock changes
 FROM base AS deps
