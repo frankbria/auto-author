@@ -17,7 +17,7 @@ on:
 jobs:
   review:
     # Same-repo head guard (#270): fork PRs must never reach a run that binds
-    # ZHIPU_API_KEY. The repo is public today (so GitHub already withholds secrets
+    # MODEL_API_KEY. The repo is public today (so GitHub already withholds secrets
     # from fork `pull_request` runs), but this fails closed even if that changes
     # (repo goes private with fork-secrets, or the trigger drifts to
     # `pull_request_target`) — the same pwn-request class #191 closed for the
@@ -32,7 +32,7 @@ jobs:
     # Deliberately a skip rather than the action's `allowed_bots`. Opening the
     # guard would not produce a review: GitHub runs Dependabot-triggered
     # pull_request workflows with a read-only token and the separate Dependabot
-    # secret store, so ZHIPU_API_KEY arrives empty and the summary comment could
+    # secret store, so MODEL_API_KEY arrives empty and the summary comment could
     # not be posted even if it did not. It would trade an 8-second bot-guard
     # failure for a credential failure. A bug-hunting reviewer has little to say
     # about a dependency bump in any case.
@@ -66,7 +66,7 @@ jobs:
        github.event.pull_request.additions >= 20 ||
        github.event.pull_request.deletions >= 20)
     # Pinned to an immutable SHA so upstream pushes can't silently change the
-    # code that receives ZHIPU_API_KEY.
+    # code that receives MODEL_API_KEY.
     #
     # Re-pinned off b877d15a (2026-07-10). That callee capped the run with a
     # 20-minute *job* timeout, which cancels every remaining step — `if:
@@ -95,9 +95,12 @@ jobs:
     # API_TIMEOUT_MS below the step timeout, so a hung request like those four
     # surfaces as an error instead of a silent kill. Same permissions and
     # secret as 77dfa9c; the new inputs are optional.
-    uses: frankbria/glm-review/.github/workflows/review.yml@9c7577a45e3a49bc44cc0f57330e3069ef97adc4 # 2026-09-29 (main; no tags upstream)
+    uses: frankbria/glm-review/.github/workflows/review.yml@694b8104c462f47ace9112dfd46ee4c5954c75d6 # 2026-10-24 (main; no tags upstream)
+    with:
+      base_url: https://api.kimi.com/coding/
+      model: k3[1m]
     permissions:
       contents: read
       pull-requests: write
     secrets:
-      ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
