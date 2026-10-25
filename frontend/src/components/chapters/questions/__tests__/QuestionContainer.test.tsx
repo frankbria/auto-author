@@ -11,6 +11,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom';
 import QuestionContainer from '../QuestionContainer';
 import { bookClient } from '@/lib/api/bookClient';
+import { toast } from '@/lib/toast';
 import { showErrorNotification } from '@/components/errors/ErrorNotification';
 import { Question, QuestionType, QuestionDifficulty, QuestionProgressResponse } from '@/types/chapter-questions';
 import { ErrorType } from '@/lib/errors/errorHandler';
@@ -416,46 +417,73 @@ describe('QuestionContainer - handleRegenerateQuestion', () => {
     });
   });
 
-  it('shows the limit toast when the backend returns 429', async () => {
-    const { toast } = require('@/lib/toast');
+  async function regenerateOne(error: Error) {
     setupTwoQuestions();
-    mockedBookClient.regenerateSingleQuestion.mockRejectedValue(
-      Object.assign(new Error('cap reached'), { statusCode: 429 })
-    );
-
+    mockedBookClient.regenerateSingleQuestion.mockRejectedValue(error);
     render(<QuestionContainer {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('question-display')).toBeInTheDocument();
-    });
-
+    await waitFor(() => expect(screen.getByTestId('question-display')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('regenerate-question-btn'));
+  }
+  const refused = (message: string, extra: Record<string, unknown>) =>
+    Object.assign(new Error(message), extra);
+
+  it('shows the limit toast, and no notification, for the regeneration cap', async () => {
+    await regenerateOne(
+      refused('cap reached', { statusCode: 429, errorCode: 'REGENERATION_LIMIT_REACHED' })
+    );
 
     await waitFor(() => {
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ title: 'Regeneration limit reached' })
       );
     });
+    expect(showErrorNotification).not.toHaveBeenCalled();
   });
 
-  it('shows a generic error toast when regeneration fails', async () => {
-    const { toast } = require('@/lib/toast');
-    setupTwoQuestions();
-    mockedBookClient.regenerateSingleQuestion.mockRejectedValue(new Error('Regeneration failed'));
+  it('an exhausted AI allowance is a limit with no retry, not the regeneration cap', async () => {
+    const quota = 'AI usage limit reached (10 generations per day on the free plan).';
+    await regenerateOne(refused(quota, { statusCode: 429, quotaPeriod: 'day' }));
 
-    render(<QuestionContainer {...defaultProps} />);
+    await waitFor(() => expect(showErrorNotification).toHaveBeenCalled());
+    expect(showErrorNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Daily AI limit reached', retryable: false }),
+      expect.anything()
+    );
+    expect(toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Regeneration limit reached' })
+    );
+  });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('question-display')).toBeInTheDocument();
-    });
+  it('a route rate limit offers a retry that regenerates again', async () => {
+    await regenerateOne(
+      refused('AI service rate limit exceeded', { statusCode: 429, errorCode: 'AI_RATE_LIMIT', retryAfter: 4 })
+    );
 
-    fireEvent.click(screen.getByTestId('regenerate-question-btn'));
+    await waitFor(() => expect(showErrorNotification).toHaveBeenCalled());
+    const [notification, options] = (showErrorNotification as jest.Mock).mock.calls[0];
+    expect(notification).toEqual(expect.objectContaining({ retryable: true }));
+    mockedBookClient.regenerateSingleQuestion.mockClear();
+    options.onRetry();
+    await waitFor(() => expect(mockedBookClient.regenerateSingleQuestion).toHaveBeenCalledTimes(1));
+  });
 
-    await waitFor(() => {
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'Error' })
-      );
-    });
+  it('a plan refusal (402) goes to the Upgrade notification', async () => {
+    await regenerateOne(refused('Your plan does not include this feature.', { statusCode: 402 }));
+
+    await waitFor(() => expect(showErrorNotification).toHaveBeenCalled());
+    expect(showErrorNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'entitlement', message: 'Upgrade required' }),
+      expect.anything()
+    );
+  });
+
+  it('an outage goes to the shared handler, not the cap toast', async () => {
+    await regenerateOne(new Error('Regeneration failed'));
+
+    await waitFor(() => expect(showErrorNotification).toHaveBeenCalled());
+    expect(toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Regeneration limit reached' })
+    );
   });
 });
 

@@ -610,7 +610,7 @@ async def regenerate_single_question(
         raise HTTPException(
             status_code=429,
             detail={
-                "error": "REGENERATION_LIMIT_REACHED",
+                "error_code": "REGENERATION_LIMIT_REACHED",
                 "message": str(e),
                 "request_id": request_id,
             }
