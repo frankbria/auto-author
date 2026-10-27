@@ -283,6 +283,13 @@ class Settings(BaseSettings):
     # checkout with automatic_tax on an account where Stripe Tax isn't activated,
     # so the operator turns this on after registering tax settings in Stripe.
     STRIPE_AUTOMATIC_TAX: bool = False
+    # Stripe Managed Payments, Stripe (as Link) selling as merchant of record
+    # (#1234). Sent as managed_payments.enabled on every checkout either way, so
+    # the account's Dashboard default never decides it: that default broke
+    # checkout once. On, it supersedes STRIPE_AUTOMATIC_TAX (Stripe handles the
+    # tax). Turn it on only once Managed Payments is activated in the Dashboard
+    # and the product carries an eligible tax code, or Stripe rejects checkout.
+    STRIPE_MANAGED_PAYMENTS: bool = False
 
     # Error tracking (issue #334). Unset => Sentry is inert (no events sent), so
     # CI/local/tests get no new behavior. Set the DSN secret in staging/prod to
