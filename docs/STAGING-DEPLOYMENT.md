@@ -200,7 +200,30 @@ Things that differ by provider:
   recognition. Its server-side cleanup is an ordinary chat call on
   `AI_MODEL_DEFAULT`. There is no Whisper, embeddings or image call.
 
-### Stripe Tax (#783)
+### Stripe Managed Payments (#1234)
+
+Auto Author sells under Stripe Managed Payments: Stripe, as Link, is merchant of
+record and handles sales tax, fraud and disputes, for a fee on top of processing.
+Checkout sends `managed_payments.enabled` from `STRIPE_MANAGED_PAYMENTS` on every
+session, so the Dashboard default never decides it. Turn it on in this order:
+
+1. In the Stripe Dashboard (in the same mode, test or live, as `STRIPE_SECRET_KEY`):
+   Settings → Managed Payments → activate it.
+2. Product catalog → Auto Author Pro → Edit product → set a **Product tax code**
+   labelled "Eligible for Managed Payments".
+3. Settings → Business details → support email `support@autoauthor.app`. Link
+   escalates customer issues there and may refund if nobody answers in 48 hours.
+4. Add `STRIPE_MANAGED_PAYMENTS=true` to `/opt/auto-author/.env` and **recreate**
+   the containers (see above).
+5. Start a checkout and confirm Stripe's page says it is sold through Link and
+   shows a tax line for a taxable address.
+
+Doing step 4 before steps 1 and 2 makes Stripe reject every checkout (the API
+returns 502 "Payment provider error"). To undo, set it back to `false` and
+recreate. With it on, `STRIPE_AUTOMATIC_TAX` is ignored and the Stripe Tax steps
+below don't apply.
+
+### Stripe Tax (#783, not used under Managed Payments)
 
 Checkout always collects a billing address and tax IDs. Tax **calculation** stays
 off until `STRIPE_AUTOMATIC_TAX=true` is in the box `.env`. Turn it on in this order:
