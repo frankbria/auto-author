@@ -265,9 +265,22 @@ async def test_quotas_endpoint_reports_each_plans_caps(auth_client_factory):
     resp = await client.get("/api/v1/billing/quotas")
 
     assert resp.status_code == 200, resp.text
+    # Free is a trial: no refilling window, a lifetime total, one chapter, no export.
     assert resp.json() == {
-        "free": {"daily": settings.AI_QUOTA_FREE_DAILY, "monthly": settings.AI_QUOTA_FREE_MONTHLY},
-        "pro": {"daily": settings.AI_QUOTA_PRO_DAILY, "monthly": settings.AI_QUOTA_PRO_MONTHLY},
+        "free": {
+            "daily": None,
+            "monthly": None,
+            "total": settings.AI_QUOTA_FREE_TOTAL,
+            "draft_chapters": settings.AI_QUOTA_FREE_DRAFT_CHAPTERS,
+            "export": False,
+        },
+        "pro": {
+            "daily": settings.AI_QUOTA_PRO_DAILY,
+            "monthly": settings.AI_QUOTA_PRO_MONTHLY,
+            "total": None,
+            "draft_chapters": None,
+            "export": True,
+        },
     }
 
 
@@ -275,10 +288,12 @@ async def test_quotas_endpoint_reports_disabled_windows_as_unlimited(
     auth_client_factory, monkeypatch
 ):
     """A <=0 window is 'disabled' to the enforcer; never advertise it as 0 (#766)."""
-    monkeypatch.setattr(settings, "AI_QUOTA_FREE_DAILY", 0)
+    monkeypatch.setattr(settings, "AI_QUOTA_PRO_DAILY", 0)
+    monkeypatch.setattr(settings, "AI_QUOTA_FREE_TOTAL", 0)
     client = await auth_client_factory()
     body = (await client.get("/api/v1/billing/quotas")).json()
-    assert body["free"] == {"daily": None, "monthly": settings.AI_QUOTA_FREE_MONTHLY}
+    assert (body["pro"]["daily"], body["pro"]["monthly"]) == (None, settings.AI_QUOTA_PRO_MONTHLY)
+    assert body["free"]["total"] is None
 
 
 async def test_quotas_endpoint_all_unlimited_when_quota_disabled(
@@ -287,10 +302,19 @@ async def test_quotas_endpoint_all_unlimited_when_quota_disabled(
     monkeypatch.setattr(settings, "AI_QUOTA_ENABLED", False)
     client = await auth_client_factory()
     body = (await client.get("/api/v1/billing/quotas")).json()
-    assert body == {
-        "free": {"daily": None, "monthly": None},
-        "pro": {"daily": None, "monthly": None},
-    }
+    for plan in ("free", "pro"):
+        assert (body[plan]["daily"], body[plan]["monthly"], body[plan]["total"]) == (None, None, None)
+
+
+async def test_quotas_endpoint_reports_no_plan_gates_when_enforcement_is_off(
+    auth_client_factory, monkeypatch
+):
+    """PLAN_ENFORCEMENT_ENABLED=false lifts the draft cap and the export gate; say so."""
+    monkeypatch.setattr(settings, "PLAN_ENFORCEMENT_ENABLED", False)
+    client = await auth_client_factory()
+    body = (await client.get("/api/v1/billing/quotas")).json()
+    assert body["free"]["draft_chapters"] is None
+    assert body["free"]["export"] is True
 
 
 # --- Auto-renewal disclosure + recorded consent (issue #770, CA ARL / ROSCA) ---

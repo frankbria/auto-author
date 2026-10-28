@@ -196,7 +196,7 @@ class TestRateLimitDrivesReal429:
         instead of 429 and this test would fail. Real PDF generation (no
         mocking of export_service).
         """
-        api = await auth_client_factory()
+        api = await auth_client_factory(overrides={"plan": "pro"})  # export is part of Pro
         book_id = await _create_book(api)
         await _seed_toc(book_id, _small_toc())
 

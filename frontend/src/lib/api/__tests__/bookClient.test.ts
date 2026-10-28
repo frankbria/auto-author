@@ -859,6 +859,21 @@ describe('BookClient exportError – detail.message object branch', () => {
     });
   });
 
+  it('surfaces the 402 text of a structured error (export is part of Pro)', async () => {
+    const reason = 'Exporting your book is part of Pro.';
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 402,
+      json: async () => ({ detail: { error: reason, error_code: 'ENTITLEMENT_REQUIRED', status_code: 402 } }),
+    });
+
+    await expect(bookClient.exportEPUB('book123')).rejects.toMatchObject({
+      statusCode: 402,
+      message: reason,
+      userMessage: reason,
+    });
+  });
+
   it('falls back to status-based message when detail is absent', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,

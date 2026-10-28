@@ -1,9 +1,13 @@
 """Plan / entitlement registry (issue #174, P0.2).
 
-Single source of truth for which plan is entitled to which AI feature, and how
-many AI generations each plan may run per day/month. Free and pro may use every
-feature; what a paid plan buys is the larger quota (#766). ``restricted`` is the
-named deny path (e.g. lapsed subscription).
+Single source of truth for which plan is entitled to which feature, and how
+many AI generations each plan may run. ``restricted`` is the named deny path
+(e.g. lapsed subscription).
+
+Free is a trial, not a plan to write a book on (owner decision 2026-10-28): it
+may use every AI feature, but has a lifetime allowance of AI generations, an AI
+draft for one chapter, and no export. Pro has every feature, a daily and
+monthly allowance, and export.
 """
 
 from typing import Optional
@@ -24,13 +28,30 @@ AI_FEATURES = frozenset(
     }
 )
 
+# Downloading the book (PDF, DOCX, EPUB, Markdown). Not an AI feature: it is
+# not metered, only gated. It is what makes a book, so the trial doesn't get it.
+EXPORT_FEATURE = "export"
+
 DEFAULT_PLAN = "free"
 
 # plan -> allowed feature set. "*" means "all features".
 PLAN_ENTITLEMENTS: dict[str, frozenset[str]] = {
-    "free": frozenset({"*"}),  # every feature, small quota
-    "pro": frozenset({"*"}),  # every feature, larger quota (see ai_quota_for_plan)
+    "free": AI_FEATURES,  # the trial: every AI feature, no export
+    "pro": frozenset({"*"}),  # everything, larger quota (see ai_quota_for_plan)
     "restricted": frozenset(),  # deny path: no AI features
+}
+
+# What a 402 tells the user, for a feature the trial doesn't include. The
+# client shows it under an Upgrade button.
+TRIAL_DENIAL_MESSAGES: dict[str, str] = {
+    EXPORT_FEATURE: (
+        "Exporting your book is part of Pro. The free trial is for trying "
+        "Auto Author on one chapter; upgrade to export PDF, DOCX, EPUB or Markdown."
+    ),
+    "generate_draft": (
+        "The free trial includes an AI draft of one chapter, and you've used it "
+        "on another chapter. Upgrade to Pro to draft the rest of your book."
+    ),
 }
 
 
@@ -140,3 +161,20 @@ def ai_quota_for_plan(plan: Optional[str]) -> Optional[tuple[int, int]]:
     if plan == "pro":
         return settings.AI_QUOTA_PRO_DAILY, settings.AI_QUOTA_PRO_MONTHLY
     return None
+
+
+def ai_trial_total_for_plan(plan: Optional[str]) -> int:
+    """Lifetime AI generations ``plan`` may run, which never reset (0 = no cap).
+
+    Only free has one: it is a trial. Missing plan is free, like the others.
+    """
+    from app.core.config import settings
+
+    return settings.AI_QUOTA_FREE_TOTAL if (plan or DEFAULT_PLAN) == "free" else 0
+
+
+def draft_chapter_cap_for_plan(plan: Optional[str]) -> int:
+    """How many distinct chapters ``plan`` may get an AI draft for (0 = no cap)."""
+    from app.core.config import settings
+
+    return settings.AI_QUOTA_FREE_DRAFT_CHAPTERS if (plan or DEFAULT_PLAN) == "free" else 0

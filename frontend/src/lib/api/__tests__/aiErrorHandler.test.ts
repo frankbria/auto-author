@@ -80,6 +80,20 @@ describe('aiErrorHandler', () => {
       );
     });
 
+    it("shows the free trial's own reason for a 402 instead of the generic text", async () => {
+      const reason =
+        "The free trial includes an AI draft of one chapter, and you've used it on another chapter. Upgrade to Pro to draft the rest of your book.";
+      const error = Object.assign(new Error(reason), { statusCode: 402 });
+
+      const result = await handleAIServiceError(error);
+
+      expect(result).toEqual({ error: reason, canRetry: false });
+      expect(ErrorNotification.showErrorNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'entitlement', message: 'Upgrade required', details: reason }),
+        expect.anything()
+      );
+    });
+
     it('should handle network errors', async () => {
       const error = new Error('Failed to fetch: network error');
       const onRetry = jest.fn();
@@ -212,6 +226,7 @@ describe('aiErrorHandler', () => {
     it.each([
       ['day', 'Daily AI limit reached'],
       ['month', 'Monthly AI limit reached'],
+      ['trial', 'Free trial used up'],
     ])('names the allowance that ran out when the 429 says which (%s) (#803)', async (period, title) => {
       // The period comes from the X-AI-Quota-Period header, so the wording of
       // the message does not have to be recognised.

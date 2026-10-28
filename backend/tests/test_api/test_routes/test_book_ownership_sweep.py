@@ -240,6 +240,9 @@ async def _signed_in(email: str):
     client = real_session_client(await mint_session(oid))
     # The first request makes the application's own record of the user; do it before anything is compared.
     assert (await client.get("/api/v1/users/me")).status_code == 200
+    # On Pro: the free trial's plan gate (export is part of Pro) would answer
+    # 402 before the ownership check this sweep is about.
+    await (await get_collection("users")).update_one({"email": email}, {"$set": {"plan": "pro"}})
     return client
 
 

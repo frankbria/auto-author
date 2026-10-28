@@ -9,6 +9,9 @@ from bson import ObjectId
 from app.db import base
 from app.api.endpoints.export import _with_author_info
 
+# Export is part of Pro (the free trial has none), so these authors are on Pro.
+PRO = {"plan": "pro"}
+
 
 def test_with_author_info_prefers_display_name():
     book = _with_author_info({"title": "T"}, {"display_name": "Pen Name", "first_name": "A", "last_name": "B", "bio": "hi"})
@@ -52,7 +55,7 @@ class TestExportEndpoints:
     @pytest.fixture
     async def test_book_with_content(self, auth_client_factory):
         """Create a test book with content for export testing."""
-        client = await auth_client_factory()
+        client = await auth_client_factory(overrides=PRO)
 
         # Create a book
         book_data = {
@@ -166,7 +169,7 @@ class TestExportEndpoints:
     @pytest.mark.asyncio
     async def test_export_pdf_with_markup_in_bio_does_not_crash(self, auth_client_factory):
         """A bio containing XML-like markup is escaped, not fed raw to ReportLab."""
-        client = await auth_client_factory(overrides={"bio": "I <3 <b>books</b> & prose"})
+        client = await auth_client_factory(overrides={**PRO, "bio": "I <3 <b>books</b> & prose"})
         book = await client.post("/api/v1/books/", json={"title": "Markup Book"})
         assert book.status_code == 201
         book_id = book.json()["id"]
@@ -250,18 +253,18 @@ class TestExportEndpoints:
     @pytest.mark.asyncio
     async def test_export_epub_not_owner(self, auth_client_factory):
         """A non-owner gets 403 on EPUB export (ownership enforced)."""
-        client1 = await auth_client_factory()
+        client1 = await auth_client_factory(overrides=PRO)
         response = await client1.post("/api/v1/books/", json={"title": "Private EPUB"})
         book_id = response.json()["id"]
 
-        client2 = await auth_client_factory(overrides={"auth_id": "different_auth_id"})
+        client2 = await auth_client_factory(overrides={**PRO, "auth_id": "different_auth_id"})
         response = await client2.get(f"/api/v1/books/{book_id}/export/epub")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_export_epub_book_not_found(self, auth_client_factory):
         """EPUB export of a missing book returns 404."""
-        client = await auth_client_factory()
+        client = await auth_client_factory(overrides=PRO)
         response = await client.get("/api/v1/books/nonexistent_id/export/epub")
         assert response.status_code == 404
 
@@ -295,18 +298,18 @@ class TestExportEndpoints:
     @pytest.mark.asyncio
     async def test_export_markdown_not_owner(self, auth_client_factory):
         """A non-owner gets 403 on Markdown export (ownership enforced)."""
-        client1 = await auth_client_factory()
+        client1 = await auth_client_factory(overrides=PRO)
         response = await client1.post("/api/v1/books/", json={"title": "Private MD"})
         book_id = response.json()["id"]
 
-        client2 = await auth_client_factory(overrides={"auth_id": "different_auth_id"})
+        client2 = await auth_client_factory(overrides={**PRO, "auth_id": "different_auth_id"})
         response = await client2.get(f"/api/v1/books/{book_id}/export/markdown")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_export_markdown_book_not_found(self, auth_client_factory):
         """Markdown export of a missing book returns 404."""
-        client = await auth_client_factory()
+        client = await auth_client_factory(overrides=PRO)
         response = await client.get("/api/v1/books/nonexistent_id/export/markdown")
         assert response.status_code == 404
 
@@ -363,7 +366,7 @@ class TestExportEndpoints:
     @pytest.mark.asyncio
     async def test_export_empty_book_returns_400(self, auth_client_factory):
         """Exporting a book with no chapter content returns a clear 400."""
-        client = await auth_client_factory()
+        client = await auth_client_factory(overrides=PRO)
         book_id = (
             await client.post("/api/v1/books/", json={"title": "Empty Export Book"})
         ).json()["id"]
@@ -399,7 +402,7 @@ class TestExportEndpoints:
     @pytest.mark.asyncio
     async def test_export_book_not_found(self, auth_client_factory):
         """Test export with non-existent book."""
-        client = await auth_client_factory()
+        client = await auth_client_factory(overrides=PRO)
 
         response = await client.get("/api/v1/books/nonexistent_id/export/pdf")
 
@@ -417,7 +420,7 @@ class TestExportEndpoints:
     async def test_export_not_owner(self, auth_client_factory):
         """Test export by non-owner."""
         # Create book with first user
-        client1 = await auth_client_factory()
+        client1 = await auth_client_factory(overrides=PRO)
         response = await client1.post("/api/v1/books/", json={"title": "Private Book"})
         book_id = response.json()["id"]
 
@@ -437,7 +440,7 @@ class TestExportEndpoints:
 
         # Try to export with second user
         # Create a client with a different auth_id
-        client2 = await auth_client_factory(overrides={"auth_id": "different_auth_id"})
+        client2 = await auth_client_factory(overrides={**PRO, "auth_id": "different_auth_id"})
         response = await client2.get(f"/api/v1/books/{book_id}/export/pdf")
 
         # Debug output if not 403
@@ -463,7 +466,7 @@ class TestExportEndpoints:
     @pytest.mark.asyncio
     async def test_export_special_characters_filename(self, auth_client_factory):
         """Test export with special characters in book title."""
-        client = await auth_client_factory()
+        client = await auth_client_factory(overrides=PRO)
 
         # Create book with special characters
         book_data = {
@@ -500,7 +503,7 @@ class TestExportAvailability:
     @pytest.mark.asyncio
     async def test_formats_report_availability(self, auth_client_factory):
         import app.api.endpoints.export as export_endpoint
-        client = await auth_client_factory()
+        client = await auth_client_factory(overrides=PRO)
         resp = await client.post("/api/v1/books/", json={"title": "Avail Book"})
         book_id = resp.json()["id"]
 
@@ -517,7 +520,7 @@ class TestExportAvailability:
 
     @pytest.mark.asyncio
     async def test_pdf_export_returns_503_when_unavailable(self, auth_client_factory, monkeypatch):
-        client = await auth_client_factory()
+        client = await auth_client_factory(overrides=PRO)
         book_id = (await client.post("/api/v1/books/", json={"title": "503 Book"})).json()["id"]
 
         # Give the book content so it passes validation and reaches generation,
@@ -541,7 +544,7 @@ class TestExportTemplateEndpoints:
 
     @pytest.fixture
     async def book(self, auth_client_factory):
-        client = await auth_client_factory()
+        client = await auth_client_factory(overrides=PRO)
         resp = await client.post(
             "/api/v1/books/", json={"title": "Template Export Book"}
         )
@@ -596,7 +599,7 @@ class TestExportTemplateEndpoints:
     @pytest.mark.asyncio
     async def test_templates_endpoint_wrong_owner_403(self, book, auth_client_factory):
         _, book_id = book
-        other = await auth_client_factory(overrides={"auth_id": "different_auth_id"})
+        other = await auth_client_factory(overrides={**PRO, "auth_id": "different_auth_id"})
         resp = await other.get(f"/api/v1/books/{book_id}/export/templates")
         assert resp.status_code == 403
 

@@ -12,7 +12,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 
 from app.api.dependencies import (
     audit_after_commit, get_rate_limiter, get_ai_usage_quota,
-    get_entitlement_checker
+    get_entitlement_checker, claim_trial_draft_chapter,
 )
 from app.core.security import get_current_user_from_session
 from app.db.database import get_book_metadata_by_id, get_book_owner_id
@@ -104,6 +104,11 @@ async def generate_chapter_draft(
         "genre": book.get("genre", ""),
         "target_audience": book.get("target_audience", ""),
     }
+
+    # The free trial drafts one chapter. Claimed only now, once the book is the
+    # caller's and the request is valid, so a refused request never uses it up.
+    # A 402 here hands the quota charge back: no model call was attempted.
+    await claim_trial_draft_chapter(current_user, book_id, chapter_id)
 
     try:
         # Generate draft using AI service

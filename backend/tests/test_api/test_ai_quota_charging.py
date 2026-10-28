@@ -250,7 +250,7 @@ class TestRateLimitsAreKeyedOnTheRouteNotTheResource:
     async def test_the_eleventh_export_across_two_books_is_refused(
         self, auth_client_factory, arm_real_rate_limiter
     ):
-        api = await auth_client_factory()
+        api = await auth_client_factory(overrides={"plan": "pro"})  # export is Pro
         books = [await _create_book(api, title=f"Book {n}") for n in (1, 2)]
         for book_id in books:
             await _seed_toc(book_id, _small_toc())

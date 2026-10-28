@@ -7,6 +7,8 @@ A TTL index on `expires_at` reaps stale buckets so the collection stays bounded.
 """
 
 from datetime import datetime, timezone
+from typing import Optional
+
 from pymongo import ReturnDocument
 
 from .base import get_collection
@@ -26,21 +28,23 @@ async def _usage_collection():
     return coll
 
 
-async def increment_usage(user_id: str, period_key: str, ttl_seconds: int) -> int:
+async def increment_usage(user_id: str, period_key: str, ttl_seconds: Optional[int]) -> int:
     """Atomically bump the counter for ``user_id`` in ``period_key`` and return the new total.
 
     ``period_key`` is a stable per-window bucket (e.g. ``day:2026-07-03``). The doc
-    expires ``ttl_seconds`` after first creation so old buckets self-clean.
+    expires ``ttl_seconds`` after first creation so old buckets self-clean. A
+    ``None`` ttl never expires: the free trial's lifetime count (``trial``).
     """
     coll = await _usage_collection()
-    now = datetime.now(timezone.utc)
-    expires_at = datetime.fromtimestamp(now.timestamp() + ttl_seconds, tz=timezone.utc)
+    on_insert: dict = {"user_id": user_id}
+    if ttl_seconds is not None:
+        now = datetime.now(timezone.utc)
+        on_insert["expires_at"] = datetime.fromtimestamp(
+            now.timestamp() + ttl_seconds, tz=timezone.utc
+        )
     doc = await coll.find_one_and_update(
         {"_id": f"{user_id}:{period_key}"},
-        {
-            "$inc": {"count": 1},
-            "$setOnInsert": {"user_id": user_id, "expires_at": expires_at},
-        },
+        {"$inc": {"count": 1}, "$setOnInsert": on_insert},
         upsert=True,
         return_document=ReturnDocument.AFTER,
     )

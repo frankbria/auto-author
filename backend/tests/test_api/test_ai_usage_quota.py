@@ -172,7 +172,9 @@ def test_quota_settings_defaults():
     from app.core.config import settings
 
     assert settings.AI_QUOTA_ENABLED is True
-    assert (settings.AI_QUOTA_FREE_DAILY, settings.AI_QUOTA_FREE_MONTHLY) == (10, 100)
+    # Free is a trial (2026-10-28): a lifetime allowance, no daily/monthly window.
+    assert (settings.AI_QUOTA_FREE_DAILY, settings.AI_QUOTA_FREE_MONTHLY) == (0, 0)
+    assert settings.AI_QUOTA_FREE_TOTAL == 30
     assert (settings.AI_QUOTA_PRO_DAILY, settings.AI_QUOTA_PRO_MONTHLY) == (50, 500)
 
 
