@@ -481,6 +481,7 @@ def handle_entitlement_denied(
     feature: str,
     plan: str,
     request_id: Optional[str] = None,
+    message: Optional[str] = None,
 ) -> HTTPException:
     """Create HTTPException for an entitlement denial (issue #174, P0.2).
 
@@ -492,6 +493,8 @@ def handle_entitlement_denied(
         feature: The AI feature that was requested (e.g. "generate_toc")
         plan: The caller's current plan (e.g. "free", "restricted")
         request_id: Optional request correlation ID
+        message: What to tell the user, when there is more to say than the
+            generic denial (the free trial's limits)
 
     Returns:
         HTTPException with standardized 402 error response
@@ -500,7 +503,7 @@ def handle_entitlement_denied(
 
     error_response = create_error_response(
         error_code=ErrorCode.ENTITLEMENT_REQUIRED,
-        message="Your plan does not include this feature.",
+        message=message or "Your plan does not include this feature.",
         status_code=status.HTTP_402_PAYMENT_REQUIRED,
         details=[
             ErrorDetail(

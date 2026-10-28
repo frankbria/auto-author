@@ -7,7 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { useBillingApi, type PlanQuotas, type RenewalDisclosure } from '@/hooks/useBillingApi';
+import {
+  useBillingApi,
+  type PlanQuota,
+  type PlanQuotas,
+  type RenewalDisclosure,
+} from '@/hooks/useBillingApi';
 import { toast } from '@/lib/toast';
 import { navigateTo } from '@/lib/navigation';
 
@@ -18,6 +23,48 @@ interface BillingSettingsFormProps {
 }
 
 const limit = (n: number | null) => (n === null ? 'unlimited' : String(n));
+
+const EXPORT_FORMATS = 'PDF, DOCX, EPUB and Markdown';
+
+/** "50 AI generations per day (500 per month)", or the one window that is set. */
+function windows(q: PlanQuota): string {
+  if (q.daily === null && q.monthly === null) return 'unlimited AI generations';
+  if (q.monthly === null) return `${limit(q.daily)} AI generations per day`;
+  if (q.daily === null) return `${limit(q.monthly)} AI generations per month`;
+  return `${q.daily} AI generations per day (${q.monthly} per month)`;
+}
+
+/** What Pro includes, in one clause list. Read from the backend (#766). */
+function proIncludes(q: PlanQuota): string {
+  const parts = [windows(q)];
+  if (q.draft_chapters == null) parts.push('AI drafts for every chapter');
+  if (q.export !== false) parts.push(`export to ${EXPORT_FORMATS}`);
+  return parts.length > 1
+    ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+    : parts[0];
+}
+
+/**
+ * Free is a trial for testing Auto Author on one chapter, not a plan to write a
+ * book on (owner decision 2026-10-28). Say so, with the backend's numbers.
+ */
+function freeTrialCopy(q: PlanQuotas): string {
+  const free = q.free;
+  const sentences = [
+    "The free trial is for testing Auto Author on your own material: a summary, a table of contents, and one chapter's interview and draft.",
+  ];
+  const limits: string[] = [];
+  if (free.total != null) limits.push(`${free.total} AI generations in total, which don't reset`);
+  if (free.draft_chapters != null) {
+    limits.push(
+      `an AI draft of ${free.draft_chapters === 1 ? 'one chapter' : `${free.draft_chapters} chapters`}`
+    );
+  }
+  if (limits.length) sentences.push(`It includes ${limits.join(' and ')}.`);
+  if (free.export === false) sentences.push('Exporting your book is part of Pro.');
+  sentences.push(`Pro includes ${proIncludes(q.pro)}.`);
+  return sentences.join(' ');
+}
 
 /**
  * Billing tab: current plan + Stripe checkout entry point (issue #221)
@@ -116,22 +163,21 @@ export default function BillingSettingsForm({ plan, hasBillingAccount }: Billing
             <p className="font-medium">You&apos;re on the Pro plan</p>
             <p className="text-sm text-muted-foreground">
               Thanks for supporting Auto Author.
-              {quotas &&
-                ` Your plan includes ${limit(quotas.pro.daily)} AI generations per day (${limit(quotas.pro.monthly)} per month).`}
+              {quotas && ` Your plan includes ${proIncludes(quotas.pro)}.`}
             </p>
           </div>
         ) : (
           <>
             <div className="space-y-1">
               <p className="font-medium">
-                {plan === 'restricted' ? 'Your subscription is inactive' : 'Free plan'}
+                {plan === 'restricted' ? 'Your subscription is inactive' : 'Free trial'}
               </p>
               <p className="text-sm text-muted-foreground">
                 {plan === 'restricted'
                   ? 'Fix your payment method below, or start a new upgrade to restore full access.'
                   : quotas
-                    ? `Free: ${limit(quotas.free.daily)} AI generations per day (${limit(quotas.free.monthly)} per month). Pro: ${limit(quotas.pro.daily)} per day (${limit(quotas.pro.monthly)} per month).`
-                    : 'Upgrade to Pro for a higher daily and monthly AI generation limit.'}
+                    ? freeTrialCopy(quotas)
+                    : 'The free trial lets you test Auto Author on one chapter. Upgrade to Pro to write and export your whole book.'}
               </p>
             </div>
             <div className="space-y-3 rounded-md border p-4">

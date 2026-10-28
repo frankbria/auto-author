@@ -40,7 +40,7 @@ class _Unreachable:
     "/export/pdf",
 ])
 async def test_an_unreachable_database_is_not_answered_404(auth_client_factory, monkeypatch, path):
-    api = await auth_client_factory()
+    api = await auth_client_factory(overrides={"plan": "pro"})  # export is Pro
     book_id = await create_book(api)
     monkeypatch.setattr(book_db, "books_collection", _Unreachable(book_db.books_collection))
 

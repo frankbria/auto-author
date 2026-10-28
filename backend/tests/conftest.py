@@ -218,7 +218,7 @@ def arm_real_ai_quota():
     Depends(get_ai_usage_quota()), the override never fires and the test's
     expected 429 fails RED — the same test-trust guarantee #199 gave the limiter.
 
-    The monthly window is disabled so the daily cap alone drives the 429 and the
+    The monthly and trial windows are disabled so the daily cap alone drives the 429 and the
     asserted X-AI-Quota-Period header is deterministic. E2E_EXEMPT_EMAILS is
     forced empty so an exemption configured in the ambient env can't silently
     un-meter the test user (`_is_exempt_e2e_user`).
@@ -233,6 +233,8 @@ def arm_real_ai_quota():
         _mock_patch.object(deps.settings, "AI_QUOTA_ENABLED", True),
         _mock_patch.object(deps.settings, "AI_QUOTA_FREE_MONTHLY", 0),
         _mock_patch.object(deps.settings, "AI_QUOTA_PRO_MONTHLY", 0),
+        # The free trial's lifetime window too: the daily cap alone drives it.
+        _mock_patch.object(deps.settings, "AI_QUOTA_FREE_TOTAL", 0),
         _mock_patch.object(deps.settings, "E2E_EXEMPT_EMAILS", ""),
     ]
     for p in patches:

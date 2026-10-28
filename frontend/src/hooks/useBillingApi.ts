@@ -12,8 +12,18 @@ export type PortalSession = {
   url: string;
 };
 
-/** A null window is unlimited. */
-export type PlanQuotas = Record<'free' | 'pro', { daily: number | null; monthly: number | null }>;
+/** What a plan allows. A null window or cap is unlimited. */
+export type PlanQuota = {
+  daily: number | null;
+  monthly: number | null;
+  /** The free trial's lifetime AI generations, which never reset. */
+  total?: number | null;
+  /** How many chapters can get an AI draft. */
+  draft_chapters?: number | null;
+  /** Whether the plan can export the book. */
+  export?: boolean;
+};
+export type PlanQuotas = Record<'free' | 'pro', PlanQuota>;
 
 /** The auto-renewal terms to show verbatim before the subscribe action (#770). */
 export type RenewalDisclosure = {

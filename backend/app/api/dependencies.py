@@ -146,13 +146,25 @@ def _quota_exceeded_detail(plan: str, limit: int, period: str) -> str:
     """Say what the cap is, when it resets, and (for free) what Pro raises it to."""
     from app.core.entitlements import ai_quota_for_plan
 
+    pro_daily, pro_monthly = ai_quota_for_plan("pro")
+    if period == "trial":
+        # The trial's allowance is for the life of the account: nothing resets.
+        msg = (
+            f"AI usage limit reached ({limit} AI generations in the free trial). "
+            "The free trial doesn't reset."
+        )
+        if pro_monthly > 0:
+            msg += f" Upgrade to Pro for {pro_monthly} per month to write your whole book."
+        else:
+            msg += " Upgrade to Pro to write your whole book."
+        return msg
+
     resets = "midnight UTC" if period == "day" else "the 1st of next month (UTC)"
     msg = (
         f"AI usage limit reached ({limit} generations per {period} on the {plan} plan). "
         f"It resets at {resets}."
     )
     if plan != "pro":
-        pro_daily, pro_monthly = ai_quota_for_plan("pro")
         pro = pro_daily if period == "day" else pro_monthly
         if pro > 0:  # a disabled (<=0) Pro window is unlimited, not "0 per day"
             msg += f" Upgrade to Pro for {pro} per {period}."
@@ -211,7 +223,9 @@ def get_ai_usage_quota():
                 detail="Unable to identify user for AI usage metering.",
             )
 
-        from app.core.entitlements import DEFAULT_PLAN, ai_quota_for_plan
+        from app.core.entitlements import (
+            DEFAULT_PLAN, ai_quota_for_plan, ai_trial_total_for_plan,
+        )
 
         plan = current_user.get("plan") or DEFAULT_PLAN
         caps = ai_quota_for_plan(plan)
@@ -231,6 +245,8 @@ def get_ai_usage_quota():
         windows = (
             ("day", now.strftime("%Y-%m-%d"), daily, 2 * 86400),
             ("month", now.strftime("%Y-%m"), monthly, 40 * 86400),
+            # The free trial's lifetime count: one bucket, never expires.
+            ("trial", "total", ai_trial_total_for_plan(plan), None),
         )
         charged = []
         try:
@@ -287,9 +303,67 @@ def get_entitlement_checker(feature: str):
 
         plan = current_user.get("plan")
         if not is_feature_allowed(plan, feature):
-            raise handle_entitlement_denied(feature=feature, plan=plan or DEFAULT_PLAN)
+            from app.core.entitlements import TRIAL_DENIAL_MESSAGES
+
+            # Free is denied only what the trial leaves out: say so, and what
+            # Pro adds. A restricted or unknown plan gets the generic text.
+            message = (
+                TRIAL_DENIAL_MESSAGES.get(feature)
+                if (plan or DEFAULT_PLAN) == DEFAULT_PLAN
+                else None
+            )
+            raise handle_entitlement_denied(
+                feature=feature, plan=plan or DEFAULT_PLAN, message=message
+            )
 
     return check_entitlement
+
+
+async def claim_trial_draft_chapter(current_user: Dict, book_id: str, chapter_id: str) -> None:
+    """Hold a free trial to AI drafts for one chapter (owner decision 2026-10-28).
+
+    The first chapter a free account drafts is recorded on the user
+    (``trial_draft_chapters``); a draft for any other chapter is refused with
+    402 and an upgrade message. Redrafting a recorded chapter is allowed (the
+    trial's AI allowance still meters it). The check and the record are one
+    atomic update, so two concurrent drafts can't both claim the last slot.
+
+    Called by the draft endpoint once ownership and the request are checked.
+    Skipped like the entitlement gate: BYPASS_AUTH, PLAN_ENFORCEMENT_ENABLED
+    off, and the staging E2E account. Paid plans have no cap.
+    """
+    from app.core.entitlements import (
+        DEFAULT_PLAN, TRIAL_DENIAL_MESSAGES, draft_chapter_cap_for_plan,
+    )
+    from app.db.base import users_collection
+    from app.utils.error_handlers import handle_entitlement_denied
+
+    if settings.BYPASS_AUTH or not settings.PLAN_ENFORCEMENT_ENABLED:
+        return
+    if _is_exempt_e2e_user(current_user):
+        return
+    plan = current_user.get("plan") or DEFAULT_PLAN
+    cap = draft_chapter_cap_for_plan(plan)
+    if cap <= 0:
+        return
+
+    key = f"{book_id}:{chapter_id}"
+    result = await users_collection.update_one(
+        {
+            "auth_id": current_user.get("auth_id"),
+            "$or": [
+                {"trial_draft_chapters": key},  # already this account's chapter
+                {f"trial_draft_chapters.{cap - 1}": {"$exists": False}},  # a slot left
+            ],
+        },
+        {"$addToSet": {"trial_draft_chapters": key}},
+    )
+    if result.matched_count == 0:
+        raise handle_entitlement_denied(
+            feature="generate_draft",
+            plan=plan,
+            message=TRIAL_DENIAL_MESSAGES["generate_draft"],
+        )
 
 
 async def audit_request(

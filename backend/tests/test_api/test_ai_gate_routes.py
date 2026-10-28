@@ -82,6 +82,14 @@ AI_GATED_ROUTES = [
 
 assert len(AI_GATED_ROUTES) == 10
 
+# Plan-gated routes that make no AI call, so carry the entitlement gate but not
+# the quota: book export is Pro (the free trial can't produce a book, owner
+# decision 2026-10-28). Their 402 is covered in test_free_trial_limits.py.
+PLAN_GATED_NON_AI_ROUTES = {
+    ("GET", f"/api/v1/books/{{book_id}}/export/{fmt}")
+    for fmt in ("pdf", "docx", "epub", "markdown")
+}
+
 # (method, path) view, for the route-keyed lookups and the denial parametrize.
 AI_ROUTE_KEYS = [(method, path) for method, path, _ in AI_GATED_ROUTES]
 
@@ -200,7 +208,7 @@ class TestAIGateWiringCompleteness:
             if quota in calls
             or any(getattr(c, "__name__", "") == ENTITLEMENT_DEP_NAME for c in calls)
         }
-        unexpected = gated - set(AI_ROUTE_KEYS)
+        unexpected = gated - set(AI_ROUTE_KEYS) - PLAN_GATED_NON_AI_ROUTES
         assert not unexpected, (
             "Found AI-gated routes not accounted for in AI_GATED_ROUTES: "
             f"{sorted(unexpected)}. Add them (and their denial coverage) if "
