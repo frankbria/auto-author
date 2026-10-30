@@ -22,7 +22,7 @@ FROM python:3.13-slim@sha256:57b29a7c050c4e679e4bea572e14b3965cf4b5839de2da49d55
 # digest of both), but Dependabot can hold a new release back for the cooldown
 # only where the registry tells it when a tag was published. Measured: for
 # ghcr.io it reports "Cooldown was not applied" and carries on.
-FROM astral/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77ad87865e381d9917da55a168 AS uv
+FROM astral/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 AS uv
 
 # ---- build: resolve from uv.lock only
 FROM base AS build
