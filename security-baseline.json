@@ -1,5 +1,8 @@
 {
   "_comment": "Known-and-accepted advisories. CI fails on anything NOT listed here, so this file is the repo's dependency-debt ledger, not an ignore-list to grow casually. Every entry is an advisory id and the reason it is accepted. The gate fails on an entry with no reason, and on an entry whose advisory is gone, until it is pruned (#821): a stale entry is still an exemption for that id if a downgrade brings the advisory back. Started at 91 entries (#342); none remain: sprintf-js was pruned 2026-10-22 when jest's coverage chain stopped pulling it, and braces 2026-10-23 when its advisory was withdrawn upstream. Regenerate with: python scripts/audit_gate.py --pip-audit <json> --npm-audit <json> --baseline security-baseline.json --write-baseline, which keeps the reasons already written and leaves a new entry's reason empty for a person to fill in.",
   "pypi": {},
-  "npm": {}
+  "npm": {
+    "GHSA-3g3m-2fjr-6pw4": "glob 10.5.0/13.0.6, dev and build-time only (jest coverage, @sentry/bundler-plugins at build). The fix is glob 14.0.2, a major released 2026-10-27 that no consumer's range accepts yet; the bug needs a caller that passes an AbortSignal timeout, which none of ours does. Prune when jest and @sentry/nextjs move to glob 14.",
+    "GHSA-g3hv-75wg-m249": "minimatch 3.1.5/9.0.9/10.2.6, dev and build-time only (eslint and its plugins, jest coverage, @sentry/bundler-plugins at build). The fix is minimatch 11.0.1; the eslint 9 chain needs minimatch 3's default-export API, so no override is possible. Patterns come from our own config, not users. Prune when eslint, jest and @sentry/nextjs move to minimatch 11."
+  }
 }

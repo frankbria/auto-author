@@ -108,9 +108,9 @@ async def get_plan_quotas(
 
 # --- Auto-renewal disclosure (#770, CA ARL / ROSCA) ---
 # The ONE place the renewal terms live: the settings page shows this text next
-# to the subscribe action, Stripe's hosted page repeats it, and the consent
-# record stores it. Counsel signed off on this wording (#791); bump the version
-# whenever the template changes.
+# to the subscribe action, Stripe's hosted page repeats it (not under Managed
+# Payments, #1234), and the consent record stores it. Counsel signed off on
+# this wording (#791); bump the version whenever the template changes.
 RENEWAL_DISCLOSURE_VERSION = "2026-10-09"
 RENEWAL_DISCLOSURE_TEMPLATE = (
     "Auto Author Pro is {price} per {period} plus any applicable tax, charged "
@@ -201,6 +201,44 @@ class CheckoutRequest(BaseModel):
 
 class CheckoutResponse(BaseModel):
     url: str
+
+
+def _seller_params(disclosure: RenewalDisclosure, frontend_base: str) -> Dict:
+    """The Checkout Session params that depend on who sells: Stripe, as Link,
+    under Managed Payments (#1234), or us with Stripe as processor.
+
+    Managed Payments is always set explicitly, so the account's Dashboard
+    default never decides it. Under it Stripe refuses custom_text (seen live)
+    and the tax and customer_update params (its docs), and collects the name
+    and billing address itself; consent_collection and billing_address_collection
+    are left out too, since the docs' list of refused params proved incomplete.
+    The renewal disclosure and consent are still shown and recorded in the app
+    before any checkout exists (#770); only Stripe's repeat of them goes.
+    """
+    if settings.STRIPE_MANAGED_PAYMENTS:
+        return {"managed_payments": {"enabled": True}}
+    return {
+        "managed_payments": {"enabled": False},
+        # Stripe's own checkbox + record, and the renewal terms repeated
+        # beside the Subscribe button (#770). Requires a Terms of Service
+        # URL in the Stripe Dashboard's public details.
+        "consent_collection": {"terms_of_service": "required"},
+        "custom_text": {
+            "submit": {"message": disclosure.text},
+            "terms_of_service_acceptance": {
+                "message": f"I agree to the [Terms of Service]({frontend_base}/terms), "
+                "including automatic renewal until I cancel."
+            },
+        },
+        # Tax (#783). The address and tax IDs are collected regardless, so
+        # turning STRIPE_AUTOMATIC_TAX on later changes nothing else. Stripe
+        # refuses both on an existing Customer unless Checkout may write the
+        # collected name and address back to it.
+        "automatic_tax": {"enabled": settings.STRIPE_AUTOMATIC_TAX},
+        "billing_address_collection": "required",
+        "tax_id_collection": {"enabled": True},
+        "customer_update": {"address": "auto", "name": "auto"},
+    }
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
@@ -295,25 +333,7 @@ async def create_checkout_session(
                     "renewal_disclosure_sha256": disclosure.sha256,
                 }
             },
-            # Stripe's own checkbox + record, and the renewal terms repeated
-            # beside the Subscribe button (#770). Requires a Terms of Service
-            # URL in the Stripe Dashboard's public details.
-            consent_collection={"terms_of_service": "required"},
-            custom_text={
-                "submit": {"message": disclosure.text},
-                "terms_of_service_acceptance": {
-                    "message": f"I agree to the [Terms of Service]({frontend_base}/terms), "
-                    "including automatic renewal until I cancel."
-                },
-            },
-            # Tax (#783). The address and tax IDs are collected regardless, so
-            # turning STRIPE_AUTOMATIC_TAX on later changes nothing else. Stripe
-            # refuses both on an existing Customer unless Checkout may write the
-            # collected name and address back to it.
-            automatic_tax={"enabled": settings.STRIPE_AUTOMATIC_TAX},
-            billing_address_collection="required",
-            tax_id_collection={"enabled": True},
-            customer_update={"address": "auto", "name": "auto"},
+            **_seller_params(disclosure, frontend_base),
             success_url=f"{frontend_base}/dashboard/settings?checkout=success",
             cancel_url=f"{frontend_base}/dashboard/settings?checkout=cancel",
         )
