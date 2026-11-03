@@ -95,12 +95,11 @@ jobs:
     # API_TIMEOUT_MS below the step timeout, so a hung request like those four
     # surfaces as an error instead of a silent kill. Same permissions and
     # secret as 77dfa9c; the new inputs are optional.
-    uses: frankbria/glm-review/.github/workflows/review.yml@694b8104c462f47ace9112dfd46ee4c5954c75d6 # 2026-10-24 (main; no tags upstream)
-    with:
-      base_url: https://api.kimi.com/coding/
-      model: k3[1m]
+    uses: frankbria/glm-review/.github/workflows/review.yml@502f7c15f0b5ccc89d50faa4026d57741750cb19 # 2026-11-03 (main; no tags upstream)
     permissions:
       contents: read
       pull-requests: write
     secrets:
-      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      KIMI_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      MODEL_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
