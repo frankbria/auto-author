@@ -25,7 +25,8 @@ import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 DEPLOY = REPO / ".github" / "workflows" / "deploy-staging-containers.yml"
-TOKEN = "ghs_FAKEtokenFAKEtokenFAKEtoken0123"
+# A placeholder, not a credential: low entropy so secret scanners pass it.
+TOKEN = "placeholder-token-" + "0" * 16
 STALE = '{"auths": {"ghcr.io": {"auth": "c3RhbGU6c3RhbGU="}}}\n'
 
 
