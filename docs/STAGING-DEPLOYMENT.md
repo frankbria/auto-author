@@ -246,8 +246,12 @@ Doing step 2 before step 1 makes Stripe reject every checkout (the API returns 5
    applications: `docker ps -a`
 3. **Directory.** `mkdir -p /opt/auto-author`, then place the two compose files
    and the `.env`. Secrets live only in that file — never baked into an image.
-4. **Registry access.** If the GHCR packages are private, `docker login ghcr.io`
-   with a token carrying `read:packages`.
+4. **Registry access.** Nothing to set up. Each deploy logs in to ghcr.io with
+   the job's own `GITHUB_TOKEN` (`packages: read`) in a throwaway docker config
+   directory that is deleted when the run ends, so the box's own docker login
+   is never used or changed. A stale saved login there made every pull fail
+   with `error from registry: denied` on 2026-11-03, though the packages are
+   public. If the job's login fails, the pull goes ahead anonymously.
 5. **nginx.** Upstreams point at `127.0.0.1:8000` / `127.0.0.1:3002`. Unchanged
    from the PM2 setup — which is why those ports were kept.
 
