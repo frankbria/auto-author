@@ -16,7 +16,7 @@ name: Deploy Staging (Containers)
 #   2. /opt/auto-author/ containing docker-compose.yml, docker-compose.staging.yml
 #      and a .env file with the secrets listed in docker-compose.yml
 #   3. Ports 8000 and 3002 free — this is a SHARED box, check before assuming
-#   4. `docker login ghcr.io` (or a pull secret) if the packages are private
+#   4. no registry login: each run logs in with its own token (see Pull and start)
 #   5. nginx upstreams already point at 127.0.0.1:8000 / :3002 — unchanged from
 #      the PM2 setup, which is why those ports were kept
 
@@ -31,8 +31,10 @@ on:
         type: string
 
 # Least privilege: this only reads the repo and pulls published images.
+# packages: read is for the job's own ghcr.io login in "Pull and start".
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   # Never let two deploys race on one box.
@@ -136,9 +138,22 @@ jobs:
           echo "::error::Failed to ship compose files after 3 attempts"
           exit 1
 
+      # Registry login. On 2026-11-03 every pull failed with "error from registry:
+      # denied" although both packages are public: the box's saved ghcr.io login
+      # held a token that no longer worked, and docker sends a saved login rather
+      # than pulling anonymously. So this run gives docker its own empty config
+      # directory, logs it in with the job's GITHUB_TOKEN and deletes it on exit.
+      # The box's own docker config (shared with other apps on the box) is never
+      # read or written. The token goes over ssh's stdin into --password-stdin,
+      # so it is never on a command line, in the box's shell history or in this
+      # log. If the login fails the pull goes ahead anonymously. Tested by
+      # scripts/test_deploy_registry_login.py.
       - name: Pull and start
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         run: |
-          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
             ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
             "set -euo pipefail
              cd /opt/auto-author
@@ -146,6 +161,18 @@ jobs:
              # docker-compose.yml requires ENVIRONMENT with no default (#777).
              # This workflow only ever targets staging, so it says so here.
              export ENVIRONMENT=staging
+             # Assign then export: 'export X=\$(cmd)' hides a failing cmd from set -e,
+             # and an empty DOCKER_CONFIG makes docker fall back to the box's config.
+             DOCKER_CONFIG=\$(mktemp -d)
+             export DOCKER_CONFIG
+             trap 'rm -rf \"\$DOCKER_CONFIG\"' EXIT
+             # A compose plugin installed per user lives in the old config dir.
+             if [ -d \"\$HOME/.docker/cli-plugins\" ]; then
+               ln -s \"\$HOME/.docker/cli-plugins\" \"\$DOCKER_CONFIG/cli-plugins\"
+             fi
+             if ! docker login ghcr.io -u $(printf '%q' "$GHCR_USER") --password-stdin; then
+               echo 'ghcr.io login failed; pulling anonymously (the packages are public).'
+             fi
              # --pull always so a re-run of the same tag still fetches a rebuilt
              # image; compose would otherwise reuse a stale local layer.
              docker compose -f docker-compose.yml -f docker-compose.staging.yml pull

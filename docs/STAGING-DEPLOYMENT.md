@@ -200,7 +200,30 @@ Things that differ by provider:
   recognition. Its server-side cleanup is an ordinary chat call on
   `AI_MODEL_DEFAULT`. There is no Whisper, embeddings or image call.
 
-### Stripe Tax (#783)
+### Stripe Managed Payments (#1234)
+
+Auto Author sells under Stripe Managed Payments: Stripe, as Link, is merchant of
+record and handles sales tax, fraud and disputes, for a fee on top of processing.
+Checkout sends `managed_payments.enabled` from `STRIPE_MANAGED_PAYMENTS` on every
+session, so the Dashboard default never decides it. Turn it on in this order:
+
+1. In the Stripe Dashboard (in the same mode, test or live, as `STRIPE_SECRET_KEY`):
+   Settings → Managed Payments → activate it.
+2. Product catalog → Auto Author Pro → Edit product → set a **Product tax code**
+   labelled "Eligible for Managed Payments".
+3. Settings → Business details → support email `support@autoauthor.app`. Link
+   escalates customer issues there and may refund if nobody answers in 48 hours.
+4. Add `STRIPE_MANAGED_PAYMENTS=true` to `/opt/auto-author/.env` and **recreate**
+   the containers (see above).
+5. Start a checkout and confirm Stripe's page says it is sold through Link and
+   shows a tax line for a taxable address.
+
+Doing step 4 before steps 1 and 2 makes Stripe reject every checkout (the API
+returns 502 "Payment provider error"). To undo, set it back to `false` and
+recreate. With it on, `STRIPE_AUTOMATIC_TAX` is ignored and the Stripe Tax steps
+below don't apply.
+
+### Stripe Tax (#783, not used under Managed Payments)
 
 Checkout always collects a billing address and tax IDs. Tax **calculation** stays
 off until `STRIPE_AUTOMATIC_TAX=true` is in the box `.env`. Turn it on in this order:
@@ -223,8 +246,12 @@ Doing step 2 before step 1 makes Stripe reject every checkout (the API returns 5
    applications: `docker ps -a`
 3. **Directory.** `mkdir -p /opt/auto-author`, then place the two compose files
    and the `.env`. Secrets live only in that file — never baked into an image.
-4. **Registry access.** If the GHCR packages are private, `docker login ghcr.io`
-   with a token carrying `read:packages`.
+4. **Registry access.** Nothing to set up. Each deploy logs in to ghcr.io with
+   the job's own `GITHUB_TOKEN` (`packages: read`) in a throwaway docker config
+   directory that is deleted when the run ends, so the box's own docker login
+   is never used or changed. A stale saved login there made every pull fail
+   with `error from registry: denied` on 2026-11-03, though the packages are
+   public. If the job's login fails, the pull goes ahead anonymously.
 5. **nginx.** Upstreams point at `127.0.0.1:8000` / `127.0.0.1:3002`. Unchanged
    from the PM2 setup — which is why those ports were kept.
 
