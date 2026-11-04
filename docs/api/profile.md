@@ -195,24 +195,28 @@ uploaded avatar and every book's cover and thumbnail file are deleted as well
 content cascade fails, the request returns 500 and the account stays active
 (its subscription is already cancelled) so it can be retried.
 
-The user record is replaced by a deactivated record (#954):
+There is one document per person, in the `users` collection (#1263):
+better-auth creates it at sign-up and the backend keeps its profile fields on
+it. Deletion first marks it with `deleted_at`, so every session is refused at
+once, then writes a record to the `deleted_users` collection (#954), and then
+deletes the books, files, usage counters, sessions, accounts, 2FA and
+verification rows, and finally the `users` document itself:
 
 | Field | Holds |
 |---|---|
 | `auth_id` | the account id |
-| `deleted_at` | when the account was deactivated; every "is this account closed" check reads this field |
+| `deleted_at` | when the account was deleted |
 | `purge_at` | `deleted_at` plus 548 days (18 months) |
 | `retained` | `email`, `first_name`, `last_name`, `display_name`, `created_at`, `plan`, `stripe_customer_id`, `cancelled_subscription` (`id`, `plan`, `status` of the subscription that account deletion cancelled), and `terms_version` and `terms_accepted_at` (#960), each only if the account had a value for it (a field that is missing or null is left out) |
 
-Nothing else survives: no bio, avatar URL, preferences or book list. The
-retained fields are nested so that they sit outside the unique indexes on
-`email` and `stripe_customer_id`.
+Nothing else survives: no bio, avatar URL, preferences or book list. The record
+is in its own collection, so the same email can sign up again at once.
 
-The backend erases a record whose `purge_at` has passed to a tombstone of
-`auth_id` and `deleted_at` (#784). It checks at startup and once a day. An
-admin erases one earlier with `DELETE /users/{auth_id}`: on an active account
-that call deactivates it, and on a deactivated one it erases it (404 once it is
-erased). This is how support honours a request for earlier erasure.
+The backend deletes a record whose `purge_at` has passed. It checks at startup
+and once a day. An admin erases one earlier with `DELETE /users/{auth_id}`: on
+an active account that call deletes it, and on a deleted one it erases the
+record (404 once it is erased). This is how support honours a request for
+earlier erasure.
 
 **Endpoint**: `DELETE /users/me`
 
@@ -265,13 +269,13 @@ curl -X GET "http://localhost:8000/api/v1/users/admin/users" \
 
 #### Deactivate or Erase Any User
 
-Deactivates an active account exactly as `DELETE /users/me` does. For an admin,
-the same call on an account that is already deactivated erases its retained
-record to the tombstone (#954).
+Deletes an active account exactly as `DELETE /users/me` does. For an admin, the
+same call on an account that is already deleted erases its `deleted_users`
+record (#954).
 
 **Endpoint**: `DELETE /users/{auth_id}`
 
-If a deactivated account still has better-auth rows (a removal that failed part way), the first call only removes those rows and keeps the retained record; a second call then erases it (#956). The daily purge loop finishes such removals on its own as well.
+If a deletion stopped part way (the `users` document is still there, marked `deleted_at`), the first call only finishes it and keeps the retained record; a second call then erases it (#956). The daily purge loop finishes such deletions on its own as well.
 
 **Authentication**: Required (admin, or the user's own id)
 

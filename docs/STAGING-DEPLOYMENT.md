@@ -332,6 +332,10 @@ IMAGE_TAG=sha-<previous> ENVIRONMENT=staging docker compose \
   -f docker-compose.yml -f docker-compose.staging.yml up -d
 ```
 
+Builds from before #1263 keep better-auth's users in a `user` collection and
+the backend's profiles in `users`; since #1263 both are one `users` document.
+Rolling back past that change signs no one in until accounts are created again.
+
 Builds from before #779 have no `-staging` frontend tag, so the current overlay
 cannot roll back past that change; pin the frontend image by hand
 (`auto-author-frontend:sha-<previous>`) for such a rollback.
