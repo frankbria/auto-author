@@ -49,7 +49,7 @@ def test_the_token_reaches_the_step_only_as_a_variable():
     assert "GITHUB_TOKEN" not in step["run"], "the token expression is pasted into the script"
 
 
-def _run(tmp_path, login_works=True):
+def _run(tmp_path, login_works=True, mktemp_works=True):
     box, stubs, home = tmp_path / "box", tmp_path / "bin", tmp_path / "home"
     for d in (box, stubs, home / ".docker"):
         d.mkdir(parents=True)
@@ -71,6 +71,8 @@ def _run(tmp_path, login_works=True):
         '  printf \'{"auths":{"ghcr.io":{"auth":"x"}}}\' > "${DOCKER_CONFIG:-$HOME/.docker}/config.json"\n'
         "fi\n"
     )
+    if not mktemp_works:
+        (stubs / "mktemp").write_text("#!/usr/bin/env bash\nexit 1\n")
     for stub in stubs.iterdir():
         stub.chmod(0o755)
     script = re.sub(r"\$\{\{[^}]*\}\}", "box", _step("Pull and start")["run"])
@@ -88,7 +90,8 @@ def _run(tmp_path, login_works=True):
         timeout=60,
         check=False,
     )
-    return result, log.read_text().splitlines(), ssh_log.read_text(), home
+    lines = log.read_text().splitlines() if log.exists() else []
+    return result, lines, ssh_log.read_text(), home
 
 
 def test_each_run_logs_in_with_the_token_on_stdin_and_leaves_nothing(tmp_path):
@@ -122,4 +125,12 @@ def test_a_failed_login_still_pulls_anonymously(tmp_path):
     assert any(line.endswith(" pull") for line in lines), "a failed login stopped the deploy"
     pulls = [line for line in lines if line.endswith(" pull")]
     assert "unset" not in pulls[0] and str(home) not in pulls[0], "the pull fell back to the stale login"
+    assert (home / ".docker" / "config.json").read_text() == STALE
+
+
+def test_a_failed_mktemp_stops_the_deploy_before_docker_runs(tmp_path):
+    # An empty DOCKER_CONFIG means "use ~/.docker" to docker, so the token would land in the box's own config.
+    result, lines, _, home = _run(tmp_path, mktemp_works=False)
+    assert result.returncode != 0, "the deploy carried on without a throwaway config"
+    assert lines == [], "docker ran without a throwaway config"
     assert (home / ".docker" / "config.json").read_text() == STALE

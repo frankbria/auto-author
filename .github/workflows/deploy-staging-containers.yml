@@ -161,7 +161,10 @@ jobs:
              # docker-compose.yml requires ENVIRONMENT with no default (#777).
              # This workflow only ever targets staging, so it says so here.
              export ENVIRONMENT=staging
-             export DOCKER_CONFIG=\$(mktemp -d)
+             # Assign then export: 'export X=\$(cmd)' hides a failing cmd from set -e,
+             # and an empty DOCKER_CONFIG makes docker fall back to the box's config.
+             DOCKER_CONFIG=\$(mktemp -d)
+             export DOCKER_CONFIG
              trap 'rm -rf \"\$DOCKER_CONFIG\"' EXIT
              # A compose plugin installed per user lives in the old config dir.
              if [ -d \"\$HOME/.docker/cli-plugins\" ]; then
