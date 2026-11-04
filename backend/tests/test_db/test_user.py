@@ -73,7 +73,10 @@ class TestReadingABetterAuthUser:
     async def test_a_name_the_user_set_is_kept(self):
         user = as_app_user({"_id": "u1", "name": "A B", "first_name": "Al", "plan": "pro"})
         assert (user["first_name"], user["plan"]) == ("Al", "pro")
-        assert "last_name" not in user
+
+    async def test_setting_one_name_keeps_the_other_derived(self):
+        user = as_app_user({"_id": "u1", "name": "Ada Lovelace", "first_name": "Ada"})
+        assert (user["first_name"], user["last_name"]) == ("Ada", "Lovelace")
 
     async def test_a_missing_document_is_none(self, reinit_db):
         assert await get_user_by_auth_id(str(ObjectId())) is None

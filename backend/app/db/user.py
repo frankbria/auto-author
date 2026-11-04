@@ -61,10 +61,11 @@ def as_app_user(doc: Optional[Dict]) -> Optional[Dict]:
     for theirs, ours in _BETTER_AUTH_NAMES.items():
         if theirs in doc:
             user[ours] = doc[theirs]
-    if "first_name" not in user and (doc.get("name") or doc.get("email")):
+    if doc.get("name") or doc.get("email"):
         # "Ada Lovelace" -> Ada / Lovelace; no name -> the email's local part.
+        # Each is derived only while the user has not set it.
         first, _, last = (doc.get("name") or doc["email"].split("@")[0]).partition(" ")
-        user["first_name"] = first
+        user.setdefault("first_name", first)
         user.setdefault("last_name", last)
     return user
 
@@ -353,6 +354,13 @@ async def delete_user(auth_id: str, actor_id: str = None) -> bool:
         resource_type="user",
     )
     return True
+
+
+async def was_deleted(auth_id: str) -> bool:
+    """Whether ``auth_id`` belongs to a deleted account: its users document is
+    gone, and its deleted_users record says so (#1263)."""
+    records = await get_collection("deleted_users")
+    return bool(await records.count_documents({"auth_id": auth_id}, limit=1))
 
 
 # What an erased record keeps: the privacy page promises the account identifier

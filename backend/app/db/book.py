@@ -2,8 +2,8 @@
 
 import logging
 
-from .base import books_collection, users_collection, get_collection
-from .user import user_key
+from .base import books_collection, users_collection
+from .user import user_key, was_deleted
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
@@ -48,9 +48,7 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
             await users_collection.count_documents(
                 {**user_key(user_auth_id), "deleted_at": {"$exists": True}}, limit=1
             )
-            or await (await get_collection("deleted_users")).count_documents(
-                {"auth_id": user_auth_id}, limit=1
-            )
+            or await was_deleted(user_auth_id)
         ):
             await books_collection.delete_one({"_id": result.inserted_id})
             raise ValueError("The account was deleted")

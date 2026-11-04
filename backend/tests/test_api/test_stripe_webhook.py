@@ -276,18 +276,13 @@ async def _post_signed(client, payload: bytes):
     )
 
 
-@pytest.mark.parametrize(
-    "finished,status",
-    [(False, "account_closed"), (True, "no_matching_user")],
-    ids=["being-deleted", "deleted"],
-)
-async def test_late_event_writes_nothing_onto_a_deleted_account(
-    webhook_client, finished, status
-):
-    """#954, #1263: while a deletion runs, Stripe's late events find the marked
-    account and are refused; once it is done there is no account to find. Either
-    way they are acknowledged and change nothing: the plan is not put back, and
-    no second record is created for the customer."""
+@pytest.mark.parametrize("finished", [False, True], ids=["being-deleted", "deleted"])
+async def test_late_event_writes_nothing_onto_a_deleted_account(webhook_client, finished):
+    """#954, #1263: Stripe's late events for an account being deleted, or
+    already deleted (its deleted_users record), are acknowledged as a closed
+    account, not reported as unmatched: cancelling a paying user's subscription
+    on deletion always produces one. They change nothing: the plan is not put
+    back, and no second record is created for the customer."""
     from datetime import datetime, timezone
 
     from app.db import base
@@ -307,7 +302,7 @@ async def test_late_event_writes_nothing_onto_a_deleted_account(
     )
 
     assert resp.status_code == 200
-    assert resp.json() == {"status": status}
+    assert resp.json() == {"status": "account_closed"}
     assert await base.users_collection.find_one({}) == before
     assert await base.users_collection.count_documents({}) == (0 if finished else 1)
 
