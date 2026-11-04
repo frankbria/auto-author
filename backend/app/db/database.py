@@ -24,9 +24,7 @@ __all__ = [
 
 from .user import (
     get_user_by_auth_id,
-    get_user_by_id,
     get_user_by_email,
-    create_user,
     update_user,
     delete_user,
     erase_deactivated_user,
@@ -80,9 +78,7 @@ from .toc_transactions import (
 __all__ += [
     # User DAOs
     "get_user_by_auth_id",
-    "get_user_by_id",
     "get_user_by_email",
-    "create_user",
     "update_user",
     "delete_user",
     "erase_deactivated_user",

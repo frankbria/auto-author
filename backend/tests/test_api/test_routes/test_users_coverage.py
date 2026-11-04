@@ -151,7 +151,7 @@ async def test_patch_sanitizes_strings(auth_client_factory):
     client = await auth_client_factory()
     resp = await client.patch("/api/v1/users/me", json={"bio": MARKUP_BIO})
     assert resp.status_code == 200
-    stored = (await base.users_collection.find_one({"auth_id": "test-auth-id-123"}))["bio"]
+    stored = (await base.users_collection.find_one({"_id": "test-auth-id-123"}))["bio"]
     assert "<" not in stored
 
 
@@ -183,11 +183,11 @@ async def test_patch_me_privileged_field_rejected_and_not_persisted(
     from app.db import base
 
     client = await auth_client_factory()
-    before = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    before = await base.users_collection.find_one({"_id": "test-auth-id-123"})
     assert before is not None  # fail fast if the factory didn't seed the user
     resp = await client.patch("/api/v1/users/me", json={field: value})
     assert resp.status_code == 422
-    after = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    after = await base.users_collection.find_one({"_id": "test-auth-id-123"})
     assert after == before
 
 
@@ -201,7 +201,7 @@ async def test_patch_me_declared_fields_still_persist(auth_client_factory):
         "/api/v1/users/me", json={"first_name": "Ada", "bio": "Mathematician"}
     )
     assert resp.status_code == 200
-    stored = await base.users_collection.find_one({"auth_id": "test-auth-id-123"})
+    stored = await base.users_collection.find_one({"_id": "test-auth-id-123"})
     assert stored["first_name"] == "Ada"
     assert stored["bio"] == "Mathematician"
 

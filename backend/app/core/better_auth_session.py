@@ -8,7 +8,7 @@ session authentication.
 Better-auth stores sessions in the 'session' collection with the following schema:
 - id: String (session ID)
 - token: String (session token from cookie)
-- userId: String (reference to user in 'user' collection)
+- userId: ObjectId (the user's _id in the 'users' collection, #1263)
 - expiresAt: Date (session expiration time)
 - createdAt: Date (session creation time)
 - updatedAt: Date (last activity time)
@@ -25,7 +25,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import unquote
 
-from bson import ObjectId
 from fastapi import Request
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import PyMongoError
@@ -33,6 +32,7 @@ from pymongo.errors import PyMongoError
 from app.core.config import is_deployed_env, settings
 from app.core.reporting import report_failure
 from app.db.base import get_collection
+from app.db.user import user_key
 
 logger = logging.getLogger(__name__)
 
@@ -63,19 +63,6 @@ def _in_time(lookup):
     """A database call for a session, given up on after the lookup's own limit."""
     return asyncio.wait_for(lookup, SESSION_LOOKUP_TIMEOUT_SECONDS)
 
-
-async def when_the_store_answers(lookup):
-    """``lookup`` with that limit, and a database failure told apart from an answer.
-
-    For the sign-in check's lookups outside this module. Reported once every
-    few minutes, like the two here.
-    """
-    try:
-        return await _in_time(lookup)
-    except (PyMongoError, asyncio.TimeoutError) as e:
-        logger.error(f"A sign-in lookup could not be made: {type(e).__name__}: {str(e)}")
-        report_failure("session-validation", e)
-        raise SessionStoreUnavailable() from e
 
 # better-auth sets the __Secure- name over HTTPS and the bare one over plain
 # HTTP (local development).
@@ -120,15 +107,20 @@ def _verified_token(cookie_value: str) -> Optional[str]:
 
 
 def _session_and_its_user(token: str) -> List[Dict[str, Any]]:
-    """The session with that token and, joined to it, its better-auth user: one read, not two (#826).
+    """The session with that token and, joined to it, its user: one read, not two (#826).
 
     better-auth's MongoDB adapter keys a user by ``_id`` and stores a session's
     ``userId`` as the same ObjectId, so the join goes through the index on ``_id``.
+    The user comes without ``book_ids``, a list nothing here reads that grows
+    with every book.
     """
     return [
         {"$match": {"token": token}},
         {"$limit": 1},
-        {"$lookup": {"from": "user", "localField": "userId", "foreignField": "_id", "as": "user"}},
+        {"$lookup": {
+            "from": "users", "localField": "userId", "foreignField": "_id",
+            "pipeline": [{"$project": {"book_ids": 0}}], "as": "user",
+        }},
     ]
 
 
@@ -249,16 +241,11 @@ async def validate_better_auth_session(request: Request) -> Optional[Dict[str, A
 
 
 async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
-    """Get user data from better-auth's user collection.
+    """Get the user's document from the users collection (#1263), as stored.
 
-    Better-auth stores users in the 'user' collection with fields:
-    - _id: ObjectId (user ID)
-    - email: String
-    - name: String (optional)
-    - image: String (optional)
-    - emailVerified: Boolean
-    - createdAt: Date
-    - updatedAt: Date
+    better-auth writes ``_id`` (an ObjectId), email, name, image,
+    emailVerified, createdAt and updatedAt; the backend's own fields are on the
+    same document.
 
     Args:
         user_id: The better-auth user ID from the session
@@ -267,15 +254,13 @@ async def get_better_auth_user(user_id: str) -> Optional[Dict[str, Any]]:
         Dict containing user data, or None if not found
     """
     try:
-        # Get the user collection using the shared MongoDB client
-        user_collection = await get_collection("user")
+        user_collection = await get_collection("users")
 
         # better-auth's MongoDB adapter keys a user by _id, an ObjectId, and
         # writes no `id` field: looking for one scanned the collection on every
         # request and found nothing (#826).
         user_id = str(user_id)
-        key = ObjectId(user_id) if ObjectId.is_valid(user_id) else user_id
-        user = await _in_time(user_collection.find_one({"_id": key}))
+        user = await _in_time(user_collection.find_one(user_key(user_id), {"book_ids": 0}))
 
         if user:
             logger.debug(f"Found better-auth user {user_id}")

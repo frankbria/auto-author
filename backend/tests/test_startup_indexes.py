@@ -111,8 +111,8 @@ async def test_lifespan_creates_owner_and_ttl_indexes(reinit_db):
 @pytest.mark.asyncio
 async def test_lifespan_purges_expired_deactivated_accounts(reinit_db):
     """#954: the 18-month purge needs no one to act. A running app does it."""
-    users = base._db.users
-    await users.insert_one(
+    records = base._db.deleted_users
+    await records.insert_one(
         {
             "auth_id": "expired",
             "deleted_at": datetime(2025, 4, 1),
@@ -122,13 +122,11 @@ async def test_lifespan_purges_expired_deactivated_accounts(reinit_db):
     )
     async with app.router.lifespan_context(app):
         for _ in range(100):
-            if "retained" not in await users.find_one({"auth_id": "expired"}):
+            if not await records.count_documents({"auth_id": "expired"}):
                 break
             await asyncio.sleep(0.05)
 
-    assert set(await users.find_one({"auth_id": "expired"})) == {
-        "_id", "auth_id", "deleted_at",
-    }
+    assert await records.count_documents({"auth_id": "expired"}) == 0
 
 
 def _assert_audit_indexes(indexes):
@@ -210,7 +208,7 @@ class TestStartingWhileTheDatabaseIsAway:
         bring_it_back = away
         bring_it_back()
         await _warm_collections()
-        await base._db.users.insert_one({"warm": True, "auth_id": "warm", "email": "warm@example.com"})
+        await base._db.users.insert_one({"warm": True, "email": "warm@example.com"})
         await base._db.question_responses.insert_one({"warm": True})
         nowhere = AsyncMongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300")
         monkeypatch.setattr(base, "_db", nowhere["nowhere"])
@@ -232,14 +230,16 @@ class TestStartingWhileTheDatabaseIsAway:
                 await asyncio.sleep(1)  # long enough for more than one failed attempt
                 assert not served.state.database_prepared.done(), "it gave up, or thought an absent database was ready"
                 assert not begun, "the work went ahead before the database could be reached"
-                assert set(reported) == {"startup-database"}
+                # The daily purge runs beside this and reports its own failure:
+                # its deleted_users collection is on the database taken away here.
+                assert set(reported) - {"purge-accounts"} == {"startup-database"}
                 bring_it_back()
                 await served.state.database_prepared
 
         # The first step's indexes as well as the last's: work that went ahead while the
         # database was away would have failed its early steps and still finished its late ones.
         assert "question_user_idx" in await _index_map(base._db.question_responses)
-        assert "auth_id_unique_idx" in await _index_map(base._db.users)
+        assert "email_unique_idx" in await _index_map(base._db.users)
         assert "owner_book_id_idx" in await _index_map(base._db.books)
         assert "access_logs_ttl_idx" in await _index_map(base._db.chapter_access_logs)
         await nowhere.close()
@@ -298,23 +298,21 @@ async def test_lifespan_repairs_duplicate_chapter_ids(reinit_db):
 
 @pytest.mark.asyncio
 async def test_lifespan_finishes_a_deletion_that_died_half_way(reinit_db):
-    """A tombstone whose better-auth user and password survived (#935)."""
-    from app.db.user import create_user
-
+    """A marked users doc whose password survived (#935, #1263)."""
     oid = ObjectId()
-    await base._db.get_collection("user").insert_one({"_id": oid, "email": "half@example.com", "name": "Half"})
+    await base._db.users.insert_one(
+        {"_id": oid, "email": "half@example.com", "name": "Half", "deleted_at": datetime.now()}
+    )
     await base._db.get_collection("account").insert_one({"userId": oid, "password": "hash"})
-    await create_user({"auth_id": str(oid), "email": "half@example.com", "plan": "free", "is_active": True})
-    await base._db.users.update_one({"auth_id": str(oid)}, {"$set": {"deleted_at": datetime.now()}})
 
     async with app.router.lifespan_context(app):
         # The sweep runs in the daily housekeeping task, beside the server.
-        # The identity goes account first, user last: wait for the last row, or
-        # leaving the lifespan cancels the sweep between the two (#1180).
+        # The identity goes account first, the users doc last: wait for the
+        # last row, or leaving the lifespan cancels the sweep between the two (#1180).
         for _ in range(100):
-            if await base._db.get_collection("user").count_documents({"_id": oid}) == 0:
+            if await base._db.users.count_documents({"_id": oid}) == 0:
                 break
             await asyncio.sleep(0.05)
 
-    assert await base._db.get_collection("user").count_documents({"_id": oid}) == 0
+    assert await base._db.users.count_documents({"_id": oid}) == 0
     assert await base._db.get_collection("account").count_documents({"userId": oid}) == 0

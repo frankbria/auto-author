@@ -141,18 +141,6 @@ class TestTheRequestIsToldToComeBackNotToSignIn:
         assert [r["fingerprint"] for r in reports] == [["handled", "session-validation"]]
         assert "TOKEN-SENTINEL" not in str(reports)
 
-    async def test_the_same_when_the_database_goes_after_the_session_was_found(self, api, monkeypatch):
-        """The sign-in check makes a third lookup, of the app's own record of the user."""
-        from app.core import security
-
-        monkeypatch.setattr(security, "validate_better_auth_session", AsyncMock(return_value={"userId": ObjectId()}))
-        monkeypatch.setattr(security, "get_better_auth_user", AsyncMock(return_value={"email": "writer@example.com"}))
-        with patch("app.db.user.get_user_by_auth_id", AsyncMock(side_effect=ServerSelectionTimeoutError("no primary"))):
-            response = await api.get("/api/v1/books/", headers={"Cookie": COOKIE})
-
-        assert response.status_code == 503
-        assert int(response.headers["retry-after"]) > 0
-
     async def test_a_request_with_no_session_is_still_asked_to_sign_in(self, api):
         response = await api.get("/api/v1/books/")
 

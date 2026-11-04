@@ -14,6 +14,7 @@ from types import SimpleNamespace
 
 from app.api.endpoints import billing
 from app.core.config import Settings, settings
+from app.db.user import as_app_user
 from tests.conftest import _sync_logs, _sync_users
 
 pytestmark = pytest.mark.asyncio
@@ -85,7 +86,7 @@ async def test_checkout_creates_customer_and_session(
     cust_kwargs = stripe_stub["customer"][0]
     user_doc = _sync_users.find_one({"stripe_customer_id": "cus_new_001"})
     assert user_doc is not None, "stripe_customer_id must be persisted on the user"
-    auth_id = user_doc["auth_id"]
+    auth_id = user_doc["_id"]
     assert cust_kwargs["email"] == user_doc["email"]
     assert cust_kwargs["metadata"] == {"auth_id": auth_id}
     assert auth_id in cust_kwargs["idempotency_key"]
@@ -422,7 +423,7 @@ async def test_checkout_records_consent_and_carries_it_to_stripe(
     assert resp.status_code == 200, resp.text
 
     # The consent record: who, when, from where, and exactly what they agreed to.
-    user = _sync_users.find_one({"stripe_customer_id": "cus_new_001"})
+    user = as_app_user(_sync_users.find_one({"stripe_customer_id": "cus_new_001"}))
     record = _sync_logs.find_one({"action": billing.RENEWAL_CONSENT_ACTION})
     assert record is not None, "consent must be recorded before checkout is created"
     assert record["actor_id"] == user["auth_id"]

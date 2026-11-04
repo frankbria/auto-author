@@ -160,8 +160,9 @@ async def _apply_subscription_event(
         auth_id = (subscription.get("metadata") or {}).get("auth_id")
         user = await get_user_by_auth_id(auth_id) if auth_id else None
     if user is not None and user.get("deleted_at"):
-        # A deactivated or erased account (#954, #784): acknowledged, never
-        # written to, so a late event cannot put a plan back on it.
+        # An account being deleted (#954, #1263): acknowledged, never written
+        # to, so a late event cannot put a plan back on it. Once deleted, the
+        # account has no document and the event finds no user below.
         logger.info(
             "Stripe %s for closed account %s — ignoring", event_type, user["auth_id"]
         )

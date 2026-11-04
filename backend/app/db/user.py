@@ -1,4 +1,12 @@
 # backend/app/db/user.py
+"""The users collection: one document per person (#1263).
+
+better-auth creates the document at sign-up and owns its login fields (email,
+name, emailVerified, createdAt, updatedAt, the #789 terms fields); the backend
+keeps its profile, plan and billing fields on the same document. The document's
+``_id`` is the user id. The app passes it around as the string ``auth_id``,
+which is not stored: ``as_app_user`` derives it on every read.
+"""
 
 import logging
 import re
@@ -14,12 +22,12 @@ from app.core.reporting import report_failure
 
 logger = logging.getLogger(__name__)
 
-# How long a deactivated account's record is kept for complaints and
-# chargebacks before it is erased (#954): 18 months.
+# How long a deleted account's record is kept for complaints and chargebacks
+# before it is erased (#954): 18 months.
 RETENTION = timedelta(days=548)
 
-# The account and billing record a deactivated account keeps. An allowlist, so
-# a field added to users later is erased by default.
+# The account and billing record a deleted account keeps. An allowlist, so a
+# field added to users later is erased by default.
 RETAINED_FIELDS = (
     "email", "first_name", "last_name", "display_name", "created_at",
     "plan", "stripe_customer_id", "cancelled_subscription",
@@ -27,33 +35,56 @@ RETAINED_FIELDS = (
     "terms_version", "terms_accepted_at",
 )
 
-# What an erased account is replaced with (#784), as a $replaceWith expression.
-_TOMBSTONE = {"_id": "$_id", "auth_id": "$auth_id", "deleted_at": "$deleted_at"}
+# better-auth's names for the fields the app reads under its own.
+_BETTER_AUTH_NAMES = {
+    "createdAt": "created_at",
+    "updatedAt": "updated_at",
+    "termsVersion": "terms_version",
+    "termsAcceptedAt": "terms_accepted_at",
+}
+
+
+def user_key(auth_id: str) -> Dict:
+    """The users filter for ``auth_id``. better-auth's MongoDB adapter keys a
+    user by an ObjectId; an id that is not one is looked for as it is."""
+    return {"_id": ObjectId(auth_id) if ObjectId.is_valid(auth_id) else auth_id}
+
+
+def as_app_user(doc: Optional[Dict]) -> Optional[Dict]:
+    """A users document as the app reads it: with ``auth_id``, the app's names
+    for better-auth's fields, and the defaults a document better-auth created
+    has not been given yet."""
+    if doc is None:
+        return None
+    user = {"role": "user", "plan": "free", "is_active": True, "metadata": {}, **doc}
+    user["auth_id"] = str(doc["_id"])
+    for theirs, ours in _BETTER_AUTH_NAMES.items():
+        if theirs in doc:
+            user[ours] = doc[theirs]
+    if "first_name" not in user and (doc.get("name") or doc.get("email")):
+        # "Ada Lovelace" -> Ada / Lovelace; no name -> the email's local part.
+        first, _, last = (doc.get("name") or doc["email"].split("@")[0]).partition(" ")
+        user["first_name"] = first
+        user.setdefault("last_name", last)
+    return user
 
 
 async def ensure_user_indexes() -> None:
-    """Create the users collection's unique indexes (issue #178).
-
-    Without a unique index on auth_id, the check-then-insert in the auth
-    auto-create path lets parallel first-load requests each insert a doc for the
-    same user. The index makes create_user's DuplicateKeyError guard effective.
+    """Create the users collection's indexes, and the deleted_users one.
 
     Idempotent (MongoDB skips existing indexes). Per-index try/except so a
     startup can't be bricked by one index.
-
-    ponytail: if the collection ALREADY holds duplicate auth_id/email docs, the
-    unique build fails here and is logged — an operator must dedupe first
-    (one-time cleanup), the app keeps running with the race still open until then.
     """
     try:
-        await users_collection.create_index(
-            "auth_id", name="auth_id_unique_idx", unique=True
-        )
+        # auth_id is no longer stored (#1263): a unique index on it makes every
+        # sign-up after the first collide on null.
+        if "auth_id_unique_idx" in await users_collection.index_information():
+            await users_collection.drop_index("auth_id_unique_idx")
     except Exception:
-        logger.error("Failed to create unique index on users.auth_id", exc_info=True)
+        logger.error("Failed to drop the users.auth_id index", exc_info=True)
 
     try:
-        # sparse: legacy/partial docs without an email don't all collide on null.
+        # sparse: a document without an email doesn't collide on null.
         await users_collection.create_index(
             "email", name="email_unique_idx", unique=True, sparse=True
         )
@@ -73,6 +104,14 @@ async def ensure_user_indexes() -> None:
         logger.error(
             "Failed to create unique index on users.stripe_customer_id", exc_info=True
         )
+
+    try:
+        # One kept record per deleted account.
+        await (await get_collection("deleted_users")).create_index(
+            "auth_id", name="auth_id_unique_idx", unique=True
+        )
+    except Exception:
+        logger.error("Failed to create unique index on deleted_users.auth_id", exc_info=True)
 
     try:
         # Every signed-in request, here and in the frontend, finds its session
@@ -101,75 +140,27 @@ async def _ensure_better_auth_indexes() -> None:
         except Exception:
             logger.error("Failed to create index on %s.%s", name, field, exc_info=True)
 
-    try:
-        user = await get_collection("user")
-        cursor = await user.aggregate(
-            [{"$group": {"_id": "$email", "n": {"$sum": 1}}}, {"$match": {"n": {"$gt": 1}}}, {"$limit": 1}]
-        )
-        duplicated = await cursor.to_list(1)
-        if duplicated:
-            # A unique build would fail on them; an operator has to merge the accounts.
-            logger.error("user.email has duplicate values; indexing it without unique")
-            await user.create_index("email", name="email_idx")
-        else:
-            await user.create_index("email", name="email_unique_idx", unique=True)
-    except Exception:
-        logger.error("Failed to create index on user.email", exc_info=True)
-
 
 # User-related database operations
 async def get_user_by_auth_id(auth_id: str) -> Optional[Dict]:
-    """Get a user by their better-auth ID, without ``book_ids``.
+    """Get a user by their id, without ``book_ids``.
 
-    Every signed-in request reads this. That list grows with every book the
-    user creates, and nothing reads it from here (#826).
+    That list grows with every book the user creates, and nothing reads it
+    from here (#826).
     """
-    user = await users_collection.find_one({"auth_id": auth_id}, {"book_ids": 0})
-    return user
-
-
-async def get_user_by_id(user_id: str) -> Optional[Dict]:
-    """Get a user by their database ID"""
-    user = await users_collection.find_one({"_id": ObjectId(user_id)})
-    return user
+    return as_app_user(await users_collection.find_one(user_key(auth_id), {"book_ids": 0}))
 
 
 async def get_user_by_email(email: str) -> Optional[Dict]:
     """Get a user by their email address"""
-    user = await users_collection.find_one({"email": email})
-    return user
+    return as_app_user(await users_collection.find_one({"email": email}))
 
 
 async def get_user_by_stripe_customer_id(stripe_customer_id: str) -> Optional[Dict]:
     """Get a user by their Stripe customer id (issue #220)."""
-    return await users_collection.find_one({"stripe_customer_id": stripe_customer_id})
-
-
-async def create_user(user_data: Dict) -> Dict:
-    """Insert a new user.
-
-    Pure insert primitive: raises DuplicateKeyError when a unique index
-    (auth_id/email, issue #178) rejects the insert. Callers apply their own
-    policy — the auth auto-create path treats a duplicate auth_id as a
-    concurrent-first-load race and re-fetches the winner. (The legacy
-    unauthenticated POST /users/ endpoint was removed in issue #186.)
-    """
-    result = await users_collection.insert_one(user_data)
-    return await get_user_by_id(str(result.inserted_id))
-
-
-async def release_email(email: str, auth_id: str) -> int:
-    """Unset ``email`` on every users doc except ``auth_id``'s (#765).
-
-    better-auth keeps emails unique and owns their verification, so when
-    ``auth_id``'s better-auth user holds ``email``, any other backend doc holding
-    it is stale (squatted through the old PATCH /users/me, or left over from a
-    deleted account). Returns how many docs were released.
-    """
-    result = await users_collection.update_many(
-        {"email": email, "auth_id": {"$ne": auth_id}}, {"$unset": {"email": ""}}
+    return as_app_user(
+        await users_collection.find_one({"stripe_customer_id": stripe_customer_id})
     )
-    return result.modified_count
 
 
 async def update_user(
@@ -185,8 +176,9 @@ async def update_user(
     Returns None when the filter does not match, which a caller must treat as
     "someone else got there first" rather than "user not found" (#352).
     """
-    # Add updated_at timestamp
-    user_data["updated_at"] = datetime.now(timezone.utc)
+    # The timestamp is better-auth's field; the app reads it as updated_at.
+    user_data.pop("updated_at", None)
+    user_data["updatedAt"] = datetime.now(timezone.utc)
 
     # Preferences are set key by key (#848): written whole, a partial object
     # dropped the keys it left out, and null wiped them all.
@@ -195,12 +187,12 @@ async def update_user(
     if preferences:
         # A null stored before #848 has no key to set into, so Mongo refuses the write.
         await users_collection.update_one(
-            {"auth_id": auth_id, "preferences": {"$type": "null"}}, {"$set": {"preferences": {}}}
+            {**user_key(auth_id), "preferences": {"$type": "null"}}, {"$set": {"preferences": {}}}
         )
 
-    # A tombstone (deleted account, #784) never matches, so a late Stripe event
-    # or an admin edit can't write personal data back onto it.
-    query: Dict = {"auth_id": auth_id, "deleted_at": {"$exists": False}}
+    # A deleted account never matches, so a late Stripe event or an admin
+    # edit can't write personal data back onto it.
+    query: Dict = {**user_key(auth_id), "deleted_at": {"$exists": False}}
     if extra_filter:
         query.update(extra_filter)
 
@@ -219,14 +211,14 @@ async def update_user(
             details={"updated_fields": list(user_data.keys())},
         )
 
-    return updated_user
+    return as_app_user(updated_user)
 
 
 async def swap_checkout_session(auth_id: str, session_id: str) -> Optional[str]:
     """Store the user's newest Stripe Checkout session and return the one it
     replaces (#912). One atomic write, so two tabs at once each see the other's."""
     before = await users_collection.find_one_and_update(
-        {"auth_id": auth_id},
+        user_key(auth_id),
         {"$set": {"stripe_checkout_session_id": session_id}},
         projection={"stripe_checkout_session_id": 1},
         return_document=ReturnDocument.BEFORE,
@@ -250,7 +242,7 @@ async def grandfather_unverified_accounts() -> int:
         upsert=True,
         return_document=ReturnDocument.AFTER,
     )
-    result = await (await get_collection("user")).update_many(
+    result = await users_collection.update_many(
         {"emailVerified": {"$ne": True}, "createdAt": {"$lt": marker["at"]}},
         {"$set": {"emailVerified": True}},
     )
@@ -258,9 +250,9 @@ async def grandfather_unverified_accounts() -> int:
 
 
 async def delete_better_auth_identity(auth_id: str) -> int:
-    """Remove the better-auth user and everything that authenticates as it:
+    """Remove everything that authenticates as the user, then the user:
     sessions (every device), credential/OAuth accounts (the old password), the
-    twoFactor secret (#763) and verification rows (#957).
+    twoFactor secret (#763), verification rows (#957) and the users document.
 
     better-auth's MongoDB adapter stores ``_id`` and ``userId`` as ObjectIds;
     the string form is matched too so a legacy string-keyed row can't survive.
@@ -287,53 +279,37 @@ async def delete_better_auth_identity(auth_id: str) -> int:
         {"identifier": {"$in": [f"2fa-{kind}-{p}" for p in pending for kind in ("attempts", "otp")]}},
         {"identifier": {"$regex": f"^2fa-otp-{re.escape(auth_id)}!"}},
     ]})).deleted_count
-    better_auth_users = await get_collection("user")
-    result = await better_auth_users.delete_many({"$or": [{"_id": {"$in": ids}}, {"id": auth_id}]})
+    result = await users_collection.delete_many({"_id": {"$in": ids}})
     return removed + result.deleted_count
 
 
-async def delete_user(auth_id: str, actor_id: str = None) -> bool:
-    """Deactivate a user and revoke their better-auth identity.
+async def _finish_deletion(doc: Dict) -> None:
+    """Everything after a users document is marked deleted: the kept record,
+    the books, avatar and usage counters, and the identity, the document last.
+    Each step is safe to repeat."""
+    user = as_app_user(doc)
+    auth_id = user["auth_id"]
 
-    Deactivating replaces the record with auth_id, deleted_at, purge_at and the
-    RETAINED_FIELDS under ``retained`` (#954): replacing, not unsetting, erases
-    every other field, including ones added later. deleted_at keeps the session
-    resolver rejecting that id and stops the auto-create path, update_user and
-    the Stripe webhook from reviving it. The retained email is nested, off the
-    unique index, so the same address can sign up again (#763) without the new
-    account colliding with this record or release_email stripping it.
-    """
-    now = datetime.now(timezone.utc)
-    previous = await users_collection.find_one_and_update(
-        {"auth_id": auth_id, "deleted_at": {"$exists": False}},
-        [
-            {
-                "$replaceWith": {
-                    "_id": "$_id",
-                    "auth_id": "$auth_id",
-                    "deleted_at": now,
-                    "purge_at": now + RETENTION,
-                    # A field the record lacks, or holds as null (an
-                    # account with no Terms record), is left out.
-                    "retained": {
-                        field: {"$ifNull": [f"${field}", "$$REMOVE"]}
-                        for field in RETAINED_FIELDS
-                    },
-                }
-            }
-        ],
+    # The account and billing record kept for 18 months (#954). Inserted once,
+    # so finishing a deletion again keeps its dates.
+    await (await get_collection("deleted_users")).update_one(
+        {"auth_id": auth_id},
+        {"$setOnInsert": {
+            "deleted_at": doc["deleted_at"],
+            "purge_at": doc["deleted_at"] + RETENTION,
+            "retained": {f: user[f] for f in RETAINED_FIELDS if user.get(f) is not None},
+        }},
+        upsert=True,
     )
-    success = previous is not None
 
     # A book created after the caller's cascade read its id list is not in it
-    # (#945); past the tombstone create_book removes its own, so a second pass
+    # (#945); past the deletion create_book removes its own, so a second pass
     # here catches the rest. Empty, it costs one find.
     from app.db.book import delete_all_user_books
 
     await delete_all_user_books(auth_id)
 
-    # The returned pre-image is the last place the avatar URL exists (#785).
-    avatar_url = (previous or {}).get("avatar_url")
+    avatar_url = doc.get("avatar_url")
     if avatar_url:
         try:
             from app.services.file_upload_service import FileUploadService
@@ -345,42 +321,45 @@ async def delete_user(auth_id: str, actor_id: str = None) -> bool:
             logger.error("Failed to delete avatar for user %s", auth_id, exc_info=True)
             report_failure("delete-files", error)
 
-    # Unconditional: a better-auth user who never reached the backend has no
-    # app record, but their sessions and credentials must still go.
-    removed = await delete_better_auth_identity(auth_id)
     await delete_usage(auth_id)  # usage counters are the account's too (#957)
-    if not success and removed:
-        # An earlier deactivation whose identity removal failed (#956):
-        # finishing it is this deletion, so an admin's repair is not taken as
-        # a request to erase the retained record.
-        success = bool(
-            await users_collection.count_documents(
-                {"auth_id": auth_id, "purge_at": {"$exists": True}}, limit=1
-            )
-        )
+    await delete_better_auth_identity(auth_id)
 
-    # Log the deletion
-    if success:
-        await audit_after_write(
-            action="user_delete",
-            actor_id=actor_id
-            or auth_id,  # If no actor specified, user deleted themselves
-            target_id=auth_id,
-            resource_type="user",
-        )
-        return True
-    return False
+
+async def delete_user(auth_id: str, actor_id: str = None) -> bool:
+    """Delete a user's account (#1263).
+
+    The document is marked ``deleted_at`` first, so the session check refuses
+    every device at once, then the kept record is written to deleted_users and
+    everything else goes, the users document last. A crash in between leaves
+    the mark, which ``erase_stranded_identities`` (or a second call here)
+    finishes. Returns False when there is no such user.
+    """
+    now = datetime.now(timezone.utc)
+    doc = await users_collection.find_one_and_update(
+        user_key(auth_id),
+        # An earlier deletion that stopped part way keeps its date.
+        [{"$set": {"deleted_at": {"$ifNull": ["$deleted_at", now]}}}],
+        projection={"book_ids": 0},
+        return_document=ReturnDocument.AFTER,
+    )
+    if doc is None:
+        return False
+    await _finish_deletion(doc)
+
+    await audit_after_write(
+        action="user_delete",
+        actor_id=actor_id or auth_id,  # If no actor specified, user deleted themselves
+        target_id=auth_id,
+        resource_type="user",
+    )
+    return True
 
 
 async def erase_deactivated_user(auth_id: str, actor_id: str) -> bool:
-    """Erase a deactivated account's retained record before its purge date, for
-    a user who asks support to (#954). Matches nothing else: not an active
-    account, and not an account that is already erased."""
-    result = await users_collection.update_one(
-        {"auth_id": auth_id, "purge_at": {"$exists": True}},
-        [{"$replaceWith": _TOMBSTONE}],
-    )
-    if not result.modified_count:
+    """Erase a deleted account's kept record before its purge date, for a user
+    who asks support to (#954). False when there is no such record."""
+    result = await (await get_collection("deleted_users")).delete_one({"auth_id": auth_id})
+    if not result.deleted_count:
         return False
     await audit_after_write(
         action="user_erase",
@@ -392,40 +371,22 @@ async def erase_deactivated_user(auth_id: str, actor_id: str) -> bool:
 
 
 async def purge_expired_users() -> int:
-    """Erase every deactivated account whose purge date has passed (#954).
-
-    Not a TTL index: that would delete the document, and the tombstone is what
-    stops a surviving session from re-creating the account.
-    """
-    result = await users_collection.update_many(
-        {"purge_at": {"$lte": datetime.now(timezone.utc)}},
-        [{"$replaceWith": _TOMBSTONE}],
+    """Erase every deleted account's kept record whose purge date has passed
+    (#954). Run daily by the housekeeping task."""
+    result = await (await get_collection("deleted_users")).delete_many(
+        {"purge_at": {"$lte": datetime.now(timezone.utc)}}
     )
-    return result.modified_count
+    return result.deleted_count
 
 
 async def erase_stranded_identities() -> int:
-    """Finish deletions that stopped between the tombstone and the identity
-    erasure (#935): a crash or failover there left the better-auth user and
-    account (email, name, password hash), and the user cannot retry because the
-    tombstone refuses their session. Idempotent; run by the housekeeping task,
-    at start-up and then daily.
-
-    shortcut: one lookup per tombstone on every run; keep a "fully erased" flag
-    on the tombstone if the number of deleted accounts grows large.
+    """Finish deletions that stopped after the users document was marked
+    (#935): a crash or failover there left the email, name and password hash,
+    and the user cannot retry because the mark refuses their session.
+    Idempotent; run by the housekeeping task, at start-up and then daily.
     """
-    ba_users = await get_collection("user")
-    accounts = await get_collection("account")
     finished = 0
-    async for doc in users_collection.find({"deleted_at": {"$exists": True}}, {"auth_id": 1}):
-        auth_id = doc.get("auth_id")
-        if not auth_id:
-            continue
-        ids: List = [auth_id] + ([ObjectId(auth_id)] if ObjectId.is_valid(auth_id) else [])
-        left = await ba_users.find_one(
-            {"$or": [{"_id": {"$in": ids}}, {"id": auth_id}]}, {"_id": 1}
-        ) or await accounts.find_one({"userId": {"$in": ids}}, {"_id": 1})
-        if left:
-            await delete_better_auth_identity(auth_id)
-            finished += 1
+    async for doc in users_collection.find({"deleted_at": {"$exists": True}}, {"book_ids": 0}):
+        await _finish_deletion(doc)
+        finished += 1
     return finished

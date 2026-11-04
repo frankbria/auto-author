@@ -9,6 +9,7 @@ from pymongo import ReturnDocument
 from app.api.endpoints.billing import cancel_subscription_for_deletion
 from app.core.security import get_current_user_from_session, SessionRoleChecker
 from app.schemas.user import UserUpdate, UserResponse
+from app.db.user import as_app_user
 from app.db.database import (
     update_user,
     delete_user,
@@ -155,13 +156,13 @@ async def delete_profile(
     current_user: Dict = Depends(get_current_user_from_session),
     rate_limit_info: Dict = Depends(get_rate_limiter(limit=3, window=300)),
 ):
-    """Deactivate the current user's account.
+    """Delete the current user's account.
 
     Cascades the user's books (and their questions/responses/ratings/access
-    logs, one bulk delete per collection, #786) BEFORE deactivating the user
-    record, so a mid-cascade failure leaves the account active and retryable
-    (#179). The account and billing record is kept for 18 months, then erased
-    (#954). The Stripe subscription is cancelled before any of that (#764).
+    logs, one bulk delete per collection, #786) BEFORE deleting the user, so a
+    mid-cascade failure leaves the account active and retryable (#179). The
+    account and billing record is kept in deleted_users for 18 months, then
+    erased (#954). The Stripe subscription is cancelled before any of that (#764).
     """
     await cancel_subscription_for_deletion(current_user["auth_id"])
     try:
@@ -304,20 +305,20 @@ async def get_all_users(
         .limit(limit)
         .to_list(length=limit)
     )
-    return users
+    return [as_app_user(user) for user in users]
 
 
 @router.delete("/{auth_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user_account(
     auth_id: str, current_user: Dict = Depends(get_current_user_from_session)
 ):
-    """Deactivate a user account, or erase one that is already deactivated
+    """Delete a user account, or erase a deleted one's kept record
 
-    Regular users can only deactivate their own account
-    Admin users can deactivate any user account, and erase a deactivated one
-    before its purge date when its owner asks support to (#954). If a deactivated
-    account still has better-auth rows (a removal that failed part way), the first
-    call only finishes removing them and keeps the record; the next one erases (#956).
+    Regular users can only delete their own account
+    Admin users can delete any user account, and erase a deleted one's record
+    before its purge date when its owner asks support to (#954). If a deletion
+    stopped part way, the first call only finishes it and keeps the record; the
+    next one erases (#956).
     """
     # Check permissions - users can only delete their own account unless they're admins
     if current_user["auth_id"] != auth_id and current_user["role"] != "admin":

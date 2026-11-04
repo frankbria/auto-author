@@ -234,11 +234,10 @@ def test_no_route_takes_a_book_id_outside_its_path():
 async def _signed_in(email: str):
     now = datetime.now(timezone.utc)
     oid = ObjectId()
-    await (await get_collection("user")).insert_one(
+    await (await get_collection("users")).insert_one(
         {"_id": oid, "email": email, "name": email.split("@")[0], "emailVerified": True, "createdAt": now, "updatedAt": now}
     )
     client = real_session_client(await mint_session(oid))
-    # The first request makes the application's own record of the user; do it before anything is compared.
     assert (await client.get("/api/v1/users/me")).status_code == 200
     return client
 

@@ -187,7 +187,7 @@ async def test_extended_preferences_round_trip(auth_client_factory, test_user):
     patch_response = await client.patch("/api/v1/users/me", json=update)
     assert patch_response.status_code == 200
 
-    stored = await base.users_collection.find_one({"auth_id": test_user["auth_id"]})
+    stored = await base.users_collection.find_one({"_id": test_user["auth_id"]})
     assert stored is not None
     prefs = stored["preferences"]
     assert prefs["default_writing_style"] == "technical"

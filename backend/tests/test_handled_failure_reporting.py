@@ -33,6 +33,7 @@ from app.services import file_upload_service
 from app.services.chapter_access_service import chapter_access_service
 from app.services.file_upload_service import FileUploadService
 from tests.session_cookies import signed_session_cookie
+from tests.user_docs import insert_user
 from tests.test_api.test_rate_limit_routes import _create_book, _seed_toc, _small_toc
 from tests.test_api import test_stripe_webhook_current_subscription as stripe_tests
 
@@ -271,9 +272,7 @@ class TestADeletedUsersFilesStillInStorage:
         assert SENTINEL not in _said(reports)
 
     async def test_or_when_an_account_is_closed(self, reinit_db, reports):
-        await user_dao.create_user(
-            {"auth_id": "auth-closing", "email": "closing@example.com", "avatar_url": f"/uploads/{SENTINEL}.png"}
-        )
+        await insert_user("auth-closing", email="closing@example.com", avatar_url=f"/uploads/{SENTINEL}.png")
         with patch.object(FileUploadService, "__init__", MagicMock(side_effect=RuntimeError("no upload storage"))):
             closed = await user_dao.delete_user("auth-closing")
 

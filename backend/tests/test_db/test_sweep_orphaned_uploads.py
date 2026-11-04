@@ -261,7 +261,7 @@ async def test_cloudinary_sweep_matches_the_stored_url_to_the_public_id(reinit_d
     cld.cloudinary_api.resources.side_effect = lambda **kw: {
         "resources": [r for r in (live, orphan) if r["public_id"].startswith(kw["prefix"])]
     }
-    await db["users"].insert_one({"auth_id": "alice", "avatar_url": live["secure_url"]})
+    await db["users"].insert_one({"_id": "alice", "avatar_url": live["secure_url"]})
 
     stats = await sweep_orphaned_uploads(db, cld, grace=HOUR, apply=True)
 

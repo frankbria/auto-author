@@ -26,7 +26,7 @@ async def _a_better_auth_user(email: str) -> ObjectId:
     """A verified user as better-auth's MongoDB adapter stores one: keyed by an ObjectId."""
     now = datetime.now(timezone.utc)
     oid = ObjectId()
-    await (await get_collection("user")).insert_one(
+    await (await get_collection("users")).insert_one(
         {"_id": oid, "email": email, "name": "Ada Writer", "emailVerified": True, "createdAt": now, "updatedAt": now}
     )
     return oid
