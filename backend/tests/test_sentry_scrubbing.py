@@ -91,7 +91,7 @@ async def _work_then_fail():
 async def _signed_in(email: str):
     """A verified better-auth user with a real session: nothing overridden."""
     oid = ObjectId()
-    await (await get_collection("user")).insert_one({"_id": oid, "email": email, "emailVerified": True})
+    await (await get_collection("users")).insert_one({"_id": oid, "email": email, "emailVerified": True})
     return real_session_client(await mint_session(oid)), oid
 
 

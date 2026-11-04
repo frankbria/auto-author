@@ -159,7 +159,7 @@ async def test_profile_update_rejects_avatar_url(auth_client_factory):
 
     assert response.status_code == 422, response.text
     users = await get_collection("users")
-    assert (await users.find_one({"auth_id": ME})).get("avatar_url") is None
+    assert (await users.find_one({"_id": ME})).get("avatar_url") is None
 
 
 # --- a stored URL naming another tenant's file is never deleted --------------

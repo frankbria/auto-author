@@ -16,7 +16,7 @@ pytestmark = pytest.mark.asyncio
 
 async def _stored_preferences(api):
     me = (await api.get("/api/v1/users/me")).json()
-    user = await (await get_collection("users")).find_one({"auth_id": me["auth_id"]})
+    user = await (await get_collection("users")).find_one({"_id": me["auth_id"]})
     return user["preferences"]
 
 

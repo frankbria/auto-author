@@ -52,7 +52,9 @@ async def _seed_account(owner_id: str, book_count: int) -> list[str]:
         [{"title": "Doomed", "owner_id": owner_id} for _ in range(book_count)]
     )).inserted_ids]
 
-    await users.insert_one({"auth_id": owner_id, "book_ids": book_ids})
+    await users.update_one(
+        {"_id": owner_id}, {"$push": {"book_ids": {"$each": book_ids}}}, upsert=True
+    )
 
     question_ids = [str(_id) for _id in (await questions.insert_many(
         [{"book_id": b, "user_id": owner_id, "text": "Q?"} for b in book_ids]
@@ -160,7 +162,7 @@ async def test_delete_book_removes_all_related_data(reinit_db):
     assert await ratings.count_documents({}) == 0
     assert await access_logs.count_documents({"book_id": book_id}) == 0
 
-    user = await users.find_one({"auth_id": owner})
+    user = await users.find_one({"_id": owner})
     assert book_id not in user["book_ids"]
 
 
@@ -247,7 +249,7 @@ async def test_delete_all_user_books_commands_do_not_grow_with_books(
     books = await get_collection("books")
     users = await get_collection("users")
     assert await books.count_documents({"owner_id": "victim"}) == 0
-    assert (await users.find_one({"auth_id": "victim"}))["book_ids"] == []
+    assert (await users.find_one({"_id": "victim"}))["book_ids"] == []
     for name in ("questions", "question_responses", "chapter_access_logs"):
         collection = await get_collection(name)
         assert await collection.count_documents({"user_id": "victim"}) == 0

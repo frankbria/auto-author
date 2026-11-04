@@ -18,6 +18,7 @@ import app.services.file_upload_service as fus
 from app.db.base import get_collection
 from app.db.book import delete_all_user_books, delete_book
 from app.db.user import delete_user
+from tests.user_docs import insert_user
 
 pytestmark = pytest.mark.asyncio
 
@@ -72,13 +73,10 @@ async def _book_with_cover(uploads, owner_id: str) -> str:
 
 async def _user_with_avatar(uploads, auth_id: str) -> None:
     (uploads.avatars / _avatar_file(auth_id)).write_bytes(b"avatar")
-    users = await get_collection("users")
-    await users.insert_one(
-        {
-            "auth_id": auth_id,
-            "email": f"{auth_id}@example.com",
-            "avatar_url": f"/uploads/profile_pictures/{_avatar_file(auth_id)}",
-        }
+    await insert_user(
+        auth_id,
+        email=f"{auth_id}@example.com",
+        avatar_url=f"/uploads/profile_pictures/{_avatar_file(auth_id)}",
     )
 
 
@@ -182,9 +180,9 @@ async def test_avatar_storage_failure_is_logged_and_the_user_is_still_erased(
     with caplog.at_level(logging.ERROR, logger="app.db.user"):
         assert await delete_user("gone-2") is True
 
-    users = await get_collection("users")
-    doc = await users.find_one({"auth_id": "gone-2"})
-    assert set(doc) == {"_id", "auth_id", "deleted_at", "purge_at", "retained"}
+    assert await (await get_collection("users")).count_documents({}) == 0
+    kept = await (await get_collection("deleted_users")).find_one({"auth_id": "gone-2"})
+    assert set(kept) == {"_id", "auth_id", "deleted_at", "purge_at", "retained"}
     assert any("gone-2" in record.getMessage() for record in caplog.records)
 
 
@@ -195,7 +193,7 @@ async def test_book_created_after_the_cascade_read_is_gone_after_deletion(
     read (#945). The endpoints run the cascade, then delete_user; a book created
     between them must not outlive the account, nor its cover and children."""
     await _user_with_avatar(uploads, "racer")
-    await delete_all_user_books("racer")  # the endpoint's pass, before the tombstone
+    await delete_all_user_books("racer")  # the endpoint's pass, before delete_user
 
     late_id = str((await book_dao.create_book({"title": "Late"}, "racer"))["_id"])
     cover, thumb = _cover_files(late_id)
@@ -223,7 +221,7 @@ async def test_book_created_after_the_cascade_read_is_gone_after_deletion(
 
 async def test_book_created_after_deletion_returns_is_not_kept(reinit_db, uploads):
     """The insert of a request still in flight can land after delete_user's
-    second pass too (#945); create_book then finds the tombstone itself."""
+    second pass too (#945); create_book then finds the deleted account itself."""
     await _user_with_avatar(uploads, "racer-2")
     assert await delete_user("racer-2") is True
 
@@ -311,10 +309,7 @@ async def test_cloud_refusing_a_cover_is_logged(reinit_db, cloud, caplog):
 
 
 async def test_cloud_refusing_an_avatar_is_logged(reinit_db, cloud, caplog):
-    users = await get_collection("users")
-    await users.insert_one(
-        {"auth_id": "gone-3", "avatar_url": "https://cdn.example.com/foreign-a.jpg"}
-    )
+    await insert_user("gone-3", avatar_url="https://cdn.example.com/foreign-a.jpg")
 
     with caplog.at_level(logging.WARNING, logger="app.services.file_upload_service"):
         assert await delete_user("gone-3") is True
@@ -495,5 +490,5 @@ async def test_overlapping_avatar_uploads_leave_no_orphan(
     ))
 
     assert [r.status_code for r in responses] == [200, 200], [r.text for r in responses]
-    user = await users.find_one({"auth_id": auth_id})
+    user = await users.find_one({"_id": auth_id})
     assert _names(uploads.avatars) == [user["avatar_url"].rsplit("/", 1)[1]]

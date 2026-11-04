@@ -1,7 +1,7 @@
 """Email verification (#792).
 
 better-auth refuses to sign in an unverified address. The backend is the second
-lock: it will not create its own record for one. Accounts that existed before
+lock: it refuses every request from one (#1263). Accounts that existed before
 verification was required are marked verified at startup, because they never
 had a way to verify; the first such startup fixes what counts as before.
 Real better-auth documents, no patched resolver.
@@ -24,24 +24,23 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.mark.parametrize("change", [{"$set": {"emailVerified": False}}, {"$unset": {"emailVerified": 1}}])
-async def test_first_request_from_an_unverified_account_is_refused(reinit_db, change):
+async def test_every_request_from_an_unverified_account_is_refused(reinit_db, change):
     seeded = await _seed_better_auth_user("unverified@example.com")
-    await (await get_collection("user")).update_one({"_id": seeded["oid"]}, change)
+    users = await get_collection("users")
+    await users.update_one({"_id": seeded["oid"]}, change)
+    before = await users.find_one({"_id": seeded["oid"]})
 
     async with _client(seeded["tokens"][0]) as c:
-        response = await c.get("/api/v1/users/me")
+        for _ in range(2):
+            response = await c.get("/api/v1/users/me")
+            assert response.status_code == 403, response.text
+            assert "verify your email" in response.json()["detail"].lower()
 
-    assert response.status_code == 403, response.text
-    assert "verify your email" in response.json()["detail"].lower()
-    users = await get_collection("users")
-    assert await users.find_one({"auth_id": seeded["user_id"]}) is None
+    assert await users.find_one({"_id": seeded["oid"]}) == before
 
 
-async def test_a_verified_account_gets_its_record_on_the_first_request(reinit_db):
+async def test_a_verified_account_is_served(reinit_db):
     seeded = await _seed_better_auth_user("verified@example.com")
-    await (await get_collection("user")).update_one(
-        {"_id": seeded["oid"]}, {"$set": {"emailVerified": True}}
-    )
 
     async with _client(seeded["tokens"][0]) as c:
         response = await c.get("/api/v1/users/me")
@@ -52,7 +51,7 @@ async def test_a_verified_account_gets_its_record_on_the_first_request(reinit_db
 
 async def _seed_account(**fields) -> ObjectId:
     oid = ObjectId()
-    await (await get_collection("user")).insert_one(
+    await (await get_collection("users")).insert_one(
         {"_id": oid, "email": f"{oid}@example.com", **fields}
     )
     return oid
@@ -69,7 +68,7 @@ async def _seed_existing_accounts() -> dict:
 
 
 async def _verified(oid: ObjectId):
-    return (await (await get_collection("user")).find_one({"_id": oid})).get("emailVerified")
+    return (await (await get_collection("users")).find_one({"_id": oid})).get("emailVerified")
 
 
 async def test_accounts_that_predate_the_requirement_are_marked_verified(reinit_db):
@@ -109,7 +108,7 @@ async def test_startup_marks_existing_accounts_verified(reinit_db, monkeypatch):
     assert await _verified(existing["unverified"]) is True
 
 
-async def test_creating_the_record_does_not_log_the_email_address(reinit_db, caplog):
+async def test_signing_in_does_not_log_the_email_address(reinit_db, caplog):
     """#794: logs are kept longer and read more widely than the users collection."""
     seeded = await _seed_better_auth_user("private-address@example.com")
 
@@ -119,7 +118,6 @@ async def test_creating_the_record_does_not_log_the_email_address(reinit_db, cap
 
     # The application's own lines; the driver's DEBUG output is not ours to shape.
     app_log = "\n".join(r.getMessage() for r in caplog.records if r.name.startswith("app."))
-    assert "Auto-creating user record" in app_log
     # The user comes joined to the session now (#826), so it is the session's line that is looked for.
     assert "Session validated for user" in app_log
     assert "private-address@example.com" not in app_log

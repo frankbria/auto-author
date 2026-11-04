@@ -13,6 +13,7 @@ from app.core.reporting import report_failure
 
 from .audit_log import audit_after_write
 from .base import books_collection, users_collection, _client, get_collection
+from .user import user_key
 
 logger = logging.getLogger(__name__)
 
@@ -100,8 +101,8 @@ async def delete_all_user_books(user_auth_id: str) -> int:
 
     Never a transaction, even on a replica set: one spanning a whole account
     outlives the 60s transaction limit on exactly the accounts this is for.
-    The id list is a snapshot; delete_user runs this again after the tombstone
-    to catch a book created mid-cascade (#945).
+    The id list is a snapshot; delete_user runs this again after marking the
+    account deleted, to catch a book created mid-cascade (#945).
     """
     books = await books_collection.find(
         {"owner_id": user_auth_id}, _DELETE_PROJECTION
@@ -213,7 +214,7 @@ async def _delete_books_internal(
         deleted = (await books_collection.delete_many(book_filter, session=session)).deleted_count
     if deleted:
         await users_collection.update_one(
-            {"auth_id": user_auth_id}, {"$pull": {"book_ids": in_books}}, session=session
+            user_key(user_auth_id), {"$pull": {"book_ids": in_books}}, session=session
         )
 
     return deleted, {

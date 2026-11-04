@@ -21,6 +21,7 @@ from app.db.user import (
     get_user_by_auth_id,
     get_user_by_stripe_customer_id,
     update_user,
+    was_deleted,
 )
 
 logger = logging.getLogger(__name__)
@@ -159,9 +160,14 @@ async def _apply_subscription_event(
         # subscription metadata with our auth_id.
         auth_id = (subscription.get("metadata") or {}).get("auth_id")
         user = await get_user_by_auth_id(auth_id) if auth_id else None
+        if user is None and auth_id and await was_deleted(auth_id):
+            # Deleting a paying account cancels its subscription, so this
+            # event always follows a deletion: not an unmatched customer.
+            logger.info("Stripe %s for deleted account %s — ignoring", event_type, auth_id)
+            return {"status": "account_closed"}
     if user is not None and user.get("deleted_at"):
-        # A deactivated or erased account (#954, #784): acknowledged, never
-        # written to, so a late event cannot put a plan back on it.
+        # An account being deleted (#954, #1263): acknowledged, never written
+        # to, so a late event cannot put a plan back on it.
         logger.info(
             "Stripe %s for closed account %s — ignoring", event_type, user["auth_id"]
         )

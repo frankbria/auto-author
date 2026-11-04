@@ -113,7 +113,7 @@ async def test_export_holds_no_credential_and_no_internal_field(reinit_db):
     async with _client(seeded["tokens"][0]) as c:
         assert (await c.get("/api/v1/users/me")).status_code == 200
     await (await get_collection("users")).update_one(
-        {"auth_id": seeded["user_id"]},
+        {"_id": seeded["oid"]},
         {"$set": {"stripe_event_created": 1760000000, "internal_note": "fraud-flag"}},
     )
 

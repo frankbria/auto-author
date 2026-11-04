@@ -14,7 +14,7 @@ import pytest
 
 from app.db.base import get_collection
 from app.db.usage import increment_usage
-from app.db.user import create_user, delete_user
+from app.db.user import delete_user
 from tests.test_api.test_routes.test_account_deletion_real_session import (
     _seed_better_auth_user,
 )
@@ -37,7 +37,6 @@ def _verification_rows(user_id: str, tag: str) -> list:
 
 async def _account(email: str, tag: str) -> str:
     user_id = (await _seed_better_auth_user(email))["user_id"]
-    await create_user({"auth_id": user_id, "email": email, "plan": "free", "is_active": True})
     await (await get_collection("verification")).insert_many(_verification_rows(user_id, tag))
     await increment_usage(user_id, "day:2026-10-22", 86400)
     await increment_usage(user_id, "rl:DELETE /users/me:0", 120)

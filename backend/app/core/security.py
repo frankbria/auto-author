@@ -1,12 +1,10 @@
-from pymongo.errors import DuplicateKeyError
 from typing import Optional, Dict, List
 from fastapi import HTTPException, status, Request
 from app.core.better_auth_session import (
     validate_better_auth_session,
     get_better_auth_user,
-    SessionStoreUnavailable,
-    when_the_store_answers,
 )
+from app.db.user import as_app_user
 import logging
 
 logger = logging.getLogger(__name__)
@@ -66,43 +64,6 @@ class SessionRoleChecker:
         return user
 
 
-async def _resolve_auto_create_conflict(user_data: Dict) -> Dict:
-    """Resolve a DuplicateKeyError from the auto-create insert.
-
-    An auth_id winner exists: a concurrent first load won the insert (#178);
-    reuse it. No winner: the email index fired (#765) — a stale doc holds this
-    user's better-auth email. better-auth guarantees the address is this user's,
-    so release it from the stale doc and retry once, instead of a 500 on every
-    request forever. Keyed on the winner, not the error's keyPattern, so a
-    differently shaped error can't fall back into the lockout.
-    """
-    from app.db.user import create_user, get_user_by_auth_id, release_email
-
-    auth_id = user_data["auth_id"]
-    user = await get_user_by_auth_id(auth_id)
-    if user:
-        logger.info(f"Concurrent auto-create race for {auth_id}; using the existing record")
-        return user
-
-    released = await release_email(user_data["email"], auth_id)
-    logger.warning(
-        f"Auto-create for {auth_id} collided on email; "
-        f"released it from {released} stale record(s)"
-    )
-    try:
-        return await create_user(user_data)
-    except DuplicateKeyError:
-        # A concurrent first load won the retry; reuse its record.
-        user = await get_user_by_auth_id(auth_id)
-    if user is None:
-        logger.error(f"Auto-create for {auth_id} failed after releasing the email")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user account. Please try signing in again or contact support."
-        )
-    return user
-
-
 async def get_current_user_from_session(request: Request) -> Dict:
     """Get the current authenticated user from better-auth session cookies.
 
@@ -159,122 +120,36 @@ async def get_current_user_from_session(request: Request) -> Dict:
     # Convert ObjectId to string (better-auth stores userId as ObjectId)
     user_id = str(user_id)
 
-    # The better-auth user row must still exist: a session outliving its user
-    # (deleted account, #763) is not a credential.
-    # It comes joined to the session (#826). A session that holds its user id
-    # as text is joined to nothing, and its user is looked up on its own.
+    # The users doc is the user (#1263). It comes joined to the session (#826);
+    # a session that holds its user id as text is joined to nothing, and its
+    # user is looked up on its own. A session outliving its user (deleted
+    # account, #763) is not a credential.
     joined = session.get("user")
-    better_auth_user = joined[0] if joined else await get_better_auth_user(user_id)
-    if not better_auth_user:
-        logger.warning(f"Session for user {user_id} has no better-auth user")
+    user = as_app_user(joined[0] if joined else await get_better_auth_user(user_id))
+    if not user:
+        logger.warning(f"Session for user {user_id} has no user")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found. Please sign up again."
         )
 
-    # Try to find user in application database. A database that cannot be
-    # asked is answered 503 like the two lookups above (#1007), not 500.
-    try:
-        from app.db.user import get_user_by_auth_id
-
-        user = await when_the_store_answers(get_user_by_auth_id(user_id))
-    except SessionStoreUnavailable:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching user {user_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error fetching user",
-        )
-
     # Explicit False: records predating the field are active (schema default).
-    # deleted_at marks the tombstone of an erased account (#784).
-    if user and (user.get("is_active") is False or user.get("deleted_at")):
+    # deleted_at marks an account whose deletion has begun (#784, #1263).
+    if user.get("is_active") is False or user.get("deleted_at"):
         logger.warning(f"Rejected session for deactivated user {user_id}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="This account is no longer active."
         )
 
-    # better-auth owns the verified email; the users doc mirrors it (#765).
-    ba_email = (better_auth_user or {}).get("email")
-    if user and ba_email and user.get("email") != ba_email:
-        try:
-            from app.db.user import release_email, update_user
-
-            await release_email(ba_email, user_id)
-            user = await update_user(user_id, {"email": ba_email}, actor_id=user_id) or user
-        except Exception:
-            # Not an auth failure: serve the stale doc, retry next request.
-            logger.error(f"Failed to mirror email for {user_id}", exc_info=True)
-
-    # Auto-create user if they have a valid session but no backend record
-    if not user:
-        logger.info(
-            f"User {user_id} authenticated with valid session but not found in backend. "
-            "Auto-creating user record from better-auth data."
+    # better-auth refuses to sign in an unverified address (#792). This is the
+    # second lock, for a session that exists anyway.
+    if user.get("emailVerified") is not True:
+        logger.warning(f"Refused a session for unverified user {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Verify your email address to use this account."
         )
-
-        try:
-            from app.db.user import create_user
-            from datetime import datetime, timezone
-
-            # Extract user info from better-auth user
-            email = better_auth_user.get("email")
-            name = better_auth_user.get("name", "")
-
-            if not email:
-                logger.error(f"Better-auth user {user_id} has no email")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid user: missing email. Please sign up again."
-                )
-
-            # better-auth refuses to sign in an unverified address (#792).
-            # This is the second lock, for a session that exists anyway.
-            if better_auth_user.get("emailVerified") is not True:
-                logger.warning(f"Refused to create a record for unverified user {user_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Verify your email address to use this account."
-                )
-
-            # Split name into first/last (fallback to email username if no name)
-            name_parts = name.split(" ", 1) if name else [email.split("@")[0]]
-            first_name = name_parts[0]
-            last_name = name_parts[1] if len(name_parts) > 1 else ""
-
-            # Create user in backend database
-            user_data = {
-                "auth_id": user_id,
-                "email": email,
-                "first_name": first_name,
-                "last_name": last_name,
-                "role": "user",
-                "plan": "free",  # Entitlement default (issue #174)
-                "is_active": True,
-                "created_at": datetime.now(timezone.utc),
-                "updated_at": datetime.now(timezone.utc),
-                "metadata": {},
-                # Stamped by better-auth at sign-up (#789); None for an
-                # account created before the record existed.
-                "terms_version": better_auth_user.get("termsVersion"),
-                "terms_accepted_at": better_auth_user.get("termsAcceptedAt"),
-            }
-
-            user = await create_user(user_data)
-            logger.info(f"Successfully created backend user record (auth_id: {user_id})")
-
-        except HTTPException:
-            raise
-        except DuplicateKeyError:
-            user = await _resolve_auto_create_conflict(user_data)
-        except Exception as e:
-            logger.error(f"Failed to auto-create user {user_id}: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create user account. Please try signing in again or contact support."
-            )
 
     return user
 

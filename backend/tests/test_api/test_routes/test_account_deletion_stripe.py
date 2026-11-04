@@ -92,8 +92,8 @@ async def test_delete_cancels_the_stored_subscription_once(
     call = stripe_stub["requests"][0]
     assert call["path"] == f"/v1/subscriptions/{SUB_ID}"
     assert call["idempotency_key"] == f"account-delete-{SUB_ID}"
-    users = await get_collection("users")
-    doc = await users.find_one({"auth_id": OWNER})
+    assert await (await get_collection("users")).find_one({"_id": OWNER}) is None
+    doc = await (await get_collection("deleted_users")).find_one({"auth_id": OWNER})
     assert set(doc) == {"_id", "auth_id", "deleted_at", "purge_at", "retained"}
     # #954: the cancel resets the plan before the record is written, so the
     # subscription the user was paying for is kept beside it.
@@ -119,7 +119,7 @@ async def test_stripe_failure_returns_502_and_leaves_account_intact(
     assert "boom" not in resp.text  # Stripe's message stays in the server log
     assert len(stripe_stub["requests"]) == 1
     users = await get_collection("users")
-    doc = await users.find_one({"auth_id": OWNER})
+    doc = await users.find_one({"_id": OWNER})
     assert doc["is_active"] is True
     assert doc["stripe_subscription_id"] == SUB_ID  # still retryable
     books = await get_collection("books")
@@ -189,7 +189,7 @@ async def test_cancelled_subscription_leaves_no_live_billing_state(
     monkeypatch.setattr(users_endpoint, "delete_all_user_books", _boom)
     assert (await client.delete("/api/v1/users/me")).status_code == 500
 
-    doc = await (await get_collection("users")).find_one({"auth_id": OWNER})
+    doc = await (await get_collection("users")).find_one({"_id": OWNER})
     assert doc["stripe_subscription_id"] is None
     assert doc["plan"] == "free"
     assert not has_live_subscription(doc)
@@ -244,6 +244,6 @@ async def test_late_pre_cancel_event_cannot_regrant_pro(
 
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "stale_event"
-    doc = await (await get_collection("users")).find_one({"auth_id": OWNER})
+    doc = await (await get_collection("users")).find_one({"_id": OWNER})
     assert (doc["plan"], doc["stripe_subscription_id"]) == ("free", None)
     assert doc["stripe_event_created"] == CANCELED_AT
