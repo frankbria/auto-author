@@ -232,9 +232,16 @@ class TestEraseAndPurge:
         await _make_user("auth-erase")
         await delete_user("auth-erase")
 
+        deleted_at = (await _deleted("auth-erase"))["deleted_at"]
+
         assert await erase_deactivated_user("auth-erase", actor_id="admin-1") is True
 
-        assert await _deleted("auth-erase") is None
+        # The privacy page promises the identifier and deletion date outlive the erasure.
+        erased = await _deleted("auth-erase")
+        assert {key: value for key, value in erased.items() if key != "_id"} == {
+            "auth_id": "auth-erase", "deleted_at": deleted_at,
+        }
+        assert await erase_deactivated_user("auth-erase", actor_id="admin-1") is False
         log = await base.audit_logs_collection.find_one({"action": "user_erase"})
         assert (log["actor_id"], log["target_id"]) == ("admin-1", "auth-erase")
 
@@ -264,7 +271,8 @@ class TestEraseAndPurge:
 
         assert await purge_expired_users() == 1
 
-        assert await _deleted("auth-due") is None
+        due = await _deleted("auth-due")
+        assert set(due) == {"_id", "auth_id", "deleted_at"} and due["auth_id"] == "auth-due"
         assert await _deleted("auth-waiting") == waiting
         assert await get_user_by_auth_id("auth-active") is not None
         assert await purge_expired_users() == 0

@@ -355,11 +355,19 @@ async def delete_user(auth_id: str, actor_id: str = None) -> bool:
     return True
 
 
+# What an erased record keeps: the privacy page promises the account identifier
+# and the date of deletion (#954).
+_ERASED = {"_id": "$_id", "auth_id": "$auth_id", "deleted_at": "$deleted_at"}
+
+
 async def erase_deactivated_user(auth_id: str, actor_id: str) -> bool:
     """Erase a deleted account's kept record before its purge date, for a user
-    who asks support to (#954). False when there is no such record."""
-    result = await (await get_collection("deleted_users")).delete_one({"auth_id": auth_id})
-    if not result.deleted_count:
+    who asks support to (#954), down to _ERASED. False when there is no record
+    left to erase."""
+    result = await (await get_collection("deleted_users")).update_one(
+        {"auth_id": auth_id, "purge_at": {"$exists": True}}, [{"$replaceWith": _ERASED}]
+    )
+    if not result.modified_count:
         return False
     await audit_after_write(
         action="user_erase",
@@ -372,11 +380,11 @@ async def erase_deactivated_user(auth_id: str, actor_id: str) -> bool:
 
 async def purge_expired_users() -> int:
     """Erase every deleted account's kept record whose purge date has passed
-    (#954). Run daily by the housekeeping task."""
-    result = await (await get_collection("deleted_users")).delete_many(
-        {"purge_at": {"$lte": datetime.now(timezone.utc)}}
+    (#954), down to _ERASED. Run daily by the housekeeping task."""
+    result = await (await get_collection("deleted_users")).update_many(
+        {"purge_at": {"$lte": datetime.now(timezone.utc)}}, [{"$replaceWith": _ERASED}]
     )
-    return result.deleted_count
+    return result.modified_count
 
 
 async def erase_stranded_identities() -> int:

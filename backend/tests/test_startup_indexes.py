@@ -122,11 +122,12 @@ async def test_lifespan_purges_expired_deactivated_accounts(reinit_db):
     )
     async with app.router.lifespan_context(app):
         for _ in range(100):
-            if not await records.count_documents({"auth_id": "expired"}):
+            if not await records.count_documents({"auth_id": "expired", "purge_at": {"$exists": True}}):
                 break
             await asyncio.sleep(0.05)
 
-    assert await records.count_documents({"auth_id": "expired"}) == 0
+    assert await records.count_documents({"auth_id": "expired", "purge_at": {"$exists": True}}) == 0
+    assert await records.count_documents({"auth_id": "expired"}) == 1  # id and date kept
 
 
 def _assert_audit_indexes(indexes):

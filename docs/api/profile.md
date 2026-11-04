@@ -271,7 +271,7 @@ curl -X GET "http://localhost:8000/api/v1/users/admin/users" \
 
 Deletes an active account exactly as `DELETE /users/me` does. For an admin, the
 same call on an account that is already deleted erases its `deleted_users`
-record (#954).
+record down to the account id and deletion date (#954).
 
 **Endpoint**: `DELETE /users/{auth_id}`
 

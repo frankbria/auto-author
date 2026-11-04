@@ -226,8 +226,8 @@ async def test_deletion_keeps_the_account_record_until_an_admin_erases_it(
     reinit_db,
 ):
     """#954: DELETE /users/me keeps the name, email and billing identity in
-    deleted_users and nowhere else. An admin's DELETE then erases that record,
-    and nothing that identifies the person survives."""
+    deleted_users and nowhere else. An admin's DELETE then erases that record
+    down to its id and deletion date, and nothing that identifies the person survives."""
     email = "erase.me@example.com"
     identifying = (email, "Zebedee", "Quillfeather", "cus_erase_me")
     seeded = await _seed_better_auth_user(email, name="Zebedee Quillfeather")
@@ -280,7 +280,8 @@ async def test_deletion_keeps_the_account_record_until_an_admin_erases_it(
     async with _client(support["tokens"][0]) as c:
         erase = await c.delete(f"/api/v1/users/{seeded['user_id']}")
         assert erase.status_code == 204, erase.text
-        assert await _kept(seeded["user_id"]) is None
+        # Only the identifier and deletion date stay, as the privacy page says.
+        assert set(await _kept(seeded["user_id"])) == {"_id", "auth_id", "deleted_at"}
         assert await _docs_mentioning(*identifying) == []
 
         again = await c.delete(f"/api/v1/users/{seeded['user_id']}")
