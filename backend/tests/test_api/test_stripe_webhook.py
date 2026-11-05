@@ -22,7 +22,8 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.endpoints import webhooks
 from app.core.config import settings
-from app.db.user import create_user, get_user_by_auth_id
+from app.db.user import get_user_by_auth_id
+from tests.user_docs import insert_user
 
 pytestmark = pytest.mark.asyncio
 
@@ -103,7 +104,9 @@ async def _seed_user(**overrides):
         "is_active": True,
     }
     data.update(overrides)
-    return await create_user(data)
+    auth_id = data.pop("auth_id")
+    await insert_user(auth_id, **data)
+    return await get_user_by_auth_id(auth_id)
 
 
 class TestSignatureVerification:
@@ -273,31 +276,35 @@ async def _post_signed(client, payload: bytes):
     )
 
 
-@pytest.mark.parametrize(
-    "metadata,status",
-    [({"auth_id": "auth-stripe-1"}, "account_closed"), ({}, "no_matching_user")],
-)
-async def test_late_event_writes_nothing_onto_a_deactivated_account(
-    webhook_client, metadata, status
-):
-    """#954: the customer id moves under ``retained`` with the account, so
-    Stripe's late events find the record through the metadata fallback or not at
-    all. Either way they are acknowledged and change nothing: the plan is not
-    put back, and no second record is created for the customer."""
+@pytest.mark.parametrize("finished", [False, True], ids=["being-deleted", "deleted"])
+async def test_late_event_writes_nothing_onto_a_deleted_account(webhook_client, finished):
+    """#954, #1263: Stripe's late events for an account being deleted, or
+    already deleted (its deleted_users record), are acknowledged as a closed
+    account, not reported as unmatched: cancelling a paying user's subscription
+    on deletion always produces one. They change nothing: the plan is not put
+    back, and no second record is created for the customer."""
+    from datetime import datetime, timezone
+
     from app.db import base
-    from app.db.user import delete_user
+    from app.db.user import delete_user, user_key
 
     await _seed_user(stripe_customer_id="cus_test_1")
-    await delete_user("auth-stripe-1")
-    before = await get_user_by_auth_id("auth-stripe-1")
-    assert before["retained"]["stripe_customer_id"] == "cus_test_1"
+    if finished:
+        await delete_user("auth-stripe-1")
+    else:
+        await base.users_collection.update_one(
+            user_key("auth-stripe-1"), {"$set": {"deleted_at": datetime.now(timezone.utc)}}
+        )
+    before = await base.users_collection.find_one({})
 
-    resp = await _post_signed(webhook_client, subscription_event(metadata=metadata))
+    resp = await _post_signed(
+        webhook_client, subscription_event(metadata={"auth_id": "auth-stripe-1"})
+    )
 
     assert resp.status_code == 200
-    assert resp.json() == {"status": status}
-    assert await get_user_by_auth_id("auth-stripe-1") == before
-    assert await base.users_collection.count_documents({}) == 1
+    assert resp.json() == {"status": "account_closed"}
+    assert await base.users_collection.find_one({}) == before
+    assert await base.users_collection.count_documents({}) == (0 if finished else 1)
 
 
 class TestSubscriptionStatus:

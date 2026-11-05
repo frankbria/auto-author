@@ -50,7 +50,7 @@ async def test_the_user_is_read_again_on_every_request(make_client):
     client = await make_client()
     before = (await client.get("/api/v1/users/me")).json()
 
-    _sync_users.update_one({"auth_id": before["auth_id"]}, {"$set": {"first_name": "Renamed"}})
+    _sync_users.update_one({"_id": before["auth_id"]}, {"$set": {"first_name": "Renamed"}})
 
     assert (await client.get("/api/v1/users/me")).json()["first_name"] == "Renamed"
 
@@ -60,7 +60,7 @@ async def test_a_user_who_is_no_longer_in_the_database_is_not_signed_in(make_cli
     client = await make_client()
     me = (await client.get("/api/v1/users/me")).json()
 
-    _sync_users.delete_one({"auth_id": me["auth_id"]})
+    _sync_users.delete_one({"_id": me["auth_id"]})
 
     assert (await client.get("/api/v1/users/me")).status_code == 401
 

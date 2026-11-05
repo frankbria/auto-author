@@ -64,6 +64,16 @@ describe('Terms acceptance recorded at sign-up (issue #789)', () => {
     expect(options.databaseHooks.user.create.before).toBe(stampTermsAcceptance);
   });
 
+  // The backend reads the same document as its user (#1263).
+  it('keeps users in the users collection the backend reads', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    const { options } = (await getAuth()) as unknown as {
+      options: { user: { modelName: string } };
+    };
+
+    expect(options.user.modelName).toBe('users');
+  });
+
   it('versions the Terms by an ISO date', () => {
     expect(TERMS_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });

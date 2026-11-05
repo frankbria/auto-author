@@ -3,6 +3,7 @@
 import logging
 
 from .base import books_collection, users_collection
+from .user import user_key, was_deleted
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
@@ -35,14 +36,19 @@ async def create_book(book_data: Dict, user_auth_id: str) -> Dict:
 
         # Associate the book with the user
         attached = await users_collection.update_one(
-            # Never onto a tombstone (deleted account, #784).
-            {"auth_id": user_auth_id, "deleted_at": {"$exists": False}},
+            # Never onto an account being deleted (#784).
+            {**user_key(user_auth_id), "deleted_at": {"$exists": False}},
             {"$push": {"book_ids": str(book_obj.id)}},
         )
         # An insert that lands after delete_user's second cascade (#945) finds
-        # the tombstone here: the book has no children or cover yet.
-        if not attached.matched_count and await users_collection.count_documents(
-            {"auth_id": user_auth_id, "deleted_at": {"$exists": True}}, limit=1
+        # the account marked deleted, or its deleted_users record once the
+        # document is gone: the book has no children or cover yet. Not "no
+        # document": the BYPASS_AUTH test user has none.
+        if not attached.matched_count and (
+            await users_collection.count_documents(
+                {**user_key(user_auth_id), "deleted_at": {"$exists": True}}, limit=1
+            )
+            or await was_deleted(user_auth_id)
         ):
             await books_collection.delete_one({"_id": result.inserted_id})
             raise ValueError("The account was deleted")

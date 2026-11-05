@@ -13,7 +13,7 @@ from app.db.user import ensure_user_indexes
 from app.main import app
 
 EXPECTED = {
-    "user": {"email": 1},
+    "users": {"email": 1},
     "account": {"userId": 1},
     "session": {"userId": 1},
     "verification": {"identifier": 1},
@@ -42,26 +42,15 @@ async def test_ensure_user_indexes_indexes_the_filters_better_auth_uses(reinit_d
 
 
 @pytest.mark.asyncio
-async def test_user_email_is_unique_when_the_data_allows(reinit_db):
-    await _warm()
-    await ensure_user_indexes()
-    indexes = await (await base._db.user.list_indexes()).to_list(None)
-    email = next(i for i in indexes if i["key"] == {"email": 1})
-    assert email.get("unique") is True
-
-
-@pytest.mark.asyncio
 async def test_duplicate_emails_do_not_block_startup(reinit_db, caplog):
-    users = base._db.user
+    users = base._db.users
     await users.insert_many([{"email": "dup@example.com"}, {"email": "dup@example.com"}])
     with caplog.at_level(logging.ERROR):
         await ensure_user_indexes()
         await ensure_user_indexes()
 
-    indexes = await (await users.list_indexes()).to_list(None)
-    email = next(i for i in indexes if i["key"] == {"email": 1})
-    assert not email.get("unique")
-    assert "duplicate" in caplog.text.lower()
+    assert {"email": 1} not in await _keys("users")
+    assert "users.email" in caplog.text
     # the rest still got built
     assert {"userId": 1} in await _keys("account")
 

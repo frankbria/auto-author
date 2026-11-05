@@ -103,27 +103,37 @@ class TestGetCurrentUserFromSession:
 
     @patch("app.core.security.validate_better_auth_session")
     @patch("app.core.security.get_better_auth_user")
-    @patch("app.db.user.get_user_by_auth_id")
     @patch("app.core.config.settings")
     async def test_get_current_user_from_session_valid_session(
-        self, mock_settings, mock_get_user, mock_get_auth_user, mock_validate
+        self, mock_settings, mock_get_auth_user, mock_validate
     ):
-        """Test get_current_user_from_session with valid session"""
+        """The users doc is the user (#1263): its _id becomes auth_id."""
         mock_settings.BYPASS_AUTH = False
         mock_validate.return_value = {"userId": "user_123"}
-        mock_get_auth_user.return_value = {"id": "user_123", "email": "test@example.com"}
-        mock_get_user.return_value = {
-            "auth_id": "user_123",
-            "email": "test@example.com",
-            "role": "user"
+        mock_get_auth_user.return_value = {
+            "_id": "user_123", "email": "test@example.com", "emailVerified": True,
         }
 
-        mock_request = Mock(spec=Request)
-
-        result = await get_current_user_from_session(mock_request)
+        result = await get_current_user_from_session(Mock(spec=Request))
 
         assert result["auth_id"] == "user_123"
         assert result["email"] == "test@example.com"
+        assert (result["role"], result["plan"]) == ("user", "free")
+
+    @patch("app.core.security.validate_better_auth_session")
+    @patch("app.core.security.get_better_auth_user")
+    @patch("app.core.config.settings")
+    async def test_the_user_joined_to_the_session_needs_no_second_read(
+        self, mock_settings, mock_get_auth_user, mock_validate
+    ):
+        mock_settings.BYPASS_AUTH = False
+        joined = {"_id": "user_123", "email": "test@example.com", "emailVerified": True}
+        mock_validate.return_value = {"userId": "user_123", "user": [joined]}
+
+        result = await get_current_user_from_session(Mock(spec=Request))
+
+        assert result["auth_id"] == "user_123"
+        mock_get_auth_user.assert_not_called()
 
     @patch("app.core.security.validate_better_auth_session")
     @patch("app.core.config.settings")
@@ -145,68 +155,13 @@ class TestGetCurrentUserFromSession:
 
     @patch("app.core.security.validate_better_auth_session")
     @patch("app.core.security.get_better_auth_user")
-    @patch("app.db.user.get_user_by_auth_id")
-    @patch("app.db.user.create_user")
-    @patch("app.core.config.settings")
-    async def test_get_current_user_from_session_auto_creates_user(
-        self, mock_settings, mock_create_user, mock_get_user, mock_get_auth_user, mock_validate
-    ):
-        """Test get_current_user_from_session auto-creates user when not in database"""
-        mock_settings.BYPASS_AUTH = False
-        mock_validate.return_value = {"userId": "user_123"}
-        mock_get_auth_user.return_value = {
-            "id": "user_123",
-            "email": "test@example.com",
-            "name": "Test User",
-            "emailVerified": True,
-        }
-        mock_get_user.return_value = None  # User not in backend database
-        created_user = {
-            "id": "new_user_id",
-            "auth_id": "user_123",
-            "email": "test@example.com",
-            "first_name": "Test",
-            "last_name": "User"
-        }
-        mock_create_user.return_value = created_user
-
-        mock_request = Mock(spec=Request)
-
-        result = await get_current_user_from_session(mock_request)
-
-        assert result == created_user
-        mock_create_user.assert_called_once()
-
-    @patch("app.core.security.validate_better_auth_session")
-    @patch("app.core.security.get_better_auth_user")
-    @patch("app.db.user.get_user_by_auth_id")
-    @patch("app.core.config.settings")
-    async def test_get_current_user_from_session_db_error(
-        self, mock_settings, mock_get_user, mock_get_auth_user, mock_validate
-    ):
-        """DB error while fetching the application user surfaces as a 500."""
-        mock_settings.BYPASS_AUTH = False
-        mock_validate.return_value = {"userId": "user_123"}
-        mock_get_auth_user.return_value = {"id": "user_123", "email": "test@example.com"}
-        mock_get_user.side_effect = Exception("connection lost")
-
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user_from_session(Mock(spec=Request))
-
-        assert exc_info.value.status_code == 500
-        assert "Error fetching user" in exc_info.value.detail
-
-    @patch("app.core.security.validate_better_auth_session")
-    @patch("app.core.security.get_better_auth_user")
-    @patch("app.db.user.get_user_by_auth_id")
     @patch("app.core.config.settings")
     async def test_get_current_user_from_session_unknown_user(
-        self, mock_settings, mock_get_user, mock_get_auth_user, mock_validate
+        self, mock_settings, mock_get_auth_user, mock_validate
     ):
-        """Valid session but user missing from both backend and better-auth -> 401."""
+        """Valid session but no users doc -> 401; nothing creates one (#1263)."""
         mock_settings.BYPASS_AUTH = False
         mock_validate.return_value = {"userId": "user_123"}
-        mock_get_user.return_value = None
         mock_get_auth_user.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
@@ -215,121 +170,44 @@ class TestGetCurrentUserFromSession:
         assert exc_info.value.status_code == 401
         assert "User not found" in exc_info.value.detail
 
+    @pytest.mark.parametrize(
+        "closed", [{"is_active": False}, {"deleted_at": "2026-11-04"}], ids=["inactive", "deleting"]
+    )
     @patch("app.core.security.validate_better_auth_session")
     @patch("app.core.security.get_better_auth_user")
-    @patch("app.db.user.get_user_by_auth_id")
     @patch("app.core.config.settings")
-    async def test_get_current_user_from_session_auto_create_missing_email(
-        self, mock_settings, mock_get_user, mock_get_auth_user, mock_validate
+    async def test_a_closed_account_is_refused(
+        self, mock_settings, mock_get_auth_user, mock_validate, closed
     ):
-        """Auto-create aborts with 400 when better-auth user has no email."""
         mock_settings.BYPASS_AUTH = False
         mock_validate.return_value = {"userId": "user_123"}
-        mock_get_user.return_value = None
-        mock_get_auth_user.return_value = {"id": "user_123", "name": "No Email"}
+        mock_get_auth_user.return_value = {
+            "_id": "user_123", "email": "test@example.com", "emailVerified": True, **closed,
+        }
 
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user_from_session(Mock(spec=Request))
 
-        assert exc_info.value.status_code == 400
-        assert "missing email" in exc_info.value.detail
+        assert exc_info.value.status_code == 401
 
+    @pytest.mark.parametrize("verified", [{}, {"emailVerified": False}], ids=["missing", "false"])
     @patch("app.core.security.validate_better_auth_session")
     @patch("app.core.security.get_better_auth_user")
-    @patch("app.db.user.get_user_by_auth_id")
-    @patch("app.db.user.create_user")
     @patch("app.core.config.settings")
-    async def test_get_current_user_from_session_auto_create_failure(
-        self, mock_settings, mock_create_user, mock_get_user, mock_get_auth_user, mock_validate
+    async def test_an_unverified_address_is_refused_on_every_request(
+        self, mock_settings, mock_get_auth_user, mock_validate, verified
     ):
-        """A failure during auto-create surfaces as a 500."""
+        """#792: better-auth refuses the sign-in; this is the second lock."""
         mock_settings.BYPASS_AUTH = False
         mock_validate.return_value = {"userId": "user_123"}
-        mock_get_user.return_value = None
         mock_get_auth_user.return_value = {
-            "id": "user_123",
-            "email": "test@example.com",
-            "name": "Test User",
-            "emailVerified": True,
+            "_id": "user_123", "email": "test@example.com", "plan": "pro", **verified,
         }
-        mock_create_user.side_effect = Exception("insert failed")
 
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user_from_session(Mock(spec=Request))
 
-        assert exc_info.value.status_code == 500
-        assert "Failed to create user account" in exc_info.value.detail
-
-    @patch("app.core.security.validate_better_auth_session")
-    @patch("app.core.security.get_better_auth_user")
-    @patch("app.db.user.get_user_by_auth_id")
-    @patch("app.db.user.create_user")
-    @patch("app.core.config.settings")
-    async def test_get_current_user_from_session_auto_create_race_reuses_winner(
-        self, mock_settings, mock_create_user, mock_get_user, mock_get_auth_user, mock_validate
-    ):
-        """Concurrent first-load race (issue #178): create_user raises
-        DuplicateKeyError because a parallel request already inserted; the path
-        re-fetches and returns that winning record instead of erroring."""
-        from pymongo.errors import DuplicateKeyError
-
-        winner = {
-            "id": "winner_id",
-            "auth_id": "user_123",
-            "email": "test@example.com",
-            "first_name": "Test",
-        }
-        mock_settings.BYPASS_AUTH = False
-        mock_validate.return_value = {"userId": "user_123"}
-        mock_get_auth_user.return_value = {
-            "id": "user_123",
-            "email": "test@example.com",
-            "name": "Test User",
-            "emailVerified": True,
-        }
-        # First call (pre-check) finds nothing; re-fetch after the race returns the winner.
-        mock_get_user.side_effect = [None, winner]
-        mock_create_user.side_effect = DuplicateKeyError("dup auth_id")
-
-        result = await get_current_user_from_session(Mock(spec=Request))
-
-        assert result == winner
-
-    @patch("app.core.security.validate_better_auth_session")
-    @patch("app.core.security.get_better_auth_user")
-    @patch("app.db.user.release_email")
-    @patch("app.db.user.get_user_by_auth_id")
-    @patch("app.db.user.create_user")
-    @patch("app.core.config.settings")
-    async def test_get_current_user_from_session_auto_create_unresolvable_duplicate(
-        self, mock_settings, mock_create_user, mock_get_user, mock_release,
-        mock_get_auth_user, mock_validate
-    ):
-        """No auth_id winner, the email released, and the retry still collides
-        with no winner to reuse: surface a 500 rather than returning None. (An
-        ordinary email collision no longer 500s — #765, covered on real Mongo in
-        test_email_ownership.py.)"""
-        from pymongo.errors import DuplicateKeyError
-
-        mock_settings.BYPASS_AUTH = False
-        mock_validate.return_value = {"userId": "user_123"}
-        mock_get_auth_user.return_value = {
-            "id": "user_123",
-            "email": "test@example.com",
-            "name": "Test User",
-            "emailVerified": True,
-        }
-        mock_get_user.return_value = None  # pre-check, winner check, re-fetch
-        mock_release.return_value = 0
-        mock_create_user.side_effect = DuplicateKeyError("dup")
-
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user_from_session(Mock(spec=Request))
-
-        assert exc_info.value.status_code == 500
-        assert "Failed to create user account" in exc_info.value.detail
-        assert mock_create_user.call_count == 2  # one release-and-retry, no loop
-        mock_release.assert_awaited_once_with("test@example.com", "user_123")
+        assert exc_info.value.status_code == 403
 
 
 @pytest.mark.asyncio

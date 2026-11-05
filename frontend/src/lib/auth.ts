@@ -38,8 +38,11 @@ function createAuthInstance(database: Db) {
     // TOTP two-factor authentication (#64). The MongoDB adapter creates the
     // twoFactor collection on demand — no migration step required.
     plugins: [twoFactor()],
-    // Every new account records the Terms version it accepted and when (#789).
-    user: { additionalFields: termsAcceptanceFields },
+    // One users collection (#1263): the backend keeps its profile, plan and
+    // billing fields on the document better-auth creates here. The adapter
+    // only ever $sets fields, so it leaves those alone. Every new account
+    // records the Terms version it accepted and when (#789).
+    user: { modelName: "users", additionalFields: termsAcceptanceFields },
     databaseHooks: { user: { create: { before: stampTermsAcceptance } } },
     // The password rule the pages show is enforced here too (#794).
     hooks: {

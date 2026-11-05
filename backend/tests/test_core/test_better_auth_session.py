@@ -226,7 +226,7 @@ class TestGetBetterAuthUser:
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             user = await bas.get_better_auth_user(oid)
         assert user["email"] == "c@d.com"
-        coll.find_one.assert_awaited_once_with({"_id": ObjectId(oid)})
+        coll.find_one.assert_awaited_once_with({"_id": ObjectId(oid)}, {"book_ids": 0})
 
     async def test_an_id_that_is_not_an_objectid_is_looked_for_as_it_is(self):
         coll = AsyncMock()
@@ -234,7 +234,7 @@ class TestGetBetterAuthUser:
         with patch.object(bas, "get_collection", AsyncMock(return_value=coll)):
             user = await bas.get_better_auth_user("u1")
         assert user["email"] == "a@b.com"
-        coll.find_one.assert_awaited_once_with({"_id": "u1"})
+        coll.find_one.assert_awaited_once_with({"_id": "u1"}, {"book_ids": 0})
 
     async def test_not_found_returns_none(self):
         coll = AsyncMock()

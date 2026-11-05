@@ -171,6 +171,8 @@ from app.api.endpoints import chapter_questions as chapter_questions_endpoint
 from app.api.endpoints import chapter_ai as chapter_ai_endpoint
 from bson import ObjectId
 from unittest.mock import patch as _mock_patch
+from app.db.user import as_app_user
+from tests.user_docs import user_doc
 
 pytest_plugins = ["pytest_asyncio"]
 
@@ -376,6 +378,16 @@ def fake_user():
     }
 
 
+def _store_user(user: dict) -> dict:
+    """``user`` stored as better-auth stores it, keyed by its auth_id (#1263),
+    and returned as the app reads it. A second client for the same auth_id is
+    the same account, so its overrides replace the first's."""
+    fields = {k: v for k, v in user.items() if k not in ("_id", "id", "auth_id")}
+    doc = user_doc(user["auth_id"], **fields)
+    _sync_users.replace_one({"_id": doc["_id"]}, doc, upsert=True)
+    return as_app_user(doc)
+
+
 def _signed_in_as(user_map: dict):
     """The stand-in both client factories put in place of the sign-in check (#838).
 
@@ -391,7 +403,7 @@ def _signed_in_as(user_map: dict):
         user = _sync_users.find_one({"_id": seeded["_id"]}) if seeded else None
         if not user:
             raise HTTPException(status_code=401, detail="Not authenticated. Please sign in.")
-        return user
+        return as_app_user(user)
 
     return _get_user_from_session
 
@@ -412,14 +424,8 @@ async def auth_client_factory(reinit_db, monkeypatch, test_user):
     created_clients = []
     user_map = {}  # Map from session_token to user
 
-    def _seed_user(overrides: dict = None):
-        user = test_user.copy()
-        user["_id"] = ObjectId()  # brand new each time
-        user["id"] = str(user["_id"])
-        if overrides:
-            user.update(overrides)
-        _sync_users.insert_one(user)
-        return user
+    def _seed_user(overrides: dict | None = None):
+        return _store_user({**test_user, **(overrides or {})})
 
     async def make_client(*, overrides: dict = None, auth: bool = True):
         user = _seed_user(overrides)
@@ -521,14 +527,8 @@ async def async_client_factory(reinit_db, monkeypatch, test_user):
     created_clients = []
     user_map = {}  # Map from session_token to user
 
-    def _seed_user(overrides: dict | None):
-        user = test_user.copy()
-        user["_id"] = ObjectId()
-        user["id"] = str(user["_id"])
-        if overrides:
-            user.update(overrides)
-        _sync_users.insert_one(user)
-        return user
+    def _seed_user(overrides: dict | None = None):
+        return _store_user({**test_user, **(overrides or {})})
 
     async def make_client(*, overrides: dict | None = None, auth: bool = True):
         user = _seed_user(overrides)

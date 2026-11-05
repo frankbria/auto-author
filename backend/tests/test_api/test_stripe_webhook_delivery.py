@@ -138,7 +138,7 @@ class TestOutOfOrderDelivery:
         async def lookup_then_newer_event_lands(customer_id):
             snapshot = await real_lookup(customer_id)
             await db_base.users_collection.update_one(
-                {"auth_id": "auth-stripe-1"}, {"$set": {"stripe_event_created_by_subscription.sub_test_1": 9_000}}
+                {"_id": "auth-stripe-1"}, {"$set": {"stripe_event_created_by_subscription.sub_test_1": 9_000}}
             )
             return snapshot  # the handler now holds a stale read
 

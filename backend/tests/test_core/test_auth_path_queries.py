@@ -4,7 +4,8 @@ It used to ask five things: the session by its token, with no index on the
 token; a write to the session; the better-auth user by a field, ``id``, that
 better-auth's MongoDB adapter does not write, which scanned the collection and
 found nothing; the same user by ``_id``; and the application's record of the
-user, with every book id the user has ever had.
+user, with every book id the user has ever had. Since #1263 the user and the
+application's record are one users document, joined to the session.
 
 The data here is in the shape better-auth writes it, and the database is asked
 what it was asked: its profiler records each command and the plan it ran.
@@ -32,11 +33,12 @@ WRITES = {"insert", "update", "remove"}
 
 
 async def _signed_in(*, last_active: timedelta = timedelta(0)) -> tuple[Request, ObjectId]:
-    """A user as better-auth stores one, a live session, the application's record, and the indexes."""
+    """A user as better-auth stores one, with the application's fields, a live session, and the indexes."""
     oid = ObjectId()
     now = datetime.now(timezone.utc)
-    await base._db["user"].insert_many([
-        {"_id": oid, "email": "writer@example.com", "name": "A Writer", "emailVerified": True},
+    await base.users_collection.insert_many([
+        {"_id": oid, "email": "writer@example.com", "name": "A Writer", "emailVerified": True,
+         "is_active": True, "book_ids": [str(ObjectId()) for _ in range(40)]},
         *({"_id": ObjectId(), "email": f"other{n}@example.com"} for n in range(5)),
     ])
     await base._db["session"].insert_many([
@@ -44,10 +46,6 @@ async def _signed_in(*, last_active: timedelta = timedelta(0)) -> tuple[Request,
          "createdAt": now - timedelta(days=1), "updatedAt": now - last_active},
         *({"token": f"tok-{ObjectId()}", "userId": ObjectId(), "expiresAt": now} for _ in range(5)),
     ])
-    await base.users_collection.insert_one({
-        "auth_id": str(oid), "email": "writer@example.com", "is_active": True,
-        "book_ids": [str(ObjectId()) for _ in range(40)],
-    })
     await ensure_user_indexes()
     cookie = f"better-auth.session_token={signed_session_cookie(f'tok-{oid}')}".encode()
     return Request({"type": "http", "headers": [(b"cookie", cookie)]}), oid
@@ -55,7 +53,7 @@ async def _signed_in(*, last_active: timedelta = timedelta(0)) -> tuple[Request,
 
 @asynccontextmanager
 async def _asked():
-    """What the database is asked inside the block, about the three collections sign-in uses."""
+    """What the database is asked inside the block, about the two collections sign-in uses."""
     asked = []
     await base._db.command("profile", 2)
     try:
@@ -64,7 +62,7 @@ async def _asked():
         await base._db.command("profile", 0)
         name = base._db.name
         asked.extend(await base._db["system.profile"].find(
-            {"ns": {"$in": [f"{name}.session", f"{name}.user", f"{name}.users"]}}
+            {"ns": {"$in": [f"{name}.session", f"{name}.users"]}}
         ).to_list(None))
 
 
@@ -77,7 +75,7 @@ def _values(explained, key):
     return []
 
 
-async def test_a_signed_in_request_reads_twice_and_writes_nothing(reinit_db):
+async def test_a_signed_in_request_reads_once_and_writes_nothing(reinit_db):
     request, oid = await _signed_in()
 
     async with _asked() as asked:
@@ -86,8 +84,8 @@ async def test_a_signed_in_request_reads_twice_and_writes_nothing(reinit_db):
     assert user["auth_id"] == str(oid)
     what = [(entry["op"], entry["ns"].split(".", 1)[1]) for entry in asked]
     assert [op for op, _ in what if op in WRITES] == [], what
-    assert len([op for op, _ in what if op in READS]) <= 2, what
-    assert len(what) >= 2, f"the profiler recorded too little to count: {what}"
+    assert len([op for op, _ in what if op in READS]) <= 1, what
+    assert len(what) >= 1, f"the profiler recorded too little to count: {what}"
 
 
 async def test_nothing_it_asks_scans_a_collection(reinit_db):
@@ -99,7 +97,6 @@ async def test_nothing_it_asks_scans_a_collection(reinit_db):
     plans = [(entry["ns"].split(".", 1)[1], entry.get("planSummary", "")) for entry in asked]
     assert not [plan for _, plan in plans if "COLLSCAN" in plan], plans
     assert [plan for collection, plan in plans if collection == "session" and "token" in plan], plans
-    assert [plan for collection, plan in plans if collection == "users" and "auth_id" in plan], plans
 
 
 async def test_the_user_is_found_through_the_index_on_its_id(reinit_db):
@@ -155,9 +152,9 @@ async def test_last_active_is_written_once_it_is_out_of_date(reinit_db):
 
 
 async def test_a_session_whose_user_is_gone_is_refused(reinit_db):
-    """A session that outlives its better-auth user is not a credential (#763)."""
+    """A session that outlives its user is not a credential (#763)."""
     request, oid = await _signed_in()
-    await base._db["user"].delete_one({"_id": oid})
+    await base.users_collection.delete_one({"_id": oid})
 
     with pytest.raises(HTTPException) as refused:
         await get_current_user_from_session(request)
@@ -173,17 +170,6 @@ async def test_a_session_holding_its_user_id_as_text_still_signs_in(reinit_db):
     user = await get_current_user_from_session(request)
 
     assert user["auth_id"] == str(oid)
-
-
-async def test_the_better_auth_email_is_still_mirrored(reinit_db):
-    """The joined user is the one whose email the application's record follows (#765)."""
-    request, oid = await _signed_in()
-    await base._db["user"].update_one({"_id": oid}, {"$set": {"email": "renamed@example.com"}})
-
-    user = await get_current_user_from_session(request)
-
-    assert user["email"] == "renamed@example.com"
-    assert (await base.users_collection.find_one({"auth_id": str(oid)}))["email"] == "renamed@example.com"
 
 
 async def test_sessions_are_indexed_by_token(reinit_db):

@@ -55,8 +55,8 @@ async def test_account_deletion_successful(auth_client_factory):
 @pytest.mark.asyncio
 async def test_account_deletion_with_data_cleanup(auth_client_factory):
     """DELETE /users/me cascades the user's books and their questions,
-    responses, ratings and access logs; the user record itself is deactivated
-    (#954). Issue #179."""
+    responses, ratings and access logs; the user's record is kept in
+    deleted_users (#954, #1263). Issue #179."""
     client = await auth_client_factory()
     owner_id = "test-auth-id-123"  # conftest test_user auth_id
 
@@ -87,9 +87,10 @@ async def test_account_deletion_with_data_cleanup(auth_client_factory):
         await questions.count_documents({"book_id": other_book}) == 1
     ), "another user's data must not be touched"
 
-    user_doc = await users.find_one({"auth_id": owner_id})
-    assert user_doc is not None, "the record is kept, not removed"
-    assert set(user_doc) == {"_id", "auth_id", "deleted_at", "purge_at", "retained"}
+    assert await users.find_one({"_id": owner_id}) is None
+    kept = await (await get_collection("deleted_users")).find_one({"auth_id": owner_id})
+    assert kept is not None, "the record is kept in deleted_users (#1263)"
+    assert set(kept) == {"_id", "auth_id", "deleted_at", "purge_at", "retained"}
 
 
 @pytest.mark.asyncio
@@ -116,7 +117,7 @@ async def test_account_deletion_cascade_failure_keeps_user_active(
     books = await get_collection("books")
     users = await get_collection("users")
     assert await books.find_one({"_id": ObjectId(book_id)}) is not None
-    user_doc = await users.find_one({"auth_id": owner_id})
+    user_doc = await users.find_one({"_id": owner_id})
     assert (
         user_doc["is_active"] is True
     ), "user must stay active after a failed cascade"
@@ -168,7 +169,7 @@ async def test_delete_by_auth_id_cascade_failure_keeps_user_active(
     books = await get_collection("books")
     users = await get_collection("users")
     assert await books.find_one({"_id": ObjectId(book_id)}) is not None
-    user_doc = await users.find_one({"auth_id": owner_id})
+    user_doc = await users.find_one({"_id": owner_id})
     assert user_doc["is_active"] is True
 
 

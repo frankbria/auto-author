@@ -255,7 +255,7 @@ async def lifespan(app: FastAPI):
         # Create indexes for question collections
         await ensure_question_indexes()
 
-        # Create unique indexes guarding against duplicate user records (issue #178)
+        # The users and deleted_users indexes (#178, #1263)
         await ensure_user_indexes()
 
         # audit_logs 90-day TTL + actor index, backfill of legacy rows (issue #787)
@@ -291,8 +291,8 @@ async def lifespan(app: FastAPI):
     # On the app, so that a test (or anything else) can wait for it.
     app.state.database_prepared = asyncio.create_task(prepare_database_when_it_is_there())
 
-    # Erase deactivated accounts whose 18 months are up (#954): now, then daily,
-    # so the purge does not wait for the next deploy.
+    # Erase deleted accounts' records whose 18 months are up (#954): now, then
+    # daily, so the purge does not wait for the next deploy.
     async def purge_daily():
         while True:
             try:
