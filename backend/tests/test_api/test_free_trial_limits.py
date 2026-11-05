@@ -128,15 +128,19 @@ async def test_increment_usage_without_ttl_sets_no_expiry(reinit_db):
 
 async def _seed_user(auth_id, plan="free", email="someone@example.com"):
     from app.db.base import users_collection
+    from app.db.user import as_app_user
 
-    await users_collection.insert_one({"auth_id": auth_id, "plan": plan, "email": email})
-    return {"auth_id": auth_id, "plan": plan, "email": email}
+    # Stored as better-auth stores it: keyed by _id, no auth_id field (#1263).
+    doc = {"_id": auth_id, "plan": plan, "email": email}
+    await users_collection.insert_one(doc)
+    return as_app_user(doc)
 
 
 async def _drafted(auth_id):
     from app.db.base import users_collection
+    from app.db.user import user_key
 
-    doc = await users_collection.find_one({"auth_id": auth_id})
+    doc = await users_collection.find_one(user_key(auth_id))
     return doc.get("trial_draft_chapters", [])
 
 

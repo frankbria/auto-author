@@ -336,6 +336,7 @@ async def claim_trial_draft_chapter(current_user: Dict, book_id: str, chapter_id
         DEFAULT_PLAN, TRIAL_DENIAL_MESSAGES, draft_chapter_cap_for_plan,
     )
     from app.db.base import users_collection
+    from app.db.user import user_key
     from app.utils.error_handlers import handle_entitlement_denied
 
     if settings.BYPASS_AUTH or not settings.PLAN_ENFORCEMENT_ENABLED:
@@ -350,7 +351,7 @@ async def claim_trial_draft_chapter(current_user: Dict, book_id: str, chapter_id
     key = f"{book_id}:{chapter_id}"
     result = await users_collection.update_one(
         {
-            "auth_id": current_user.get("auth_id"),
+            **user_key(current_user["auth_id"]),
             "$or": [
                 {"trial_draft_chapters": key},  # already this account's chapter
                 {f"trial_draft_chapters.{cap - 1}": {"$exists": False}},  # a slot left
