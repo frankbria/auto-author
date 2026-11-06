@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Loading03Icon, Download01Icon, CancelCircleIcon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
 import {
@@ -31,6 +32,8 @@ interface ExportProgressModalProps {
   onClose: () => void;
   /** Filename of the exported file */
   filename?: string;
+  /** The export was refused because the plan doesn't include it (402): offer the upgrade, not a retry */
+  upgradeRequired?: boolean;
 }
 
 /**
@@ -63,6 +66,7 @@ export function ExportProgressModal({
   onCancel,
   onClose,
   filename,
+  upgradeRequired = false,
 }: ExportProgressModalProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -200,10 +204,16 @@ export function ExportProgressModal({
               <Button variant="outline" onClick={onClose}>
                 Close
               </Button>
-              {onCancel && (
-                <Button onClick={onCancel}>
-                  Retry Export
+              {upgradeRequired ? (
+                <Button asChild>
+                  <Link href="/dashboard/settings?tab=billing">Upgrade to Pro</Link>
                 </Button>
+              ) : (
+                onCancel && (
+                  <Button onClick={onCancel}>
+                    Retry Export
+                  </Button>
+                )
               )}
             </div>
           )}

@@ -6,7 +6,8 @@ import logging
 from typing import Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from app.api.dependencies import get_rate_limiter
+from app.api.dependencies import get_entitlement_checker, get_rate_limiter
+from app.core.entitlements import EXPORT_FEATURE
 from app.core.security import get_current_user_from_session
 from app.db.book import get_book_by_id, get_book_owner_id
 from app.services.export_service import (
@@ -91,7 +92,7 @@ def _parse_custom_options(raw: Optional[str]) -> Optional[Dict]:
     return parsed
 
 
-@router.get("/pdf")
+@router.get("/pdf", dependencies=[Depends(get_entitlement_checker(EXPORT_FEATURE))])
 async def export_book_pdf(
     book_id: str,
     current_user: Dict = Depends(get_current_user_from_session),
@@ -192,7 +193,7 @@ async def export_book_pdf(
         )
 
 
-@router.get("/docx")
+@router.get("/docx", dependencies=[Depends(get_entitlement_checker(EXPORT_FEATURE))])
 async def export_book_docx(
     book_id: str,
     current_user: Dict = Depends(get_current_user_from_session),
@@ -286,7 +287,7 @@ async def export_book_docx(
         )
 
 
-@router.get("/epub")
+@router.get("/epub", dependencies=[Depends(get_entitlement_checker(EXPORT_FEATURE))])
 async def export_book_epub(
     book_id: str,
     current_user: Dict = Depends(get_current_user_from_session),
@@ -365,7 +366,7 @@ async def export_book_epub(
         )
 
 
-@router.get("/markdown")
+@router.get("/markdown", dependencies=[Depends(get_entitlement_checker(EXPORT_FEATURE))])
 async def export_book_markdown(
     book_id: str,
     current_user: Dict = Depends(get_current_user_from_session),

@@ -1,5 +1,14 @@
 # Environment Variable Refactoring Summary
 
+## Free is a trial (2026-10-28)
+
+Owner pricing decision: Free tests one chapter and cannot produce a book.
+
+- **AI_QUOTA_FREE_TOTAL** (int, default `30`): AI generations a free account gets for its whole life. The counter (`usage_counters`, key `<auth_id>:trial:total`) has no `expires_at`, so it never resets. `0` turns the window off.
+- **AI_QUOTA_FREE_DRAFT_CHAPTERS** (int, default `1`): chapters a free account can AI-draft. The first drafted chapter is recorded on the user (`trial_draft_chapters`); redrafting it is allowed, another chapter is 402. `0` lifts the cap.
+- **AI_QUOTA_FREE_DAILY / AI_QUOTA_FREE_MONTHLY**: defaults change from `10` / `100` to `0` / `0` (off). A box whose `.env` still sets them explicitly keeps a refilling free allowance on top of the trial: remove them.
+- **PLAN_ENFORCEMENT_ENABLED** now also gates book export (`export` feature, Pro only) and the draft cap. Pro limits are unchanged.
+
 ## Removed settings (2026-10-14)
 
 Issue #851: **BETTER_AUTH_ISSUER** and **JWT_ALGORITHM** are no longer read. Nothing used either, so a value left in an `.env` is ignored and can be deleted. Compose's **CORS_ORIGINS** was never read: **BACKEND_CORS_ORIGINS** is the variable. The sections below describe these settings as they were.
