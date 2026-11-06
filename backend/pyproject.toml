@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     # Core FastAPI dependencies
-    "fastapi==0.156.3",
+    "fastapi==0.161.1",
     "uvicorn==0.54.0",
     "python-multipart==0.0.32",
     # Database
@@ -16,23 +16,23 @@ dependencies = [
     "pydantic[email]==2.14.1",
     "pydantic-settings==2.16.1",
     # AI and external APIs
-    "openai==3.35.1",
+    "openai==3.37.0",
     "requests==2.34.2",
     # Authentication is better-auth (TypeScript) end to end: the backend only
     # validates session cookies, so it needs no JWT or password-hashing library.
     # python-jose (zero importers, dragged in ecdsa/rsa/pyasn1) and passlib
     # (helpers had no production callers) were removed in #342.
     # AWS SDK for transcription and S3
-    "boto3==1.43.116",
+    "boto3==1.43.118",
     # Image processing and storage
     "cloudinary==1.46.3",
     "pillow==13.0.0",
     # Export functionality
-    "reportlab==5.0.1",
+    "reportlab==5.1.0",
     "python-docx==1.2.0",
     "stripe==16.0.0",
     # Error tracking (issue #334) — inert unless SENTRY_DSN is set
-    "sentry-sdk[fastapi]==2.72.0",
+    "sentry-sdk[fastapi]==2.73.0",
     "markdownify==1.2.3",
 ]
 
@@ -46,14 +46,14 @@ test = [
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "pytest-mock==3.17.0",
-    "coverage[toml]==7.16.2",
+    "coverage[toml]==7.17.0",
     "httpx==0.28.1",  # used only by tests; not imported by app/
-    "ruff==0.17.1",  # the backend-lint pre-commit hook runs this (#561)
+    "ruff==0.17.2",  # the backend-lint pre-commit hook runs this (#561)
 ]
 load = [
     # locust <2.46 caps gevent below 26, which collides with the gevent floor in
     # [tool.uv] below. 2.46.2 dropped that upper bound.
-    "locust==2.46.7",
+    "locust==2.47.0",
     # locust-cloud removed: nothing imported or invoked it (it appeared only on
     # this line), and every published version requires gevent<26.0.0 — so it, not
     # locust, was what pinned uv.lock to the gevent 25.5.1 that Snyk flagged.
