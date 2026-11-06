@@ -16,6 +16,9 @@ from app.db import base
 from tests.test_api.test_export_endpoints import _seed_toc
 from tests.test_api.test_rate_limit_routes import _small_toc
 
+# Export is part of Pro (the free trial has none), so these authors are on Pro.
+PRO = {"plan": "pro"}
+
 pytestmark = pytest.mark.asyncio
 
 FORMATS = {"pdf": ".pdf", "docx": ".docx", "epub": ".epub", "markdown": ".md"}
@@ -46,7 +49,7 @@ async def _book(api, title: str) -> str:
 async def test_a_book_with_any_title_exports_in_every_format(
     auth_client_factory, title, saved_as, fallback, fmt
 ):
-    api = await auth_client_factory()
+    api = await auth_client_factory(overrides=PRO)
     book_id = await _book(api, title)
 
     response = await api.get(f"/api/v1/books/{book_id}/export/{fmt}")
@@ -63,7 +66,7 @@ async def test_a_book_with_any_title_exports_in_every_format(
 
 
 async def test_a_title_cannot_break_out_of_the_header(auth_client_factory):
-    api = await auth_client_factory()
+    api = await auth_client_factory(overrides=PRO)
     book_id = await _book(api, 'x"; filename="evil.exe\r\nSet-Cookie: a=b')
 
     response = await api.get(f"/api/v1/books/{book_id}/export/markdown")
@@ -77,7 +80,7 @@ async def test_a_title_cannot_break_out_of_the_header(auth_client_factory):
 
 @pytest.mark.parametrize("fmt", FORMATS)
 async def test_an_export_is_recorded_in_the_access_log(auth_client_factory, fmt):
-    api = await auth_client_factory()
+    api = await auth_client_factory(overrides=PRO)
     book_id = await _book(api, "Logged Book")
 
     response = await api.get(f"/api/v1/books/{book_id}/export/{fmt}")

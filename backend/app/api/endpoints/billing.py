@@ -18,7 +18,15 @@ from pydantic import BaseModel
 
 from app.api.dependencies import audit_request, get_rate_limiter
 from app.core.config import settings
-from app.core.entitlements import DEFAULT_PLAN, ai_quota_for_plan, has_live_subscription
+from app.core.entitlements import (
+    DEFAULT_PLAN,
+    EXPORT_FEATURE,
+    ai_quota_for_plan,
+    ai_trial_total_for_plan,
+    draft_chapter_cap_for_plan,
+    has_live_subscription,
+    is_feature_allowed,
+)
 from app.core.security import get_current_user_from_session
 from app.db.user import get_user_by_auth_id, swap_checkout_session, update_user
 
@@ -84,26 +92,45 @@ PAID_PLANS = frozenset({"pro"})
 
 
 class PlanQuota(BaseModel):
-    """A ``None`` window is unlimited (disabled in settings, or quota off)."""
+    """A ``None`` window or cap is unlimited (disabled in settings, or quota off)."""
 
     daily: Optional[int]
     monthly: Optional[int]
+    # The free trial's lifetime allowance, which never resets.
+    total: Optional[int] = None
+    # How many chapters can get an AI draft.
+    draft_chapters: Optional[int] = None
+    # Whether the plan can export the book (PDF, DOCX, EPUB, Markdown).
+    export: bool = True
 
 
 @router.get("/quotas", response_model=Dict[str, PlanQuota])
 async def get_plan_quotas(
     current_user: Dict = Depends(get_current_user_from_session),
 ):
-    """AI-generation caps per plan: the one source the billing copy reads (#766)."""
+    """What each plan allows: the one source the billing copy reads (#766)."""
     def window(limit: int) -> Optional[int]:
         # The enforcer treats <=0 as "window disabled"; never advertise it as 0.
         return limit if settings.AI_QUOTA_ENABLED and limit > 0 else None
 
-    quotas = {plan: ai_quota_for_plan(plan) for plan in ("free", "pro")}
-    return {
-        plan: PlanQuota(daily=window(daily), monthly=window(monthly))
-        for plan, (daily, monthly) in quotas.items()
-    }
+    def cap(limit: int) -> Optional[int]:
+        # Like the trial gate: off when <=0 or with plan enforcement off.
+        return limit if settings.PLAN_ENFORCEMENT_ENABLED and limit > 0 else None
+
+    result = {}
+    for plan in ("free", "pro"):
+        daily, monthly = ai_quota_for_plan(plan)
+        result[plan] = PlanQuota(
+            daily=window(daily),
+            monthly=window(monthly),
+            total=window(ai_trial_total_for_plan(plan)),
+            draft_chapters=cap(draft_chapter_cap_for_plan(plan)),
+            export=(
+                not settings.PLAN_ENFORCEMENT_ENABLED
+                or is_feature_allowed(plan, EXPORT_FEATURE)
+            ),
+        )
+    return result
 
 
 # --- Auto-renewal disclosure (#770, CA ARL / ROSCA) ---
