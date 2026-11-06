@@ -25,7 +25,7 @@ import { ExportOptionsModal } from '@/components/export/ExportOptionsModal';
 import { ExportProgressModal } from '@/components/export/ExportProgressModal';
 import { downloadBlob, generateFilename, formatFileSize } from '@/components/export/exportHelpers';
 import { ExportOptions, ExportStatus } from '@/types/export';
-import { handleApiCall } from '@/lib/errors';
+import { ErrorType, handleApiCall } from '@/lib/errors';
 import { showErrorNotification, showRecoveryNotification } from '@/components/errors';
 
 // Define types for book data
@@ -174,6 +174,8 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
   const [exportProgress, setExportProgress] = useState(0);
   const [exportError, setExportError] = useState<string | undefined>();
   const [exportFilename, setExportFilename] = useState<string | undefined>();
+  // Export is part of Pro (the free trial is one chapter): a 402 offers the upgrade.
+  const [exportNeedsUpgrade, setExportNeedsUpgrade] = useState(false);
 
   const handleExportClick = () => {
     setShowExportOptions(true);
@@ -188,6 +190,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
     setExportStatus('pending');
     setExportProgress(0);
     setExportError(undefined);
+    setExportNeedsUpgrade(false);
 
     // Update status to processing
     setExportStatus('processing');
@@ -263,10 +266,15 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
       setExportStatus('failed');
       setExportError(result.error.message);
 
-      // Show error notification with retry capability
-      showErrorNotification(result.error, {
-        onRetry: handleRetryExport,
-      });
+      if (result.error.type === ErrorType.ENTITLEMENT) {
+        // A plan refusal: the modal says why and links to the upgrade. No retry.
+        setExportNeedsUpgrade(true);
+      } else {
+        // Show error notification with retry capability
+        showErrorNotification(result.error, {
+          onRetry: handleRetryExport,
+        });
+      }
     }
   };
 
@@ -490,6 +498,7 @@ export default function BookPage({ params }: { params: Promise<{ bookId: string 
         progress={exportProgress}
         error={exportError}
         filename={exportFilename}
+        upgradeRequired={exportNeedsUpgrade}
         onCancel={handleRetryExport}
         onClose={handleCloseExportProgress}
       />

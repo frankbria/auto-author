@@ -195,8 +195,15 @@ class Settings(BaseSettings):
     # endpoint returns 429. A limit <= 0 disables that window. `restricted` (and
     # any unknown plan) gets no allowance at all — see entitlements.ai_quota_for_plan.
     AI_QUOTA_ENABLED: bool = True
-    AI_QUOTA_FREE_DAILY: int = 10
-    AI_QUOTA_FREE_MONTHLY: int = 100
+    # Free is a trial (owner decision 2026-10-28): AI_QUOTA_FREE_TOTAL
+    # generations for the life of the account, never reset, and an AI draft for
+    # AI_QUOTA_FREE_DRAFT_CHAPTERS chapters. Enough for a summary, a TOC and one
+    # chapter's interview and draft; not enough for a book. Its daily and
+    # monthly windows are off, so a trial user can try it all in one sitting.
+    AI_QUOTA_FREE_TOTAL: int = 30
+    AI_QUOTA_FREE_DRAFT_CHAPTERS: int = 1
+    AI_QUOTA_FREE_DAILY: int = 0
+    AI_QUOTA_FREE_MONTHLY: int = 0
     AI_QUOTA_PRO_DAILY: int = 50
     AI_QUOTA_PRO_MONTHLY: int = 500
 

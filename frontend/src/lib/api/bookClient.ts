@@ -257,6 +257,8 @@ export class BookClient {
       const detail = body?.detail;
       if (typeof detail === 'string' && detail) message = detail;
       else if (detail?.message) message = detail.message;
+      // A 402 (export is part of Pro) is a structured error: its text is `detail.error`.
+      else if (detail?.error) message = detail.error;
     } catch {
       // Non-JSON body — leave message undefined; classifier picks a default.
     }
