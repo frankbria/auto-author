@@ -71,6 +71,22 @@ jobs:
           oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
           tags: tag:ci,tag:staging-server
 
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The configured host is the box's full MagicDNS name. If the tailnet's
+      # DNS name changes, that name stops resolving although the box is still
+      # in the tailnet (2026-11-06). The script keeps a resolvable host as it is
+      # and otherwise picks the one online peer with the same machine name;
+      # the pinned host key still refuses any other machine.
+      - name: Find the box on the tailnet
+        env:
+          CONFIGURED_HOST: ${{ secrets.STAGING_TS_HOST || secrets.HOST }}
+        run: |
+          box=$(scripts/find-staging-box.sh "$CONFIGURED_HOST")
+          echo "::add-mask::$box"
+          echo "STAGING_BOX=$box" >> "$GITHUB_ENV"
+
       - name: Setup SSH
         env:
           STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
@@ -135,7 +151,7 @@ jobs:
           # out of argv on this shared box.
           printf '%s\n' "${MONGODB_URI}" | ssh -i ~/.ssh/staging_key \
             -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            ${{ secrets.USER }}@"$STAGING_BOX" \
             'set -euo pipefail; docker exec -i auto-author-backend-1 python -c "import sys, pymongo; uri = sys.stdin.readline().strip(); pymongo.MongoClient(uri, serverSelectionTimeoutMS=8000).admin.command(\"ping\"); print(\"PRE-FLIGHT PING OK\")"'
 
       - name: Write MONGODB_URI into /opt/auto-author/.env
@@ -148,7 +164,7 @@ jobs:
           # masking does not.
           printf '%s\n' "${MONGODB_URI}" | ssh -i ~/.ssh/staging_key \
             -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} '
+            ${{ secrets.USER }}@"$STAGING_BOX" '
               set -euo pipefail
               IFS= read -r VALUE
               [ -n "$VALUE" ] || { echo "empty value reached the box"; exit 1; }
@@ -178,7 +194,7 @@ jobs:
         if: ${{ inputs.recreate }}
         run: |
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            ${{ secrets.USER }}@"$STAGING_BOX" \
             "set -euo pipefail
              cd /opt/auto-author
              # docker-compose.staging.yml pins both images to
@@ -210,7 +226,7 @@ jobs:
           # agrees. /health returns only an exception type, so the ping is what
           # gives a diagnosable message.
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} bash -s <<'REMOTE'
+            ${{ secrets.USER }}@"$STAGING_BOX" bash -s <<'REMOTE'
           set -euo pipefail
           echo '--- direct MongoDB ping from the backend container ---'
           docker exec auto-author-backend-1 python -c "import os, pymongo; pymongo.MongoClient(os.environ['MONGODB_URI'], serverSelectionTimeoutMS=8000).admin.command('ping'); print('PING OK')"
