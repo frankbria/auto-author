@@ -81,7 +81,7 @@ jobs:
       # OAuth client rather than a static auth key: the node is ephemeral and
       # re-tagged per run, so there is no long-lived key to rotate or leak.
       - name: Connect to Tailscale
-        uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf # v4.3.0
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
         with:
           oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
@@ -125,6 +125,24 @@ jobs:
           fi
           printf '%s\n' "$STAGING_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+
+      - name: Diagnose tailnet DNS (temporary, experiment)
+        env:
+          H: ${{ secrets.STAGING_TS_HOST || secrets.HOST }}
+        run: |
+          set +e
+          tailscale version | head -1
+          J=$(tailscale status --json)
+          echo "MagicDNS enabled: $(jq -r '.CurrentTailnet.MagicDNSEnabled' <<<"$J")"
+          echo "self online: $(jq -r '.Self.Online' <<<"$J")  peers: $(jq '.Peer|length' <<<"$J")"
+          if [[ "$H" =~ ^[0-9.]+$ ]]; then echo "target kind: ip"; elif [[ "$H" == *.* ]]; then echo "target kind: dotted name"; else echo "target kind: short name"; fi
+          short=$(tr 'A-Z' 'a-z' <<<"${H%%.*}")
+          echo "peers matching target: $(jq --arg h "$short" '[.Peer[]|select((.HostName|ascii_downcase)==$h or (.DNSName|split(".")[0])==$h)]|length' <<<"$J")"
+          echo "matching peers online: $(jq --arg h "$short" '[.Peer[]|select(((.HostName|ascii_downcase)==$h or (.DNSName|split(".")[0])==$h) and .Online)]|length' <<<"$J")"
+          getent hosts "$H" >/dev/null && echo "getent: ok" || echo "getent: FAIL"
+          echo "dig @100.100.100.100 answers: $(dig +short @100.100.100.100 "$H" | wc -l)"
+          echo "resolv.conf nameservers: $(grep -c ^nameserver /etc/resolv.conf), has 100.100.100.100: $(grep -c 100.100.100.100 /etc/resolv.conf)"
+          resolvectl status tailscale0 2>&1 | grep -E "Current Scopes|DNS Servers|Protocols" | head -5
 
       - name: Ship compose files
         run: |
