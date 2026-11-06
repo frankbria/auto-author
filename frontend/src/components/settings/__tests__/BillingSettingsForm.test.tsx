@@ -51,8 +51,8 @@ const DISCLOSURE = {
 const agree = async () => fireEvent.click(await screen.findByRole('checkbox', { name: /i agree/i }));
 
 const QUOTAS = {
-  free: { daily: 10, monthly: 100 },
-  pro: { daily: 50, monthly: 500 },
+  free: { daily: null, monthly: null, total: 30, draft_chapters: 1, export: false },
+  pro: { daily: 50, monthly: 500, total: null, draft_chapters: null, export: true },
 };
 
 describe('BillingSettingsForm', () => {
@@ -141,35 +141,51 @@ describe('BillingSettingsForm', () => {
     expect(mockGetRenewalDisclosure).not.toHaveBeenCalled();
   });
 
-  it('names the concrete Free vs Pro AI limits, read from the API', async () => {
+  it('positions Free as a one-chapter trial, with the limits read from the API', async () => {
     render(<BillingSettingsForm plan="free" />);
 
-    expect(
-      await screen.findByText(/free: 10 AI generations per day \(100 per month\)/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/pro: 50 per day \(500 per month\)/i)).toBeInTheDocument();
-    expect(screen.queryByText(/full access to every/i)).not.toBeInTheDocument();
+    expect(await screen.findByText(/free trial is for testing auto author/i)).toBeInTheDocument();
+    const copy = screen.getByText(/free trial is for testing auto author/i).textContent ?? '';
+    expect(copy).toMatch(/30 AI generations in total, which don't reset/);
+    expect(copy).toMatch(/an AI draft of one chapter/);
+    expect(copy).toMatch(/exporting your book is part of pro/i);
+    expect(copy).toMatch(
+      /pro includes 50 AI generations per day \(500 per month\), AI drafts for every chapter and export to PDF, DOCX, EPUB and Markdown/i
+    );
+    expect(screen.getByText('Free trial')).toBeInTheDocument();
   });
 
-  it('says "unlimited" for a disabled (null) window instead of 0', async () => {
+  it('leaves out a trial limit the backend reports as off (null)', async () => {
     mockGetPlanQuotas.mockResolvedValue({
-      free: { daily: null, monthly: 100 },
-      pro: { daily: null, monthly: null },
+      free: { daily: null, monthly: null, total: null, draft_chapters: 2, export: true },
+      pro: { daily: null, monthly: 500, total: null, draft_chapters: null, export: true },
     });
     render(<BillingSettingsForm plan="free" />);
 
-    expect(
-      await screen.findByText(
-        /free: unlimited AI generations per day \(100 per month\)\. pro: unlimited per day \(unlimited per month\)/i
-      )
-    ).toBeInTheDocument();
+    const copy = (await screen.findByText(/free trial is for testing/i)).textContent ?? '';
+    expect(copy).toMatch(/It includes an AI draft of 2 chapters\./);
+    expect(copy).not.toMatch(/in total/);
+    expect(copy).not.toMatch(/exporting your book is part of pro/i);
+    expect(copy).toMatch(/pro includes 500 AI generations per month/i);
   });
 
-  it('tells a Pro user their own cap', async () => {
+  it('says "unlimited" when Pro has no AI window at all, instead of 0', async () => {
+    mockGetPlanQuotas.mockResolvedValue({
+      free: { daily: null, monthly: null, total: 30, draft_chapters: 1, export: false },
+      pro: { daily: null, monthly: null, total: null, draft_chapters: null, export: true },
+    });
+    render(<BillingSettingsForm plan="free" />);
+
+    expect(await screen.findByText(/pro includes unlimited AI generations/i)).toBeInTheDocument();
+  });
+
+  it('tells a Pro user what their plan includes', async () => {
     render(<BillingSettingsForm plan="pro" />);
 
     expect(
-      await screen.findByText(/50 AI generations per day \(500 per month\)/i)
+      await screen.findByText(
+        /50 AI generations per day \(500 per month\), AI drafts for every chapter and export/i
+      )
     ).toBeInTheDocument();
   });
 
@@ -184,7 +200,7 @@ describe('BillingSettingsForm', () => {
   it('shows an Upgrade button for a free plan', () => {
     render(<BillingSettingsForm plan="free" />);
 
-    expect(screen.getByText(/free plan/i)).toBeInTheDocument();
+    expect(screen.getByText('Free trial')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeInTheDocument();
   });
 
@@ -277,8 +293,8 @@ describe('BillingSettingsForm', () => {
 
     expect(screen.getByRole('button', { name: /manage billing/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeInTheDocument();
-    // The heading must not mislabel a lapsed subscriber as "Free plan".
+    // The heading must not mislabel a lapsed subscriber as on the free trial.
     expect(screen.getByText(/subscription is inactive/i)).toBeInTheDocument();
-    expect(screen.queryByText(/free plan/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Free trial')).not.toBeInTheDocument();
   });
 });

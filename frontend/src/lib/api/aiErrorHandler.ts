@@ -28,6 +28,9 @@ export interface AIServiceResult<T> {
   canRetry?: boolean;
 }
 
+/** The backend's text for a 402 that has nothing more specific to say. */
+const GENERIC_ENTITLEMENT_MESSAGE = 'Your plan does not include this feature.';
+
 /**
  * True for the backend's per-plan quota 429 (#766), as opposed to the transient
  * per-endpoint rate limit: its detail already states the cap and when it resets,
@@ -157,7 +160,11 @@ function getUserFriendlyMessage(errorDetails: Partial<AIErrorResponse>): string 
         : 'Invalid request data. Please check your input and try again.';
 
     case 'entitlement':
-      return 'Your current plan does not include this feature. Upgrade your plan to continue.';
+      // The free trial's refusals say what the trial includes and what Pro adds;
+      // the bare generic denial says nothing the fallback doesn't.
+      return errorDetails.message && errorDetails.message !== GENERIC_ENTITLEMENT_MESSAGE
+        ? errorDetails.message
+        : 'Your current plan does not include this feature. Upgrade your plan to continue.';
 
     default:
       return errorDetails.message || 'An error occurred while processing your request.';
@@ -232,8 +239,11 @@ export async function handleAIServiceError<T>(
     (errorDetails.quota_period || isQuotaCapMessage(errorDetails.message))
   ) {
     const title =
-      { day: 'Daily AI limit reached', month: 'Monthly AI limit reached' }[errorDetails.quota_period ?? ''] ??
-      'AI usage limit reached';
+      {
+        day: 'Daily AI limit reached',
+        month: 'Monthly AI limit reached',
+        trial: 'Free trial used up',
+      }[errorDetails.quota_period ?? ''] ?? 'AI usage limit reached';
     showErrorNotification(
       {
         type: ErrorType.PERMANENT,
