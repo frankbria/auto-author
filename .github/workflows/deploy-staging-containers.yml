@@ -99,6 +99,19 @@ jobs:
           # If this client's tags change, this line must change with them.
           tags: tag:ci,tag:staging-server
 
+      # The configured host is the box's full MagicDNS name. If the tailnet's
+      # DNS name changes, that name stops resolving although the box is still
+      # in the tailnet (2026-11-06). The script keeps a resolvable host as it is
+      # and otherwise picks the one online peer with the same machine name;
+      # the pinned host key still refuses any other machine.
+      - name: Find the box on the tailnet
+        env:
+          CONFIGURED_HOST: ${{ secrets.STAGING_TS_HOST || secrets.HOST }}
+        run: |
+          box=$(scripts/find-staging-box.sh "$CONFIGURED_HOST")
+          echo "::add-mask::$box"
+          echo "STAGING_BOX=$box" >> "$GITHUB_ENV"
+
       - name: Setup SSH
         env:
           STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
@@ -129,7 +142,7 @@ jobs:
             if scp -i ~/.ssh/staging_key \
                  -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
                  docker-compose.yml docker-compose.staging.yml \
-                 ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }}:/opt/auto-author/; then
+                 ${{ secrets.USER }}@"$STAGING_BOX":/opt/auto-author/; then
               exit 0
             fi
             echo "Upload attempt $attempt failed; retrying in 60s..."
@@ -154,7 +167,7 @@ jobs:
           GHCR_USER: ${{ github.actor }}
         run: |
           printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            ${{ secrets.USER }}@"$STAGING_BOX" \
             "set -euo pipefail
              cd /opt/auto-author
              export IMAGE_TAG=$(printf '%q' "$IMAGE_TAG")
@@ -183,7 +196,7 @@ jobs:
       - name: Health check
         run: |
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            ${{ secrets.USER }}@"$STAGING_BOX" \
             "set -euo pipefail
              for i in \$(seq 1 30); do
                be=\$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8000/api/v1/health || true)
@@ -207,7 +220,7 @@ jobs:
       - name: Frontend carries no backend secret
         run: |
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            ${{ secrets.USER }}@"$STAGING_BOX" \
             "set -euo pipefail
              names=\$(docker exec auto-author-frontend-1 env | cut -d= -f1)
              # An empty or wrong read would pass the leak check vacuously.
@@ -226,7 +239,7 @@ jobs:
         if: success()
         run: |
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            ${{ secrets.USER }}@"$STAGING_BOX" \
             "docker image prune -f --filter 'until=336h'"
 
       - name: Summary
