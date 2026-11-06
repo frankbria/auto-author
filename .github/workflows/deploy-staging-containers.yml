@@ -143,6 +143,16 @@ jobs:
           echo "dig @100.100.100.100 answers: $(dig +short @100.100.100.100 "$H" | wc -l)"
           echo "resolv.conf nameservers: $(grep -c ^nameserver /etc/resolv.conf), has 100.100.100.100: $(grep -c 100.100.100.100 /etc/resolv.conf)"
           resolvectl status tailscale0 2>&1 | grep -E "Current Scopes|DNS Servers|Protocols" | head -5
+          sfx=$(jq -r '.MagicDNSSuffix // .CurrentTailnet.MagicDNSSuffix' <<<"$J")
+          pdns=$(jq -r --arg h "$short" '[.Peer[]|select((.HostName|ascii_downcase)==$h or (.DNSName|split(".")[0])==$h)][0].DNSName|rtrimstr(".")' <<<"$J")
+          hl=$(tr 'A-Z' 'a-z' <<<"${H%.}")
+          [[ "$hl" == *.ts.net ]] && echo "target ends .ts.net: yes" || echo "target ends .ts.net: no"
+          [[ "${hl#*.}" == "$sfx" ]] && echo "target suffix == tailnet suffix: yes" || echo "target suffix == tailnet suffix: NO"
+          [[ "$hl" == "$pdns" ]] && echo "target == peer DNSName: yes" || echo "target == peer DNSName: NO"
+          [[ "${pdns%%.*}" == "$short" ]] && echo "peer first label == target first label: yes" || echo "peer first label == target first label: NO"
+          echo "dig peer DNSName answers: $(dig +short @100.100.100.100 "$pdns" | wc -l)"
+          echo "dig short name answers: $(dig +short @100.100.100.100 "$short" | wc -l)"
+          echo "target label count: $(awk -F. '{print NF}' <<<"$hl")  tailnet suffix label count: $(awk -F. '{print NF}' <<<"$sfx")"
 
       - name: Ship compose files
         run: |
