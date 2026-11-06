@@ -69,6 +69,12 @@ jobs:
         with:
           oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
+          # Pinned client: action v4.3.0 moved its default client from
+          # 1.94.2 to 1.104.2, and with 1.104.2 the runner could not resolve the
+          # box's MagicDNS name ("Could not resolve hostname"), so the deploy
+          # failed before reaching the box. Dependabot bumps the action, not
+          # this input; raise it only with a test dispatch of the deploy.
+          version: 1.94.2
           tags: tag:ci,tag:staging-server
 
       - name: Setup SSH
