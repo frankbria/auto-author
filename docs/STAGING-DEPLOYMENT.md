@@ -66,12 +66,24 @@ The box is shared, so only nginx may face the internet:
 `/opt/auto-author/.env` carries every application secret. The deploy ships
 compose files and runs `docker compose up`; the values come from that file.
 
-**One workflow writes one key of it:** `sync-staging-env.yml` (manual dispatch,
-#537) copies the `staging` environment secret `MONGODB_URI` into the file in
-place, keeps a timestamped `.env.bak.*` (the five newest), leaves every other
-key alone, and (unless dispatched with `recreate=false`) recreates the
-containers on the running tag. Dispatching it with a stale secret
-puts the stale credential on the box. Every other key is edited by hand.
+**Two workflows write keys of it.** Both keep a timestamped `.env.bak.*` (the
+five newest), leave every other key alone, and recreate the containers on the
+running tag.
+
+- `sync-staging-env.yml` (manual dispatch, #537) copies the `staging`
+  environment secret `MONGODB_URI` into the file (unless dispatched with
+  `recreate=false`, it also recreates). Dispatching it with a stale secret puts
+  the stale credential on the box.
+- `set-staging-billing.yml` (manual dispatch) sets `STRIPE_PRICE_ID_PRO` and
+  `STRIPE_MANAGED_PAYMENTS` from its inputs, and drops `AI_QUOTA_FREE_DAILY`,
+  `AI_QUOTA_FREE_MONTHLY` and `PLAN_ENFORCEMENT_ENABLED=false`, which would undo
+  the free trial. Before writing, the running backend asks Stripe for the price
+  with the box's own key (`scripts/staging_billing_preflight.py`), so a price
+  from another account or mode (a live price on sandbox keys) stops the run with
+  nothing changed. If the recreated backend isn't healthy with `billing` ok and
+  reading the new values, the run puts the backup back and recreates again.
+
+Every other key is edited by hand.
 
 Compose asserts the required ones with `${VAR:?...}`, so a missing key fails the
 deploy with a named error instead of starting a container that dies at first

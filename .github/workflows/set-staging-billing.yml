@@ -1,0 +1,213 @@
+name: Set Staging Billing
+
+# Points staging at a Stripe price and switches Managed Payments on or off,
+# without anyone SSHing to the box. It replaces the hand-edit of
+# /opt/auto-author/.env in the launch runbook (steps 52 to 56).
+#
+# It writes two keys, both non-secret: STRIPE_PRICE_ID_PRO and
+# STRIPE_MANAGED_PAYMENTS. It also removes the three settings that would undo
+# the free trial if an old .env still carried them (AI_QUOTA_FREE_DAILY,
+# AI_QUOTA_FREE_MONTHLY, and PLAN_ENFORCEMENT_ENABLED=false). Every other line
+# of .env is carried through untouched, as sync-staging-env.yml does.
+#
+# Order, and why it is safe:
+# 1. Pre-flight: the running backend asks Stripe, with the box's own key, for
+#    the price. A price that key can't see (a live price on sandbox keys, or one
+#    from another account) stops the run before anything is written. So does an
+#    archived or non-monthly price, or, with Managed Payments on, a product with
+#    no tax code.
+# 2. Back up .env, then write.
+# 3. Recreate the containers on the tag already running (this ships config, not
+#    a release), then check the backend reads the new values and /health says
+#    billing is ok.
+# 4. If step 3 fails, put the backup back and recreate again, so a failed run
+#    leaves staging as it found it.
+#
+# What it can't check: that Managed Payments is switched on in the Stripe
+# Dashboard. Stripe has no API read for that; a test purchase is the check.
+
+on:
+  workflow_dispatch:
+    inputs:
+      price_id:
+        description: 'Stripe price for Pro (price_...). It must belong to the same account and mode (sandbox or live) as the box''s Stripe key.'
+        required: true
+        type: string
+      managed_payments:
+        description: 'Sell through Stripe Managed Payments (needs it on in the Dashboard and a tax code on the product)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # Shared with the deploy and env-sync workflows: all three rewrite
+  # /opt/auto-author and bounce its containers.
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  set:
+    name: Set the Stripe price and Managed Payments on staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
+    # The dispatch inputs reach every script as variables, never as text
+    # GitHub pastes into the script (#816).
+    env:
+      PRICE_ID: ${{ inputs.price_id }}
+      MANAGED_PAYMENTS: ${{ inputs.managed_payments }}
+
+    steps:
+      # First (#816); scripts/test_workflow_inputs_not_in_run.py runs this script.
+      - name: Check the inputs
+        run: |
+          if [[ ! "$PRICE_ID" =~ ^price_[A-Za-z0-9]{8,64}$ ]]; then
+            echo "::error::price_id must look like price_ followed by letters and digits"
+            exit 1
+          fi
+          if [[ ! "$MANAGED_PAYMENTS" =~ ^(true|false)$ ]]; then
+            echo "::error::managed_payments must be true or false"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Same access path as the deploy. See deploy-staging-containers.yml.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
+          tags: tag:ci,tag:staging-server
+
+      # Resolve the box once, as the deploy does: if the stored MagicDNS name
+      # stops resolving, pick the one online peer with its machine name. The
+      # pinned host key still refuses any other machine.
+      - name: Find the box on the tailnet
+        env:
+          CONFIGURED_HOST: ${{ secrets.STAGING_TS_HOST || secrets.HOST }}
+        run: |
+          box=$(scripts/find-staging-box.sh "$CONFIGURED_HOST")
+          echo "::add-mask::$box"
+          echo "STAGING_BOX=$box" >> "$GITHUB_ENV"
+
+      - name: Setup SSH
+        env:
+          STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
+          chmod 600 ~/.ssh/staging_key
+          # Pinned host key (#859); see deploy-staging-containers.yml.
+          if [ -z "$STAGING_KNOWN_HOSTS" ]; then
+            echo "::error::STAGING_KNOWN_HOSTS is empty; refusing to SSH without a pinned host key"
+            exit 1
+          fi
+          printf '%s\n' "$STAGING_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Pre-flight, check the price with the box's own Stripe key
+        run: |
+          # The check script travels on stdin into the running backend, which
+          # already holds the key, so the key never leaves the box.
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@"$STAGING_BOX" \
+            "docker exec -i auto-author-backend-1 python - $(printf '%q' "$PRICE_ID") $(printf '%q' "$MANAGED_PAYMENTS")" \
+            < scripts/staging_billing_preflight.py
+
+      - name: Write the settings into /opt/auto-author/.env
+        run: |
+          printf '%s\n%s\n' "$PRICE_ID" "$MANAGED_PAYMENTS" | ssh -i ~/.ssh/staging_key \
+            -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@"$STAGING_BOX" '
+              set -euo pipefail
+              IFS= read -r PRICE
+              IFS= read -r MP
+              [[ "$PRICE" =~ ^price_[A-Za-z0-9]{8,64}$ ]] || { echo "bad price id reached the box"; exit 1; }
+              [[ "$MP" =~ ^(true|false)$ ]] || { echo "bad managed_payments reached the box"; exit 1; }
+              cd /opt/auto-author
+
+              backup=".env.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+              cp -a .env "$backup"
+              echo "$backup" > .env.billing-rollback
+
+              # Names only, never values.
+              removed=$(grep -E "^(AI_QUOTA_FREE_DAILY|AI_QUOTA_FREE_MONTHLY)=|^PLAN_ENFORCEMENT_ENABLED=false" .env | cut -d= -f1 || true)
+              [ -z "$removed" ] || echo "Removing settings that would undo the free trial: $removed"
+
+              tmp=$(mktemp)
+              grep -vE "^(STRIPE_PRICE_ID_PRO|STRIPE_MANAGED_PAYMENTS|AI_QUOTA_FREE_DAILY|AI_QUOTA_FREE_MONTHLY)=|^PLAN_ENFORCEMENT_ENABLED=false" .env > "$tmp" || true
+              printf "STRIPE_PRICE_ID_PRO=%s\nSTRIPE_MANAGED_PAYMENTS=%s\n" "$PRICE" "$MP" >> "$tmp"
+              chmod 600 "$tmp"
+              mv "$tmp" .env
+
+              # Backups hold credentials on a shared box; keep five.
+              ls -1t .env.bak.* 2>/dev/null | tail -n +6 | xargs -r rm -f
+              echo "Wrote STRIPE_PRICE_ID_PRO and STRIPE_MANAGED_PAYMENTS."
+            '
+
+      - name: Recreate containers and check the new settings
+        id: apply
+        run: |
+          printf '%s\n%s\n' "$PRICE_ID" "$MANAGED_PAYMENTS" | ssh -i ~/.ssh/staging_key \
+            -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@"$STAGING_BOX" '
+              set -euo pipefail
+              IFS= read -r PRICE
+              IFS= read -r MP
+              cd /opt/auto-author
+              # The running tag, never main: this ships config, not a release.
+              IMAGE_TAG=$(docker inspect --format "{{.Config.Image}}" auto-author-backend-1 | sed "s/.*://")
+              [ -n "$IMAGE_TAG" ] || { echo "could not determine the running image tag"; exit 1; }
+              export IMAGE_TAG
+              export ENVIRONMENT=staging
+              echo "recreating on the running tag: $IMAGE_TAG"
+              # compose reads .env when it creates a container; a restart keeps the old values.
+              docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --force-recreate
+
+              body=""
+              for i in $(seq 1 24); do
+                body=$(curl -s --max-time 5 http://127.0.0.1:8000/api/v1/health || true)
+                case "$body" in *"\"status\":\"healthy\""*) break ;; esac
+                sleep 5
+              done
+              case "$body" in
+                *"\"status\":\"healthy\""*"\"billing\":\"ok\""*|*"\"billing\":\"ok\""*"\"status\":\"healthy\""*) echo "$body" ;;
+                *) echo "health is not healthy with billing ok; last body: $body"; exit 1 ;;
+              esac
+
+              # The backend must read what was written, not a stale value.
+              docker exec auto-author-backend-1 python -c "import os, sys; p, m = sys.argv[1], sys.argv[2]; ok = os.environ.get(\"STRIPE_PRICE_ID_PRO\") == p and os.environ.get(\"STRIPE_MANAGED_PAYMENTS\") == m; print(\"backend reads the new settings\" if ok else \"backend does NOT read the new settings\"); sys.exit(0 if ok else 1)" "$PRICE" "$MP"
+            '
+
+      - name: Roll back on failure
+        if: ${{ failure() && steps.apply.conclusion == 'failure' }}
+        run: |
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@"$STAGING_BOX" '
+              set -euo pipefail
+              cd /opt/auto-author
+              backup=$(cat .env.billing-rollback)
+              cp -a "$backup" .env
+              echo "Restored $backup"
+              IMAGE_TAG=$(docker inspect --format "{{.Config.Image}}" auto-author-backend-1 | sed "s/.*://")
+              export IMAGE_TAG
+              export ENVIRONMENT=staging
+              docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --force-recreate
+            '
+
+      - name: Summary
+        if: always()
+        run: |
+          { echo '## Staging billing settings';
+            echo "- price: \`$PRICE_ID\`";
+            echo "- managed payments: $MANAGED_PAYMENTS";
+            echo "- result: ${{ job.status }}";
+            echo '- a timestamped `.env.bak.*` was left on the box before the write';
+          } >> $GITHUB_STEP_SUMMARY

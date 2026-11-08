@@ -81,7 +81,15 @@ def test_no_host_configured_stops_the_job(tmp_path):
     assert r.returncode != 0
 
 
-@pytest.mark.parametrize("workflow", ["deploy-staging-containers.yml", "sync-staging-env.yml"])
+# Every workflow that SSHes to the box, so a new one can't skip the resolver.
+SSHING = sorted(p.name for p in WORKFLOWS.glob("*.yml") if re.search(r"\b(ssh|scp) -i ", p.read_text()))
+
+
+def test_the_sshing_workflows_are_found():
+    assert {"deploy-staging-containers.yml", "sync-staging-env.yml", "set-staging-billing.yml"} <= set(SSHING)
+
+
+@pytest.mark.parametrize("workflow", SSHING)
 def test_the_workflows_ssh_to_the_found_address_only(workflow):
     text = (WORKFLOWS / workflow).read_text()
     assert "scripts/find-staging-box.sh" in text
