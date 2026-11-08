@@ -46,8 +46,13 @@ def main(argv):
     if not price.active:
         fail(f"{price_id} is archived; checkout can't sell it")
     recurring = price.recurring
-    if price.type != "recurring" or recurring is None or recurring.interval != "month":
-        fail(f"{price_id} is not a monthly recurring price")
+    if (
+        price.type != "recurring"
+        or recurring is None
+        or recurring.interval != "month"
+        or getattr(recurring, "interval_count", 1) != 1
+    ):
+        fail(f"{price_id} is not a monthly recurring price (every 1 month)")
     # Checkout sends quantity 1, which Stripe refuses for a metered price, and
     # a tiered price has no single amount to show the buyer.
     if getattr(recurring, "usage_type", "licensed") != "licensed":
