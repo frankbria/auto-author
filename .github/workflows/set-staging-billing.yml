@@ -86,6 +86,17 @@ jobs:
           oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
           tags: tag:ci,tag:staging-server
 
+      # Resolve the box once, as the deploy does: if the stored MagicDNS name
+      # stops resolving, pick the one online peer with its machine name. The
+      # pinned host key still refuses any other machine.
+      - name: Find the box on the tailnet
+        env:
+          CONFIGURED_HOST: ${{ secrets.STAGING_TS_HOST || secrets.HOST }}
+        run: |
+          box=$(scripts/find-staging-box.sh "$CONFIGURED_HOST")
+          echo "::add-mask::$box"
+          echo "STAGING_BOX=$box" >> "$GITHUB_ENV"
+
       - name: Setup SSH
         env:
           STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
@@ -106,7 +117,7 @@ jobs:
           # The check script travels on stdin into the running backend, which
           # already holds the key, so the key never leaves the box.
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} \
+            ${{ secrets.USER }}@"$STAGING_BOX" \
             "docker exec -i auto-author-backend-1 python - $(printf '%q' "$PRICE_ID") $(printf '%q' "$MANAGED_PAYMENTS")" \
             < scripts/staging_billing_preflight.py
 
@@ -114,7 +125,7 @@ jobs:
         run: |
           printf '%s\n%s\n' "$PRICE_ID" "$MANAGED_PAYMENTS" | ssh -i ~/.ssh/staging_key \
             -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} '
+            ${{ secrets.USER }}@"$STAGING_BOX" '
               set -euo pipefail
               IFS= read -r PRICE
               IFS= read -r MP
@@ -146,7 +157,7 @@ jobs:
         run: |
           printf '%s\n%s\n' "$PRICE_ID" "$MANAGED_PAYMENTS" | ssh -i ~/.ssh/staging_key \
             -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} '
+            ${{ secrets.USER }}@"$STAGING_BOX" '
               set -euo pipefail
               IFS= read -r PRICE
               IFS= read -r MP
@@ -179,7 +190,7 @@ jobs:
         if: ${{ failure() && steps.apply.conclusion == 'failure' }}
         run: |
           ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
-            ${{ secrets.USER }}@${{ secrets.STAGING_TS_HOST || secrets.HOST }} '
+            ${{ secrets.USER }}@"$STAGING_BOX" '
               set -euo pipefail
               cd /opt/auto-author
               backup=$(cat .env.billing-rollback)
