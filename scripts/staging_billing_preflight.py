@@ -8,7 +8,7 @@ already holds STRIPE_SECRET_KEY, so the key never leaves the box:
 It refuses (exit 1) a price the key's account and mode cannot see, such as a
 live-mode price on a box with sandbox keys: checkout would fail with "No such
 price" for every buyer. It also refuses a price checkout can't sell as Pro (not
-active, not a monthly recurring USD price), and, with Managed Payments on, a
+active, not a flat monthly recurring USD price), and, with Managed Payments on, a
 product with no tax code, which Stripe rejects at checkout. Prints only the
 price's public facts, never the key.
 """
@@ -48,6 +48,12 @@ def main(argv):
     recurring = price.recurring
     if price.type != "recurring" or recurring is None or recurring.interval != "month":
         fail(f"{price_id} is not a monthly recurring price")
+    # Checkout sends quantity 1, which Stripe refuses for a metered price, and
+    # a tiered price has no single amount to show the buyer.
+    if getattr(recurring, "usage_type", "licensed") != "licensed":
+        fail(f"{price_id} is metered; checkout sells a fixed monthly price")
+    if getattr(price, "billing_scheme", "per_unit") != "per_unit" or price.unit_amount is None:
+        fail(f"{price_id} is not a flat per-unit price")
     if price.currency != "usd":
         fail(f"{price_id} is in {price.currency}, not usd")
 
