@@ -53,6 +53,15 @@ VALIDATED = {
     ("sync-staging-env.yml", "sync"): {
         "RECREATE": (["true", "false"], ["yes", "1", "True", "true; id", "true\nfalse"]),
     },
+    ("set-staging-billing.yml", "set"): {
+        "PRICE_ID": (
+            # The longest allowed first, so the anchoring cases ("…x") run past the cap.
+            ["price_" + "1AbCdEfGhIjKlMnO" * 4, "price_1AbCdEfGhIjKlMnOpQrStUvW", "price_12345678"],
+            ["price_", "price_1234567", "prod_1AbCdEfGh", "PRICE_1AbCdEfGh", "price_1AbCd-EfGh",
+             "price_1AbCdEfGh'; id; '", "price_1AbCdEfGh && id", "price_1AbCdEfGh\nid", "price_1AbCdEfGh$(id)"],
+        ),
+        "MANAGED_PAYMENTS": (["true", "false"], ["yes", "1", "True", "true; id", "true\nfalse"]),
+    },
 }
 
 
@@ -194,7 +203,9 @@ def test_the_first_step_checks_them_and_cannot_be_skipped(workflow, job):
 def _first_step_exit(workflow, job, variable, value):
     path = next(p for p in _workflow_files() if p.name == workflow)
     script = dict(_jobs(path))[job]["steps"][0]["run"]
-    env = {"PATH": os.environ["PATH"], variable: value}
+    # The job's other checked variables hold a good value, so only `variable` decides.
+    others = {name: good[0] for name, (good, _) in VALIDATED[(workflow, job)].items()}
+    env = {"PATH": os.environ["PATH"], **others, variable: value}
     return subprocess.run(["bash", "-euo", "pipefail", "-c", script], env=env, capture_output=True, timeout=30).returncode
 
 
