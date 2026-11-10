@@ -1,0 +1,79 @@
+name: Staging Billing Check
+
+# The launch runbook's steps 57 to 64, by machine: the free trial's limits, a
+# $49 Pro purchase with Stripe's test card, export on Pro, and cancelling,
+# with every subscription event delivered to the webhook. See
+# scripts/staging_billing_check.py for each step and what it can't check.
+#
+# Sandbox only: the box-side script refuses a live Stripe key and any
+# environment but staging, and touches only the throwaway account it makes,
+# which it deletes again (with its Stripe customer), also after a failure.
+# Nothing on the box is changed and no container is recreated.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Queued behind a deploy or settings change, which bounce the containers.
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check the trial, a $49 purchase and cancelling on staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Same access path as the deploy. See deploy-staging-containers.yml.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
+          tags: tag:ci,tag:staging-server
+
+      - name: Find the box on the tailnet
+        env:
+          CONFIGURED_HOST: ${{ secrets.STAGING_TS_HOST || secrets.HOST }}
+        run: |
+          box=$(scripts/find-staging-box.sh "$CONFIGURED_HOST")
+          echo "::add-mask::$box"
+          echo "STAGING_BOX=$box" >> "$GITHUB_ENV"
+
+      - name: Setup SSH
+        env:
+          STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
+          chmod 600 ~/.ssh/staging_key
+          # Pinned host key (#859); see deploy-staging-containers.yml.
+          if [ -z "$STAGING_KNOWN_HOSTS" ]; then
+            echo "::error::STAGING_KNOWN_HOSTS is empty; refusing to SSH without a pinned host key"
+            exit 1
+          fi
+          printf '%s\n' "$STAGING_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      # Stops here, before any account exists, unless the box sells in the sandbox.
+      - name: Pre-flight, the box's Stripe key is a sandbox key
+        run: |
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@"$STAGING_BOX" \
+            "docker exec -i auto-author-backend-1 python - mode" < scripts/staging_billing_box.py
+
+      - name: Run steps 57 to 63
+        run: |
+          python3 scripts/staging_billing_check.py -- \
+            ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@"$STAGING_BOX"
