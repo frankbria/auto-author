@@ -73,6 +73,10 @@ jobs:
             "docker exec -i auto-author-backend-1 python - mode" < scripts/staging_billing_box.py
 
       - name: Run steps 57 to 63
+        env:
+          # The staging environment's own addresses, as the frontend image build uses them.
+          APP_URL: ${{ vars.NEXT_PUBLIC_BETTER_AUTH_URL }}
+          API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
         run: |
           python3 scripts/staging_billing_check.py -- \
             ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \

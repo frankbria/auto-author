@@ -164,10 +164,14 @@ class FakeStaging:
         self.customer = None
         self.account = False
         self.calls = []
+        self.chapter_ids = []
+        self.unreachable = False
 
     # The HTTP side.
     def __call__(self, method, url, body=None, follow=False):
         self.calls.append((method, url.split("?")[0]))
+        if self.unreachable:
+            raise OSError("staging is unreachable")
         path = url.split("/api/v1", 1)[-1].split("?")[0] if "/api/v1" in url else url
         if url.endswith("/api/auth/sign-up/email"):
             self.account = True
@@ -188,12 +192,17 @@ class FakeStaging:
         if path == "/books/":
             return _response(201, {"id": "a" * 24})
         if path.endswith("/toc"):
-            return _response(200, {"success": True})
+            # As the server does (#754): new chapters get ids of its own, not the client's.
+            ids = [f"0000000{n}-aaaa-4bbb-8ccc-dddddddddddd" for n in range(len(body["toc"]["chapters"]))]
+            self.chapter_ids = ids
+            return _response(200, {"toc": {"chapters": [{"id": i, "title": "t"} for i in ids]}, "success": True})
         if path.endswith("/export/pdf"):
             if self.plan == "pro":
                 return _response(200, raw=b"%PDF-1.7 ...")
             return _response(402, {"detail": {"message": check.EXPORT_REFUSED + ". Upgrade."}})
         if path.endswith("/generate-draft"):
+            if f"/chapters/{self.chapter_ids[1]}/" not in path:
+                return _response(404, {"detail": "Chapter not found in table of contents"})
             return _response(402, {"detail": {"message": check.DRAFT_REFUSED + ", and you've used it."}})
         if path == "/billing/checkout":
             self.customer = "cus_1AbCdEfGhIj"
@@ -209,6 +218,9 @@ class FakeStaging:
         self.calls.append(("box", command))
         if command == "mode":
             return {"key_mode": "test", "price_id": PRICE, "managed_payments": "true", "webhook_endpoints": []}
+        if command == "seed-draft":
+            assert args[1].endswith(":" + self.chapter_ids[0]), args
+            return {"seeded": args[1]}
         if command == "checkout":
             return {"mode": "subscription", "livemode": False, "currency": "usd", "amount_subtotal": 4900,
                     "price_ids": [PRICE], "customer": self.customer, "managed_payments": {"enabled": True}}
@@ -305,3 +317,28 @@ def test_the_workflow_checks_the_key_before_it_makes_an_account():
     assert steps.index("Pre-flight, the box's Stripe key is a sandbox key") < steps.index("Run steps 57 to 63")
     assert on["workflow_dispatch"] is None  # no inputs: nothing a caller types reaches the box
     assert wf["permissions"] == {"contents": "read"}
+
+
+def test_cleanup_reaches_the_box_when_staging_stops_answering():
+    staging = FakeStaging(breaks="webhook")
+    run, _, _, _ = _run(staging)
+    staging.unreachable, run.cancelled = True, False
+    staging.calls.clear()
+
+    problems = check.Check.cleanup(run)
+
+    assert any("deleting the account" in p for p in problems)
+    assert staging.calls[-1] == ("box", "cleanup")
+
+
+def test_the_check_needs_staging_addresses_from_its_environment(monkeypatch, capsys):
+    monkeypatch.delenv("APP_URL", raising=False)
+    monkeypatch.delenv("API_URL", raising=False)
+
+    assert check.main(["staging_billing_check.py", "--", "ssh", "box"]) == 2
+    assert "APP_URL and API_URL" in capsys.readouterr().out
+
+
+def test_the_api_address_works_with_or_without_its_version_path():
+    for api in ("https://api.example", "https://api.example/api/v1", "https://api.example/api/v1/"):
+        assert check.Check(None, None, "https://app.example", api).api == "https://api.example/api/v1"

@@ -139,7 +139,9 @@ def wait_for(read, done, seconds, sleep):
 
 class Check:
     def __init__(self, http, box, app, api, say=print, sleep=time.sleep, now=time.time):
-        self.http, self.box, self.app, self.api = http, box, app.rstrip("/"), api.rstrip("/") + "/api/v1"
+        self.http, self.box, self.app = http, box, app.rstrip("/")
+        api = api.rstrip("/")
+        self.api = api if api.endswith("/api/v1") else api + "/api/v1"
         self.say, self.sleep, self.now = say, sleep, now
         self.email = f"delivered+billing-check-{secrets.token_hex(6)}@resend.dev"
         self.signed_up = False
@@ -210,15 +212,17 @@ class Check:
         ]
         response = self.http("PUT", f"{self.api}/books/{book}/toc", {"toc": {"chapters": chapters}})
         expect(response.status == 200, f"saving the table of contents answered {response.status}: {response.text[:300]}")
+        # The server gives every new chapter its own id (#754); use the stored ones.
+        first, second = [c["id"] for c in response.json()["toc"]["chapters"]][:2]
         response = self.export(book)
         expect(response.status == 402, f"export on the trial answered {response.status}, not 402")
         expect(EXPORT_REFUSED in response.text, f"the refusal reads: {response.text[:300]}")
         self.ok("58", f"export refused with 402 and {EXPORT_REFUSED!r}")
 
         # 59: the trial's one draft is used on chapter 1; chapter 2 is refused.
-        self.box("seed-draft", self.email, f"{book}:ch-1")
+        self.box("seed-draft", self.email, f"{book}:{first}")
         response = self.http(
-            "POST", f"{self.api}/books/{book}/chapters/ch-2/generate-draft",
+            "POST", f"{self.api}/books/{book}/chapters/{second}/generate-draft",
             {"question_responses": [{"question": "What is this?", "answer": "A billing check."}]},
         )
         expect(response.status == 402, f"a second chapter's draft answered {response.status}, not 402")
@@ -290,22 +294,27 @@ class Check:
     def cleanup(self):
         """Always runs. Each part is tried even if an earlier one fails."""
         problems = []
+        # A transport error (staging or the box unreachable) is recorded, never
+        # allowed to skip the parts after it.
         if self.subscription and not self.cancelled:
             try:
                 self.box("cancel", self.email, self.subscription)
-            except Failed as exc:
-                problems.append(str(exc))
+            except Exception as exc:
+                problems.append(f"cancelling the subscription: {exc}")
         if self.http.cookie:
-            response = self.http("DELETE", f"{self.api}/users/me")
-            if response.status != 200:
-                problems.append(f"deleting the account answered {response.status}")
+            try:
+                response = self.http("DELETE", f"{self.api}/users/me")
+                if response.status != 200:
+                    problems.append(f"deleting the account answered {response.status}")
+            except Exception as exc:
+                problems.append(f"deleting the account: {exc}")
         if self.signed_up:
             try:
                 left = self.box("cleanup", self.email)
                 if left.get("accounts_left"):
                     problems.append("the check's account is still on staging")
-            except Failed as exc:
-                problems.append(str(exc))
+            except Exception as exc:
+                problems.append(f"box cleanup: {exc}")
         for problem in problems:
             self.say(f"CLEANUP: {problem}")
         return problems
@@ -316,14 +325,17 @@ def main(argv):
         print("usage: staging_billing_check.py -- SSH COMMAND...")
         return 2
     ssh = argv[argv.index("--") + 1:]
-    app = os.environ.get("APP_URL", "https://dev.autoauthor.app")
-    api = os.environ.get("API_URL", "https://api.dev.autoauthor.app")
+    # From the staging environment's variables, as the image build reads them.
+    app, api = os.environ.get("APP_URL", ""), os.environ.get("API_URL", "")
+    if not (app.startswith("https://") and api.startswith("https://")):
+        print("APP_URL and API_URL must be set to staging's https addresses")
+        return 2
     check = Check(Http(app), Box(ssh), app, api)
     failure = None
     try:
         check.run()
-    except Failed as exc:
-        failure = str(exc)
+    except Exception as exc:  # a Failed check, or staging or the box out of reach
+        failure = str(exc) if isinstance(exc, Failed) else f"{type(exc).__name__}: {exc}"
         print(f"FAIL after {', '.join(check.passed) or 'no step'}: {failure}")
     finally:
         problems = check.cleanup()
