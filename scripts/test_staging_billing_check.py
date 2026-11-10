@@ -342,3 +342,25 @@ def test_the_check_needs_staging_addresses_from_its_environment(monkeypatch, cap
 def test_the_api_address_works_with_or_without_its_version_path():
     for api in ("https://api.example", "https://api.example/api/v1", "https://api.example/api/v1/"):
         assert check.Check(None, None, "https://app.example", api).api == "https://api.example/api/v1"
+
+
+def test_the_session_cookie_goes_only_to_staging(monkeypatch):
+    sent = []
+
+    class Opener:
+        def open(self, request, timeout):
+            sent.append((request.full_url, request.get_header("Cookie")))
+            raise check.urllib.error.HTTPError(request.full_url, 404, "x", {}, None)
+
+    http = check.Http("https://app.example", ["app.example", "api.example"])
+    http._plain = http._follow = Opener()
+    http.cookie = "s=1"
+    http("GET", "https://api.example/api/v1/users/me")
+    http("GET", "https://checkout.stripe.com/c/pay/cs_test_x", follow=True)
+    http("GET", "https://evil.example/")
+
+    assert sent == [
+        ("https://api.example/api/v1/users/me", "s=1"),
+        ("https://checkout.stripe.com/c/pay/cs_test_x", None),
+        ("https://evil.example/", None),
+    ]

@@ -40,6 +40,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -97,8 +98,11 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 class Http:
     """A tiny client: JSON in, the status, headers and body out, never an exception for a 4xx."""
 
-    def __init__(self, origin):
+    def __init__(self, origin, hosts):
         self.origin = origin
+        # The session goes only to staging's own hosts, never to Stripe, and never
+        # on a request that follows redirects (urllib would carry it along).
+        self.hosts = set(hosts)
         self.cookie = None
         self._plain = urllib.request.build_opener(_NoRedirect)
         self._follow = urllib.request.build_opener()
@@ -109,7 +113,7 @@ class Http:
         if body is not None:
             data = json.dumps(body).encode()
             headers["Content-Type"] = "application/json"
-        if self.cookie:
+        if self.cookie and not follow and urllib.parse.urlsplit(url).hostname in self.hosts:
             headers["Cookie"] = self.cookie
         request = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
@@ -330,7 +334,8 @@ def main(argv):
     if not (app.startswith("https://") and api.startswith("https://")):
         print("APP_URL and API_URL must be set to staging's https addresses")
         return 2
-    check = Check(Http(app), Box(ssh), app, api)
+    hosts = [urllib.parse.urlsplit(u).hostname for u in (app, api)]
+    check = Check(Http(app, hosts), Box(ssh), app, api)
     failure = None
     try:
         check.run()
