@@ -6,31 +6,31 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     # Core FastAPI dependencies
-    "fastapi==0.161.1",
+    "fastapi==0.162.0",
     "uvicorn==0.54.0",
     "python-multipart==0.0.32",
     # Database
     "pymongo==4.19.0",
     # Configuration and environment
     "python-dotenv==1.2.4",
-    "pydantic[email]==2.14.1",
-    "pydantic-settings==2.16.1",
+    "pydantic[email]==2.14.2",
+    "pydantic-settings==2.16.2",
     # AI and external APIs
-    "openai==3.37.0",
+    "openai==3.41.0",
     "requests==2.34.2",
     # Authentication is better-auth (TypeScript) end to end: the backend only
     # validates session cookies, so it needs no JWT or password-hashing library.
     # python-jose (zero importers, dragged in ecdsa/rsa/pyasn1) and passlib
     # (helpers had no production callers) were removed in #342.
     # AWS SDK for transcription and S3
-    "boto3==1.43.118",
+    "boto3==1.43.122",
     # Image processing and storage
     "cloudinary==1.46.3",
     "pillow==13.0.0",
     # Export functionality
     "reportlab==5.1.0",
     "python-docx==1.2.0",
-    "stripe==16.0.0",
+    "stripe==16.1.0",
     # Error tracking (issue #334) — inert unless SENTRY_DSN is set
     "sentry-sdk[fastapi]==2.73.0",
     "markdownify==1.2.3",
@@ -42,13 +42,13 @@ dependencies = [
 # into uv.lock by the resolver — do not list them by hand here.
 [project.optional-dependencies]
 test = [
-    "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1",
     "pytest-cov==7.1.0",
     "pytest-mock==3.17.0",
     "coverage[toml]==7.17.0",
     "httpx==0.28.1",  # used only by tests; not imported by app/
-    "ruff==0.17.2",  # the backend-lint pre-commit hook runs this (#561)
+    "ruff==0.17.3",  # the backend-lint pre-commit hook runs this (#561)
 ]
 load = [
     # locust <2.46 caps gevent below 26, which collides with the gevent floor in
