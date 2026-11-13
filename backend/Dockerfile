@@ -12,7 +12,7 @@
 # docker entry moves the digest, as a pull request the image scan runs on. It
 # reads a literal FROM line only; with the tag in a build argument it found no
 # dependency here at all.
-FROM python:3.13-slim@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc AS base
+FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 AS base
 
 # uv, by version and digest (#819). `:latest` was whatever was newest on the day
 # of the build. A stage of its own, so that it is named in a FROM line like the
@@ -22,7 +22,7 @@ FROM python:3.13-slim@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637e
 # digest of both), but Dependabot can hold a new release back for the cooldown
 # only where the registry tells it when a tag was published. Measured: for
 # ghcr.io it reports "Cooldown was not applied" and carries on.
-FROM astral/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv
+FROM astral/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
 # ---- build: resolve from uv.lock only
 FROM base AS build
