@@ -12,7 +12,15 @@
 # docker entry moves the digest, as a pull request the image scan runs on. It
 # reads a literal FROM line only; with the tag in a build argument it found no
 # dependency here at all.
-FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 AS base
+FROM python:3.13-slim@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc AS base
+
+# Debian's zlib fix (1:1.3.dfsg+really1.3.1-1+deb13u1, CVE-2026-76844 and
+# CVE-2026-85091) is newer than every python:3.13-slim on Docker Hub, the
+# 2026-11-08 rebuild included, so the image scan fails on the base layer alone.
+# Upgrade just that package until a base digest carries it; then delete this.
+RUN apt-get update \
+    && apt-get install --yes --only-upgrade --no-install-recommends zlib1g \
+    && rm -rf /var/lib/apt/lists/*
 
 # uv, by version and digest (#819). `:latest` was whatever was newest on the day
 # of the build. A stage of its own, so that it is named in a FROM line like the
