@@ -115,6 +115,24 @@ describe('buildCsp — Sentry connect-src (#334)', () => {
   });
 });
 
+describe('buildCsp — analytics connect-src', () => {
+  it('adds the GoatCounter origin to connect-src, and nowhere else, when analytics is on', () => {
+    const csp = buildCsp(NONCE, { ...PROD, analyticsOrigin: 'https://stats.autoauthor.app' });
+    expect(directive(csp, 'connect-src')).toBe(
+      "connect-src 'self' https://api.dev.autoauthor.app https://stats.autoauthor.app"
+    );
+    // The script loads under the nonce (strict-dynamic ignores host lists).
+    expect(directive(csp, 'script-src')).not.toContain('stats.autoauthor.app');
+  });
+
+  it('adds nothing when analytics is off', () => {
+    for (const analyticsOrigin of [undefined, null]) {
+      const csp = buildCsp(NONCE, { ...PROD, analyticsOrigin });
+      expect(directive(csp, 'connect-src')).toBe("connect-src 'self' https://api.dev.autoauthor.app");
+    }
+  });
+});
+
 describe('buildCsp — development', () => {
   const csp = buildCsp(NONCE, DEV);
 

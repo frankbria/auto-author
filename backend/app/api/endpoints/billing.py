@@ -104,11 +104,8 @@ class PlanQuota(BaseModel):
     export: bool = True
 
 
-@router.get("/quotas", response_model=Dict[str, PlanQuota])
-async def get_plan_quotas(
-    current_user: Dict = Depends(get_current_user_from_session),
-):
-    """What each plan allows: the one source the billing copy reads (#766)."""
+def _plan_quotas() -> Dict[str, PlanQuota]:
+    """What each plan allows, from the same settings the enforcer reads (#766)."""
     def window(limit: int) -> Optional[int]:
         # The enforcer treats <=0 as "window disabled"; never advertise it as 0.
         return limit if settings.AI_QUOTA_ENABLED and limit > 0 else None
@@ -131,6 +128,14 @@ async def get_plan_quotas(
             ),
         )
     return result
+
+
+@router.get("/quotas", response_model=Dict[str, PlanQuota])
+async def get_plan_quotas(
+    current_user: Dict = Depends(get_current_user_from_session),
+):
+    """What each plan allows: the one source the billing copy reads (#766)."""
+    return _plan_quotas()
 
 
 # --- Auto-renewal disclosure (#770, CA ARL / ROSCA) ---
@@ -175,22 +180,28 @@ def _format_price(unit_amount: int, currency: str) -> str:
     return f"${amount}" if currency.lower() == "usd" else f"{amount} {currency.upper()}"
 
 
+async def _retrieve_price(price_id: str):
+    """The Stripe Price for ``price_id``, cached per id. Raises ``stripe.StripeError``."""
+    price = _PRICE_CACHE.get(price_id)
+    if price is None:
+        price = await asyncio.to_thread(
+            stripe.Price.retrieve, price_id, api_key=settings.STRIPE_SECRET_KEY
+        )
+        _PRICE_CACHE[price_id] = price
+    return price
+
+
 async def _current_disclosure() -> RenewalDisclosure:
     """Render the renewal terms from the live Stripe Price (the charge's own source)."""
     _require_stripe_checkout()
     price_id = settings.STRIPE_PRICE_ID_PRO
-    price = _PRICE_CACHE.get(price_id)
-    if price is None:
-        try:
-            price = await asyncio.to_thread(
-                stripe.Price.retrieve, price_id, api_key=settings.STRIPE_SECRET_KEY
-            )
-        except stripe.StripeError:
-            logger.error("Stripe price lookup failed for %s", price_id, exc_info=True)
-            raise HTTPException(
-                status_code=502, detail="Payment provider error — please try again"
-            ) from None
-        _PRICE_CACHE[price_id] = price
+    try:
+        price = await _retrieve_price(price_id)
+    except stripe.StripeError:
+        logger.error("Stripe price lookup failed for %s", price_id, exc_info=True)
+        raise HTTPException(
+            status_code=502, detail="Payment provider error — please try again"
+        ) from None
 
     recurring = getattr(price, "recurring", None)
     if recurring is None or price.unit_amount is None:
@@ -216,6 +227,61 @@ async def get_renewal_disclosure(
 ):
     """The auto-renewal terms the UI must show, verbatim, before the subscribe action."""
     return await _current_disclosure()
+
+
+# --- Public plan summary for the pricing page ---
+# No sign-in: the pricing page is for visitors. It carries nothing the billing
+# settings page doesn't already show a signed-in user, and the price comes from
+# the same Stripe Price the charge and the renewal disclosure use, so the page
+# can't advertise a number the checkout won't charge.
+
+# A failed lookup is remembered this long, so an outage or a misconfigured price
+# can't turn every anonymous page view into a Stripe API call.
+PRICE_FAILURE_BACKOFF_SECONDS = 60.0
+_PRICE_FAILED_AT: Dict[str, float] = {}
+
+
+class PlanPrice(BaseModel):
+    # Formatted like the renewal disclosure: "$49.00".
+    amount: str
+    # "month", or "3 months" for a multi-period price.
+    period: str
+
+
+class PublicPlans(BaseModel):
+    # None when Stripe isn't configured or the price can't be read right now;
+    # the page then shows no price rather than a guessed one.
+    pro_price: Optional[PlanPrice]
+    plans: Dict[str, PlanQuota]
+
+
+async def _public_pro_price() -> Optional[PlanPrice]:
+    if not settings.STRIPE_SECRET_KEY or not settings.STRIPE_PRICE_ID_PRO:
+        return None
+    price_id = settings.STRIPE_PRICE_ID_PRO
+    failed_at = _PRICE_FAILED_AT.get(price_id)
+    if failed_at is not None and time.monotonic() - failed_at < PRICE_FAILURE_BACKOFF_SECONDS:
+        return None
+    try:
+        price = await _retrieve_price(price_id)
+    except stripe.StripeError:
+        logger.warning("Stripe price lookup failed for %s (pricing page)", price_id, exc_info=True)
+        _PRICE_FAILED_AT[price_id] = time.monotonic()
+        return None
+    _PRICE_FAILED_AT.pop(price_id, None)
+
+    recurring = getattr(price, "recurring", None)
+    if recurring is None or price.unit_amount is None:
+        return None
+    count = recurring.interval_count or 1
+    period = recurring.interval if count == 1 else f"{count} {recurring.interval}s"
+    return PlanPrice(amount=_format_price(price.unit_amount, price.currency), period=period)
+
+
+@router.get("/plans", response_model=PublicPlans)
+async def get_public_plans():
+    """The plans and the Pro price, for the public pricing page. No sign-in."""
+    return PublicPlans(pro_price=await _public_pro_price(), plans=_plan_quotas())
 
 
 class CheckoutRequest(BaseModel):

@@ -1,110 +1,96 @@
-import { render, screen } from '@testing-library/react';
-import { useRouter } from 'next/navigation';
+import { render, screen, within } from '@testing-library/react';
 import HomePage from '@/app/page';
 import { useSession } from '@/lib/auth-client';
 
-// Mock Next.js navigation
-jest.mock('next/navigation', () => ({
-  useRouter: jest.fn(),
+// The landing page is public and carries the positioning adopted on
+// 2026-10-28. These tests pin the adopted copy, the ways in, and the claims
+// the positioning doc says the page must never make.
+
+jest.mock('@/lib/auth-client', () => ({
+  useSession: jest.fn().mockReturnValue({ data: null, isPending: false, error: null }),
+  authClient: { signOut: jest.fn() },
 }));
 
-jest.mock('next/link', () => {
-  return jest.fn(({ href, children }) => (
-    <a href={href} data-testid="next-link">
-      {children}
-    </a>
-  ));
-});
+// An async server component; the analytics tag has its own tests.
+jest.mock('@/components/marketing/Analytics', () => ({
+  __esModule: true,
+  default: () => null,
+}));
 
-// Mock better-auth
-jest.mock('@/lib/auth-client', () => {
-  // Create a mockUseSession function that can be controlled by tests
-  const mockUseSession = jest.fn().mockReturnValue({
-    data: null,
-    isPending: false,
-    error: null,
-  });
+const signedIn = {
+  data: { user: { id: 'u1', email: 'a@example.com', name: 'A' }, session: { id: 's1' } },
+  isPending: false,
+  error: null,
+};
 
-  return {
-    useSession: mockUseSession,
-    authClient: {
-      signIn: { email: jest.fn() },
-      signUp: { email: jest.fn() },
-      signOut: jest.fn(),
-    },
-  };
-});
-
-describe('Home Page Sign Up Integration', () => {
-  const mockRouter = {
-    push: jest.fn(),
-  };
-
+describe('Landing page', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (useRouter as jest.Mock).mockReturnValue(mockRouter);
+    (useSession as jest.Mock).mockReturnValue({ data: null, isPending: false, error: null });
   });
 
-  test('renders sign-up section on the home page when not authenticated', () => {
-    (useSession as jest.Mock).mockReturnValue({
-      data: null,
-      isPending: false,
-      error: null,
-    });
-
+  test('leads with the adopted headline', () => {
     render(<HomePage />);
-
-    // When not authenticated, should show authentication UI
-    // (exact selectors depend on HomePage component structure)
-    expect(screen.getByText(/sign up/i) || screen.getByText(/get started/i)).toBeDefined();
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1).toHaveTextContent(
+      'Your book is already in your head. Auto Author asks the questions that get it out.'
+    );
   });
 
-  test('shows loading state while authentication is being determined', () => {
-    (useSession as jest.Mock).mockReturnValue({
-      data: null,
-      isPending: true,
-      error: null,
-    });
-
+  test('carries the three proof points and the steps of how it works', () => {
     render(<HomePage />);
-
-    // Loading state should be visible
-    expect(screen.getByText(/loading|verifying/i) || document.querySelector('.animate-spin')).toBeDefined();
+    expect(screen.getByText('Questions for every chapter, not one prompt for the whole book.')).toBeInTheDocument();
+    expect(screen.getByText('Answer by typing or by speaking.')).toBeInTheDocument();
+    expect(screen.getByText(/A real editor, and your manuscript exports as DOCX, EPUB, PDF or Markdown/)).toBeInTheDocument();
+    const how = screen.getByRole('heading', { name: 'How it works' }).parentElement as HTMLElement;
+    expect(within(how).getAllByRole('listitem')).toHaveLength(7);
   });
 
-  test('shows authenticated content when signed in', () => {
-    (useSession as jest.Mock).mockReturnValue({
-      data: {
-        user: {
-          id: 'test-user-123',
-          email: 'test@example.com',
-          name: 'Test User',
-        },
-        session: {
-          token: 'mock-jwt-token',
-          id: 'session-123',
-        },
-      },
-      isPending: false,
-      error: null,
-    });
-
+  test('offers the free trial and the pricing page to a signed-out visitor', () => {
     render(<HomePage />);
-
-    // The dashboard link should be available
-    expect(screen.getByText(/go to dashboard|dashboard/i) || screen.getByText(/welcome back/i)).toBeDefined();
+    const trial = screen.getByRole('link', { name: 'Try Auto Author on one chapter, free' });
+    expect(trial).toHaveAttribute('href', '/auth/sign-up');
+    expect(screen.getByRole('link', { name: 'See pricing' })).toHaveAttribute('href', '/pricing');
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/auth/sign-in');
+    expect(screen.queryByRole('link', { name: 'Go to dashboard' })).not.toBeInTheDocument();
   });
 
-  test('does not show authenticated content when not logged in', () => {
-    (useSession as jest.Mock).mockReturnValue({
-      data: null,
-      isPending: false,
-      error: null,
-    });
-
+  test('gives a signed-in visitor the dashboard and sign-out instead of sign-up', () => {
+    (useSession as jest.Mock).mockReturnValue(signedIn);
     render(<HomePage />);
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('link', { name: 'Go to dashboard' })).toHaveAttribute('href', '/dashboard');
+    expect(within(header).getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(within(header).queryByRole('link', { name: 'Start free trial' })).not.toBeInTheDocument();
+  });
 
-    // Dashboard content should not be visible when not authenticated
-    expect(screen.queryByText(/your books/i)).not.toBeInTheDocument();
+  test('shows the page while the session is still loading, not a spinner', () => {
+    (useSession as jest.Mock).mockReturnValue({ data: null, isPending: true, error: null });
+    render(<HomePage />);
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(document.querySelector('.animate-spin')).toBeNull();
+  });
+
+  test('makes none of the claims the positioning rules out', () => {
+    const { container } = render(<HomePage />);
+    const text = (container.textContent ?? '').toLowerCase();
+    for (const banned of [
+      'in your voice',
+      'voice interviewer',
+      'calls you',
+      'kdp',
+      'isbn',
+      'cover design',
+      'publish',
+      'human editor',
+      'free plan',
+      'write your book free',
+      'in an hour',
+      'minutes',
+      'clients will',
+      'roi',
+      'testimonial',
+    ]) {
+      expect(text).not.toContain(banned);
+    }
   });
 });

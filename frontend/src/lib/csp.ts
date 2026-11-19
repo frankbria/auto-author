@@ -12,9 +12,14 @@ export interface CspOptions {
   isDev: boolean;
   apiUrl?: string;
   sentryDsn?: string;
+  /** The GoatCounter origin from analyticsOrigin(), when analytics is on. */
+  analyticsOrigin?: string | null;
 }
 
-export function buildCsp(nonce: string, { isDev, apiUrl, sentryDsn }: CspOptions): string {
+export function buildCsp(
+  nonce: string,
+  { isDev, apiUrl, sentryDsn, analyticsOrigin }: CspOptions
+): string {
   // connect-src derives from the configured API origin: prod deploys ship
   // only the real API host, while dev/CI (NEXT_PUBLIC_API_URL=localhost:8000)
   // keep localhost automatically — no generic-env keying (#192).
@@ -38,6 +43,14 @@ export function buildCsp(nonce: string, { isDev, apiUrl, sentryDsn }: CspOptions
     }
   }
 
+  // The public pages' analytics script posts its count to its own origin
+  // (navigator.sendBeacon). The script itself loads under the nonce and needs
+  // no script-src host; its image fallback is covered by img-src https:.
+  const extraConnect = [apiOrigin, sentryOrigin, analyticsOrigin ?? '']
+    .filter(Boolean)
+    .map((o) => ` ${o}`)
+    .join('');
+
   const directives = [
     "default-src 'self'",
     // 'unsafe-eval' in dev only: webpack HMR evals. Production is nonce +
@@ -51,7 +64,7 @@ export function buildCsp(nonce: string, { isDev, apiUrl, sentryDsn }: CspOptions
     // over http (local dev, CI) `https:` alone would block them (#941).
     `img-src 'self' data: https: blob:${apiOrigin ? ` ${apiOrigin}` : ''}`,
     "media-src 'self'",
-    `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''}${sentryOrigin ? ` ${sentryOrigin}` : ''}${isDev ? ' ws://localhost:*' : ''}`,
+    `connect-src 'self'${extraConnect}${isDev ? ' ws://localhost:*' : ''}`,
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",

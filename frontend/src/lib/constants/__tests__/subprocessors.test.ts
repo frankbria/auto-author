@@ -17,6 +17,9 @@ const FIRST_PARTY = [
   'BETTER_AUTH_URL',
   'NEXT_PUBLIC_BETTER_AUTH_URL',
   'NEXT_PUBLIC_API_URL',
+  // Our own GoatCounter, self-hosted on our server: page views stay with us. Point
+  // it at a hosted service instead and it becomes a subprocessor entry.
+  'GOATCOUNTER_URL',
 ];
 
 const BACKEND_APP = join(FRONTEND_ROOT, '..', 'backend/app');

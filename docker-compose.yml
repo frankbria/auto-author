@@ -96,6 +96,10 @@ services:
       EMAIL_SERVICE_API_KEY:
       EMAIL_FROM_ADDRESS:
       EMAIL_FROM_NAME:
+      # Cookieless page analytics on the public pages: the self-hosted
+      # GoatCounter site, e.g. https://stats.autoauthor.app. Unset = off. Read
+      # per request (the page and its CSP), so no rebuild is needed to change it.
+      GOATCOUNTER_URL:
       # Public values, not secrets. They are also build arguments (#779), and
       # what the build was given is what the browser bundle and the page's CSP
       # use (#809: an image built with an address allows it in its CSP with
