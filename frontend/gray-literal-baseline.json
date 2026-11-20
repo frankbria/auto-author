@@ -86,15 +86,6 @@
       },
       "reason": "App shell / error boundary. Renders on its own full-bleed surface, so the #331 near-white-on-white failure mode does not apply directly, but the literals are still theme-blind."
     },
-    "src/app/page.tsx": {
-      "literals": {
-        "bg-gray-600": 3,
-        "bg-gray-700": 3,
-        "text-gray-100": 1,
-        "text-gray-400": 3
-      },
-      "reason": "App shell / error boundary. Renders on its own full-bleed surface, so the #331 near-white-on-white failure mode does not apply directly, but the literals are still theme-blind."
-    },
     "src/components/BookCreationWizard.tsx": {
       "literals": {
         "bg-gray-800": 9,

@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { buildCsp } from '@/lib/csp';
+import { analyticsOrigin } from '@/lib/analytics';
 import { isDeployedEnv } from '@/lib/deployed-env';
 
 // Middleware for route protection using better-auth session cookies
@@ -19,7 +20,10 @@ import { isDeployedEnv } from '@/lib/deployed-env';
 // inline scripts; layout reads x-nonce for next-themes) and the response.
 function withCsp(request: NextRequest): NextResponse {
   const nonce = btoa(crypto.randomUUID());
-  const csp = buildCsp(nonce, { isDev: process.env.NODE_ENV === 'development' });
+  const csp = buildCsp(nonce, {
+    isDev: process.env.NODE_ENV === 'development',
+    analyticsOrigin: analyticsOrigin(),
+  });
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce); // set(), not append — clobbers any client-sent value
