@@ -37,7 +37,10 @@ describe('third-party notices', () => {
   const entryFor = (name: string) => entries.find((entry) => entry.startsWith(`${name}@`));
 
   it('covers the packages that ship, and is not close to empty', () => {
-    expect(entries.length).toBeGreaterThan(250);
+    // A floor against an empty or truncated file, not a count of the tree: about
+    // 250 packages ship today and a routine update can drop a few (Nov 2026:
+    // @hookform/resolvers 7 and @sentry/nextjs 11.12 left three out).
+    expect(entries.length).toBeGreaterThan(200);
     for (const name of ['react', 'next', 'sharp', 'better-auth']) {
       expect(entryFor(name)).toBeDefined();
     }
