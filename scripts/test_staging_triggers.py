@@ -66,7 +66,8 @@ def test_health_probe_is_scheduled_ai_free_and_alerts_with_its_own_label():
     text = HEALTH.read_text()
     assert not re.search(r"\bsecrets\.\w", text), "public URLs only: the probe needs no secret"
     (job,) = wf["jobs"].values()
-    assert job["permissions"] == {"contents": "read", "issues": "write"}
+    # `actions: read` only so the strike check can read the previous run.
+    assert job["permissions"] == {"contents": "read", "issues": "write", "actions": "read"}
     probe = next(s for s in job["steps"] if "staging_health_probe.py" in s.get("run", ""))
     alert = next(s for s in job["steps"] if "ci-alert-issue.sh" in s.get("run", ""))
     assert probe["id"] == "probe"

@@ -12,6 +12,14 @@ name: Staging Health Probe
 # and at six hours an outage could still run most of a working day unseen.
 # While the issue is open a failing run adds a comment only after six quiet
 # hours (ALERT_QUIET_HOURS), so the cadence does not flood it.
+#
+# Two strikes: the alert fires on the second failed probe in a row, not the
+# first. Almost every past failure was a single run between two green ones (a
+# short network blip between GitHub's runners and the host, with the box
+# healthy), and each one opened and closed an issue. A first failed probe now
+# leaves a warning on a green run; the next failed one opens the issue and
+# turns the run red. scripts/staging_health_strike.py tells the two apart by
+# reading the previous run's steps, and fails towards alerting.
 
 on:
   schedule:
@@ -32,21 +40,44 @@ jobs:
     timeout-minutes: 5
     # One job: the probe runs only this repo's stdlib script, so there is no
     # third-party code to keep away from `issues: write`.
+    # `actions: read` lets the strike check read this workflow's previous run.
     permissions:
       contents: read
       issues: write
+      actions: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # continue-on-error: a first failed probe must not turn the run red on its
+      # own. The steps below decide; the last one fails the run on strike two.
       - name: Probe API health and frontend root
         id: probe
+        continue-on-error: true
         run: python3 scripts/staging_health_probe.py
 
+      - name: Check whether the previous probe failed too
+        id: strike
+        if: steps.probe.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: python3 scripts/staging_health_strike.py
+
+      # Its name is how the next run recognises a first strike: keep it in step
+      # with FIRST_STRIKE_STEP in scripts/staging_health_strike.py.
+      - name: 'First failed probe: not alerting yet'
+        if: steps.probe.outcome == 'failure' && steps.strike.outputs.strike == '1'
+        run: echo "::warning::Staging probe failed once. An alert opens if the next run fails too."
+
       # Only on a real verdict: if checkout failed (probe skipped) or the run was
-      # cancelled, "recovery" would wrongly close an open alert.
+      # cancelled, "recovery" would wrongly close an open alert. A failure
+      # alerts only on strike two.
       - name: Open, update or close the alert issue
-        if: always() && (steps.probe.outcome == 'failure' || steps.probe.outcome == 'success')
+        if: >-
+          always() && (steps.probe.outcome == 'success' ||
+          (steps.probe.outcome == 'failure' && steps.strike.outputs.strike == '2'))
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -58,3 +89,11 @@ jobs:
         run: |
           if [ "$OUTCOME" = "failure" ]; then mode=failure; else mode=recovery; fi
           sh scripts/ci-alert-issue.sh "$mode"
+
+      # Its name is how the next run recognises a second strike: keep it in step
+      # with SECOND_STRIKE_STEP in scripts/staging_health_strike.py.
+      - name: 'Fail the run: probe failed twice in a row'
+        if: always() && steps.probe.outcome == 'failure' && steps.strike.outputs.strike == '2'
+        run: |
+          echo "::error::Staging probe failed on two runs in a row. See the ci-alert:staging-health issue."
+          exit 1
