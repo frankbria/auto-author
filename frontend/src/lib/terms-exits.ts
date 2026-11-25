@@ -3,8 +3,8 @@
  * from the acceptance screen (#961): Settings, to cancel a subscription online
  * as Terms section 7 promises, and the profile, to download its data or delete
  * the account. They open only after the screen's own links are followed, for
- * that account in this tab, until sign-out, so a sign-in that lands on one is
- * still asked.
+ * that session in this tab, so a sign-in that lands on one is still asked,
+ * however the previous session ended (sign-out, expiry, revocation).
  */
 export const TERMS_EXITS = ['/dashboard/settings', '/profile'];
 
@@ -14,17 +14,17 @@ const KEY = 'terms-exits-open';
 // (client-side navigation keeps this module loaded).
 let openFor: string | null = null;
 
-/** The account chose an exit link on the acceptance screen. */
-export function openTermsExits(userId: string): void {
-  openFor = userId;
+/** The session chose an exit link on the acceptance screen. */
+export function openTermsExits(sessionId: string): void {
+  openFor = sessionId;
   try {
-    sessionStorage.setItem(KEY, userId);
+    sessionStorage.setItem(KEY, sessionId);
   } catch {
     // Storage blocked: the in-memory grant above still holds.
   }
 }
 
-/** Sign-out: the next sign-in in this tab is asked again. */
+/** Sign-out: drop the grant now rather than leave a dead session's id behind. */
 export function closeTermsExits(): void {
   openFor = null;
   try {
@@ -34,14 +34,14 @@ export function closeTermsExits(): void {
   }
 }
 
-/** Whether `path` is an exit this account opened from the screen. */
-export function termsExitOpen(path: string | null, userId: string): boolean {
+/** Whether `path` is an exit this session opened from the screen. */
+export function termsExitOpen(path: string | null, sessionId: string): boolean {
   if (!TERMS_EXITS.some((exit) => path === exit || path?.startsWith(`${exit}/`))) {
     return false;
   }
-  if (openFor === userId) return true;
+  if (openFor === sessionId) return true;
   try {
-    return sessionStorage.getItem(KEY) === userId;
+    return sessionStorage.getItem(KEY) === sessionId;
   } catch {
     return false;
   }

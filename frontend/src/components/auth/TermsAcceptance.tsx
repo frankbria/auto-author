@@ -16,8 +16,12 @@ const TERMS_CHANGED =
 const TITLE = 'Accept the Terms of Service · Auto Author';
 
 interface TermsAcceptanceProps {
-  /** The signed-in account: the one accepting, and the one the exit links open for. */
+  /** The signed-in account, the one accepting. */
   userId: string;
+  /** The current session, for which the exit links open Settings and Profile. */
+  sessionId: string;
+  /** Called when an exit link is followed, so the guard checks again. */
+  onExit: () => void;
   /** Called once the acceptance is recorded. */
   onAccepted: () => unknown;
 }
@@ -27,7 +31,12 @@ interface TermsAcceptanceProps {
  * version is older than TERMS_VERSION, or missing (#961). Asked once: the
  * server records the acceptance, and the reloaded session no longer needs it.
  */
-export function TermsAcceptance({ userId, onAccepted }: TermsAcceptanceProps) {
+export function TermsAcceptance({ userId, sessionId, onExit, onAccepted }: TermsAcceptanceProps) {
+  const openExits = () => {
+    openTermsExits(sessionId);
+    onExit();
+  };
+
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState('');
@@ -94,7 +103,7 @@ export function TermsAcceptance({ userId, onAccepted }: TermsAcceptanceProps) {
           Not ready to accept? You can still{' '}
           <Link
             href="/dashboard/settings?tab=billing"
-            onClick={() => openTermsExits(userId)}
+            onClick={openExits}
             className="text-primary underline underline-offset-4"
           >
             cancel your subscription
@@ -102,7 +111,7 @@ export function TermsAcceptance({ userId, onAccepted }: TermsAcceptanceProps) {
           or{' '}
           <Link
             href="/profile"
-            onClick={() => openTermsExits(userId)}
+            onClick={openExits}
             className="text-primary underline underline-offset-4"
           >
             download your data or delete your account
