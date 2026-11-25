@@ -1773,3 +1773,7 @@ Removing the backend seed script broke `subprocessors.test.ts`, a frontend test 
 ### A wait loop that exits is not a finished build (2026-10-22)
 A `for i in $(seq ...)` wait for "Build Images" ran out of iterations with the build still `in_progress`, and I dispatched the staging deploy on that.
 **Rule:** read the run's actual `status`/`conclusion` (or use `gh run watch <id> --exit-status`) before acting on a wait, never the loop's exit.
+
+### A new log line breaks every test that pins the log sequence (2026-11-25)
+#965 added a guarded `create_index` step to `ensure_audit_log_indexes()` with its own `logger.error`. The targeted run covered `test_startup_indexes.py` but not `test_db/test_audit_log.py`, which asserts the exact list of failure messages on an unreachable Mongo, so CI's Backend Tests failed on the first push.
+**Rule:** when a change adds a step or message to a function, `git grep` the tests for the function's name and one of its existing messages, and include every hit in the targeted run.
