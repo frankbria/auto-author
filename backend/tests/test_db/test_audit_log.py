@@ -135,6 +135,7 @@ async def test_unreachable_mongo_is_logged_and_never_fatal(monkeypatch, caplog):
     assert [r.getMessage() for r in caplog.records] == [
         "Failed to create TTL index on audit_logs.expires_at",
         "Failed to create actor index on audit_logs",
+        "Failed to create target index on audit_logs",
         "Failed to backfill audit_logs.expires_at",
         "Failed to backfill renewal-consent expiry",
     ]
