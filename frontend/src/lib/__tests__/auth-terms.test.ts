@@ -92,7 +92,8 @@ describe('An existing account accepts a new Terms version (issue #961)', () => {
     ['an older version', '2000-01-01', false],
     ['no version (an account from before #789)', undefined, false],
     ['null', null, false],
-    ['a non-string', 20261010, false],
+    ['a number', 20261010, false],
+    ['a non-string that would compare as a later one', ['2999-01-01'], false],
   ])('counts %s as accepted: %s', (_label, version, accepted) => {
     expect(acceptedCurrentTerms(version)).toBe(accepted);
   });
