@@ -143,6 +143,45 @@ describe('waitForMessage', () => {
     }
   });
 
+  it('rides out a transient mail.tm error (429, 5xx) while polling', async () => {
+    let polls = 0;
+    const { impl } = fakeFetch({
+      'GET /messages': () => {
+        polls += 1;
+        if (polls === 1) return new Response('slow down', { status: 429 });
+        if (polls === 2) return new Response('oops', { status: 502 });
+        return json({ 'hydra:member': [{ id: 'm1', subject: 'Verify your email address' }] });
+      },
+      'GET /messages/m1': () => json({ text: LINK, html: [] }),
+    });
+    const message = await waitForMessage(
+      inbox,
+      { subject: 'Verify your email address', timeoutMs: 1000, intervalMs: 1 },
+      impl
+    );
+    expect(message.text).toBe(LINK);
+    expect(polls).toBe(3);
+  });
+
+  it('still fails at once on a refused token', async () => {
+    const { impl } = fakeFetch({
+      'GET /messages': () => new Response('no', { status: 401 }),
+    });
+    await expect(
+      waitForMessage(inbox, { subject: 'Verify your email address', timeoutMs: 1000, intervalMs: 1 }, impl)
+    ).rejects.toThrow(/mail\.tm GET \/messages: 401/);
+  });
+
+  it('gives every request a timeout, and names mail.tm when one fires', async () => {
+    const seen: (AbortSignal | null | undefined)[] = [];
+    const impl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push(init?.signal);
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    }) as typeof fetch;
+    await expect(deleteInbox(inbox, impl)).rejects.toThrow(/mail\.tm DELETE \/accounts\/acc1: timed out/);
+    expect(seen[0]).toBeInstanceOf(AbortSignal);
+  });
+
   it('times out naming the subject and the wait', async () => {
     const { impl } = fakeFetch({
       'GET /messages': () => json({ 'hydra:member': [] }),
