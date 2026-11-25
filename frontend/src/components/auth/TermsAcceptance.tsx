@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { acceptTerms } from '@/lib/auth-client';
 import { TERMS_LAST_UPDATED } from '@/lib/constants/legal';
@@ -12,10 +12,11 @@ import { openTermsExits } from '@/lib/terms-exits';
 const NOT_RECORDED =
   'We could not record your acceptance. Check your connection and try again.';
 const TERMS_CHANGED =
-  'The Terms of Service changed while this page was open. Reload the page to read the current version.';
+  'The Terms of Service changed while this page was open, or you signed in elsewhere. Reload the page to read the current version.';
+const TITLE = 'Accept the Terms of Service · Auto Author';
 
 interface TermsAcceptanceProps {
-  /** The signed-in account, for which the exit links open Settings and Profile. */
+  /** The signed-in account: the one accepting, and the one the exit links open for. */
   userId: string;
   /** Called once the acceptance is recorded. */
   onAccepted: () => unknown;
@@ -32,10 +33,19 @@ export function TermsAcceptance({ userId, onAccepted }: TermsAcceptanceProps) {
   const [problem, setProblem] = useState('');
   const acceptRef = useRef<HTMLButtonElement>(null);
 
+  // The screen replaces the page, so it names itself (WCAG 2.4.2).
+  useEffect(() => {
+    const previous = document.title;
+    document.title = TITLE;
+    return () => {
+      document.title = previous;
+    };
+  }, []);
+
   async function accept() {
     setSaving(true);
     setProblem('');
-    const status = await acceptTerms().then(
+    const status = await acceptTerms(userId).then(
       ({ error }) => (error ? error.status : 200),
       () => 0
     );

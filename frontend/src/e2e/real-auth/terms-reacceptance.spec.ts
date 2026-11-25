@@ -61,10 +61,11 @@ test('the browser cannot choose the version it accepts, or accept for another si
   const email = `terms-forged-${Date.now()}@example.com`;
   await signUpAndVerify(page, email);
   await users().updateOne({ email }, { $set: { termsVersion: '2000-01-01' } });
+  const userId = String((await users().findOne({ email }))?._id);
 
   const crossSite = await page.request.post(`${WEB}/api/auth/terms/accept`, {
     headers: { Origin: 'https://evil.example' },
-    data: { version: TERMS_VERSION },
+    data: { version: TERMS_VERSION, userId },
   });
   expect(crossSite.status()).toBe(403);
   expect((await users().findOne({ email }))?.termsVersion).toBe('2000-01-01');
@@ -72,14 +73,25 @@ test('the browser cannot choose the version it accepts, or accept for another si
   // A screen showing older Terms (left open across a deploy) is refused.
   const stale = await page.request.post(`${WEB}/api/auth/terms/accept`, {
     headers: { Origin: WEB },
-    data: { version: '2000-01-01' },
+    data: { version: '2000-01-01', userId },
   });
   expect(stale.status()).toBe(409);
+  // So is a screen shown to another account, before this one signed in.
+  const otherAccount = await page.request.post(`${WEB}/api/auth/terms/accept`, {
+    headers: { Origin: WEB },
+    data: { version: TERMS_VERSION, userId: 'someone-else' },
+  });
+  expect(otherAccount.status()).toBe(409);
   expect((await users().findOne({ email }))?.termsVersion).toBe('2000-01-01');
 
   const forged = await page.request.post(`${WEB}/api/auth/terms/accept`, {
     headers: { Origin: WEB },
-    data: { version: TERMS_VERSION, termsVersion: '2999-01-01', termsAcceptedAt: '1999-01-01T00:00:00Z' },
+    data: {
+      version: TERMS_VERSION,
+      userId,
+      termsVersion: '2999-01-01',
+      termsAcceptedAt: '1999-01-01T00:00:00Z',
+    },
   });
   expect(forged.status()).toBe(200);
   const doc = await users().findOne({ email });
@@ -90,7 +102,7 @@ test('the browser cannot choose the version it accepts, or accept for another si
 test('a request without a session is refused', async ({ request }) => {
   const res = await request.post(`${WEB}/api/auth/terms/accept`, {
     headers: { Origin: WEB },
-    data: { version: TERMS_VERSION },
+    data: { version: TERMS_VERSION, userId: 'anyone' },
   });
   expect(res.status()).toBe(401);
 });

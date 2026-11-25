@@ -107,7 +107,7 @@ describe('An existing account accepts a new Terms version (issue #961)', () => {
       ctx: {
         json,
         // The version the screen showed: TERMS_VERSION in the same build.
-        body: { version: TERMS_VERSION } as { version?: unknown },
+        body: { version: TERMS_VERSION, userId } as { version?: unknown; userId?: unknown },
         context: {
           session: { user: { id: userId, termsVersion: recorded } },
           internalAdapter: { updateUser },
@@ -136,7 +136,12 @@ describe('An existing account accepts a new Terms version (issue #961)', () => {
     const { ctx, updateUser } = fakeContext();
     await acceptCurrentTerms({
       ...ctx,
-      body: { version: TERMS_VERSION, termsVersion: '1999-01-01', termsAcceptedAt: new Date(0) },
+      body: {
+        version: TERMS_VERSION,
+        userId: 'user-1',
+        termsVersion: '1999-01-01',
+        termsAcceptedAt: new Date(0),
+      },
     } as typeof ctx);
 
     expect(updateUser.mock.calls[0][1]).toMatchObject({ termsVersion: TERMS_VERSION });
@@ -145,14 +150,27 @@ describe('An existing account accepts a new Terms version (issue #961)', () => {
   // A screen left open across a deploy showed the old Terms; accepting it must
   // not record consent to text the user never saw.
   it.each([
-    ['an older version', { version: '2000-01-01' }],
-    ['no version', {}],
+    ['an older version', { version: '2000-01-01', userId: 'user-1' }],
+    ['no version', { userId: 'user-1' }],
     ['no body', undefined],
   ])('refuses a screen that showed %s, recording nothing', async (_label, body) => {
     const { ctx, updateUser } = fakeContext();
     await expect(acceptCurrentTerms({ ...ctx, body })).rejects.toMatchObject({
       status: 'CONFLICT',
     });
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  // Another account signed in on a different tab since the screen loaded: the
+  // cookie is now theirs, and they never saw this screen.
+  it.each([
+    ['another account', 'user-2'],
+    ['no account', undefined],
+  ])('refuses a screen shown to %s, recording nothing', async (_label, userId) => {
+    const { ctx, updateUser } = fakeContext('user-1');
+    await expect(
+      acceptCurrentTerms({ ...ctx, body: { version: TERMS_VERSION, userId } })
+    ).rejects.toMatchObject({ status: 'CONFLICT' });
     expect(updateUser).not.toHaveBeenCalled();
   });
 

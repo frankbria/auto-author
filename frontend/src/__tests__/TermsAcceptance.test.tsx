@@ -10,6 +10,7 @@ import { acceptTerms, useSession } from '@/lib/auth-client';
 import { signOutOrNotify } from '@/lib/sign-out';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { TERMS_VERSION } from '@/lib/constants/legal';
+import { closeTermsExits } from '@/lib/terms-exits';
 
 expect.extend(toHaveNoViolations);
 
@@ -57,6 +58,7 @@ const acceptButton = () => screen.getByRole('button', { name: /i accept the term
 beforeEach(() => {
   jest.clearAllMocks();
   sessionStorage.clear();
+  closeTermsExits();
   delete process.env.NEXT_PUBLIC_BYPASS_AUTH;
   (useRouter as jest.Mock).mockReturnValue({ push });
   (usePathname as jest.Mock).mockReturnValue('/dashboard');
@@ -93,7 +95,7 @@ describe('Terms re-acceptance gate (#961)', () => {
 
     await userEvent.click(acceptButton());
 
-    expect(acceptTerms).toHaveBeenCalledTimes(1);
+    expect(acceptTerms).toHaveBeenCalledWith('u1');
     await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
     expect(screen.getByText('Protected Content')).toBeInTheDocument();
   });
@@ -117,7 +119,7 @@ describe('Terms re-acceptance gate (#961)', () => {
 
     await userEvent.click(acceptButton());
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/changed while this page was open\. reload/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/changed while this page was open.*reload the page/i);
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 
@@ -281,6 +283,15 @@ describe('Terms re-acceptance gate (#961)', () => {
 
     await screen.findByText(/could not record your acceptance/i);
     expect(acceptButton()).toHaveFocus();
+  });
+
+  it('titles the document for the screen, and restores the title after (WCAG 2.4.2)', () => {
+    document.title = 'Dashboard · Auto Author';
+    signedInWith(undefined);
+    const { unmount } = renderPage();
+    expect(document.title).toBe('Accept the Terms of Service · Auto Author');
+    unmount();
+    expect(document.title).toBe('Dashboard · Auto Author');
   });
 
   it('is the page landmark the skip link targets, and has no axe violations', async () => {

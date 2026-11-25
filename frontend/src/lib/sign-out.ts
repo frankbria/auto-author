@@ -1,5 +1,6 @@
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
+import { closeTermsExits } from "@/lib/terms-exits";
 
 // Until when a sign-out the user asked for owns the navigation: open-ended
 // while the request runs, then long enough for the caller's router.push.
@@ -39,6 +40,8 @@ export async function signOutOrNotify({
   // leavePage: the caller replaces the document, which resets this module, so
   // no timer can expire before a slow navigation lands (#1177).
   underwayUntil = failed ? 0 : leavePage ? Infinity : Date.now() + CALLER_NAVIGATES_WITHIN_MS;
+  // The next sign-in in this tab is asked about the Terms again (#961).
+  if (!failed) closeTermsExits();
   if (failed && !quiet) {
     toast({
       title: "Could not sign out",
