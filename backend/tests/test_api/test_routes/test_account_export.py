@@ -143,8 +143,9 @@ async def test_export_includes_the_accounts_activity_records(reinit_db):
     # The export writes its own audit row before the file is built.
     assert ("account_export", seeded["user_id"]) in audit
     assert [a["metadata"]["note"] for a in data["chapter_access_logs"]] == ["MINE access"]
-    assert [(u["_id"], u["count"]) for u in data["usage_counters"]] == [
-        (f"{seeded['user_id']}:day:MINE", 3)
+    # The token's rate-limit counter shares the collection where the limiter is on.
+    assert (f"{seeded['user_id']}:day:MINE", 3) in [
+        (u["_id"], u["count"]) for u in data["usage_counters"]
     ]
 
 
@@ -160,20 +161,21 @@ async def test_export_never_contains_another_accounts_activity(reinit_db):
     alices = await _export(alice["tokens"][0])
     bobs = await _export(bob["tokens"][0])
 
-    for mine, theirs, other_id in (
-        (alices, "BOB", bob["user_id"]), (bobs, "ALICE", alice["user_id"])
+    for mine, theirs, other_id, data_owner in (
+        (alices, "BOB", bob["user_id"], alice["user_id"]),
+        (bobs, "ALICE", alice["user_id"], bob["user_id"]),
     ):
         data = mine.json()
         assert len(data["audit_logs"]) == 3 and len(data["chapter_access_logs"]) == 1
-        assert len(data["usage_counters"]) == 1
+        assert all(u["user_id"] == data_owner for u in data["usage_counters"])
         assert theirs not in mine.text and other_id not in mine.text
 
 
 @pytest.mark.asyncio
 async def test_an_action_on_another_account_is_in_neither_export_as_the_others_data(reinit_db):
     """#965: an admin deleting or erasing an account writes a row with the admin
-    as actor and that account as target. The admin's export must not carry the
-    other account's id, and the target's export must not carry the admin's id,
+    as actor and that account as target. The admin's export has the action but
+    not the other account's id, and the target's export must not carry the admin's id,
     IP address or user-agent."""
     admin = await _seed_better_auth_user("admin@example.com", name="Ad Min")
     bob = await _seed_better_auth_user("bob@example.com", name="Bob B")
@@ -187,7 +189,9 @@ async def test_an_action_on_another_account_is_in_neither_export_as_the_others_d
     bobs = await _export(bob["tokens"][0])
 
     assert bob["user_id"] not in admins.text
-    assert "user_erase" not in admins.text
+    [done] = [r for r in admins.json()["audit_logs"] if r["action"] == "user_erase"]
+    assert done["target_id"] == "another account"
+    assert done["details"]["ip_address"] == "ADMIN-IP"  # the admin's own request
     [erase] = [r for r in bobs.json()["audit_logs"] if r["action"] == "user_erase"]
     assert erase["actor_id"] == "another account"
     assert erase["details"] == {"method": "DELETE"}

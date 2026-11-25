@@ -32,27 +32,40 @@ EXPORTED_PROFILE_FIELDS = (
     "updated_at", "terms_version", "terms_accepted_at",
 )
 
-# Who an audit row about this account names as actor when it is someone else
-# (an admin deleting or erasing it): not their id, IP address or user-agent.
-OTHER_ACTOR = "another account"
-_OTHER_ACTORS_REQUEST_DETAILS = ("ip_address", "user_agent", "request_id")
-
-
 # The resource types of audit rows whose target_id is an account's auth_id. Any
 # other row's target is a book, chapter, question or image id, which can come
 # from the request, so it is never read as naming an account (#965).
 ACCOUNT_RESOURCE_TYPES = ["user", "billing", "books"]
 
+# What an exported audit row says in place of another account's id. A row
+# someone else wrote about the account (an admin's) also loses where it came from.
+OTHER_ACCOUNT = "another account"
+_REQUEST_ORIGIN = ("ip_address", "user_agent", "request_id")
+
 
 def _audit_rows(auth_id: str) -> Dict:
-    """The account's audit rows (#965): account-level rows about it (target),
-    which takes in the Stripe webhook's, whose actor is "stripe:<event id>", and
-    its actions on its own content (actor). Its actions on another account (an
-    admin's deletion or erasure of one) are that account's."""
+    """The account's audit rows (#965): every row it wrote (actor), and the
+    account-level rows about it (target), which takes in the Stripe webhook's,
+    whose actor is "stripe:<event id>"."""
     return {"$or": [
+        {"actor_id": auth_id},
         {"target_id": auth_id, "resource_type": {"$in": ACCOUNT_RESOURCE_TYPES}},
-        {"actor_id": auth_id, "resource_type": {"$nin": ACCOUNT_RESOURCE_TYPES}},
     ]}
+
+
+def _without_other_accounts(row: Dict, auth_id: str) -> Dict:
+    """``row`` naming no other account: an admin's action on someone else keeps
+    what was done to whom only as "another account"; an action someone else took
+    on this account keeps what was done, not who did it or from where."""
+    if row.get("resource_type") in ACCOUNT_RESOURCE_TYPES and row.get("target_id") != auth_id:
+        row = {**row, "target_id": OTHER_ACCOUNT}
+    actor = row.get("actor_id")
+    if actor != auth_id and not str(actor).startswith("stripe:"):
+        details = row.get("details")
+        if isinstance(details, dict):
+            details = {k: v for k, v in details.items() if k not in _REQUEST_ORIGIN}
+        row = {**row, "actor_id": OTHER_ACCOUNT, "details": details}
+    return row
 
 
 # The collections an export reads, and the filter for the owner's documents in
@@ -66,20 +79,6 @@ EXPORTED_COLLECTIONS: Dict[str, Callable[[str], Dict]] = {
     "chapter_access_logs": lambda auth_id: {"user_id": auth_id},
     "usage_counters": lambda auth_id: {"user_id": auth_id},
 }
-
-
-def _scrub_other_actor(row: Dict, auth_id: str) -> Dict:
-    """An audit row another person wrote about the account keeps what was done,
-    not who did it or from where."""
-    actor = row.get("actor_id")
-    if actor == auth_id or str(actor).startswith("stripe:"):
-        return row
-    details = row.get("details")
-    if isinstance(details, dict):
-        row["details"] = {
-            k: v for k, v in details.items() if k not in _OTHER_ACTORS_REQUEST_DETAILS
-        }
-    return {**row, "actor_id": OTHER_ACTOR}
 
 
 # Documents per cursor round trip: what the export holds at once is this many
@@ -125,7 +124,7 @@ async def stream_account_export(user: Dict) -> AsyncIterator[bytes]:
         separator = b""
         async for doc in cursor:
             if name == "audit_logs":
-                doc = _scrub_other_actor(doc, auth_id)
+                doc = _without_other_accounts(doc, auth_id)
             yield separator + _encode(doc)
             separator = b","
         yield b"]"
