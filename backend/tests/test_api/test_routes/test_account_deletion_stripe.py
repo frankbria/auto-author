@@ -257,7 +257,7 @@ async def test_renewal_consent_survives_deletion_until_cancel_plus_four_years(
     account leaves it in place, now dated from the cancellation."""
     from datetime import datetime, timezone
 
-    from app.db.audit_log import RENEWAL_CONSENT_ACTION, RENEWAL_CONSENT_RETENTION
+    from app.db.audit_log import RENEWAL_CONSENT_ACTION, renewal_consent_expiry
 
     client = await auth_client_factory(
         overrides={
@@ -279,5 +279,5 @@ async def test_renewal_consent_survives_deletion_until_cancel_plus_four_years(
     row = await audit_logs.find_one({"action": RENEWAL_CONSENT_ACTION, "actor_id": OWNER})
     assert row is not None
     assert row["details"]["ip_address"] == "203.0.113.7"
-    expected = datetime.fromtimestamp(CANCELED_AT, timezone.utc) + RENEWAL_CONSENT_RETENTION
+    expected = renewal_consent_expiry(datetime.fromtimestamp(CANCELED_AT, timezone.utc))
     assert row["expires_at"].replace(tzinfo=timezone.utc) == expected

@@ -17,7 +17,7 @@ from app.core.entitlements import (
     has_live_subscription,
     plan_for_subscription,
 )
-from app.db.audit_log import renewal_consent_ended, renewal_consent_live
+from app.db.audit_log import sync_renewal_consent
 from app.db.stripe_events import is_event_processed, mark_event_processed
 from app.db.user import (
     get_user_by_auth_id,
@@ -139,6 +139,12 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=500, detail="Failed to process Stripe event")
 
 
+def _ended_at(subscription: dict, event_created: int | None) -> datetime:
+    """When the subscription ended: Stripe's ended_at, else the event's time."""
+    ended = subscription.get("ended_at") or event_created
+    return datetime.fromtimestamp(ended, timezone.utc) if ended else datetime.now(timezone.utc)
+
+
 async def _apply_subscription_event(
     event_type: str, subscription: dict, event_id: str,
     event_created: int | None = None, _again: bool = False,
@@ -218,6 +224,10 @@ async def _apply_subscription_event(
                 "Stripe %s for subscription %s is not user %s's current %s — ignoring",
                 event_type, subscription_id, user["auth_id"], current_id,
             )
+        if deleted:
+            # Also the retry of a deletion whose consent write failed after
+            # the user write had already cleared this id (#948).
+            await sync_renewal_consent(user["auth_id"], _ended_at(subscription, event_created))
         return {"status": "not_current_subscription", "event_id": event_id}
 
     if deleted:
@@ -369,15 +379,7 @@ async def _apply_subscription_event(
         return {"status": "stale_event", "event_id": event_id}
 
     # The consent record lives until the subscription ends + 4 years (#948).
-    # Raising here is safe: no replay marker yet, so Stripe's retry re-applies.
-    if status in LIVE_SUBSCRIPTION_STATUSES:
-        await renewal_consent_live(user["auth_id"])
-    else:
-        ended = subscription.get("ended_at") or event_created
-        await renewal_consent_ended(
-            user["auth_id"],
-            datetime.fromtimestamp(ended, timezone.utc) if ended else datetime.now(timezone.utc),
-        )
+    await sync_renewal_consent(user["auth_id"], _ended_at(subscription, event_created))
 
     # Report the stored plan, whether this event wrote it or kept it.
     plan = (updated or {}).get("plan", plan) or DEFAULT_PLAN
