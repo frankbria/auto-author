@@ -101,21 +101,25 @@ export async function waitForMessage(
   for (;;) {
     // One mail.tm blip in a two-minute poll must not fail the check: only an
     // error that would repeat (a refused token) ends it early.
-    let list: { 'hydra:member': { id: string; subject: string }[] } = { 'hydra:member': [] };
     try {
-      list = await call(fetchImpl, 'GET', '/messages', { token: inbox.token });
-    } catch (error) {
-      if (!transient(error) || Date.now() >= deadline) throw error;
-    }
-    const found = list['hydra:member'].find((m) => m.subject === subject);
-    if (found) {
-      const { text, html } = await call<Partial<InboxMessage>>(
+      const list = await call<{ 'hydra:member': { id: string; subject: string }[] }>(
         fetchImpl,
         'GET',
-        `/messages/${found.id}`,
+        '/messages',
         { token: inbox.token }
       );
-      return { text: text ?? '', html: html ?? [] };
+      const found = list['hydra:member'].find((m) => m.subject === subject);
+      if (found) {
+        const { text, html } = await call<Partial<InboxMessage>>(
+          fetchImpl,
+          'GET',
+          `/messages/${found.id}`,
+          { token: inbox.token }
+        );
+        return { text: text ?? '', html: html ?? [] };
+      }
+    } catch (error) {
+      if (!transient(error) || Date.now() >= deadline) throw error;
     }
     if (Date.now() >= deadline) {
       throw new Error(
