@@ -1,4 +1,4 @@
-import { createAuthEndpoint, sessionMiddleware } from "better-auth/api";
+import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api";
 import { TERMS_VERSION } from "./constants/legal";
 
 /**
@@ -24,21 +24,34 @@ export async function stampTermsAcceptance<T extends object>(user: T) {
 }
 
 interface AcceptTermsContext {
+  body?: { version?: unknown };
   json(body: { termsVersion: string }): unknown;
   context: {
-    session: { user: { id: string } };
+    session: { user: { id: string; termsVersion?: unknown } };
     internalAdapter: { updateUser(userId: string, data: Record<string, unknown>): Promise<unknown> };
   };
 }
 
 /**
- * An existing account accepts the current Terms (#961). The body is never
- * read: the server chooses the version and the time, as at sign-up. Since
- * #1263 this is the one users document the backend reads too, so its user and
- * the record kept at deletion carry the new acceptance with no copy to update.
+ * An existing account accepts the current Terms (#961). The body names the
+ * version the screen showed; anything else in it is ignored, and the server
+ * records its own version and the time, as at sign-up. A screen left open
+ * across a deploy showed older Terms, so it is refused (409) rather than
+ * recorded as consent to text the user never saw. Since #1263 this is the one
+ * users document the backend reads too, so its user and the record kept at
+ * deletion carry the new acceptance with no copy to update.
  */
 export async function acceptCurrentTerms(ctx: AcceptTermsContext) {
-  await ctx.context.internalAdapter.updateUser(ctx.context.session.user.id, acceptedNow());
+  if (ctx.body?.version !== TERMS_VERSION) {
+    throw new APIError("CONFLICT", {
+      message: "The Terms of Service changed. Reload the page to read the current version.",
+    });
+  }
+  const { user } = ctx.context.session;
+  // Already accepted (a retry after a lost response): keep the first time.
+  if (user.termsVersion !== TERMS_VERSION) {
+    await ctx.context.internalAdapter.updateUser(user.id, acceptedNow());
+  }
   return ctx.json({ termsVersion: TERMS_VERSION });
 }
 

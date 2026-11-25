@@ -94,6 +94,38 @@ describe('Terms re-acceptance gate (#961)', () => {
 
     expect(acceptTerms).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('Protected Content')).toBeInTheDocument();
+  });
+
+  // The acceptance is recorded; a session reload that fails must not ask again.
+  it('shows the page once accepted even if the session reload fails', async () => {
+    signedInWith('2000-01-01');
+    refetch.mockRejectedValueOnce(new Error('503'));
+    (acceptTerms as jest.Mock).mockResolvedValue({ data: { termsVersion: TERMS_VERSION }, error: null });
+    renderPage();
+
+    await userEvent.click(acceptButton());
+
+    expect(await screen.findByText('Protected Content')).toBeInTheDocument();
+  });
+
+  it('asks for a reload when the Terms changed while the screen was open', async () => {
+    signedInWith('2000-01-01');
+    (acceptTerms as jest.Mock).mockResolvedValue({ data: null, error: { status: 409 } });
+    renderPage();
+
+    await userEvent.click(acceptButton());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/changed while this page was open\. reload/i);
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
+  });
+
+  it('keeps its alert region in the accessibility tree before any failure', () => {
+    signedInWith(undefined);
+    renderPage();
+    const region = screen.getByRole('alert');
+    expect(region).toBeEmptyDOMElement();
+    expect(region.className).not.toMatch(/\b(hidden|empty:hidden)\b/);
   });
 
   it('says so when the server refuses, and lets the user try again', async () => {
@@ -154,6 +186,48 @@ describe('Terms re-acceptance gate (#961)', () => {
 
     await waitFor(() => expect(signOutOrNotify).toHaveBeenCalled());
     expect(push).not.toHaveBeenCalled();
+  });
+
+  // Terms section 7 promises cancelling online; declining must not take that,
+  // the data download or account deletion away.
+  it.each(['/dashboard/settings', '/profile'])(
+    'still opens %s, where the account can be cancelled, downloaded or deleted',
+    (path) => {
+      (usePathname as jest.Mock).mockReturnValue(path);
+      signedInWith(undefined);
+      renderPage();
+      expect(screen.getByText('Protected Content')).toBeInTheDocument();
+    }
+  );
+
+  it('asks on every other page, including ones that only start like an exit', () => {
+    (usePathname as jest.Mock).mockReturnValue('/dashboard/settingsX');
+    signedInWith(undefined);
+    renderPage();
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
+  });
+
+  it('links a user who does not accept to billing, and to their data and account', () => {
+    signedInWith(undefined);
+    renderPage();
+    expect(screen.getByRole('link', { name: /cancel your subscription/i })).toHaveAttribute(
+      'href',
+      '/dashboard/settings?tab=billing'
+    );
+    expect(
+      screen.getByRole('link', { name: /download your data or delete your account/i })
+    ).toHaveAttribute('href', '/profile');
+  });
+
+  it('returns focus to the accept button when recording fails', async () => {
+    signedInWith(undefined);
+    (acceptTerms as jest.Mock).mockResolvedValue({ data: null, error: { status: 500 } });
+    renderPage();
+
+    await userEvent.click(acceptButton());
+
+    await screen.findByText(/could not record your acceptance/i);
+    expect(acceptButton()).toHaveFocus();
   });
 
   it('is the page landmark the skip link targets, and has no axe violations', async () => {

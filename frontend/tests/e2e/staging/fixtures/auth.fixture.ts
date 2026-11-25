@@ -112,15 +112,14 @@ async function loginToStaging(page: Page): Promise<void> {
 /**
  * A Terms version newer than the one the test account accepted shows the
  * acceptance screen in place of the dashboard (#961). Accept it, as a user
- * would, so the journey continues; absent, this costs a five-second wait.
+ * would, so the journey continues.
  */
 async function acceptTermsIfAsked(page: Page): Promise<void> {
   const accept = page.getByRole('button', { name: 'I accept the Terms of Service' });
-  const asked = await accept.waitFor({ state: 'visible', timeout: 5000 }).then(
-    () => true,
-    () => false
-  );
-  if (!asked) return;
+  // Whichever shows first: the acceptance screen, or the dashboard's header
+  // (the screen replaces the whole layout, header included).
+  await expect(accept.or(page.locator('header'))).toBeVisible({ timeout: SIGN_IN_TIMEOUT_MS });
+  if (!(await accept.isVisible())) return;
   await accept.click();
   // The button relabels while saving; the screen itself goes once it is recorded.
   await expect(

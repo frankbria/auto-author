@@ -56,6 +56,8 @@ describe('Terms of Service page', () => {
     expect(section).toHaveTextContent(/next time you sign in/i);
     expect(section).toHaveTextContent(/record the version you accept and when/i);
     expect(section).not.toHaveTextContent(/continued use/i);
+    // Declining still leaves section 7's ways out.
+    expect(section).toHaveTextContent(/cancel a subscription, download your data or delete your account/i);
   });
 
   // #789: sign-up records TERMS_VERSION, so the date shown here must be it.

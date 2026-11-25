@@ -2,10 +2,19 @@
 
 import { useSession } from '@/lib/auth-client';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { endSignOut, signOutUnderway } from '@/lib/sign-out';
 import { acceptedCurrentTerms } from '@/lib/constants/legal';
 import { TermsAcceptance } from '@/components/auth/TermsAcceptance';
+
+/**
+ * Pages an account that has not accepted the current Terms can still open
+ * (#961): Settings, to cancel a subscription online as Terms section 7
+ * promises, and the profile, to download its data or delete the account.
+ */
+const TERMS_EXITS = ['/dashboard/settings', '/profile'];
+const isTermsExit = (path: string | null) =>
+  TERMS_EXITS.some((exit) => path === exit || path?.startsWith(`${exit}/`));
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,6 +28,9 @@ interface ProtectedRouteProps {
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { data: session, isPending, refetch } = useSession();
+  // The account that accepted the Terms on this page: the server has it even
+  // if the session reload fails.
+  const [acceptedBy, setAcceptedBy] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -73,8 +85,20 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // before the page loads (#961). The field is better-auth's additionalField
   // from auth-terms.ts; the client's session type does not declare it.
   const { termsVersion } = session.user as { termsVersion?: unknown };
-  if (!acceptedCurrentTerms(termsVersion)) {
-    return <TermsAcceptance onAccepted={() => refetch?.()} />;
+  if (
+    acceptedBy !== session.user.id &&
+    !isTermsExit(pathname) &&
+    !acceptedCurrentTerms(termsVersion)
+  ) {
+    return (
+      <TermsAcceptance
+        onAccepted={() => {
+          setAcceptedBy(session.user.id);
+          // Best effort: the page is already shown, and the next load reads it.
+          void Promise.resolve(refetch?.()).catch(() => {});
+        }}
+      />
+    );
   }
 
   // User is authenticated, render children

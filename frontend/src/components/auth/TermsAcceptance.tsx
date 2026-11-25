@@ -2,14 +2,19 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { acceptTerms } from '@/lib/auth-client';
 import { TERMS_LAST_UPDATED } from '@/lib/constants/legal';
 import { signOutOrNotify } from '@/lib/sign-out';
 
+const NOT_RECORDED =
+  'We could not record your acceptance. Check your connection and try again.';
+const TERMS_CHANGED =
+  'The Terms of Service changed while this page was open. Reload the page to read the current version.';
+
 interface TermsAcceptanceProps {
-  /** Called once the acceptance is recorded; reloads the session. */
+  /** Called once the acceptance is recorded. */
   onAccepted: () => unknown;
 }
 
@@ -21,21 +26,24 @@ interface TermsAcceptanceProps {
 export function TermsAcceptance({ onAccepted }: TermsAcceptanceProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [problem, setProblem] = useState('');
+  const acceptRef = useRef<HTMLButtonElement>(null);
 
   async function accept() {
     setSaving(true);
-    setFailed(false);
-    const recorded = await acceptTerms().then(
-      ({ error }) => !error,
-      () => false
+    setProblem('');
+    const status = await acceptTerms().then(
+      ({ error }) => (error ? error.status : 200),
+      () => 0
     );
-    if (recorded) {
-      await onAccepted();
-    } else {
-      setFailed(true);
-    }
     setSaving(false);
+    if (status === 200) {
+      onAccepted();
+    } else {
+      setProblem(status === 409 ? TERMS_CHANGED : NOT_RECORDED);
+      // Disabling the button while saving dropped focus to the page.
+      requestAnimationFrame(() => acceptRef.current?.focus());
+    }
   }
 
   async function signOut() {
@@ -69,13 +77,23 @@ export function TermsAcceptance({ onAccepted }: TermsAcceptanceProps) {
             Read the Terms of Service (opens in a new tab)
           </Link>
         </p>
-        <p role="alert" className="mt-4 text-sm text-destructive empty:hidden">
-          {failed
-            ? 'We could not record your acceptance. Check your connection and try again.'
-            : ''}
+        <p className="mt-3 text-muted-foreground">
+          Not ready to accept? You can still{' '}
+          <Link href="/dashboard/settings?tab=billing" className="text-primary underline underline-offset-4">
+            cancel your subscription
+          </Link>{' '}
+          or{' '}
+          <Link href="/profile" className="text-primary underline underline-offset-4">
+            download your data or delete your account
+          </Link>
+          .
+        </p>
+        {/* Always rendered, so the live region exists before it has text to announce. */}
+        <p role="alert" className={`text-sm text-destructive ${problem ? 'mt-4' : ''}`}>
+          {problem}
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Button onClick={accept} busy={saving} className="min-h-11">
+          <Button ref={acceptRef} onClick={accept} busy={saving} className="min-h-11">
             {saving ? 'Accepting…' : 'I accept the Terms of Service'}
           </Button>
           <Button variant="outline" onClick={signOut} disabled={saving} className="min-h-11">

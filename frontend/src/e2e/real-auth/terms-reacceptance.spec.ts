@@ -64,14 +64,22 @@ test('the browser cannot choose the version it accepts, or accept for another si
 
   const crossSite = await page.request.post(`${WEB}/api/auth/terms/accept`, {
     headers: { Origin: 'https://evil.example' },
-    data: {},
+    data: { version: TERMS_VERSION },
   });
   expect(crossSite.status()).toBe(403);
   expect((await users().findOne({ email }))?.termsVersion).toBe('2000-01-01');
 
+  // A screen showing older Terms (left open across a deploy) is refused.
+  const stale = await page.request.post(`${WEB}/api/auth/terms/accept`, {
+    headers: { Origin: WEB },
+    data: { version: '2000-01-01' },
+  });
+  expect(stale.status()).toBe(409);
+  expect((await users().findOne({ email }))?.termsVersion).toBe('2000-01-01');
+
   const forged = await page.request.post(`${WEB}/api/auth/terms/accept`, {
     headers: { Origin: WEB },
-    data: { termsVersion: '2999-01-01', termsAcceptedAt: '1999-01-01T00:00:00Z' },
+    data: { version: TERMS_VERSION, termsVersion: '2999-01-01', termsAcceptedAt: '1999-01-01T00:00:00Z' },
   });
   expect(forged.status()).toBe(200);
   const doc = await users().findOne({ email });
@@ -82,7 +90,7 @@ test('the browser cannot choose the version it accepts, or accept for another si
 test('a request without a session is refused', async ({ request }) => {
   const res = await request.post(`${WEB}/api/auth/terms/accept`, {
     headers: { Origin: WEB },
-    data: {},
+    data: { version: TERMS_VERSION },
   });
   expect(res.status()).toBe(401);
 });

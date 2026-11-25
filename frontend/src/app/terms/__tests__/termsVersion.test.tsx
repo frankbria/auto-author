@@ -16,7 +16,7 @@ import { TERMS_VERSION } from '@/lib/constants/legal';
 
 const RECORDED = {
   version: '2026-11-25',
-  digest: 'b1bac6e297823c9e846206832c3f0a91746a810993592180897fde914ac3a54f',
+  digest: '94ef15005e0e74300d98cb9742b7e124e1c06dcabf83c5f72f0fcb32b4cbfaee',
 };
 
 function termsDigest(): string {

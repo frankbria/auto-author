@@ -2,6 +2,7 @@
 
 import { createAuthClient } from "better-auth/react";
 import { twoFactorClient } from "better-auth/client/plugins";
+import { TERMS_VERSION } from "./constants/legal";
 
 // better-auth types the password-reset methods itself, so nothing is layered on
 // top. A hand-rolled `PasswordResetMethods` interface used to declare
@@ -31,11 +32,15 @@ export const signUp = authClient.signUp;
 export const signOut = authClient.signOut;
 
 /**
- * Accept the current Terms of Service for the signed-in user (#961). The
- * server records which version and when; nothing is sent but the request.
+ * Accept the current Terms of Service for the signed-in user (#961). Sends the
+ * version this build shows; the server refuses it (409) if its own is newer,
+ * and records its own version and the time.
  */
 export const acceptTerms = () =>
-  authClient.$fetch<{ termsVersion: string }>("/terms/accept", { method: "POST", body: {} });
+  authClient.$fetch<{ termsVersion: string }>("/terms/accept", {
+    method: "POST",
+    body: { version: TERMS_VERSION },
+  });
 
 // Password reset methods, typed by better-auth itself
 export const requestPasswordReset = authClient.requestPasswordReset;

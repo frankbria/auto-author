@@ -173,8 +173,8 @@ export default function TermsPage() {
               the &ldquo;Last updated&rdquo; date above and ask you to accept the
               revised terms the next time you sign in, before you can keep using
               the Service. We record the version you accept and when. If you do
-              not accept them, you may stop using the Service and contact us to
-              close your account.
+              not accept them, you can still cancel a subscription, download your
+              data or delete your account, and you may stop using the Service.
             </p>
           </section>
 

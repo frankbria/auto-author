@@ -98,7 +98,7 @@ describe('An existing account accepts a new Terms version (issue #961)', () => {
     expect(acceptedCurrentTerms(version)).toBe(accepted);
   });
 
-  function fakeContext(userId = 'user-1') {
+  function fakeContext(userId = 'user-1', recorded?: string) {
     const updateUser = jest.fn(async (_id: string, data: object) => ({ id: _id, ...data }));
     const json = jest.fn((body: unknown) => body);
     return {
@@ -106,7 +106,12 @@ describe('An existing account accepts a new Terms version (issue #961)', () => {
       json,
       ctx: {
         json,
-        context: { session: { user: { id: userId } }, internalAdapter: { updateUser } },
+        // The version the screen showed: TERMS_VERSION in the same build.
+        body: { version: TERMS_VERSION } as { version?: unknown },
+        context: {
+          session: { user: { id: userId, termsVersion: recorded } },
+          internalAdapter: { updateUser },
+        },
       },
     };
   }
@@ -125,15 +130,38 @@ describe('An existing account accepts a new Terms version (issue #961)', () => {
     expect(json).toHaveBeenCalledWith({ termsVersion: TERMS_VERSION });
   });
 
-  // The body is never read: the server chooses what was accepted and when.
+  // The server chooses what was accepted and when; the body only says which
+  // version the screen showed.
   it('ignores a version or time sent by the browser', async () => {
     const { ctx, updateUser } = fakeContext();
     await acceptCurrentTerms({
       ...ctx,
-      body: { termsVersion: '1999-01-01', termsAcceptedAt: new Date(0) },
+      body: { version: TERMS_VERSION, termsVersion: '1999-01-01', termsAcceptedAt: new Date(0) },
     } as typeof ctx);
 
     expect(updateUser.mock.calls[0][1]).toMatchObject({ termsVersion: TERMS_VERSION });
+  });
+
+  // A screen left open across a deploy showed the old Terms; accepting it must
+  // not record consent to text the user never saw.
+  it.each([
+    ['an older version', { version: '2000-01-01' }],
+    ['no version', {}],
+    ['no body', undefined],
+  ])('refuses a screen that showed %s, recording nothing', async (_label, body) => {
+    const { ctx, updateUser } = fakeContext();
+    await expect(acceptCurrentTerms({ ...ctx, body })).rejects.toMatchObject({
+      status: 'CONFLICT',
+    });
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  // A retry after a lost response keeps the time the user first accepted.
+  it('keeps the original time when the account already accepted this version', async () => {
+    const { ctx, updateUser, json } = fakeContext('user-1', TERMS_VERSION);
+    await acceptCurrentTerms(ctx);
+    expect(updateUser).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith({ termsVersion: TERMS_VERSION });
   });
 
   it('is a POST endpoint that requires a session', () => {
