@@ -169,6 +169,19 @@ Two consequences worth knowing before you write a spec:
 - `complete-user-journey.spec.ts` - Full workflow from start to finish
 - `regressions.spec.ts` (future) - Tests for specific bugs
 - `edge-cases.spec.ts` (future) - Boundary conditions and error cases
+- `email-verification.spec.ts` - A new account's verification email arrives and
+  its link lands on the dashboard, signed in (#971). Signs up with a throwaway
+  [mail.tm](https://mail.tm) inbox (public API, no key, no secret) and a random
+  per-run password, then deletes (deactivates) the account from `/profile` and
+  the inbox. Runs once, no retries. Does not use the shared account. Nothing it
+  prints carries the link's sign-in token. Inbox-vs-spam placement at the large
+  providers is not measured. A red run with a `mail.tm ...` error is the inbox
+  service, not the app. `No "Verify your email address" email reached ...` is
+  the app or its provider: the frontend container's log has
+  `[email] Verification email NOT sent` (no provider configured) or
+  `Resend API error` / `SendGrid API error` (key or sending domain refused); if
+  it has neither, the provider accepted the message and its dashboard shows
+  what happened to it.
 
 ## CI/CD Integration
 
@@ -326,7 +339,8 @@ fails its first attempt and passes on retry turns the run red instead of
 reporting `1 flaky` and exiting `success`. Retries (`retries: 2`) stay on so the
 retry still produces a trace — they buy diagnostics, not a green tick. The two
 live-AI tests are the exception: they run once (#916), since their failures are
-mostly deterministic (quota, key) and a retry re-spends the calls.
+mostly deterministic (quota, key) and a retry re-spends the calls. So does
+`email-verification.spec.ts` (#971), since a retry signs up another account.
 
 This was decided in #551. The `regressions.spec.ts` #83 session canary is the
 spec most likely to catch an auth-path break; while `flaky` counted as success, a
