@@ -281,3 +281,30 @@ async def test_renewal_consent_survives_deletion_until_cancel_plus_four_years(
     assert row["details"]["ip_address"] == "203.0.113.7"
     expected = renewal_consent_expiry(datetime.fromtimestamp(CANCELED_AT, timezone.utc))
     assert row["expires_at"].replace(tzinfo=timezone.utc) == expected
+
+
+async def test_deletion_without_a_subscription_stamps_bare_consent_rows(
+    auth_client_factory, stripe_stub
+):
+    """#948: a deletion webhook cleared the subscription id but its consent write
+    failed; the account is deleted before Stripe's retry (which then finds the
+    account closed). The deletion itself dates the rows from that event."""
+    from datetime import datetime, timezone
+
+    from app.db.audit_log import RENEWAL_CONSENT_ACTION, renewal_consent_expiry
+
+    ended = 1_850_000_000
+    client = await auth_client_factory(overrides={
+        "stripe_subscription_id": None,
+        "stripe_event_created_by_subscription": {SUB_ID: ended},
+    })
+    audit_logs = await get_collection("audit_logs")
+    await audit_logs.insert_one({"action": RENEWAL_CONSENT_ACTION, "actor_id": OWNER,
+                                 "timestamp": datetime(2026, 11, 1, tzinfo=timezone.utc)})
+
+    assert (await client.delete("/api/v1/users/me")).status_code == 200
+
+    assert stripe_stub["requests"] == []
+    row = await audit_logs.find_one({"actor_id": OWNER})
+    expected = renewal_consent_expiry(datetime.fromtimestamp(ended, timezone.utc))
+    assert row["expires_at"].replace(tzinfo=timezone.utc) == expected

@@ -98,9 +98,9 @@ async def test_a_stale_event_does_not_move_the_stamp(webhook_client):
     await _subscribed(webhook_client)
     await _post_signed(webhook_client, event(
         event_id="evt_2", event_type="customer.subscription.deleted",
-        subscription_id="sub_A", status="canceled", ended_at=ENDED_AT, created=1_900_000_000))
+        subscription_id="sub_A", status="canceled", ended_at=ENDED_AT, created=ENDED_AT))
     stale = await _post_signed(webhook_client, event(
-        event_id="evt_old", subscription_id="sub_A", status="active", created=1_800_000_500))
+        event_id="evt_old", subscription_id="sub_A", status="active", created=ENDED_AT - 500))
     assert stale.json()["status"] != "processed"
     assert await _expiry() == _at(ENDED_AT)
 

@@ -29,7 +29,7 @@ from app.core.entitlements import (
     is_feature_allowed,
 )
 from app.core.security import get_current_user_from_session
-from app.db.audit_log import RENEWAL_CONSENT_ACTION, renewal_consent_ended
+from app.db.audit_log import RENEWAL_CONSENT_ACTION, renewal_consent_ended, sync_renewal_consent
 from app.db.user import get_user_by_auth_id, swap_checkout_session, update_user
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,8 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
     user = await get_user_by_auth_id(auth_id)
     subscription_id = (user or {}).get("stripe_subscription_id")
     if not subscription_id:
+        # Ended already; stamps consent rows a failed webhook write left bare (#948).
+        await sync_renewal_consent(auth_id)
         return
     try:
         cancelled = await asyncio.to_thread(

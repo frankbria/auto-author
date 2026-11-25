@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict
+from typing import Dict, Optional
 
 from app.core.reporting import report_failure
 
@@ -70,20 +70,22 @@ async def renewal_consent_ended(auth_id: str, ended_at: datetime) -> None:
     )
 
 
-async def sync_renewal_consent(auth_id: str, ended_at: datetime) -> None:
-    """Make the user's consent rows match their stored subscription: no expiry
-    while it exists, else ``ended_at`` + 4 years (#948).
+async def sync_renewal_consent(auth_id: str, ended_at: Optional[datetime] = None) -> None:
+    """Make the user's consent rows match their stored subscription (#948): no
+    expiry while it exists, else 4 years after it ended.
 
-    Read from the users document, not the event, and read again after writing:
-    two webhook deliveries can write the user in one order and the rows in the
-    other, and whichever writes the rows last then puts them right.
+    The end is the later of ``ended_at`` (the event's) and the newest event
+    applied to the user (``_known_end``), so an older event finishing last
+    cannot date the rows from before the real end. State is read from the
+    users document, and read again after writing: two writers can update the
+    user in one order and the rows in the other, and whichever writes the rows
+    last then puts them right.
     """
     from app.core.entitlements import subscription_exists
-    from app.db.user import get_user_by_auth_id
 
     written = None
     for _ in range(3):
-        user = await get_user_by_auth_id(auth_id)
+        user = await _stored_user(auth_id)
         exists = user is not None and subscription_exists(user)
         if exists == written:
             return
@@ -91,7 +93,16 @@ async def sync_renewal_consent(auth_id: str, ended_at: datetime) -> None:
         if exists:
             await renewal_consent_live(auth_id)
         else:
-            await renewal_consent_ended(auth_id, ended_at)
+            known = await _known_end(auth_id, user)
+            await renewal_consent_ended(auth_id, max(known, ended_at) if ended_at else known)
+
+
+async def _stored_user(auth_id: str) -> Optional[Dict]:
+    """The users document as stored, for its subscription fields."""
+    from app.db.user import user_key
+
+    users = await get_collection("users")
+    return await users.find_one(user_key(auth_id), {"book_ids": 0})
 
 
 async def audit_after_write(**kwargs) -> None:
@@ -147,14 +158,9 @@ async def _backfill_renewal_consent() -> None:
     """Consent rows written before #948 have no expiry. Date each user's from the
     best record of when their subscription ended (``_known_end``); rows of a
     subscription that still exists stay as they are."""
-    from app.core.entitlements import subscription_exists
-    from app.db.user import get_user_by_auth_id
-
     unstamped = {"action": RENEWAL_CONSENT_ACTION, "expires_at": {"$exists": False}}
     for auth_id in await audit_logs_collection.distinct("actor_id", unstamped):
-        user = await get_user_by_auth_id(auth_id)
-        if user is None or not subscription_exists(user):
-            await renewal_consent_ended(auth_id, await _known_end(auth_id, user))
+        await sync_renewal_consent(auth_id)
 
 
 async def _known_end(auth_id: str, user) -> datetime:

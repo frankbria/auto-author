@@ -125,11 +125,9 @@ async def test_sync_stamps_rows_once_the_subscription_has_ended(reinit_db, field
 async def test_sync_puts_right_a_write_the_user_changed_under(reinit_db, monkeypatch):
     """A webhook read the user as live, then another one ended the subscription
     before the rows were written: the re-read after writing stamps them."""
-    import app.db.user as user_dao
-
     await insert_user("u1", stripe_subscription_id="sub_1", stripe_subscription_status="active")
     await _consent()
-    real = user_dao.get_user_by_auth_id
+    real = audit_log_dao._stored_user
     reads = []
 
     async def read_then_end(auth_id):
@@ -140,7 +138,7 @@ async def test_sync_puts_right_a_write_the_user_changed_under(reinit_db, monkeyp
         reads.append(auth_id)
         return user
 
-    monkeypatch.setattr(user_dao, "get_user_by_auth_id", read_then_end)
+    monkeypatch.setattr(audit_log_dao, "_stored_user", read_then_end)
     await sync_renewal_consent("u1", ENDED)
     assert await _expiry() == renewal_consent_expiry(ENDED)
 
@@ -170,3 +168,15 @@ async def test_startup_dates_legacy_rows_from_the_best_known_end(reinit_db):
     assert await _expiry("deleted") == renewal_consent_expiry(ENDED)
     now = renewal_consent_expiry(datetime.now(timezone.utc))
     assert abs(await _expiry("unknown") - now) < timedelta(minutes=5)
+
+
+async def test_an_older_event_finishing_last_cannot_date_the_rows_early(reinit_db):
+    """An `active` event resumes after the deletion was applied: the rows are
+    dated from the deletion recorded on the user, not from the older event."""
+    deletion = int(ENDED.timestamp())
+    await insert_user("u1", stripe_subscription_id=None,
+                      stripe_event_created_by_subscription={"sub_1": deletion})
+    await _consent()
+    await renewal_consent_live("u1")
+    await sync_renewal_consent("u1", ENDED - timedelta(days=60))
+    assert await _expiry() == renewal_consent_expiry(ENDED)
