@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { useSession } from '@/lib/auth-client';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useRouter } from 'next/navigation';
+import { TERMS_VERSION } from '@/lib/constants/legal';
 
 // Mock Next.js navigation
 jest.mock('next/navigation', () => ({
@@ -80,6 +81,7 @@ describe('Authentication State Persistence', () => {
     (useSession as jest.Mock).mockReturnValue({
       data: {
         user: {
+          termsVersion: TERMS_VERSION,
           id: 'user_123',
           email: 'test@example.com',
           name: 'Test User',
@@ -111,6 +113,7 @@ describe('Authentication State Persistence', () => {
     (useSession as jest.Mock).mockReturnValue({
       data: {
         user: {
+          termsVersion: TERMS_VERSION,
           id: 'user_123',
           email: 'test@example.com',
           name: 'Test User',

@@ -88,3 +88,37 @@ async def test_deactivation_keeps_no_empty_entry_for_an_account_with_no_record(
 
     assert "terms_version" not in retained
     assert "terms_accepted_at" not in retained
+
+
+@pytest.mark.asyncio
+async def test_re_accepting_new_terms_reaches_the_app_user_and_the_retained_record(
+    reinit_db,
+):
+    """#961: re-acceptance stamps the users doc better-auth and the backend
+    share (#1263). Nothing holds a copy made at creation (the #963 concern):
+    the app user and the record kept at deletion both carry the new version."""
+    seeded = await _seed_better_auth_user("re-accepts@example.com")
+    users = await get_collection("users")
+    await users.update_one(
+        {"_id": seeded["oid"]},
+        {"$set": {
+            "termsVersion": "2026-10-10",
+            "termsAcceptedAt": datetime(2026, 10, 11, 12, 0, tzinfo=timezone.utc),
+        }},
+    )
+    assert (await _user_after_a_request(seeded))["terms_version"] == "2026-10-10"
+
+    # What POST /api/auth/terms/accept writes, on the same document.
+    re_accepted_at = datetime(2026, 11, 25, 9, 30, tzinfo=timezone.utc)
+    await users.update_one(
+        {"_id": seeded["oid"]},
+        {"$set": {"termsVersion": "2026-11-25", "termsAcceptedAt": re_accepted_at}},
+    )
+
+    user = await _user_after_a_request(seeded)
+    assert user["terms_version"] == "2026-11-25"
+    assert user["terms_accepted_at"].replace(tzinfo=timezone.utc) == re_accepted_at
+
+    retained = await _retained_after_deletion(seeded)
+    assert retained["terms_version"] == "2026-11-25"
+    assert retained["terms_accepted_at"].replace(tzinfo=timezone.utc) == re_accepted_at

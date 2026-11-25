@@ -41,6 +41,7 @@ jest.mock('@/lib/auth-client', () => ({
   useSession: () => ({
     data: {
       user: {
+        termsVersion: jest.requireActual('@/lib/constants/legal').TERMS_VERSION,
         id: 'test-user',
         email: 'test@example.com',
         name: 'Test User',

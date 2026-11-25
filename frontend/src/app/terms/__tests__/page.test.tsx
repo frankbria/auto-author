@@ -48,6 +48,16 @@ describe('Terms of Service page', () => {
     expect(section).toHaveTextContent(/cancels a paid subscription immediately/i);
   });
 
+  it('section 9 asks for acceptance at the next sign-in, not by continued use (#961)', () => {
+    render(<TermsPage />);
+    const section = screen
+      .getByRole('heading', { level: 2, name: /changes to these terms/i })
+      .closest('section');
+    expect(section).toHaveTextContent(/next time you sign in/i);
+    expect(section).toHaveTextContent(/record the version you accept and when/i);
+    expect(section).not.toHaveTextContent(/continued use/i);
+  });
+
   // #789: sign-up records TERMS_VERSION, so the date shown here must be it.
   it('shows the recorded Terms version as its last-updated date', () => {
     render(<TermsPage />);

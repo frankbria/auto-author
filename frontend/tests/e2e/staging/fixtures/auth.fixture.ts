@@ -90,6 +90,8 @@ async function loginToStaging(page: Page): Promise<void> {
   // Verify we're on the dashboard
   await expect(page).toHaveURL(/\/dashboard/);
 
+  await acceptTermsIfAsked(page);
+
   // Verify session cookie is set (Better-auth uses httpOnly cookies)
   const cookies = await page.context().cookies();
   const sessionCookie = cookies.find(
@@ -105,6 +107,26 @@ async function loginToStaging(page: Page): Promise<void> {
   }
 
   console.log(`✅ Logged in successfully - session cookie: ${sessionCookie.name}`);
+}
+
+/**
+ * A Terms version newer than the one the test account accepted shows the
+ * acceptance screen in place of the dashboard (#961). Accept it, as a user
+ * would, so the journey continues; absent, this costs a five-second wait.
+ */
+async function acceptTermsIfAsked(page: Page): Promise<void> {
+  const accept = page.getByRole('button', { name: 'I accept the Terms of Service' });
+  const asked = await accept.waitFor({ state: 'visible', timeout: 5000 }).then(
+    () => true,
+    () => false
+  );
+  if (!asked) return;
+  await accept.click();
+  // The button relabels while saving; the screen itself goes once it is recorded.
+  await expect(
+    page.getByRole('heading', { name: 'Please accept the Terms of Service' })
+  ).toHaveCount(0, { timeout: 15000 });
+  console.log('Accepted the current Terms of Service for the test account');
 }
 
 /** Read whatever the sign-in form is complaining about, if anything. */

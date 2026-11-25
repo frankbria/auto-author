@@ -1,19 +1,16 @@
 import Link from 'next/link';
 import SiteFooter from '@/components/SiteFooter';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/constants/contact';
-import { TERMS_VERSION } from '@/lib/constants/legal';
+import { TERMS_LAST_UPDATED as LAST_UPDATED } from '@/lib/constants/legal';
 
 export const metadata = {
   title: 'Terms of Service · Auto Author',
   description: 'The terms governing your use of Auto Author.',
 };
 
-// Counsel signed off on this copy (#791). Static server component; owns its own
+// Counsel signed off on this copy (#791); section 9 changed by owner decision
+// on #961. Static server component; owns its own
 // <main id="main-content"> so the layout skip-link resolves here.
-const LAST_UPDATED = new Date(`${TERMS_VERSION}T00:00:00Z`).toLocaleDateString(
-  'en-US',
-  { dateStyle: 'long', timeZone: 'UTC' }
-);
 
 export default function TermsPage() {
   return (
@@ -172,10 +169,12 @@ export default function TermsPage() {
               9. Changes to These Terms
             </h2>
             <p>
-              We may update these terms from time to time. Material changes will
-              be reflected by updating the &ldquo;Last updated&rdquo; date above,
-              and continued use of the Service constitutes acceptance of the
-              revised terms.
+              We may update these terms from time to time. When we do, we change
+              the &ldquo;Last updated&rdquo; date above and ask you to accept the
+              revised terms the next time you sign in, before you can keep using
+              the Service. We record the version you accept and when. If you do
+              not accept them, you may stop using the Service and contact us to
+              close your account.
             </p>
           </section>
 

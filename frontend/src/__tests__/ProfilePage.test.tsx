@@ -5,6 +5,7 @@ import UserProfile from '../app/profile/page';
 import { useSession } from '@/lib/auth-client';
 import useProfileApi from '../hooks/useProfileApi';
 import { toast } from '../lib/toast';
+import { TERMS_VERSION } from '@/lib/constants/legal';
 
 // Mock Next.js hooks
 jest.mock('next/navigation', () => ({
@@ -115,10 +116,12 @@ interface SessionUser {
   email: string;
   name: string;
   image?: string;
+  termsVersion: string;
 }
 
 const mockSessionUser: SessionUser = {
   id: 'user-123',
+  termsVersion: TERMS_VERSION,
   email: 'jane@example.com',
   name: 'Jane Doe',
   image: 'https://example.com/avatar.jpg',

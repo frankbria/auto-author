@@ -9,7 +9,7 @@ import { createAuthMiddleware } from "better-auth/api";
 import { getDefaultCookieAttributes } from "./auth-cookies";
 import { rejectWeakPassword } from "./auth-password-policy";
 import { getIpAddressConfig } from "./auth-ip";
-import { stampTermsAcceptance, termsAcceptanceFields } from "./auth-terms";
+import { stampTermsAcceptance, termsAcceptance, termsAcceptanceFields } from "./auth-terms";
 import { endOtherSessionsOnSecondFactorChange, forgetTrustedDevices } from "./auth-second-factor";
 
 const mongoUrl = process.env.DATABASE_URL || "mongodb://localhost:27017/auto_author";
@@ -37,7 +37,8 @@ function createAuthInstance(database: Db) {
     database: mongodbAdapter(database),
     // TOTP two-factor authentication (#64). The MongoDB adapter creates the
     // twoFactor collection on demand — no migration step required.
-    plugins: [twoFactor()],
+    // termsAcceptance: an existing account accepts a new Terms version (#961).
+    plugins: [twoFactor(), termsAcceptance()],
     // One users collection (#1263): the backend keeps its profile, plan and
     // billing fields on the document better-auth creates here. The adapter
     // only ever $sets fields, so it leaves those alone. Every new account

@@ -4,6 +4,8 @@ import { useSession } from '@/lib/auth-client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { endSignOut, signOutUnderway } from '@/lib/sign-out';
+import { acceptedCurrentTerms } from '@/lib/constants/legal';
+import { TermsAcceptance } from '@/components/auth/TermsAcceptance';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,7 +18,7 @@ interface ProtectedRouteProps {
  * Can be bypassed with NEXT_PUBLIC_BYPASS_AUTH=true for E2E testing.
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, refetch } = useSession();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -65,6 +67,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         </div>
       </main>
     );
+  }
+
+  // An account on an older Terms version, or none, accepts the current one
+  // before the page loads (#961). The field is better-auth's additionalField
+  // from auth-terms.ts; the client's session type does not declare it.
+  const { termsVersion } = session.user as { termsVersion?: unknown };
+  if (!acceptedCurrentTerms(termsVersion)) {
+    return <TermsAcceptance onAccepted={() => refetch?.()} />;
   }
 
   // User is authenticated, render children

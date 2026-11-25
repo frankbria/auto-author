@@ -30,6 +30,13 @@ export const signIn = authClient.signIn;
 export const signUp = authClient.signUp;
 export const signOut = authClient.signOut;
 
+/**
+ * Accept the current Terms of Service for the signed-in user (#961). The
+ * server records which version and when; nothing is sent but the request.
+ */
+export const acceptTerms = () =>
+  authClient.$fetch<{ termsVersion: string }>("/terms/accept", { method: "POST", body: {} });
+
 // Password reset methods, typed by better-auth itself
 export const requestPasswordReset = authClient.requestPasswordReset;
 export const resetPassword = authClient.resetPassword;
