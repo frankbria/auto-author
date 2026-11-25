@@ -104,6 +104,18 @@ LIVE_SUBSCRIPTION_STATUSES = frozenset(
 )
 
 
+# Statuses a Stripe subscription never leaves. Every other one (paused,
+# unpaid, incomplete) can still become active again.
+ENDED_SUBSCRIPTION_STATUSES = frozenset({"canceled", "incomplete_expired"})
+
+
+def subscription_exists(user: dict) -> bool:
+    """Whether the user's subscription has not ended: it may still bill (#948)."""
+    return bool(user.get("stripe_subscription_id")) and (
+        user.get("stripe_subscription_status") not in ENDED_SUBSCRIPTION_STATUSES
+    )
+
+
 def has_live_subscription(user: dict) -> bool:
     """Whether the user's current Stripe subscription is still being billed."""
     status = user.get("stripe_subscription_status")
