@@ -11,8 +11,10 @@ import { useRouter, usePathname } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { signOutOrNotify } from '@/lib/sign-out';
 import { apiFetch, browser, resetUnauthorizedForTests } from '@/lib/api/unauthorized';
+import { TERMS_VERSION } from '@/lib/constants/legal';
 
-let session: { user: { id: string } } | null;
+// A real session: its id, and an account on the current Terms (#961).
+let session: { user: { id: string; termsVersion: string }; session: { id: string } } | null;
 const listeners = new Set<() => void>();
 const setSession = (next: typeof session) => {
   session = next;
@@ -49,7 +51,7 @@ beforeEach(() => {
   delete process.env.NEXT_PUBLIC_BYPASS_AUTH;
   (useRouter as jest.Mock).mockReturnValue(router);
   (usePathname as jest.Mock).mockReturnValue('/dashboard/books/b1');
-  setSession({ user: { id: 'u1' } });
+  setSession({ user: { id: 'u1', termsVersion: TERMS_VERSION }, session: { id: 's1' } });
   // The real client clears the session before its promise resolves.
   mockSignOut.mockImplementation(async () => {
     setSession(null);
@@ -88,7 +90,7 @@ it('after a sign-out, a later session that ends is redirected as usual', async (
   await waitFor(() => expect(router.push).toHaveBeenCalledWith('/'));
 
   // Signed in again in the same tab, then the session expires.
-  act(() => setSession({ user: { id: 'u1' } }));
+  act(() => setSession({ user: { id: 'u1', termsVersion: TERMS_VERSION }, session: { id: 's2' } }));
   router.push.mockClear();
   act(() => setSession(null));
 

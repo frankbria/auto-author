@@ -15,8 +15,8 @@ import TermsPage from '@/app/terms/page';
 import { TERMS_VERSION } from '@/lib/constants/legal';
 
 const RECORDED = {
-  version: '2026-10-10',
-  digest: '72c35d30002038dceaef7f2252207660301cf7446c8790f387c5fe52f3998a91',
+  version: '2026-11-25',
+  digest: '94ef15005e0e74300d98cb9742b7e124e1c06dcabf83c5f72f0fcb32b4cbfaee',
 };
 
 function termsDigest(): string {

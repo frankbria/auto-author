@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import UserProfile from '@/app/profile/page';
 import { invalidateUserPreferencesCache } from '@/hooks/useUserPreferences';
 import { useSession } from '@/lib/auth-client';
+import { TERMS_VERSION } from '@/lib/constants/legal';
 
 // Merge-contract tests for the Profile page (issue #204): a save must send the
 // FULL preferences object, not a 3-field reconstruction that wipes the
@@ -178,7 +179,7 @@ describe('ProfilePage save preserves preferences (#204)', () => {
     mockAuthFetch.mockImplementation(() => new Promise(() => {}));
     (useSession as jest.Mock).mockReturnValue({
       data: {
-        user: { id: 'user-2', email: 'b@c.com', name: 'Bob Other', image: null },
+        user: { termsVersion: TERMS_VERSION, id: 'user-2', email: 'b@c.com', name: 'Bob Other', image: null },
         session: { token: 'tok2', id: 'sess-2' },
       },
     });

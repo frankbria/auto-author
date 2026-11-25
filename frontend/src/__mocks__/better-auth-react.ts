@@ -1,3 +1,5 @@
+import { TERMS_VERSION } from '@/lib/constants/legal';
+
 // Mock for better-auth/react
 //
 // This is the useSession components actually get: `@/lib/auth-client` is not
@@ -14,6 +16,8 @@ const sessionResult = {
       email: 'test@example.com',
       name: 'Test User',
       image: null,
+      // Accepted the current Terms, so ProtectedRoute shows the page (#961).
+      termsVersion: TERMS_VERSION,
     },
     session: {
       token: 'test-token',

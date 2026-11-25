@@ -4,6 +4,7 @@ import UserProfile from '@/app/profile/page';
 import { authClient, useSession } from '@/lib/auth-client';
 import { browser } from '@/lib/api/unauthorized';
 import { toast } from '@/lib/toast';
+import { TERMS_VERSION } from '@/lib/constants/legal';
 
 // Type-to-confirm tests for account deletion (issue #216): the Delete-account
 // button must stay disabled until the user types the account email, matching
@@ -72,7 +73,7 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     // (the fallback test below) must not leak into other tests via ordering.
     (useSession as jest.Mock).mockReturnValue({
       data: {
-        user: { id: 'test-user-id', email: SESSION_EMAIL, name: 'Test User', image: null },
+        user: { termsVersion: TERMS_VERSION, id: 'test-user-id', email: SESSION_EMAIL, name: 'Test User', image: null },
         session: { token: 't', id: 's' },
       },
       isPending: false,
@@ -305,7 +306,7 @@ describe('ProfilePage account deletion type-to-confirm (#216)', () => {
     // to confirm — the phrase falls back to the profile fetched from the API.
     (useSession as jest.Mock).mockReturnValue({
       data: {
-        user: { id: 'test-user-id', name: 'Test User', image: null },
+        user: { termsVersion: TERMS_VERSION, id: 'test-user-id', name: 'Test User', image: null },
         session: { token: 't', id: 's' },
       },
       isPending: false,

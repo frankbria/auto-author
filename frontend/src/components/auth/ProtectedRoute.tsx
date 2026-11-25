@@ -2,8 +2,11 @@
 
 import { useSession } from '@/lib/auth-client';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { endSignOut, signOutUnderway } from '@/lib/sign-out';
+import { acceptedCurrentTerms } from '@/lib/constants/legal';
+import { TermsAcceptance } from '@/components/auth/TermsAcceptance';
+import { termsExitOpen } from '@/lib/terms-exits';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,7 +19,10 @@ interface ProtectedRouteProps {
  * Can be bypassed with NEXT_PUBLIC_BYPASS_AUTH=true for E2E testing.
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, refetch } = useSession();
+  // The account that accepted the Terms on this page: the server has it even
+  // if the session reload fails.
+  const [acceptedBy, setAcceptedBy] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -64,6 +70,28 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           ></div>
         </div>
       </main>
+    );
+  }
+
+  // An account on an older Terms version, or none, accepts the current one
+  // before the page loads (#961). The field is better-auth's additionalField
+  // from auth-terms.ts; the client's session type does not declare it.
+  const { termsVersion } = session.user as { termsVersion?: unknown };
+  if (
+    acceptedBy !== session.user.id &&
+    !termsExitOpen(pathname, session.session.id) &&
+    !acceptedCurrentTerms(termsVersion)
+  ) {
+    return (
+      <TermsAcceptance
+        userId={session.user.id}
+        sessionId={session.session.id}
+        onAccepted={() => {
+          setAcceptedBy(session.user.id);
+          // Best effort: the page is already shown, and the next load reads it.
+          void Promise.resolve(refetch?.()).catch(() => {});
+        }}
+      />
     );
   }
 
