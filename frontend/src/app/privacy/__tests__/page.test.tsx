@@ -117,11 +117,12 @@ describe('Privacy Policy page', () => {
     render(<PrivacyPage />);
     const rights = section(/your rights/i);
     expect(rights).toHaveTextContent(
-      /download also holds your account.s activity records[^.]*security log[^.]*IP address[^.]*chapters you opened[^.]*AI usage counts/i
+      /download also holds your account.s activity records[^.]*security log[^.]*can include the IP address[^.]*chapter edits, status changes, exports and open tabs[^.]*AI usage counts/i
     );
     expect(rights).toHaveTextContent(
       /does not include uploaded image files[^.]*or payment records held by our payment processor/i
     );
+    expect(rights).toHaveTextContent(/someone else acted on your account[^.]*not who or from where/i);
     expect(rights).not.toHaveTextContent(/activity and security logs, or payment records/i);
   });
 

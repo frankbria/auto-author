@@ -8,7 +8,7 @@ token and the browser streams the file to disk.
 import json
 import logging
 from datetime import datetime, timezone
-from typing import AsyncIterator, Dict
+from typing import AsyncIterator, Callable, Dict
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -32,20 +32,49 @@ EXPORTED_PROFILE_FIELDS = (
     "updated_at", "terms_version", "terms_accepted_at",
 )
 
-# The collections an export reads, and the fields in each that tie a document
-# to the owner's auth_id: a document matching any of them is the owner's.
-# Chapter content is embedded in the book document. An audit row is the
-# account's as actor or as target: the Stripe webhook's rows name the account
-# only as target, their actor being "stripe:<event id>" (#965).
-EXPORTED_COLLECTIONS = {
-    "books": ("owner_id",),
-    "questions": ("user_id",),
-    "question_responses": ("user_id",),
-    "question_ratings": ("user_id",),
-    "audit_logs": ("actor_id", "target_id"),
-    "chapter_access_logs": ("user_id",),
-    "usage_counters": ("user_id",),
+# Who an audit row about this account names as actor when it is someone else
+# (an admin deleting or erasing it): not their id, IP address or user-agent.
+OTHER_ACTOR = "another account"
+_OTHER_ACTORS_REQUEST_DETAILS = ("ip_address", "user_agent", "request_id")
+
+
+def _audit_rows(auth_id: str) -> Dict:
+    """The account's audit rows (#965): those about it (target), which takes in
+    the Stripe webhook's, whose actor is "stripe:<event id>", and those it wrote
+    (actor), except an action on another account (an admin's deletion or erasure
+    of one), which is that account's."""
+    return {"$or": [
+        {"target_id": auth_id},
+        {"actor_id": auth_id, "resource_type": {"$ne": "user"}},
+    ]}
+
+
+# The collections an export reads, and the filter for the owner's documents in
+# each. Chapter content is embedded in the book document.
+EXPORTED_COLLECTIONS: Dict[str, Callable[[str], Dict]] = {
+    "books": lambda auth_id: {"owner_id": auth_id},
+    "questions": lambda auth_id: {"user_id": auth_id},
+    "question_responses": lambda auth_id: {"user_id": auth_id},
+    "question_ratings": lambda auth_id: {"user_id": auth_id},
+    "audit_logs": _audit_rows,
+    "chapter_access_logs": lambda auth_id: {"user_id": auth_id},
+    "usage_counters": lambda auth_id: {"user_id": auth_id},
 }
+
+
+def _scrub_other_actor(row: Dict, auth_id: str) -> Dict:
+    """An audit row another person wrote about the account keeps what was done,
+    not who did it or from where."""
+    actor = row.get("actor_id")
+    if actor == auth_id or str(actor).startswith("stripe:"):
+        return row
+    details = row.get("details")
+    if isinstance(details, dict):
+        row["details"] = {
+            k: v for k, v in details.items() if k not in _OTHER_ACTORS_REQUEST_DETAILS
+        }
+    return {**row, "actor_id": OTHER_ACTOR}
+
 
 # Documents per cursor round trip: what the export holds at once is this many
 # books, whatever the library's size, at one round trip per batch.
@@ -71,13 +100,6 @@ def _encode(value) -> bytes:
     ).encode("utf-8")
 
 
-def owner_query(owner_fields, auth_id: str) -> Dict:
-    """The filter for the documents ``auth_id`` owns in a collection."""
-    if len(owner_fields) == 1:
-        return {owner_fields[0]: auth_id}
-    return {"$or": [{field: auth_id} for field in owner_fields]}
-
-
 async def stream_account_export(user: Dict) -> AsyncIterator[bytes]:
     """The export document, one Mongo document per chunk. Every query is scoped
     to ``user``'s own auth_id."""
@@ -87,15 +109,17 @@ async def stream_account_export(user: Dict) -> AsyncIterator[bytes]:
         b'{"exported_at":' + _encode(datetime.now(timezone.utc))
         + b',"profile":' + _encode(profile)
     )
-    for name, owner_fields in EXPORTED_COLLECTIONS.items():
+    for name, owner_filter in EXPORTED_COLLECTIONS.items():
         yield b"," + _encode(name) + b":["
         collection = await get_collection(name)
         # collaborators would name other accounts; no document here has another use for the key.
         cursor = collection.find(
-            owner_query(owner_fields, auth_id), {"collaborators": 0}
+            owner_filter(auth_id), {"collaborators": 0}
         ).batch_size(EXPORT_BATCH_SIZE)
         separator = b""
         async for doc in cursor:
+            if name == "audit_logs":
+                doc = _scrub_other_actor(doc, auth_id)
             yield separator + _encode(doc)
             separator = b","
         yield b"]"

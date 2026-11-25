@@ -66,7 +66,7 @@ async def _seed_activity(owner_id: str, marker: str) -> None:
     )
     await (await get_collection("chapter_access_logs")).insert_one(
         {"user_id": owner_id, "book_id": f"{marker}-book", "chapter_id": "ch1",
-         "access_type": "view", "metadata": {"note": f"{marker} access"}}
+         "access_type": "edit", "metadata": {"note": f"{marker} access"}}
     )
     await (await get_collection("usage_counters")).insert_one(
         {"_id": f"{owner_id}:day:{marker}", "user_id": owner_id, "count": 3}
@@ -167,6 +167,31 @@ async def test_export_never_contains_another_accounts_activity(reinit_db):
         assert len(data["audit_logs"]) == 3 and len(data["chapter_access_logs"]) == 1
         assert len(data["usage_counters"]) == 1
         assert theirs not in mine.text and other_id not in mine.text
+
+
+@pytest.mark.asyncio
+async def test_an_action_on_another_account_is_in_neither_export_as_the_others_data(reinit_db):
+    """#965: an admin deleting or erasing an account writes a row with the admin
+    as actor and that account as target. The admin's export must not carry the
+    other account's id, and the target's export must not carry the admin's id,
+    IP address or user-agent."""
+    admin = await _seed_better_auth_user("admin@example.com", name="Ad Min")
+    bob = await _seed_better_auth_user("bob@example.com", name="Bob B")
+    await (await get_collection("audit_logs")).insert_one(
+        {"action": "user_erase", "actor_id": admin["user_id"], "target_id": bob["user_id"],
+         "resource_type": "user",
+         "details": {"ip_address": "ADMIN-IP", "user_agent": "ADMIN-UA", "method": "DELETE"}}
+    )
+
+    admins = await _export(admin["tokens"][0])
+    bobs = await _export(bob["tokens"][0])
+
+    assert bob["user_id"] not in admins.text
+    assert "user_erase" not in admins.text
+    [erase] = [r for r in bobs.json()["audit_logs"] if r["action"] == "user_erase"]
+    assert erase["actor_id"] == "another account"
+    assert erase["details"] == {"method": "DELETE"}
+    assert admin["user_id"] not in bobs.text and "ADMIN-" not in bobs.text
 
 
 @pytest.mark.asyncio

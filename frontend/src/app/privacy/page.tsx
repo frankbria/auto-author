@@ -311,9 +311,12 @@ export default function PrivacyPage() {
               my data), delete your content and close your account directly
               from your profile page. The download also holds your account&rsquo;s
               activity records: the security log of actions taken by or on
-              your account (with the IP address and browser user-agent of
-              each), the log of chapters you opened, and your AI usage
-              counts. It does not include uploaded image files (it lists their
+              your account (which can include the IP address and browser
+              user-agent of your requests), the log of your chapter edits,
+              status changes, exports and open tabs, and your AI usage counts.
+              Where someone else acted on your account, such as our support
+              team, the record says what was done but not who or from where.
+              It does not include uploaded image files (it lists their
               addresses) or payment records held by our payment processor. To
               get those, to have the account record
               we keep for 18 months (section 8) erased sooner, or for any other
