@@ -23,9 +23,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // The account that accepted the Terms on this page: the server has it even
   // if the session reload fails.
   const [acceptedBy, setAcceptedBy] = useState<string | null>(null);
-  // Bumped when an exit link is followed: from Settings itself only the query
-  // changes, which does not re-render this guard (#961).
-  const [, setExitsChosen] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -89,7 +86,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       <TermsAcceptance
         userId={session.user.id}
         sessionId={session.session.id}
-        onExit={() => setExitsChosen((n) => n + 1)}
         onAccepted={() => {
           setAcceptedBy(session.user.id);
           // Best effort: the page is already shown, and the next load reads it.

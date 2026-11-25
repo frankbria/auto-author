@@ -133,3 +133,19 @@ test('an account that does not accept can still reach billing and its data, but 
   await expect(page.getByRole('button', { name: /download my data/i })).toBeVisible();
   expect((await users().findOne({ email }))?.termsVersion).toBe('2000-01-01');
 });
+
+// From the screen shown on /profile itself, the link points at the same URL.
+test('the data and deletion link works from the screen shown on the profile itself', async ({
+  page,
+}) => {
+  const email = `terms-exits-profile-${Date.now()}@example.com`;
+  await signUpAndVerify(page, email);
+  await users().updateOne({ email }, { $set: { termsVersion: '2000-01-01' } });
+
+  await page.goto('/profile');
+  const heading = page.getByRole('heading', { level: 1, name: 'Please accept the Terms of Service' });
+  await expect(heading).toBeVisible();
+  await page.getByRole('link', { name: 'download your data or delete your account' }).click();
+  await expect(page.getByRole('button', { name: /download my data/i })).toBeVisible();
+  await expect(heading).toHaveCount(0);
+});

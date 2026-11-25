@@ -20,8 +20,6 @@ interface TermsAcceptanceProps {
   userId: string;
   /** The current session, for which the exit links open Settings and Profile. */
   sessionId: string;
-  /** Called when an exit link is followed, so the guard checks again. */
-  onExit: () => void;
   /** Called once the acceptance is recorded. */
   onAccepted: () => unknown;
 }
@@ -31,11 +29,9 @@ interface TermsAcceptanceProps {
  * version is older than TERMS_VERSION, or missing (#961). Asked once: the
  * server records the acceptance, and the reloaded session no longer needs it.
  */
-export function TermsAcceptance({ userId, sessionId, onExit, onAccepted }: TermsAcceptanceProps) {
-  const openExits = () => {
-    openTermsExits(sessionId);
-    onExit();
-  };
+export function TermsAcceptance({ userId, sessionId, onAccepted }: TermsAcceptanceProps) {
+  // The navigation that follows re-renders the guard, which then finds the grant.
+  const openExits = () => openTermsExits(sessionId);
 
   const router = useRouter();
   const [saving, setSaving] = useState(false);

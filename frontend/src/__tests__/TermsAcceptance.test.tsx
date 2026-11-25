@@ -241,16 +241,6 @@ describe('Terms re-acceptance gate (#961)', () => {
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 
-  // The link from a screen already on Settings changes only the query, so the
-  // guard must re-check without a new pathname.
-  it('opens Settings when the screen was shown there and its link is followed', async () => {
-    (usePathname as jest.Mock).mockReturnValue('/dashboard/settings');
-    signedInWith(undefined);
-    renderPage();
-    await userEvent.click(screen.getByRole('link', { name: /cancel your subscription/i }));
-    expect(await screen.findByText('Protected Content')).toBeInTheDocument();
-  });
-
   // A grant belongs to the session that chose it: after the session expires or
   // is revoked, the next sign-in in the tab is asked, however it ended.
   it('does not open the exits for a new session of the same account', async () => {
