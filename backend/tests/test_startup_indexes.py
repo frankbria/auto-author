@@ -135,6 +135,8 @@ def _assert_audit_indexes(indexes):
     assert ttl["key"] == {"expires_at": 1}
     assert ttl["expireAfterSeconds"] == 0
     assert indexes["actor_timestamp_idx"]["key"] == {"actor_id": 1, "timestamp": -1}
+    # The account export matches actor_id OR target_id (#965): both branches indexed.
+    assert indexes["target_timestamp_idx"]["key"] == {"target_id": 1, "timestamp": -1}
 
 
 @pytest.mark.asyncio

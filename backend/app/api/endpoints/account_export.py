@@ -8,7 +8,7 @@ token and the browser streams the file to disk.
 import json
 import logging
 from datetime import datetime, timezone
-from typing import AsyncIterator, Dict
+from typing import AsyncIterator, Callable, Dict
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -32,14 +32,54 @@ EXPORTED_PROFILE_FIELDS = (
     "updated_at", "terms_version", "terms_accepted_at",
 )
 
-# The collections an export reads, and the field in each that holds the
-# owner's auth_id. Chapter content is embedded in the book document.
-EXPORTED_COLLECTIONS = {
-    "books": "owner_id",
-    "questions": "user_id",
-    "question_responses": "user_id",
-    "question_ratings": "user_id",
+# The resource types of audit rows whose target_id is an account's auth_id. Any
+# other row's target is a book, chapter, question or image id, which can come
+# from the request, so it is never read as naming an account (#965).
+ACCOUNT_RESOURCE_TYPES = ["user", "billing", "books"]
+
+# What an exported audit row says in place of another account's id. A row
+# someone else wrote about the account (an admin's) also loses where it came from.
+OTHER_ACCOUNT = "another account"
+_REQUEST_ORIGIN = ("ip_address", "user_agent", "request_id")
+
+
+def _audit_rows(auth_id: str) -> Dict:
+    """The account's audit rows (#965): every row it wrote (actor), and the
+    account-level rows about it (target), which takes in the Stripe webhook's,
+    whose actor is "stripe:<event id>"."""
+    return {"$or": [
+        {"actor_id": auth_id},
+        {"target_id": auth_id, "resource_type": {"$in": ACCOUNT_RESOURCE_TYPES}},
+    ]}
+
+
+def _without_other_accounts(row: Dict, auth_id: str) -> Dict:
+    """``row`` naming no other account: an admin's action on someone else keeps
+    what was done to whom only as "another account"; an action someone else took
+    on this account keeps what was done, not who did it or from where."""
+    if row.get("resource_type") in ACCOUNT_RESOURCE_TYPES and row.get("target_id") != auth_id:
+        row = {**row, "target_id": OTHER_ACCOUNT}
+    actor = row.get("actor_id")
+    if actor != auth_id and not str(actor).startswith("stripe:"):
+        details = row.get("details")
+        if isinstance(details, dict):
+            details = {k: v for k, v in details.items() if k not in _REQUEST_ORIGIN}
+        row = {**row, "actor_id": OTHER_ACCOUNT, "details": details}
+    return row
+
+
+# The collections an export reads, and the filter for the owner's documents in
+# each. Chapter content is embedded in the book document.
+EXPORTED_COLLECTIONS: Dict[str, Callable[[str], Dict]] = {
+    "books": lambda auth_id: {"owner_id": auth_id},
+    "questions": lambda auth_id: {"user_id": auth_id},
+    "question_responses": lambda auth_id: {"user_id": auth_id},
+    "question_ratings": lambda auth_id: {"user_id": auth_id},
+    "audit_logs": _audit_rows,
+    "chapter_access_logs": lambda auth_id: {"user_id": auth_id},
+    "usage_counters": lambda auth_id: {"user_id": auth_id},
 }
+
 
 # Documents per cursor round trip: what the export holds at once is this many
 # books, whatever the library's size, at one round trip per batch.
@@ -74,15 +114,17 @@ async def stream_account_export(user: Dict) -> AsyncIterator[bytes]:
         b'{"exported_at":' + _encode(datetime.now(timezone.utc))
         + b',"profile":' + _encode(profile)
     )
-    for name, owner_field in EXPORTED_COLLECTIONS.items():
+    for name, owner_filter in EXPORTED_COLLECTIONS.items():
         yield b"," + _encode(name) + b":["
         collection = await get_collection(name)
         # collaborators would name other accounts; no document here has another use for the key.
         cursor = collection.find(
-            {owner_field: auth_id}, {"collaborators": 0}
+            owner_filter(auth_id), {"collaborators": 0}
         ).batch_size(EXPORT_BATCH_SIZE)
         separator = b""
         async for doc in cursor:
+            if name == "audit_logs":
+                doc = _without_other_accounts(doc, auth_id)
             yield separator + _encode(doc)
             separator = b","
         yield b"]"
@@ -104,11 +146,12 @@ async def export_my_data(
     token: str = Query(..., max_length=128),
     current_user: Dict = Depends(get_current_user_from_session),
 ):
-    """Download the caller's profile, books, questions, answers and ratings (#790).
+    """Download the caller's profile, books, questions, answers and ratings
+    (#790), and their audit, chapter-access and usage rows (#965).
 
     Needs a token from POST /me/export/token and the session it was issued to.
-    Takes no id. Activity logs, uploaded files and anything better-auth or
-    Stripe holds are not read.
+    Takes no id. Uploaded files and anything better-auth or Stripe holds are
+    not read.
     """
     owner = await redeem_export_token(token)
     if owner is None:

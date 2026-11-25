@@ -52,6 +52,27 @@ async def _seed_content(owner_id: str, marker: str) -> None:
     )
 
 
+async def _seed_activity(owner_id: str, marker: str) -> None:
+    """The account's activity rows (#965), each carrying ``marker``: an audit row
+    it wrote, one a Stripe webhook wrote about it (actor ``stripe:<event>``,
+    target the account), a chapter access and a usage counter."""
+    await (await get_collection("audit_logs")).insert_many(
+        [
+            {"action": "book_create", "actor_id": owner_id, "target_id": f"{marker}-book",
+             "resource_type": "book", "details": {"ip_address": f"{marker}-ip"}},
+            {"action": "user_update", "actor_id": f"stripe:evt_{marker}", "target_id": owner_id,
+             "resource_type": "user", "details": {"updated_fields": [f"{marker}-plan"]}},
+        ]
+    )
+    await (await get_collection("chapter_access_logs")).insert_one(
+        {"user_id": owner_id, "book_id": f"{marker}-book", "chapter_id": "ch1",
+         "access_type": "edit", "metadata": {"note": f"{marker} access"}}
+    )
+    await (await get_collection("usage_counters")).insert_one(
+        {"_id": f"{owner_id}:day:{marker}", "user_id": owner_id, "count": 3}
+    )
+
+
 async def _export(token: str):
     async with _client(token) as c:
         issued = await c.post("/api/v1/users/me/export/token")
@@ -105,6 +126,97 @@ async def test_export_never_contains_another_users_data(reinit_db):
     assert "BOB" in bobs.text and "ALICE" not in bobs.text
     assert "alice@example.com" not in bobs.text
     assert len(bobs.json()["books"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_export_includes_the_accounts_activity_records(reinit_db):
+    """#965: audit rows where the account is actor or target, chapter accesses
+    and usage counters."""
+    seeded = await _seed_better_auth_user("active@example.com")
+    await _seed_activity(seeded["user_id"], "MINE")
+
+    data = (await _export(seeded["tokens"][0])).json()
+
+    audit = {(row["action"], row["actor_id"]) for row in data["audit_logs"]}
+    assert ("book_create", seeded["user_id"]) in audit
+    assert ("user_update", "stripe:evt_MINE") in audit  # the webhook's row, matched by target
+    # The export writes its own audit row before the file is built.
+    assert ("account_export", seeded["user_id"]) in audit
+    assert [a["metadata"]["note"] for a in data["chapter_access_logs"]] == ["MINE access"]
+    # The token's rate-limit counter shares the collection where the limiter is on.
+    assert (f"{seeded['user_id']}:day:MINE", 3) in [
+        (u["_id"], u["count"]) for u in data["usage_counters"]
+    ]
+
+
+@pytest.mark.asyncio
+async def test_export_never_contains_another_accounts_activity(reinit_db):
+    """#965: no audit, access or usage row of one account in another's export,
+    whichever field (actor or target) ties the row to its account."""
+    alice = await _seed_better_auth_user("alice@example.com", name="Alice A")
+    bob = await _seed_better_auth_user("bob@example.com", name="Bob B")
+    await _seed_activity(alice["user_id"], "ALICE")
+    await _seed_activity(bob["user_id"], "BOB")
+
+    alices = await _export(alice["tokens"][0])
+    bobs = await _export(bob["tokens"][0])
+
+    for mine, theirs, other_id, data_owner in (
+        (alices, "BOB", bob["user_id"], alice["user_id"]),
+        (bobs, "ALICE", alice["user_id"], bob["user_id"]),
+    ):
+        data = mine.json()
+        assert len(data["audit_logs"]) == 3 and len(data["chapter_access_logs"]) == 1
+        assert all(u["user_id"] == data_owner for u in data["usage_counters"])
+        assert theirs not in mine.text and other_id not in mine.text
+
+
+@pytest.mark.asyncio
+async def test_an_action_on_another_account_is_in_neither_export_as_the_others_data(reinit_db):
+    """#965: an admin deleting or erasing an account writes a row with the admin
+    as actor and that account as target. The admin's export has the action but
+    not the other account's id, and the target's export must not carry the admin's id,
+    IP address or user-agent."""
+    admin = await _seed_better_auth_user("admin@example.com", name="Ad Min")
+    bob = await _seed_better_auth_user("bob@example.com", name="Bob B")
+    await (await get_collection("audit_logs")).insert_one(
+        {"action": "user_erase", "actor_id": admin["user_id"], "target_id": bob["user_id"],
+         "resource_type": "user",
+         "details": {"ip_address": "ADMIN-IP", "user_agent": "ADMIN-UA",
+                     "request_id": "ADMIN-REQ", "method": "DELETE"}}
+    )
+
+    admins = await _export(admin["tokens"][0])
+    bobs = await _export(bob["tokens"][0])
+
+    assert bob["user_id"] not in admins.text
+    [done] = [r for r in admins.json()["audit_logs"] if r["action"] == "user_erase"]
+    assert done["target_id"] == "another account"
+    assert done["details"]["ip_address"] == "ADMIN-IP"  # the admin's own request
+    [erase] = [r for r in bobs.json()["audit_logs"] if r["action"] == "user_erase"]
+    assert erase["actor_id"] == "another account"
+    assert erase["details"] == {"method": "DELETE"}
+    assert admin["user_id"] not in bobs.text and "ADMIN-" not in bobs.text
+
+
+@pytest.mark.asyncio
+async def test_a_resource_id_equal_to_an_account_id_does_not_match_that_account(reinit_db):
+    """#965: a chapter or question id comes from the request, so a row about one
+    could carry another account's id as target. Only account-level rows (user,
+    billing, books) are matched by target."""
+    alice = await _seed_better_auth_user("alice@example.com", name="Alice A")
+    bob = await _seed_better_auth_user("bob@example.com", name="Bob B")
+    await (await get_collection("audit_logs")).insert_one(
+        {"action": "batch_save_failed", "actor_id": alice["user_id"], "target_id": bob["user_id"],
+         "resource_type": "chapter", "details": {"ip_address": "ALICE-IP"}}
+    )
+
+    alices = await _export(alice["tokens"][0])
+    bobs = await _export(bob["tokens"][0])
+
+    assert "batch_save_failed" not in bobs.text and "ALICE-IP" not in bobs.text
+    assert alice["user_id"] not in bobs.text
+    assert "batch_save_failed" in alices.text  # still Alice's own activity
 
 
 @pytest.mark.asyncio

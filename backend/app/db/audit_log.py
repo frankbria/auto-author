@@ -119,7 +119,7 @@ async def audit_after_write(**kwargs) -> None:
 
 
 async def ensure_audit_log_indexes() -> None:
-    """Create the audit_logs TTL + actor indexes and backfill legacy rows (#787).
+    """Create the audit_logs TTL, actor and target indexes and backfill legacy rows (#787).
 
     Idempotent; each step is logged and never fatal so a startup can't be
     bricked by it.
@@ -136,6 +136,14 @@ async def ensure_audit_log_indexes() -> None:
         )
     except Exception:
         logger.error("Failed to create actor index on audit_logs", exc_info=True)
+
+    try:
+        # The account export reads actor_id OR target_id (#965).
+        await coll.create_index(
+            [("target_id", 1), ("timestamp", -1)], name="target_timestamp_idx"
+        )
+    except Exception:
+        logger.error("Failed to create target index on audit_logs", exc_info=True)
 
     try:
         # Rows written before the TTL existed would otherwise live forever.

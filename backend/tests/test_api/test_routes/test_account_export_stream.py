@@ -128,9 +128,9 @@ async def test_streamed_export_matches_the_old_document_byte_for_byte(reinit_db)
     streamed = b"".join([chunk async for chunk in stream_account_export(USER)])
 
     docs = {}
-    for name, owner_field in EXPORTED_COLLECTIONS.items():
+    for name, owner_filter in EXPORTED_COLLECTIONS.items():
         docs[name] = await (await get_collection(name)).find(
-            {owner_field: OWNER}, {"collaborators": 0}
+            owner_filter(OWNER), {"collaborators": 0}
         ).to_list(None)
     reference = _old_export(USER, docs)
 
