@@ -78,10 +78,11 @@ async def test_row_expires_ninety_days_after_timestamp(reinit_db):
 
 
 @pytest.mark.asyncio
-async def test_renewal_consent_row_has_no_expiry(reinit_db):
+async def test_renewal_consent_row_outlives_the_ninety_days(reinit_db):
+    # Its own period, tied to the subscription (#948): test_renewal_consent_retention.py
     await create_audit_log(RENEWAL_CONSENT_ACTION, "u1", "u1", "billing")
     row = await audit_log_dao.audit_logs_collection.find_one({"actor_id": "u1"})
-    assert "expires_at" not in row
+    assert row["expires_at"] - row["timestamp"] > timedelta(days=4 * 365)
 
 
 def test_retained_actions_track_the_billing_consent_action():
@@ -113,13 +114,14 @@ async def test_backfill_stamps_legacy_rows_only(reinit_db):
     for actor in ("no-ts", "bad-ts"):
         stamped = (await get(actor))["expires_at"].replace(tzinfo=timezone.utc)
         assert abs(stamped - expected) < timedelta(minutes=5)
-    assert "expires_at" not in await get("consent")
+    # Stamped from the subscription instead (#948).
+    assert (await get("consent"))["expires_at"].replace(tzinfo=timezone.utc) != old + NINETY_DAYS
     assert (await get("set"))["expires_at"].replace(tzinfo=timezone.utc) == other
 
 
 @pytest.mark.asyncio
 async def test_unreachable_mongo_is_logged_and_never_fatal(monkeypatch, caplog):
-    """Startup must survive: a real client pointed at a closed port fails all three steps."""
+    """Startup must survive: a real client pointed at a closed port fails every step."""
     dead = AsyncMongoClient(
         "mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=200"
     )
@@ -134,4 +136,5 @@ async def test_unreachable_mongo_is_logged_and_never_fatal(monkeypatch, caplog):
         "Failed to create TTL index on audit_logs.expires_at",
         "Failed to create actor index on audit_logs",
         "Failed to backfill audit_logs.expires_at",
+        "Failed to backfill renewal-consent expiry",
     ]

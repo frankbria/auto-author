@@ -247,3 +247,37 @@ async def test_late_pre_cancel_event_cannot_regrant_pro(
     doc = await (await get_collection("users")).find_one({"_id": OWNER})
     assert (doc["plan"], doc["stripe_subscription_id"]) == ("free", None)
     assert doc["stripe_event_created"] == CANCELED_AT
+
+
+@pytest.mark.parametrize("path,ok_status", ROUTES)
+async def test_renewal_consent_survives_deletion_until_cancel_plus_four_years(
+    auth_client_factory, stripe_stub, path, ok_status
+):
+    """#948: the consent record is kept on a legal-claims basis, so deleting the
+    account leaves it in place, now dated from the cancellation."""
+    from datetime import datetime, timezone
+
+    from app.db.audit_log import RENEWAL_CONSENT_ACTION, RENEWAL_CONSENT_RETENTION
+
+    client = await auth_client_factory(
+        overrides={
+            "plan": "pro",
+            "stripe_subscription_id": SUB_ID,
+            "stripe_subscription_status": "active",
+        }
+    )
+    audit_logs = await get_collection("audit_logs")
+    # As the live subscription left it: no expiry.
+    await audit_logs.insert_one({
+        "action": RENEWAL_CONSENT_ACTION, "actor_id": OWNER, "target_id": OWNER,
+        "details": {"ip_address": "203.0.113.7"},
+        "timestamp": datetime(2026, 11, 1, tzinfo=timezone.utc),
+    })
+
+    assert (await client.delete(path)).status_code == ok_status
+
+    row = await audit_logs.find_one({"action": RENEWAL_CONSENT_ACTION, "actor_id": OWNER})
+    assert row is not None
+    assert row["details"]["ip_address"] == "203.0.113.7"
+    expected = datetime.fromtimestamp(CANCELED_AT, timezone.utc) + RENEWAL_CONSENT_RETENTION
+    assert row["expires_at"].replace(tzinfo=timezone.utc) == expected

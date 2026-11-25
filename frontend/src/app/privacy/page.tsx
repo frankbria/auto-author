@@ -12,7 +12,7 @@ export const metadata = {
 // cascade-delete path (#179) and the 18-month deactivated record (#954):
 // deleting your account deletes your books at once and keeps the account and
 // billing record.
-const LAST_UPDATED = 'October 14, 2026';
+const LAST_UPDATED = 'November 25, 2026';
 
 export default function PrivacyPage() {
   return (
@@ -266,8 +266,16 @@ export default function PrivacyPage() {
               address and browser user-agent of the request. Audit log entries are deleted
               automatically 90 days after they are written; deleting your account
               does not remove them sooner. The one exception is the record of your
-              agreement to the automatic-renewal terms when you subscribe, which we
-              keep for as long as we need to demonstrate that agreement.
+              agreement to the automatic-renewal terms when you subscribe, which
+              holds the IP address and browser user-agent you agreed from, the
+              date and time, and the exact terms you were shown. We keep it
+              while your subscription lasts and until four years after your
+              subscription ends (or, if you agree but never complete the
+              subscription, four years after you agreed), even after your
+              account is deleted, so that we can answer a legal claim about the
+              renewal. If you subscribe again, the period restarts from the end
+              of the new subscription. After that the record is deleted
+              automatically.
             </p>
           </section>
 

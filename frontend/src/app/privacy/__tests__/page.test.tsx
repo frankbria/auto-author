@@ -95,6 +95,17 @@ describe('Privacy Policy page', () => {
     expect(section(/your rights/i)).toHaveTextContent(/erased sooner/i);
   });
 
+  it('states the renewal-consent period and that the record holds the IP and user-agent (#948)', () => {
+    render(<PrivacyPage />);
+    const retention = section(/data retention and deletion/i);
+    expect(retention).toHaveTextContent(
+      /record of your agreement to the automatic-renewal terms[^.]*IP address and browser user-agent/i
+    );
+    expect(retention).toHaveTextContent(/until four years after your subscription ends/i);
+    expect(retention).toHaveTextContent(/even after your account is deleted/i);
+    expect(retention).not.toHaveTextContent(/as long as we need to demonstrate/i);
+  });
+
   it('says a copy of the account data can be downloaded from the profile page (#790)', () => {
     render(<PrivacyPage />);
     const rights = section(/your rights/i);

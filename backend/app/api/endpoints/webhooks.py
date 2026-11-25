@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timezone
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
@@ -16,6 +17,7 @@ from app.core.entitlements import (
     has_live_subscription,
     plan_for_subscription,
 )
+from app.db.audit_log import renewal_consent_ended, renewal_consent_live
 from app.db.stripe_events import is_event_processed, mark_event_processed
 from app.db.user import (
     get_user_by_auth_id,
@@ -365,6 +367,17 @@ async def _apply_subscription_event(
             user["auth_id"],
         )
         return {"status": "stale_event", "event_id": event_id}
+
+    # The consent record lives until the subscription ends + 4 years (#948).
+    # Raising here is safe: no replay marker yet, so Stripe's retry re-applies.
+    if status in LIVE_SUBSCRIPTION_STATUSES:
+        await renewal_consent_live(user["auth_id"])
+    else:
+        ended = subscription.get("ended_at") or event_created
+        await renewal_consent_ended(
+            user["auth_id"],
+            datetime.fromtimestamp(ended, timezone.utc) if ended else datetime.now(timezone.utc),
+        )
 
     # Report the stored plan, whether this event wrote it or kept it.
     plan = (updated or {}).get("plan", plan) or DEFAULT_PLAN
