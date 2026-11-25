@@ -195,6 +195,26 @@ async def test_an_action_on_another_account_is_in_neither_export_as_the_others_d
 
 
 @pytest.mark.asyncio
+async def test_a_resource_id_equal_to_an_account_id_does_not_match_that_account(reinit_db):
+    """#965: a chapter or question id comes from the request, so a row about one
+    could carry another account's id as target. Only account-level rows (user,
+    billing, books) are matched by target."""
+    alice = await _seed_better_auth_user("alice@example.com", name="Alice A")
+    bob = await _seed_better_auth_user("bob@example.com", name="Bob B")
+    await (await get_collection("audit_logs")).insert_one(
+        {"action": "batch_save_failed", "actor_id": alice["user_id"], "target_id": bob["user_id"],
+         "resource_type": "chapter", "details": {"ip_address": "ALICE-IP"}}
+    )
+
+    alices = await _export(alice["tokens"][0])
+    bobs = await _export(bob["tokens"][0])
+
+    assert "batch_save_failed" not in bobs.text and "ALICE-IP" not in bobs.text
+    assert alice["user_id"] not in bobs.text
+    assert "batch_save_failed" in alices.text  # still Alice's own activity
+
+
+@pytest.mark.asyncio
 async def test_export_holds_no_credential_and_no_internal_field(reinit_db):
     seeded = await _seed_better_auth_user("careful@example.com")
     async with _client(seeded["tokens"][0]) as c:

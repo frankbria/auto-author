@@ -38,14 +38,20 @@ OTHER_ACTOR = "another account"
 _OTHER_ACTORS_REQUEST_DETAILS = ("ip_address", "user_agent", "request_id")
 
 
+# The resource types of audit rows whose target_id is an account's auth_id. Any
+# other row's target is a book, chapter, question or image id, which can come
+# from the request, so it is never read as naming an account (#965).
+ACCOUNT_RESOURCE_TYPES = ["user", "billing", "books"]
+
+
 def _audit_rows(auth_id: str) -> Dict:
-    """The account's audit rows (#965): those about it (target), which takes in
-    the Stripe webhook's, whose actor is "stripe:<event id>", and those it wrote
-    (actor), except an action on another account (an admin's deletion or erasure
-    of one), which is that account's."""
+    """The account's audit rows (#965): account-level rows about it (target),
+    which takes in the Stripe webhook's, whose actor is "stripe:<event id>", and
+    its actions on its own content (actor). Its actions on another account (an
+    admin's deletion or erasure of one) are that account's."""
     return {"$or": [
-        {"target_id": auth_id},
-        {"actor_id": auth_id, "resource_type": {"$ne": "user"}},
+        {"target_id": auth_id, "resource_type": {"$in": ACCOUNT_RESOURCE_TYPES}},
+        {"actor_id": auth_id, "resource_type": {"$nin": ACCOUNT_RESOURCE_TYPES}},
     ]}
 
 

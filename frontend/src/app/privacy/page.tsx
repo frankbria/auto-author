@@ -313,7 +313,8 @@ export default function PrivacyPage() {
               activity records: the security log of actions taken by or on
               your account (which can include the IP address and browser
               user-agent of your requests), the log of your chapter edits,
-              status changes, exports and open tabs, and your AI usage counts.
+              status changes, exports and open tabs, and your usage counters
+              (AI generations and request rate limits).
               Where someone else acted on your account, such as our support
               team, the record says what was done but not who or from where.
               It does not include uploaded image files (it lists their
