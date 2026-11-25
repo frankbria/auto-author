@@ -182,7 +182,8 @@ async def test_an_action_on_another_account_is_in_neither_export_as_the_others_d
     await (await get_collection("audit_logs")).insert_one(
         {"action": "user_erase", "actor_id": admin["user_id"], "target_id": bob["user_id"],
          "resource_type": "user",
-         "details": {"ip_address": "ADMIN-IP", "user_agent": "ADMIN-UA", "method": "DELETE"}}
+         "details": {"ip_address": "ADMIN-IP", "user_agent": "ADMIN-UA",
+                     "request_id": "ADMIN-REQ", "method": "DELETE"}}
     )
 
     admins = await _export(admin["tokens"][0])
