@@ -169,6 +169,14 @@ Two consequences worth knowing before you write a spec:
 - `complete-user-journey.spec.ts` - Full workflow from start to finish
 - `regressions.spec.ts` (future) - Tests for specific bugs
 - `edge-cases.spec.ts` (future) - Boundary conditions and error cases
+- `email-verification.spec.ts` - A new account's verification email arrives and
+  its link lands on the dashboard, signed in (#971). Signs up with a throwaway
+  [mail.tm](https://mail.tm) inbox (public API, no key, no secret), deletes the
+  account from `/profile` and the inbox afterwards. Runs once, no retries. Does
+  not use the shared account. Inbox-vs-spam placement at the large providers is
+  not measured. A red run with a `mail.tm ...` error is the inbox service, not
+  the app; `No "Verify your email address" email reached ...` is the app (look
+  for `[email] Verification email NOT sent` in the frontend container's log).
 
 ## CI/CD Integration
 
