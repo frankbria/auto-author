@@ -52,7 +52,7 @@ export const termsAcceptance = () => ({
     acceptTerms: createAuthEndpoint(
       "/terms/accept",
       { method: "POST", use: [sessionMiddleware] },
-      (ctx) => acceptCurrentTerms(ctx)
+      acceptCurrentTerms
     ),
   },
 });
