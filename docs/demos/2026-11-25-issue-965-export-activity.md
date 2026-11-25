@@ -10,7 +10,7 @@ uv run python -I $DEMO/bin/seed.py $DEMO/ids.json
 ```
 
 ```output
-{'alice': '6b0762c7f2562dc2c96992a3', 'bob': '6b0762c7f2562dc2c96992a8'}
+{'alice': '6b0763658d4db7b444c8197e', 'bob': '6b0763658d4db7b444c81983'}
 ```
 
 ## Each account downloads its export through the real route
@@ -24,35 +24,34 @@ GET /users/me/export -> 200
 GET /users/me/export -> 200
 ```
 
-## (1) The export holds audit (actor or target), chapter-access and usage rows
+## (1) Alice's file: audit rows she wrote or that are about her, her chapter access and usage counters
 
-Alice's file: her Stripe row (matched by target), her chapter row (matched by actor), her own `account_export` row (written before the file, so it is in it), her chapter access, and her usage counters (the AI count and the export-token rate-limit counter, which share `usage_counters`). The admin erasure she performed on Bob is not in her file.
+Her Stripe row (matched by target), her chapter row (matched by actor; its target is the id she sent, which here equals Bob's), the erasure she performed as admin (the erased account shown only as `another account`), her own `account_export` row (written before the file, so it is in it), her chapter access, and her usage counters (the AI count and the export-token rate-limit counter, which share `usage_counters`).
 
 ```bash
 python3 -I - $DEMO/alice.json $DEMO/ids.json <<"EOF"
 import json, sys
-d = json.load(open(sys.argv[1])); ids = json.load(open(sys.argv[2])); raw = open(sys.argv[1]).read()
-me = ids["alice"]["auth_id"]
+d = json.load(open(sys.argv[1])); ids = json.load(open(sys.argv[2]))
+name = {ids["alice"]["auth_id"]: "<alice>", ids["bob"]["auth_id"]: "<bob id>"}
 for r in d["audit_logs"]:
-    print("audit:", r["action"], "| actor:", "alice" if r["actor_id"] == me else r["actor_id"], "| target:", "alice" if r["target_id"] == me else ("bob" if r["target_id"] == ids["bob"]["auth_id"] else r["target_id"]), "|", r["resource_type"])
+    print("audit:", r["action"], "| actor:", name.get(r["actor_id"], r["actor_id"]), "| target:", name.get(r["target_id"], r["target_id"]), "|", r["resource_type"])
 print("chapter_access_logs:", [(a["access_type"], a["metadata"]) for a in d["chapter_access_logs"]])
-print("usage_counters:", [(u["_id"].replace(me, "<alice>"), u["count"]) for u in d["usage_counters"]])
-print("user_erase in Alice file:", "user_erase" in raw)
+print("usage_counters:", [(u["_id"].replace(ids["alice"]["auth_id"], "<alice>"), u["count"]) for u in d["usage_counters"]])
 EOF
 ```
 
 ```output
-audit: user_update | actor: stripe:evt_alice | target: alice | user
-audit: batch_save_failed | actor: alice | target: bob | chapter
-audit: account_export | actor: alice | target: alice | user
+audit: user_update | actor: stripe:evt_alice | target: <alice> | user
+audit: user_erase | actor: <alice> | target: another account | user
+audit: batch_save_failed | actor: <alice> | target: <bob id> | chapter
+audit: account_export | actor: <alice> | target: <alice> | user
 chapter_access_logs: [('edit', {'chapter_title': "alice's chapter"})]
 usage_counters: [('<alice>:day:2026-11-25', 1), ('<alice>:rl:POST /me/export/token:1795644000', 1)]
-user_erase in Alice file: False
 ```
 
 ## (2) Bob's file: what someone else did to him, not who or from where; nothing of Alice's
 
-Bob's file holds the erasure row about him with the actor replaced by `another account` and no IP address, user-agent or request id. Alice's chapter row, whose target id equals Bob's id, is not in it. Alice's id, both of her IP addresses and the admin user-agent appear nowhere in it.
+The erasure row about him has its actor replaced by `another account` and no IP address, user-agent or request id. Alice's chapter row, whose target id equals Bob's id, is not in it. Alice's id, both of her IP addresses and the admin user-agent appear nowhere in it.
 
 ```bash
 python3 -I - $DEMO/bob.json $DEMO/ids.json <<"EOF"
@@ -60,7 +59,7 @@ import json, sys
 d = json.load(open(sys.argv[1])); ids = json.load(open(sys.argv[2])); raw = open(sys.argv[1]).read()
 me = ids["bob"]["auth_id"]
 for r in d["audit_logs"]:
-    print("audit:", r["action"], "| actor:", "bob" if r["actor_id"] == me else r["actor_id"], "| details keys:", sorted(r["details"]))
+    print("audit:", r["action"], "| actor:", "<bob>" if r["actor_id"] == me else r["actor_id"], "| details keys:", sorted(r["details"]))
 for needle in (ids["alice"]["auth_id"], "203.0.113.7", "198.51.100.9", "AdminBrowser", "batch_save_failed"):
     print(needle.replace(ids["alice"]["auth_id"], "<alice id>"), "in Bob file:", needle in raw)
 EOF
@@ -69,7 +68,7 @@ EOF
 ```output
 audit: user_update | actor: stripe:evt_bob | details keys: ['updated_fields']
 audit: user_erase | actor: another account | details keys: []
-audit: account_export | actor: bob | details keys: ['ip_address', 'method', 'path', 'request_id', 'user_agent']
+audit: account_export | actor: <bob> | details keys: ['ip_address', 'method', 'path', 'request_id', 'user_agent']
 <alice id> in Bob file: False
 203.0.113.7 in Bob file: False
 198.51.100.9 in Bob file: False
@@ -77,9 +76,9 @@ AdminBrowser in Bob file: False
 batch_save_failed in Bob file: False
 ```
 
-## (3) Every activity row in each file belongs to that file's account
+## (3) Every activity row in each file is that account's
 
-An audit row belongs when it is an account-level row (user, billing, books) whose target is the account, or a content-level row the account wrote; access and usage rows when their `user_id` is the account.
+An audit row is when the account wrote it or it is an account-level row (user, billing, books) about the account; access and usage rows when their `user_id` is the account.
 
 ```bash
 python3 -I - $DEMO/ids.json $DEMO/alice.json $DEMO/bob.json <<"EOF"
@@ -87,15 +86,15 @@ import json, sys
 ids = json.load(open(sys.argv[1])); ACCOUNT = {"user", "billing", "books"}
 for who, path in (("alice", sys.argv[2]), ("bob", sys.argv[3])):
     me = ids[who]["auth_id"]; d = json.load(open(path))
-    ok = all((r["resource_type"] in ACCOUNT and r["target_id"] == me) or (r["resource_type"] not in ACCOUNT and r["actor_id"] == me) for r in d["audit_logs"])
+    ok = all(r["actor_id"] == me or (r["resource_type"] in ACCOUNT and r["target_id"] == me) for r in d["audit_logs"])
     ok &= all(r["user_id"] == me for r in d["chapter_access_logs"] + d["usage_counters"])
-    print(who, "| rows:", {k: len(d[k]) for k in ("audit_logs", "chapter_access_logs", "usage_counters")}, "| every row the account own:", ok)
+    print(who, "| rows:", {k: len(d[k]) for k in ("audit_logs", "chapter_access_logs", "usage_counters")}, "| every row the account s own:", ok)
 EOF
 ```
 
 ```output
-alice | rows: {'audit_logs': 3, 'chapter_access_logs': 1, 'usage_counters': 2} | every row the account own: True
-bob | rows: {'audit_logs': 3, 'chapter_access_logs': 1, 'usage_counters': 2} | every row the account own: True
+alice | rows: {'audit_logs': 4, 'chapter_access_logs': 1, 'usage_counters': 2} | every row the account s own: True
+bob | rows: {'audit_logs': 3, 'chapter_access_logs': 1, 'usage_counters': 2} | every row the account s own: True
 ```
 
 ## (4) /privacy section 9 says what the download holds
