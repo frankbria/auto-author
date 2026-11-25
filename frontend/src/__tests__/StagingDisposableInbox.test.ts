@@ -182,6 +182,24 @@ describe('waitForMessage', () => {
     expect(bodies).toBe(2);
   });
 
+  it('treats a body that breaks off mid-read as transient', async () => {
+    let bodies = 0;
+    const { impl } = fakeFetch({
+      'GET /messages': () =>
+        json({ 'hydra:member': [{ id: 'm1', subject: 'Verify your email address' }] }),
+      'GET /messages/m1': () => {
+        bodies += 1;
+        return bodies === 1 ? new Response('{"text": "cut', { status: 200 }) : json({ text: LINK, html: [] });
+      },
+    });
+    const message = await waitForMessage(
+      inbox,
+      { subject: 'Verify your email address', timeoutMs: 1000, intervalMs: 1 },
+      impl
+    );
+    expect(message.text).toBe(LINK);
+  });
+
   it('still fails at once on a refused token', async () => {
     const { impl } = fakeFetch({
       'GET /messages': () => new Response('no', { status: 401 }),

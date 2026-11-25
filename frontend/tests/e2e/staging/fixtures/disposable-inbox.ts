@@ -66,7 +66,13 @@ async function call<T>(
     const detail = (await res.text().catch(() => '')).slice(0, 200);
     throw new MailTmError(`mail.tm ${method} ${path}: ${res.status} ${detail}`.trim(), res.status);
   }
-  return (res.status === 204 ? undefined : await res.json()) as T;
+  if (res.status === 204) return undefined as T;
+  try {
+    return (await res.json()) as T;
+  } catch (error) {
+    // Headers arrived but the body broke off or timed out: as transient as no answer.
+    throw new MailTmError(`mail.tm ${method} ${path}: unreadable body (${String(error)})`, 0);
+  }
 }
 
 /** Worth polling again: rate-limited, a server error, or no answer at all. */

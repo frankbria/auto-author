@@ -72,13 +72,18 @@ test('#971: the verification email arrives and its link lands on the dashboard, 
     await test.step('its link lands on the dashboard, signed in', async () => {
       // The link's token signs whoever holds it in, and Playwright errors print
       // URLs into public CI logs. So no error here carries the link: the
-      // navigation error is replaced, and only the path is asserted.
+      // navigation error is replaced, and only origin and path are asserted.
       try {
         await page.goto(link);
       } catch {
         throw new Error('Opening the verification link failed (URL withheld: it carries a sign-in token)');
       }
-      await expect.poll(() => new URL(page.url()).pathname).toBe('/dashboard');
+      await expect
+        .poll(() => {
+          const landed = new URL(page.url());
+          return landed.origin + landed.pathname;
+        })
+        .toBe(`${origin}/dashboard`);
       const session = await (await page.request.get('/api/auth/get-session')).json();
       expect(session?.user?.email).toBe(address);
       expect(session?.user?.emailVerified).toBe(true);
