@@ -29,7 +29,7 @@ from app.core.entitlements import (
     is_feature_allowed,
 )
 from app.core.security import get_current_user_from_session
-from app.db.audit_log import RENEWAL_CONSENT_ACTION, renewal_consent_ended, sync_renewal_consent
+from app.db.audit_log import RENEWAL_CONSENT_ACTION, sync_renewal_consent
 from app.db.user import get_user_by_auth_id, swap_checkout_session, update_user
 
 logger = logging.getLogger(__name__)
@@ -66,10 +66,7 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
             detail="Couldn't cancel your subscription, so your account was not "
             "deleted. Please try again.",
         ) from None
-    # The webhook ignores events for a closed account: date the consent
-    # record from this cancel instead (#948). It survives the deletion.
     ended_at = getattr(cancelled, "canceled_at", None) or int(time.time())
-    await renewal_consent_ended(auth_id, datetime.fromtimestamp(ended_at, timezone.utc))
     # Forget the cancelled id: if a later deletion step fails, the retry must not
     # depend on how Stripe answers a second cancel once the 24h key has expired.
     # With the id gone, the webhook treats Stripe's subscription.deleted for it
@@ -92,6 +89,10 @@ async def cancel_subscription_for_deletion(auth_id: str) -> None:
         },
         extra_filter={"stripe_subscription_id": subscription_id},
     )
+    # The webhook ignores events for a closed account: date the consent record
+    # from this cancel instead (#948). After the id is cleared, so a webhook
+    # sync in flight re-reads it as ended. It survives the deletion.
+    await sync_renewal_consent(auth_id, datetime.fromtimestamp(ended_at, timezone.utc))
 
 
 # Only paying plans block a new checkout — "restricted" users (lapsed/revoked)

@@ -308,3 +308,36 @@ async def test_deletion_without_a_subscription_stamps_bare_consent_rows(
     row = await audit_logs.find_one({"actor_id": OWNER})
     expected = renewal_consent_expiry(datetime.fromtimestamp(ended, timezone.utc))
     assert row["expires_at"].replace(tzinfo=timezone.utc) == expected
+
+
+async def test_a_webhook_clearing_the_stamp_mid_deletion_does_not_leave_rows_bare(
+    auth_client_factory, stripe_stub, monkeypatch
+):
+    """#948: an in-flight `active` webhook clears the consent stamp while the
+    deletion is cancelling. The deletion stamps after it forgets the
+    subscription, so the rows still end up dated from the cancel."""
+    from datetime import datetime, timezone
+
+    import app.api.endpoints.billing as billing
+    from app.db.audit_log import (
+        RENEWAL_CONSENT_ACTION, renewal_consent_expiry, renewal_consent_live,
+    )
+
+    client = await auth_client_factory(overrides={
+        "plan": "pro", "stripe_subscription_id": SUB_ID, "stripe_subscription_status": "active",
+    })
+    audit_logs = await get_collection("audit_logs")
+    await audit_logs.insert_one({"action": RENEWAL_CONSENT_ACTION, "actor_id": OWNER,
+                                 "timestamp": datetime(2026, 11, 1, tzinfo=timezone.utc)})
+    real_update = billing.update_user
+
+    async def webhook_lands_first(auth_id, *args, **kwargs):
+        await renewal_consent_live(auth_id)
+        return await real_update(auth_id, *args, **kwargs)
+
+    monkeypatch.setattr(billing, "update_user", webhook_lands_first)
+    assert (await client.delete("/api/v1/users/me")).status_code == 200
+
+    row = await audit_logs.find_one({"actor_id": OWNER})
+    expected = renewal_consent_expiry(datetime.fromtimestamp(CANCELED_AT, timezone.utc))
+    assert row["expires_at"].replace(tzinfo=timezone.utc) == expected

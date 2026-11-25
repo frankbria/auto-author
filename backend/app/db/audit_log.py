@@ -94,7 +94,10 @@ async def sync_renewal_consent(auth_id: str, ended_at: Optional[datetime] = None
             await renewal_consent_live(auth_id)
         else:
             known = await _known_end(auth_id, user)
-            await renewal_consent_ended(auth_id, max(known, ended_at) if ended_at else known)
+            if known is None and ended_at is None:
+                await _each_from_its_own_consent(auth_id)
+            else:
+                await renewal_consent_ended(auth_id, max(filter(None, (known, ended_at))))
 
 
 async def _stored_user(auth_id: str) -> Optional[Dict]:
@@ -163,12 +166,13 @@ async def _backfill_renewal_consent() -> None:
         await sync_renewal_consent(auth_id)
 
 
-async def _known_end(auth_id: str, user) -> datetime:
+async def _known_end(auth_id: str, user) -> Optional[datetime]:
     """The earliest end date known to be no earlier than the real one.
 
-    A deleted account: its deletion, which cancelled any subscription first.
-    A user with subscription events: the newest one applied (the deletion's).
-    A user with none never subscribed: their latest consent. Else now.
+    A deleted account: its deletion, which cancelled any subscription first
+    (now if there is no record). A user with subscription events: the newest
+    one applied (the deletion's). None for a user with none, who never
+    subscribed.
     """
     if user is None:
         record = await (await get_collection("deleted_users")).find_one({"auth_id": auth_id})
@@ -176,12 +180,17 @@ async def _known_end(auth_id: str, user) -> datetime:
     marks = [user.get("stripe_event_created"),
              *(user.get("stripe_event_created_by_subscription") or {}).values()]
     marks = [m for m in marks if isinstance(m, (int, float))]
-    if marks:
-        return datetime.fromtimestamp(max(marks), timezone.utc)
-    latest = await audit_logs_collection.find_one(
-        _consent_rows(auth_id), sort=[("timestamp", -1)]
-    )
-    return _utc((latest or {}).get("timestamp"))
+    return datetime.fromtimestamp(max(marks), timezone.utc) if marks else None
+
+
+async def _each_from_its_own_consent(auth_id: str) -> None:
+    """No subscription ever started: each consent row (an abandoned checkout)
+    expires 4 years after it was given, as a new row is written."""
+    async for row in audit_logs_collection.find(_consent_rows(auth_id), {"timestamp": 1}):
+        await audit_logs_collection.update_one(
+            {"_id": row["_id"]},
+            {"$max": {"expires_at": renewal_consent_expiry(_utc(row.get("timestamp")))}},
+        )
 
 
 def _utc(value) -> datetime:

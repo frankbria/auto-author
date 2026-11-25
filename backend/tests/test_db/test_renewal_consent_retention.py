@@ -180,3 +180,21 @@ async def test_an_older_event_finishing_last_cannot_date_the_rows_early(reinit_d
     await renewal_consent_live("u1")
     await sync_renewal_consent("u1", ENDED - timedelta(days=60))
     assert await _expiry() == renewal_consent_expiry(ENDED)
+
+
+async def test_legacy_abandoned_consents_each_keep_their_own_date(reinit_db):
+    """Never subscribed: each abandoned checkout's consent expires 4 years
+    after it was given, not after the latest one."""
+    coll = audit_log_dao.audit_logs_collection
+    later = OLD + timedelta(days=300)
+    await insert_user("never", plan="free")
+    await coll.insert_many([
+        {"actor_id": "never", "action": RENEWAL_CONSENT_ACTION, "timestamp": when}
+        for when in (OLD, later)
+    ])
+
+    await ensure_audit_log_indexes()
+
+    rows = await coll.find({"actor_id": "never"}).sort("timestamp", 1).to_list()
+    assert [_utc(r["expires_at"]) for r in rows] == [
+        renewal_consent_expiry(OLD), renewal_consent_expiry(later)]
