@@ -258,7 +258,7 @@ async def lifespan(app: FastAPI):
         # The users and deleted_users indexes (#178, #1263)
         await ensure_user_indexes()
 
-        # audit_logs 90-day TTL + actor index, backfill of legacy rows (issue #787)
+        # audit_logs 90-day TTL, actor and target indexes, backfill of legacy rows (issue #787)
         await ensure_audit_log_indexes()
 
         # Book owner_id indexes + chapter_access_logs indexes and 90-day TTL

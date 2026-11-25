@@ -32,13 +32,19 @@ EXPORTED_PROFILE_FIELDS = (
     "updated_at", "terms_version", "terms_accepted_at",
 )
 
-# The collections an export reads, and the field in each that holds the
-# owner's auth_id. Chapter content is embedded in the book document.
+# The collections an export reads, and the fields in each that tie a document
+# to the owner's auth_id: a document matching any of them is the owner's.
+# Chapter content is embedded in the book document. An audit row is the
+# account's as actor or as target: the Stripe webhook's rows name the account
+# only as target, their actor being "stripe:<event id>" (#965).
 EXPORTED_COLLECTIONS = {
-    "books": "owner_id",
-    "questions": "user_id",
-    "question_responses": "user_id",
-    "question_ratings": "user_id",
+    "books": ("owner_id",),
+    "questions": ("user_id",),
+    "question_responses": ("user_id",),
+    "question_ratings": ("user_id",),
+    "audit_logs": ("actor_id", "target_id"),
+    "chapter_access_logs": ("user_id",),
+    "usage_counters": ("user_id",),
 }
 
 # Documents per cursor round trip: what the export holds at once is this many
@@ -65,6 +71,13 @@ def _encode(value) -> bytes:
     ).encode("utf-8")
 
 
+def owner_query(owner_fields, auth_id: str) -> Dict:
+    """The filter for the documents ``auth_id`` owns in a collection."""
+    if len(owner_fields) == 1:
+        return {owner_fields[0]: auth_id}
+    return {"$or": [{field: auth_id} for field in owner_fields]}
+
+
 async def stream_account_export(user: Dict) -> AsyncIterator[bytes]:
     """The export document, one Mongo document per chunk. Every query is scoped
     to ``user``'s own auth_id."""
@@ -74,12 +87,12 @@ async def stream_account_export(user: Dict) -> AsyncIterator[bytes]:
         b'{"exported_at":' + _encode(datetime.now(timezone.utc))
         + b',"profile":' + _encode(profile)
     )
-    for name, owner_field in EXPORTED_COLLECTIONS.items():
+    for name, owner_fields in EXPORTED_COLLECTIONS.items():
         yield b"," + _encode(name) + b":["
         collection = await get_collection(name)
         # collaborators would name other accounts; no document here has another use for the key.
         cursor = collection.find(
-            {owner_field: auth_id}, {"collaborators": 0}
+            owner_query(owner_fields, auth_id), {"collaborators": 0}
         ).batch_size(EXPORT_BATCH_SIZE)
         separator = b""
         async for doc in cursor:
@@ -104,11 +117,12 @@ async def export_my_data(
     token: str = Query(..., max_length=128),
     current_user: Dict = Depends(get_current_user_from_session),
 ):
-    """Download the caller's profile, books, questions, answers and ratings (#790).
+    """Download the caller's profile, books, questions, answers and ratings
+    (#790), and their audit, chapter-access and usage rows (#965).
 
     Needs a token from POST /me/export/token and the session it was issued to.
-    Takes no id. Activity logs, uploaded files and anything better-auth or
-    Stripe holds are not read.
+    Takes no id. Uploaded files and anything better-auth or Stripe holds are
+    not read.
     """
     owner = await redeem_export_token(token)
     if owner is None:

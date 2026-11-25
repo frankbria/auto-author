@@ -113,6 +113,18 @@ describe('Privacy Policy page', () => {
     expect(rights).toHaveTextContent(/does not include/i);
   });
 
+  it('says the download holds the activity records and what stays on request (#965)', () => {
+    render(<PrivacyPage />);
+    const rights = section(/your rights/i);
+    expect(rights).toHaveTextContent(
+      /download also holds your account.s activity records[^.]*security log[^.]*IP address[^.]*chapters you opened[^.]*AI usage counts/i
+    );
+    expect(rights).toHaveTextContent(
+      /does not include uploaded image files[^.]*or payment records held by our payment processor/i
+    );
+    expect(rights).not.toHaveTextContent(/activity and security logs, or payment records/i);
+  });
+
   it('says billing records stay with the payment processor after deletion (#784)', () => {
     render(<PrivacyPage />);
     expect(screen.getByText(/records of past payments.*stay with our payment processor/i)).toBeInTheDocument();

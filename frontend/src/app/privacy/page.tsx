@@ -309,9 +309,13 @@ export default function PrivacyPage() {
               You can download a copy of your profile, your books and the
               questions, answers and ratings in them as a JSON file (Download
               my data), delete your content and close your account directly
-              from your profile page. The download does not include uploaded
-              images, activity and security logs, or payment records held by
-              our payment processor. To get those, to have the account record
+              from your profile page. The download also holds your account&rsquo;s
+              activity records: the security log of actions taken by or on
+              your account (with the IP address and browser user-agent of
+              each), the log of chapters you opened, and your AI usage
+              counts. It does not include uploaded image files (it lists their
+              addresses) or payment records held by our payment processor. To
+              get those, to have the account record
               we keep for 18 months (section 8) erased sooner, or for any other
               request, contact us using the details below. We do not
               charge for a request and will not treat you differently for

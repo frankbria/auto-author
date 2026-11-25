@@ -52,6 +52,27 @@ async def _seed_content(owner_id: str, marker: str) -> None:
     )
 
 
+async def _seed_activity(owner_id: str, marker: str) -> None:
+    """The account's activity rows (#965), each carrying ``marker``: an audit row
+    it wrote, one a Stripe webhook wrote about it (actor ``stripe:<event>``,
+    target the account), a chapter access and a usage counter."""
+    await (await get_collection("audit_logs")).insert_many(
+        [
+            {"action": "book_create", "actor_id": owner_id, "target_id": f"{marker}-book",
+             "resource_type": "book", "details": {"ip_address": f"{marker}-ip"}},
+            {"action": "user_update", "actor_id": f"stripe:evt_{marker}", "target_id": owner_id,
+             "resource_type": "user", "details": {"updated_fields": [f"{marker}-plan"]}},
+        ]
+    )
+    await (await get_collection("chapter_access_logs")).insert_one(
+        {"user_id": owner_id, "book_id": f"{marker}-book", "chapter_id": "ch1",
+         "access_type": "view", "metadata": {"note": f"{marker} access"}}
+    )
+    await (await get_collection("usage_counters")).insert_one(
+        {"_id": f"{owner_id}:day:{marker}", "user_id": owner_id, "count": 3}
+    )
+
+
 async def _export(token: str):
     async with _client(token) as c:
         issued = await c.post("/api/v1/users/me/export/token")
@@ -105,6 +126,47 @@ async def test_export_never_contains_another_users_data(reinit_db):
     assert "BOB" in bobs.text and "ALICE" not in bobs.text
     assert "alice@example.com" not in bobs.text
     assert len(bobs.json()["books"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_export_includes_the_accounts_activity_records(reinit_db):
+    """#965: audit rows where the account is actor or target, chapter accesses
+    and usage counters."""
+    seeded = await _seed_better_auth_user("active@example.com")
+    await _seed_activity(seeded["user_id"], "MINE")
+
+    data = (await _export(seeded["tokens"][0])).json()
+
+    audit = {(row["action"], row["actor_id"]) for row in data["audit_logs"]}
+    assert ("book_create", seeded["user_id"]) in audit
+    assert ("user_update", "stripe:evt_MINE") in audit  # the webhook's row, matched by target
+    # The export writes its own audit row before the file is built.
+    assert ("account_export", seeded["user_id"]) in audit
+    assert [a["metadata"]["note"] for a in data["chapter_access_logs"]] == ["MINE access"]
+    assert [(u["_id"], u["count"]) for u in data["usage_counters"]] == [
+        (f"{seeded['user_id']}:day:MINE", 3)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_export_never_contains_another_accounts_activity(reinit_db):
+    """#965: no audit, access or usage row of one account in another's export,
+    whichever field (actor or target) ties the row to its account."""
+    alice = await _seed_better_auth_user("alice@example.com", name="Alice A")
+    bob = await _seed_better_auth_user("bob@example.com", name="Bob B")
+    await _seed_activity(alice["user_id"], "ALICE")
+    await _seed_activity(bob["user_id"], "BOB")
+
+    alices = await _export(alice["tokens"][0])
+    bobs = await _export(bob["tokens"][0])
+
+    for mine, theirs, other_id in (
+        (alices, "BOB", bob["user_id"]), (bobs, "ALICE", alice["user_id"])
+    ):
+        data = mine.json()
+        assert len(data["audit_logs"]) == 3 and len(data["chapter_access_logs"]) == 1
+        assert len(data["usage_counters"]) == 1
+        assert theirs not in mine.text and other_id not in mine.text
 
 
 @pytest.mark.asyncio
