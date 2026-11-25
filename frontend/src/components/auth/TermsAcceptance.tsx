@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { acceptTerms } from '@/lib/auth-client';
 import { TERMS_LAST_UPDATED } from '@/lib/constants/legal';
 import { signOutOrNotify } from '@/lib/sign-out';
+import { openTermsExits } from '@/lib/terms-exits';
 
 const NOT_RECORDED =
   'We could not record your acceptance. Check your connection and try again.';
@@ -14,6 +15,8 @@ const TERMS_CHANGED =
   'The Terms of Service changed while this page was open. Reload the page to read the current version.';
 
 interface TermsAcceptanceProps {
+  /** The signed-in account, for which the exit links open Settings and Profile. */
+  userId: string;
   /** Called once the acceptance is recorded. */
   onAccepted: () => unknown;
 }
@@ -23,7 +26,7 @@ interface TermsAcceptanceProps {
  * version is older than TERMS_VERSION, or missing (#961). Asked once: the
  * server records the acceptance, and the reloaded session no longer needs it.
  */
-export function TermsAcceptance({ onAccepted }: TermsAcceptanceProps) {
+export function TermsAcceptance({ userId, onAccepted }: TermsAcceptanceProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState('');
@@ -79,11 +82,19 @@ export function TermsAcceptance({ onAccepted }: TermsAcceptanceProps) {
         </p>
         <p className="mt-3 text-muted-foreground">
           Not ready to accept? You can still{' '}
-          <Link href="/dashboard/settings?tab=billing" className="text-primary underline underline-offset-4">
+          <Link
+            href="/dashboard/settings?tab=billing"
+            onClick={() => openTermsExits(userId)}
+            className="text-primary underline underline-offset-4"
+          >
             cancel your subscription
           </Link>{' '}
           or{' '}
-          <Link href="/profile" className="text-primary underline underline-offset-4">
+          <Link
+            href="/profile"
+            onClick={() => openTermsExits(userId)}
+            className="text-primary underline underline-offset-4"
+          >
             download your data or delete your account
           </Link>
           .
@@ -93,10 +104,21 @@ export function TermsAcceptance({ onAccepted }: TermsAcceptanceProps) {
           {problem}
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Button ref={acceptRef} onClick={accept} busy={saving} className="min-h-11">
+          <Button
+            ref={acceptRef}
+            onClick={accept}
+            busy={saving}
+            // Wraps at 200% text instead of overflowing a narrow card (WCAG 1.4.4).
+            className="h-auto min-h-11 whitespace-normal"
+          >
             {saving ? 'Accepting…' : 'I accept the Terms of Service'}
           </Button>
-          <Button variant="outline" onClick={signOut} disabled={saving} className="min-h-11">
+          <Button
+            variant="outline"
+            onClick={signOut}
+            disabled={saving}
+            className="h-auto min-h-11 whitespace-normal"
+          >
             Sign out
           </Button>
         </div>

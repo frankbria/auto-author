@@ -6,15 +6,7 @@ import { useEffect, useState } from 'react';
 import { endSignOut, signOutUnderway } from '@/lib/sign-out';
 import { acceptedCurrentTerms } from '@/lib/constants/legal';
 import { TermsAcceptance } from '@/components/auth/TermsAcceptance';
-
-/**
- * Pages an account that has not accepted the current Terms can still open
- * (#961): Settings, to cancel a subscription online as Terms section 7
- * promises, and the profile, to download its data or delete the account.
- */
-const TERMS_EXITS = ['/dashboard/settings', '/profile'];
-const isTermsExit = (path: string | null) =>
-  TERMS_EXITS.some((exit) => path === exit || path?.startsWith(`${exit}/`));
+import { termsExitOpen } from '@/lib/terms-exits';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -87,11 +79,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { termsVersion } = session.user as { termsVersion?: unknown };
   if (
     acceptedBy !== session.user.id &&
-    !isTermsExit(pathname) &&
+    !termsExitOpen(pathname, session.user.id) &&
     !acceptedCurrentTerms(termsVersion)
   ) {
     return (
       <TermsAcceptance
+        userId={session.user.id}
         onAccepted={() => {
           setAcceptedBy(session.user.id);
           // Best effort: the page is already shown, and the next load reads it.

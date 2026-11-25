@@ -56,6 +56,7 @@ const acceptButton = () => screen.getByRole('button', { name: /i accept the term
 
 beforeEach(() => {
   jest.clearAllMocks();
+  sessionStorage.clear();
   delete process.env.NEXT_PUBLIC_BYPASS_AUTH;
   (useRouter as jest.Mock).mockReturnValue({ push });
   (usePathname as jest.Mock).mockReturnValue('/dashboard');
@@ -189,22 +190,74 @@ describe('Terms re-acceptance gate (#961)', () => {
   });
 
   // Terms section 7 promises cancelling online; declining must not take that,
-  // the data download or account deletion away.
+  // the data download or account deletion away. The exits open from the
+  // screen's own links, so a sign-in that lands on one is still asked.
+  it.each([
+    ['cancel your subscription', '/dashboard/settings'],
+    ['download your data or delete your account', '/profile'],
+  ])('following "%s" from the screen opens %s', async (link, path) => {
+    signedInWith(undefined);
+    const { rerender } = renderPage();
+    await userEvent.click(screen.getByRole('link', { name: new RegExp(link, 'i') }));
+
+    (usePathname as jest.Mock).mockReturnValue(path);
+    rerender(
+      <ProtectedRoute>
+        <div>Protected Content</div>
+      </ProtectedRoute>
+    );
+    expect(screen.getByText('Protected Content')).toBeInTheDocument();
+  });
+
   it.each(['/dashboard/settings', '/profile'])(
-    'still opens %s, where the account can be cancelled, downloaded or deleted',
+    'asks a sign-in that lands straight on %s',
     (path) => {
       (usePathname as jest.Mock).mockReturnValue(path);
       signedInWith(undefined);
       renderPage();
-      expect(screen.getByText('Protected Content')).toBeInTheDocument();
+      expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
     }
   );
 
-  it('asks on every other page, including ones that only start like an exit', () => {
+  it('does not open the exits for another account signed in on the same tab', async () => {
+    signedInWith(undefined);
+    const { rerender } = renderPage();
+    await userEvent.click(screen.getByRole('link', { name: /cancel your subscription/i }));
+
+    (useSession as jest.Mock).mockReturnValue({
+      data: { user: { id: 'u2', termsVersion: undefined }, session: { id: 's2' } },
+      isPending: false,
+      error: null,
+      refetch,
+    });
+    (usePathname as jest.Mock).mockReturnValue('/dashboard/settings');
+    rerender(
+      <ProtectedRoute>
+        <div>Protected Content</div>
+      </ProtectedRoute>
+    );
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
+  });
+
+  it('asks on every other page, including ones that only start like an exit', async () => {
+    signedInWith(undefined);
+    const { rerender } = renderPage();
+    await userEvent.click(screen.getByRole('link', { name: /cancel your subscription/i }));
+
     (usePathname as jest.Mock).mockReturnValue('/dashboard/settingsX');
+    rerender(
+      <ProtectedRoute>
+        <div>Protected Content</div>
+      </ProtectedRoute>
+    );
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
+  });
+
+  it('lets the accept label wrap at large text sizes', () => {
     signedInWith(undefined);
     renderPage();
-    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
+    expect(acceptButton().className).toMatch(/\bwhitespace-normal\b/);
+    expect(acceptButton().className).toMatch(/\bh-auto\b/);
   });
 
   it('links a user who does not accept to billing, and to their data and account', () => {

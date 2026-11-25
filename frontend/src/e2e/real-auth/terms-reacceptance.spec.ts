@@ -94,3 +94,30 @@ test('a request without a session is refused', async ({ request }) => {
   });
   expect(res.status()).toBe(401);
 });
+
+test('an account that does not accept can still reach billing and its data, but is asked on landing there', async ({
+  page,
+}) => {
+  const email = `terms-exits-${Date.now()}@example.com`;
+  await signUpAndVerify(page, email);
+  await users().updateOne({ email }, { $set: { termsVersion: '2000-01-01' } });
+  const heading = page.getByRole('heading', { level: 1, name: 'Please accept the Terms of Service' });
+
+  // A sign-in that lands straight on Settings is still asked.
+  await page.goto('/dashboard/settings');
+  await expect(heading).toBeVisible();
+
+  // The screen's own link opens Billing, where the subscription is cancelled.
+  await page.getByRole('link', { name: 'cancel your subscription' }).click();
+  await expect(page).toHaveURL(/\/dashboard\/settings\?tab=billing/);
+  await expect(page.getByRole('tab', { name: 'Billing' })).toHaveAttribute('aria-selected', 'true');
+  await expect(heading).toHaveCount(0);
+
+  // Any other page asks again; nothing was recorded.
+  await page.goto('/dashboard');
+  await expect(heading).toBeVisible();
+  await page.getByRole('link', { name: 'download your data or delete your account' }).click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByRole('button', { name: /download my data/i })).toBeVisible();
+  expect((await users().findOne({ email }))?.termsVersion).toBe('2000-01-01');
+});

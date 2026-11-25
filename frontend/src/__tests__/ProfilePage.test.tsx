@@ -185,7 +185,7 @@ beforeEach(() => {
   // Set up better-auth useSession mock
   (useSession as jest.Mock).mockReturnValue({
     data: {
-      user: mockSessionUser,
+      user: { ...mockSessionUser, termsVersion: jest.requireActual('@/lib/constants/legal').TERMS_VERSION },
       session: {
         token: 'mock-jwt-token',
         id: 'session-123',
