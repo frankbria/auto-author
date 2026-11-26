@@ -117,7 +117,41 @@ describe('ChapterEditor: signing out from a book page (#1091)', () => {
 
     expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
     expect(mockSignOut).toHaveBeenCalledTimes(1);
-    // The unmount flush failed too, after the clear, and wrote nothing.
+    // Leaving the page sends no save without a session, and writes nothing.
+    expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('a save in flight when the user signs out is waited for, and nothing is written back later', async () => {
+    const view = await openWithUnsavedEdit();
+    // The autosave goes out and hangs; no newer edit follows it.
+    let failSave: (err: Error) => void = () => {};
+    mockBookClient.saveChapterContent.mockImplementation(
+      () => new Promise((_resolve, reject) => (failSave = reject)) as never
+    );
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(3000);
+    });
+    expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1);
+
+    let signedOut: Promise<boolean> = Promise.resolve(false);
+    await act(async () => {
+      signedOut = signOutOrNotify();
+    });
+    expect(mockSignOut).not.toHaveBeenCalled();
+    mockBookClient.saveChapterContent.mockRejectedValue(SERVER_DOWN);
+    await act(async () => {
+      failSave(SERVER_DOWN);
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(await signedOut).toBe(true);
+    expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
+    view.unmount();
+    // Well past the few seconds the sign-out holds the redirect guards.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60_000);
+    });
+
     expect(localStorage.getItem(KEY)).toBeNull();
   });
 

@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
-import { signOutUnderway } from '@/lib/sign-out';
+import { signOutCount, signOutUnderway } from '@/lib/sign-out';
 import {
   ChapterBackup,
   getValidatedItem,
@@ -69,10 +69,11 @@ export async function saveChapterEdit(
 export function flushChapterContentOnPageHide(
   edit: PendingChapterEdit,
   seen: SeenChapters,
-  inFlightSave: Promise<unknown> | null
+  inFlightSave: Promise<unknown> | null,
+  startedIn: number = signOutCount()
 ): Promise<boolean> {
-  backupChapterContent(edit, new Error('Not saved yet: the page was closed'));
-  return flushChapterContent(edit, seen, inFlightSave);
+  backupChapterContent(edit, new Error('Not saved yet: the page was closed'), startedIn);
+  return flushChapterContent(edit, seen, inFlightSave, startedIn);
 }
 
 export const chapterDroppedKey = (bookId: string, chapterId: string) =>
@@ -123,15 +124,17 @@ export function saveSucceeded(): void {
  * Keeps content that failed to save in localStorage. Returns whether it was stored.
  *
  * Not once the user has chosen to sign out (#1091): sign-out removes their writing
- * from this browser, and the editor it unmounts would otherwise save with no
- * session and write a backup after the clear. Edits waiting to save were saved,
- * or backed up and warned about, before the sign-out began.
+ * from this browser, and a save that fails after it, however late, would write
+ * the text back. Edits waiting to save were saved, or backed up and warned
+ * about, before the sign-out began. `startedIn` is signOutCount() when the save,
+ * or the editor it belongs to, started.
  */
 export function backupChapterContent(
   { bookId, chapterId, content }: PendingChapterEdit,
-  err: unknown
+  err: unknown,
+  startedIn: number = signOutCount()
 ): boolean {
-  if (signOutUnderway()) return false;
+  if (signOutUnderway() || signOutCount() !== startedIn) return false;
   const backup: ChapterBackup = {
     content,
     timestamp: Date.now(),
@@ -151,12 +154,17 @@ export function backupChapterContent(
  * A save still in flight goes first. Otherwise its older content could land
  * after this edit, and its success handler could clear this edit's backup. It
  * also moves the chapter's token, which this save then sends.
+ *
+ * An editor that outlived a sign-out (#1091) has nothing to save: the user
+ * already chose what happens to its text, and there is no session to save with.
  */
 export async function flushChapterContent(
   edit: PendingChapterEdit,
   seen: SeenChapters,
-  inFlightSave: Promise<unknown> | null = null
+  inFlightSave: Promise<unknown> | null = null,
+  startedIn: number = signOutCount()
 ): Promise<boolean> {
+  if (signOutCount() !== startedIn) return false;
   await inFlightSave?.catch(() => {});
   try {
     // A conflict lands in the backup too: leaving never overwrites the other copy.
@@ -168,7 +176,7 @@ export async function flushChapterContent(
     console.error('Failed to save chapter content on leaving it:', err);
     // A conflict is an answer, not a failure: the other copy stands and this one is kept.
     if (!isChapterConflict(err)) reportSaveFailure('leave-save', err);
-    backupChapterContent(edit, err);
+    backupChapterContent(edit, err, startedIn);
     return false;
   }
 }

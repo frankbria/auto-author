@@ -18,6 +18,7 @@ import {
 import { useSpeechRecognitionSupported } from '@/lib/voice/useSpeechRecognitionSupported';
 import { SummarySaveNotices } from '@/components/books/SummarySaveNotices';
 import { readStored, removeStored, writeStored } from '@/lib/storage/safeLocalStorage';
+import { beforeSignOut, signOutCount } from '@/lib/sign-out';
 
 // Where a summary whose save failed is kept (#832): apart from the working copy,
 // which every load and every keystroke writes over.
@@ -71,9 +72,12 @@ export default function BookSummaryPage() {
     shownBookRef.current = bookId;
   }, [bookId]);
   const saveInFlight = useRef(false);
+  const savingRef = useRef<Promise<void> | null>(null);
   const persist = useCallback((text: string) => {
     saveInFlight.current = true;
-    bookClient.saveBookSummary(bookId, text)
+    // A save that fails after the user signed out keeps nothing (#1091).
+    const startedIn = signOutCount();
+    const saving = bookClient.saveBookSummary(bookId, text)
       .then((data) => {
         // A save of another book says nothing about the one on screen.
         if (shownBookRef.current !== bookId) return;
@@ -82,6 +86,7 @@ export default function BookSummaryPage() {
         setSaveFailure(null);
       })
       .catch(() => {
+        if (signOutCount() !== startedIn) return;
         // The text exists only here now. It is kept under its own key, which the
         // next load does not write over, and the writer is told (#832). Kept for
         // its own book whichever book is on screen; told only if it is this one.
@@ -91,6 +96,8 @@ export default function BookSummaryPage() {
       .finally(() => {
         saveInFlight.current = false;
       });
+    savingRef.current = saving;
+    return saving;
   }, [bookId]);
   const [summaryHistory, setSummaryHistory] = useState<unknown[]>([]);
   // Derived during render, not mirrored into state via an effect (#584,
@@ -181,6 +188,21 @@ export default function BookSummaryPage() {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
   }, [summary, bookId, summaryLoaded, persist]);
+
+  // An explicit sign-out saves the text still inside the delay above, while the
+  // session can, and waits for a save in flight (#1091). The working copy is
+  // removed by the sign-out, so a save that fails leaves the unsaved copy, which
+  // sign-out asks about before removing it.
+  useEffect(
+    () =>
+      beforeSignOut(async () => {
+        await savingRef.current;
+        if (!bookId || (!summaryLoaded && !userEditedRef.current)) return;
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        if (summary !== lastSaved.current) await persist(summary);
+      }),
+    [summary, bookId, summaryLoaded, persist]
+  );
 
   // A failed save is tried again by Try again and by the browser coming back
   // online, not only by a change to the text (#1047). Never over a save in flight.

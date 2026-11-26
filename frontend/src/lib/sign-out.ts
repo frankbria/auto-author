@@ -20,6 +20,16 @@ export const endSignOut = () => {
   underwayUntil = 0;
 };
 
+let signOuts = 0;
+/**
+ * How many sign-outs the user asked for have succeeded in this tab (#1091).
+ * Writing code records it when it starts (a save, an editor); if it has moved
+ * by the time a save fails, the user has signed out since, and the text is
+ * not written back to the browser they just cleared. Unlike signOutUnderway(),
+ * this does not expire, however slowly a request fails.
+ */
+export const signOutCount = () => signOuts;
+
 type BeforeSignOut = () => Promise<unknown>;
 const beforeSignOutHandlers = new Set<BeforeSignOut>();
 
@@ -71,6 +81,7 @@ export async function signOutOrNotify({
   underwayUntil = failed ? 0 : leavePage ? Infinity : Date.now() + CALLER_NAVIGATES_WITHIN_MS;
   // The next sign-in in this tab is asked about the Terms again (#961).
   if (!failed) {
+    signOuts += 1;
     closeTermsExits();
     clearLocalWriting();
   }

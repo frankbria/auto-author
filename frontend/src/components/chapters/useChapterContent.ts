@@ -8,7 +8,7 @@ import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { AUTO_SAVE_DEFAULT_SECONDS, isValidAutoSaveInterval } from '@/lib/constants/auto-save';
-import { beforeSignOut } from '@/lib/sign-out';
+import { beforeSignOut, signOutCount } from '@/lib/sign-out';
 import {
   validateChapterBackup,
   getValidatedItem,
@@ -124,8 +124,11 @@ export function useChapterContent({
     return 0;
   });
   const noteBackupWrite = () => setBackupWrites((n) => n + 1);
+  // The sign-out count this editor opened in. Once the user signs out, nothing
+  // this editor still has running writes their text back to the browser (#1091).
+  const sessionRef = useRef(signOutCount());
   const backUp = (edit: { bookId: string; chapterId: string; content: string }, err: unknown) => {
-    const stored = backupChapterContent(edit, err);
+    const stored = backupChapterContent(edit, err, sessionRef.current);
     if (stored) ownBackups.current.add(chapterBackupKey(edit.bookId, edit.chapterId));
     return stored;
   };
@@ -280,7 +283,9 @@ export function useChapterContent({
       // A bfcache restore must not fire the pre-hide timer: its token is stale.
       clearTimeout(autoSaveTimerRef.current);
       setAutoSavePending(false); // so the first edit after a restore re-arms it
-      if (edit) void flushChapterContentOnPageHide(edit, seenRef.current, inFlightSaveRef.current);
+      if (edit) {
+        void flushChapterContentOnPageHide(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current);
+      }
     };
     window.addEventListener('pagehide', flushOnPageHide);
     return () => window.removeEventListener('pagehide', flushOnPageHide);
@@ -292,8 +297,13 @@ export function useChapterContent({
   useEffect(
     () =>
       beforeSignOut(async () => {
+        // A save in flight settles first, so a failure is backed up and asked about.
+        await inFlightSaveRef.current?.catch(() => {});
         const edit = unsavedRef.current;
-        if (!edit) return;
+        if (!edit) {
+          setBackupWrites((n) => n + 1);
+          return;
+        }
         const saved = await flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
         if (saved && unsavedRef.current === edit) unsavedRef.current = null;
         setBackupWrites((n) => n + 1);
@@ -309,7 +319,7 @@ export function useChapterContent({
       const edit = unsavedRef.current;
       unsavedRef.current = null;
       autoSaveFailuresRef.current = 0;
-      if (edit) void flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
+      if (edit) void flushChapterContent(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current);
     },
     [bookId, chapterId]
   );
